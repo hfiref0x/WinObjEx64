@@ -1,0 +1,66 @@
+Alphabetical order
+
+aboutDlg.c - About dialog routines including window dialog procedure
+aboutDlg.h
+
+excepth.c - custom access violation exception handler including minidump
+excepth.h
+
+findDlg.c - Find Object routines including window dialog procedure
+findDlg.h
+
+
+instdrv.c - driver installation routines
+instdrv.h
+
+kldbg.c - Windows Kernel Debugging Driver support routines, object related internal API set
+kldbg.h
+
+list.c - treeview and listview handlers for main window
+list.h
+
+main.c - program entry point and initialization routines, main window dialog procedure handler
+
+minirtl.c - set of reimplemented rtl routines
+minirtl.h
+
+propBasic.c - property sheet "Basic" handlers, including window procedures
+propBasic.h
+propBasicConsts.h
+
+propDesktop.c - property sheet "Desktop" handlers
+propDesktop.h
+
+propDlg.c - "Properties" property sheet creation and window procedures, all sheets created here
+propDlg.h
+
+propDriver.c - property sheet "Driver" handlers, including window procedures
+propDriver.h
+propDriverConsts.h
+
+propObjectDump.c - dumping and decoding kernel objects for "Object" property sheet
+propObjectDump.h
+propObjectDumpConsts.h - kernel object string converted constants 
+
+propProcess.c - property sheet "Process" handler, window procedure
+propProcess.h
+
+propSecurity.c - "Security" property sheet handler and ISecurityInformation implementation
+propSecurity.h
+propSecurityConsts.h - object type access values, generic mappings here
+
+propType.c - property sheet "Type" handlers, including window procedure for "Procedures" sheet
+propType.h
+propTypeConsts.h - known object access rights converted to strings listed here
+
+sup.c - supported api's, !!!!include string array of known objects
+sup.h - !!!!include object type indexes
+supConsts.h
+
+treelist.c - systreeview32 combined with sysheader32 control
+treelist.h
+
+global.h - global include file
+ntos.h - os internals related definitions and prototypes
+resource.h - studio generated resource header
+ui.h - user interface global constant

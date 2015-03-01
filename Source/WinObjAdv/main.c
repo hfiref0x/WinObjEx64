@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.00
+*  VERSION:     1.10
 *
-*  DATE:        23 Feb 2015
+*  DATE:        27 Feb 2015
 *
 *  Program entry point and main window handler.
 *
@@ -23,6 +23,7 @@
 #include "aboutDlg.h"
 #include "findDlg.h"
 #include "propDlg.h"
+#include "extrasDlg.h"
 
 #pragma comment(lib, "comctl32.lib")
 
@@ -109,7 +110,7 @@ VOID MainWindowHandleObjectTreeProp(
 	tvi.mask = TVIF_TEXT;
 	tvi.hItem = SelectedTreeItem;
 	if (TreeView_GetItem(ObjectTree, &tvi)) {
-		propCreateDialog(hwnd, szBuffer, T_ObjectNames[TYPE_DIRECTORY]);
+		propCreateDialog(hwnd, szBuffer, T_ObjectNames[TYPE_DIRECTORY], NULL);
 	}
 }
 
@@ -125,7 +126,8 @@ VOID MainWindowHandleObjectListProp(
 	_In_ HWND hwnd
 	)
 {
-	LPWSTR	lpItemText, lpType;
+	INT nSelected;
+	LPWSTR	lpItemText, lpType, lpDesc = NULL;
 
 	if (g_PropWindow != NULL)
 		return;
@@ -135,11 +137,24 @@ VOID MainWindowHandleObjectListProp(
 		return;
 	}
 
-	lpItemText = supGetItemText(ObjectList, ListView_GetSelectionMark(ObjectList), 0, NULL);
+	nSelected = ListView_GetSelectionMark(ObjectList);
+	if (nSelected == -1) {
+		return;
+	}
+
+	lpItemText = supGetItemText(ObjectList, nSelected, 0, NULL);
 	if (lpItemText) {
-		lpType = supGetItemText(ObjectList, ListView_GetSelectionMark(ObjectList), 1, NULL);
+		lpType = supGetItemText(ObjectList, nSelected, 1, NULL);
 		if (lpType) {
-			propCreateDialog(hwnd, lpItemText, lpType);
+
+			//lpDesc is not important, we can work if it NULL
+			lpDesc = supGetItemText(ObjectList, nSelected, 2, NULL);
+			
+			propCreateDialog(hwnd, lpItemText, lpType, lpDesc);
+
+			if (lpDesc) {
+				HeapFree(GetProcessHeap(), 0, lpDesc);
+			}
 			HeapFree(GetProcessHeap(), 0, lpType);
 		}
 		HeapFree(GetProcessHeap(), 0, lpItemText);
@@ -158,25 +173,26 @@ VOID MainWindowOnRefresh(
 	_In_ HWND hwnd
 	)
 {
-	LPWSTR		CurrentObject;
-	SIZE_T		sz, len;
+	LPWSTR	CurrentObject;
+	SIZE_T	len;
 
 	UNREFERENCED_PARAMETER(hwnd);
 
 	supSetWaitCursor(TRUE);
 
-	ObListDestroy(&g_kdctx.ObjectList);
+	if (g_kdctx.hDevice != NULL) {
+		ObListDestroy(&g_kdctx.ObjectList);
+		if (g_kdctx.hThreadWorker) {
+			WaitForSingleObject(g_kdctx.hThreadWorker, INFINITE);
+			CloseHandle(g_kdctx.hThreadWorker);
+			g_kdctx.hThreadWorker = NULL;
+		}
 
-	if (g_kdctx.hThreadWorker) {
-		WaitForSingleObject(g_kdctx.hThreadWorker, INFINITE);
-		CloseHandle(g_kdctx.hThreadWorker);
-		g_kdctx.hThreadWorker = NULL;
+		//query object list info
+		g_kdctx.hThreadWorker = CreateThread(NULL, 0,
+			kdQueryProc,
+			&g_kdctx, 0, NULL);
 	}
-
-	//query object list info
-	g_kdctx.hThreadWorker = CreateThread(NULL, 0,
-		kdQueryProc,
-		&g_kdctx, 0, NULL);
 
 	supFreeSCMSnapshot(g_enumParams.scmSnapshot);
 	sapiFreeSnapshot(g_enumParams.sapiDB);
@@ -185,7 +201,6 @@ VOID MainWindowOnRefresh(
 	g_enumParams.sapiDB = sapiCreateSetupDBSnapshot();
 	g_enumParams.lpSubDirName = CurrentObjectPath;
 
-	sz = ListView_GetSelectionMark(ObjectList);
 	len = _strlenW(CurrentObjectPath);
 	CurrentObject = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (len + 1)*sizeof(WCHAR));
 	if (CurrentObject)
@@ -269,11 +284,15 @@ LRESULT MainWindowHandleWMCommand(
 		break;
 
 	case ID_FIND_FINDOBJECT:
-		FindDlgInit();
+		FindDlgCreate(hwnd);
 		break;
 
 	case ID_VIEW_REFRESH:
 		MainWindowOnRefresh(hwnd);
+		break;
+
+	case ID_EXTRAS_PIPES:
+		extrasCreatePipeDialog(hwnd);
 		break;
 
 	case ID_HELP_ABOUT:
@@ -303,10 +322,10 @@ VOID MainWindowTreeViewSelChanged(
 	)
 {
 	WCHAR			text[MAX_PATH + 2];
-	HTREEITEM		hitem, root = TreeView_GetRoot(trhdr->hdr.hwndFrom);
+	HTREEITEM		hitem, root;
 	TVITEMEXW		sitem;
 	POE_LIST_ITEM	list = NULL, prevlist = NULL;
-	size_t			p = 1; // size of empty string buffer in characters
+	SIZE_T			p = 1; // size of empty string buffer in characters
 
 	if (trhdr == NULL)
 		return;
@@ -316,6 +335,8 @@ VOID MainWindowTreeViewSelChanged(
 
 	if (CurrentObjectPath != NULL)
 		HeapFree(GetProcessHeap(), 0, CurrentObjectPath);
+
+	root = TreeView_GetRoot(trhdr->hdr.hwndFrom);
 
 	// build the path from bottom to top and counting string buffer size
 	for (hitem = trhdr->itemNew.hItem; hitem != root; hitem = TreeView_GetParent(trhdr->hdr.hwndFrom, hitem)) {
@@ -691,6 +712,16 @@ LRESULT CALLBACK MainWindowProc(
 
 HANDLE hObject = NULL;
 
+VOID TestIoCompletion()
+{
+	OBJECT_ATTRIBUTES obja;
+	UNICODE_STRING ustr;
+	RtlInitUnicodeString(&ustr, L"\\BaseNamedObjects\\TestCompletion");
+	InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
+	NtCreateIoCompletion(&hObject, IO_COMPLETION_ALL_ACCESS, &obja, 100);
+}
+
+
 VOID TestTimer()
 {
 	HANDLE hTimer = NULL;
@@ -738,6 +769,7 @@ void WinObjExMain()
 	HANDLE					tmpb;
 
 #ifdef _DEBUG
+	TestIoCompletion();
 	//TestTimer();
 	//TestTransaction();
 #endif
@@ -868,13 +900,23 @@ void WinObjExMain()
 				supSetMenuIcon(hMenu, ID_OBJECT_GOTOLINKTARGET,
 					(ULONG_PTR)ImageList_ExtractIcon(g_hInstance, ListViewImages, ID_FROM_VALUE(IDI_ICON_SYMLINK)));
 			}
+
+			//set object -> find object menu image
 			hMenu = GetSubMenu(GetMenu(MainWindow), 3);
 			if (hMenu) {
 				supSetMenuIcon(hMenu, ID_FIND_FINDOBJECT,
 					(ULONG_PTR)ImageList_ExtractIcon(g_hInstance, ToolBarMenuImages, 2));
 			}
 
+			//set extras-pipe menu image
 			hMenu = GetSubMenu(GetMenu(MainWindow), 4);
+			if (hMenu) {
+				supSetMenuIcon(hMenu, ID_EXTRAS_PIPES,
+					(ULONG_PTR)ImageList_ExtractIcon(g_hInstance, ToolBarMenuImages, 6));
+			}
+
+			//set help menu image
+			hMenu = GetSubMenu(GetMenu(MainWindow), 5);
 			if (hMenu) {
 				supSetMenuIcon(hMenu, ID_HELP_HELP,
 					(ULONG_PTR)ImageList_ExtractIcon(g_hInstance, ToolBarMenuImages, 3));
@@ -934,6 +976,11 @@ void WinObjExMain()
 			if (g_PropWindow != NULL)
 				if (IsDialogMessage(g_PropWindow, &msg1))
 					continue;
+
+			if (PipeDialog != NULL) 
+				if (IsDialogMessage(PipeDialog, &msg1))
+					continue;
+
 
 			if (IsDialogMessage(MainWindow, &msg1)) {
 				TranslateAccelerator(MainWindow, hAccTable, &msg1);

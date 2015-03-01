@@ -4,9 +4,9 @@
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     1.00
+*  VERSION:     1.10
 *
-*  DATE:        17 Feb 2015
+*  DATE:        24 Feb 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -43,7 +43,8 @@ BOOL AboutDialogQuerySecureBootState(
 			break;
 
 		bSecureBoot = FALSE;
-		returnLength = GetFirmwareEnvironmentVariable(L"SecureBoot", L"{8be4df61-93ca-11d2-aa0d-00e098032b8c}", &bSecureBoot, sizeof(BOOLEAN));
+		returnLength = GetFirmwareEnvironmentVariable(L"SecureBoot", 
+			L"{8be4df61-93ca-11d2-aa0d-00e098032b8c}", &bSecureBoot, sizeof(BOOLEAN));
 		supEnablePrivilege(SE_SYSTEM_ENVIRONMENT_PRIVILEGE, FALSE);
 		if (returnLength != 0) {
 			if (pbSecureBoot) {
@@ -98,7 +99,6 @@ VOID AboutDialogInit(
 	WCHAR buf[MAX_PATH];
 	BOOLEAN bSecureBoot = FALSE;
 	ULONG returnLength;
-	RTL_OSVERSIONINFOW osver;
 	SYSTEM_BOOT_ENVIRONMENT_INFORMATION sbei;
 	HANDLE hImage;
 
@@ -110,6 +110,9 @@ VOID AboutDialogInit(
 		SendMessage(GetDlgItem(hwndDlg, ID_ABOUT_ICON), STM_SETIMAGE, IMAGE_ICON, (LPARAM)hImage);
 		DestroyIcon(hImage);
 	}
+
+	//remove class icon if any
+	SetClassLongPtr(hwndDlg, GCLP_HICON, (LONG_PTR)NULL);
 
 	RtlSecureZeroMemory(buf, sizeof(buf));
 #if (_MSC_VER == 1800) //2013
@@ -136,18 +139,13 @@ VOID AboutDialogInit(
 	SetDlgItemText(hwndDlg, ID_ABOUT_BUILDDATE, buf);
 
 	// fill OS name
-	RtlSecureZeroMemory(&osver, sizeof(osver));
-	osver.dwOSVersionInfoSize = sizeof(osver);
-	status = RtlGetVersion(&osver);
-	if (NT_SUCCESS(status)) {
-		wsprintfW(buf, L"Windows NT %1u.%1u (build %u",
-			osver.dwMajorVersion, osver.dwMinorVersion, osver.dwBuildNumber);
-		if (osver.szCSDVersion[0]) {
-			wsprintfW(_strendW(buf), L", %ws)", osver.szCSDVersion);
-		}
-		else {
-			_strcatW(buf, L")");
-		}
+	wsprintfW(buf, L"Windows NT %1u.%1u (build %u",
+		g_kdctx.osver.dwMajorVersion, g_kdctx.osver.dwMinorVersion, g_kdctx.osver.dwBuildNumber);
+	if (g_kdctx.osver.szCSDVersion[0]) {
+		wsprintfW(_strendW(buf), L", %ws)", g_kdctx.osver.szCSDVersion);
+	}
+	else {
+		_strcatW(buf, L")");
 	}
 	SetDlgItemText(hwndDlg, ID_ABOUT_OSNAME, buf);
 

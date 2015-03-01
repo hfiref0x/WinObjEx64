@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.00
+*  VERSION:     1.10
 *
-*  DATE:        23 Feb 2015
+*  DATE:        01 Mar 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -26,46 +26,57 @@
 ENUM_PARAMS	g_enumParams;
 
 //types collection
-POBJECT_TYPES_INFORMATION g_pObjectTypesInfo;
+POBJECT_TYPES_INFORMATION g_pObjectTypesInfo = NULL;
 
 //Known object type names
 LPCWSTR T_ObjectNames[TYPE_MAX] = {
-	L"Device",				//0
-	L"Driver",				//1
-	L"Section",				//2
-	L"ALPC Port",			//3
-	L"SymbolicLink",		//4
-	L"Key",					//5
-	L"Event",				//6
-	L"Job",					//7
-	L"Mutant",				//8
-	L"KeyedEvent",			//9
-	L"Type",				//10
-	L"Directory",			//11
-	L"WindowStation",		//12
-	L"Callback",			//13
-	L"Semaphore",			//14
-	L"WaitablePort",		//15
-	L"Timer",				//16
-	L"Session",				//17
-	L"Controller",			//18
-	L"Profile",				//19
-	L"EventPair",			//20
-	L"Desktop",				//21
-	L"File",				//22
-	L"WMIGuid",				//23
-	L"DebugObject",			//24
-	L"IoCompletion",		//25
-	L"Process",				//26
-	L"Adapter",				//27
-	L"Token",				//28
-	L"EtwRegistration",		//29
-	L"Thread",				//30
-	L"TmTx",				//31
-	L"TmTm",				//32
-	L"TmRm",				//33
-	L"TmEn",				//34
-	L""						//35
+	L"Device",						//0
+	L"Driver",						//1
+	L"Section",						//2
+	L"ALPC Port",					//3
+	L"SymbolicLink",				//4
+	L"Key",							//5
+	L"Event",						//6
+	L"Job",							//7
+	L"Mutant",						//8
+	L"KeyedEvent",					//9
+	L"Type",						//10
+	L"Directory",					//11
+	L"WindowStation",				//12
+	L"Callback",					//13
+	L"Semaphore",					//14
+	L"WaitablePort",				//15
+	L"Timer",						//16
+	L"Session",						//17
+	L"Controller",					//18
+	L"Profile",						//19
+	L"EventPair",					//20
+	L"Desktop",						//21
+	L"File",						//22
+	L"WMIGuid",						//23
+	L"DebugObject",					//24
+	L"IoCompletion",				//25
+	L"Process",						//26
+	L"Adapter",						//27
+	L"Token",						//28
+	L"EtwRegistration",				//29
+	L"Thread",						//30
+	L"TmTx",						//31
+	L"TmTm",						//32
+	L"TmRm",						//33
+	L"TmEn",						//34
+	L"PcwObject",					//35
+	L"FilterConnectionPort",		//36
+	L"FilterCommunicationPort",		//37
+	L"PowerRequest",				//38
+	L"EtwConsumer",					//39
+	L"TpWorkerFactory",				//40
+	L"Composition",					//41
+	L"IRTimer",						//42
+	L"DxgkSharedResource",			//43
+	L"DxgkSharedSwapChainObject",	//44
+	L"DxgkSharedSyncObject",		//45
+	L""								//46
 };
 
 /*
@@ -322,6 +333,11 @@ HICON supGetMainIcon(
 		FreeLibrary(hModule);
 	}
 	return pin.hIcon;
+/*
+	SHFILEINFO shinfo;
+	RtlSecureZeroMemory(&shinfo, sizeof(shinfo));
+	SHGetFileInfo(lpFileName, 0, &shinfo, sizeof(shinfo), SHGFI_ICON | SHGFI_SMALLICON);
+	return shinfo.hIcon;*/
 }
 
 /*
@@ -332,29 +348,29 @@ HICON supGetMainIcon(
 * Copies bytes between buffers.
 *
 * dest - Destination buffer 
-* ccdest - Destination buffer size in bytes
+* cbdest - Destination buffer size in bytes
 * src - Source buffer
-* ccsrc - Source buffer size in bytes
+* cbsrc - Source buffer size in bytes
 *
 */
 void supCopyMemory(
 	_Inout_ void *dest,
-	_In_ size_t ccdest,
+	_In_ size_t cbdest,
 	_In_ const void *src,
-	_In_ size_t ccsrc
+	_In_ size_t cbsrc
 	)
 {
 	char *d = (char*)dest;
 	char *s = (char*)src;
 
-	if ((dest == 0) || (src == 0) || (ccdest == 0))
+	if ((dest == 0) || (src == 0) || (cbdest == 0))
 		return;
-	if (ccdest<ccsrc)
-		ccsrc = ccdest;
+	if (cbdest<cbsrc)
+		cbsrc = cbdest;
 
-	while (ccsrc>0) {
+	while (cbsrc>0) {
 		*d++ = *s++;
-		ccsrc--;
+		cbsrc--;
 	}
 }
 
@@ -414,12 +430,14 @@ VOID supCenterWindow(
 * Returns buffer with system information by given InfoClass.
 *
 * Returned buffer must be freed with HeapFree after usage.
+* Function will return error after 100 attempts.
 *
 */
 PVOID supGetSystemInfo(
 	_In_ SYSTEM_INFORMATION_CLASS InfoClass
 	)
 {
+	INT			c = 0;
 	PVOID		Buffer = NULL;
 	ULONG		Size	= 0x1000;
 	NTSTATUS	status;
@@ -430,10 +448,17 @@ PVOID supGetSystemInfo(
 		if (Buffer != NULL) {
 			status = NtQuerySystemInformation(InfoClass, Buffer, Size, &memIO);
 		}
-		else return NULL;
+		else {
+			return NULL;
+		}
 		if (status == STATUS_INFO_LENGTH_MISMATCH) {
 			HeapFree(GetProcessHeap(), 0, Buffer);
 			Size *= 2;
+		}
+		c++;
+		if (c > 100) {
+			status = STATUS_SECRET_TOO_LONG;
+			break;
 		}
 	} while (status == STATUS_INFO_LENGTH_MISMATCH);
 
@@ -455,6 +480,7 @@ PVOID supGetSystemInfo(
 * Returns buffer with system types information.
 *
 * Returned buffer must be freed with HeapFree after usage.
+* Function will return error after 100 attempts.
 *
 */
 PVOID supGetObjectTypesInfo(
@@ -601,18 +627,20 @@ INT supGetObjectIndexByTypeName(
 		return TYPE_UNKNOWN;
 	}
 
-	//handle two special cases
-	if (_strcmpiW(lpTypeName, L"FilterConnectionPort") == 0) {
-		return TYPE_PORT;
-	}
-	if (_strcmpiW(lpTypeName, L"FilterCommunicationPort") == 0) {
-		return TYPE_PORT;
-	}
-
 	for (nIndex = TYPE_DEVICE; nIndex < TYPE_UNKNOWN; nIndex++) {
 		if (_strcmpiW(lpTypeName, T_ObjectNames[nIndex]) == 0)
 			return nIndex;
 	}
+
+	//
+	// In Win8 the following Win32k object was named 
+	// CompositionSurface, in Win8.1 MS renamed it to
+	// Composition, handle this.
+	//
+	if (_strcmpiW(lpTypeName, L"CompositionSurface") == 0) {
+		return TYPE_COMPOSITION;
+	}
+
 	return TYPE_UNKNOWN;
 }
 
@@ -642,6 +670,36 @@ VOID supRunAsAdmin(
 		}
 	}
 }
+
+/*
+* supShowProperties
+*
+* Purpose:
+*
+* Show file properties Windows dialog.
+*
+*/
+VOID supShowProperties(
+	_In_ HWND hwndDlg,
+	_In_ LPWSTR lpFileName
+	)
+{
+	SHELLEXECUTEINFOW shinfo;
+
+	if (lpFileName == NULL) {
+		return;
+	}
+
+	RtlSecureZeroMemory(&shinfo, sizeof(shinfo));
+	shinfo.cbSize = sizeof(shinfo);
+	shinfo.fMask = SEE_MASK_INVOKEIDLIST | SEE_MASK_FLAG_NO_UI;
+	shinfo.hwnd = hwndDlg; 
+	shinfo.lpVerb = L"properties";
+	shinfo.lpFile = lpFileName;
+	shinfo.nShow = SW_SHOWNORMAL;
+	ShellExecuteEx(&shinfo);
+}
+
 
 /*
 * supUserIsFullAdmin
@@ -1588,6 +1646,17 @@ BOOL supQueryTypeInfo(
 
 	pObject = (POBJECT_TYPE_INFORMATION)&g_pObjectTypesInfo->TypeInformation;
 	for (i = 0; i < g_pObjectTypesInfo->NumberOfTypes; i++) {
+
+
+	/*	Warning: Dxgk objects missing in this enum in Windows 10 TP
+	
+		WCHAR test[1000];
+		RtlSecureZeroMemory(&test, sizeof(test));
+		wsprintfW(test, L"\nLength=%lx, MaxLen=%lx \n", pObject->TypeName.Length, pObject->TypeName.MaximumLength);
+		OutputDebugString(test);
+		_strncpyW(test, MAX_PATH, pObject->TypeName.Buffer, pObject->TypeName.MaximumLength);
+		OutputDebugString(test);*/
+
 		if (_strncmpiW(pObject->TypeName.Buffer, lpTypeName, pObject->TypeName.Length / sizeof(WCHAR)) == 0) {
 			for (nPool = 0; nPool < MAX_KNOWN_POOL_TYPES; nPool++) {
 				if ((POOL_TYPE)pObject->PoolType == (POOL_TYPE)a_PoolTypes[nPool].dwValue) {

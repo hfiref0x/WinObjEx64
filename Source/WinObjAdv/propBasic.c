@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     1.00
+*  VERSION:     1.10
 *
-*  DATE:        23 Feb 2015
+*  DATE:        24 Feb 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -211,6 +211,50 @@ VOID propBasicQuerySemaphore(
 }
 
 /*
+* propBasicQueryIoCompletion
+*
+* Purpose:
+*
+* Set information values for IoCompletion object type
+*
+* If ExtendedInfoAvailable is FALSE then it calls propSetDefaultInfo to set Basic page properties
+*
+*/
+VOID propBasicQueryIoCompletion(
+	_In_ PROP_OBJECT_INFO *Context,
+	_In_ HWND hwndDlg,
+	_In_ BOOL ExtendedInfoAvailable
+	)
+{
+	HANDLE							hObject;
+	NTSTATUS						status;
+	ULONG							bytesNeeded;
+	IO_COMPLETION_BASIC_INFORMATION iobi;
+
+	SetDlgItemText(hwndDlg, ID_IOCOMPLETIONSTATE, T_CannotQuery);
+
+	if (Context == NULL) {
+		return;
+	}
+
+	//open object specified as current which properties we are viewing
+	hObject = NULL;
+	if (!propOpenCurrentObject(Context, &hObject, IO_COMPLETION_QUERY_STATE)) {
+		return;
+	}
+
+	status = NtQueryIoCompletion(hObject, IoCompletionBasicInformation, &iobi, sizeof(iobi), &bytesNeeded);
+	if (NT_SUCCESS(status)) {
+		SetDlgItemText(hwndDlg, ID_IOCOMPLETIONSTATE, (iobi.Depth > 0) ? L"Signaled" : L"Nonsignaled");
+	}
+	//extended information not available, query some fields
+	if (ExtendedInfoAvailable != TRUE) {
+		propSetDefaultInfo(Context, hwndDlg, hObject);
+	}
+	NtClose(hObject);
+}
+
+/*
 * propBasicQueryTimer
 *
 * Purpose:
@@ -252,7 +296,7 @@ VOID propBasicQueryTimer(
 	if (NT_SUCCESS(status)) {
 
 		//Timer state
-		SetDlgItemText(hwndDlg, ID_TIMERSTATE, (tbi.TimerState) ? L"Signaled" : L"Notsignaled");
+		SetDlgItemText(hwndDlg, ID_TIMERSTATE, (tbi.TimerState) ? L"Signaled" : L"Nonsignaled");
 		if (tbi.TimerState != TRUE) {
 			ConvertedSeconds = (tbi.RemainingTime.QuadPart / 10000000LL);
 			Seconds = (CSHORT)(ConvertedSeconds % 60);
@@ -390,11 +434,11 @@ VOID propBasicQuerySymlink(
 		return;
 	}
 
-	//Copy Link Target from list for performance reasons as we don't need to query it again
-	lpLinkTarget = supGetItemText(ObjectList, ListView_GetSelectionMark(ObjectList), 2, NULL);
+	//Copy link target from main object list for performance reasons 
+	//so we don't need to query same data again
+	lpLinkTarget = Context->lpDescription;
 	if (lpLinkTarget) {
 		SetDlgItemText(hwndDlg, ID_OBJECT_SYMLINK_TARGET, lpLinkTarget);
-		HeapFree(GetProcessHeap(), 0, lpLinkTarget);
 	}
 
 	//Query Link Creation Time
@@ -802,20 +846,26 @@ VOID propBasicQueryWindowStation(
 *
 */
 VOID propBasicQueryDriver(
+	_In_ PROP_OBJECT_INFO *Context,
 	_In_ HWND hwndDlg
 	)
 {
 	RECT	rGB;
 	LPWSTR	lpItemText;
 
-	lpItemText = supGetItemText(ObjectList, ListView_GetSelectionMark(ObjectList), 2, NULL);
+	if (Context == NULL) {
+		return;
+	}
+
+	//for performance reasons instead of query again
+	//we use description from main object list
+	lpItemText = Context->lpDescription;
 	if (lpItemText) {
 		//show hidden controls
 		if (GetWindowRect(GetDlgItem(hwndDlg, ID_DRIVERINFO), &rGB)) {
 			EnumChildWindows(hwndDlg, supEnumEnableChildWindows, (LPARAM)&rGB);
 		}
 		SetDlgItemText(hwndDlg, ID_DRIVERDISPLAYNAME, lpItemText);
-		HeapFree(GetProcessHeap(), 0, lpItemText);
 	}
 }
 
@@ -828,20 +878,26 @@ VOID propBasicQueryDriver(
 *
 */
 VOID propBasicQueryDevice(
+	_In_ PROP_OBJECT_INFO *Context,
 	_In_ HWND hwndDlg
 	)
 {
 	RECT	rGB;
 	LPWSTR	lpItemText;
 
-	lpItemText = supGetItemText(ObjectList, ListView_GetSelectionMark(ObjectList), 2, NULL);
+	if (Context == NULL) {
+		return;
+	}
+
+	//for performance reasons instead of query again
+	//we use description from main object list
+	lpItemText = Context->lpDescription;
 	if (lpItemText) {
 		//show hidden controls
 		if (GetWindowRect(GetDlgItem(hwndDlg, ID_DEVICEINFO), &rGB)) {
 			EnumChildWindows(hwndDlg, supEnumEnableChildWindows, (LPARAM)&rGB);
 		}
 		SetDlgItemText(hwndDlg, ID_DEVICEDESCRIPTION, lpItemText);
-		HeapFree(GetProcessHeap(), 0, lpItemText);
 	}
 }
 
@@ -1204,10 +1260,10 @@ VOID propSetBasicInfo(
 		}
 		break;
 	case TYPE_DRIVER:
-		propBasicQueryDriver(hwndDlg);
+		propBasicQueryDriver(Context, hwndDlg);
 		break;
 	case TYPE_DEVICE:
-		propBasicQueryDevice(hwndDlg);
+		propBasicQueryDevice(Context, hwndDlg);
 		break;
 	case TYPE_SYMLINK:
 		propBasicQuerySymlink(Context, hwndDlg, ExtendedInfoAvailable);
@@ -1238,6 +1294,9 @@ VOID propSetBasicInfo(
 		break;
 	case TYPE_DESKTOP:
 		propBasicQueryDesktop(Context, hwndDlg);
+		break;
+	case TYPE_IOCOMPLETION:
+		propBasicQueryIoCompletion(Context, hwndDlg, ExtendedInfoAvailable);
 		break;
 	}
 

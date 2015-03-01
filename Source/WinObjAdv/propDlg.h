@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDLG.H
 *
-*  VERSION:     1.00
+*  VERSION:     1.10
 *
-*  DATE:        23 Feb 2015
+*  DATE:        26 Feb 2015
 *
 *  Common header file for properties dialog.
 *
@@ -22,11 +22,12 @@ typedef struct _PROP_OBJECT_INFO {
 	BOOL	IsType; //TRUE if selected object is object type
 	INT		TypeIndex;
 	INT		RealTypeIndex;//save index for type
-	DWORD	ObjectFlags;
+	DWORD	ObjectFlags;//Object specific flags
 	LPWSTR	lpObjectName;
 	LPWSTR	lpObjectType;
 	LPWSTR  lpCurrentObjectPath;
-	OBJINFO	ObjectInfo;
+	LPWSTR	lpDescription; //description from main list (3rd column)
+	OBJINFO	ObjectInfo; //object dump related structures
 } PROP_OBJECT_INFO, *PPROP_OBJECT_INFO;
 
 typedef struct _VALUE_DESC {
@@ -44,7 +45,7 @@ extern HWND g_PropWindow;
 extern HWND g_SubPropWindow;
 
 
-//Display simple "-" if no info
+//Display simple "-" if no info available
 #define T_CannotQuery	L"-"
 
 //Display for unknown type value
@@ -73,5 +74,17 @@ BOOL propOpenCurrentObject(
 VOID propCreateDialog(
 	_In_ HWND hwndParent,
 	_In_ LPWSTR lpObjectName,
-	_In_ LPCWSTR lpObjectType
+	_In_ LPCWSTR lpObjectType,
+	_In_opt_ LPWSTR lpDescription
+	);
+
+PPROP_OBJECT_INFO propContextCreate(
+	LPWSTR lpObjectName,
+	LPCWSTR lpObjectType,
+	LPWSTR lpCurrentObjectPath,
+	LPWSTR lpDescription
+	);
+
+VOID propContextDestroy(
+	PROP_OBJECT_INFO *Context
 	);

@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDRIVER.C
 *
-*  VERSION:     1.00
+*  VERSION:     1.10
 *
-*  DATE:        21 Feb 2015
+*  DATE:        24 Feb 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -414,7 +414,7 @@ VOID DriverJumpToKey(
 
 		lpRegPath = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sz);
 		if (lpRegPath == NULL) {
-			break;;
+			break;
 		}
 		wsprintf(lpRegPath, REGISTRYSERVICESKEY, Context->lpObjectName);
 

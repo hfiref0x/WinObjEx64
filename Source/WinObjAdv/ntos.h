@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.00
+*  VERSION:     1.10
 *
-*  DATE:        17 Feb 2015
+*  DATE:        25 Feb 2015
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -18,6 +18,8 @@
 * PARTICULAR PURPOSE.
 *
 ************************************************************************************/
+
+#pragma comment(lib, "ntdll.lib")
 
 #pragma warning(disable: 4214) // nonstandard extension used : bit field types other than int
 
@@ -76,6 +78,15 @@
 
 #define SYMBOLIC_LINK_QUERY (0x0001)
 #define SYMBOLIC_LINK_ALL_ACCESS (STANDARD_RIGHTS_REQUIRED | 0x1)
+
+#define THREAD_ALERT	(0x0004)
+
+#define WORKER_FACTORY_RELEASE_WORKER 0x0001
+#define WORKER_FACTORY_WAIT 0x0002
+#define WORKER_FACTORY_SET_INFORMATION 0x0004
+#define WORKER_FACTORY_QUERY_INFORMATION 0x0008
+#define WORKER_FACTORY_READY_WORKER 0x0010
+#define WORKER_FACTORY_SHUTDOWN 0x0020
 
 #define OBJECT_TYPE_CREATE (0x0001)
 #define OBJECT_TYPE_ALL_ACCESS (STANDARD_RIGHTS_REQUIRED | 0x1)
@@ -924,6 +935,52 @@ typedef struct _FILE_COMPLETION_INFORMATION {
 	HANDLE Port;
 	PVOID Key;
 } FILE_COMPLETION_INFORMATION, *PFILE_COMPLETION_INFORMATION;
+
+//
+// Define the NamedPipeType flags for NtCreateNamedPipeFile
+//
+
+#define FILE_PIPE_BYTE_STREAM_TYPE      0x00000000
+#define FILE_PIPE_MESSAGE_TYPE          0x00000001
+
+//
+// Define the CompletionMode flags for NtCreateNamedPipeFile
+//
+
+#define FILE_PIPE_QUEUE_OPERATION       0x00000000
+#define FILE_PIPE_COMPLETE_OPERATION    0x00000001
+
+//
+// Define the ReadMode flags for NtCreateNamedPipeFile
+//
+
+#define FILE_PIPE_BYTE_STREAM_MODE      0x00000000
+#define FILE_PIPE_MESSAGE_MODE          0x00000001
+
+//
+// Define the NamedPipeConfiguration flags for NtQueryInformation
+//
+
+#define FILE_PIPE_INBOUND               0x00000000
+#define FILE_PIPE_OUTBOUND              0x00000001
+#define FILE_PIPE_FULL_DUPLEX           0x00000002
+
+//
+// Define the NamedPipeState flags for NtQueryInformation
+//
+
+#define FILE_PIPE_DISCONNECTED_STATE    0x00000001
+#define FILE_PIPE_LISTENING_STATE       0x00000002
+#define FILE_PIPE_CONNECTED_STATE       0x00000003
+#define FILE_PIPE_CLOSING_STATE         0x00000004
+
+//
+// Define the NamedPipeEnd flags for NtQueryInformation
+//
+
+#define FILE_PIPE_CLIENT_END            0x00000000
+#define FILE_PIPE_SERVER_END            0x00000001
+
 
 typedef struct _FILE_PIPE_INFORMATION {
 	ULONG ReadMode;
@@ -2058,6 +2115,14 @@ typedef struct _VPB {
 	WCHAR VolumeLabel[MAXIMUM_VOLUME_LABEL_LENGTH / sizeof(WCHAR)];
 } VPB, *PVPB;
 
+typedef struct _KQUEUE {
+	DISPATCHER_HEADER Header;
+	LIST_ENTRY EntryListHead;
+	ULONG CurrentCount;
+	ULONG MaximumCount;
+	LIST_ENTRY ThreadListHead;
+} KQUEUE, *PKQUEUE;
+
 typedef struct _KDEVICE_QUEUE {
 	CSHORT Type;
 	CSHORT Size;
@@ -3001,4 +3066,19 @@ NTSTATUS NTAPI NtQuerySecurityObject(
 	_Out_ PSECURITY_DESCRIPTOR SecurityDescriptor,
 	_In_ ULONG Length,
 	_Out_ PULONG LengthNeeded
+	);
+
+NTSTATUS NtCreateIoCompletion(
+	_Out_ PHANDLE IoCompletionHandle,
+	_In_ ACCESS_MASK DesiredAccess,
+	_In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
+	_In_ ULONG Count OPTIONAL
+	);
+
+NTSTATUS NTAPI NtCreateEvent(
+	_Out_ PHANDLE EventHandle,
+	_In_ ACCESS_MASK DesiredAccess,
+	_In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
+	_In_ EVENT_TYPE EventType,
+	_In_ BOOLEAN InitialState
 	);

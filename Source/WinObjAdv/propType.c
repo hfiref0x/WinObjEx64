@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.00
 *
-*  DATE:        23 Feb 2015
+*  DATE:        01 Mar 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -75,6 +75,7 @@ VOID propSetTypeDecodeValue(
 	)
 {
 	INT	i, Count;
+	DWORD u;
 	PVALUE_DESC Desc = NULL;
 
 	switch (TypeIndex) {
@@ -99,6 +100,7 @@ VOID propSetTypeDecodeValue(
 		Count = MAX_KNOWN_THREAD_ATTRIBUTES;
 		break;
 
+	case TYPE_IRTIMER:
 	case TYPE_TIMER:
 		Desc = a_TimerProp;
 		Count = MAX_KNOWN_TIMER_ATTRIBUTES;
@@ -173,6 +175,9 @@ VOID propSetTypeDecodeValue(
 		Count = MAX_KNOWN_MUTANT_ATTRIBUTES;
 		break;
 
+		//all ports
+	case TYPE_FLTCOMM_PORT:
+	case TYPE_FLTCONN_PORT:
 	case TYPE_WAITABLEPORT:
 	case TYPE_PORT:
 		Desc = a_PortProp;
@@ -223,6 +228,21 @@ VOID propSetTypeDecodeValue(
 		Count = MAX_KNOWN_TMTM_ATTRIBUTES;
 		break;
 
+	case TYPE_TPWORKERFACTORY:
+		Desc = a_TpwfProp;
+		Count = MAX_KNOWN_TPWORKERFACTORY_ATTRIBUTES;
+		break;
+
+	case TYPE_PCWOBJECT:
+		Desc = a_PcwProp;
+		Count = MAX_KNOWN_PCWOBJECT_ATTRIBUTES;
+		break;
+
+	case TYPE_COMPOSITION:
+		Desc = a_CompositionProp;
+		Count = MAX_KNOWN_COMPOSITION_ATTRIBUTES;
+		break;
+
 	default:
 		Count = 0;
 		break;
@@ -249,7 +269,16 @@ VOID propSetTypeDecodeValue(
 	}
 	//set unknown to anything else
 	if (Value != 0) {
-		propSetTypeFlagValue(hListView, T_Unknown, Value);
+		u = 0x00000001;
+		while (Value) {
+			if (Value & u) {
+				propSetTypeFlagValue(hListView, T_Unknown, u);
+				Value &= ~u;
+			}
+			u *= 2;
+			if (u >= MAXIMUM_ALLOWED) 
+				break;
+		}
 	}
 }
 
@@ -636,25 +665,6 @@ VOID propSetTypeInfo(
 		//cannot query, no driver or other error, try second method
 		if (pObject == NULL) {
 			bOkay = propQueryTypeInfo(Context->lpObjectType, &ObjectTypeDump);
-		}
-	}
-
-
-	//two special cases, they are ports but with no description, set type/name as description
-	if (Context->IsType) {
-		if (_strcmpiW(Context->lpObjectName, T_FILTER_CONNECTION_PORT) == 0) {
-			lpTypeDescription = Context->lpObjectName;
-		}
-		if (_strcmpiW(Context->lpObjectName, T_FILTER_COMMUNICATION_PORT) == 0) {
-			lpTypeDescription = Context->lpObjectName;
-		}
-	}
-	else {
-		if (_strcmpiW(Context->lpObjectType, T_FILTER_CONNECTION_PORT) == 0) {
-			lpTypeDescription = Context->lpObjectType;
-		}
-		if (_strcmpiW(Context->lpObjectType, T_FILTER_COMMUNICATION_PORT) == 0) {
-			lpTypeDescription = Context->lpObjectType;
 		}
 	}
 

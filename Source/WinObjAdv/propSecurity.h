@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPSECURITY.H
 *
-*  VERSION:     1.00
+*  VERSION:     1.10
 *
-*  DATE:        19 Feb 2015
+*  DATE:        25 Feb 2015
 *
 *  Common header file for Security property sheet.
 *
@@ -22,20 +22,34 @@
 
 typedef struct _ObjectSecurityVtbl ObjectSecurityVtbl, *PObjectSecurityVtbl;
 
+//custom open object method
+typedef BOOL(CALLBACK *POPENOBJECTMETHOD)(
+	_In_	PROP_OBJECT_INFO *Context,
+	_Inout_ PHANDLE	phObject,
+	_In_	ACCESS_MASK	DesiredAccess
+	);
+
+//future use, currently the same as propDefaultCloseObject
+typedef VOID(CALLBACK *PCLOSEOBJECTMETHOD)(
+	_In_ PVOID SelfPtrReserved,//do not use
+	_In_ HANDLE hObject
+	);
+
 //class
 typedef struct _IObjectSecurity {
 	ObjectSecurityVtbl* lpVtbl;
-	HINSTANCE hInstance;
 	ULONG RefCount;
 	ULONG psiFlags;
 	ULONG dwAccessMax;
-	PSI_ACCESS SiAccessTable;
 	GENERIC_MAPPING GenericMapping;
 	ACCESS_MASK ValidAccessMask;
+	HINSTANCE hInstance;
 	PROP_OBJECT_INFO *ObjectContext;
-	PSI_ACCESS AccessTable;
-	PSECURITY_DESCRIPTOR SecurityDescriptor;
+	PSI_ACCESS AccessTable;//dynamically allocated access table
+	POPENOBJECTMETHOD OpenObjectMethod;
+	PCLOSEOBJECTMETHOD CloseObjectMethod;
 } IObjectSecurity, *PIObjectSecurity;
+
 
 //Vtbl prototypes
 
@@ -78,6 +92,8 @@ typedef struct _ObjectSecurityVtbl {
 } ObjectSecurityVtbl, *PObjectSecurityVtbl;
 
 HPROPSHEETPAGE propSecurityCreatePage(
-	_In_	PROP_OBJECT_INFO *Context,
-	_In_	ULONG psiFlags
+	_In_		PROP_OBJECT_INFO *Context,
+	_In_		POPENOBJECTMETHOD OpenObjectMethod,
+	_In_opt_	PCLOSEOBJECTMETHOD CloseObjectMethod,
+	_In_		ULONG psiFlags
 	);

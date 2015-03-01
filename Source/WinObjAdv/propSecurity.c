@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPSECURITY.C
 *
-*  VERSION:     1.00
+*  VERSION:     1.10
 *
-*  DATE:        19 Feb 2015
+*  DATE:        25 Feb 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -34,6 +34,7 @@ BOOL propSecurityObjectSupported(
 	)
 {
 	if (
+		(nTypeIndex != TYPE_FILE) &&
 		(nTypeIndex != TYPE_DIRECTORY) &&
 		(nTypeIndex != TYPE_DEVICE) &&
 		(nTypeIndex != TYPE_SECTION) &&
@@ -45,6 +46,7 @@ BOOL propSecurityObjectSupported(
 		(nTypeIndex != TYPE_SYMLINK) &&
 		(nTypeIndex != TYPE_TIMER) &&
 		(nTypeIndex != TYPE_WINSTATION) &&
+		(nTypeIndex != TYPE_IOCOMPLETION) &&
 		(nTypeIndex != TYPE_JOB)
 		)
 	{
@@ -54,79 +56,90 @@ BOOL propSecurityObjectSupported(
 }
 
 /*
-* propSetSiAccessTable
+* propGetAccessTable
 *
 * Purpose:
 *
-* Set access rights table, generic mappings depending on object type.
+* Return access rights table and set generic mappings depending on object type.
 *
 */
-VOID propSetSiAccessTable(
+PSI_ACCESS propGetAccessTable(
 	IObjectSecurity * This
 	)
 {
+	SI_ACCESS *AccessTable = NULL;
+
 	switch (This->ObjectContext->TypeIndex) {
 
 	case TYPE_DIRECTORY:
 		This->dwAccessMax = MAX_KNOWN_DIRECTORY_ACCESS_VALUE;
-		This->SiAccessTable	= (PSI_ACCESS)&DirectoryAccessValues;
+		AccessTable	= (PSI_ACCESS)&DirectoryAccessValues;
 		break;
 
+	case TYPE_FILE:
 	case TYPE_DEVICE:
 		This->dwAccessMax = MAX_KNOWN_FILE_ACCESS_VALUE;
-		This->SiAccessTable = (PSI_ACCESS)&FileAccessValues;
+		AccessTable = (PSI_ACCESS)&FileAccessValues;
 		break;
 
 	case TYPE_SECTION:
 		This->dwAccessMax = MAX_KNOWN_SECTION_ACCESS_VALUE;
-		This->SiAccessTable = (PSI_ACCESS)&SectionAccessValues;
+		AccessTable = (PSI_ACCESS)&SectionAccessValues;
 		break;
 
 	case TYPE_EVENT:
 		This->dwAccessMax = MAX_KNOWN_EVENT_ACCESS_VALUE;
-		This->SiAccessTable = (PSI_ACCESS)&EventAccessValues;
+		AccessTable = (PSI_ACCESS)&EventAccessValues;
 		break;
 
 	case TYPE_MUTANT:
 		This->dwAccessMax = MAX_KNOWN_MUTANT_ACCESS_VALUE;
-		This->SiAccessTable = (PSI_ACCESS)&MutantAccessValues;
+		AccessTable = (PSI_ACCESS)&MutantAccessValues;
 		break;
 
 	case TYPE_DESKTOP:
 		This->dwAccessMax = MAX_KNOWN_DESKTOP_ACCESS_VALUE;
-		This->SiAccessTable = (PSI_ACCESS)&DesktopAccessValues;
+		AccessTable = (PSI_ACCESS)&DesktopAccessValues;
 		break;
 
 	case TYPE_WINSTATION:
 		This->dwAccessMax = MAX_KNOWN_WINSTATION_ACCESS_VALUE;
-		This->SiAccessTable = (PSI_ACCESS)&WinStationAccessValues;
+		AccessTable = (PSI_ACCESS)&WinStationAccessValues;
 		break;
 
 	case TYPE_KEY:
 		This->dwAccessMax = MAX_KNOWN_KEY_ACCESS_VALUE;
-		This->SiAccessTable = (PSI_ACCESS)&KeyAccessValues;
+		AccessTable = (PSI_ACCESS)&KeyAccessValues;
 		break;
 
 	case TYPE_SEMAPHORE:
 		This->dwAccessMax = MAX_KNOWN_SEMAPHORE_ACCESS_VALUE;
-		This->SiAccessTable = (PSI_ACCESS)&SemaphoreAccessValues;
+		AccessTable = (PSI_ACCESS)&SemaphoreAccessValues;
 		break;
 
 	case TYPE_SYMLINK:
 		This->dwAccessMax = MAX_KNOWN_SYMLINK_ACCESS_VALUE;
-		This->SiAccessTable = (PSI_ACCESS)&SymlinkAccessValues;
+		AccessTable = (PSI_ACCESS)&SymlinkAccessValues;
 		break;
 
 	case TYPE_TIMER:
 		This->dwAccessMax = MAX_KNOWN_TIMER_ACCESS_VALUE;
-		This->SiAccessTable = (PSI_ACCESS)&TimerAccessValues;
+		AccessTable = (PSI_ACCESS)&TimerAccessValues;
 		break;
 
 	case TYPE_JOB:
 		This->dwAccessMax = MAX_KNOWN_JOB_ACCESS_VALUE;
-		This->SiAccessTable = (PSI_ACCESS)&JobAccessValues;
+		AccessTable = (PSI_ACCESS)&JobAccessValues;
 		break;
+
+	case TYPE_IOCOMPLETION:
+		This->dwAccessMax = MAX_KNOWN_IOCOMPLETION_ACCESS_VALUE;
+		AccessTable = (PSI_ACCESS)&IoCompletionAccessValues;
+		break;
+
 	}
+
+	return AccessTable;
 }
 
 /*
@@ -181,14 +194,14 @@ ACCESS_MASK propGetObjectAccessMask(
 }
 
 /*
-* propCloseObject
+* propDefaultCloseObject
 *
 * Purpose:
 *
 * Dereference.
 *
 */
-VOID propCloseObject(
+VOID propDefaultCloseObject(
 	_In_ IObjectSecurity * This,
 	_In_ HANDLE hObject
 	)
@@ -291,11 +304,12 @@ HRESULT STDMETHODCALLTYPE GetSecurity(
 	BOOL fDefault
 	)
 {
-	HRESULT						hResult;
-	HANDLE						hObject;
-	ULONG						bytesNeeded;
-	NTSTATUS					status;
-	ACCESS_MASK					DesiredAccess;
+	HRESULT					hResult;
+	HANDLE					hObject;
+	ULONG					bytesNeeded;
+	NTSTATUS				status;
+	ACCESS_MASK				DesiredAccess;
+	PSECURITY_DESCRIPTOR	PSD;
 
 	if (fDefault) {
 		return E_NOTIMPL;
@@ -304,44 +318,45 @@ HRESULT STDMETHODCALLTYPE GetSecurity(
 	//open object
 	hObject = NULL;
 	DesiredAccess = propGetObjectAccessMask(RequestedInformation, FALSE);
-	if (!propOpenCurrentObject(This->ObjectContext, &hObject, DesiredAccess)) {
+
+	if (!This->OpenObjectMethod(This->ObjectContext, &hObject, DesiredAccess)) {
 		return HRESULT_FROM_WIN32(GetLastError());
 	}
 
 	//query object SD
 	//warning: system free SD with LocalFree on security dialog destroy
 	bytesNeeded = 0x100;
-	This->SecurityDescriptor = LocalAlloc(LPTR, bytesNeeded);
-	if (This->SecurityDescriptor == NULL) {
+	PSD = LocalAlloc(LPTR, bytesNeeded);
+	if (PSD == NULL) {
 		hResult = HRESULT_FROM_WIN32(GetLastError());
 		goto Done;
 	}
 
 	status = NtQuerySecurityObject(hObject, RequestedInformation, 
-		This->SecurityDescriptor, bytesNeeded, &bytesNeeded);
+		PSD, bytesNeeded, &bytesNeeded);
 
 	if (status == STATUS_BUFFER_TOO_SMALL) {
-		LocalFree(This->SecurityDescriptor);
-		This->SecurityDescriptor = LocalAlloc(LPTR, bytesNeeded);
-		if (This->SecurityDescriptor == NULL) {
+		LocalFree(PSD);
+		PSD = LocalAlloc(LPTR, bytesNeeded);
+		if (PSD == NULL) {
 			hResult = HRESULT_FROM_WIN32(GetLastError());
 			goto Done;
 		}
 		status = NtQuerySecurityObject(
 			hObject,
 			RequestedInformation,
-			This->SecurityDescriptor,
+			PSD,
 			bytesNeeded,
 			&bytesNeeded
 			);
 	}
 
 	hResult = HRESULT_FROM_WIN32(RtlNtStatusToDosError(status));
-	*ppSecurityDescriptor = This->SecurityDescriptor;
+	*ppSecurityDescriptor = PSD;
 
 Done:
 	//cleanup
-	propCloseObject(This, hObject);
+	This->CloseObjectMethod(This, hObject);
 	return hResult;
 }
 
@@ -356,14 +371,14 @@ HRESULT STDMETHODCALLTYPE SetSecurity(
 	ACCESS_MASK		DesiredAccess;
 
 	DesiredAccess = propGetObjectAccessMask(SecurityInformation, TRUE);
-	if (!propOpenCurrentObject(This->ObjectContext, &hObject, DesiredAccess)) {
+	if (!This->OpenObjectMethod(This->ObjectContext, &hObject, DesiredAccess)) {
 		return HRESULT_FROM_WIN32(GetLastError());
 	}
 
 	status = NtSetSecurityObject(hObject, SecurityInformation, pSecurityDescriptor);
 
 	//cleanup
-	propCloseObject(This, hObject);
+	This->CloseObjectMethod(This, hObject);
 	return HRESULT_FROM_WIN32(RtlNtStatusToDosError(status));
 }
 
@@ -429,25 +444,38 @@ ObjectSecurityVtbl g_Vtbl = {
 *
 * Purpose:
 *
-* Initialize class object, query type info, set Vtbl, Access table.
+* Initialize class object, query type info, Vtbl, AccessTable, object specific methods.
 *
 */
 HRESULT propSecurityConstructor(
-	IObjectSecurity * This,
-	_In_	PROP_OBJECT_INFO *Context,
-	_In_	ULONG psiFlags
+	IObjectSecurity		*This,
+	_In_				PROP_OBJECT_INFO *Context,
+	_In_				POPENOBJECTMETHOD OpenObjectMethod,
+	_In_opt_			PCLOSEOBJECTMETHOD CloseObjectMethod,
+	_In_				ULONG psiFlags
 	)
 {
-	BOOL cond = FALSE;
-	ULONG bytesNeeded;
-	SIZE_T Size;
-	HRESULT hResult;
-	HANDLE hObject = NULL;
-	NTSTATUS status;
-	POBJECT_TYPE_INFORMATION TypeInfo = NULL;
+	BOOL						cond = FALSE;
+	ULONG						bytesNeeded = 0L;
+	NTSTATUS					status;
+	SIZE_T						Size;
+	HRESULT						hResult;
+	HANDLE						hObject = NULL;
+	SI_ACCESS					*TypeAccessTable = NULL;
+	POBJECT_TYPE_INFORMATION	TypeInfo = NULL;
 
 	do {
-		if (!propOpenCurrentObject(Context, &hObject, READ_CONTROL)) {
+		This->OpenObjectMethod = OpenObjectMethod;
+
+		//if no close method specified, use default
+		if (CloseObjectMethod == NULL) {
+			This->CloseObjectMethod = propDefaultCloseObject;
+		}
+		else {
+			This->CloseObjectMethod = CloseObjectMethod;
+		}
+
+		if (!This->OpenObjectMethod(Context, &hObject, READ_CONTROL)) {
 			hResult = E_ACCESSDENIED;
 			break;
 		}
@@ -483,7 +511,7 @@ HRESULT propSecurityConstructor(
 		This->hInstance = g_hInstance;
 		This->psiFlags = psiFlags;
 
-		propSetSiAccessTable(This);
+		TypeAccessTable = propGetAccessTable(This);
 
 		//allocate access table
 		Size = (MAX_KNOWN_GENERAL_ACCESS_VALUE + This->dwAccessMax) * sizeof(SI_ACCESS);
@@ -494,10 +522,10 @@ HRESULT propSecurityConstructor(
 		}
 
 		//copy object specific access table if it present
-		if (This->SiAccessTable && This->dwAccessMax) {
+		if (TypeAccessTable && This->dwAccessMax) {
 			supCopyMemory(This->AccessTable,
 				Size,
-				This->SiAccessTable,
+				TypeAccessTable,
 				(This->dwAccessMax * sizeof(SI_ACCESS))
 				);
 		}
@@ -527,7 +555,7 @@ HRESULT propSecurityConstructor(
 	} while (cond);
 	
 	//cleanup
-	propCloseObject(This, hObject);
+	This->CloseObjectMethod(This, hObject);
 	if (TypeInfo) {
 		HeapFree(GetProcessHeap(), 0, TypeInfo);
 	}
@@ -552,13 +580,19 @@ HRESULT propSecurityConstructor(
 * PropertySheetPageCallback->Release.
 */
 HPROPSHEETPAGE propSecurityCreatePage(
-	_In_	PROP_OBJECT_INFO *Context,
-	_In_	ULONG psiFlags
+	_In_		PROP_OBJECT_INFO *Context,
+	_In_		POPENOBJECTMETHOD OpenObjectMethod,
+	_In_opt_	PCLOSEOBJECTMETHOD CloseObjectMethod,
+	_In_		ULONG psiFlags
 	)
 {
 	IObjectSecurity *psi;
 
-	if (Context == NULL) {
+	if (
+		(Context == NULL) ||
+		(OpenObjectMethod == NULL) //OpenObjectMethod is required
+		)
+	{
 		return NULL;
 	}
 
@@ -571,7 +605,12 @@ HPROPSHEETPAGE propSecurityCreatePage(
 		return NULL;
 	}
 
-	if (propSecurityConstructor(psi, Context, psiFlags) != S_OK) {
+	if (
+		propSecurityConstructor(psi, Context, 
+		OpenObjectMethod, CloseObjectMethod, 
+		psiFlags) != S_OK
+		) 
+	{
 		HeapFree(GetProcessHeap(), 0, psi);
 		return NULL;
 	}

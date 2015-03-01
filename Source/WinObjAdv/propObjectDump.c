@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     1.00
+*  VERSION:     1.10
 *
-*  DATE:        23 Feb 2015
+*  DATE:        01 Mar 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1018,7 +1018,6 @@ VOID ObDumpDeviceObject(
 
 		//NextDevice
 		lpType = NULL;
-		BgColor = 0;
 		LookupObject = ObListFindByAddress(&g_kdctx.ObjectList, (ULONG_PTR)devObject.NextDevice);
 		if (LookupObject != NULL) {
 			lpType = LookupObject->ObjectName;
@@ -1030,7 +1029,6 @@ VOID ObDumpDeviceObject(
 
 		//AttachedDevice
 		lpType = NULL;
-		BgColor = 0;
 		LookupObject = ObListFindByAddress(&g_kdctx.ObjectList, (ULONG_PTR)devObject.AttachedDevice);
 		if (LookupObject != NULL) {
 			lpType = LookupObject->ObjectName;
@@ -1599,8 +1597,7 @@ VOID ObDumpSyncObject(
 			return;
 		}
 
-
-		//dump dirObject
+		//dump object
 		if (!kdReadSystemMemory(Context->ObjectInfo.ObjectAddress, Object, ObjectSize)) {
 			ObDumpShowError(hwndDlg);
 			HeapFree(GetProcessHeap(), 0, Object);
@@ -1687,7 +1684,7 @@ VOID ObDumpSyncObject(
 			Header = &Timer->Header;
 
 			lpDescType = T_TIMER_SYNC;
-			if (Header->Type == 8) {
+			if (Header->TimerType == 8) {
 				lpDescType = T_TIMER_NOTIFICATION;
 			}
 			//Timer state
@@ -1771,7 +1768,6 @@ VOID ObDumpObjectType(
 	if (Context == NULL) {
 		return;
 	}
-
 
 	__try {
 
@@ -1893,8 +1889,6 @@ VOID ObDumpObjectType(
 			}
 		}
 		ObDumpUlong(h_tviSubItem, L"PoolType", lpType, ObjectTypeDump.TypeInfo.PoolType, TRUE, FALSE, 0, 0);
-
-
 		ObDumpUlong(h_tviSubItem, L"DefaultPagedPoolCharge", NULL, ObjectTypeDump.TypeInfo.DefaultPagedPoolCharge, TRUE, FALSE, 0, 0);
 		ObDumpUlong(h_tviSubItem, L"DefaultNonPagedPoolCharge", NULL, ObjectTypeDump.TypeInfo.DefaultNonPagedPoolCharge, TRUE, FALSE, 0, 0);
 
@@ -1907,9 +1901,6 @@ VOID ObDumpObjectType(
 			&ObjectTypeDump.TypeInfo.DumpProcedure,
 			sizeof(TypeProcs)
 			);
-
-		SelfDriverBase = NULL;
-		SelfDriverSize = 0;
 
 		//assume ntoskrnl first in list and list initialized
 		SelfDriverBase = pModulesList->Modules[0].ImageBase;
@@ -1934,6 +1925,73 @@ VOID ObDumpObjectType(
 		return;
 	}
 }
+
+/*
+* ObDumpQueueObject
+*
+* Purpose:
+*
+* Dump KQUEUE members to the treelist.
+*
+*/
+VOID ObDumpQueueObject(
+	PROP_OBJECT_INFO *Context,
+	HWND hwndDlg
+	)
+{
+	HTREEITEM				h_tviRootItem;
+	LPWSTR					lpDesc2;
+	KQUEUE					Queue;
+
+
+	if (Context == NULL) {
+		return;
+	}
+
+	__try {
+
+		//dump dirObject
+		RtlSecureZeroMemory(&Queue, sizeof(Queue));
+		if (!kdReadSystemMemory(Context->ObjectInfo.ObjectAddress, &Queue, sizeof(Queue))) {
+			ObDumpShowError(hwndDlg);
+			return;
+		}
+
+		g_TreeList = 0;
+		g_TreeListAtom = 0;
+		if (!supInitTreeListForDump(hwndDlg, &g_TreeListAtom, &g_TreeList)) {
+			ObDumpShowError(hwndDlg);
+			return;
+		}
+		
+		lpDesc2 = NULL;
+		if (Queue.Header.Size == (sizeof(KQUEUE) / sizeof(ULONG))) {
+			lpDesc2 = L"sizeof(KQUEUE)/sizeof(ULONG)";
+		}
+
+		h_tviRootItem = TreeListAddItem(NULL, TVIF_TEXT | TVIF_STATE, TVIS_EXPANDED,
+			TVIS_EXPANDED, T_KQUEUE, NULL);
+
+		//Header
+		ObDumpDispatcherHeader(h_tviRootItem, &Queue.Header, NULL, NULL, lpDesc2);
+		//EntryListHead
+		ObDumpListEntry(h_tviRootItem, L"EntryListHead", &Queue.EntryListHead);
+
+		//CurrentCount
+		ObDumpUlong(h_tviRootItem, L"CurrentCount", NULL, Queue.CurrentCount, TRUE, FALSE, 0, 0);
+
+		//MaximumCount
+		ObDumpUlong(h_tviRootItem, L"MaximumCount", NULL, Queue.MaximumCount, TRUE, FALSE, 0, 0);
+
+		//ThreadListHead
+		ObDumpListEntry(h_tviRootItem, L"ThreadListHead", &Queue.ThreadListHead);
+
+	}
+	__except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
+		return;
+	}
+}
+
 
 /*
 * ObjectDumpHandlePopupMenu
@@ -1968,7 +2026,7 @@ VOID ObjectDumpHandlePopupMenu(
 *
 * Purpose:
 *
-* Copy selected value to the clipboard
+* Copy selected value to the clipboard.
 *
 */
 VOID ObjectDumpCopyValue(
@@ -2046,31 +2104,37 @@ INT_PTR CALLBACK ObjectDumpDialogProc(
 		if (pSheet) {
 
 			Context = (PROP_OBJECT_INFO*)pSheet->lParam;
-			switch (Context->TypeIndex) {
+			if (Context) {
 
-			case TYPE_DIRECTORY:
-				ObDumpDirectoryObject(Context, hwndDlg);
-				break;
+				switch (Context->TypeIndex) {
 
-			case TYPE_DRIVER:
-				ObDumpDriverObject(Context, hwndDlg);
-				break;
+				case TYPE_DIRECTORY:
+					ObDumpDirectoryObject(Context, hwndDlg);
+					break;
 
-			case TYPE_DEVICE:
-				ObDumpDeviceObject(Context, hwndDlg);
-				break;
+				case TYPE_DRIVER:
+					ObDumpDriverObject(Context, hwndDlg);
+					break;
 
-			case TYPE_EVENT:
-			case TYPE_MUTANT:
-			case TYPE_SEMAPHORE:
-			case TYPE_TIMER:
-				ObDumpSyncObject(Context, hwndDlg);
-				break;
+				case TYPE_DEVICE:
+					ObDumpDeviceObject(Context, hwndDlg);
+					break;
 
-			case TYPE_TYPE:
-				ObDumpObjectType(Context, hwndDlg);
-				break;
+				case TYPE_EVENT:
+				case TYPE_MUTANT:
+				case TYPE_SEMAPHORE:
+				case TYPE_TIMER:
+					ObDumpSyncObject(Context, hwndDlg);
+					break;
 
+				case TYPE_IOCOMPLETION:
+					ObDumpQueueObject(Context, hwndDlg);
+					break;
+
+				case TYPE_TYPE:
+					ObDumpObjectType(Context, hwndDlg);
+					break;
+				}
 			}
 		}
 		return 1;

@@ -237,6 +237,7 @@
   <ItemGroup>
     <ClCompile Include="aboutDlg.c" />
     <ClCompile Include="excepth.c" />
+    <ClCompile Include="extrasDlg.c" />
     <ClCompile Include="propObjectDump.c" />
     <ClCompile Include="propSecurity.c" />
     <ClCompile Include="instdrv.c" />
@@ -259,6 +260,7 @@
     <ClInclude Include="excepth.h" />
     <ClInclude Include="propBasicConsts.h" />
     <ClInclude Include="propDriverConsts.h" />
+    <ClInclude Include="extrasDlg.h" />
     <ClInclude Include="propObjectDump.h" />
     <ClInclude Include="propObjectDumpConsts.h" />
     <ClInclude Include="propSecurity.h" />
@@ -326,10 +328,25 @@
     <Image Include="rsrc\136.ico" />
     <Image Include="rsrc\137.ico" />
     <Image Include="rsrc\138.ico" />
+    <Image Include="rsrc\139.ico" />
+    <Image Include="rsrc\140.ico" />
+    <Image Include="rsrc\141.ico" />
+    <Image Include="rsrc\142.ico" />
+    <Image Include="rsrc\143.ico" />
+    <Image Include="rsrc\144.ico" />
+    <Image Include="rsrc\145.ico" />
+    <Image Include="rsrc\146.ico" />
+    <Image Include="rsrc\147.ico" />
+    <Image Include="rsrc\148.ico" />
+    <Image Include="rsrc\149.ico" />
     <Image Include="rsrc\6001.ico" />
     <Image Include="rsrc\6002.ico" />
     <Image Include="rsrc\Bitmap_125.bmp" />
     <Image Include="rsrc\objects.ico" />
+    <Image Include="rsrc\pipe.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="rsrc\kldbgdrv.sys" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

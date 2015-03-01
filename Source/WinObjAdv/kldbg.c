@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.00
+*  VERSION:     1.10
 *
-*  DATE:        22 Feb 2015 
+*  DATE:        27 Feb 2015 
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -921,15 +921,8 @@ VOID pkdQuerySystemInformation(
 
 	do {
 
-		miSpace = (PRTL_PROCESS_MODULES)VirtualAlloc(NULL, 1024 * 1024, 
-			MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+		miSpace = supGetSystemInfo(SystemModuleInformation);
 		if (miSpace == NULL) {
-			break;
-		}
-
-		if (!NT_SUCCESS(NtQuerySystemInformation(SystemModuleInformation,
-			miSpace, 1024 * 1024, &rl)))
-		{
 			break;
 		}
 
@@ -946,7 +939,7 @@ VOID pkdQuerySystemInformation(
 		_strcpyA(&KernelFullPathName[rl + 1],
 			(const char*)&miSpace->Modules[0].FullPathName[miSpace->Modules[0].OffsetToFileName]);
 		KernelBase = (ULONG_PTR)miSpace->Modules[0].ImageBase;
-		VirtualFree(miSpace, 0, MEM_RELEASE);
+		HeapFree(GetProcessHeap(), 0, miSpace);
 		miSpace = NULL;
 
 		MappedKernel = LoadLibraryExA(KernelFullPathName, NULL, DONT_RESOLVE_DLL_REFERENCES);
@@ -957,16 +950,25 @@ VOID pkdQuerySystemInformation(
 		FuncAddress = KernelBase + FuncAddress - (ULONG_PTR)MappedKernel;
 		kdReadSystemMemory(FuncAddress, &Context->SystemRangeStart, sizeof(ULONG_PTR));
 
+		//extra case
+		if (Context->SystemRangeStart == 0) {
+			if (g_kdctx.osver.dwBuildNumber < 9200) {			
+				Context->SystemRangeStart = 0xFFFF080000000000;
+			}
+			else {
+				Context->SystemRangeStart = 0xFFFF800000000000;
+			}
+		}
+
 	} while (cond);
 
 	if (MappedKernel != NULL) {
 		FreeLibrary(MappedKernel);
 	}
 	if (miSpace != NULL) {
-		VirtualFree(miSpace, 0, MEM_RELEASE);
+		HeapFree(GetProcessHeap(), 0, miSpace);
 	}
 }
-
 
 /*
 * pKdQueryProc
@@ -1009,8 +1011,7 @@ DWORD WINAPI kdQueryProc(
 * Enable Debug Privilege and open/load KLDBGDRV driver
 *
 * If there is no DEBUG mode OS flag or OS version is below than Windows 7 
-* this routine only does nothing except object list cs initiailization 
-* and global osver query. 
+* this routine only does nothing except global osver query. 
 *
 */
 VOID kdInit(
@@ -1019,13 +1020,12 @@ VOID kdInit(
 {
 	WCHAR szDrvPath[MAX_PATH * 2];
 
-	RtlSecureZeroMemory(&g_kdctx, sizeof(g_kdctx));
-	InitializeCriticalSection(&g_kdctx.ListLock);
-
 	/*
 	** Minimum supported client is windows 7
+	** Query version info in global context and  
+	** if version below Win7 - leave
 	*/
-	RtlSecureZeroMemory(&g_kdctx.osver, sizeof(g_kdctx.osver));
+	RtlSecureZeroMemory(&g_kdctx, sizeof(g_kdctx));
 	g_kdctx.osver.dwOSVersionInfoSize = sizeof(g_kdctx.osver);
 	RtlGetVersion(&g_kdctx.osver);
 	if (
@@ -1036,7 +1036,7 @@ VOID kdInit(
 		return;
 	}
 
-	//only init ListLock and version info
+	// no admin rights, leave
 	if (IsFullAdmin != TRUE)
 		return;
 
@@ -1071,6 +1071,7 @@ VOID kdInit(
 
 	//query global variable and dump object directory if driver support available.
 	if (g_kdctx.hDevice != NULL) {
+		InitializeCriticalSection(&g_kdctx.ListLock);
 		g_kdctx.hThreadWorker = CreateThread(NULL, 0, kdQueryProc, &g_kdctx, 0, NULL);
 		g_kdctx.IopInvalidDeviceRequest = kdQueryIopInvalidDeviceRequest();
 	}

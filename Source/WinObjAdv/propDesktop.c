@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDESKTOP.C
 *
-*  VERSION:     1.00
+*  VERSION:     1.10
 *
-*  DATE:        12 Feb 2015
+*  DATE:        28 Feb 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -328,9 +328,8 @@ VOID DesktopListHandleNotify(
 
 	case NM_DBLCLK:
 		/*
-		* a very basic support for this type
+		* A very basic support for this type
 		* desktop described by win32k PDESKTOP structure which is totally undocumented
-		*
 		*/
 		sz = 0;
 		lpItemText = supGetItemText(DesktopList, ListView_GetSelectionMark(DesktopList), 0, &sz);
@@ -341,7 +340,7 @@ VOID DesktopListHandleNotify(
 					l = i + 1;
 			lpName = &lpItemText[l];
 			//hwndDlg set to mainwindow on purpose
-			propCreateDialog(hwndDlg, lpName, T_ObjectNames[TYPE_DESKTOP]);
+			propCreateDialog(hwndDlg, lpName, T_ObjectNames[TYPE_DESKTOP], NULL);
 			HeapFree(GetProcessHeap(), 0, lpItemText);
 		}
 		break;

@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.00
+*  VERSION:     1.10
 *
-*  DATE:        23 Feb 2015
+*  DATE:        01 Mar 2015
 *
 *  Common header file for the program support routines.
 *
@@ -79,8 +79,19 @@ typedef struct _ENUMICONINFO {
 #define TYPE_TMTM                   32
 #define TYPE_TMRM                   33
 #define TYPE_TMEN                   34
-#define TYPE_UNKNOWN                35
-#define TYPE_MAX					36
+#define TYPE_PCWOBJECT				35
+#define TYPE_FLTCONN_PORT			36
+#define TYPE_FLTCOMM_PORT			37
+#define TYPE_POWER_REQUEST			38
+#define TYPE_ETWCONSUMER			39
+#define TYPE_TPWORKERFACTORY		40
+#define TYPE_COMPOSITION			41
+#define TYPE_IRTIMER				42
+#define TYPE_DXGKSHAREDRES			43
+#define TYPE_DXGKSHAREDSWAPCHAIN	44
+#define TYPE_DXGKSHAREDSYNC			45
+#define TYPE_UNKNOWN                46
+#define TYPE_MAX					47
 
 typedef struct _LANGANDCODEPAGE {
 	WORD wLanguage;
@@ -102,6 +113,7 @@ typedef struct _SAPIDBENTRY {
 
 extern LPCWSTR T_ObjectNames[TYPE_MAX];
 extern ENUM_PARAMS	g_enumParams;
+extern POBJECT_TYPES_INFORMATION g_pObjectTypesInfo;
 
 //global variables
 LPWSTR	g_lpKnownDlls32;
@@ -197,6 +209,11 @@ VOID supShutdown(
 
 PVOID supGetObjectTypesInfo(
 	VOID
+	);
+
+VOID supShowProperties(
+	_In_ HWND hwndDlg,
+	_In_ LPWSTR lpFileName
 	);
 
 VOID supClipboardCopy(

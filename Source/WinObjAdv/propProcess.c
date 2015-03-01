@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPPROCESS.C
 *
-*  VERSION:     1.00
+*  VERSION:     1.10
 *
-*  DATE:        19 Feb 2015
+*  DATE:        25 Feb 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -18,6 +18,9 @@
 #include "global.h"
 #include "propDlg.h"
 #include "propProcess.h"
+
+//number of columns, revise this unit code after any change to this number
+#define PROCESSLIST_COLUMN_COUNT 4
 
 //page imagelist
 HIMAGELIST ProcessImageList = NULL;
@@ -49,12 +52,12 @@ INT CALLBACK ProcessListCompareFunc(
 
 	sz1 = 0;
 	lpItem1 = supGetItemText(ProcessList, (INT)lParam1, (INT)lParamSort, &sz1);
-	if (lpItem1 == NULL)
+	if (lpItem1 == NULL) //can't be 0 for this dialog
 		return 0;
 
 	sz2 = 0;
 	lpItem2 = supGetItemText(ProcessList, (INT)lParam2, (INT)lParamSort, &sz2);
-	if (lpItem2 == NULL)
+	if (lpItem2 == NULL) //can't be 0 for this dialog
 		return 0;
 
 	switch (lParamSort) {
@@ -98,6 +101,62 @@ INT CALLBACK ProcessListCompareFunc(
 	return nResult;
 }
 
+VOID ProcessShowProperties(
+	HWND hwndDlg,
+	INT iItem
+	)
+{
+	LPWSTR				Buffer;
+	DWORD				dwProcessId;
+	ULONG				bytesNeeded;
+	HANDLE				hProcess;
+	NTSTATUS			status;
+	PUNICODE_STRING		dynUstr;
+	OBJECT_ATTRIBUTES	obja;
+	CLIENT_ID			cid;
+
+	__try {
+		//query process id
+		Buffer = supGetItemText(ProcessList, iItem, 1, NULL);
+		if (Buffer) {
+			dwProcessId = strtoulW(Buffer);
+			HeapFree(GetProcessHeap(), 0, Buffer);
+
+			//query process win32 image path
+			//1. open target process
+			cid.UniqueProcess = (HANDLE)dwProcessId;
+			cid.UniqueThread = NULL;
+			InitializeObjectAttributes(&obja, NULL, 0, NULL, NULL);
+			status = NtOpenProcess(&hProcess, PROCESS_QUERY_LIMITED_INFORMATION, &obja, &cid);
+			if (NT_SUCCESS(status)) {
+				bytesNeeded = 0;
+				//2. query required buffer size
+				NtQueryInformationProcess(hProcess, ProcessImageFileNameWin32, NULL, 0, &bytesNeeded);
+				if (bytesNeeded) {
+					Buffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytesNeeded);
+					if (Buffer) {
+						//3. query win32 filename
+						status = NtQueryInformationProcess(hProcess, ProcessImageFileNameWin32, Buffer,
+							bytesNeeded, &bytesNeeded);
+						if (NT_SUCCESS(status)) {
+							dynUstr = (PUNICODE_STRING)Buffer;
+							if (dynUstr->Buffer && dynUstr->Length) {
+								//4. shellexecute properties dialog
+								supShowProperties(hwndDlg, dynUstr->Buffer);
+							}
+						}
+						HeapFree(GetProcessHeap(), 0, Buffer);
+					}
+				}
+				NtClose(hProcess);
+			}
+		}
+	}
+	__except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
+		return;
+	}
+}
+
 
 /*
 * ProcessListHandleNotify
@@ -108,19 +167,21 @@ INT CALLBACK ProcessListCompareFunc(
 *
 */
 VOID ProcessListHandleNotify(
-	LPNMLISTVIEW	nhdr
+	HWND hwndDlg,
+	LPARAM lParam
 	)
 {
 	LVCOLUMNW		col;
 	INT				c;
+	LPNMHDR			nhdr = (LPNMHDR)lParam;
 
 	if (nhdr == NULL)
 		return;
 
-	if (nhdr->hdr.idFrom != ID_PROCESSLIST)
+	if (nhdr->idFrom != ID_PROCESSLIST)
 		return;
 
-	switch (nhdr->hdr.code) {
+	switch (nhdr->code) {
 
 	case LVN_COLUMNCLICK:
 		bProcessListSortInverse = !bProcessListSortInverse;
@@ -131,7 +192,7 @@ VOID ProcessListHandleNotify(
 		col.mask = LVCF_IMAGE;
 		col.iImage = -1;
 
-		for (c = 0; c < 4; c++)
+		for (c = 0; c < PROCESSLIST_COLUMN_COUNT; c++)
 			ListView_SetColumn(ProcessList, c, &col);
 
 		if (bProcessListSortInverse)
@@ -140,6 +201,10 @@ VOID ProcessListHandleNotify(
 			col.iImage = 2;
 
 		ListView_SetColumn(ProcessList, ((NMLISTVIEW *)nhdr)->iSubItem, &col);
+		break;
+
+	case NM_DBLCLK:
+		ProcessShowProperties(hwndDlg, ((LPNMITEMACTIVATE)lParam)->iItem);
 		break;
 
 	default:
@@ -197,7 +262,8 @@ BOOL ProcessQueryInfo(
 		if (bytesNeeded) {
 			Buffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytesNeeded);
 			if (Buffer) {
-				status = NtQueryInformationProcess(hProcess, ProcessImageFileNameWin32, Buffer, bytesNeeded, &bytesNeeded);
+				status = NtQueryInformationProcess(hProcess, ProcessImageFileNameWin32, Buffer, 
+					bytesNeeded, &bytesNeeded);
 				if (NT_SUCCESS(status)) {
 					dynUstr = (PUNICODE_STRING)Buffer;
 					if (dynUstr->Buffer && dynUstr->Length) {
@@ -415,6 +481,9 @@ VOID ProcessListSetInfo(
 			case TYPE_WINSTATION:
 				DesiredAccess = WINSTA_READATTRIBUTES;
 				break;
+			case TYPE_IOCOMPLETION:
+				DesiredAccess = IO_COMPLETION_QUERY_STATE;
+				break;
 			default:
 				DesiredAccess = MAXIMUM_ALLOWED;
 				break;
@@ -553,16 +622,114 @@ VOID ProcessListCreate(
 }
 
 /*
+* ProcessHandlePopupMenu
+*
+* Purpose:
+*
+* Process list popup construction
+*
+*/
+VOID ProcessHandlePopupMenu(
+	_In_ HWND hwndDlg
+	)
+{
+	POINT pt1;
+	HMENU hMenu;
+
+	if (GetCursorPos(&pt1) != TRUE)
+		return;
+
+	hMenu = CreatePopupMenu();
+	if (hMenu == NULL)
+		return;
+
+	InsertMenu(hMenu, 0, MF_BYCOMMAND, ID_OBJECT_COPY, T_COPYTEXTROW);
+
+	TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, hwndDlg, NULL);
+	DestroyMenu(hMenu);
+}
+
+/*
+* ProcessCopyText
+*
+* Purpose:
+*
+* Copy selected list view row to the clipboard.
+*
+*/
+VOID ProcessCopyText(
+	_In_ HWND hwndDlg
+	)
+{
+	INT		nSelection, i;
+	SIZE_T	cbText, sz;
+	LPWSTR	lpText, lpItemText[4];
+	HWND	hwndList;
+
+
+	hwndList = GetDlgItem(hwndDlg, ID_PROCESSLIST);
+	if (hwndList == NULL) {
+		return;
+	}
+
+	if (ListView_GetSelectedCount(hwndList) == 0) {
+		return;
+	}
+
+	nSelection = ListView_GetSelectionMark(hwndList);
+	if (nSelection == -1) {
+		return;
+	}
+
+	__try {
+		cbText = 0;
+		for (i = 0; i < PROCESSLIST_COLUMN_COUNT; i++) {
+			sz = 0;
+			lpItemText[i] = supGetItemText(hwndList, nSelection, i, &sz);
+			cbText += sz;
+		}
+
+		cbText += (PROCESSLIST_COLUMN_COUNT * sizeof(WCHAR)) + sizeof(UNICODE_NULL);
+		lpText = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, cbText);
+		if (lpText) {
+
+			for (i = 0; i < PROCESSLIST_COLUMN_COUNT; i++) {
+				if (lpItemText[i]) {
+					_strcat(lpText, lpItemText[i]);
+					if (i != 3) {
+						_strcat(lpText, L" ");
+					}
+				}
+			}
+			supClipboardCopy(lpText, cbText);
+			HeapFree(GetProcessHeap(), 0, lpText);
+		}
+		for (i = 0; i < PROCESSLIST_COLUMN_COUNT; i++) {
+			if (lpItemText[i] != NULL) {
+				HeapFree(GetProcessHeap(), 0, lpItemText[i]);
+			}
+		}
+	}
+	__except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
+		return;
+	}
+}
+
+/*
 * ProcessListDialogProc
 *
 * Purpose:
 *
 * Process list page for various object types.
 *
-* WM_INITDIALOG - Initialize listview, set window prop with context.
+* WM_INITDIALOG - Initialize listview, set window prop with context,
+* collect processes info and fill list.
+*
 * WM_NOTIFY - Handle list view notifications.
-* WM_SHOWWINDOW - Collect processes info and fill list.
+*
 * WM_DESTROY - Free image list and remove window prop.
+*
+* WM_CONTEXTMENU - Handle popup menu.
 *
 */
 INT_PTR CALLBACK ProcessListDialogProc(
@@ -572,26 +739,24 @@ INT_PTR CALLBACK ProcessListDialogProc(
 	_In_  LPARAM lParam
 	)
 {
-	LPNMLISTVIEW	nhdr;
 	PROPSHEETPAGE *pSheet = NULL;
 	PROP_OBJECT_INFO *Context = NULL;
 
 	switch (uMsg) {
 
-	case WM_SHOWWINDOW:
-		if (wParam) {
-			Context = GetProp(hwndDlg, T_PROPCONTEXT);
-			ProcessListSetInfo(Context, hwndDlg);
-			if (ProcessList) {
-				ListView_SortItemsEx(ProcessList, &ProcessListCompareFunc, ProcessListSortColumn);
-			}
-			return 1;
+	case WM_CONTEXTMENU:
+		ProcessHandlePopupMenu(hwndDlg);
+		break;
+
+	case WM_COMMAND:
+
+		if (LOWORD(wParam) == ID_OBJECT_COPY) {
+			ProcessCopyText(hwndDlg);
 		}
 		break;
 
 	case WM_NOTIFY:
-		nhdr = (LPNMLISTVIEW)lParam;
-		ProcessListHandleNotify(nhdr);
+		ProcessListHandleNotify(hwndDlg, lParam);
 		return 1;
 		break;
 
@@ -606,9 +771,16 @@ INT_PTR CALLBACK ProcessListDialogProc(
 
 		pSheet = (PROPSHEETPAGE *)lParam;
 		if (pSheet) {
-			SetProp(hwndDlg, T_PROPCONTEXT, (HANDLE)pSheet->lParam);
+			Context = (PROP_OBJECT_INFO *)pSheet->lParam;
+			SetProp(hwndDlg, T_PROPCONTEXT, (HANDLE)Context);
+
+			ProcessListCreate(hwndDlg);
+			if (ProcessList) {
+				ProcessListSetInfo(Context, hwndDlg);
+				ListView_SortItemsEx(ProcessList, &ProcessListCompareFunc, ProcessListSortColumn);
+			}
+
 		}
-		ProcessListCreate(hwndDlg);
 		return 1;
 		break;
 

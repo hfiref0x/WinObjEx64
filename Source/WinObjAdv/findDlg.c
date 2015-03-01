@@ -4,9 +4,9 @@
 *
 *  TITLE:       FINDDLG.C
 *
-*  VERSION:     1.00
+*  VERSION:     1.10
 *
-*  DATE:        17 Feb 2015
+*  DATE:        27 Feb 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -280,7 +280,6 @@ INT_PTR CALLBACK FindDlgProc(
 	LPWSTR			pnamestr = (LPWSTR)search_string, ptypestr = (LPWSTR)type_name;
 	PFO_LIST_ITEM	flist, plist;
 	ULONG			cci;
-	HANDLE			hIcon = NULL;
 	LPNMLISTVIEW	nhdr = (LPNMLISTVIEW)lParam;
 
 	switch (uMsg) {
@@ -298,11 +297,6 @@ INT_PTR CALLBACK FindDlgProc(
 	case WM_INITDIALOG:
 		supCenterWindow(hwndDlg);
 		FindDlgResize(hwndDlg);
-		hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN), IMAGE_ICON, 0, 0, LR_SHARED);
-		if (hIcon) {
-			SetClassLongPtr(hwndDlg, GCLP_HICON, (LONG_PTR)hIcon);
-			DestroyIcon(hIcon);
-		}
 		break;
 
 	case WM_SIZE:
@@ -371,85 +365,94 @@ INT_PTR CALLBACK FindDlgProc(
 *
 * Enumerate object types and fill combobox with them.
 *
-* Elevation required.
-*
 */
 VOID FindDlgAddTypes(
 	HWND hwnd
 	)
 {
-	OBJECT_ATTRIBUTES	objattr;
-	UNICODE_STRING		objname;
-	HANDLE				hDirectory = NULL;
-	NTSTATUS			status;
-	ULONG				ctx, rlen;
-	BOOL				cond = TRUE;
+	ULONG							i;
+	HWND							hComboBox;
+	SIZE_T							sz;
+	LPWSTR							lpType;
+	POBJECT_TYPE_INFORMATION		pObject;
 
-	POBJECT_DIRECTORY_INFORMATION	objinf;
+	hComboBox = GetDlgItem(hwnd, ID_SEARCH_TYPE);
+	if (hComboBox == NULL) {
+		return;
+	}
 
-	HWND hComboBox = GetDlgItem(hwnd, ID_SEARCH_TYPE);
-	if (hComboBox) {
+	SendMessage(hComboBox, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
 
-		SendMessage(hComboBox, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
+	if (g_pObjectTypesInfo == NULL) {
+		SendMessage(hComboBox, CB_ADDSTRING, (WPARAM)0, (LPARAM)L"*");
+		SendMessage(hComboBox, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
+		return;
+	}
 
-		RtlSecureZeroMemory(&objname, sizeof(objname));
-		RtlInitUnicodeString(&objname, L"\\ObjectTypes");
-		InitializeObjectAttributes(&objattr, &objname, OBJ_CASE_INSENSITIVE, NULL, NULL);
-		status = NtOpenDirectoryObject(&hDirectory, FILE_LIST_DIRECTORY, &objattr);
-
-		if (NT_SUCCESS(status)) {
-
-			ctx = 0;
-			do {
-				rlen = 0;
-				status = NtQueryDirectoryObject(hDirectory, NULL, 0, TRUE, FALSE, &ctx, &rlen);
-				if (status != STATUS_BUFFER_TOO_SMALL)
-					break;
-
-				objinf = HeapAlloc(GetProcessHeap(), 0, rlen);
-				if (objinf == NULL)
-					break;
-
-				RtlSecureZeroMemory(objinf, rlen);
-				status = NtQueryDirectoryObject(hDirectory, objinf, rlen, TRUE, FALSE, &ctx, &rlen);
-				if (!NT_SUCCESS(status)) {
-					HeapFree(GetProcessHeap(), 0, objinf);
-					break;
-				}
-
-				SendMessage(hComboBox, CB_ADDSTRING, (WPARAM)0, (LPARAM)objinf->Name.Buffer);
-
-				HeapFree(GetProcessHeap(), 0, objinf);
-			} while (cond);
-
-			NtClose(hDirectory);
+	//
+	// Since this enumeration fully based on bugged MS code
+	// take it in try/except as it may produce unexpected behaviour
+	//
+	__try {
+		//type collection available, list it
+		pObject = (POBJECT_TYPE_INFORMATION)&g_pObjectTypesInfo->TypeInformation;
+		for (i = 0; i < g_pObjectTypesInfo->NumberOfTypes; i++) {
+			//
+			//Thanks to MS copy-pasters we need to allocate buffer for each type name
+			//to exclude situation with their inproper zero terminated object name,
+			//like in case of TmTx.
+			//
+			sz = pObject->TypeName.MaximumLength + sizeof(UNICODE_NULL);
+			lpType = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sz);
+			if (lpType) {
+				_strncpyW(lpType, sz / sizeof(WCHAR),
+					pObject->TypeName.Buffer, pObject->TypeName.Length / sizeof(WCHAR));
+				SendMessage(hComboBox, CB_ADDSTRING, (WPARAM)0, (LPARAM)lpType);
+				HeapFree(GetProcessHeap(), 0, lpType);
+			}
+			pObject = (POBJECT_TYPE_INFORMATION)((PCHAR)(pObject + 1) +
+				ALIGN_UP(pObject->TypeName.MaximumLength, sizeof(ULONG_PTR)));
 		}
 		SendMessage(hComboBox, CB_ADDSTRING, (WPARAM)0, (LPARAM)L"*");
 		SendMessage(hComboBox, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
 	}
+	__except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
+		return;
+	}
 }
 
 /*
-* FindDlgInit
+* FindDlgCreate
 *
 * Purpose:
 *
-* Initialize Find Dialog.
+* Create and initialize Find Dialog.
 *
 */
-VOID FindDlgInit(
-	VOID
+VOID FindDlgCreate(
+	_In_ HWND hwndParent
 	)
 {
 	LVCOLUMNW	col;
+	HICON		hIcon;
 
 	//do not allow second copy
-	if (FindDialog)
+	if (FindDialog) {
 		return;
+	}
 
-	FindDialog = CreateDialogParam(g_hInstance, MAKEINTRESOURCE(IDD_DIALOG_SEARCH), MainWindow, &FindDlgProc, 0);
-	if (FindDialog == NULL)
+	FindDialog = CreateDialogParam(g_hInstance, MAKEINTRESOURCE(IDD_DIALOG_SEARCH), hwndParent, &FindDlgProc, 0);
+	if (FindDialog == NULL) {
 		return;
+	}
+
+	//set dialog icon, because we use shared dlg template this icon must be
+	//removed after use, see aboutDlg/propDlg.
+	hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN), IMAGE_ICON, 0, 0, LR_SHARED);
+	if (hIcon) {
+		SetClassLongPtr(FindDialog, GCLP_HICON, (LONG_PTR)hIcon);
+		DestroyIcon(hIcon);
+	}
 
 	FindDlgList = GetDlgItem(FindDialog, ID_SEARCH_LIST);
 	if (FindDlgList) {

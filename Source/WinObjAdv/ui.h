@@ -4,9 +4,9 @@
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.00
+*  VERSION:     1.10
 *
-*  DATE:        21 Feb 2015
+*  DATE:        24 Feb 2015
 *
 *  Common header file for the user interface.
 *
@@ -32,7 +32,7 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 	_In_ DWORD_PTR dwData
 	);
 
-#define PROGRAM_VERSION				L"1.0.0"
+#define PROGRAM_VERSION				L"1.1.0"
 #define PROGRAM_NAME				L"Windows Object Explorer 64-bit"
 #define PROFRAM_NAME_AND_TITLE		L"Object Explorer for Windows 7/8/8.1/10"
 #define MAINWINDOWCLASSNAME			L"WinObjAdvClass"
@@ -41,13 +41,13 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 #define T_PROPERTIES				L"Properties...\tEnter"
 #define T_GOTOLINKTARGET			L"Go To Link Target\tCtrl+->"
 #define T_RUNASADMIN				L"R&un as Administrator"
-#define T_COPYADDRESS				L"Copy Address"
-#define T_COPYVALUE					L"Copy Value field text"
+#define T_COPYTEXTROW				L"Copy Row Selection"
+#define T_COPYVALUE					L"Copy Value Field Text"
 
 
 //global variables
 BOOL			bSortInverse;
-HWND			MainWindow, StatusBar, ObjectTree, ObjectList, ToolBar1, Splitter, FindDialog;
+HWND			MainWindow, StatusBar, ObjectTree, ObjectList, ToolBar1, Splitter, FindDialog, PipeDialog;
 LPWSTR			CurrentObjectPath;
 HIMAGELIST		TreeViewImages, ListViewImages, ToolBarMenuImages;
 pfnHtmlHelpW	pHtmlHelpW;

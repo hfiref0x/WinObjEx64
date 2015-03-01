@@ -4,9 +4,9 @@
 *
 *  TITLE:       LIST.C
 *
-*  VERSION:     1.00
+*  VERSION:     1.10
 *
-*  DATE:        18 Feb 2015
+*  DATE:        27 Feb 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -15,8 +15,6 @@
 *
 *******************************************************************************/
 #include "global.h"
-
-#pragma comment(lib, "ntdll.lib")
 
 /*
 * GetNextSub
@@ -31,7 +29,7 @@ LPWSTR GetNextSub(
 	LPWSTR Sub
 	)
 {
-	size_t i;
+	SIZE_T i;
 
 	for (i = 0; (*ObjectFullPathName != 0) && (*ObjectFullPathName != '\\') && (i < MAX_PATH); i++, ObjectFullPathName++)
 		Sub[i] = *ObjectFullPathName;
@@ -212,7 +210,9 @@ VOID ListObjectDirectoryTree(
 			break;
 		}
 
-		if (_strcmpiW(objinf->TypeName.Buffer, T_ObjectNames[TYPE_DIRECTORY]) == 0) {
+		if (_strncmpiW(objinf->TypeName.Buffer, T_ObjectNames[TYPE_DIRECTORY], 
+			objinf->TypeName.Length / sizeof(WCHAR)) == 0) 
+		{
 			ListObjectDirectoryTree(objinf->Name.Buffer, hDirectory, ViewRootHandle);
 		};
 
@@ -237,10 +237,11 @@ VOID AddListViewItem(
 	_In_ PENUM_PARAMS lpEnumParams
 	)
 {
-	LVITEMW				lvitem;
-	INT					index;
-	BOOL				bFound = FALSE;
-	WCHAR				szBuffer[MAX_PATH + 1];
+	BOOL		bFound = FALSE;
+	INT			index;
+	SIZE_T		cch;
+	LVITEMW		lvitem;
+	WCHAR		szBuffer[MAX_PATH + 1];
 
 	if (!objinf) return;
 
@@ -258,59 +259,56 @@ VOID AddListViewItem(
 	lvitem.iItem = index;
 	ListView_SetItem(ObjectList, &lvitem);
 
-	if (_strcmpiW(objinf->TypeName.Buffer, T_ObjectNames[TYPE_SYMLINK]) == 0) {
-		RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-		if (supQueryLinkTarget(hObjectRootDirectory, &objinf->Name, szBuffer, MAX_PATH * sizeof(WCHAR)))
-			bFound = TRUE;
-	}
-	if (bFound != TRUE) {
-		if (_strcmpiW(objinf->TypeName.Buffer, T_ObjectNames[TYPE_SECTION]) == 0) {
-			RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-			if (supQuerySectionFileInfo(hObjectRootDirectory, &objinf->Name, szBuffer, MAX_PATH))
-				bFound = TRUE;
-		}
-	}
-	if (bFound != TRUE) {
-		if (_strcmpiW(objinf->TypeName.Buffer, T_ObjectNames[TYPE_DRIVER]) == 0)
-		{
-			RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-			if (
-				supQueryDriverDescription(
-				objinf->Name.Buffer,
-				lpEnumParams->scmSnapshot,
-				lpEnumParams->scmNumberOfEntries,
-				szBuffer, MAX_PATH)
-				)
-				bFound = TRUE;
-		}
+	cch = objinf->TypeName.Length / sizeof(WCHAR);
+	RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+
+	//check SymbolicLink
+	if (_strncmpiW(objinf->TypeName.Buffer, T_ObjectNames[TYPE_SYMLINK], cch) == 0) {
+		bFound = supQueryLinkTarget(hObjectRootDirectory,
+			&objinf->Name, szBuffer, MAX_PATH * sizeof(WCHAR));
+		goto Done;
 	}
 
-	if (bFound != TRUE) {
-		if (_strcmpiW(objinf->TypeName.Buffer, T_ObjectNames[TYPE_DEVICE]) == 0)
-		{
-			RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-			if (
-				supQueryDeviceDescription(
-				objinf->Name.Buffer,
-				lpEnumParams->sapiDB,
-				szBuffer, MAX_PATH)
-				)
-				bFound = TRUE;
-		}
-	}
-	if (bFound != TRUE) {
-		if (_strcmpiW(objinf->TypeName.Buffer, T_ObjectNames[TYPE_WINSTATION]) == 0) {
-			RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-			bFound = supQueryWinstationDescription(objinf->Name.Buffer, szBuffer, MAX_PATH);
-		}
-	}
-	if (bFound != TRUE) {
-		if (_strcmpiW(objinf->TypeName.Buffer, T_ObjectNames[TYPE_TYPE]) == 0) {
-			RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-			bFound = supQueryTypeInfo(objinf->Name.Buffer, szBuffer, MAX_PATH);
-		}
+	//check Section
+	if (_strncmpiW(objinf->TypeName.Buffer, T_ObjectNames[TYPE_SECTION], cch) == 0) {
+		bFound = supQuerySectionFileInfo(hObjectRootDirectory, &objinf->Name, szBuffer, MAX_PATH);
+		goto Done;
 	}
 
+	//check Driver
+	if (_strncmpiW(objinf->TypeName.Buffer, T_ObjectNames[TYPE_DRIVER], cch) == 0) {
+		bFound =supQueryDriverDescription(
+			objinf->Name.Buffer,
+			lpEnumParams->scmSnapshot, 
+			lpEnumParams->scmNumberOfEntries,
+			szBuffer, MAX_PATH
+			);
+		goto Done;
+	}
+
+	//check Device
+	if (_strncmpiW(objinf->TypeName.Buffer, T_ObjectNames[TYPE_DEVICE], cch) == 0) {
+		bFound = supQueryDeviceDescription(
+			objinf->Name.Buffer,
+			lpEnumParams->sapiDB,
+			szBuffer, MAX_PATH
+			);
+		goto Done;
+	}
+
+	//check WindowStation
+	if (_strncmpiW(objinf->TypeName.Buffer, T_ObjectNames[TYPE_WINSTATION], cch) == 0) {
+		bFound = supQueryWinstationDescription(objinf->Name.Buffer, szBuffer, MAX_PATH);
+		goto Done;
+	}
+
+	//check Type
+	if (_strncmpiW(objinf->TypeName.Buffer, T_ObjectNames[TYPE_TYPE], cch) == 0) {
+		bFound = supQueryTypeInfo(objinf->Name.Buffer, szBuffer, MAX_PATH);
+//		goto Done;
+	}
+
+Done:
 	//finally add information if exists
 	if (bFound != FALSE) {
 		lvitem.mask = LVIF_TEXT;
@@ -360,11 +358,10 @@ VOID ListObjectsInDirectory(
 		if (status != STATUS_BUFFER_TOO_SMALL)
 			break;
 
-		objinf = HeapAlloc(GetProcessHeap(), 0, rlen);
+		objinf = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, rlen);
 		if (objinf == NULL)
 			break;
 
-		RtlSecureZeroMemory(objinf, rlen);
 		status = NtQueryDirectoryObject(hDirectory, objinf, rlen, TRUE, FALSE, &ctx, &rlen);
 		if (!NT_SUCCESS(status)) {
 			HeapFree(GetProcessHeap(), 0, objinf);
@@ -422,11 +419,10 @@ VOID FindObject(
 		if (status != STATUS_BUFFER_TOO_SMALL)
 			break;
 
-		objinf = HeapAlloc(GetProcessHeap(), 0, rlen);
+		objinf = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, rlen);
 		if (objinf == NULL)
 			break;
 
-		RtlSecureZeroMemory(objinf, rlen);
 		status = NtQueryDirectoryObject(hDirectory, objinf, rlen, TRUE, FALSE, &ctx, &rlen);
 		if (!NT_SUCCESS(status)) {
 			HeapFree(GetProcessHeap(), 0, objinf);
@@ -435,7 +431,8 @@ VOID FindObject(
 
 		if ((_strstriW(objinf->Name.Buffer, NameSubstring) != 0) || (NameSubstring == NULL))
 			if ((_strcmpiW(objinf->TypeName.Buffer, TypeName) == 0) || (TypeName == NULL)) {
-				tmp = HeapAlloc(GetProcessHeap(), 0, sizeof(FO_LIST_ITEM) + objinf->Name.Length + objinf->TypeName.Length + (sdlen + 4) * sizeof(WCHAR));
+				tmp = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 
+					sizeof(FO_LIST_ITEM) + objinf->Name.Length + objinf->TypeName.Length + (sdlen + 4) * sizeof(WCHAR));
 				if (tmp == NULL) {
 					HeapFree(GetProcessHeap(), 0, objinf);
 					break;
@@ -456,7 +453,7 @@ VOID FindObject(
 			};
 
 		if (_strcmpiW(objinf->TypeName.Buffer, T_ObjectNames[TYPE_DIRECTORY]) == 0) {
-			newdir = HeapAlloc(GetProcessHeap(), 0, (sdlen + 4)*sizeof(WCHAR) + objinf->Name.Length);
+			newdir = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (sdlen + 4)*sizeof(WCHAR) + objinf->Name.Length);
 			if (newdir != NULL) {
 				_strcpyW(newdir, DirName);
 				if ((DirName[0] == '\\') && (DirName[1] == 0)) {

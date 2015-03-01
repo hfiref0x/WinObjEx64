@@ -6,9 +6,11 @@ aboutDlg.h
 excepth.c - custom access violation exception handler including minidump
 excepth.h
 
+extrasDlg.c - extras menu dialogs: Pipe Dialog
+extrasDlg.h
+
 findDlg.c - Find Object routines including window dialog procedure
 findDlg.h
-
 
 instdrv.c - driver installation routines
 instdrv.h

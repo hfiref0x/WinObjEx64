@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMPCONSTS.H
 *
-*  VERSION:     1.00
+*  VERSION:     1.10
 *
-*  DATE:        21 Feb 2015
+*  DATE:        24 Feb 2015
 *
 *  Consts header file for Object Dump module.
 *
@@ -41,6 +41,7 @@
 #define T_KMUTANT					L"KMUTANT"
 #define T_KSEMAPHORE				L"KSEMAPHORE"
 #define T_KTIMER					L"KTIMER"
+#define T_KQUEUE					L"KQUEUE"
 #define T_PKDPC						L"PKDPC"
 #define T_GENERIC_MAPPING			L"GENERIC_MAPPING"
 

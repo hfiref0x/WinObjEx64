@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPTYPE.H
 *
-*  VERSION:     1.00
+*  VERSION:     1.10
 *
-*  DATE:        09 Feb 2015
+*  DATE:        25 Feb 2015
 *
 *  Common header file for Basic property sheet.
 *

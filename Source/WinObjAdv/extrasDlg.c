@@ -332,6 +332,10 @@ VOID PipeDlgShowProperties(
 	WCHAR				szCaption[MAX_PATH];
 
 	Context = propContextCreate(NULL, NULL, NULL, NULL);
+	if (Context == NULL) {
+		return;
+	}
+
 	Context->lpObjectName = supGetItemText(PipeDlgList, iItem, 0, NULL);
 	Context->lpCurrentObjectPath = PipeCreateFullName(Context->lpObjectName);
 

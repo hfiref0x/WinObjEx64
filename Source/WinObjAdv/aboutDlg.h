@@ -4,9 +4,9 @@
 *
 *  TITLE:       ABOUTDLG.H
 *
-*  VERSION:     1.00
+*  VERSION:     1.11
 *
-*  DATE:        12 Feb 2015
+*  DATE:        10 Mar 2015
 *
 *  Common header file for the About Dialog.
 *

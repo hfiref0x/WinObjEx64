@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASDLG.C
 *
-*  VERSION:     1.10
+*  VERSION:     1.11
 *
-*  DATE:        27 Feb 2015
+*  DATE:        10 Mar 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -55,9 +55,9 @@ VOID PipeDisplayError(
 	ShowWindow(GetDlgItem(hwndDlg, ID_PIPE_QUERYFAIL), SW_SHOW);
 
 	RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-	_strcpyW(szBuffer, L"Cannot open pipe because: ");
+	_strcpy(szBuffer, L"Cannot open pipe because: ");
 	FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, dwLastError,
-		0, _strendW(szBuffer), MAX_PATH, NULL);
+		0, _strend(szBuffer), MAX_PATH, NULL);
 	SetDlgItemText(hwndDlg, ID_PIPE_QUERYFAIL, szBuffer);
 }
 
@@ -81,15 +81,15 @@ LPWSTR PipeCreateFullName(
 		return NULL;
 	}
 
-	sz = (_strlenW(T_DEVICE_NAMED_PIPE) + _strlenW(lpObjectName)) * sizeof(WCHAR) +
+	sz = (_strlen(T_DEVICE_NAMED_PIPE) + _strlen(lpObjectName)) * sizeof(WCHAR) +
 		sizeof(UNICODE_NULL);
 	lpFullName = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sz);
 	if (lpFullName == NULL) {
 		return lpFullName;
 	}
 
-	_strcpyW(lpFullName, T_DEVICE_NAMED_PIPE);
-	_strcatW(lpFullName, lpObjectName);
+	_strcpy(lpFullName, T_DEVICE_NAMED_PIPE);
+	_strcat(lpFullName, lpObjectName);
 	return lpFullName;
 }
 
@@ -215,15 +215,15 @@ VOID PipeQueryInfo(
 		}
 		SetDlgItemText(hwndDlg, ID_PIPE_ACCESSMODE, lpType);
 		
-		//Current Instances
+		//CurrentInstances
 		RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
 		ultostr(fpli.CurrentInstances, szBuffer);
 		SetDlgItemText(hwndDlg, ID_PIPE_CURINSTANCES, szBuffer);
 
-		//MaximumInstances Instances
+		//MaximumInstances
 		RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
 		if (fpli.MaximumInstances == MAXDWORD) {
-			_strcpyW(szBuffer, L"Unlimited");
+			_strcpy(szBuffer, L"Unlimited");
 		}
 		else {
 			ultostr(fpli.MaximumInstances, szBuffer);
@@ -370,7 +370,7 @@ VOID PipeDlgShowProperties(
 	//
 	//Create property sheet
 	//
-	_strcpyW(szCaption, L"Pipe Properties");
+	_strcpy(szCaption, L"Pipe Properties");
 	RtlSecureZeroMemory(&PropHeader, sizeof(PropHeader));
 	PropHeader.dwSize = sizeof(PropHeader);
 	PropHeader.phpage = epsp;
@@ -642,8 +642,6 @@ VOID extrasCreatePipeDialog(
 
 	PipeDlgList = GetDlgItem(PipeDialog, ID_PIPESLIST);
 	if (PipeDlgList) {
-		bPipeDlgSortInverse = FALSE;
-
 		PipeImageList = ImageList_Create(16, 16, ILC_COLOR32 | ILC_MASK, 42, 8);
 		if (PipeImageList) {
 

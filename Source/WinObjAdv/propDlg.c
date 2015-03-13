@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDLG.C
 *
-*  VERSION:     1.10
+*  VERSION:     1.11
 *
-*  DATE:        28 Feb 2015
+*  DATE:        10 Mar 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -104,7 +104,7 @@ BOOL propOpenCurrentObject(
 	if (Context->TypeIndex == TYPE_DIRECTORY) {
 
 		//if this is root, then root hDirectory = NULL
-		if (_strcmpiW(Context->lpObjectName, L"\\") != 0) {
+		if (_strcmpi(Context->lpObjectName, L"\\") != 0) {
 			//else open directory that holds this object
 			hDirectory = supOpenDirectoryForObject(Context->lpObjectName, Context->lpCurrentObjectPath);
 			if (hDirectory == NULL) {
@@ -256,10 +256,10 @@ PPROP_OBJECT_INFO propContextCreate(
 		if (lpObjectName) {
 			Context->lpObjectName = HeapAlloc(GetProcessHeap(),
 				HEAP_ZERO_MEMORY,
-				_strlenW(lpObjectName) * sizeof(WCHAR) + sizeof(UNICODE_NULL));
+				_strlen(lpObjectName) * sizeof(WCHAR) + sizeof(UNICODE_NULL));
 			if (Context->lpObjectName) {
-				_strcpyW(Context->lpObjectName, lpObjectName);
-				bSelectedObject = (_strcmpiW(Context->lpObjectName, L"ObjectTypes") == 0);
+				_strcpy(Context->lpObjectName, lpObjectName);
+				bSelectedObject = (_strcmpi(Context->lpObjectName, L"ObjectTypes") == 0);
 			}
 		}
 
@@ -267,9 +267,9 @@ PPROP_OBJECT_INFO propContextCreate(
 		if (lpObjectType) {
 			Context->lpObjectType = HeapAlloc(GetProcessHeap(),
 				HEAP_ZERO_MEMORY,
-				_strlenW(lpObjectType) * sizeof(WCHAR) + sizeof(UNICODE_NULL));
+				_strlen(lpObjectType) * sizeof(WCHAR) + sizeof(UNICODE_NULL));
 			if (Context->lpObjectType) {
-				_strcpyW(Context->lpObjectType, lpObjectType);
+				_strcpy(Context->lpObjectType, lpObjectType);
 			}
 			Context->TypeIndex = supGetObjectIndexByTypeName(lpObjectType);
 		}
@@ -278,10 +278,10 @@ PPROP_OBJECT_INFO propContextCreate(
 		if (lpCurrentObjectPath) {
 			Context->lpCurrentObjectPath = HeapAlloc(GetProcessHeap(),
 				HEAP_ZERO_MEMORY,
-				_strlenW(lpCurrentObjectPath) * sizeof(WCHAR) + sizeof(UNICODE_NULL));
+				_strlen(lpCurrentObjectPath) * sizeof(WCHAR) + sizeof(UNICODE_NULL));
 			if (Context->lpCurrentObjectPath) {
-				_strcpyW(Context->lpCurrentObjectPath, lpCurrentObjectPath);
-				bSelectedDirectory = (_strcmpiW(Context->lpCurrentObjectPath, T_OBJECTTYPES) == 0);
+				_strcpy(Context->lpCurrentObjectPath, lpCurrentObjectPath);
+				bSelectedDirectory = (_strcmpi(Context->lpCurrentObjectPath, T_OBJECTTYPES) == 0);
 			}
 		}
 
@@ -289,9 +289,9 @@ PPROP_OBJECT_INFO propContextCreate(
 		if (lpDescription) {
 			Context->lpDescription = HeapAlloc(GetProcessHeap(),
 				HEAP_ZERO_MEMORY,
-				_strlenW(lpDescription) * sizeof(WCHAR) + sizeof(UNICODE_NULL));
+				_strlen(lpDescription) * sizeof(WCHAR) + sizeof(UNICODE_NULL));
 			if (Context->lpDescription) {
-				_strcpyW(Context->lpDescription, lpDescription);
+				_strcpy(Context->lpDescription, lpDescription);
 			}
 		}
 
@@ -658,13 +658,13 @@ VOID propCreateDialog(
 	//Finally create property sheet
 	//
 	if (propContext->IsType) {
-		_strncpyW(szCaption, MAX_PATH, lpObjectName, _strlenW(lpObjectName));
+		_strncpy(szCaption, MAX_PATH, lpObjectName, _strlen(lpObjectName));
 	}
 	else {
-		_strncpyW(szCaption, MAX_PATH, lpObjectType, _strlenW(lpObjectType));
+		_strncpy(szCaption, MAX_PATH, lpObjectType, _strlen(lpObjectType));
 	}
 
-	_strcatW(szCaption, L" Properties");
+	_strcat(szCaption, L" Properties");
 	RtlSecureZeroMemory(&PropHeader, sizeof(PropHeader));
 	PropHeader.dwSize = sizeof(PropHeader);
 	PropHeader.phpage = psp;

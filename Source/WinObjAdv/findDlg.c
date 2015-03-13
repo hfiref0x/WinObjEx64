@@ -4,9 +4,9 @@
 *
 *  TITLE:       FINDDLG.C
 *
-*  VERSION:     1.10
+*  VERSION:     1.11
 *
-*  DATE:        27 Feb 2015
+*  DATE:        10 Mar 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -343,8 +343,8 @@ INT_PTR CALLBACK FindDlgProc(
 				cci++;
 			}
 
-			ultostrW(cci, search_string);
-			_strcatW(search_string, L" Object(s) found");
+			ultostr(cci, search_string);
+			_strcat(search_string, L" Object(s) found");
 			SendMessageW(GetDlgItem(hwndDlg, ID_SEARCH_GROUPBOX), WM_SETTEXT, 0, (LPARAM)search_string);
 
 			ListView_SortItemsEx(FindDlgList, &FindDlgCompareFunc, FindDlgSortColumn);
@@ -405,7 +405,7 @@ VOID FindDlgAddTypes(
 			sz = pObject->TypeName.MaximumLength + sizeof(UNICODE_NULL);
 			lpType = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sz);
 			if (lpType) {
-				_strncpyW(lpType, sz / sizeof(WCHAR),
+				_strncpy(lpType, sz / sizeof(WCHAR),
 					pObject->TypeName.Buffer, pObject->TypeName.Length / sizeof(WCHAR));
 				SendMessage(hComboBox, CB_ADDSTRING, (WPARAM)0, (LPARAM)lpType);
 				HeapFree(GetProcessHeap(), 0, lpType);

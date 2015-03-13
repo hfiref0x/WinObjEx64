@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.10
+*  VERSION:     1.11
 *
-*  DATE:        01 Mar 2015
+*  DATE:        10 Mar 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -105,7 +105,8 @@ BOOL supInitTreeListForDump(
 	GetClientRect(hwndParent, &rc);
 	TreeListAtom = InitializeTreeListControl();
 	TreeList = CreateWindowEx(WS_EX_CLIENTEDGE, WC_TREELIST, NULL,
-		WS_VISIBLE | WS_CHILD | WS_TABSTOP | TLSTYLE_COLAUTOEXPAND, 12, 20, rc.right - 24, rc.bottom - 30, hwndParent, NULL, NULL, NULL);
+		WS_VISIBLE | WS_CHILD | WS_TABSTOP | TLSTYLE_COLAUTOEXPAND, 12, 20, 
+		rc.right - 24, rc.bottom - 30, hwndParent, NULL, NULL, NULL);
 
 	if (TreeList == NULL) {
 		UnregisterClass(MAKEINTATOM(TreeListAtom), g_hInstance);
@@ -148,17 +149,16 @@ VOID supClipboardCopy(
 {
 	LPWSTR  lptstrCopy;
 	HGLOBAL hglbCopy;
-	SIZE_T	cch;
+	SIZE_T	dwSize;
 
 	if (OpenClipboard(NULL)) {
 		EmptyClipboard();
-		cch = cbText + sizeof(UNICODE_NULL);
-		hglbCopy = GlobalAlloc(GMEM_MOVEABLE, cch);
+		dwSize = cbText + sizeof(UNICODE_NULL);
+		hglbCopy = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, dwSize);
 		if (hglbCopy != NULL) {
 			lptstrCopy = GlobalLock(hglbCopy);
 			if (lptstrCopy) {
-				RtlSecureZeroMemory(lptstrCopy, cch);
-				supCopyMemory(lptstrCopy, cch, lpText, cbText);
+				supCopyMemory(lptstrCopy, dwSize, lpText, cbText);
 			}
 			GlobalUnlock(hglbCopy);
 			SetClipboardData(CF_UNICODETEXT, hglbCopy);
@@ -253,14 +253,14 @@ VOID supShowHelp(
 		}
 	}
 	if (lRet != ERROR_SUCCESS) {
-		_strcpyW(szOcxPath, HHCTRLOCX);
+		_strcpy(szOcxPath, HHCTRLOCX);
 	}
 
 	RtlSecureZeroMemory(szHelpFile, sizeof(szHelpFile));
 	if (!GetCurrentDirectory(MAX_PATH, szHelpFile)) {
 		return;
 	}
-	_strcatW(szHelpFile, L"\\winobjex64.chm");
+	_strcat(szHelpFile, L"\\winobjex64.chm");
 
 	hHtmlOcx = GetModuleHandle(HHCTRLOCX);
 	if (hHtmlOcx == NULL) {
@@ -329,15 +329,11 @@ HICON supGetMainIcon(
 
 	hModule = LoadLibraryEx(lpFileName, 0, LOAD_LIBRARY_AS_DATAFILE);
 	if (hModule != NULL) {
-		EnumResourceNames(hModule, RT_GROUP_ICON, (ENUMRESNAMEPROC)&supEnumIconCallback, (LONG_PTR)&pin);
+		EnumResourceNames(hModule, RT_GROUP_ICON, (ENUMRESNAMEPROC)&supEnumIconCallback, 
+			(LONG_PTR)&pin);
 		FreeLibrary(hModule);
 	}
 	return pin.hIcon;
-/*
-	SHFILEINFO shinfo;
-	RtlSecureZeroMemory(&shinfo, sizeof(shinfo));
-	SHGetFileInfo(lpFileName, 0, &shinfo, sizeof(shinfo), SHGFI_ICON | SHGFI_SMALLICON);
-	return shinfo.hIcon;*/
 }
 
 /*
@@ -628,7 +624,7 @@ INT supGetObjectIndexByTypeName(
 	}
 
 	for (nIndex = TYPE_DEVICE; nIndex < TYPE_UNKNOWN; nIndex++) {
-		if (_strcmpiW(lpTypeName, T_ObjectNames[nIndex]) == 0)
+		if (_strcmpi(lpTypeName, T_ObjectNames[nIndex]) == 0)
 			return nIndex;
 	}
 
@@ -637,7 +633,7 @@ INT supGetObjectIndexByTypeName(
 	// CompositionSurface, in Win8.1 MS renamed it to
 	// Composition, handle this.
 	//
-	if (_strcmpiW(lpTypeName, L"CompositionSurface") == 0) {
+	if (_strcmpi(lpTypeName, L"CompositionSurface") == 0) {
 		return TYPE_COMPOSITION;
 	}
 
@@ -789,7 +785,7 @@ BOOL supIsSymlink(
 	WCHAR ItemText[MAX_PATH + 1];
 	RtlSecureZeroMemory(ItemText, sizeof(ItemText));
 	ListView_GetItemText(ObjectList, iItem, 1, ItemText, MAX_PATH);
-	return (_strcmpiW(ItemText, T_ObjectNames[TYPE_SYMLINK]) == 0);
+	return (_strcmpi(ItemText, T_ObjectNames[TYPE_SYMLINK]) == 0);
 }
 
 /*
@@ -1193,7 +1189,7 @@ BOOL supQueryProcessName(
 
 	for (;;) {
 		if ((DWORD)pList->UniqueProcessId == dwProcessId) {		
-			_strncpyW(Buffer, ccBuffer, pList->ImageName.Buffer, pList->ImageName.Length / sizeof(WCHAR));
+			_strncpy(Buffer, ccBuffer, pList->ImageName.Buffer, pList->ImageName.Length / sizeof(WCHAR));
 			return TRUE;
 		}
 		if (pList->NextEntryDelta == 0)
@@ -1263,8 +1259,8 @@ PVOID supCreateSCMSnapshot(
 			break;
 		}
 		
-		bResult = EnumServicesStatusEx(schSCManager, SC_ENUM_PROCESS_INFO, SERVICE_DRIVER, SERVICE_STATE_ALL,
-			Services, dwSize, &dwBytesNeeded, &dwServicesReturned, NULL, NULL);	
+		bResult = EnumServicesStatusEx(schSCManager, SC_ENUM_PROCESS_INFO, SERVICE_DRIVER, 
+			SERVICE_STATE_ALL, Services, dwSize, &dwBytesNeeded, &dwServicesReturned, NULL, NULL);	
 		if (bResult != TRUE) {
 
 			if (GetLastError() == ERROR_MORE_DATA) {
@@ -1279,9 +1275,9 @@ PVOID supCreateSCMSnapshot(
 					break;
 				}
 
-				if (!EnumServicesStatusEx(schSCManager, SC_ENUM_PROCESS_INFO, SERVICE_DRIVER, SERVICE_STATE_ALL,
-					Services, dwSize, &dwBytesNeeded, &dwServicesReturned, NULL, NULL)) {
-
+				if (!EnumServicesStatusEx(schSCManager, SC_ENUM_PROCESS_INFO, SERVICE_DRIVER, 
+					SERVICE_STATE_ALL, Services, dwSize, &dwBytesNeeded, &dwServicesReturned, NULL, NULL)) 
+				{
 					VirtualFree(Services, 0, MEM_RELEASE);
 					Services = NULL;
 					break;
@@ -1332,6 +1328,7 @@ PVOID sapiCreateSetupDBSnapshot(
 
 	do {
 		sObj->hDevInfo = SetupDiGetClassDevsW(NULL, NULL, NULL, DIGCF_PRESENT | DIGCF_ALLCLASSES);
+
 		if (sObj->hDevInfo == INVALID_HANDLE_VALUE)
 			break;
 
@@ -1524,22 +1521,22 @@ BOOL supQueryWinstationDescription(
 		return bFound;
 	
 	lpType = NULL;
-	if (_strstriW(lpWindowStationName, T_WINSTA_SYSTEM) != NULL) {
+	if (_strstri(lpWindowStationName, T_WINSTA_SYSTEM) != NULL) {
 		lpType = L"System";
 		bFound = TRUE;
 		goto Done;
 	}
-	if (_strstriW(lpWindowStationName, T_WINSTA_ANONYMOUS) != NULL) {
+	if (_strstri(lpWindowStationName, T_WINSTA_ANONYMOUS) != NULL) {
 		lpType = L"Anonymous";
 		bFound = TRUE;
 		goto Done;
 	}
-	if (_strstriW(lpWindowStationName, T_WINSTA_LOCALSERVICE) != NULL) {
+	if (_strstri(lpWindowStationName, T_WINSTA_LOCALSERVICE) != NULL) {
 		lpType = L"Local Service";
 		bFound = TRUE;
 		goto Done;
 	}
-	if (_strstriW(lpWindowStationName, T_WINSTA_NETWORK_SERVICE) != NULL) {
+	if (_strstri(lpWindowStationName, T_WINSTA_NETWORK_SERVICE) != NULL) {
 		lpType = L"Network Service";
 		bFound = TRUE;
 	}
@@ -1603,7 +1600,7 @@ BOOL supFindModuleEntryByAddress(
 				MAX_PATH)
 				) 
 			{
-				_strncpyW(Buffer, ccBuffer, szBuffer, _strlenW(szBuffer));
+				_strncpy(Buffer, ccBuffer, szBuffer, _strlen(szBuffer));
 				return TRUE;
 			}
 			else { //MultiByteToWideChar error
@@ -1654,17 +1651,17 @@ BOOL supQueryTypeInfo(
 		RtlSecureZeroMemory(&test, sizeof(test));
 		wsprintfW(test, L"\nLength=%lx, MaxLen=%lx \n", pObject->TypeName.Length, pObject->TypeName.MaximumLength);
 		OutputDebugString(test);
-		_strncpyW(test, MAX_PATH, pObject->TypeName.Buffer, pObject->TypeName.MaximumLength);
+		_strncpy(test, MAX_PATH, pObject->TypeName.Buffer, pObject->TypeName.MaximumLength);
 		OutputDebugString(test);*/
 
-		if (_strncmpiW(pObject->TypeName.Buffer, lpTypeName, pObject->TypeName.Length / sizeof(WCHAR)) == 0) {
+		if (_strncmpi(pObject->TypeName.Buffer, lpTypeName, pObject->TypeName.Length / sizeof(WCHAR)) == 0) {
 			for (nPool = 0; nPool < MAX_KNOWN_POOL_TYPES; nPool++) {
 				if ((POOL_TYPE)pObject->PoolType == (POOL_TYPE)a_PoolTypes[nPool].dwValue) {
 
-					_strncpyW(
+					_strncpy(
 						Buffer, ccBuffer, 
 						a_PoolTypes[nPool].lpDescription, 
-						_strlenW(a_PoolTypes[nPool].lpDescription)
+						_strlen(a_PoolTypes[nPool].lpDescription)
 						);
 
 					break;
@@ -1723,19 +1720,19 @@ BOOL supQueryDeviceDescription(
 
 	lpFullDeviceName = NULL;
 
-	Length = (_strlenW(lpDeviceName) * sizeof(WCHAR)) +
-		(_strlenW(CurrentObjectPath) * sizeof(WCHAR)) + (2 * sizeof(WCHAR)) + sizeof(UNICODE_NULL);
+	Length = (_strlen(lpDeviceName) * sizeof(WCHAR)) +
+		(_strlen(CurrentObjectPath) * sizeof(WCHAR)) + (2 * sizeof(WCHAR)) + sizeof(UNICODE_NULL);
 
 	lpFullDeviceName = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, Length);
 	if (lpFullDeviceName != NULL) {
 	
 		// create full path device name for comparison
-		_strcpyW(lpFullDeviceName, CurrentObjectPath);
-		bIsRoot = (_strcmpiW(CurrentObjectPath, L"\\") == 0);
+		_strcpy(lpFullDeviceName, CurrentObjectPath);
+		bIsRoot = (_strcmpi(CurrentObjectPath, L"\\") == 0);
 		if (bIsRoot != TRUE) {
-			_strcatW(lpFullDeviceName, L"\\");
+			_strcat(lpFullDeviceName, L"\\");
 		}
-		_strcatW(lpFullDeviceName, lpDeviceName);
+		_strcat(lpFullDeviceName, lpDeviceName);
 
 		// enumerate devices
 		Entry = pObj->sapiDBHead.Flink;
@@ -1743,9 +1740,9 @@ BOOL supQueryDeviceDescription(
 			Item = CONTAINING_RECORD(Entry, SAPIDBENTRY, ListEntry);
 			if (Item != NULL) {
 				if (Item->lpDeviceName != NULL) {
-					if (_strcmpiW(lpFullDeviceName, Item->lpDeviceName) == 0) {
+					if (_strcmpi(lpFullDeviceName, Item->lpDeviceName) == 0) {
 						if (Item->lpDeviceDesc != NULL) {
-							_strncpyW(Buffer, ccBuffer, Item->lpDeviceDesc, _strlenW(Item->lpDeviceDesc));
+							_strncpy(Buffer, ccBuffer, Item->lpDeviceDesc, _strlen(Item->lpDeviceDesc));
 						}
 						bResult = TRUE;
 						break;
@@ -1812,7 +1809,7 @@ BOOL supQueryDriverDescription(
 			}
 
 			// not our driver - skip
-			if (_strcmpiW(lpServiceName, lpDriverName) != 0) {
+			if (_strcmpi(lpServiceName, lpDriverName) != 0) {
 				continue;
 			}
 
@@ -1822,12 +1819,12 @@ BOOL supQueryDriverDescription(
 			}
 
 			// driver has the same name as service - skip, there is no description available
-			if (_strcmpiW(lpDisplayName, lpDriverName) == 0) {
+			if (_strcmpi(lpDisplayName, lpDriverName) == 0) {
 				continue;
 			}
 
-			sz = _strlenW(lpDisplayName);
-			_strncpyW(Buffer, ccBuffer, lpDisplayName, sz);
+			sz = _strlen(lpDisplayName);
+			_strncpy(Buffer, ccBuffer, lpDisplayName, sz);
 			bResult = TRUE;
 			break;
 		}
@@ -1890,7 +1887,7 @@ BOOL supQueryDriverDescription(
 				dwSize = 0;
 				bResult = VerQueryValue(vinfo, szBuffer, &lpDisplayName, (PUINT)&dwSize);
 				if (bResult) {
-					_strncpyW(Buffer, ccBuffer, lpDisplayName, dwSize);
+					_strncpy(Buffer, ccBuffer, lpDisplayName, dwSize);
 				}
 				HeapFree(GetProcessHeap(), 0, vinfo);
 			}
@@ -1985,17 +1982,17 @@ BOOL supQuerySectionFileInfo(
 
 		// allocate memory buffer to store full filename
 		// KnownDlls + \\ + Object->Name + \0 
-		cLength = (_strlenW(lpszKnownDlls) * sizeof(WCHAR)) +
-			(_strlenW(ObjectName->Buffer) * sizeof(WCHAR)) + 2 * sizeof(WCHAR);
+		cLength = (_strlen(lpszKnownDlls) * sizeof(WCHAR)) +
+			(_strlen(ObjectName->Buffer) * sizeof(WCHAR)) + 2 * sizeof(WCHAR);
 
 		lpszFileName = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, cLength);
 		if (lpszFileName == NULL)
 			break;
 
 		// construct target filepath
-		_strcpyW(lpszFileName, lpszKnownDlls);
-		_strcatW(lpszFileName, L"\\");
-		_strcatW(lpszFileName, ObjectName->Buffer);
+		_strcpy(lpszFileName, lpszKnownDlls);
+		_strcat(lpszFileName, L"\\");
+		_strcat(lpszFileName, ObjectName->Buffer);
 
 		// query size of version info
 		dwSize = GetFileVersionInfoSize(lpszFileName, &dwHandle);
@@ -2027,7 +2024,7 @@ BOOL supQuerySectionFileInfo(
 		dwInfoSize = 0;
 		bResult = VerQueryValue(vinfo, szQueryBlock, &pcValue, (PUINT)&dwInfoSize);
 		if (bResult) {
-			_strncpyW(Buffer, ccBuffer, pcValue, dwInfoSize);
+			_strncpy(Buffer, ccBuffer, pcValue, dwInfoSize);
 		}
 
 	} while (cond);
@@ -2101,13 +2098,13 @@ HANDLE supOpenDirectoryForObject(
 	// Else go to 3
 	//
 	l = 0;
-	rdirLen = _strlenW(lpDirectory);
+	rdirLen = _strlen(lpDirectory);
 	for (i = 0; i < rdirLen; i++) {
 		if (lpDirectory[i] == '\\')
 			l = i + 1;
 	}
 	SingleDirName = &lpDirectory[l];
-	if (_strcmpiW(SingleDirName, lpObjectName) == 0) {
+	if (_strcmpi(SingleDirName, lpObjectName) == 0) {
 		//
 		//  2) If we are looking for directory, move search directory up
 		//  e.g. lpDirectory = \ObjectTypes, lpObjectName = ObjectTypes then lpDirectory = \ 

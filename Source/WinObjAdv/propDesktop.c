@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDESKTOP.C
 *
-*  VERSION:     1.10
+*  VERSION:     1.11
 *
-*  DATE:        28 Feb 2015
+*  DATE:        10 Mar 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -60,8 +60,8 @@ BOOL CALLBACK DesktopListEnumProc(
 		return FALSE;
 	}
 
-	sz = (_strlenW(lpszDesktop) * sizeof(WCHAR)) +
-		(_strlenW(Context->lpObjectName) * sizeof(WCHAR)) +
+	sz = (_strlen(lpszDesktop) * sizeof(WCHAR)) +
+		(_strlen(Context->lpObjectName) * sizeof(WCHAR)) +
 		(2 * sizeof(WCHAR)) + sizeof(UNICODE_NULL);
 
 	lpName = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sz);
@@ -70,9 +70,9 @@ BOOL CALLBACK DesktopListEnumProc(
 		return 0;
 	}
 	
-	_strcpyW(lpName, Context->lpObjectName);
-	_strcatW(lpName, L"\\");
-	_strcatW(lpName, lpszDesktop);
+	_strcpy(lpName, Context->lpObjectName);
+	_strcat(lpName, L"\\");
+	_strcat(lpName, lpszDesktop);
 
 	//Name
 	RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
@@ -125,7 +125,7 @@ BOOL CALLBACK DesktopListEnumProc(
 
 			RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
 			ultostr(dwDesktopHeapSize / 1024, szBuffer);
-			_strcatW(szBuffer, L" Mb");
+			_strcat(szBuffer, L" Mb");
 
 			lvitem.mask = LVIF_TEXT;
 			lvitem.iSubItem = 2;
@@ -215,7 +215,8 @@ VOID DesktopListCreate(
 		ListView_SetImageList(DesktopList, DesktopImageList, LVSIL_SMALL);
 	}
 
-	ListView_SetExtendedListViewStyle(DesktopList, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
+	ListView_SetExtendedListViewStyle(DesktopList, 
+		LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
 
 	RtlSecureZeroMemory(&col, sizeof(col));
 	col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
@@ -381,7 +382,8 @@ INT_PTR CALLBACK DesktopListDialogProc(
 			Context = GetProp(hwndDlg, T_PROPCONTEXT);
 			DesktopListSetInfo(Context, hwndDlg);
 			if (DesktopList) {
-				ListView_SortItemsEx(DesktopList, &DesktopListCompareFunc, DesktopListSortColumn);
+				ListView_SortItemsEx(DesktopList, 
+					&DesktopListCompareFunc, DesktopListSortColumn);
 			}
 			return 1;
 		}

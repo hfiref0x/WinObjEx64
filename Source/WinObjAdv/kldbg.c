@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.10
+*  VERSION:     1.11
 *
-*  DATE:        27 Feb 2015 
+*  DATE:        10 Mar 2015 
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -19,7 +19,7 @@
 #include "global.h"
 #include <Shlwapi.h>
 
-//include for PathExists API
+//include for PathFileExists API
 #pragma comment(lib, "shlwapi.lib")
 
 //number of buckets in the object directory
@@ -144,7 +144,7 @@ BOOL ObGetDirectoryObjectAddress(
 	RtlSecureZeroMemory(&objname, sizeof(objname));
 	RtlInitUnicodeString(&objname, lpTarget);
 	InitializeObjectAttributes(&objattr, &objname, OBJ_CASE_INSENSITIVE, NULL, NULL);
-	status = NtOpenDirectoryObject(&hDirectory, FILE_LIST_DIRECTORY, &objattr);
+	status = NtOpenDirectoryObject(&hDirectory, DIRECTORY_QUERY, &objattr);
 	if (!NT_SUCCESS(status))
 		return bFound;
 	
@@ -241,7 +241,7 @@ POBJINFO ObWalkDirectory(
 		lpData = NULL;
 
 		//check if root special case
-		if (_strcmpiW(lpObjectToFind, L"\\") == 0) {
+		if (_strcmpi(lpObjectToFind, L"\\") == 0) {
 
 			//read object header
 			RtlSecureZeroMemory(&ObjectHeader, sizeof(OBJECT_HEADER));
@@ -315,7 +315,7 @@ POBJINFO ObWalkDirectory(
 						goto NextItem;
 
 					//compare full object names
-					bFound = (_strcmpiW(lpObjectName, lpObjectToFind) == 0);
+					bFound = (_strcmpi(lpObjectName, lpObjectToFind) == 0);
 					HeapFree(GetProcessHeap(), 0, lpObjectName);
 					if (bFound != TRUE) {
 						goto NextItem;
@@ -395,13 +395,13 @@ POBJINFO ObQueryObject(
 		// Else go to 3
 		//
 		l = 0;
-		rdirLen = _strlenW(lpDirectory);
+		rdirLen = _strlen(lpDirectory);
 		for (i = 0; i < rdirLen; i++) {
 			if (lpDirectory[i] == '\\')
 				l = i + 1;
 		}
 		SingleDirName = &lpDirectory[l];
-		if (_strcmpiW(SingleDirName, lpObjectName) == 0) {
+		if (_strcmpi(SingleDirName, lpObjectName) == 0) {
 			//
 			//  2) If we are looking for directory itself, move search directory up
 			//  e.g. lpDirectory = \ObjectTypes, lpObjectName = ObjectTypes then lpDirectory = \ 
@@ -490,7 +490,7 @@ VOID ObWalkDirectoryRecursiveEx(
 		return;
 
 	if (lpRootDirectory != NULL) {
-		rdirLen = _strlenW(lpRootDirectory) * sizeof(WCHAR);
+		rdirLen = _strlen(lpRootDirectory) * sizeof(WCHAR);
 	}
 	else {
 		rdirLen = 0;
@@ -538,17 +538,17 @@ VOID ObWalkDirectoryRecursiveEx(
 							//copy dir + name
 							if (lpObjectName) {
 
-								fLen = (_strlenW(lpObjectName) * sizeof(WCHAR)) +
+								fLen = (_strlen(lpObjectName) * sizeof(WCHAR)) +
 									(2 * sizeof(WCHAR)) +
 									rdirLen + sizeof(UNICODE_NULL);
 
 								lpListEntry->ObjectName = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, fLen);
 								if (lpListEntry->ObjectName) {
-									_strcpyW(lpListEntry->ObjectName, lpRootDirectory);
+									_strcpy(lpListEntry->ObjectName, lpRootDirectory);
 									if (fIsRoot != TRUE) {
-										_strcatW(lpListEntry->ObjectName, L"\\");
+										_strcat(lpListEntry->ObjectName, L"\\");
 									}
-									_strcatW(lpListEntry->ObjectName, lpObjectName);
+									_strcat(lpListEntry->ObjectName, lpObjectName);
 								}
 							}
 
@@ -569,12 +569,12 @@ VOID ObWalkDirectoryRecursiveEx(
 							dirLen = fLen + rdirLen + (2 * sizeof(WCHAR)) + sizeof(UNICODE_NULL);
 							lpDirectoryName = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, dirLen);
 							if (lpDirectoryName) {
-								_strcpyW(lpDirectoryName, lpRootDirectory);
+								_strcpy(lpDirectoryName, lpRootDirectory);
 								if (fIsRoot != TRUE) {
-									_strcatW(lpDirectoryName, L"\\");
+									_strcat(lpDirectoryName, L"\\");
 								}
 								if (lpObjectName) {
-									_strcatW(lpDirectoryName, lpObjectName);
+									_strcat(lpDirectoryName, lpObjectName);
 								}
 							}
 
@@ -805,7 +805,7 @@ BOOL kdIsDebugBoot(
 		if (lRet != ERROR_SUCCESS)
 			break;
 
-		if (_strstriW(lpszBootOptions, L"DEBUG") != NULL)
+		if (_strstri(lpszBootOptions, L"DEBUG") != NULL)
 			bResult = TRUE;
 
 		RegCloseKey(hKey);
@@ -936,7 +936,7 @@ VOID pkdQuerySystemInformation(
 		}
 
 		KernelFullPathName[rl] = (CHAR)'\\';
-		_strcpyA(&KernelFullPathName[rl + 1],
+		_strcpy_a(&KernelFullPathName[rl + 1],
 			(const char*)&miSpace->Modules[0].FullPathName[miSpace->Modules[0].OffsetToFileName]);
 		KernelBase = (ULONG_PTR)miSpace->Modules[0].ImageBase;
 		HeapFree(GetProcessHeap(), 0, miSpace);
@@ -1011,7 +1011,7 @@ DWORD WINAPI kdQueryProc(
 * Enable Debug Privilege and open/load KLDBGDRV driver
 *
 * If there is no DEBUG mode OS flag or OS version is below than Windows 7 
-* this routine only does nothing except global osver query. 
+* this routine only query windows version to the global context variable.
 *
 */
 VOID kdInit(
@@ -1053,7 +1053,7 @@ VOID kdInit(
 			// no such device exist, construct filepath and check if driver already present
 			RtlSecureZeroMemory(szDrvPath, sizeof(szDrvPath));
 			if (GetSystemDirectory(szDrvPath, MAX_PATH)) {
-				_strcatW(szDrvPath, KLDBGDRVSYS);
+				_strcat(szDrvPath, KLDBGDRVSYS);
 
 				// if no file exists, extract it to the drivers directory
 				if (!PathFileExists(szDrvPath)) {

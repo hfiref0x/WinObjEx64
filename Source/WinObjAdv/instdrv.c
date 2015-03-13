@@ -4,9 +4,9 @@
 *
 *  TITLE:       INSTDRV.C
 *
-*  VERSION:     1.00
+*  VERSION:     1.11
 *
-*  DATE:        17 Feb 2015
+*  DATE:        10 Mar 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -101,6 +101,7 @@ BOOL scmOpenDevice(
 	TCHAR    completeDeviceName[64];
 	HANDLE   hDevice;
 
+	RtlSecureZeroMemory(completeDeviceName, sizeof(completeDeviceName));
 	wsprintf(completeDeviceName, TEXT("\\\\.\\%s"), DriverName);
 
 	hDevice = CreateFile(completeDeviceName,

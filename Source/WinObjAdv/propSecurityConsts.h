@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPSECURITYCONSTS.H
 *
-*  VERSION:     1.10
+*  VERSION:     1.11
 *
-*  DATE:        24 Feb 2015
+*  DATE:        10 Mar 2015
 *
 *  Consts header file for Security property sheet.
 *

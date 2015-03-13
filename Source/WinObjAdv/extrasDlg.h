@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASDLG.H
 *
-*  VERSION:     1.10
+*  VERSION:     1.11
 *
-*  DATE:        25 Feb 2015
+*  DATE:        10 Mar 2015
 *
 *  Common header file for Extras dialogs.
 *

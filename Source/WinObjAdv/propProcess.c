@@ -119,7 +119,7 @@ VOID ProcessShowProperties(
 		//query process id
 		Buffer = supGetItemText(ProcessList, iItem, 1, NULL);
 		if (Buffer) {
-			dwProcessId = strtoulW(Buffer);
+			dwProcessId = strtoul(Buffer);
 			HeapFree(GetProcessHeap(), 0, Buffer);
 
 			//query process win32 image path
@@ -321,7 +321,7 @@ VOID ProcessListAddItem(
 
 	//set default process name as Unknown
 	RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-	_strcpyW(szBuffer, T_Unknown);
+	_strcpy(szBuffer, T_Unknown);
 
 	if (supQueryProcessName(phti->UniqueProcessId,
 		ProcessesList, szBuffer, MAX_PATH)) {
@@ -340,7 +340,7 @@ VOID ProcessListAddItem(
 					DestroyIcon(hIcon);
 				}
 				if (bIsWow64) {
-					_strcatW(szBuffer, L"*32");
+					_strcat(szBuffer, L"*32");
 				}
 			} //ProcessQueryInfo
 		} //else
@@ -366,8 +366,8 @@ VOID ProcessListAddItem(
 
 	//Value
 	RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-	_strcpyW(szBuffer, L"0x");
-	ultohex(phti->HandleValue, _strendW(szBuffer));
+	_strcpy(szBuffer, L"0x");
+	ultohex(phti->HandleValue, _strend(szBuffer));
 	lvitem.mask = LVIF_TEXT;
 	lvitem.iSubItem = 2;
 	lvitem.pszText = szBuffer;
@@ -376,8 +376,8 @@ VOID ProcessListAddItem(
 
 	//GrantedAccess
 	RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-	_strcpyW(szBuffer, L"0x");
-	ultohex(phti->GrantedAccess, _strendW(szBuffer));
+	_strcpy(szBuffer, L"0x");
+	ultohex(phti->GrantedAccess, _strend(szBuffer));
 	lvitem.mask = LVIF_TEXT;
 	lvitem.iSubItem = 3;
 	lvitem.pszText = szBuffer;

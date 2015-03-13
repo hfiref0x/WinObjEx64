@@ -4,9 +4,9 @@
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     1.10
+*  VERSION:     1.11
 *
-*  DATE:        24 Feb 2015
+*  DATE:        10 Mar 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -117,35 +117,35 @@ VOID AboutDialogInit(
 	RtlSecureZeroMemory(buf, sizeof(buf));
 #if (_MSC_VER == 1800) //2013
 #if (_MSC_FULL_VER == 180031101)
-	_strcpyW(buf, L"MSVC 2013 Update 4");
+	_strcpy(buf, L"MSVC 2013 Update 4");
 #elif (_MSC_FULL_VER == 180030723)
-	_strcpyW(buf, L"MSVC 2013 Update 3");
+	_strcpy(buf, L"MSVC 2013 Update 3");
 #elif (_MSC_FULL_VER == 180030501)
-	_strcpyW(buf, L"MSVC 2013 Update 2");
+	_strcpy(buf, L"MSVC 2013 Update 2");
 #elif (_MSC_FULL_VER < 180021005)
-	_strcpyW(buf, L"MSVC 2013 Preview/Beta/RC");
+	_strcpy(buf, L"MSVC 2013 Preview/Beta/RC");
 #else
-	_strcpyW(buf, L"MSVC 2013");
+	_strcpy(buf, L"MSVC 2013");
 #endif
 #else
-	_strcpyW(buf, L"Unknown Compiler");
+	_strcpy(buf, L"Unknown Compiler");
 #endif
 	SetDlgItemText(hwndDlg, ID_ABOUT_COMPILERINFO, buf);
 
 	RtlSecureZeroMemory(buf, sizeof(buf));
-	MultiByteToWideChar(CP_ACP, 0, __DATE__, (INT)_strlenA(__DATE__), _strendW(buf), 40);
-	_strcatW(buf, TEXT(" "));
-	MultiByteToWideChar(CP_ACP, 0, __TIME__, (INT)_strlenA(__TIME__), _strendW(buf), 40);
+	MultiByteToWideChar(CP_ACP, 0, __DATE__, (INT)_strlen_a(__DATE__), _strend(buf), 40);
+	_strcat(buf, TEXT(" "));
+	MultiByteToWideChar(CP_ACP, 0, __TIME__, (INT)_strlen_a(__TIME__), _strend(buf), 40);
 	SetDlgItemText(hwndDlg, ID_ABOUT_BUILDDATE, buf);
 
 	// fill OS name
 	wsprintfW(buf, L"Windows NT %1u.%1u (build %u",
 		g_kdctx.osver.dwMajorVersion, g_kdctx.osver.dwMinorVersion, g_kdctx.osver.dwBuildNumber);
 	if (g_kdctx.osver.szCSDVersion[0]) {
-		wsprintfW(_strendW(buf), L", %ws)", g_kdctx.osver.szCSDVersion);
+		wsprintfW(_strend(buf), L", %ws)", g_kdctx.osver.szCSDVersion);
 	}
 	else {
-		_strcatW(buf, L")");
+		_strcat(buf, L")");
 	}
 	SetDlgItemText(hwndDlg, ID_ABOUT_OSNAME, buf);
 
@@ -161,7 +161,7 @@ VOID AboutDialogInit(
 		if (sbei.FirmwareType == FirmwareTypeUefi) {
 			bSecureBoot = FALSE;
 			if (AboutDialogQuerySecureBootState(&bSecureBoot)) {
-				wsprintfW(_strendW(buf), L" with%ws SecureBoot", (bSecureBoot == TRUE) ? L"" : L"out");
+				wsprintfW(_strend(buf), L" with%ws SecureBoot", (bSecureBoot == TRUE) ? L"" : L"out");
 			}
 		}
 	}

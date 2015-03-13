@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     1.10
+*  VERSION:     1.11
 *
-*  DATE:        01 Mar 2015
+*  DATE:        10 Mar 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -156,12 +156,12 @@ VOID ObDumpAddressWithModule(
 		//if SelfDriverBase & SelfDriverSize present, look if Address routine points to current driver
 		if (SelfDriverBase != NULL && SelfDriverSize) {
 			if (!IN_REGION(Address, SelfDriverBase, SelfDriverSize)) {
-				_strcpyW(szModuleName, L"Hooked by ");
+				_strcpy(szModuleName, L"Hooked by ");
 				subitems.ColorFlags = TLF_BGCOLOR_SET;
 				subitems.BgColor = CLR_HOOK;
 			}
 		}
-		if (supFindModuleEntryByAddress(pModules, Address, _strendW(szModuleName), MAX_PATH)) {
+		if (supFindModuleEntryByAddress(pModules, Address, _strend(szModuleName), MAX_PATH)) {
 			subitems.Text[1] = szModuleName;
 		}
 		else {
@@ -208,7 +208,7 @@ VOID ObDumpByte(
 
 	RtlSecureZeroMemory(szValue, sizeof(szValue));
 	if (IsBool) {
-		_strcpyW(szValue, (BOOL)(Value) ? L"TRUE" : L"FALSE");
+		_strcpy(szValue, (BOOL)(Value) ? L"TRUE" : L"FALSE");
 	}
 	else {
 		wsprintfW(szValue, FORMAT_HEXBYTE, Value);
@@ -1803,6 +1803,10 @@ VOID ObDumpObjectType(
 			HeapFree(GetProcessHeap(), 0, pObject);
 		}
 
+		//
+		//pObject is NULL, ObDumpTypeInfo failure, list init failure or pModules
+		//allocation failure - show error and leave
+		//
 		if (bOkay != TRUE) {
 			ObDumpShowError(hwndDlg);
 			return;
@@ -1917,9 +1921,7 @@ VOID ObDumpObjectType(
 			}
 		}
 
-		if (pModulesList) {
-			HeapFree(GetProcessHeap(), 0, pModulesList);
-		}
+		HeapFree(GetProcessHeap(), 0, pModulesList);
 	}
 	__except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
 		return;
@@ -2054,7 +2056,7 @@ VOID ObjectDumpCopyValue(
 		if (subitems) {
 			lpText = subitems->Text[0];
 			if (lpText) {
-				cbText = _strlenW(lpText) * sizeof(WCHAR);
+				cbText = _strlen(lpText) * sizeof(WCHAR);
 				supClipboardCopy(lpText, cbText);
 			}
 		}

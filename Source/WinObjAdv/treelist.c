@@ -6,7 +6,7 @@
 #include <vsstyle.h>
 #include <vssym32.h>
 #include "treelist.h"
-#include "minirtl.h"
+#include "minirtl\minirtl.h"
 #pragma comment(lib, "Uxtheme.lib")
 
 HTHEME		tl_theme = NULL;

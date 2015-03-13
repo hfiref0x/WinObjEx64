@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDRIVER.C
 *
-*  VERSION:     1.10
+*  VERSION:     1.11
 *
-*  DATE:        24 Feb 2015
+*  DATE:        10 Mar 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -200,7 +200,9 @@ VOID DriverSetInfo(
 
 				//State
 				RtlSecureZeroMemory(&ssp, sizeof(ssp));
-				if (QueryServiceStatusEx(schService, SC_STATUS_PROCESS_INFO, (LPBYTE)&ssp, sizeof(ssp), &bytesNeeded)) {
+				if (QueryServiceStatusEx(schService, SC_STATUS_PROCESS_INFO, 
+					(LPBYTE)&ssp, sizeof(ssp), &bytesNeeded)) 
+				{
 					lpType = T_Unknown;
 					switch (ssp.dwCurrentState) {
 					case SERVICE_STOPPED:
@@ -237,14 +239,19 @@ VOID DriverSetInfo(
 				bytesNeeded = 0x1000;
 				psd = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytesNeeded);
 				if (psd) {				
-					bRet = QueryServiceConfig2(schService, SERVICE_CONFIG_DESCRIPTION, (LPBYTE)psd, bytesNeeded, &bytesNeeded);
+
+					bRet = QueryServiceConfig2(schService, SERVICE_CONFIG_DESCRIPTION, 
+						(LPBYTE)psd, bytesNeeded, &bytesNeeded);
+
 					if ((bRet != TRUE) && (bytesNeeded != 0)) {
 						HeapFree(GetProcessHeap(), 0, psd);
 						psd = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytesNeeded);
 					}
 					if (psd) {
 						//set description or hide window
-						bRet = QueryServiceConfig2(schService, SERVICE_CONFIG_DESCRIPTION, (LPBYTE)psd, bytesNeeded, &bytesNeeded);
+						bRet = QueryServiceConfig2(schService, SERVICE_CONFIG_DESCRIPTION, 
+							(LPBYTE)psd, bytesNeeded, &bytesNeeded);
+
 						if (bRet) {
 							SetDlgItemText(hwndDlg, IDC_SERVICE_DESCRIPTION, psd->lpDescription);
 						}
@@ -285,16 +292,18 @@ VOID DriverSetInfo(
 
 							RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
 							//maximum bytes that can be copied is sizeof(szBuffer)
-							_strncpyW(szBuffer, sizeof(szBuffer), &psci->lpDependencies[nStart], nEnd);
+							_strncpy(szBuffer, sizeof(szBuffer), &psci->lpDependencies[nStart], nEnd);
 
 							//check if dependency is a group (has "+" before name)
 							fGroup = (szBuffer[0] == SC_GROUP_IDENTIFIER);
 							if (fGroup) {
-								SendDlgItemMessage(hwndDlg, IDC_SERVICE_DEPENDSONGROUP, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer[1]);
+								SendDlgItemMessage(hwndDlg, IDC_SERVICE_DEPENDSONGROUP, CB_ADDSTRING, 
+									(WPARAM)0, (LPARAM)&szBuffer[1]);
 								dwGroups++;
 							}
 							else {
-								SendDlgItemMessage(hwndDlg, IDC_SERVICE_DEPENDSONSERVICE, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+								SendDlgItemMessage(hwndDlg, IDC_SERVICE_DEPENDSONSERVICE, CB_ADDSTRING, 
+									(WPARAM)0, (LPARAM)&szBuffer);
 								dwServices++;
 							}
 							nEnd++;
@@ -304,17 +313,21 @@ VOID DriverSetInfo(
 						//group present, enable combobox
 						if (dwGroups > 0) {
 							EnableWindow(GetDlgItem(hwndDlg, IDC_SERVICE_DEPENDSONGROUP), TRUE);
-							SendDlgItemMessage(hwndDlg, IDC_SERVICE_DEPENDSONGROUP, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
+							SendDlgItemMessage(hwndDlg, IDC_SERVICE_DEPENDSONGROUP, CB_SETCURSEL, 
+								(WPARAM)0, (LPARAM)0);
 						}
 						//service present, enable combobox
 						if (dwServices > 0) {
 							EnableWindow(GetDlgItem(hwndDlg, IDC_SERVICE_DEPENDSONSERVICE), TRUE);
-							SendDlgItemMessage(hwndDlg, IDC_SERVICE_DEPENDSONSERVICE, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
+							SendDlgItemMessage(hwndDlg, IDC_SERVICE_DEPENDSONSERVICE, CB_SETCURSEL, 
+								(WPARAM)0, (LPARAM)0);
 						}
 					} //if (nEndOfList > 0)
 
 					//second list services that depends on this service
-					SendDlgItemMessage(hwndDlg, IDC_SERVICE_DEPENDENTSERVICES, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
+					SendDlgItemMessage(hwndDlg, IDC_SERVICE_DEPENDENTSERVICES, CB_RESETCONTENT, 
+						(WPARAM)0, (LPARAM)0);
+
 					dwServices = 0;
 					bytesNeeded = 1024;
 					bRet = FALSE;
@@ -322,7 +335,9 @@ VOID DriverSetInfo(
 					//avoid SCM unexpected behaviour by using preallocated buffer
 					lpDependencies = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytesNeeded);
 					if (lpDependencies) {
-						bRet = EnumDependentServices(schService, SERVICE_STATE_ALL, lpDependencies, bytesNeeded, &bytesNeeded, &dwServices);
+						bRet = EnumDependentServices(schService, SERVICE_STATE_ALL, lpDependencies, 
+							bytesNeeded, &bytesNeeded, &dwServices);
+
 						if (bRet && (GetLastError() == ERROR_MORE_DATA)) {
 							//more memory needed for enum
 							HeapFree(GetProcessHeap(), 0, lpDependencies);
@@ -338,11 +353,13 @@ VOID DriverSetInfo(
 						if (bRet && dwServices) {
 							for (i = 0; i < dwServices; i++) {
 								ess = *(lpDependencies + i);
-								SendDlgItemMessage(hwndDlg, IDC_SERVICE_DEPENDENTSERVICES, CB_ADDSTRING, (WPARAM)0, (LPARAM)ess.lpServiceName);
+								SendDlgItemMessage(hwndDlg, IDC_SERVICE_DEPENDENTSERVICES, CB_ADDSTRING, 
+									(WPARAM)0, (LPARAM)ess.lpServiceName);
 							}
 							//enable combobox and set current selection to the first item
 							EnableWindow(GetDlgItem(hwndDlg, IDC_SERVICE_DEPENDENTSERVICES), TRUE);
-							SendDlgItemMessage(hwndDlg, IDC_SERVICE_DEPENDENTSERVICES, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
+							SendDlgItemMessage(hwndDlg, IDC_SERVICE_DEPENDENTSERVICES, CB_SETCURSEL, 
+								(WPARAM)0, (LPARAM)0);
 						}
 						HeapFree(GetProcessHeap(), 0, lpDependencies);
 					}
@@ -408,8 +425,8 @@ VOID DriverJumpToKey(
 	do {
 
 		//create regkeypath buffer to navigate for
-		sz = _strlenW(Context->lpObjectName) * sizeof(WCHAR) +
-			_strlenW(REGISTRYSERVICESKEY) * sizeof(WCHAR) +
+		sz = _strlen(Context->lpObjectName) * sizeof(WCHAR) +
+			_strlen(REGISTRYSERVICESKEY) * sizeof(WCHAR) +
 			sizeof(UNICODE_NULL);
 
 		lpRegPath = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sz);

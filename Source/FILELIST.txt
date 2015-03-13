@@ -23,8 +23,7 @@ list.h
 
 main.c - program entry point and initialization routines, main window dialog procedure handler
 
-minirtl.c - set of reimplemented rtl routines
-minirtl.h
+minirtl folder - set of reimplemented rtl routines
 
 propBasic.c - property sheet "Basic" handlers, including window procedures
 propBasic.h

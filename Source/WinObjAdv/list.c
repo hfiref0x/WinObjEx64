@@ -4,9 +4,9 @@
 *
 *  TITLE:       LIST.C
 *
-*  VERSION:     1.10
+*  VERSION:     1.11
 *
-*  DATE:        27 Feb 2015
+*  DATE:        10 Mar 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -31,8 +31,11 @@ LPWSTR GetNextSub(
 {
 	SIZE_T i;
 
-	for (i = 0; (*ObjectFullPathName != 0) && (*ObjectFullPathName != '\\') && (i < MAX_PATH); i++, ObjectFullPathName++)
+	for (i = 0; (*ObjectFullPathName != 0) && (*ObjectFullPathName != '\\')
+		&& (i < MAX_PATH); i++, ObjectFullPathName++)
+	{
 		Sub[i] = *ObjectFullPathName;
+	}
 	Sub[i] = 0;
 
 	if (*ObjectFullPathName == '\\')
@@ -86,7 +89,7 @@ VOID ListToObject(
 			if (!TreeView_GetItem(ObjectTree, &ritem))
 				break;
 
-			if (_strcmpiW(sobject, object) == 0) {
+			if (_strcmpi(sobject, object) == 0) {
 				if (item)
 					lastfound = item;
 				break;
@@ -111,7 +114,7 @@ VOID ListToObject(
 		if (!ListView_GetItem(ObjectList, &lvitem))
 			break;
 
-		if (_strcmpiW(sobject, object) == 0) {
+		if (_strcmpi(sobject, object) == 0) {
 			s = ListView_GetSelectionMark(ObjectList);
 			lvitem.mask = LVIF_STATE;
 			lvitem.stateMask = LVIS_SELECTED | LVIS_FOCUSED;
@@ -199,18 +202,17 @@ VOID ListObjectDirectoryTree(
 		if (status != STATUS_BUFFER_TOO_SMALL)
 			break;
 
-		objinf = HeapAlloc(GetProcessHeap(), 0, rlen);
+		objinf = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, rlen);
 		if (objinf == NULL)
 			break;
 
-		RtlSecureZeroMemory(objinf, rlen);
 		status = NtQueryDirectoryObject(hDirectory, objinf, rlen, TRUE, FALSE, &ctx, &rlen);
 		if (!NT_SUCCESS(status)) {
 			HeapFree(GetProcessHeap(), 0, objinf);
 			break;
 		}
 
-		if (_strncmpiW(objinf->TypeName.Buffer, T_ObjectNames[TYPE_DIRECTORY], 
+		if (_strncmpi(objinf->TypeName.Buffer, T_ObjectNames[TYPE_DIRECTORY], 
 			objinf->TypeName.Length / sizeof(WCHAR)) == 0) 
 		{
 			ListObjectDirectoryTree(objinf->Name.Buffer, hDirectory, ViewRootHandle);
@@ -263,20 +265,21 @@ VOID AddListViewItem(
 	RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
 
 	//check SymbolicLink
-	if (_strncmpiW(objinf->TypeName.Buffer, T_ObjectNames[TYPE_SYMLINK], cch) == 0) {
+	if (_strncmpi(objinf->TypeName.Buffer, T_ObjectNames[TYPE_SYMLINK], cch) == 0) {
 		bFound = supQueryLinkTarget(hObjectRootDirectory,
 			&objinf->Name, szBuffer, MAX_PATH * sizeof(WCHAR));
 		goto Done;
 	}
 
 	//check Section
-	if (_strncmpiW(objinf->TypeName.Buffer, T_ObjectNames[TYPE_SECTION], cch) == 0) {
-		bFound = supQuerySectionFileInfo(hObjectRootDirectory, &objinf->Name, szBuffer, MAX_PATH);
+	if (_strncmpi(objinf->TypeName.Buffer, T_ObjectNames[TYPE_SECTION], cch) == 0) {
+		bFound = supQuerySectionFileInfo(hObjectRootDirectory, 
+			&objinf->Name, szBuffer, MAX_PATH);
 		goto Done;
 	}
 
 	//check Driver
-	if (_strncmpiW(objinf->TypeName.Buffer, T_ObjectNames[TYPE_DRIVER], cch) == 0) {
+	if (_strncmpi(objinf->TypeName.Buffer, T_ObjectNames[TYPE_DRIVER], cch) == 0) {
 		bFound =supQueryDriverDescription(
 			objinf->Name.Buffer,
 			lpEnumParams->scmSnapshot, 
@@ -287,7 +290,7 @@ VOID AddListViewItem(
 	}
 
 	//check Device
-	if (_strncmpiW(objinf->TypeName.Buffer, T_ObjectNames[TYPE_DEVICE], cch) == 0) {
+	if (_strncmpi(objinf->TypeName.Buffer, T_ObjectNames[TYPE_DEVICE], cch) == 0) {
 		bFound = supQueryDeviceDescription(
 			objinf->Name.Buffer,
 			lpEnumParams->sapiDB,
@@ -297,14 +300,16 @@ VOID AddListViewItem(
 	}
 
 	//check WindowStation
-	if (_strncmpiW(objinf->TypeName.Buffer, T_ObjectNames[TYPE_WINSTATION], cch) == 0) {
-		bFound = supQueryWinstationDescription(objinf->Name.Buffer, szBuffer, MAX_PATH);
+	if (_strncmpi(objinf->TypeName.Buffer, T_ObjectNames[TYPE_WINSTATION], cch) == 0) {
+		bFound = supQueryWinstationDescription(objinf->Name.Buffer, 
+			szBuffer, MAX_PATH);
 		goto Done;
 	}
 
 	//check Type
-	if (_strncmpiW(objinf->TypeName.Buffer, T_ObjectNames[TYPE_TYPE], cch) == 0) {
-		bFound = supQueryTypeInfo(objinf->Name.Buffer, szBuffer, MAX_PATH);
+	if (_strncmpi(objinf->TypeName.Buffer, T_ObjectNames[TYPE_TYPE], cch) == 0) {
+		bFound = supQueryTypeInfo(objinf->Name.Buffer, 
+			szBuffer, MAX_PATH);
 //		goto Done;
 	}
 
@@ -406,7 +411,7 @@ VOID FindObject(
 	POBJECT_DIRECTORY_INFORMATION	objinf;
 	RtlSecureZeroMemory(&objname, sizeof(objname));
 	RtlInitUnicodeString(&objname, DirName);
-	sdlen = _strlenW(DirName);
+	sdlen = _strlen(DirName);
 	InitializeObjectAttributes(&objattr, &objname, OBJ_CASE_INSENSITIVE, NULL, NULL);
 	status = NtOpenDirectoryObject(&hDirectory, DIRECTORY_QUERY, &objattr);
 	if (!NT_SUCCESS(status))
@@ -429,10 +434,15 @@ VOID FindObject(
 			break;
 		}
 
-		if ((_strstriW(objinf->Name.Buffer, NameSubstring) != 0) || (NameSubstring == NULL))
-			if ((_strcmpiW(objinf->TypeName.Buffer, TypeName) == 0) || (TypeName == NULL)) {
+		if ((_strstri(objinf->Name.Buffer, NameSubstring) != 0) || (NameSubstring == NULL))
+			if ((_strcmpi(objinf->TypeName.Buffer, TypeName) == 0) || (TypeName == NULL)) {
+
 				tmp = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 
-					sizeof(FO_LIST_ITEM) + objinf->Name.Length + objinf->TypeName.Length + (sdlen + 4) * sizeof(WCHAR));
+					sizeof(FO_LIST_ITEM) + 
+					objinf->Name.Length + 
+					objinf->TypeName.Length +
+					(sdlen + 4) * sizeof(WCHAR));
+
 				if (tmp == NULL) {
 					HeapFree(GetProcessHeap(), 0, objinf);
 					break;
@@ -440,28 +450,36 @@ VOID FindObject(
 				tmp->Prev = *List;
 				tmp->ObjectName = tmp->NameBuffer;
 				tmp->ObjectType = tmp->NameBuffer + sdlen + 2 + objinf->Name.Length / sizeof(WCHAR);
-				_strcpyW(tmp->ObjectName, DirName);
+				_strcpy(tmp->ObjectName, DirName);
 				if ((DirName[0] == '\\') && (DirName[1] == 0)) {
-					_strncpyW(tmp->ObjectName + sdlen, 1 + objinf->Name.Length / sizeof(WCHAR), objinf->Name.Buffer, objinf->Name.Length / sizeof(WCHAR));
+					_strncpy(tmp->ObjectName + sdlen, 1 + objinf->Name.Length / sizeof(WCHAR), 
+						objinf->Name.Buffer, objinf->Name.Length / sizeof(WCHAR));
 				}
 				else {
 					tmp->ObjectName[sdlen] = '\\';
-					_strncpyW(tmp->ObjectName + sdlen + 1, 1 + objinf->Name.Length / sizeof(WCHAR), objinf->Name.Buffer, objinf->Name.Length / sizeof(WCHAR));
+					_strncpy(tmp->ObjectName + sdlen + 1, 1 + objinf->Name.Length / sizeof(WCHAR), 
+						objinf->Name.Buffer, objinf->Name.Length / sizeof(WCHAR));
 				}
-				_strncpyW(tmp->ObjectType, 1 + objinf->TypeName.Length / sizeof(WCHAR), objinf->TypeName.Buffer, objinf->TypeName.Length / sizeof(WCHAR));
+				_strncpy(tmp->ObjectType, 1 + objinf->TypeName.Length / sizeof(WCHAR), 
+					objinf->TypeName.Buffer, objinf->TypeName.Length / sizeof(WCHAR));
 				*List = tmp;
 			};
 
-		if (_strcmpiW(objinf->TypeName.Buffer, T_ObjectNames[TYPE_DIRECTORY]) == 0) {
-			newdir = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (sdlen + 4)*sizeof(WCHAR) + objinf->Name.Length);
+		if (_strcmpi(objinf->TypeName.Buffer, T_ObjectNames[TYPE_DIRECTORY]) == 0) {
+
+			newdir = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (sdlen + 4)*sizeof(WCHAR) + 
+				objinf->Name.Length);
+
 			if (newdir != NULL) {
-				_strcpyW(newdir, DirName);
+				_strcpy(newdir, DirName);
 				if ((DirName[0] == '\\') && (DirName[1] == 0)) {
-					_strncpyW(newdir + sdlen, 1 + objinf->Name.Length / sizeof(WCHAR), objinf->Name.Buffer, objinf->Name.Length / sizeof(WCHAR));
+					_strncpy(newdir + sdlen, 1 + objinf->Name.Length / sizeof(WCHAR), 
+						objinf->Name.Buffer, objinf->Name.Length / sizeof(WCHAR));
 				}
 				else {
 					newdir[sdlen] = '\\';
-					_strncpyW(newdir + sdlen + 1, 1 + objinf->Name.Length / sizeof(WCHAR), objinf->Name.Buffer, objinf->Name.Length / sizeof(WCHAR));
+					_strncpy(newdir + sdlen + 1, 1 + objinf->Name.Length / sizeof(WCHAR), 
+						objinf->Name.Buffer, objinf->Name.Length / sizeof(WCHAR));
 				}
 				FindObject(newdir, NameSubstring, TypeName, List);
 				HeapFree(GetProcessHeap(), 0, newdir);

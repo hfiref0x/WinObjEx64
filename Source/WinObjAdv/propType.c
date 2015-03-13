@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPTYPE.C
 *
-*  VERSION:     1.00
+*  VERSION:     1.11
 *
-*  DATE:        01 Mar 2015
+*  DATE:        10 Mar 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -306,7 +306,8 @@ VOID propSetTypeFlags(
 		SendMessage(hwndCB, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
 		if (ObjectFlags) {
 			for (i = 0; i < 8; i++) {
-				if (GET_BIT(ObjectFlags, i)) SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)T_ObjectTypeFlags[i]);
+				if (GET_BIT(ObjectFlags, i)) SendMessage(hwndCB, CB_ADDSTRING, 
+					(WPARAM)0, (LPARAM)T_ObjectTypeFlags[i]);
 			}
 			SendMessage(hwndCB, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
 		}
@@ -341,44 +342,50 @@ VOID propSetTypeAttributes(
 
 	//Invalid attributes
 	nIndex = SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&T_InvalidAttributes);
-	SendMessage(hListAttrbites, LB_SETITEMDATA, (WPARAM)nIndex, (LPARAM)ObjectTypeDump->TypeInfo.InvalidAttributes);
-	_strcpyW(szBuffer, FORMATTED_ATTRIBUTE);
-	ultohex(ObjectTypeDump->TypeInfo.InvalidAttributes, _strendW(szBuffer));
+	SendMessage(hListAttrbites, LB_SETITEMDATA, (WPARAM)nIndex, 
+		(LPARAM)ObjectTypeDump->TypeInfo.InvalidAttributes);
+	_strcpy(szBuffer, FORMATTED_ATTRIBUTE);
+	ultohex(ObjectTypeDump->TypeInfo.InvalidAttributes, _strend(szBuffer));
 	SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
 
 	//Valid access
 	nIndex = SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&T_ValidAccess);
-	SendMessage(hListAttrbites, LB_SETITEMDATA, (WPARAM)nIndex, (LPARAM)ObjectTypeDump->TypeInfo.ValidAccessMask);
-	_strcpyW(szBuffer, FORMATTED_ATTRIBUTE);
-	ultohex(ObjectTypeDump->TypeInfo.ValidAccessMask, _strendW(szBuffer));
+	SendMessage(hListAttrbites, LB_SETITEMDATA, (WPARAM)nIndex, 
+		(LPARAM)ObjectTypeDump->TypeInfo.ValidAccessMask);
+	_strcpy(szBuffer, FORMATTED_ATTRIBUTE);
+	ultohex(ObjectTypeDump->TypeInfo.ValidAccessMask, _strend(szBuffer));
 	SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
 
 	//Generic Read
 	nIndex = SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&T_GenericRead);
-	SendMessage(hListAttrbites, LB_SETITEMDATA, (WPARAM)nIndex, (LPARAM)ObjectTypeDump->TypeInfo.GenericMapping.GenericRead);
-	_strcpyW(szBuffer, FORMATTED_ATTRIBUTE);
-	ultohex(ObjectTypeDump->TypeInfo.GenericMapping.GenericRead, _strendW(szBuffer));
+	SendMessage(hListAttrbites, LB_SETITEMDATA, (WPARAM)nIndex, 
+		(LPARAM)ObjectTypeDump->TypeInfo.GenericMapping.GenericRead);
+	_strcpy(szBuffer, FORMATTED_ATTRIBUTE);
+	ultohex(ObjectTypeDump->TypeInfo.GenericMapping.GenericRead, _strend(szBuffer));
 	SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
 
 	//Generic Write
 	nIndex = SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&T_GenericWrite);
-	SendMessage(hListAttrbites, LB_SETITEMDATA, (WPARAM)nIndex, (LPARAM)ObjectTypeDump->TypeInfo.GenericMapping.GenericWrite);
-	_strcpyW(szBuffer, FORMATTED_ATTRIBUTE);
-	ultohex(ObjectTypeDump->TypeInfo.GenericMapping.GenericWrite, _strendW(szBuffer));
+	SendMessage(hListAttrbites, LB_SETITEMDATA, (WPARAM)nIndex, 
+		(LPARAM)ObjectTypeDump->TypeInfo.GenericMapping.GenericWrite);
+	_strcpy(szBuffer, FORMATTED_ATTRIBUTE);
+	ultohex(ObjectTypeDump->TypeInfo.GenericMapping.GenericWrite, _strend(szBuffer));
 	SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
 
 	//Generic Execute
 	nIndex = SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&T_GenericExecute);
-	SendMessage(hListAttrbites, LB_SETITEMDATA, (WPARAM)nIndex, (LPARAM)ObjectTypeDump->TypeInfo.GenericMapping.GenericExecute);
-	_strcpyW(szBuffer, FORMATTED_ATTRIBUTE);
-	ultohex(ObjectTypeDump->TypeInfo.GenericMapping.GenericExecute, _strendW(szBuffer));
+	SendMessage(hListAttrbites, LB_SETITEMDATA, (WPARAM)nIndex, 
+		(LPARAM)ObjectTypeDump->TypeInfo.GenericMapping.GenericExecute);
+	_strcpy(szBuffer, FORMATTED_ATTRIBUTE);
+	ultohex(ObjectTypeDump->TypeInfo.GenericMapping.GenericExecute, _strend(szBuffer));
 	SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
 
 	//Generic All
 	nIndex = SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&T_GenericAll);
-	SendMessage(hListAttrbites, LB_SETITEMDATA, (WPARAM)nIndex, (LPARAM)ObjectTypeDump->TypeInfo.GenericMapping.GenericAll);
-	_strcpyW(szBuffer, FORMATTED_ATTRIBUTE);
-	ultohex(ObjectTypeDump->TypeInfo.GenericMapping.GenericAll, _strendW(szBuffer));
+	SendMessage(hListAttrbites, LB_SETITEMDATA, (WPARAM)nIndex, 
+		(LPARAM)ObjectTypeDump->TypeInfo.GenericMapping.GenericAll);
+	_strcpy(szBuffer, FORMATTED_ATTRIBUTE);
+	ultohex(ObjectTypeDump->TypeInfo.GenericMapping.GenericAll, _strend(szBuffer));
 	SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
 }
 
@@ -473,7 +480,8 @@ VOID propSetTypeListView(
 	if (hListRights == NULL)
 		return;
 
-	ListView_SetExtendedListViewStyle(hListRights, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP);
+	ListView_SetExtendedListViewStyle(hListRights, 
+		LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP);
 
 	RtlSecureZeroMemory(&col, sizeof(col));
 	col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH;
@@ -533,8 +541,11 @@ BOOL propQueryTypeInfo(
 				sz = (pObject->TypeName.MaximumLength) + sizeof(UNICODE_NULL);
 				lpType = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sz);
 				if (lpType) {
-					_strncpy(lpType, sz / sizeof(WCHAR), pObject->TypeName.Buffer, pObject->TypeName.Length / sizeof(WCHAR));
-					if (_strcmpiW(lpType, lpObjectType) == 0) {
+
+					_strncpy(lpType, sz / sizeof(WCHAR), pObject->TypeName.Buffer, 
+						pObject->TypeName.Length / sizeof(WCHAR));
+
+					if (_strcmpi(lpType, lpObjectType) == 0) {
 						pObjectTypeDump->TotalNumberOfHandles = pObject->TotalNumberOfHandles;
 						pObjectTypeDump->TotalNumberOfObjects = pObject->TotalNumberOfObjects;
 						pObjectTypeDump->TypeInfo.InvalidAttributes = pObject->InvalidAttributes;
@@ -680,22 +691,22 @@ VOID propSetTypeInfo(
 	if (bOkay) {
 		//Object count
 		RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-		u64tostr(ObjectTypeDump.TotalNumberOfObjects, _strendW(szBuffer));
+		u64tostr(ObjectTypeDump.TotalNumberOfObjects, _strend(szBuffer));
 		SetDlgItemText(hwndDlg, ID_TYPE_COUNT, szBuffer);
 
 		//Handle count
 		RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-		u64tostr(ObjectTypeDump.TotalNumberOfHandles, _strendW(szBuffer));
+		u64tostr(ObjectTypeDump.TotalNumberOfHandles, _strend(szBuffer));
 		SetDlgItemText(hwndDlg, ID_TYPE_HANDLECOUNT, szBuffer);
 
 		//Peek object count
 		RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-		u64tostr(ObjectTypeDump.HighWaterNumberOfObjects, _strendW(szBuffer));
+		u64tostr(ObjectTypeDump.HighWaterNumberOfObjects, _strend(szBuffer));
 		SetDlgItemText(hwndDlg, ID_TYPE_PEAKCOUNT, szBuffer);
 
 		//Peek handle count
 		RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-		u64tostr(ObjectTypeDump.HighWaterNumberOfHandles, _strendW(szBuffer));
+		u64tostr(ObjectTypeDump.HighWaterNumberOfHandles, _strend(szBuffer));
 		SetDlgItemText(hwndDlg, ID_TYPE_PEAKHANDLECOUNT, szBuffer);
 
 		//PoolType
@@ -715,7 +726,7 @@ VOID propSetTypeInfo(
 
 		//Default PagedPoolCharge
 		RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-		u64tostr(ObjectTypeDump.TypeInfo.DefaultPagedPoolCharge, _strendW(szBuffer));
+		u64tostr(ObjectTypeDump.TypeInfo.DefaultPagedPoolCharge, _strend(szBuffer));
 		SetDlgItemText(hwndDlg, ID_TYPE_PPCHARGE, szBuffer);
 
 		//Type flags
@@ -757,8 +768,10 @@ INT_PTR CALLBACK TypePropDialogProc(
 			//show window
 			if (wParam) {
 				propSetTypeInfo(Context, hwndDlg);
-				SendDlgItemMessage(hwndDlg, ID_TYPE_ATTRLIST, LB_SETCURSEL, (WPARAM)0, (LPARAM)0);
-				SendMessage(hwndDlg, WM_COMMAND, MAKEWPARAM(ID_TYPE_ATTRLIST, LBN_SELCHANGE), 0);
+				SendDlgItemMessage(hwndDlg, ID_TYPE_ATTRLIST, LB_SETCURSEL, 
+					(WPARAM)0, (LPARAM)0);
+				SendMessage(hwndDlg, WM_COMMAND, 
+					MAKEWPARAM(ID_TYPE_ATTRLIST, LBN_SELCHANGE), 0);
 			}
 		}
 		return 1;
@@ -788,7 +801,8 @@ INT_PTR CALLBACK TypePropDialogProc(
 		if (Context) {
 			hDc = BeginPaint(hwndDlg, &Paint);
 			if (hDc) {
-				ImageList_Draw(ListViewImages, Context->RealTypeIndex, hDc, 24, 34, ILD_NORMAL | ILD_TRANSPARENT);
+				ImageList_Draw(ListViewImages, Context->RealTypeIndex, hDc, 24, 34, 
+					ILD_NORMAL | ILD_TRANSPARENT);
 				EndPaint(hwndDlg, &Paint);
 			}
 		}

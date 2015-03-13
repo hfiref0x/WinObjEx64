@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDLG.H
 *
-*  VERSION:     1.10
+*  VERSION:     1.11
 *
-*  DATE:        26 Feb 2015
+*  DATE:        10 Mar 2015
 *
 *  Common header file for properties dialog.
 *
@@ -49,8 +49,8 @@ extern HWND g_SubPropWindow;
 #define T_CannotQuery	L"-"
 
 //Display for unknown type value
-#define T_UnknownType	L"UnknownType"
-#define T_UnknownFlag	L"UnknownFlag"
+#define T_UnknownType	L"Unknown Type"
+#define T_UnknownFlag	L"Unknown Flag"
 
 //Display for unknown value
 #define T_Unknown		L"Unknown"

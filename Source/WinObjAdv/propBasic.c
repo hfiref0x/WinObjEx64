@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     1.10
+*  VERSION:     1.11
 *
-*  DATE:        24 Feb 2015
+*  DATE:        10 Mar 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -51,17 +51,20 @@ VOID propSetDefaultInfo(
 	}
 
 	RtlSecureZeroMemory(&obi, sizeof(obi));
-	status = NtQueryObject(hObject, ObjectBasicInformation, &obi, sizeof(OBJECT_BASIC_INFORMATION), &bytesNeeded);
+
+	status = NtQueryObject(hObject, ObjectBasicInformation, &obi, 
+		sizeof(OBJECT_BASIC_INFORMATION), &bytesNeeded);
+
 	if (NT_SUCCESS(status)) {
 
 		//Reference Count
 		RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-		u64tostr(obi.PointerCount, _strendW(szBuffer));
+		u64tostr(obi.PointerCount, szBuffer);
 		SetDlgItemText(hwndDlg, ID_OBJECT_REFC, szBuffer);
 
 		//Handle Count
 		RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-		u64tostr(obi.HandleCount, _strendW(szBuffer));
+		u64tostr(obi.HandleCount, szBuffer);
 		SetDlgItemText(hwndDlg, ID_OBJECT_HANDLES, szBuffer);
 
 		//NonPagedPoolCharge
@@ -71,7 +74,7 @@ VOID propSetDefaultInfo(
 
 		//PagedPoolCharge
 		RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-		u64tostr(obi.PagedPoolCharge, _strendW(szBuffer));
+		u64tostr(obi.PagedPoolCharge, szBuffer);
 		SetDlgItemText(hwndDlg, ID_OBJECT_PP_CHARGE, szBuffer);
 
 		//Attributes
@@ -81,7 +84,8 @@ VOID propSetDefaultInfo(
 			SendMessage(hwndCB, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
 			if (hwndCB) {
 				for (i = 0; i < 8; i++) {
-					if (GET_BIT(obi.Attributes, i)) SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)T_ObjectFlags[i]);
+					if (GET_BIT(obi.Attributes, i)) SendMessage(hwndCB, CB_ADDSTRING, 
+						(WPARAM)0, (LPARAM)T_ObjectFlags[i]);
 				}
 				SendMessage(hwndCB, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
 			}
@@ -98,7 +102,7 @@ VOID propSetDefaultInfo(
 			break;
 		}
 
-		poti = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytesNeeded);
+		poti = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytesNeeded + sizeof(ULONG_PTR));
 		if (poti == NULL) {
 			break;
 		}
@@ -190,7 +194,9 @@ VOID propBasicQuerySemaphore(
 		return;
 	}
 
-	status = NtQuerySemaphore(hObject, SemaphoreBasicInformation, &sbi, sizeof(SEMAPHORE_BASIC_INFORMATION), &bytesNeeded);
+	status = NtQuerySemaphore(hObject, SemaphoreBasicInformation, &sbi, 
+		sizeof(SEMAPHORE_BASIC_INFORMATION), &bytesNeeded);
+
 	if (NT_SUCCESS(status)) {
 
 		//Current count
@@ -243,9 +249,12 @@ VOID propBasicQueryIoCompletion(
 		return;
 	}
 
-	status = NtQueryIoCompletion(hObject, IoCompletionBasicInformation, &iobi, sizeof(iobi), &bytesNeeded);
+	status = NtQueryIoCompletion(hObject, IoCompletionBasicInformation, &iobi, 
+		sizeof(iobi), &bytesNeeded);
+
 	if (NT_SUCCESS(status)) {
-		SetDlgItemText(hwndDlg, ID_IOCOMPLETIONSTATE, (iobi.Depth > 0) ? L"Signaled" : L"Nonsignaled");
+		SetDlgItemText(hwndDlg, ID_IOCOMPLETIONSTATE, 
+			(iobi.Depth > 0) ? L"Signaled" : L"Nonsignaled");
 	}
 	//extended information not available, query some fields
 	if (ExtendedInfoAvailable != TRUE) {
@@ -292,11 +301,15 @@ VOID propBasicQueryTimer(
 		return;
 	}
 
-	status = NtQueryTimer(hObject, TimerBasicInformation, &tbi, sizeof(TIMER_BASIC_INFORMATION), &bytesNeeded);
+	status = NtQueryTimer(hObject, TimerBasicInformation, &tbi, 
+		sizeof(TIMER_BASIC_INFORMATION), &bytesNeeded);
+
 	if (NT_SUCCESS(status)) {
 
 		//Timer state
-		SetDlgItemText(hwndDlg, ID_TIMERSTATE, (tbi.TimerState) ? L"Signaled" : L"Nonsignaled");
+		SetDlgItemText(hwndDlg, ID_TIMERSTATE, 
+			(tbi.TimerState) ? L"Signaled" : L"Nonsignaled");
+
 		if (tbi.TimerState != TRUE) {
 			ConvertedSeconds = (tbi.RemainingTime.QuadPart / 10000000LL);
 			Seconds = (CSHORT)(ConvertedSeconds % 60);
@@ -358,7 +371,9 @@ VOID propBasicQueryEvent(
 	}
 
 	RtlSecureZeroMemory(&ebi, sizeof(ebi));
-	status = NtQueryEvent(hObject, EventBasicInformation, &ebi, sizeof(EVENT_BASIC_INFORMATION), &bytesNeeded);
+	status = NtQueryEvent(hObject, EventBasicInformation, &ebi, 
+		sizeof(EVENT_BASIC_INFORMATION), &bytesNeeded);
+
 	if (NT_SUCCESS(status)) {
 
 		//Event type
@@ -443,7 +458,10 @@ VOID propBasicQuerySymlink(
 
 	//Query Link Creation Time
 	RtlSecureZeroMemory(&obi, sizeof(obi));
-	status = NtQueryObject(hObject, ObjectBasicInformation, &obi, sizeof(OBJECT_BASIC_INFORMATION), &bytesNeeded);
+
+	status = NtQueryObject(hObject, ObjectBasicInformation, &obi, 
+		sizeof(OBJECT_BASIC_INFORMATION), &bytesNeeded);
+
 	if (NT_SUCCESS(status)) {
 		FileTimeToLocalFileTime((PFILETIME)&obi.CreationTime, (PFILETIME)&obi.CreationTime);
 		RtlSecureZeroMemory(&SystemTime, sizeof(SystemTime));
@@ -510,23 +528,27 @@ VOID propBasicQueryKey(
 	}
 
 	RtlSecureZeroMemory(&kfi, sizeof(kfi));
-	status = NtQueryKey(hObject, KeyFullInformation, &kfi, sizeof(KEY_FULL_INFORMATION), &bytesNeeded);
+	status = NtQueryKey(hObject, KeyFullInformation, &kfi, 
+		sizeof(KEY_FULL_INFORMATION), &bytesNeeded);
+
 	if (NT_SUCCESS(status)) {
 
 		//Subkeys count
 		RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-		ultostr(kfi.SubKeys, _strendW(szBuffer));
+		ultostr(kfi.SubKeys, _strend(szBuffer));
 		SetDlgItemText(hwndDlg, ID_KEYSUBKEYS, szBuffer);
 
 		//Values count
 		RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-		ultostr(kfi.Values, _strendW(szBuffer));
+		ultostr(kfi.Values, _strend(szBuffer));
 		SetDlgItemText(hwndDlg, ID_KEYVALUES, szBuffer);
 
 		//LastWrite time
 		RtlSecureZeroMemory(&SystemTime, sizeof(SystemTime));
-		FileTimeToLocalFileTime((PFILETIME)&kfi.LastWriteTime, (PFILETIME)&kfi.LastWriteTime);
-		RtlTimeToTimeFields((PLARGE_INTEGER)&kfi.LastWriteTime, (PTIME_FIELDS)&SystemTime);
+		FileTimeToLocalFileTime((PFILETIME)&kfi.LastWriteTime, 
+			(PFILETIME)&kfi.LastWriteTime);
+		RtlTimeToTimeFields((PLARGE_INTEGER)&kfi.LastWriteTime, 
+			(PTIME_FIELDS)&SystemTime);
 
 		//Month starts from 0 index
 		if (SystemTime.Month - 1 < 0) SystemTime.Month = 1;
@@ -586,7 +608,10 @@ VOID propBasicQueryMutant(
 	}
 
 	RtlSecureZeroMemory(&mbi, sizeof(MUTANT_BASIC_INFORMATION));
-	status = NtQueryMutant(hObject, MutantBasicInformation, &mbi, sizeof(MUTANT_BASIC_INFORMATION), NULL);
+
+	status = NtQueryMutant(hObject, MutantBasicInformation, &mbi, 
+		sizeof(MUTANT_BASIC_INFORMATION), NULL);
+
 	if (NT_SUCCESS(status)) {
 
 		//Abandoned
@@ -594,7 +619,7 @@ VOID propBasicQueryMutant(
 
 		//State
 		RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-		_strcpyW(szBuffer, L"Not Held");
+		_strcpy(szBuffer, L"Not Held");
 		if (mbi.OwnedByCaller) {
 			wsprintf(szBuffer, L"Held recursively %d times", mbi.CurrentCount);
 		}
@@ -653,53 +678,56 @@ VOID propBasicQuerySection(
 
 	//query basic information
 	RtlSecureZeroMemory(&sbi, sizeof(sbi));
-	status = NtQuerySection(hObject, SectionBasicInformation, &sbi, sizeof(SECTION_BASIC_INFORMATION), &bytesNeeded);
+
+	status = NtQuerySection(hObject, SectionBasicInformation, &sbi, 
+		sizeof(SECTION_BASIC_INFORMATION), &bytesNeeded);
+
 	if (NT_SUCCESS(status)) {
 
 		bSet = FALSE;
 		RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
 		if (sbi.AllocationAttributes & SEC_BASED) {
-			_strcatW(szBuffer, L"Based");
+			_strcat(szBuffer, L"Based");
 			bSet = TRUE;
 		}
 		if (sbi.AllocationAttributes & SEC_NO_CHANGE) {
-			if (bSet) _strcatW(szBuffer, L" + ");
-			_strcatW(szBuffer, L"NoChange");
+			if (bSet) _strcat(szBuffer, L" + ");
+			_strcat(szBuffer, L"NoChange");
 			bSet = TRUE;
 		}
 		if (sbi.AllocationAttributes & SEC_FILE) {
-			if (bSet) _strcatW(szBuffer, L" + ");
-			_strcatW(szBuffer, L"File");
+			if (bSet) _strcat(szBuffer, L" + ");
+			_strcat(szBuffer, L"File");
 			bSet = TRUE;
 		}
 		if (sbi.AllocationAttributes & SEC_IMAGE) {
-			if (bSet) _strcatW(szBuffer, L" + ");
-			_strcatW(szBuffer, L"Image");
+			if (bSet) _strcat(szBuffer, L" + ");
+			_strcat(szBuffer, L"Image");
 			bSet = TRUE;
 		}
 		if (sbi.AllocationAttributes & SEC_RESERVE) {
-			if (bSet) _strcatW(szBuffer, L" + ");
-			_strcatW(szBuffer, L"Reserve");
+			if (bSet) _strcat(szBuffer, L" + ");
+			_strcat(szBuffer, L"Reserve");
 			bSet = TRUE;
 		}
 		if (sbi.AllocationAttributes & SEC_COMMIT) {
-			if (bSet) _strcatW(szBuffer, L" + ");
-			_strcatW(szBuffer, L"Commit");
+			if (bSet) _strcat(szBuffer, L" + ");
+			_strcat(szBuffer, L"Commit");
 			bSet = TRUE;
 		}
 		if (sbi.AllocationAttributes & SEC_NOCACHE) {
-			if (bSet) _strcatW(szBuffer, L" + ");
-			_strcatW(szBuffer, L"NoCache");
+			if (bSet) _strcat(szBuffer, L" + ");
+			_strcat(szBuffer, L"NoCache");
 			bSet = TRUE;
 		}
 		if (sbi.AllocationAttributes & SEC_GLOBAL) {
-			if (bSet) _strcatW(szBuffer, L" + ");
-			_strcatW(szBuffer, L"Global");
+			if (bSet) _strcat(szBuffer, L" + ");
+			_strcat(szBuffer, L"Global");
 			bSet = TRUE;
 		}
 		if (sbi.AllocationAttributes & SEC_LARGE_PAGES) {
-			if (bSet) _strcatW(szBuffer, L" + ");
-			_strcatW(szBuffer, L"LargePages");
+			if (bSet) _strcat(szBuffer, L" + ");
+			_strcat(szBuffer, L"LargePages");
 		}
 		SetDlgItemText(hwndDlg, ID_SECTION_ATTR, szBuffer);
 
@@ -712,7 +740,10 @@ VOID propBasicQuerySection(
 		if ((sbi.AllocationAttributes & SEC_IMAGE) && (sbi.AllocationAttributes & SEC_FILE)) {
 
 			RtlSecureZeroMemory(&sii, sizeof(sii));
-			status = NtQuerySection(hObject, SectionImageInformation, &sii, sizeof(SECTION_IMAGE_INFORMATION), &bytesNeeded);
+
+			status = NtQuerySection(hObject, SectionImageInformation, &sii, 
+				sizeof(SECTION_IMAGE_INFORMATION), &bytesNeeded);
+
 			if (NT_SUCCESS(status)) {
 
 				//show hidden controls
@@ -736,7 +767,8 @@ VOID propBasicQuerySection(
 				SetDlgItemText(hwndDlg, ID_IMAGE_STACKCOMMIT, szBuffer);
 
 				//Executable			
-				SetDlgItemText(hwndDlg, ID_IMAGE_EXECUTABLE, (sii.ImageContainsCode) ? L"Yes" : L"No");
+				SetDlgItemText(hwndDlg, ID_IMAGE_EXECUTABLE, 
+					(sii.ImageContainsCode) ? L"Yes" : L"No");
 
 				//Subsystem
 				lpType = L"Unknown";
@@ -773,12 +805,12 @@ VOID propBasicQuerySection(
 
 				//Major Version
 				RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-				ultostr(sii.SubSystemMajorVersion, _strendW(szBuffer));
+				ultostr(sii.SubSystemMajorVersion, _strend(szBuffer));
 				SetDlgItemText(hwndDlg, ID_IMAGE_MJV, szBuffer);
 
 				//Minor Version
 				RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-				ultostr(sii.SubSystemMinorVersion, _strendW(szBuffer));
+				ultostr(sii.SubSystemMinorVersion, _strend(szBuffer));
 				SetDlgItemText(hwndDlg, ID_IMAGE_MNV, szBuffer);
 			}
 		}
@@ -824,8 +856,11 @@ VOID propBasicQueryWindowStation(
 	}
 
 	RtlSecureZeroMemory(&userFlags, sizeof(userFlags));
-	if (GetUserObjectInformation(hObject, UOI_FLAGS, &userFlags, sizeof(USEROBJECTFLAGS), &bytesNeeded)) {
-		SetDlgItemText(hwndDlg, ID_WINSTATIONVISIBLE, (userFlags.dwFlags & WSF_VISIBLE) ? L"Yes" : L"No");
+	if (GetUserObjectInformation(hObject, UOI_FLAGS, &userFlags, 
+		sizeof(USEROBJECTFLAGS), &bytesNeeded)) 
+	{
+		SetDlgItemText(hwndDlg, ID_WINSTATIONVISIBLE, 
+			(userFlags.dwFlags & WSF_VISIBLE) ? L"Yes" : L"No");
 	}
 
 	//query object basic and type info
@@ -950,7 +985,8 @@ VOID propBasicQueryJob(
 
 	//query basic information
 	RtlSecureZeroMemory(&jbai, sizeof(jbai));
-	status = NtQueryInformationJobObject(hObject, JobObjectBasicAccountingInformation, &jbai, sizeof(JOBOBJECT_BASIC_ACCOUNTING_INFORMATION), &bytesNeeded);
+	status = NtQueryInformationJobObject(hObject, JobObjectBasicAccountingInformation, 
+		&jbai, sizeof(JOBOBJECT_BASIC_ACCOUNTING_INFORMATION), &bytesNeeded);
 	if (NT_SUCCESS(status)) {
 
 		//Total processes
@@ -1009,14 +1045,19 @@ VOID propBasicQueryJob(
 				break;
 
 			//if buffer is not enough, reallocate it
-			status = NtQueryInformationJobObject(hObject, JobObjectBasicProcessIdList, pJobProcList, bytesNeeded, &bytesNeeded);
+			status = NtQueryInformationJobObject(hObject, JobObjectBasicProcessIdList, 
+				pJobProcList, bytesNeeded, &bytesNeeded);
+			
 			if (status == STATUS_BUFFER_TOO_SMALL) {
+				
 				VirtualFree(pJobProcList, 0, MEM_RELEASE);
 				pJobProcList = VirtualAlloc(NULL, bytesNeeded, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 				if (pJobProcList == NULL)
 					break;
 
-				status = NtQueryInformationJobObject(hObject, JobObjectBasicProcessIdList, pJobProcList, bytesNeeded, &bytesNeeded);
+				status = NtQueryInformationJobObject(hObject, JobObjectBasicProcessIdList, 
+					pJobProcList, bytesNeeded, &bytesNeeded);
+				
 				if (!NT_SUCCESS(status))
 					break;
 			}
@@ -1032,7 +1073,7 @@ VOID propBasicQueryJob(
 						RtlSecureZeroMemory(&szProcessName, sizeof(szProcessName));
 						//query process name
 						if (!supQueryProcessName(pid, ProcessList, szProcessName, MAX_PATH)) {
-							_strcpyW(szProcessName, L"UnknownProcess");
+							_strcpy(szProcessName, L"UnknownProcess");
 						}
 						wsprintf(szBuffer, L"[0x%X:%u] %ws", pid, pid, szProcessName);
 						SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
@@ -1078,24 +1119,24 @@ VOID propSetBasicInfoEx(
 	RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
 	szBuffer[0] = L'0';
 	szBuffer[1] = L'x';
-	u64tohexW(InfoObject->ObjectAddress, &szBuffer[2]);
+	u64tohex(InfoObject->ObjectAddress, &szBuffer[2]);
 	SetDlgItemText(hwndDlg, ID_OBJECT_ADDR, szBuffer);
 
 	//Header Address
 	RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
 	szBuffer[0] = L'0';
 	szBuffer[1] = L'x';
-	u64tohexW(InfoObject->HeaderAddress, &szBuffer[2]);
+	u64tohex(InfoObject->HeaderAddress, &szBuffer[2]);
 	SetDlgItemText(hwndDlg, ID_OBJECT_HEADER, szBuffer);
 
 	//Reference Count
 	RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-	ultostr(InfoObject->ObjectHeader.PointerCount, _strendW(szBuffer));
+	ultostr(InfoObject->ObjectHeader.PointerCount, _strend(szBuffer));
 	SetDlgItemText(hwndDlg, ID_OBJECT_REFC, szBuffer);
 
 	//Handle Count
 	RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-	ultostr(InfoObject->ObjectHeader.HandleCount, _strendW(szBuffer));
+	ultostr(InfoObject->ObjectHeader.HandleCount, _strend(szBuffer));
 	SetDlgItemText(hwndDlg, ID_OBJECT_HANDLES, szBuffer);
 
 	//NonPagedPoolCharge
@@ -1105,7 +1146,7 @@ VOID propSetBasicInfoEx(
 
 	//PagedPoolCharge
 	RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-	ultostr(InfoObject->ObjectQuotaHeader.PagedPoolCharge, _strendW(szBuffer));
+	ultostr(InfoObject->ObjectQuotaHeader.PagedPoolCharge, _strend(szBuffer));
 	SetDlgItemText(hwndDlg, ID_OBJECT_PP_CHARGE, szBuffer);
 
 	//Attributes
@@ -1115,7 +1156,10 @@ VOID propSetBasicInfoEx(
 		SendMessage(hwndCB, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
 		if (InfoObject->ObjectHeader.Flags > 0) {
 			for (i = 0; i < 8; i++) {
-				if (GET_BIT(InfoObject->ObjectHeader.Flags, i)) SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)T_ObjectFlags[i]);
+
+				if (GET_BIT(InfoObject->ObjectHeader.Flags, i))
+					SendMessage(hwndCB,	CB_ADDSTRING, 
+					(WPARAM)0, (LPARAM)T_ObjectFlags[i]);
 			}
 			SendMessage(hwndCB, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
 		}
@@ -1169,14 +1213,16 @@ VOID propBasicQueryDesktop(
 			InfoObject.HeaderAddress = HeaderAddress;
 			InfoObject.ObjectAddress = ObjectAddress;
 			//dump object header
-			bExtendedInfoAvailable = kdReadSystemMemory(HeaderAddress, &InfoObject.ObjectHeader, sizeof(OBJECT_HEADER));
+			bExtendedInfoAvailable = kdReadSystemMemory(HeaderAddress, 
+				&InfoObject.ObjectHeader, sizeof(OBJECT_HEADER));
 			if (bExtendedInfoAvailable) {
 				//dump quota info
 				InfoHeaderAddress = 0;
 				if ( ObHeaderToNameInfoAddress(InfoObject.ObjectHeader.InfoMask, 
 					HeaderAddress, &InfoHeaderAddress, HeaderQuotaInfoFlag))
 				{
-					kdReadSystemMemory(InfoHeaderAddress, &InfoObject.ObjectQuotaHeader, sizeof(OBJECT_HEADER_QUOTA_INFO));
+					kdReadSystemMemory(InfoHeaderAddress, 
+						&InfoObject.ObjectQuotaHeader, sizeof(OBJECT_HEADER_QUOTA_INFO));
 				}
 				propSetBasicInfoEx(hwndDlg, &InfoObject);
 			}
@@ -1187,14 +1233,14 @@ VOID propBasicQueryDesktop(
 			RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
 			szBuffer[0] = L'0';
 			szBuffer[1] = L'x';
-			u64tohexW(ObjectAddress, &szBuffer[2]);
+			u64tohex(ObjectAddress, &szBuffer[2]);
 			SetDlgItemText(hwndDlg, ID_OBJECT_ADDR, szBuffer);
 
 			//Object Address
 			RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
 			szBuffer[0] = L'0';
 			szBuffer[1] = L'x';
-			u64tohexW(HeaderAddress, &szBuffer[2]);
+			u64tohex(HeaderAddress, &szBuffer[2]);
 			SetDlgItemText(hwndDlg, ID_OBJECT_HEADER, szBuffer);
 		}
 	}

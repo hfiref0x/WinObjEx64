@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXCEPTH.H
 *
-*  VERSION:     1.00
+*  VERSION:     1.11
 *
-*  DATE:        16 Feb 2015
+*  DATE:        10 Mar 2015
 *
 *  Common header file for the exception handling routines.
 *

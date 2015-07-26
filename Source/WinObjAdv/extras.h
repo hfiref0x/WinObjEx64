@@ -2,11 +2,11 @@
 *
 *  (C) COPYRIGHT AUTHORS, 2015
 *
-*  TITLE:       EXTRASDLG.H
+*  TITLE:       EXTRAS.H
 *
-*  VERSION:     1.11
+*  VERSION:     1.20
 *
-*  DATE:        10 Mar 2015
+*  DATE:        23 July 2015
 *
 *  Common header file for Extras dialogs.
 *
@@ -17,6 +17,10 @@
 *
 *******************************************************************************/
 
-VOID extrasCreatePipeDialog(
+VOID extrasShowPipeDialog(
+	_In_ HWND hwndParent
+	);
+
+VOID extrasShowUserSharedDataDialog(
 	_In_ HWND hwndParent
 	);

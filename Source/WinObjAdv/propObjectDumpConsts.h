@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMPCONSTS.H
 *
-*  VERSION:     1.11
+*  VERSION:     1.20
 *
-*  DATE:        10 Mar 2015
+*  DATE:        26 July 2015
 *
 *  Consts header file for Object Dump module.
 *
@@ -17,46 +17,47 @@
 *
 *******************************************************************************/
 
-#define FORMAT_HEXBYTE		L"0x%02x"
-#define FORMAT_HEXUSHORT	L"0x%04X"
-#define FORMAT_HEXDWORD		L"0x%08X"
-#define FORMAT_ULONG		L"%u"
-#define FORMAT_USHORT		L"0x%04u"
-#define FORMAT_POINTER		L"0x%p"
-#define T_NULL				L"NULL"
-#define T_UNNAMED			L"Unnamed"
+#define FORMAT_HEXBYTE      L"0x%02x"
+#define FORMAT_HEXUSHORT    L"0x%04X"
+#define FORMAT_HEXDWORD     L"0x%08X"
+#define FORMAT_ULONG        L"%u"
+#define FORMAT_USHORT       L"0x%04u"
+#define FORMAT_POINTER      L"0x%p"
+#define T_NULL              L"NULL"
+#define T_UNNAMED           L"Unnamed"
 
-#define T_LDR_DATA_TABLE_ENTRY		L"LDR_DATA_TABLE_ENTRY"
-#define T_LIST_ENTRY				L"LIST_ENTRY"
-#define T_PLIST_ENTRY				L"PLIST_ENTRY"
-#define T_EX_PUSH_LOCK				L"EX_PUSH_LOCK"
-#define T_PDEVICE_MAP				L"PDEVICE_MAP"
-#define T_POBJECT_DIRECTORY_ENTRY	L"POBJECT_DIRECTORY_ENTRY"
-#define T_OBJECT_DIRECTORY			L"OBJECT_DIRECTORY"
-#define T_OBJECT_TYPE				L"OBJECT_TYPE"
-#define T_OBJECT_TYPE_INITIALIZER	L"OBJECT_TYPE_INITIALIZER"
-#define T_PUNICODE_STRING			L"PUNICODE_STRING"
-#define T_PKTHREAD					L"PKTHREAD"
-#define T_KEVENT					L"KEVENT"
-#define T_KMUTANT					L"KMUTANT"
-#define T_KSEMAPHORE				L"KSEMAPHORE"
-#define T_KTIMER					L"KTIMER"
-#define T_KQUEUE					L"KQUEUE"
-#define T_PKDPC						L"PKDPC"
-#define T_GENERIC_MAPPING			L"GENERIC_MAPPING"
+#define T_LDR_DATA_TABLE_ENTRY      L"LDR_DATA_TABLE_ENTRY"
+#define T_LIST_ENTRY                L"LIST_ENTRY"
+#define T_PLIST_ENTRY               L"PLIST_ENTRY"
+#define T_EX_PUSH_LOCK              L"EX_PUSH_LOCK"
+#define T_PDEVICE_MAP               L"PDEVICE_MAP"
+#define T_POBJECT_DIRECTORY_ENTRY   L"POBJECT_DIRECTORY_ENTRY"
+#define T_OBJECT_DIRECTORY          L"OBJECT_DIRECTORY"
+#define T_OBJECT_TYPE               L"OBJECT_TYPE"
+#define T_OBJECT_TYPE_INITIALIZER   L"OBJECT_TYPE_INITIALIZER"
+#define T_PUNICODE_STRING           L"PUNICODE_STRING"
+#define T_PKTHREAD                  L"PKTHREAD"
+#define T_KEVENT                    L"KEVENT"
+#define T_KMUTANT                   L"KMUTANT"
+#define T_KSEMAPHORE                L"KSEMAPHORE"
+#define T_KTIMER                    L"KTIMER"
+#define T_KQUEUE                    L"KQUEUE"
+#define T_PKDPC                     L"PKDPC"
+#define T_GENERIC_MAPPING           L"GENERIC_MAPPING"
 
-#define T_EVENT_NOTIFICATION		L"NotificationEvent"
-#define T_EVENT_SYNC				L"SynchronizationEvent"
-#define T_SIGNALED					L"Signaled"
-#define T_NONSIGNALED				L"Nonsignaled"
-#define T_OBJECTYPEFLAGS			L"ObjectTypeFlags"
+#define T_EVENT_NOTIFICATION        L"NotificationEvent"
+#define T_EVENT_SYNC                L"SynchronizationEvent"
+#define T_SIGNALED                  L"Signaled"
+#define T_NONSIGNALED               L"Nonsignaled"
+#define T_OBJECTYPEFLAGS            L"ObjectTypeFlags"
 
-#define T_TIMER_NOTIFICATION		L"NotificationTimer"
-#define T_TIMER_SYNC				L"SynchronizationTimer"
-#define T_CHARACTERISTICS			L"Characteristics"
-#define T_FLAGS						L"Flags"
-#define T_LENGTH					L"Length"
-#define T_REFNOTFOUND				L"! Reference not found"
+#define T_TIMER_NOTIFICATION        L"NotificationTimer"
+#define T_TIMER_SYNC                L"SynchronizationTimer"
+#define T_CHARACTERISTICS           L"Characteristics"
+#define T_FLAGS                     L"Flags"
+#define T_LENGTH                    L"Length"
+#define T_TYPEINDEX                 L"Index"
+#define T_REFNOTFOUND               L"! Reference not found"
 
 
 #define MAX_KNOWN_DRV_FLAGS 8

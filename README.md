@@ -19,7 +19,7 @@ In order to use all program features Windows must be booted in the DEBUG mode.
 # Build 
 
 WinObjEx64 comes with full source code.
-In order to build from source you need Microsoft Visual Studio 2013 U4 and later versions.
+In order to build from source you need Microsoft Visual Studio 2013 U4 or Visual Studio 2015 and later versions.
  
 # Changelog
 

@@ -399,7 +399,7 @@ VOID FindDlgAddTypes(
 		for (i = 0; i < g_pObjectTypesInfo->NumberOfTypes; i++) {
 			//
 			//Thanks to MS copy-pasters we need to allocate buffer for each type name
-			//to exclude situation with their inproper zero terminated object name,
+			//to avoid situation with their improper zero terminated object name,
 			//like in case of TmTx.
 			//
 			sz = pObject->TypeName.MaximumLength + sizeof(UNICODE_NULL);

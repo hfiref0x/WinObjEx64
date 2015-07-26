@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDESKTOP.C
 *
-*  VERSION:     1.11
+*  VERSION:     1.12
 *
-*  DATE:        10 Mar 2015
+*  DATE:        26 May 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -167,7 +167,7 @@ VOID DesktopListSetInfo(
 		CloseWindowStation(hObject);
 		bResult = TRUE;
 	}
-	ShowWindow(GetDlgItem(hwndDlg, ID_DESKTOPSNOTALL), (bResult != TRUE) ? SW_SHOW : SW_HIDE);
+	ShowWindow(GetDlgItem(hwndDlg, ID_DESKTOPSNOTALL), (bResult == FALSE) ? SW_SHOW : SW_HIDE);
 }
 
 /*

@@ -4,9 +4,9 @@
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     1.11
+*  VERSION:     1.20
 *
-*  DATE:        10 Mar 2015
+*  DATE:        24 July 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -114,9 +114,17 @@ VOID AboutDialogInit(
 	//remove class icon if any
 	SetClassLongPtr(hwndDlg, GCLP_HICON, (LONG_PTR)NULL);
 
-	RtlSecureZeroMemory(buf, sizeof(buf));
+	RtlSecureZeroMemory(buf, sizeof(buf)); 
+
+#if (_MSC_VER == 1900) //2015
+#if (_MSC_FULL_VER == 190023026) //2015 RTM
+	_strcpy(buf, L"MSVC 2015");
+#endif
+#else
 #if (_MSC_VER == 1800) //2013
-#if (_MSC_FULL_VER == 180031101)
+#if (_MSC_FULL_VER == 180040629)
+	_strcpy(buf, L"MSVC 2013 Update 5");
+#elif (_MSC_FULL_VER == 180031101)
 	_strcpy(buf, L"MSVC 2013 Update 4");
 #elif (_MSC_FULL_VER == 180030723)
 	_strcpy(buf, L"MSVC 2013 Update 3");
@@ -129,6 +137,7 @@ VOID AboutDialogInit(
 #endif
 #else
 	_strcpy(buf, L"Unknown Compiler");
+#endif
 #endif
 	SetDlgItemText(hwndDlg, ID_ABOUT_COMPILERINFO, buf);
 

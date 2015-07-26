@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.11
+*  VERSION:     1.20
 *
-*  DATE:        10 Mar 2015 
+*  DATE:        26 July 2015 
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -18,6 +18,7 @@
 *******************************************************************************/
 #include "global.h"
 #include <Shlwapi.h>
+#include "ldasm\ldasm.h"
 
 //include for PathFileExists API
 #pragma comment(lib, "shlwapi.lib")
@@ -108,6 +109,86 @@ BOOL ObHeaderToNameInfoAddress(
 	
 	*HeaderAddress = Address;
 	return TRUE;
+}
+
+/*
+* ObDecodeTypeIndex
+*
+* Purpose:
+*
+* Decode encoded type index for Windows 10+ objects
+*
+*/
+UCHAR ObDecodeTypeIndex(
+	_In_ PVOID Object,
+	_In_ UCHAR EncodedTypeIndex
+	)
+{
+	if (g_kdctx.ObHeaderCookie == 0) {
+		return 0;
+	}
+	return (UCHAR)((g_kdctx.ObHeaderCookie ^ EncodedTypeIndex) ^ ((ULONG_PTR)Object >> OBJECT_SHIFT));
+}
+
+/*
+* ObFindHeaderCookie
+*
+* Purpose:
+*
+* Parse ObGetObjectType and extract object header cookie variable address
+*
+* Limitation:
+*
+* Only for Win10+ use
+*
+*/
+UCHAR ObFindHeaderCookie(
+	_In_ PVOID UserBase,
+	_In_ ULONG_PTR KernelBase
+	)
+{
+	UCHAR ObHeaderCookie = 0;
+	BOOL cond = FALSE;
+	ULONG_PTR Address = 0, KmAddress;
+
+	UINT        c;
+	LONG         rel = 0;
+	ldasm_data	 ld;
+
+	do {
+
+		Address = (ULONG_PTR)GetProcAddress(UserBase, "ObGetObjectType");
+		if (Address == 0) {
+			break;
+		}
+
+		c = 0;
+		do {	
+			//movzx   ecx, byte ptr cs:ObHeaderCookie
+			if ((*(PBYTE)(Address + c) == 0x0f) &&
+				(*(PBYTE)(Address + c + 1) == 0xb6) &&
+				(*(PBYTE)(Address + c + 2) == 0x0d))
+			{
+				rel = *(PLONG)(Address + c + 3);
+				break;
+			}
+			c += ldasm((void*)(Address + c), &ld, 1);
+		} while (c < 256);
+		KmAddress = Address + c + 7 + rel;
+
+		KmAddress = KernelBase + KmAddress - (ULONG_PTR)UserBase;
+
+		if (KmAddress < g_kdctx.SystemRangeStart) {
+			break;
+		}
+
+		if (!kdReadSystemMemory(KmAddress, &ObHeaderCookie, sizeof(ObHeaderCookie))) {
+			break;
+		}
+
+	} while (cond);
+
+	return ObHeaderCookie;
 }
 
 /*
@@ -317,7 +398,7 @@ POBJINFO ObWalkDirectory(
 					//compare full object names
 					bFound = (_strcmpi(lpObjectName, lpObjectToFind) == 0);
 					HeapFree(GetProcessHeap(), 0, lpObjectName);
-					if (bFound != TRUE) {
+					if (bFound == FALSE) {
 						goto NextItem;
 					}
 					//identical, allocate item info and copy it
@@ -545,7 +626,7 @@ VOID ObWalkDirectoryRecursiveEx(
 								lpListEntry->ObjectName = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, fLen);
 								if (lpListEntry->ObjectName) {
 									_strcpy(lpListEntry->ObjectName, lpRootDirectory);
-									if (fIsRoot != TRUE) {
+									if (fIsRoot == FALSE) {
 										_strcat(lpListEntry->ObjectName, L"\\");
 									}
 									_strcat(lpListEntry->ObjectName, lpObjectName);
@@ -570,7 +651,7 @@ VOID ObWalkDirectoryRecursiveEx(
 							lpDirectoryName = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, dirLen);
 							if (lpDirectoryName) {
 								_strcpy(lpDirectoryName, lpRootDirectory);
-								if (fIsRoot != TRUE) {
+								if (fIsRoot == FALSE) {
 									_strcat(lpDirectoryName, L"\\");
 								}
 								if (lpObjectName) {
@@ -780,6 +861,7 @@ BOOL kdIsDebugBoot(
 	HKEY hKey;
 	LPWSTR lpszBootOptions = NULL;
 	LRESULT lRet;
+	SIZE_T memIO;
 	DWORD dwSize;
 	BOOL cond = FALSE;
 	BOOL bResult = FALSE;
@@ -795,11 +877,10 @@ BOOL kdIsDebugBoot(
 		if (lRet != ERROR_SUCCESS)
 			break;
 
-		lpszBootOptions = HeapAlloc(GetProcessHeap(), 0, dwSize + sizeof(WCHAR));
+		memIO = dwSize + sizeof(WCHAR);
+		lpszBootOptions = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, memIO);
 		if (lpszBootOptions == NULL)
 			break;
-
-		RtlSecureZeroMemory(lpszBootOptions, dwSize + sizeof(WCHAR));
 
 		lRet = RegQueryValueExW(hKey, RegStartOptionsValue, NULL, NULL, (LPBYTE)lpszBootOptions, &dwSize);
 		if (lRet != ERROR_SUCCESS)
@@ -960,6 +1041,12 @@ VOID pkdQuerySystemInformation(
 			}
 		}
 
+		//future use
+		//find and remember ObHeaderCookie
+		//if (Context->osver.dwMajorVersion >= 10) {
+		//	Context->ObHeaderCookie = ObFindHeaderCookie(MappedKernel, KernelBase);
+		//}
+
 	} while (cond);
 
 	if (MappedKernel != NULL) {
@@ -1037,18 +1124,18 @@ VOID kdInit(
 	}
 
 	// no admin rights, leave
-	if (IsFullAdmin != TRUE)
+	if (IsFullAdmin == FALSE)
 		return;
 
 	// check if system booted in the debug mode
-	if (kdIsDebugBoot() != TRUE) 
+	if (kdIsDebugBoot() == FALSE) 
 		return;
 
 	// test privilege assigned and continue to load/open kldbg driver
 	if (supEnablePrivilege(SE_DEBUG_PRIVILEGE, TRUE)) {
 
 		// try to open existing
-		if (scmOpenDevice(KLDBGDRV, &g_kdctx.hDevice) != TRUE) {
+		if (scmOpenDevice(KLDBGDRV, &g_kdctx.hDevice) == FALSE) {
 
 			// no such device exist, construct filepath and check if driver already present
 			RtlSecureZeroMemory(szDrvPath, sizeof(szDrvPath));

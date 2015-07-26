@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.11
+*  VERSION:     1.20
 *
-*  DATE:        10 Mar 2015
+*  DATE:        23 July 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -440,7 +440,7 @@ PVOID supGetSystemInfo(
 	ULONG       memIO;
 
 	do {
-		Buffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, Size);
+		Buffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (SIZE_T)Size);
 		if (Buffer != NULL) {
 			status = NtQuerySystemInformation(InfoClass, Buffer, Size, &memIO);
 		}
@@ -490,7 +490,7 @@ PVOID supGetObjectTypesInfo(
 	ULONG       memIO;
 
 	do {
-		Buffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, Size);
+		Buffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (SIZE_T)Size);
 		if (Buffer != NULL) {
 			status = NtQueryObject(NULL, ObjectTypesInformation, Buffer, Size, &memIO);
 		}
@@ -738,7 +738,7 @@ BOOL supUserIsFullAdmin(
 		if (status != STATUS_BUFFER_TOO_SMALL)
 			break;
 
-		pTkGroups = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, ReturnLength);
+		pTkGroups = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (SIZE_T)ReturnLength);
 		if (pTkGroups == NULL)
 			break;
 
@@ -941,6 +941,7 @@ BOOL supQueryKnownDllsLink(
 {
 	BOOL				bResult;
 	HANDLE				hLink;
+	SIZE_T				memIO;
 	ULONG				bytesNeeded;
 	NTSTATUS			status;
 	UNICODE_STRING		KnownDlls;
@@ -969,7 +970,8 @@ BOOL supQueryKnownDllsLink(
 			bytesNeeded = MAX_USTRING - sizeof(UNICODE_NULL);
 		}
 
-		lpDataBuffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytesNeeded + sizeof(UNICODE_NULL));
+		memIO = bytesNeeded + sizeof(UNICODE_NULL);
+		lpDataBuffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, memIO);
 		if (lpKnownDllsBuffer) {
 			KnownDlls.Buffer = lpDataBuffer;
 			KnownDlls.Length = (USHORT)bytesNeeded;
@@ -1261,7 +1263,7 @@ PVOID supCreateSCMSnapshot(
 		
 		bResult = EnumServicesStatusEx(schSCManager, SC_ENUM_PROCESS_INFO, SERVICE_DRIVER, 
 			SERVICE_STATE_ALL, Services, dwSize, &dwBytesNeeded, &dwServicesReturned, NULL, NULL);	
-		if (bResult != TRUE) {
+		if (bResult == FALSE) {
 
 			if (GetLastError() == ERROR_MORE_DATA) {
 				// allocate memory block with page aligned size
@@ -1283,7 +1285,7 @@ PVOID supCreateSCMSnapshot(
 					break;
 				}
 			} //ERROR_MORE_DATA
-		} //bResult != TRUE;
+		} //bResult == FALSE;
 
 		// also return actual number of services
 		if (lpNumberOfEntries) {
@@ -1729,7 +1731,7 @@ BOOL supQueryDeviceDescription(
 		// create full path device name for comparison
 		_strcpy(lpFullDeviceName, CurrentObjectPath);
 		bIsRoot = (_strcmpi(CurrentObjectPath, L"\\") == 0);
-		if (bIsRoot != TRUE) {
+		if (bIsRoot == FALSE) {
 			_strcat(lpFullDeviceName, L"\\");
 		}
 		_strcat(lpFullDeviceName, lpDeviceName);
@@ -1831,7 +1833,7 @@ BOOL supQueryDriverDescription(
 	}
 	
 	// second attempt - query through registry and fs
-	if (bResult != TRUE) {
+	if (bResult == FALSE) {
 	
 		do {
 

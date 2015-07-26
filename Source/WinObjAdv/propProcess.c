@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPPROCESS.C
 *
-*  VERSION:     1.10
+*  VERSION:     1.12
 *
-*  DATE:        25 Feb 2015
+*  DATE:        26 May 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -636,7 +636,7 @@ VOID ProcessHandlePopupMenu(
 	POINT pt1;
 	HMENU hMenu;
 
-	if (GetCursorPos(&pt1) != TRUE)
+	if (GetCursorPos(&pt1) == FALSE)
 		return;
 
 	hMenu = CreatePopupMenu();

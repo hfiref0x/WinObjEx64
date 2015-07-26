@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.11
+*  VERSION:     1.18
 *
-*  DATE:        10 Mar 2015
+*  DATE:        25 June 2015
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -118,6 +118,34 @@ typedef struct _UNICODE_STRING {
 } UNICODE_STRING;
 typedef UNICODE_STRING *PUNICODE_STRING;
 typedef const UNICODE_STRING *PCUNICODE_STRING;
+
+typedef struct _STRING
+{
+	USHORT Length;
+	USHORT MaximumLength;
+	PCHAR Buffer;
+} STRING;
+typedef STRING *PSTRING;
+
+typedef STRING ANSI_STRING;
+typedef PSTRING PANSI_STRING;
+
+typedef STRING OEM_STRING;
+typedef PSTRING POEM_STRING;
+typedef CONST STRING* PCOEM_STRING;
+typedef CONST char *PCSZ;
+
+typedef struct _CSTRING
+{
+	USHORT Length;
+	USHORT MaximumLength;
+	CONST char *Buffer;
+} CSTRING;
+typedef CSTRING *PCSTRING;
+#define ANSI_NULL ((CHAR)0)
+
+typedef STRING CANSI_STRING;
+typedef PSTRING PCANSI_STRING;
 
 typedef struct _OBJECT_ATTRIBUTES {
 	ULONG Length;
@@ -351,21 +379,21 @@ typedef struct _PROCESS_BASIC_INFORMATION {
 typedef PROCESS_BASIC_INFORMATION *PPROCESS_BASIC_INFORMATION;
 
 typedef struct _PROCESS_EXTENDED_BASIC_INFORMATION {
-	SIZE_T Size;  
+	SIZE_T Size;
 	PROCESS_BASIC_INFORMATION BasicInfo;
 	union
 	{
 		ULONG Flags;
 		struct
 		{
-			ULONG IsProtectedProcess : 1; 
-			ULONG IsWow64Process : 1; 
-			ULONG IsProcessDeleting : 1; 
-			ULONG IsCrossSessionCreate : 1; 
-			ULONG IsFrozen : 1; 
-			ULONG IsBackground : 1; 
+			ULONG IsProtectedProcess : 1;
+			ULONG IsWow64Process : 1;
+			ULONG IsProcessDeleting : 1;
+			ULONG IsCrossSessionCreate : 1;
+			ULONG IsFrozen : 1;
+			ULONG IsBackground : 1;
 			ULONG IsStronglyNamed : 1;
-			ULONG SpareBits : 25; 
+			ULONG SpareBits : 25;
 		} DUMMYSTRUCTNAME;
 	} DUMMYUNIONNAME;
 } PROCESS_EXTENDED_BASIC_INFORMATION, *PPROCESS_EXTENDED_BASIC_INFORMATION;
@@ -652,27 +680,27 @@ typedef struct _OBJECT_NAME_INFORMATION {
 
 #ifndef _OBJECT_TYPE_INFORMATION
 typedef struct _OBJECT_TYPE_INFORMATION {
-    UNICODE_STRING TypeName;
-    ULONG TotalNumberOfObjects;
-    ULONG TotalNumberOfHandles;
-    ULONG TotalPagedPoolUsage;
-    ULONG TotalNonPagedPoolUsage;
-    ULONG TotalNamePoolUsage;
-    ULONG TotalHandleTableUsage;
-    ULONG HighWaterNumberOfObjects;
-    ULONG HighWaterNumberOfHandles;
-    ULONG HighWaterPagedPoolUsage;
-    ULONG HighWaterNonPagedPoolUsage;
-    ULONG HighWaterNamePoolUsage;
-    ULONG HighWaterHandleTableUsage;
-    ULONG InvalidAttributes;
-    GENERIC_MAPPING GenericMapping;
-    ULONG ValidAccessMask;
-    BOOLEAN SecurityRequired;
-    BOOLEAN MaintainHandleCount;
-    ULONG PoolType;
-    ULONG DefaultPagedPoolCharge;
-    ULONG DefaultNonPagedPoolCharge;
+	UNICODE_STRING TypeName;
+	ULONG TotalNumberOfObjects;
+	ULONG TotalNumberOfHandles;
+	ULONG TotalPagedPoolUsage;
+	ULONG TotalNonPagedPoolUsage;
+	ULONG TotalNamePoolUsage;
+	ULONG TotalHandleTableUsage;
+	ULONG HighWaterNumberOfObjects;
+	ULONG HighWaterNumberOfHandles;
+	ULONG HighWaterPagedPoolUsage;
+	ULONG HighWaterNonPagedPoolUsage;
+	ULONG HighWaterNamePoolUsage;
+	ULONG HighWaterHandleTableUsage;
+	ULONG InvalidAttributes;
+	GENERIC_MAPPING GenericMapping;
+	ULONG ValidAccessMask;
+	BOOLEAN SecurityRequired;
+	BOOLEAN MaintainHandleCount;
+	ULONG PoolType;
+	ULONG DefaultPagedPoolCharge;
+	ULONG DefaultNonPagedPoolCharge;
 } OBJECT_TYPE_INFORMATION, *POBJECT_TYPE_INFORMATION;
 #endif
 
@@ -827,22 +855,22 @@ typedef struct _FILE_ACCESS_INFORMATION {
 	ACCESS_MASK AccessFlags;
 } FILE_ACCESS_INFORMATION, *PFILE_ACCESS_INFORMATION;
 
-typedef struct _FILE_POSITION_INFORMATION {                 
-	LARGE_INTEGER CurrentByteOffset;                        
-} FILE_POSITION_INFORMATION, *PFILE_POSITION_INFORMATION;   
+typedef struct _FILE_POSITION_INFORMATION {
+	LARGE_INTEGER CurrentByteOffset;
+} FILE_POSITION_INFORMATION, *PFILE_POSITION_INFORMATION;
 
 typedef struct _FILE_MODE_INFORMATION {
 	ULONG Mode;
 } FILE_MODE_INFORMATION, *PFILE_MODE_INFORMATION;
 
-typedef struct _FILE_ALIGNMENT_INFORMATION {               
-	ULONG AlignmentRequirement;                             
+typedef struct _FILE_ALIGNMENT_INFORMATION {
+	ULONG AlignmentRequirement;
 } FILE_ALIGNMENT_INFORMATION, *PFILE_ALIGNMENT_INFORMATION;
 
-typedef struct _FILE_NAME_INFORMATION {                    
-	ULONG FileNameLength;                                   
-	WCHAR FileName[1];                                      
-} FILE_NAME_INFORMATION, *PFILE_NAME_INFORMATION;          
+typedef struct _FILE_NAME_INFORMATION {
+	ULONG FileNameLength;
+	WCHAR FileName[1];
+} FILE_NAME_INFORMATION, *PFILE_NAME_INFORMATION;
 
 typedef struct _FILE_ALL_INFORMATION {
 	FILE_BASIC_INFORMATION BasicInformation;
@@ -856,20 +884,20 @@ typedef struct _FILE_ALL_INFORMATION {
 	FILE_NAME_INFORMATION NameInformation;
 } FILE_ALL_INFORMATION, *PFILE_ALL_INFORMATION;
 
-typedef struct _FILE_NETWORK_OPEN_INFORMATION {                 
-	LARGE_INTEGER CreationTime;                                 
-	LARGE_INTEGER LastAccessTime;                             
-	LARGE_INTEGER LastWriteTime;                              
-	LARGE_INTEGER ChangeTime;                                   
-	LARGE_INTEGER AllocationSize;                            
-	LARGE_INTEGER EndOfFile;                                  
-	ULONG FileAttributes;                                    
-} FILE_NETWORK_OPEN_INFORMATION, *PFILE_NETWORK_OPEN_INFORMATION;   
+typedef struct _FILE_NETWORK_OPEN_INFORMATION {
+	LARGE_INTEGER CreationTime;
+	LARGE_INTEGER LastAccessTime;
+	LARGE_INTEGER LastWriteTime;
+	LARGE_INTEGER ChangeTime;
+	LARGE_INTEGER AllocationSize;
+	LARGE_INTEGER EndOfFile;
+	ULONG FileAttributes;
+} FILE_NETWORK_OPEN_INFORMATION, *PFILE_NETWORK_OPEN_INFORMATION;
 
-typedef struct _FILE_ATTRIBUTE_TAG_INFORMATION {             
-	ULONG FileAttributes;                                     
-	ULONG ReparseTag;                                         
-} FILE_ATTRIBUTE_TAG_INFORMATION, *PFILE_ATTRIBUTE_TAG_INFORMATION; 
+typedef struct _FILE_ATTRIBUTE_TAG_INFORMATION {
+	ULONG FileAttributes;
+	ULONG ReparseTag;
+} FILE_ATTRIBUTE_TAG_INFORMATION, *PFILE_ATTRIBUTE_TAG_INFORMATION;
 
 typedef struct _FILE_ALLOCATION_INFORMATION {
 	LARGE_INTEGER AllocationSize;
@@ -884,17 +912,17 @@ typedef struct _FILE_COMPRESSION_INFORMATION {
 	UCHAR Reserved[3];
 } FILE_COMPRESSION_INFORMATION, *PFILE_COMPRESSION_INFORMATION;
 
-typedef struct _FILE_DISPOSITION_INFORMATION {                  
-	BOOLEAN DeleteFile;                                         
-} FILE_DISPOSITION_INFORMATION, *PFILE_DISPOSITION_INFORMATION; 
+typedef struct _FILE_DISPOSITION_INFORMATION {
+	BOOLEAN DeleteFile;
+} FILE_DISPOSITION_INFORMATION, *PFILE_DISPOSITION_INFORMATION;
 
-typedef struct _FILE_END_OF_FILE_INFORMATION {                  
-	LARGE_INTEGER EndOfFile;                                    
-} FILE_END_OF_FILE_INFORMATION, *PFILE_END_OF_FILE_INFORMATION; 
+typedef struct _FILE_END_OF_FILE_INFORMATION {
+	LARGE_INTEGER EndOfFile;
+} FILE_END_OF_FILE_INFORMATION, *PFILE_END_OF_FILE_INFORMATION;
 
-typedef struct _FILE_VALID_DATA_LENGTH_INFORMATION {                                    
-	LARGE_INTEGER ValidDataLength;                                                      
-} FILE_VALID_DATA_LENGTH_INFORMATION, *PFILE_VALID_DATA_LENGTH_INFORMATION;             
+typedef struct _FILE_VALID_DATA_LENGTH_INFORMATION {
+	LARGE_INTEGER ValidDataLength;
+} FILE_VALID_DATA_LENGTH_INFORMATION, *PFILE_VALID_DATA_LENGTH_INFORMATION;
 
 typedef struct _FILE_LINK_INFORMATION {
 	BOOLEAN ReplaceIfExists;
@@ -1242,7 +1270,7 @@ typedef enum _SECTION_INHERIT {
 */
 
 /*
-** Kernel Debugger START 
+** Kernel Debugger START
 */
 
 #ifndef _SYSDBG_COMMAND
@@ -1312,9 +1340,9 @@ typedef struct _SYSTEM_BOOT_ENVIRONMENT_INFORMATION_V1 // Size=20
 
 typedef struct _SYSTEM_BOOT_ENVIRONMENT_INFORMATION // Size=32
 {
-	struct _GUID BootIdentifier; 
-	enum _FIRMWARE_TYPE FirmwareType; 
-	unsigned __int64 BootFlags; 
+	struct _GUID BootIdentifier;
+	enum _FIRMWARE_TYPE FirmwareType;
+	unsigned __int64 BootFlags;
 } SYSTEM_BOOT_ENVIRONMENT_INFORMATION, *PSYSTEM_BOOT_ENVIRONMENT_INFORMATION;
 
 /*
@@ -1371,7 +1399,7 @@ typedef struct _KEY_FULL_INFORMATION {
 	ULONG   Values;
 	ULONG   MaxValueNameLen;
 	ULONG   MaxValueDataLen;
-	WCHAR   Class[1];           
+	WCHAR   Class[1];
 } KEY_FULL_INFORMATION, *PKEY_FULL_INFORMATION;
 #endif
 
@@ -1736,8 +1764,8 @@ typedef struct _OBJECT_TYPE_INITIALIZER_V1 {
 	GENERIC_MAPPING GenericMapping;
 	ACCESS_MASK     ValidAccessMask;
 	BOOLEAN         SecurityRequired;
-	BOOLEAN         MaintainHandleCount; 
-	BOOLEAN         MaintainTypeList;    
+	BOOLEAN         MaintainHandleCount;
+	BOOLEAN         MaintainTypeList;
 	UCHAR           Reserved2;
 	BOOLEAN         PagedPool;
 	ULONG           DefaultPagedPoolCharge;
@@ -1747,7 +1775,7 @@ typedef struct _OBJECT_TYPE_INITIALIZER_V1 {
 	PVOID           CloseProcedure;
 	PVOID           DeleteProcedure;
 	PVOID           ParseProcedure;
-	PVOID           SecurityProcedure;    
+	PVOID           SecurityProcedure;
 	PVOID           QueryNameProcedure;
 	PVOID           OkayToCloseProcedure;
 } OBJECT_TYPE_INITIALIZER_V1, *POBJECT_TYPE_INITIALIZER_V1;
@@ -1827,10 +1855,10 @@ typedef struct _OBJECT_TYPE_V2 {// Size=216
 	ULONG TotalNumberOfHandles; // Size=4 Offset=48
 	ULONG HighWaterNumberOfObjects; // Size=4 Offset=52
 	ULONG HighWaterNumberOfHandles; // Size=4 Offset=56
-	OBJECT_TYPE_INITIALIZER_V2 TypeInfo; 
-	EX_PUSH_LOCK TypeLock; 
-	ULONG Key; 
-	LIST_ENTRY CallbackList; 
+	OBJECT_TYPE_INITIALIZER_V2 TypeInfo;
+	EX_PUSH_LOCK TypeLock;
+	ULONG Key;
+	LIST_ENTRY CallbackList;
 } OBJECT_TYPE_V2, *POBJECT_TYPE_V2;
 
 typedef struct _OBJECT_TYPE_V3 {// Size=216
@@ -1843,20 +1871,20 @@ typedef struct _OBJECT_TYPE_V3 {// Size=216
 	ULONG HighWaterNumberOfObjects; // Size=4 Offset=52
 	ULONG HighWaterNumberOfHandles; // Size=4 Offset=56
 	OBJECT_TYPE_INITIALIZER_V3 TypeInfo;
-	EX_PUSH_LOCK TypeLock; 
-	ULONG Key; 
+	EX_PUSH_LOCK TypeLock;
+	ULONG Key;
 	LIST_ENTRY CallbackList;
 } OBJECT_TYPE_V3, *POBJECT_TYPE_V3;
 
 typedef struct _OBJECT_TYPE_COMPATIBLE {
-	LIST_ENTRY TypeList; 
-	UNICODE_STRING Name; 
-	PVOID DefaultObject; 
-	UCHAR Index; 
-	ULONG TotalNumberOfObjects; 
-	ULONG TotalNumberOfHandles; 
-	ULONG HighWaterNumberOfObjects; 
-	ULONG HighWaterNumberOfHandles; 
+	LIST_ENTRY TypeList;
+	UNICODE_STRING Name;
+	PVOID DefaultObject;
+	UCHAR Index;
+	ULONG TotalNumberOfObjects;
+	ULONG TotalNumberOfHandles;
+	ULONG HighWaterNumberOfObjects;
+	ULONG HighWaterNumberOfHandles;
 	OBJECT_TYPE_INITIALIZER_V2 TypeInfo;
 } OBJECT_TYPE_COMPATIBLE, *POBJECT_TYPE_COMPATIBLE;
 
@@ -2618,6 +2646,9 @@ typedef struct _LDR_DATA_TABLE_ENTRY_COMPATIBLE {
 	//fields below removed for compatibility
 } LDR_DATA_TABLE_ENTRY_COMPATIBLE, *PLDR_DATA_TABLE_ENTRY_COMPATIBLE;
 typedef LDR_DATA_TABLE_ENTRY_COMPATIBLE LDR_DATA_TABLE_ENTRY;
+typedef LDR_DATA_TABLE_ENTRY_COMPATIBLE *PLDR_DATA_TABLE_ENTRY;
+
+
 /*
 * WDM END
 */
@@ -2648,6 +2679,693 @@ typedef struct _RTL_PROCESS_MODULES {
 *	NTQSI Modules END
 */
 
+/*
+** Virtual Memory START
+*/
+
+typedef enum _MEMORY_INFORMATION_CLASS
+{
+	MemoryBasicInformation,
+	MemoryWorkingSetInformation,
+	MemoryMappedFilenameInformation,
+	MemoryRegionInformation,
+	MemoryWorkingSetExInformation
+} MEMORY_INFORMATION_CLASS, *PMEMORY_INFORMATION_CLASS;
+
+typedef struct _MEMORY_REGION_INFORMATION {
+	PVOID AllocationBase;
+	ULONG AllocationProtect;
+	ULONG RegionType;
+	SIZE_T RegionSize;
+} MEMORY_REGION_INFORMATION, *PMEMORY_REGION_INFORMATION;
+
+/*
+** Virtual Memory END
+*/
+
+/*
+** System Firmware START
+*/
+
+typedef enum _SYSTEM_FIRMWARE_TABLE_ACTION
+{
+	SystemFirmwareTable_Enumerate,
+	SystemFirmwareTable_Get
+} SYSTEM_FIRMWARE_TABLE_ACTION, *PSYSTEM_FIRMWARE_TABLE_ACTION;
+
+typedef struct _SYSTEM_FIRMWARE_TABLE_INFORMATION {
+	ULONG ProviderSignature;
+	SYSTEM_FIRMWARE_TABLE_ACTION Action;
+	ULONG TableID;
+	ULONG TableBufferLength;
+	UCHAR TableBuffer[ANYSIZE_ARRAY];
+} SYSTEM_FIRMWARE_TABLE_INFORMATION, *PSYSTEM_FIRMWARE_TABLE_INFORMATION;
+
+/*
+** System Firmware END
+*/
+
+//
+//  PEB/TEB
+//
+typedef struct _PEB_LDR_DATA
+{
+	ULONG Length;
+	BOOLEAN Initialized;
+	HANDLE SsHandle;
+	LIST_ENTRY InLoadOrderModuleList;
+	LIST_ENTRY InMemoryOrderModuleList;
+	LIST_ENTRY InInitializationOrderModuleList;
+	PVOID EntryInProgress;
+	BOOLEAN ShutdownInProgress;
+	HANDLE ShutdownThreadId;
+} PEB_LDR_DATA, *PPEB_LDR_DATA;
+
+typedef struct _GDI_HANDLE_ENTRY
+{
+	union
+	{
+		PVOID Object;
+		PVOID NextFree;
+	};
+	union
+	{
+		struct
+		{
+			USHORT ProcessId;
+			USHORT Lock : 1;
+			USHORT Count : 15;
+		};
+		ULONG Value;
+	} Owner;
+	USHORT Unique;
+	UCHAR Type;
+	UCHAR Flags;
+	PVOID UserPointer;
+} GDI_HANDLE_ENTRY, *PGDI_HANDLE_ENTRY;
+
+#define GDI_MAX_HANDLE_COUNT 0x4000
+
+typedef struct _GDI_SHARED_MEMORY
+{
+	GDI_HANDLE_ENTRY Handles[GDI_MAX_HANDLE_COUNT];
+} GDI_SHARED_MEMORY, *PGDI_SHARED_MEMORY;
+
+#define FLS_MAXIMUM_AVAILABLE 128
+#define TLS_MINIMUM_AVAILABLE 64
+#define TLS_EXPANSION_SLOTS 1024
+
+#define DOS_MAX_COMPONENT_LENGTH 255
+#define DOS_MAX_PATH_LENGTH (DOS_MAX_COMPONENT_LENGTH + 5)
+
+typedef struct _CURDIR
+{
+	UNICODE_STRING DosPath;
+	HANDLE Handle;
+} CURDIR, *PCURDIR;
+
+#define RTL_USER_PROC_CURDIR_CLOSE 0x00000002
+#define RTL_USER_PROC_CURDIR_INHERIT 0x00000003
+
+typedef struct _RTL_DRIVE_LETTER_CURDIR
+{
+	USHORT Flags;
+	USHORT Length;
+	ULONG TimeStamp;
+	STRING DosPath;
+} RTL_DRIVE_LETTER_CURDIR, *PRTL_DRIVE_LETTER_CURDIR;
+
+#define RTL_MAX_DRIVE_LETTERS 32
+#define RTL_DRIVE_LETTER_VALID (USHORT)0x0001
+
+typedef struct _RTL_USER_PROCESS_PARAMETERS
+{
+	ULONG MaximumLength;
+	ULONG Length;
+
+	ULONG Flags;
+	ULONG DebugFlags;
+
+	HANDLE ConsoleHandle;
+	ULONG ConsoleFlags;
+	HANDLE StandardInput;
+	HANDLE StandardOutput;
+	HANDLE StandardError;
+
+	CURDIR CurrentDirectory;
+	UNICODE_STRING DllPath;
+	UNICODE_STRING ImagePathName;
+	UNICODE_STRING CommandLine;
+	PVOID Environment;
+
+	ULONG StartingX;
+	ULONG StartingY;
+	ULONG CountX;
+	ULONG CountY;
+	ULONG CountCharsX;
+	ULONG CountCharsY;
+	ULONG FillAttribute;
+
+	ULONG WindowFlags;
+	ULONG ShowWindowFlags;
+	UNICODE_STRING WindowTitle;
+	UNICODE_STRING DesktopInfo;
+	UNICODE_STRING ShellInfo;
+	UNICODE_STRING RuntimeData;
+	RTL_DRIVE_LETTER_CURDIR CurrentDirectories[RTL_MAX_DRIVE_LETTERS];
+
+	ULONG EnvironmentSize;
+	ULONG EnvironmentVersion;
+} RTL_USER_PROCESS_PARAMETERS, *PRTL_USER_PROCESS_PARAMETERS;
+
+#define GDI_HANDLE_BUFFER_SIZE32  34
+#define GDI_HANDLE_BUFFER_SIZE64  60
+
+#if !defined(_M_X64)
+#define GDI_HANDLE_BUFFER_SIZE      GDI_HANDLE_BUFFER_SIZE32
+#else
+#define GDI_HANDLE_BUFFER_SIZE      GDI_HANDLE_BUFFER_SIZE64
+#endif
+
+typedef ULONG GDI_HANDLE_BUFFER32[GDI_HANDLE_BUFFER_SIZE32];
+typedef ULONG GDI_HANDLE_BUFFER64[GDI_HANDLE_BUFFER_SIZE64];
+typedef ULONG GDI_HANDLE_BUFFER[GDI_HANDLE_BUFFER_SIZE];
+
+typedef struct _PEB
+{
+	BOOLEAN InheritedAddressSpace;
+	BOOLEAN ReadImageFileExecOptions;
+	BOOLEAN BeingDebugged;
+	union
+	{
+		BOOLEAN BitField;
+		struct
+		{
+			BOOLEAN ImageUsesLargePages : 1;
+			BOOLEAN IsProtectedProcess : 1;
+			BOOLEAN IsLegacyProcess : 1;
+			BOOLEAN IsImageDynamicallyRelocated : 1;
+			BOOLEAN SkipPatchingUser32Forwarders : 1;
+			BOOLEAN SpareBits : 3;
+		};
+	};
+	HANDLE Mutant;
+
+	PVOID ImageBaseAddress;
+	PPEB_LDR_DATA Ldr;
+	PRTL_USER_PROCESS_PARAMETERS ProcessParameters;
+	PVOID SubSystemData;
+	PVOID ProcessHeap;
+	PRTL_CRITICAL_SECTION FastPebLock;
+	PVOID AtlThunkSListPtr;
+	PVOID IFEOKey;
+	union
+	{
+		ULONG CrossProcessFlags;
+		struct
+		{
+			ULONG ProcessInJob : 1;
+			ULONG ProcessInitializing : 1;
+			ULONG ProcessUsingVEH : 1;
+			ULONG ProcessUsingVCH : 1;
+			ULONG ProcessUsingFTH : 1;
+			ULONG ReservedBits0 : 27;
+		};
+		ULONG EnvironmentUpdateCount;
+	};
+	union
+	{
+		PVOID KernelCallbackTable;
+		PVOID UserSharedInfoPtr;
+	};
+	ULONG SystemReserved[1];
+	ULONG AtlThunkSListPtr32;
+	PVOID ApiSetMap;
+	ULONG TlsExpansionCounter;
+	PVOID TlsBitmap;
+	ULONG TlsBitmapBits[2];
+	PVOID ReadOnlySharedMemoryBase;
+	PVOID HotpatchInformation;
+	PVOID *ReadOnlyStaticServerData;
+	PVOID AnsiCodePageData;
+	PVOID OemCodePageData;
+	PVOID UnicodeCaseTableData;
+
+	ULONG NumberOfProcessors;
+	ULONG NtGlobalFlag;
+
+	LARGE_INTEGER CriticalSectionTimeout;
+	SIZE_T HeapSegmentReserve;
+	SIZE_T HeapSegmentCommit;
+	SIZE_T HeapDeCommitTotalFreeThreshold;
+	SIZE_T HeapDeCommitFreeBlockThreshold;
+
+	ULONG NumberOfHeaps;
+	ULONG MaximumNumberOfHeaps;
+	PVOID *ProcessHeaps;
+
+	PVOID GdiSharedHandleTable;
+	PVOID ProcessStarterHelper;
+	ULONG GdiDCAttributeList;
+
+	PRTL_CRITICAL_SECTION LoaderLock;
+
+	ULONG OSMajorVersion;
+	ULONG OSMinorVersion;
+	USHORT OSBuildNumber;
+	USHORT OSCSDVersion;
+	ULONG OSPlatformId;
+	ULONG ImageSubsystem;
+	ULONG ImageSubsystemMajorVersion;
+	ULONG ImageSubsystemMinorVersion;
+	ULONG_PTR ImageProcessAffinityMask;
+	GDI_HANDLE_BUFFER GdiHandleBuffer;
+	PVOID PostProcessInitRoutine;
+
+	PVOID TlsExpansionBitmap;
+	ULONG TlsExpansionBitmapBits[32];
+
+	ULONG SessionId;
+
+	ULARGE_INTEGER AppCompatFlags;
+	ULARGE_INTEGER AppCompatFlagsUser;
+	PVOID pShimData;
+	PVOID AppCompatInfo;
+
+	UNICODE_STRING CSDVersion;
+
+	PVOID ActivationContextData;
+	PVOID ProcessAssemblyStorageMap;
+	PVOID SystemDefaultActivationContextData;
+	PVOID SystemAssemblyStorageMap;
+
+	SIZE_T MinimumStackCommit;
+
+	PVOID *FlsCallback;
+	LIST_ENTRY FlsListHead;
+	PVOID FlsBitmap;
+	ULONG FlsBitmapBits[FLS_MAXIMUM_AVAILABLE / (sizeof(ULONG) * 8)];
+	ULONG FlsHighIndex;
+
+	PVOID WerRegistrationData;
+	PVOID WerShipAssertPtr;
+	PVOID pContextData;
+	PVOID pImageHeaderHash;
+	union
+	{
+		ULONG TracingFlags;
+		struct
+		{
+			ULONG HeapTracingEnabled : 1;
+			ULONG CritSecTracingEnabled : 1;
+			ULONG SpareTracingBits : 30;
+		};
+	};
+} PEB, *PPEB;
+
+typedef struct _TEB_ACTIVE_FRAME_CONTEXT
+{
+	ULONG Flags;
+	PSTR FrameName;
+} TEB_ACTIVE_FRAME_CONTEXT, *PTEB_ACTIVE_FRAME_CONTEXT;
+
+typedef struct _TEB_ACTIVE_FRAME
+{
+	ULONG Flags;
+	struct _TEB_ACTIVE_FRAME *Previous;
+	PTEB_ACTIVE_FRAME_CONTEXT Context;
+} TEB_ACTIVE_FRAME, *PTEB_ACTIVE_FRAME;
+
+#define GDI_BATCH_BUFFER_SIZE 310
+
+typedef struct _GDI_TEB_BATCH {
+	ULONG	Offset;
+	UCHAR	Alignment[4];
+	ULONG_PTR HDC;
+	ULONG	Buffer[GDI_BATCH_BUFFER_SIZE];
+} GDI_TEB_BATCH, *PGDI_TEB_BATCH;
+
+typedef struct _TEB
+{
+	NT_TIB NtTib;
+
+	PVOID EnvironmentPointer;
+	CLIENT_ID ClientId;
+	PVOID ActiveRpcHandle;
+	PVOID ThreadLocalStoragePointer;
+	PPEB ProcessEnvironmentBlock;
+
+	ULONG LastErrorValue;
+	ULONG CountOfOwnedCriticalSections;
+	PVOID CsrClientThread;
+	PVOID Win32ThreadInfo;
+	ULONG User32Reserved[26];
+	ULONG UserReserved[5];
+	PVOID WOW32Reserved;
+	LCID CurrentLocale;
+	ULONG FpSoftwareStatusRegister;
+	PVOID SystemReserved1[54];
+	NTSTATUS ExceptionCode;
+	PVOID ActivationContextStackPointer;
+#if defined(_M_X64)
+	UCHAR SpareBytes[24];
+#else
+	UCHAR SpareBytes[36];
+#endif
+	ULONG TxFsContext;
+
+	GDI_TEB_BATCH GdiTebBatch;
+	CLIENT_ID RealClientId;
+	HANDLE GdiCachedProcessHandle;
+	ULONG GdiClientPID;
+	ULONG GdiClientTID;
+	PVOID GdiThreadLocalInfo;
+	ULONG_PTR Win32ClientInfo[62];
+	PVOID glDispatchTable[233];
+	ULONG_PTR glReserved1[29];
+	PVOID glReserved2;
+	PVOID glSectionInfo;
+	PVOID glSection;
+	PVOID glTable;
+	PVOID glCurrentRC;
+	PVOID glContext;
+
+	NTSTATUS LastStatusValue;
+	UNICODE_STRING StaticUnicodeString;
+	WCHAR StaticUnicodeBuffer[261];
+
+	PVOID DeallocationStack;
+	PVOID TlsSlots[64];
+	LIST_ENTRY TlsLinks;
+
+	PVOID Vdm;
+	PVOID ReservedForNtRpc;
+	PVOID DbgSsReserved[2];
+
+	ULONG HardErrorMode;
+#if defined(_M_X64)
+	PVOID Instrumentation[11];
+#else
+	PVOID Instrumentation[9];
+#endif
+	GUID ActivityId;
+
+	PVOID SubProcessTag;
+	PVOID EtwLocalData;
+	PVOID EtwTraceData;
+	PVOID WinSockData;
+	ULONG GdiBatchCount;
+
+	union
+	{
+		PROCESSOR_NUMBER CurrentIdealProcessor;
+		ULONG IdealProcessorValue;
+		struct
+		{
+			UCHAR ReservedPad0;
+			UCHAR ReservedPad1;
+			UCHAR ReservedPad2;
+			UCHAR IdealProcessor;
+		};
+	};
+
+	ULONG GuaranteedStackBytes;
+	PVOID ReservedForPerf;
+	PVOID ReservedForOle;
+	ULONG WaitingOnLoaderLock;
+	PVOID SavedPriorityState;
+	ULONG_PTR SoftPatchPtr1;
+	PVOID ThreadPoolData;
+	PVOID *TlsExpansionSlots;
+#if defined(_M_X64)
+	PVOID DeallocationBStore;
+	PVOID BStoreLimit;
+#endif
+	ULONG MuiGeneration;
+	ULONG IsImpersonating;
+	PVOID NlsCache;
+	PVOID pShimData;
+	ULONG HeapVirtualAffinity;
+	HANDLE CurrentTransactionHandle;
+	PTEB_ACTIVE_FRAME ActiveFrame;
+	PVOID FlsData;
+
+	PVOID PreferredLanguages;
+	PVOID UserPrefLanguages;
+	PVOID MergedPrefLanguages;
+	ULONG MuiImpersonation;
+
+	union
+	{
+		USHORT CrossTebFlags;
+		USHORT SpareCrossTebBits : 16;
+	};
+	union
+	{
+		USHORT SameTebFlags;
+		struct
+		{
+			USHORT SafeThunkCall : 1;
+			USHORT InDebugPrint : 1;
+			USHORT HasFiberData : 1;
+			USHORT SkipThreadAttach : 1;
+			USHORT WerInShipAssertCode : 1;
+			USHORT RanProcessInit : 1;
+			USHORT ClonedThread : 1;
+			USHORT SuppressDebugMsg : 1;
+			USHORT DisableUserStackWalk : 1;
+			USHORT RtlExceptionAttached : 1;
+			USHORT InitialThread : 1;
+			USHORT SpareSameTebBits : 1;
+		};
+	};
+
+	PVOID TxnScopeEnterCallback;
+	PVOID TxnScopeExitCallback;
+	PVOID TxnScopeContext;
+	ULONG LockCount;
+	ULONG SpareUlong0;
+	PVOID ResourceRetValue;
+} TEB, *PTEB;
+
+__inline struct _PEB * NtCurrentPeb() { return NtCurrentTeb()->ProcessEnvironmentBlock; }
+
+/*
+** PEB/TEB END
+*/
+
+/*
+** ALPC START
+*/
+
+typedef struct _PORT_MESSAGE {
+	union {
+		struct {
+			CSHORT DataLength;
+			CSHORT TotalLength;
+		} s1;
+		ULONG Length;
+	} u1;
+	union {
+		struct {
+			CSHORT Type;
+			CSHORT DataInfoOffset;
+		} s2;
+		ULONG ZeroInit;
+	} u2;
+	union {
+		CLIENT_ID ClientId;
+		double DoNotUseThisField;       // Force quadword alignment
+	} u3;
+	ULONG MessageId;
+	union {
+		ULONG ClientViewSize;               // Only valid on LPC_CONNECTION_REQUEST message
+		ULONG CallbackId;                   // Only valid on LPC_REQUEST message
+	} u4;
+	UCHAR Reserved[8];
+} PORT_MESSAGE, *PPORT_MESSAGE;
+
+// end_ntsrv
+
+typedef struct _PORT_DATA_ENTRY {
+	PVOID Base;
+	ULONG Size;
+} PORT_DATA_ENTRY, *PPORT_DATA_ENTRY;
+
+typedef struct _PORT_DATA_INFORMATION {
+	ULONG CountDataEntries;
+	PORT_DATA_ENTRY DataEntries[1];
+} PORT_DATA_INFORMATION, *PPORT_DATA_INFORMATION;
+
+#define LPC_REQUEST             1
+#define LPC_REPLY               2
+#define LPC_DATAGRAM            3
+#define LPC_LOST_REPLY          4
+#define LPC_PORT_CLOSED         5
+#define LPC_CLIENT_DIED         6
+#define LPC_EXCEPTION           7
+#define LPC_DEBUG_EVENT         8
+#define LPC_ERROR_EVENT         9
+#define LPC_CONNECTION_REQUEST 10
+
+#define PORT_VALID_OBJECT_ATTRIBUTES (OBJ_CASE_INSENSITIVE)
+#define PORT_MAXIMUM_MESSAGE_LENGTH 256
+
+typedef struct _LPC_CLIENT_DIED_MSG {
+	PORT_MESSAGE PortMsg;
+	LARGE_INTEGER CreateTime;
+} LPC_CLIENT_DIED_MSG, *PLPC_CLIENT_DIED_MSG;
+
+typedef struct _PORT_VIEW {
+	ULONG Length;
+	HANDLE SectionHandle;
+	ULONG SectionOffset;
+	ULONG ViewSize;
+	PVOID ViewBase;
+	PVOID ViewRemoteBase;
+} PORT_VIEW, *PPORT_VIEW;
+
+typedef struct _REMOTE_PORT_VIEW {
+	ULONG Length;
+	ULONG ViewSize;
+	PVOID ViewBase;
+} REMOTE_PORT_VIEW, *PREMOTE_PORT_VIEW;
+
+/*
+** ALPC END
+*/
+
+/*
+** KUSER_SHARED_DATA START
+*/
+
+typedef struct _KSYSTEM_TIME {
+	ULONG LowPart;
+	LONG High1Time;
+	LONG High2Time;
+} KSYSTEM_TIME, *PKSYSTEM_TIME;
+
+typedef enum _NT_PRODUCT_TYPE {
+	NtProductWinNt = 1,
+	NtProductLanManNt,
+	NtProductServer
+} NT_PRODUCT_TYPE, *PNT_PRODUCT_TYPE;
+
+#define PROCESSOR_FEATURE_MAX 64
+
+typedef enum _ALTERNATIVE_ARCHITECTURE_TYPE {
+	StandardDesign,                 // None == 0 == standard design
+	NEC98x86,                       // NEC PC98xx series on X86
+	EndAlternatives                 // past end of known alternatives
+} ALTERNATIVE_ARCHITECTURE_TYPE;
+
+//
+// Define Address of User Shared Data
+//
+#define MM_SHARED_USER_DATA_VA      0x000000007FFE0000
+
+//
+// WARNING: this definition is compatibility only.
+// Structure is incomplete. Only important fields.
+//
+typedef struct _KUSER_SHARED_DATA_COMPAT {
+	ULONG TickCountLowDeprecated;
+	ULONG TickCountMultiplier;
+	volatile KSYSTEM_TIME InterruptTime;
+	volatile KSYSTEM_TIME SystemTime;
+	volatile KSYSTEM_TIME TimeZoneBias;
+	USHORT ImageNumberLow;
+	USHORT ImageNumberHigh;
+	WCHAR NtSystemRoot[260];
+	ULONG MaxStackTraceDepth;
+	ULONG CryptoExponent;
+	ULONG TimeZoneId;
+	ULONG LargePageMinimum;
+
+	union {
+		ULONG Reserved2[7];
+		struct {
+			ULONG AitSamplingValue;
+			ULONG AppCompatFlag;
+			struct {
+				ULONG LowPart;
+				ULONG HighPart;
+			} RNGSeedVersion;
+			ULONG GlobalValidationRunlevel;
+			ULONG TimeZoneBiasStamp;
+			ULONG ReservedField;
+		};
+	};
+	
+	NT_PRODUCT_TYPE NtProductType;
+	BOOLEAN ProductTypeIsValid;
+	ULONG NtMajorVersion;
+	ULONG NtMinorVersion;
+	BOOLEAN ProcessorFeatures[PROCESSOR_FEATURE_MAX];
+	ULONG Reserved1;
+	ULONG Reserved3;
+	volatile ULONG TimeSlip;
+	ALTERNATIVE_ARCHITECTURE_TYPE AlternativeArchitecture;
+	ULONG AltArchitecturePad;
+	LARGE_INTEGER SystemExpirationDate;
+	ULONG SuiteMask;
+	BOOLEAN KdDebuggerEnabled;
+
+	union {
+		UCHAR MitigationPolicies;
+		struct {
+			UCHAR NXSupportPolicy : 2;
+			UCHAR SEHValidationPolicy : 2;
+			UCHAR CurDirDevicesSkippedForDlls : 2;
+			UCHAR Reserved : 2;
+			UCHAR Reserved6[2];
+		};
+	};
+
+	volatile ULONG ActiveConsoleId;
+	volatile ULONG DismountCount;
+	ULONG ComPlusPackage;
+	ULONG LastSystemRITEventTickCount;
+	ULONG NumberOfPhysicalPages;
+	BOOLEAN SafeBootMode;
+	UCHAR Reserved12[3];
+
+	union {
+		ULONG SharedDataFlags;
+		struct {
+			ULONG DbgErrorPortPresent : 1;
+			ULONG DbgElevationEnabled : 1;
+			ULONG DbgVirtEnabled : 1;
+			ULONG DbgInstallerDetectEnabled: 1;
+			ULONG DbgLkgEnabled : 1;
+			ULONG DbgDynProcessorEnabled : 1;
+			ULONG DbgConsoleBrokerEnabled : 1;
+			ULONG DbgSecureBootEnabled : 1;
+			ULONG DbgMultiSessionSku : 1;
+			ULONG SpareBits : 23;
+		};
+	};
+
+	//incomplete
+
+} KUSER_SHARED_DATA, *PKUSER_SHARED_DATA;
+
+#define USER_SHARED_DATA ((KUSER_SHARED_DATA * const)MM_SHARED_USER_DATA_VA)
+
+/*
+** KUSER_SHARED_DATA END
+*/
+
+/*
+** Csr Runtime START
+*/
+
+ULONG NTAPI CsrGetProcessId(
+	);
+
+/*
+** Csr Runtime END
+*/
 
 /*
 ** Runtime Library API START
@@ -2658,7 +3376,7 @@ VOID NTAPI RtlInitUnicodeString(
 	_In_	PCWSTR SourceString
 	);
 
-NTSTATUS RtlGetVersion(
+NTSTATUS NTAPI RtlGetVersion(
 	_Inout_	PRTL_OSVERSIONINFOW lpVersionInformation
 	);
 
@@ -2706,8 +3424,44 @@ VOID NTAPI RtlMapGenericMask(
 	_In_ PGENERIC_MAPPING GenericMapping
 	);
 
+VOID NTAPI RtlInitString(
+	PSTRING DestinationString,
+	PCSZ SourceString
+	);
+
+NTSTATUS NTAPI RtlExpandEnvironmentStrings_U(
+	_In_opt_	PVOID Environment,
+	_In_		PCUNICODE_STRING Source,
+	_Out_		PUNICODE_STRING Destination,
+	_Out_opt_	PULONG ReturnedLength
+	);
+
+VOID NTAPI RtlSetLastWin32Error(
+	LONG Win32Error
+	);
+
+ULONG DbgPrint(
+	_In_ PCH Format,
+	...
+	);
+
 /*
 ** Runtime Library API END
+*/
+
+/*
+** Loader API START
+*/
+
+NTSTATUS NTAPI LdrGetProcedureAddress(
+	_In_ PVOID DllHandle,
+	_In_opt_ CONST ANSI_STRING* ProcedureName,
+	_In_opt_ ULONG ProcedureNumber,
+	_Out_ PVOID *ProcedureAddress
+	);
+
+/*
+** Loader API END
 */
 
 /*
@@ -2731,7 +3485,7 @@ NTSTATUS NTAPI NtQueryDirectoryObject(
 	_In_       BOOLEAN ReturnSingleEntry,
 	_In_       BOOLEAN RestartScan,
 	_Inout_    PULONG Context,
-			   PULONG ReturnLength
+	PULONG ReturnLength
 	);
 
 NTSTATUS NTAPI NtQueryObject(
@@ -2793,9 +3547,9 @@ NTSTATUS NtSetTimer(
 	);
 
 NTSTATUS NTAPI NtOpenTimer(
-	_In_ PHANDLE TimerHandle,
-	_In_ ACCESS_MASK DesiredAccess,
-	_In_ POBJECT_ATTRIBUTES ObjectAttributes
+	_In_	PHANDLE TimerHandle,
+	_In_	ACCESS_MASK DesiredAccess,
+	_In_	POBJECT_ATTRIBUTES ObjectAttributes
 	);
 
 NTSTATUS NTAPI NtQueryTimer(
@@ -2807,9 +3561,9 @@ NTSTATUS NTAPI NtQueryTimer(
 	);
 
 NTSTATUS WINAPI NtOpenSymbolicLinkObject(
-	_Out_		PHANDLE LinkHandle,
-	_In_		ACCESS_MASK DesiredAccess,
-	_In_		POBJECT_ATTRIBUTES ObjectAttributes
+	_Out_	PHANDLE LinkHandle,
+	_In_	ACCESS_MASK DesiredAccess,
+	_In_	POBJECT_ATTRIBUTES ObjectAttributes
 	);
 
 NTSTATUS NTAPI NtQuerySymbolicLinkObject(
@@ -2849,9 +3603,37 @@ NTSTATUS NTAPI NtQuerySection(
 	);
 
 NTSTATUS NtOpenSection(
+	_Out_	PHANDLE SectionHandle,
+	_In_	ACCESS_MASK DesiredAccess,
+	_In_	POBJECT_ATTRIBUTES ObjectAttributes
+	);
+
+NTSTATUS NTAPI NtCreateSection(
 	_Out_		PHANDLE SectionHandle,
 	_In_		ACCESS_MASK DesiredAccess,
-	_In_		POBJECT_ATTRIBUTES ObjectAttributes
+	_In_opt_	POBJECT_ATTRIBUTES ObjectAttributes,
+	_In_opt_	PLARGE_INTEGER MaximumSize,
+	_In_		ULONG SectionPageProtection,
+	_In_		ULONG AllocationAttributes,
+	_In_opt_	HANDLE FileHandle
+	);
+
+NTSTATUS NTAPI NtMapViewOfSection(
+	_In_		HANDLE SectionHandle,
+	_In_		HANDLE ProcessHandle,
+	__inout		PVOID *BaseAddress,
+	_In_		ULONG_PTR ZeroBits,
+	_In_		SIZE_T CommitSize,
+	_Inout_opt_ PLARGE_INTEGER SectionOffset,
+	_Inout_		PSIZE_T ViewSize,
+	_In_		SECTION_INHERIT InheritDisposition,
+	_In_		ULONG AllocationType,
+	_In_		ULONG Win32Protect
+	);
+
+NTSTATUS NTAPI NtUnmapViewOfSection(
+	_In_	HANDLE ProcessHandle,
+	_In_	PVOID BaseAddress
 	);
 
 NTSTATUS NTAPI NtOpenProcessToken(
@@ -3036,6 +3818,21 @@ NTSTATUS NTAPI NtOpenProcess(
 	_In_opt_	PCLIENT_ID ClientId
 	);
 
+NTSTATUS NTAPI NtTerminateProcess(
+	_In_opt_	HANDLE ProcessHandle,
+	_In_		NTSTATUS ExitStatus
+	);
+
+NTSTATUS NTAPI NtSuspendThread(
+	_In_		HANDLE ThreadHandle,
+	_Out_opt_	PULONG PreviousSuspendCount
+	);
+
+NTSTATUS NTAPI NtResumeThread(
+	_In_		HANDLE ThreadHandle,
+	_Out_opt_	PULONG PreviousSuspendCount
+	);
+
 NTSTATUS NTAPI NtQueryInformationProcess(
 	_In_		HANDLE ProcessHandle,
 	_In_		PROCESSINFOCLASS ProcessInformationClass,
@@ -3055,30 +3852,151 @@ NTSTATUS NTAPI NtDuplicateObject(
 	);
 
 NTSTATUS NTAPI NtSetSecurityObject(
-	_In_ HANDLE Handle,
-	_In_ SECURITY_INFORMATION SecurityInformation,
-	_In_ PSECURITY_DESCRIPTOR SecurityDescriptor
+	_In_	HANDLE Handle,
+	_In_	SECURITY_INFORMATION SecurityInformation,
+	_In_	PSECURITY_DESCRIPTOR SecurityDescriptor
 	);
 
 NTSTATUS NTAPI NtQuerySecurityObject(
-	_In_ HANDLE Handle,
-	__in SECURITY_INFORMATION SecurityInformation,
-	_Out_ PSECURITY_DESCRIPTOR SecurityDescriptor,
-	_In_ ULONG Length,
-	_Out_ PULONG LengthNeeded
+	_In_	HANDLE Handle,
+	_In_	SECURITY_INFORMATION SecurityInformation,
+	_Out_	PSECURITY_DESCRIPTOR SecurityDescriptor,
+	_In_	ULONG Length,
+	_Out_	PULONG LengthNeeded
 	);
 
 NTSTATUS NtCreateIoCompletion(
-	_Out_ PHANDLE IoCompletionHandle,
-	_In_ ACCESS_MASK DesiredAccess,
-	_In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
-	_In_ ULONG Count OPTIONAL
+	_Out_		PHANDLE IoCompletionHandle,
+	_In_		ACCESS_MASK DesiredAccess,
+	_In_opt_	POBJECT_ATTRIBUTES ObjectAttributes,
+	_In_opt_	ULONG Count
 	);
 
 NTSTATUS NTAPI NtCreateEvent(
-	_Out_ PHANDLE EventHandle,
-	_In_ ACCESS_MASK DesiredAccess,
-	_In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
-	_In_ EVENT_TYPE EventType,
-	_In_ BOOLEAN InitialState
+	_Out_		PHANDLE EventHandle,
+	_In_		ACCESS_MASK DesiredAccess,
+	_In_opt_	POBJECT_ATTRIBUTES ObjectAttributes,
+	_In_		EVENT_TYPE EventType,
+	_In_		BOOLEAN InitialState
+	);
+
+NTSTATUS NTAPI NtQueryVirtualMemory(
+	_In_		HANDLE ProcessHandle,
+	_In_		PVOID BaseAddress,
+	_In_		MEMORY_INFORMATION_CLASS MemoryInformationClass,
+	_Out_		PVOID MemoryInformation,
+	_In_		SIZE_T MemoryInformationLength,
+	_Out_opt_	PSIZE_T ReturnLength
+	);
+
+NTSTATUS NTAPI NtReadVirtualMemory(
+	_In_		HANDLE ProcessHandle,
+	_In_opt_	PVOID BaseAddress,
+	_Out_		PVOID Buffer,
+	_In_		SIZE_T BufferSize,
+	_Out_opt_	PSIZE_T NumberOfBytesRead
+	);
+
+NTSTATUS NTAPI NtWriteVirtualMemory(
+	_In_ HANDLE ProcessHandle,
+	_In_opt_ PVOID BaseAddress,
+	_In_ VOID *Buffer,
+	_In_ SIZE_T BufferSize,
+	_Out_opt_ PSIZE_T NumberOfBytesWritten
+	);
+
+NTSTATUS NTAPI NtEnumerateKey(
+	_In_		HANDLE KeyHandle,
+	_In_		ULONG Index,
+	_In_		KEY_INFORMATION_CLASS KeyInformationClass,
+	_Out_opt_	PVOID KeyInformation,
+	_In_		ULONG Length,
+	_Out_		PULONG ResultLength
+	);
+
+NTSTATUS NTAPI NtCreatePort(
+	_Out_	PHANDLE PortHandle,
+	_In_	POBJECT_ATTRIBUTES ObjectAttributes,
+	_In_	ULONG MaxConnectionInfoLength,
+	_In_	ULONG MaxMessageLength,
+	_In_	ULONG MaxPoolUsage
+	);
+
+NTSTATUS NTAPI NtCompleteConnectPort(
+	_In_	HANDLE PortHandle
+	);
+
+NTSTATUS NTAPI NtListenPort(
+	_In_	HANDLE PortHandle,
+	_Out_	PPORT_MESSAGE ConnectionRequest
+	);
+
+NTSTATUS NTAPI NtReplyPort(
+	_In_	HANDLE PortHandle,
+	_In_	PPORT_MESSAGE ReplyMessage
+	);
+
+NTSTATUS NTAPI NtReplyWaitReplyPort(
+	_In_	HANDLE PortHandle,
+	_Inout_	PPORT_MESSAGE ReplyMessage
+	);
+
+NTSTATUS NTAPI NtRequestPort(
+	_In_	HANDLE PortHandle,
+	_In_	PPORT_MESSAGE RequestMessage
+	);
+
+NTSTATUS NTAPI NtRequestWaitReplyPort(
+	_In_	HANDLE PortHandle,
+	_In_	PPORT_MESSAGE RequestMessage,
+	_Out_	PPORT_MESSAGE ReplyMessage
+	);
+
+NTSTATUS NTAPI NtClosePort(
+	_In_	HANDLE PortHandle
+	);
+
+NTSTATUS NTAPI NtReplyWaitReceivePort(
+	_In_		HANDLE PortHandle,
+	_Out_opt_	PVOID *PortContext,
+	_In_opt_	PPORT_MESSAGE ReplyMessage,
+	_Out_		PPORT_MESSAGE ReceiveMessage
+	);
+
+NTSTATUS NTAPI NtWriteRequestData(
+	_In_		HANDLE PortHandle,
+	_In_		PPORT_MESSAGE Message,
+	_In_		ULONG DataEntryIndex,
+	_In_		PVOID Buffer,
+	_In_		ULONG BufferSize,
+	_Out_opt_	PULONG NumberOfBytesWritten
+	);
+
+NTSTATUS NTAPI NtReadRequestData(
+	_In_		HANDLE PortHandle,
+	_In_		PPORT_MESSAGE Message,
+	_In_		ULONG DataEntryIndex,
+	_Out_		PVOID Buffer,
+	_In_		ULONG BufferSize,
+	_Out_opt_	PULONG NumberOfBytesRead
+	);
+
+NTSTATUS NTAPI NtConnectPort(
+	_Out_			PHANDLE PortHandle,
+	_In_			PUNICODE_STRING PortName,
+	_In_			PSECURITY_QUALITY_OF_SERVICE SecurityQos,
+	_Inout_opt_		PPORT_VIEW ClientView,
+	_Out_opt_		PREMOTE_PORT_VIEW ServerView,
+	_Out_opt_		PULONG MaxMessageLength,
+	_Inout_opt_		PVOID ConnectionInformation,
+	_Inout_opt_		PULONG ConnectionInformationLength
+	);
+
+NTSTATUS NTAPI NtAcceptConnectPort(
+	_Out_			PHANDLE PortHandle,
+	_In_opt_		PVOID PortContext,
+	_In_			PPORT_MESSAGE ConnectionRequest,
+	_In_			BOOLEAN AcceptConnection,
+	_Inout_opt_		PPORT_VIEW ServerView,
+	_Out_opt_		PREMOTE_PORT_VIEW ClientView
 	);

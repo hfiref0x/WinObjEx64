@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXCEPTH.C
 *
-*  VERSION:     1.11
+*  VERSION:     1.20
 *
-*  DATE:        10 Mar 2015
+*  DATE:        23 July 2015
 *
 *  Exception handler routines.
 *
@@ -25,9 +25,9 @@ typedef BOOL (WINAPI *pfnMiniDumpWriteDump)(
 	_In_  DWORD ProcessId,
 	_In_  HANDLE hFile,
 	_In_  MINIDUMP_TYPE DumpType,
-	_In_  PMINIDUMP_EXCEPTION_INFORMATION ExceptionParam,
-	_In_  PMINIDUMP_USER_STREAM_INFORMATION UserStreamParam,
-	_In_  PMINIDUMP_CALLBACK_INFORMATION CallbackParam
+	_In_opt_  PMINIDUMP_EXCEPTION_INFORMATION ExceptionParam,
+	_In_opt_  PMINIDUMP_USER_STREAM_INFORMATION UserStreamParam,
+	_In_opt_  PMINIDUMP_CALLBACK_INFORMATION CallbackParam
 	);
 
 pfnMiniDumpWriteDump pMiniDumpWriteDump;

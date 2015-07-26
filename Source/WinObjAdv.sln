@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
 VisualStudioVersion = 12.0.31101.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WinObjAdv", "WinObjAdv\WinObjAdv.vcxproj", "{86A3FD15-6481-4D37-A87D-4280AC41ED44}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WinObjEx64", "WinObjAdv\WinObjAdv.vcxproj", "{86A3FD15-6481-4D37-A87D-4280AC41ED44}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
@@ -27,26 +27,26 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v140</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v140</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v140</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v140</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -85,7 +85,7 @@
     <IntDir>.\output\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet>SecurityRules.ruleset</CodeAnalysisRuleSet>
     <RunCodeAnalysis>true</RunCodeAnalysis>
     <OutDir>.\output\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>.\output\$(Platform)\$(Configuration)\</IntDir>
@@ -207,9 +207,10 @@
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <SDLCheck>true</SDLCheck>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
     </ClCompile>
     <Link>
-      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <GenerateDebugInformation>No</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <Version>6.0</Version>
@@ -237,7 +238,10 @@
   <ItemGroup>
     <ClCompile Include="aboutDlg.c" />
     <ClCompile Include="excepth.c" />
-    <ClCompile Include="extrasDlg.c" />
+    <ClCompile Include="extras.c" />
+    <ClCompile Include="extrasPipes.c" />
+    <ClCompile Include="extrasUSD.c" />
+    <ClCompile Include="ldasm\ldasm.c" />
     <ClCompile Include="minirtl\hextou64.c" />
     <ClCompile Include="minirtl\hextoul.c" />
     <ClCompile Include="minirtl\i64tostr.c" />
@@ -280,10 +284,13 @@
   <ItemGroup>
     <ClInclude Include="aboutDlg.h" />
     <ClInclude Include="excepth.h" />
+    <ClInclude Include="extrasPipes.h" />
+    <ClInclude Include="extrasUSD.h" />
+    <ClInclude Include="ldasm\ldasm.h" />
     <ClInclude Include="minirtl\minirtl.h" />
     <ClInclude Include="propBasicConsts.h" />
     <ClInclude Include="propDriverConsts.h" />
-    <ClInclude Include="extrasDlg.h" />
+    <ClInclude Include="extras.h" />
     <ClInclude Include="propObjectDump.h" />
     <ClInclude Include="propObjectDumpConsts.h" />
     <ClInclude Include="propSecurity.h" />

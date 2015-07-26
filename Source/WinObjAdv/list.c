@@ -4,9 +4,9 @@
 *
 *  TITLE:       LIST.C
 *
-*  VERSION:     1.11
+*  VERSION:     1.12
 *
-*  DATE:        10 Mar 2015
+*  DATE:        26 May 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -202,7 +202,7 @@ VOID ListObjectDirectoryTree(
 		if (status != STATUS_BUFFER_TOO_SMALL)
 			break;
 
-		objinf = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, rlen);
+		objinf = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (SIZE_T)rlen);
 		if (objinf == NULL)
 			break;
 
@@ -363,7 +363,7 @@ VOID ListObjectsInDirectory(
 		if (status != STATUS_BUFFER_TOO_SMALL)
 			break;
 
-		objinf = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, rlen);
+		objinf = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (SIZE_T)rlen);
 		if (objinf == NULL)
 			break;
 
@@ -424,7 +424,7 @@ VOID FindObject(
 		if (status != STATUS_BUFFER_TOO_SMALL)
 			break;
 
-		objinf = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, rlen);
+		objinf = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (SIZE_T)rlen);
 		if (objinf == NULL)
 			break;
 

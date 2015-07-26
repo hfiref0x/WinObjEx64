@@ -2,11 +2,11 @@
 *
 *  (C) COPYRIGHT AUTHORS, 2015
 *
-*  TITLE:       EXTRASDLG.C
+*  TITLE:       EXTRASPIPES.C
 *
-*  VERSION:     1.11
+*  VERSION:     1.20
 *
-*  DATE:        10 Mar 2015
+*  DATE:        23 July 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,16 +17,10 @@
 
 #include "global.h"
 #include "propDlg.h"
-#include "extrasDlg.h"
 #include "propSecurity.h"
 
 //named pipes root
 #define T_DEVICE_NAMED_PIPE L"\\Device\\NamedPipe\\"
-
-//
-// if more extras will be added consider
-// moving pipe stuff to the separate files 
-//
 
 //maximum number of possible pages
 #define EXTRAS_MAX_PAGE 2
@@ -114,7 +108,7 @@ BOOL CALLBACK PipeOpenObjectMethod(
 	UNICODE_STRING		uStr;
 	IO_STATUS_BLOCK		iost;
 
-	if ( 
+	if (
 		(Context == NULL) ||
 		(phObject == NULL)
 		)
@@ -214,7 +208,7 @@ VOID PipeQueryInfo(
 			break;
 		}
 		SetDlgItemText(hwndDlg, ID_PIPE_ACCESSMODE, lpType);
-		
+
 		//CurrentInstances
 		RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
 		ultostr(fpli.CurrentInstances, szBuffer);
@@ -310,7 +304,6 @@ INT_PTR CALLBACK PipeTypeDialogProc(
 	return 0;
 }
 
-
 /*
 * PipeDlgShowProperties
 *
@@ -384,7 +377,6 @@ VOID PipeDlgShowProperties(
 	PropertySheet(&PropHeader);
 	propContextDestroy(Context);
 }
-
 
 /*
 * PipeDlgCompareFunc
@@ -511,12 +503,12 @@ VOID PipeDlgQueryInfo(
 		RtlSecureZeroMemory(&uStr, sizeof(uStr));
 		RtlInitUnicodeString(&uStr, T_DEVICE_NAMED_PIPE);
 		InitializeObjectAttributes(&obja, &uStr, OBJ_CASE_INSENSITIVE, NULL, NULL);
-		status = NtOpenFile(&hObject, FILE_LIST_DIRECTORY, &obja, &iost, 
+		status = NtOpenFile(&hObject, FILE_LIST_DIRECTORY, &obja, &iost,
 			FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, FILE_SUPERSEDE);
 		if (!NT_SUCCESS(status)) {
 			break;
 		}
-	
+
 		DirectoryInfo = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 0x1000);
 		if (DirectoryInfo == NULL) {
 			break;
@@ -529,9 +521,9 @@ VOID PipeDlgQueryInfo(
 			RtlSecureZeroMemory(&iost, sizeof(iost));
 
 			status = NtQueryDirectoryFile(hObject, NULL, NULL, NULL, &iost,
-				DirectoryInfo, 0x1000, FileDirectoryInformation, 
+				DirectoryInfo, 0x1000, FileDirectoryInformation,
 				TRUE, //ReturnSingleEntry
-				NULL, 
+				NULL,
 				bRestartScan //RestartScan
 				);
 
@@ -542,7 +534,7 @@ VOID PipeDlgQueryInfo(
 				)
 			{
 				break;
-			}		
+			}
 
 			//Name
 			RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
@@ -573,14 +565,14 @@ VOID PipeDlgQueryInfo(
 }
 
 /*
-* extrasPipeDlgProc
+* PipeDlgProc
 *
 * Purpose:
 *
 * Pipe Dialog window procedure.
 *
 */
-INT_PTR CALLBACK extrasPipeDlgProc(
+INT_PTR CALLBACK PipeDlgProc(
 	_In_  HWND hwndDlg,
 	_In_  UINT uMsg,
 	_In_  WPARAM wParam,
@@ -633,8 +625,8 @@ VOID extrasCreatePipeDialog(
 		return;
 	}
 
-	PipeDialog = CreateDialogParam(g_hInstance, MAKEINTRESOURCE(IDD_DIALOG_PIPES), 
-		hwndParent, &extrasPipeDlgProc, 0);
+	PipeDialog = CreateDialogParam(g_hInstance, MAKEINTRESOURCE(IDD_DIALOG_PIPES),
+		hwndParent, &PipeDlgProc, 0);
 
 	if (PipeDialog == NULL) {
 		return;
@@ -665,7 +657,7 @@ VOID extrasCreatePipeDialog(
 			ListView_SetImageList(PipeDlgList, PipeImageList, LVSIL_SMALL);
 		}
 
-		ListView_SetExtendedListViewStyle(PipeDlgList, 
+		ListView_SetExtendedListViewStyle(PipeDlgList,
 			LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
 
 		RtlSecureZeroMemory(&col, sizeof(col));

@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDRIVER.C
 *
-*  VERSION:     1.11
+*  VERSION:     1.12
 *
-*  DATE:        10 Mar 2015
+*  DATE:        26 May 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -91,7 +91,7 @@ VOID DriverSetInfo(
 
 			bytesNeeded = 0;
 			bResult = QueryServiceConfig(schService, NULL, 0, &bytesNeeded);
-			if ((bResult != TRUE) && (bytesNeeded == 0)) {
+			if ((bResult == FALSE) && (bytesNeeded == 0)) {
 				break;
 			}
 
@@ -243,7 +243,7 @@ VOID DriverSetInfo(
 					bRet = QueryServiceConfig2(schService, SERVICE_CONFIG_DESCRIPTION, 
 						(LPBYTE)psd, bytesNeeded, &bytesNeeded);
 
-					if ((bRet != TRUE) && (bytesNeeded != 0)) {
+					if ((bRet == FALSE) && (bytesNeeded != 0)) {
 						HeapFree(GetProcessHeap(), 0, psd);
 						psd = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytesNeeded);
 					}
@@ -258,7 +258,7 @@ VOID DriverSetInfo(
 						HeapFree(GetProcessHeap(), 0, psd);
 					}
 				}
-				if (bRet != TRUE) {
+				if (bRet == FALSE) {
 					//not enough memory, hide description window
 					ShowWindow(GetDlgItem(hwndDlg, IDC_SERVICE_DESCRIPTION), SW_HIDE);
 				}
@@ -377,7 +377,7 @@ VOID DriverSetInfo(
 			CloseServiceHandle(SchSCManager);
 		}
 
-		if (bResult != TRUE) {
+		if (bResult == FALSE) {
 			EnumChildWindows(hwndDlg, DriverShowChildWindows, SW_HIDE);
 			ShowWindow(GetDlgItem(hwndDlg, IDC_QUERYFAIL), SW_SHOW);
 		}

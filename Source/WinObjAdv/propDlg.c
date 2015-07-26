@@ -295,9 +295,9 @@ PPROP_OBJECT_INFO propContextCreate(
 			}
 		}
 
-		//check if object is Type object
-		//Type objects handled differently
-		if ((bSelectedObject != TRUE) && (bSelectedDirectory != FALSE)) {
+		//Check if object is Type object.
+		//Type objects handled differently.
+		if ((bSelectedObject == FALSE) && (bSelectedDirectory != FALSE)) {
 			Context->IsType = TRUE;
 			//
 			// Query actual type index for case when user will browse Type object info

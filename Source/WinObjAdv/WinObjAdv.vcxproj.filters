@@ -16,6 +16,9 @@
     <Filter Include="minirtl">
       <UniqueIdentifier>{cfd14ebb-1155-43f6-96e1-e89b36260242}</UniqueIdentifier>
     </Filter>
+    <Filter Include="ldasm">
+      <UniqueIdentifier>{307bb68c-bc57-423c-90ca-816d63a674e9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.c">
@@ -67,9 +70,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="excepth.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="extrasDlg.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="minirtl\_strcat.c">
@@ -140,6 +140,18 @@
     </ClCompile>
     <ClCompile Include="minirtl\ultostr.c">
       <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="extrasPipes.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="extras.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="extrasUSD.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ldasm\ldasm.c">
+      <Filter>ldasm</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -221,11 +233,20 @@
     <ClInclude Include="excepth.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="extrasDlg.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="minirtl\minirtl.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="extrasPipes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="extras.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="extrasUSD.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ldasm\ldasm.h">
+      <Filter>ldasm</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

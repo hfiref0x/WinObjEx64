@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.11
+*  VERSION:     1.20
 *
-*  DATE:        10 Mar 2015
+*  DATE:        23 July 2015
 *
 *  Program entry point and main window handler.
 *
@@ -23,9 +23,18 @@
 #include "aboutDlg.h"
 #include "findDlg.h"
 #include "propDlg.h"
-#include "extrasDlg.h"
+#include "extras.h"
 
 #pragma comment(lib, "comctl32.lib")
+
+#if (_MSC_VER >= 1900) 
+#ifdef _DEBUG
+#pragma comment(lib, "vcruntimed.lib")
+#pragma comment(lib, "ucrtd.lib")
+#else
+#pragma comment(lib, "libvcruntime.lib")
+#endif
+#endif
 
 static LONG	SplitterPos = 180;
 static LONG	SortColumn = 0;
@@ -292,7 +301,11 @@ LRESULT MainWindowHandleWMCommand(
 		break;
 
 	case ID_EXTRAS_PIPES:
-		extrasCreatePipeDialog(hwnd);
+		extrasShowPipeDialog(hwnd);
+		break;
+
+	case ID_EXTRAS_USERSHAREDDATA:
+		extrasShowUserSharedDataDialog(hwnd);
 		break;
 
 	case ID_HELP_ABOUT:
@@ -864,7 +877,7 @@ void WinObjExMain()
 		}
 
 		//insert run as admin menu entry
-		if (IsFullAdmin != TRUE) {
+		if (IsFullAdmin == FALSE) {
 			hMenu = GetSubMenu(GetMenu(MainWindow), 0);
 			InsertMenu(hMenu, 0, MF_BYPOSITION, ID_FILE_RUNASADMIN, T_RUNASADMIN);
 			InsertMenu(hMenu, 1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
@@ -995,6 +1008,9 @@ void WinObjExMain()
 				if (IsDialogMessage(PipeDialog, &msg1))
 					continue;
 
+			if (UsdDialog != NULL)
+				if (IsDialogMessage(UsdDialog, &msg1))
+					continue;
 
 			if (IsDialogMessage(MainWindow, &msg1)) {
 				TranslateAccelerator(MainWindow, hAccTable, &msg1);

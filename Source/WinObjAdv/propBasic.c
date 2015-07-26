@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     1.11
+*  VERSION:     1.12
 *
-*  DATE:        10 Mar 2015
+*  DATE:        26 May 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -210,7 +210,7 @@ VOID propBasicQuerySemaphore(
 		SetDlgItemText(hwndDlg, ID_SEMAPHOREMAXCOUNT, szBuffer);
 	}
 	//extended information not available, query some fields
-	if (ExtendedInfoAvailable != TRUE) {
+	if (ExtendedInfoAvailable == FALSE) {
 		propSetDefaultInfo(Context, hwndDlg, hObject);
 	}
 	NtClose(hObject);
@@ -257,7 +257,7 @@ VOID propBasicQueryIoCompletion(
 			(iobi.Depth > 0) ? L"Signaled" : L"Nonsignaled");
 	}
 	//extended information not available, query some fields
-	if (ExtendedInfoAvailable != TRUE) {
+	if (ExtendedInfoAvailable == FALSE) {
 		propSetDefaultInfo(Context, hwndDlg, hObject);
 	}
 	NtClose(hObject);
@@ -328,7 +328,7 @@ VOID propBasicQueryTimer(
 	}
 
 	//extended information not available, query some fields
-	if (ExtendedInfoAvailable != TRUE) {
+	if (ExtendedInfoAvailable == FALSE) {
 		propSetDefaultInfo(Context, hwndDlg, hObject);
 	}
 	NtClose(hObject);
@@ -405,7 +405,7 @@ VOID propBasicQueryEvent(
 		SetDlgItemText(hwndDlg, ID_EVENTSTATE, lpInfo);
 	}
 	//extended information not available, query some fields
-	if (ExtendedInfoAvailable != TRUE) {
+	if (ExtendedInfoAvailable == FALSE) {
 		propSetDefaultInfo(Context, hwndDlg, hObject);
 	}
 	NtClose(hObject);
@@ -483,7 +483,7 @@ VOID propBasicQuerySymlink(
 		SetDlgItemText(hwndDlg, ID_OBJECT_SYMLINK_CREATION, szBuffer);
 	}
 	//extended information not available, query some fields
-	if (ExtendedInfoAvailable != TRUE) {
+	if (ExtendedInfoAvailable == FALSE) {
 		propSetDefaultInfo(Context, hwndDlg, hObject);
 	}
 	NtClose(hObject);
@@ -567,7 +567,7 @@ VOID propBasicQueryKey(
 	}
 
 	//extended information not available, query some missing fields
-	if (ExtendedInfoAvailable != TRUE) {
+	if (ExtendedInfoAvailable == FALSE) {
 		propSetDefaultInfo(Context, hwndDlg, hObject);
 	}
 	NtClose(hObject);
@@ -626,7 +626,7 @@ VOID propBasicQueryMutant(
 		SetDlgItemText(hwndDlg, ID_MUTANTSTATE, szBuffer);
 	}
 	//query object basic and type info
-	if (ExtendedInfoAvailable != TRUE) {
+	if (ExtendedInfoAvailable == FALSE) {
 		propSetDefaultInfo(Context, hwndDlg, hObject);
 	}
 	NtClose(hObject);
@@ -817,7 +817,7 @@ VOID propBasicQuerySection(
 	}
 
 	//query object basic and type info
-	if (ExtendedInfoAvailable != TRUE) {
+	if (ExtendedInfoAvailable == FALSE) {
 		propSetDefaultInfo(Context, hwndDlg, hObject);
 	}
 	NtClose(hObject);
@@ -864,7 +864,7 @@ VOID propBasicQueryWindowStation(
 	}
 
 	//query object basic and type info
-	if (ExtendedInfoAvailable != TRUE) {
+	if (ExtendedInfoAvailable == FALSE) {
 		propSetDefaultInfo(Context, hwndDlg, hObject);
 	}
 	CloseWindowStation(hObject);
@@ -1089,7 +1089,7 @@ VOID propBasicQueryJob(
 		}
 	}
 	//query object basic and type info
-	if (ExtendedInfoAvailable != TRUE) {
+	if (ExtendedInfoAvailable == FALSE) {
 		propSetDefaultInfo(Context, hwndDlg, hObject);
 	}
 	NtClose(hObject);
@@ -1228,7 +1228,7 @@ VOID propBasicQueryDesktop(
 			}
 		}
 		//cannot query extended info, output what we have
-		if (bExtendedInfoAvailable != TRUE) {
+		if (bExtendedInfoAvailable == FALSE) {
 			//Object Address
 			RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
 			szBuffer[0] = L'0';
@@ -1244,7 +1244,7 @@ VOID propBasicQueryDesktop(
 			SetDlgItemText(hwndDlg, ID_OBJECT_HEADER, szBuffer);
 		}
 	}
-	if (bExtendedInfoAvailable != TRUE) {
+	if (bExtendedInfoAvailable == FALSE) {
 		propSetDefaultInfo(Context, hwndDlg, hDesktop);
 	}
 	CloseDesktop(hDesktop);
@@ -1301,7 +1301,7 @@ VOID propSetBasicInfo(
 	switch (Context->TypeIndex) {
 	case TYPE_DIRECTORY:
 		//if TRUE skip this because directory is basic dialog and basic info already set
-		if (ExtendedInfoAvailable != TRUE) {
+		if (ExtendedInfoAvailable == FALSE) {
 			propBasicQueryDirectory(Context, hwndDlg);
 		}
 		break;

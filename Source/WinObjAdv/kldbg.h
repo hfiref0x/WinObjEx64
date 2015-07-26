@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.11
+*  VERSION:     1.20
 *
-*  DATE:        10 Mar 2015
+*  DATE:        26 July 2015
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -18,11 +18,12 @@
 *******************************************************************************/
 
 #define IOCTL_KD_PASS_THROUGH CTL_CODE(FILE_DEVICE_UNKNOWN, 0x1, METHOD_NEITHER, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
+#define OBJECT_SHIFT 8
 
-#define KLDBGDRV				L"kldbgdrv"
-#define KLDBGDRVSYS				L"\\drivers\\kldbgdrv.sys"
-#define RegControlKey			L"System\\CurrentControlSet\\Control"
-#define RegStartOptionsValue	L"SystemStartOptions"
+#define KLDBGDRV                L"kldbgdrv"
+#define KLDBGDRVSYS             L"\\drivers\\kldbgdrv.sys"
+#define RegControlKey           L"System\\CurrentControlSet\\Control"
+#define RegStartOptionsValue    L"SystemStartOptions"
 
 //enum with information flags used by ObGetObjectHeaderOffset
 typedef enum _OBJ_HEADER_INFO_FLAG {
@@ -36,6 +37,9 @@ typedef enum _OBJ_HEADER_INFO_FLAG {
 typedef struct _KLDBGCONTEXT {
 	//we loaded driver?
 	BOOL IsOurLoad;
+
+	//system object header cookie (win10+)
+	UCHAR ObHeaderCookie;
 
 	//kldbgdrv device handle
 	HANDLE hDevice;
@@ -87,6 +91,16 @@ typedef struct _OBJREF {
 
 DWORD WINAPI kdQueryProc(
 	_In_  LPVOID lpParameter
+	);
+
+UCHAR ObDecodeTypeIndex(
+	_In_ PVOID Object,
+	_In_ UCHAR EncodedTypeIndex
+	);
+
+UCHAR ObFindHeaderCookie(
+	_In_ PVOID UserBase,
+	_In_ ULONG_PTR KernelBase
 	);
 
 POBJINFO ObQueryObject(

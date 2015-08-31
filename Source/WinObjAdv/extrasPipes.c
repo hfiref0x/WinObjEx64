@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPIPES.C
 *
-*  VERSION:     1.20
+*  VERSION:     1.30
 *
-*  DATE:        23 July 2015
+*  DATE:        10 Aug 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -25,6 +25,8 @@
 //maximum number of possible pages
 #define EXTRAS_MAX_PAGE 2
 HPROPSHEETPAGE epsp[EXTRAS_MAX_PAGE];//pipe, security
+
+static HWND PipeDialog = NULL;
 
 HWND PipeDlgList = NULL;
 BOOL bPipeDlgSortInverse = FALSE;
@@ -591,6 +593,7 @@ INT_PTR CALLBACK PipeDlgProc(
 	case WM_CLOSE:
 		DestroyWindow(hwndDlg);
 		PipeDialog = NULL;
+		g_wobjDialogs[WOBJ_PIPEDLG_IDX] = NULL;
 		ImageList_Destroy(PipeImageList);
 		PipeImageList = NULL;
 		return TRUE;
@@ -621,7 +624,7 @@ VOID extrasCreatePipeDialog(
 	HICON		hIcon;
 
 	//allow only one dialog
-	if (PipeDialog) {
+	if (g_wobjDialogs[WOBJ_PIPEDLG_IDX]) {
 		return;
 	}
 
@@ -631,6 +634,7 @@ VOID extrasCreatePipeDialog(
 	if (PipeDialog == NULL) {
 		return;
 	}
+	g_wobjDialogs[WOBJ_PIPEDLG_IDX] = PipeDialog;
 
 	PipeDlgList = GetDlgItem(PipeDialog, ID_PIPESLIST);
 	if (PipeDlgList) {

@@ -425,8 +425,8 @@ VOID DriverJumpToKey(
 	do {
 
 		//create regkeypath buffer to navigate for
-		sz = _strlen(Context->lpObjectName) * sizeof(WCHAR) +
-			_strlen(REGISTRYSERVICESKEY) * sizeof(WCHAR) +
+		sz = (_strlen(Context->lpObjectName) * sizeof(WCHAR)) +
+			(_strlen(REGISTRYSERVICESKEY) * sizeof(WCHAR)) +
 			sizeof(UNICODE_NULL);
 
 		lpRegPath = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sz);

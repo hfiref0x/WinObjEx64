@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.20
+*  VERSION:     1.30
 *
-*  DATE:        23 July 2015
+*  DATE:        31 Aug 2015
 *
 *  Program entry point and main window handler.
 *
@@ -32,6 +32,7 @@
 #pragma comment(lib, "vcruntimed.lib")
 #pragma comment(lib, "ucrtd.lib")
 #else
+#pragma comment(linker,"/MERGE:.rdata=.text")
 #pragma comment(lib, "libvcruntime.lib")
 #endif
 #endif
@@ -244,6 +245,7 @@ LRESULT MainWindowHandleWMCommand(
 	LPWSTR		lpItemText;
 	HWND		hwndFocus;
 
+
 	UNREFERENCED_PARAMETER(lParam);
 
 	switch (LOWORD(wParam)) {
@@ -306,6 +308,10 @@ LRESULT MainWindowHandleWMCommand(
 
 	case ID_EXTRAS_USERSHAREDDATA:
 		extrasShowUserSharedDataDialog(hwnd);
+		break;
+
+	case ID_EXTRAS_PRIVATENAMESPACES:
+		extrasShowPrivateNamespacesDialog(hwnd);
 		break;
 
 	case ID_HELP_ABOUT:
@@ -760,7 +766,91 @@ VOID TestTransaction()
 	NtCreateTransaction(&hObject, TRANSACTION_ALL_ACCESS, &obja, NULL, NULL, 0, 0, 0, NULL, NULL);
 }
 
+#include <Sddl.h>
+
+HANDLE g_hNamespace = NULL, g_hMutex = NULL;
+
+VOID TestPrivateNamespace()
+{
+	HANDLE hBoundaryDescriptor = NULL;
+	BOOL cond = FALSE;
+	SECURITY_ATTRIBUTES sa;
+
+	BYTE localAdminSID[SECURITY_MAX_SID_SIZE];
+	PSID pLocalAdminSID = &localAdminSID; 
+	DWORD cbSID = sizeof(localAdminSID);
+	CHAR text[1000];
+
+	do {
+		RtlSecureZeroMemory(&localAdminSID, sizeof(localAdminSID));
+		hBoundaryDescriptor = CreateBoundaryDescriptor(TEXT("TestBoundaryDescriptor"), 0);
+		if (hBoundaryDescriptor == NULL) {
+			break;
+		}
+
+		if (!CreateWellKnownSid(WinBuiltinAdministratorsSid, NULL, pLocalAdminSID, &cbSID)) {
+			break;
+		}
+		if (!AddSIDToBoundaryDescriptor(&hBoundaryDescriptor, pLocalAdminSID)) {
+			break;
+		}
+
+		RtlSecureZeroMemory(&sa, sizeof(sa));
+		sa.nLength = sizeof(sa); 
+		sa.bInheritHandle = FALSE;
+		if (!ConvertStringSecurityDescriptorToSecurityDescriptor(TEXT("D:(A;;GA;;;BA)"),
+			SDDL_REVISION_1, &sa.lpSecurityDescriptor, NULL)) {
+			break;
+		}
+
+		g_hNamespace = CreatePrivateNamespace(&sa, hBoundaryDescriptor, TEXT("Mynamespace2"));
+		LocalFree(sa.lpSecurityDescriptor);
+		
+		if (g_hNamespace == NULL) {
+			ultostr_a(GetLastError(), text);
+			OutputDebugStringA(text);
+			break;
+		}
+
+		g_hMutex = CreateMutex(NULL, FALSE, TEXT("Mynamespace2\\TestMutex"));
+
+	} while (cond);
+
+}
+
 #endif
+
+/*
+* MainDlgMsgHandler
+*
+* Purpose:
+*
+* Check window message against existing dialogs.
+*
+*/
+BOOL MainDlgMsgHandler(
+	MSG msg
+	)
+{
+	UINT c;
+
+	for (c = 0; c < WOBJ_MAX_DIALOGS; c++) {
+		if ((g_wobjDialogs[c] != NULL)) {
+			if (IsDialogMessage(g_wobjDialogs[c], &msg))
+				return TRUE;
+		}
+	}
+
+	if (g_SubPropWindow != NULL)
+		if (IsDialogMessage(g_SubPropWindow, &msg))
+			return TRUE;
+
+	if (g_PropWindow != NULL)
+		if (IsDialogMessage(g_PropWindow, &msg))
+			return TRUE;
+
+	return FALSE;
+}
 
 /*
 * WinObjExMain
@@ -784,8 +874,10 @@ void WinObjExMain()
 	WCHAR					szWindowTitle[100];
 	HANDLE					tmpb;
 
+
 #ifdef _DEBUG
-	TestIoCompletion();
+	TestPrivateNamespace();
+	//TestIoCompletion();
 	//TestTimer();
 	//TestTransaction();
 #endif
@@ -795,6 +887,9 @@ void WinObjExMain()
 	bSortInverse = FALSE;
 	g_hInstance = GetModuleHandle(NULL);
 	RtlSecureZeroMemory(szWindowTitle, sizeof(szWindowTitle));
+
+	//clear dialogs array
+	RtlSecureZeroMemory(g_wobjDialogs, sizeof(g_wobjDialogs));
 
 	// do not move anywhere
 	IsFullAdmin = supUserIsFullAdmin();
@@ -861,9 +956,6 @@ void WinObjExMain()
 
 		Splitter = CreateWindowEx(0, WC_STATIC, NULL,
 			WS_VISIBLE | WS_CHILD, 0, 0, 0, 0, MainWindow, (HMENU)1005, g_hInstance, NULL);
-
-		//set FindDialog initial state
-		FindDialog = NULL;
 
 		// initialization of views
 		SendMessage(MainWindow, WM_SIZE, 0, 0);
@@ -992,25 +1084,8 @@ void WinObjExMain()
 			if (rv == -1)
 				break;
 
-			if (FindDialog != NULL)
-				if (IsDialogMessage(FindDialog, &msg1))
-					continue;
-
-			if (g_SubPropWindow != NULL)
-				if (IsDialogMessage(g_SubPropWindow, &msg1))
-					continue;
-
-			if (g_PropWindow != NULL)
-				if (IsDialogMessage(g_PropWindow, &msg1))
-					continue;
-
-			if (PipeDialog != NULL) 
-				if (IsDialogMessage(PipeDialog, &msg1))
-					continue;
-
-			if (UsdDialog != NULL)
-				if (IsDialogMessage(UsdDialog, &msg1))
-					continue;
+			if (MainDlgMsgHandler(msg1)) 
+				continue;
 
 			if (IsDialogMessage(MainWindow, &msg1)) {
 				TranslateAccelerator(MainWindow, hAccTable, &msg1);
@@ -1032,6 +1107,14 @@ void WinObjExMain()
 
 #ifdef _DEBUG
 	if (hObject) NtClose(hObject);
+
+	if (g_hMutex != NULL) {
+		CloseHandle(g_hMutex);
+	}
+	if (g_hNamespace != NULL) {
+		ClosePrivateNamespace(g_hNamespace, PRIVATE_NAMESPACE_FLAG_DESTROY);
+	}
+
 #endif
 }
 

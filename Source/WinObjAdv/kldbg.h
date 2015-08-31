@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.20
+*  VERSION:     1.21
 *
-*  DATE:        26 July 2015
+*  DATE:        31 July 2015
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -41,6 +41,10 @@ typedef struct _KLDBGCONTEXT {
 	//system object header cookie (win10+)
 	UCHAR ObHeaderCookie;
 
+	//index of directory type and root address
+	UCHAR DirectoryTypeIndex;
+	ULONG_PTR DirectoryRootAddress;
+
 	//kldbgdrv device handle
 	HANDLE hDevice;
 
@@ -52,6 +56,9 @@ typedef struct _KLDBGCONTEXT {
 
 	//address of invalid request handler
 	PVOID IopInvalidDeviceRequest;
+
+	//address of PrivateNamespaceLookupTable
+	PVOID ObpPrivateNamespaceLookupTable;
 
 	//system range start
 	ULONG_PTR SystemRangeStart;
@@ -87,6 +94,7 @@ typedef struct _OBJREF {
 	LPWSTR ObjectName;
 	ULONG_PTR HeaderAddress;
 	ULONG_PTR ObjectAddress;
+	ULONG_PTR NamespaceDirectoryAddress; //point to OBJECT_DIRECTORY
 } OBJREF, *POBJREF;
 
 DWORD WINAPI kdQueryProc(
@@ -96,11 +104,6 @@ DWORD WINAPI kdQueryProc(
 UCHAR ObDecodeTypeIndex(
 	_In_ PVOID Object,
 	_In_ UCHAR EncodedTypeIndex
-	);
-
-UCHAR ObFindHeaderCookie(
-	_In_ PVOID UserBase,
-	_In_ ULONG_PTR KernelBase
 	);
 
 POBJINFO ObQueryObject(
@@ -126,7 +129,8 @@ BOOL ObHeaderToNameInfoAddress(
 	);
 
 BOOL ObListCreate(
-	_Inout_ PLIST_ENTRY ListHead
+	_Inout_ PLIST_ENTRY ListHead,
+	_In_ BOOL fNamespace
 	);
 
 VOID ObListDestroy(

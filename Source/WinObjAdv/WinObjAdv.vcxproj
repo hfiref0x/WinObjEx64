@@ -240,6 +240,7 @@
     <ClCompile Include="excepth.c" />
     <ClCompile Include="extras.c" />
     <ClCompile Include="extrasPipes.c" />
+    <ClCompile Include="extrasPN.c" />
     <ClCompile Include="extrasUSD.c" />
     <ClCompile Include="ldasm\ldasm.c" />
     <ClCompile Include="minirtl\hextou64.c" />
@@ -285,6 +286,7 @@
     <ClInclude Include="aboutDlg.h" />
     <ClInclude Include="excepth.h" />
     <ClInclude Include="extrasPipes.h" />
+    <ClInclude Include="extrasPN.h" />
     <ClInclude Include="extrasUSD.h" />
     <ClInclude Include="ldasm\ldasm.h" />
     <ClInclude Include="minirtl\minirtl.h" />

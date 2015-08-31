@@ -4,9 +4,9 @@
 *
 *  TITLE:       FINDDLG.C
 *
-*  VERSION:     1.11
+*  VERSION:     1.30
 *
-*  DATE:        10 Mar 2015
+*  DATE:        10 Aug 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -25,6 +25,8 @@ static LONG sizes_init = 0, dx1, dx2, dx3, dx4, dx5, dx6, dx7, dx8, dx9, dx10, d
 BOOL bFindDlgSortInverse = FALSE;
 
 static LONG	FindDlgSortColumn = 0;
+
+static HWND FindDialog = NULL;
 
 /*
 * FindDlgCompareFunc
@@ -306,6 +308,7 @@ INT_PTR CALLBACK FindDlgProc(
 	case WM_CLOSE:
 		DestroyWindow(hwndDlg);
 		FindDialog = NULL;
+		g_wobjDialogs[WOBJ_FINDDLG_IDX] = NULL;
 		return TRUE;
 
 	case WM_COMMAND:
@@ -437,7 +440,7 @@ VOID FindDlgCreate(
 	HICON		hIcon;
 
 	//do not allow second copy
-	if (FindDialog) {
+	if (g_wobjDialogs[WOBJ_FINDDLG_IDX]) {
 		return;
 	}
 
@@ -445,12 +448,13 @@ VOID FindDlgCreate(
 	if (FindDialog == NULL) {
 		return;
 	}
+	g_wobjDialogs[WOBJ_FINDDLG_IDX] = FindDialog;
 
 	//set dialog icon, because we use shared dlg template this icon must be
 	//removed after use, see aboutDlg/propDlg.
 	hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN), IMAGE_ICON, 0, 0, LR_SHARED);
 	if (hIcon) {
-		SetClassLongPtr(FindDialog, GCLP_HICON, (LONG_PTR)hIcon);
+		SetClassLongPtr(g_wobjDialogs[WOBJ_FINDDLG_IDX], GCLP_HICON, (LONG_PTR)hIcon);
 		DestroyIcon(hIcon);
 	}
 

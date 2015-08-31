@@ -4,9 +4,9 @@
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.20
+*  VERSION:     1.30
 *
-*  DATE:        23 July 2015
+*  DATE:        31 Aug 2015
 *
 *  Common header file for the user interface.
 *
@@ -17,8 +17,8 @@
 *
 *******************************************************************************/
 
-#define SplitterSize			3L
-#define SplitterMargin			80L
+#define SplitterSize          3
+#define SplitterMargin        80
 
 typedef	struct _OE_LIST_ITEM {
 	struct _OE_LIST_ITEM *Prev;
@@ -32,22 +32,30 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 	_In_ DWORD_PTR dwData
 	);
 
-#define PROGRAM_VERSION				L"1.2.0"
-#define PROGRAM_NAME				L"Windows Object Explorer 64-bit"
-#define PROFRAM_NAME_AND_TITLE		L"Object Explorer for Windows 7/8/8.1/10"
-#define MAINWINDOWCLASSNAME			L"WinObjAdvClass"
+#define PROGRAM_VERSION            L"1.3.0 Beta 1"
+#define PROGRAM_NAME               L"Windows Object Explorer 64-bit"
+#define PROFRAM_NAME_AND_TITLE     L"Object Explorer for Windows 7/8/8.1/10"
+#define MAINWINDOWCLASSNAME        L"WinObjEx64Class"
 
 
-#define T_PROPERTIES				L"Properties...\tEnter"
-#define T_GOTOLINKTARGET			L"Go To Link Target\tCtrl+->"
-#define T_RUNASADMIN				L"R&un as Administrator"
-#define T_COPYTEXTROW				L"Copy Row Selection"
-#define T_COPYVALUE					L"Copy Value Field Text"
+#define T_PROPERTIES               L"Properties...\tEnter"
+#define T_GOTOLINKTARGET           L"Go To Link Target\tCtrl+->"
+#define T_RUNASADMIN               L"R&un as Administrator"
+#define T_COPYTEXTROW              L"Copy Row Selection"
+#define T_COPYVALUE                L"Copy Value Field Text"
 
+#define WOBJ_MAX_DIALOGS 4
+
+#define WOBJ_FINDDLG_IDX 0
+#define WOBJ_PIPEDLG_IDX 1
+#define WOBJ_USDDLG_IDX  2
+#define WOBJ_PNDLG_IDX   3
+
+HWND g_wobjDialogs[WOBJ_MAX_DIALOGS];
 
 //global variables
-BOOL			bSortInverse;
-HWND			MainWindow, StatusBar, ObjectTree, ObjectList, ToolBar1, Splitter, FindDialog, PipeDialog, UsdDialog;
-LPWSTR			CurrentObjectPath;
-HIMAGELIST		TreeViewImages, ListViewImages, ToolBarMenuImages;
-pfnHtmlHelpW	pHtmlHelpW;
+BOOL            bSortInverse;
+HWND            MainWindow, StatusBar, ObjectTree, ObjectList, ToolBar1, Splitter;
+LPWSTR          CurrentObjectPath;
+HIMAGELIST      TreeViewImages, ListViewImages, ToolBarMenuImages;
+pfnHtmlHelpW    pHtmlHelpW;

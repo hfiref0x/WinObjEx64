@@ -2,13 +2,13 @@
 *
 *  (C) COPYRIGHT AUTHORS, 2015
 *
-*  TITLE:       EXTRAS.H
+*  TITLE:       EXTRASPN.H
 *
 *  VERSION:     1.30
 *
-*  DATE:        05 Aug 2015
+*  DATE:        03 Aug 2015
 *
-*  Common header file for Extras dialogs.
+*  Common header file for Extras Private Namespaces dialog.
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,14 +17,6 @@
 *
 *******************************************************************************/
 
-VOID extrasShowPipeDialog(
-	_In_ HWND hwndParent
-	);
-
-VOID extrasShowUserSharedDataDialog(
-	_In_ HWND hwndParent
-	);
-
-VOID extrasShowPrivateNamespacesDialog(
+VOID extrasCreatePNDialog(
 	_In_ HWND hwndParent
 	);

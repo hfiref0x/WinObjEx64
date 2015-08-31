@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRAS.C
 *
-*  VERSION:     1.20
+*  VERSION:     1.30
 *
-*  DATE:        23 July 2015
+*  DATE:        05 Aug 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -20,6 +20,7 @@
 #include "propSecurity.h"
 #include "extrasPipes.h"
 #include "extrasUSD.h"
+#include "extrasPN.h"
 
 /*
 * extrasShowPipeDialog
@@ -51,3 +52,17 @@ VOID extrasShowUserSharedDataDialog(
 	extrasCreateUsdDialog(hwndParent);
 }
 
+/*
+* extrasShowPrivateNamespacesDialog
+*
+* Purpose:
+*
+* Display PrivateNamespaces dialog.
+*
+*/
+VOID extrasShowPrivateNamespacesDialog(
+	_In_ HWND hwndParent
+	)
+{
+	extrasCreatePNDialog(hwndParent);
+}

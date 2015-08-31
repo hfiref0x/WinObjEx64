@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPPROCESS.C
 *
-*  VERSION:     1.12
+*  VERSION:     1.30
 *
-*  DATE:        26 May 2015
+*  DATE:        31 Aug 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -447,7 +447,7 @@ VOID ProcessListSetInfo(
 	//check if additional info available
 	if (Context->ObjectInfo.ObjectAddress != 0) {
 		ObjectAddress = Context->ObjectInfo.ObjectAddress;
-		ObjectTypeIndex = Context->ObjectInfo.ObjectHeader.TypeIndex;
+		ObjectTypeIndex = ObDecodeTypeIndex((PVOID)ObjectAddress, Context->ObjectInfo.ObjectHeader.TypeIndex);
 	}
 
 	do {

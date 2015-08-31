@@ -1,11 +1,9 @@
 DmaAdapter
 DmaDomain
 IoCompletionReserve - same as IoCompletion except using reserve process allocated memory
-NetworkNamespace
-Partition
 RawInputManager - DirectX Kernel Subsystem object, Window Manager for phones
 UserApcReserve - same as NtQueueApc except using reserve process allocated memory
 WaitCompletionPacket
 Silo
-NetworkNamespace
-Partition
+NetworkNamespace - managed by NDIS.sys
+Partition - memory manager object, partition is a new type of dynamic server partitioning scheme that goes beyond NUMA. It's basically a set of nodes plus an IO Bus.

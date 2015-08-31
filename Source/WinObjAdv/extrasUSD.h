@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASUSD.H
 *
-*  VERSION:     1.20
+*  VERSION:     1.30
 *
-*  DATE:        23 July 2015
+*  DATE:        03 Aug 2015
 *
 *  Common header file for Extras User Shared Data dialog.
 *
@@ -52,6 +52,40 @@ static LPWSTR T_PROCESSOR_FEATURES[] = {
 	L"PF_ARM_V8_CRC32_INSTRUCTIONS_AVAILABLE",
 	L"PF_RDTSCP_INSTRUCTION_AVAILABLE",
 	L""
+};
+
+static LPCWSTR T_SharedDataFlags[9] = {
+	L"DbgErrorPortPresent",
+	L"DbgElevationEnabled",
+	L"DbgVirtEnabled",
+	L"DbgInstallerDetectEnabled",
+	L"DbgLkgEnabled",
+	L"DbgDynProcessorEnabled",
+	L"DbgConsoleBrokerEnabled",
+	L"DbgSecureBootEnabled",
+	L"DbgMultiSessionSku"
+};
+
+#define MAX_KNOWN_SUITEMASKS 18
+static VALUE_DESC SuiteMasks[MAX_KNOWN_SUITEMASKS] = {
+	{ L"ServerNT", VER_SERVER_NT },
+	{ L"WorkstationNT", VER_WORKSTATION_NT },
+	{ L"SmallBusiness", VER_SUITE_SMALLBUSINESS },
+	{ L"Enterprise", VER_SUITE_ENTERPRISE },
+	{ L"BackOffice", VER_SUITE_BACKOFFICE },
+	{ L"Communications", VER_SUITE_COMMUNICATIONS },
+	{ L"Terminal", VER_SUITE_TERMINAL },
+	{ L"SmallBussinessRestricted", VER_SUITE_SMALLBUSINESS_RESTRICTED },
+	{ L"EmbeddedNT", VER_SUITE_EMBEDDEDNT },
+	{ L"DataCenter", VER_SUITE_DATACENTER },
+	{ L"SingleUserTS", VER_SUITE_SINGLEUSERTS },
+	{ L"Personal", VER_SUITE_PERSONAL },
+	{ L"Blade", VER_SUITE_BLADE },
+	{ L"EmbeddedRestricted", VER_SUITE_EMBEDDED_RESTRICTED },
+	{ L"SecurityAppliance", VER_SUITE_SECURITY_APPLIANCE },
+	{ L"StorageServer", VER_SUITE_STORAGE_SERVER },
+	{ L"ComputeServer", VER_SUITE_COMPUTE_SERVER },
+	{ L"HomeServer", VER_SUITE_WH_SERVER }
 };
 
 VOID extrasCreateUsdDialog(

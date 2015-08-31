@@ -216,7 +216,7 @@ VOID ListObjectDirectoryTree(
 			objinf->TypeName.Length / sizeof(WCHAR)) == 0) 
 		{
 			ListObjectDirectoryTree(objinf->Name.Buffer, hDirectory, ViewRootHandle);
-		};
+		}
 
 		HeapFree(GetProcessHeap(), 0, objinf);
 	} while (cond);

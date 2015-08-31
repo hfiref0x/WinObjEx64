@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.18
+*  VERSION:     1.19
 *
-*  DATE:        25 June 2015
+*  DATE:        30 July 2015
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -1656,6 +1656,21 @@ typedef struct _EX_PUSH_LOCK {
 		PVOID Ptr;
 	};
 } EX_PUSH_LOCK, *PEX_PUSH_LOCK;
+
+typedef struct _OBJECT_NAMESPACE_LOOKUPTABLE {
+	LIST_ENTRY HashBuckets[37];
+	EX_PUSH_LOCK Lock;
+	ULONG NumberOfPrivateSpaces;
+} OBJECT_NAMESPACE_LOOKUPTABLE, *POBJECT_NAMESPACE_LOOKUPTABLE;
+
+typedef struct _OBJECT_NAMESPACE_ENTRY {
+	LIST_ENTRY ListEntry;
+	PVOID NamespaceRootDirectory;
+	ULONG SizeOfBoundaryInformation;
+	ULONG Reserved;
+	UCHAR HashValue;
+	ULONG Alignment;
+} OBJECT_NAMESPACE_ENTRY, *POBJECT_NAMESPACE_ENTRY;
 
 typedef struct _OBJECT_DIRECTORY {
 	POBJECT_DIRECTORY_ENTRY HashBuckets[37];

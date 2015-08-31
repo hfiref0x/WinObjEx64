@@ -153,6 +153,9 @@
     <ClCompile Include="ldasm\ldasm.c">
       <Filter>ldasm</Filter>
     </ClCompile>
+    <ClCompile Include="extrasPN.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h">
@@ -247,6 +250,9 @@
     </ClInclude>
     <ClInclude Include="ldasm\ldasm.h">
       <Filter>ldasm</Filter>
+    </ClInclude>
+    <ClInclude Include="extrasPN.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -6,4 +6,4 @@ UserApcReserve - same as NtQueueApc except using reserve process allocated memor
 WaitCompletionPacket
 Silo
 NetworkNamespace - managed by NDIS.sys
-Partition - memory manager object
+Partition - memory manager object, partition is a new type of dynamic server partitioning scheme that goes beyond NUMA. It's basically a set of nodes plus an IO Bus.

@@ -1128,6 +1128,7 @@ void WinObjExMain()
 */
 void main()
 {
+
 	__security_init_cookie();
 
 	WinObjExMain();

@@ -757,6 +757,7 @@ VOID ObWalkDirectoryRecursiveEx(
 							//save object address
 							lpListEntry->ObjectAddress = (ULONG_PTR)Entry.Object;
 							lpListEntry->HeaderAddress = ObjectHeaderAddress;
+							lpListEntry->TypeIndex = ObjectHeader.TypeIndex;
 
 							//copy dir + name
 							if (lpObjectName) {
@@ -845,19 +846,18 @@ BOOL ObWalkPrivateNamespaceTable(
 	OBJECT_DIRECTORY DirObject;
 	OBJECT_DIRECTORY_ENTRY Entry;
 
-	ULONG_PTR ObjectHeaderAddress, item0, item1, InfoHeaderAddress;
+	ULONG_PTR ObjectHeaderAddress, item0, item1, InfoHeaderAddress, NameSpaceIdMax = 0L;
 
 	OBJECT_NAMESPACE_LOOKUPTABLE LookupTable;
 	OBJECT_NAMESPACE_ENTRY LookupEntry;
-	PLIST_ENTRY Current, Head;
+	PLIST_ENTRY Current, Head, FindEntry;
 
-	POBJREF lpListEntry;
-
+	POBJREF lpListEntry, ObjectInfo;
 	LPWSTR lpObjectName = NULL;
-
 	SIZE_T retSize = 0;
-
 	INT c, d;
+
+	BOOL EntryFound;
 
 	if (
 		(ListHead == NULL) ||
@@ -928,9 +928,28 @@ BOOL ObWalkPrivateNamespaceTable(
 									//save object address
 									lpListEntry->ObjectAddress = (ULONG_PTR)Entry.Object;
 									lpListEntry->HeaderAddress = ObjectHeaderAddress;
+									lpListEntry->TypeIndex = ObjectHeader.TypeIndex;
 
 									//save object namespace address
 									lpListEntry->NamespaceDirectoryAddress = (ULONG_PTR)LookupEntry.NamespaceRootDirectory;
+
+									//assign id
+									EntryFound = FALSE;
+									FindEntry = ListHead->Flink;
+									while ((FindEntry != NULL) && (FindEntry != ListHead)) {
+										ObjectInfo = CONTAINING_RECORD(FindEntry, OBJREF, ListEntry);
+										if (ObjectInfo) {
+											if (lpListEntry->NamespaceDirectoryAddress == ObjectInfo->NamespaceDirectoryAddress) {
+												lpListEntry->NamespaceId = ObjectInfo->NamespaceId;
+												EntryFound = TRUE;
+												break;
+											}
+										}
+										FindEntry = FindEntry->Flink;
+									}
+									if (EntryFound == FALSE) {
+										lpListEntry->NamespaceId = NameSpaceIdMax++;
+									}
 
 									//copy object name
 									if (lpObjectName) {

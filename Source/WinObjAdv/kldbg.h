@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.21
+*  VERSION:     1.30
 *
-*  DATE:        31 July 2015
+*  DATE:        04 Sept 2015
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -95,6 +95,8 @@ typedef struct _OBJREF {
 	ULONG_PTR HeaderAddress;
 	ULONG_PTR ObjectAddress;
 	ULONG_PTR NamespaceDirectoryAddress; //point to OBJECT_DIRECTORY
+	ULONG_PTR NamespaceId;
+	UCHAR TypeIndex;
 } OBJREF, *POBJREF;
 
 DWORD WINAPI kdQueryProc(

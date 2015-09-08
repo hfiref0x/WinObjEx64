@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.19
+*  VERSION:     1.20
 *
-*  DATE:        30 July 2015
+*  DATE:        04 Sept 2015
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -703,6 +703,32 @@ typedef struct _OBJECT_TYPE_INFORMATION {
 	ULONG DefaultNonPagedPoolCharge;
 } OBJECT_TYPE_INFORMATION, *POBJECT_TYPE_INFORMATION;
 #endif
+
+typedef struct _OBJECT_TYPE_INFORMATION_8 {
+	UNICODE_STRING TypeName;
+	ULONG TotalNumberOfObjects;
+	ULONG TotalNumberOfHandles;
+	ULONG TotalPagedPoolUsage;
+	ULONG TotalNonPagedPoolUsage;
+	ULONG TotalNamePoolUsage;
+	ULONG TotalHandleTableUsage;
+	ULONG HighWaterNumberOfObjects;
+	ULONG HighWaterNumberOfHandles;
+	ULONG HighWaterPagedPoolUsage;
+	ULONG HighWaterNonPagedPoolUsage;
+	ULONG HighWaterNamePoolUsage;
+	ULONG HighWaterHandleTableUsage;
+	ULONG InvalidAttributes;
+	GENERIC_MAPPING GenericMapping;
+	ULONG ValidAccessMask;
+	BOOLEAN SecurityRequired;
+	BOOLEAN MaintainHandleCount;
+	UCHAR TypeIndex;
+	CHAR ReservedByte;
+	ULONG PoolType;
+	ULONG DefaultPagedPoolCharge;
+	ULONG DefaultNonPagedPoolCharge;
+} OBJECT_TYPE_INFORMATION_8, *POBJECT_TYPE_INFORMATION_8;
 
 #ifndef _OBJECT_TYPES_INFORMATION
 typedef struct _OBJECT_TYPES_INFORMATION

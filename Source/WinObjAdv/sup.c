@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.20
+*  VERSION:     1.30
 *
-*  DATE:        23 July 2015
+*  DATE:        04 Sept 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -604,6 +604,60 @@ HIMAGELIST supLoadImageList(
 }
 
 /*
+* supGetObjectNameIndexByTypeIndex
+*
+* Purpose:
+*
+* Returns object index of known type.
+*
+* Known type names listed in sup.c T_ObjectNames, and known object indexes listed in sup.h as TYPE_*
+*
+*/
+UINT supGetObjectNameIndexByTypeIndex(
+	_In_ PVOID Object,
+	_In_ UCHAR TypeIndex
+	)
+{
+	UINT Index;
+	ULONG i;
+	BOOL bFound = FALSE;
+	POBJECT_TYPE_INFORMATION pObject;
+	POBJECT_TYPE_INFORMATION_8 pObject8;
+
+	if (Object == NULL) {
+		return TYPE_UNKNOWN;
+	}
+
+	Index = ObDecodeTypeIndex(Object, TypeIndex);
+
+	pObject = (POBJECT_TYPE_INFORMATION)&g_pObjectTypesInfo->TypeInformation;
+	for (i = 0; i < g_pObjectTypesInfo->NumberOfTypes; i++) {
+		
+		if (g_kdctx.osver.dwBuildNumber >= 9200) {
+			pObject8 = (POBJECT_TYPE_INFORMATION_8)pObject;
+			if (pObject8->TypeIndex == Index) {
+				bFound = TRUE;
+			}
+		}
+		else {
+			if (i + 2 == Index) {
+				bFound = TRUE;
+			}
+		}
+
+		if (bFound) {
+			return supGetObjectIndexByTypeName(pObject->TypeName.Buffer);
+		}
+
+		pObject = (POBJECT_TYPE_INFORMATION)((PCHAR)(pObject + 1) +
+			ALIGN_UP(pObject->TypeName.MaximumLength, sizeof(ULONG_PTR)));
+	}
+
+	return TYPE_UNKNOWN;
+}
+
+
+/*
 * supGetObjectIndexByTypeName
 *
 * Purpose:
@@ -613,11 +667,11 @@ HIMAGELIST supLoadImageList(
 * Known type names listed in sup.c T_ObjectNames, and known object indexes listed in sup.h as TYPE_*
 *
 */
-INT supGetObjectIndexByTypeName(
+UINT supGetObjectIndexByTypeName(
 	_In_ LPCWSTR lpTypeName
 	)
 {
-	INT nIndex;
+	UINT nIndex;
 
 	if (lpTypeName == NULL) {
 		return TYPE_UNKNOWN;

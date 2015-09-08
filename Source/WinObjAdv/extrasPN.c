@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.30
 *
-*  DATE:        13 Aug 2015
+*  DATE:        04 Sept 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -23,6 +23,13 @@ static HWND PNDialog = NULL;
 static LONG	PNDlgSortColumn = 0;
 HWND PNListView = NULL;
 BOOL bPNDlgSortInverse = FALSE;
+
+//columns count
+#define NS_LISTCOLCNT          3
+
+#define T_NAMESPACEID          TEXT("Ns%lu")
+#define T_NAMESPACEOBJECTCNT   TEXT("Total Object(s): %lu")
+#define T_NAMESPACEQUERYFAILED TEXT("Unable to list namespaces! Make sure you run this program as Admin and Windows is in a DEBUG mode.")
 
 /*
 * PNListCompareFunc
@@ -49,15 +56,15 @@ INT CALLBACK PNListCompareFunc(
 		goto Done;
 	}
 	if ((lpItem1 == NULL) && (lpItem2 != NULL)) {
-		nResult = (bSortInverse) ? 1 : -1;
+		nResult = (bPNDlgSortInverse) ? 1 : -1;
 		goto Done;
 	}
 	if ((lpItem2 == NULL) && (lpItem1 != NULL)) {
-		nResult = (bSortInverse) ? -1 : 1;
+		nResult = (bPNDlgSortInverse) ? -1 : 1;
 		goto Done;
 	}
 
-	if (bSortInverse)
+	if (bPNDlgSortInverse)
 		nResult = _strcmpi(lpItem2, lpItem1);
 	else
 		nResult = _strcmpi(lpItem1, lpItem2);
@@ -76,13 +83,15 @@ BOOL PNDlgQueryInfo(
 	VOID
 	)
 {
-	INT             index;
-	LIST_ENTRY      PrivateObjectList;
-	BOOL            bResult = FALSE;
-	POBJREF         ObjectInfo;
-	PLIST_ENTRY     Entry;
-	LVITEMW         lvitem;
-//	WCHAR           szBuffer[MAX_PATH + 1];
+	INT           index;
+	UINT          ConvertedTypeIndex;
+	LIST_ENTRY    PrivateObjectList;
+	BOOL          bResult = FALSE;
+	POBJREF       ObjectInfo;
+	PLIST_ENTRY   Entry;
+	LVITEMW       lvitem;
+	LPCWSTR       TypeName;
+	WCHAR         szBuffer[MAX_PATH + 1];
 
 
 	bResult = ObListCreate(&PrivateObjectList, TRUE);
@@ -96,20 +105,35 @@ BOOL PNDlgQueryInfo(
 		ObjectInfo = CONTAINING_RECORD(Entry, OBJREF, ListEntry);
 		if (ObjectInfo) {
 
+			ConvertedTypeIndex = supGetObjectNameIndexByTypeIndex(
+				(PVOID)ObjectInfo->ObjectAddress, ObjectInfo->TypeIndex);
+
+			TypeName = T_ObjectNames[ConvertedTypeIndex];
+
+			//Name
 			RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
 			lvitem.mask = LVIF_TEXT | LVIF_IMAGE;
 			lvitem.iSubItem = 0;
-			lvitem.pszText = ObjectInfo->ObjectName;
 			lvitem.iItem = MAXINT;
-//			lvitem.iImage = supGetObjectIndexByTypeName(objinf->TypeName.Buffer);
+			lvitem.iImage = ConvertedTypeIndex;
+			lvitem.pszText = ObjectInfo->ObjectName;
 			index = ListView_InsertItem(PNListView, &lvitem);
 
+			//Type
 			lvitem.mask = LVIF_TEXT;
 			lvitem.iSubItem = 1;
-			lvitem.pszText = L"TypeHere";
+			lvitem.pszText = (LPWSTR)TypeName;
 			lvitem.iItem = index;
 			ListView_SetItem(PNListView, &lvitem);
 
+			//Namespace id
+			lvitem.mask = LVIF_TEXT;
+			lvitem.iSubItem = 2;
+			lvitem.iItem = index;
+			RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+			wsprintf(szBuffer, T_NAMESPACEID, ObjectInfo->NamespaceId);
+			lvitem.pszText = szBuffer;
+			ListView_SetItem(PNListView, &lvitem);
 		}
 		Entry = Entry->Flink;
 	}
@@ -129,7 +153,6 @@ VOID PNDlgHandleNotify(
 	LPNMLISTVIEW	nhdr
 	)
 {
-//	LPWSTR			lpItemText;
 	LVCOLUMNW		col;
 	INT				c, k;
 
@@ -151,7 +174,7 @@ VOID PNDlgHandleNotify(
 		col.mask = LVCF_IMAGE;
 		col.iImage = -1;
 
-		for (c = 0; c < 2; c++)
+		for (c = 0; c < NS_LISTCOLCNT; c++)
 			ListView_SetColumn(PNListView, c, &col);
 
 		k = ImageList_GetImageCount(ListViewImages);
@@ -222,10 +245,9 @@ VOID extrasCreatePNDialog(
 	_In_ HWND hwndParent
 	)
 {
-	LVCOLUMNW	col;
-//	HICON		hIcon;
+	LVCOLUMNW   col;
+	WCHAR       szBuffer[MAX_PATH + 1];
 
-	MessageBox(hwndParent, TEXT("Under construction"), PROGRAM_NAME, 0);
 
 	//allow only one dialog
 	if (g_wobjDialogs[WOBJ_PNDLG_IDX]) {
@@ -255,7 +277,7 @@ VOID extrasCreatePNDialog(
 		col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
 		col.iOrder = 0;
 		col.iImage = ImageList_GetImageCount(ListViewImages) - 1;
-		col.cx = 300;
+		col.cx = 400;
 		ListView_InsertColumn(PNListView, 1, &col);
 
 		col.iSubItem = 2;
@@ -265,13 +287,23 @@ VOID extrasCreatePNDialog(
 		col.cx = 100;
 		ListView_InsertColumn(PNListView, 2, &col);
 
+		col.iSubItem = 3;
+		col.pszText = L"Namespace";
+		col.iOrder = 2;
+		col.iImage = -1;
+		col.cx = 100;
+		ListView_InsertColumn(PNListView, 3, &col);
+
 		if (PNDlgQueryInfo()) {
-			ShowWindow(GetDlgItem(PNDialog, ID_PNAMESPACESNOTALL), SW_HIDE);
 			bPNDlgSortInverse = FALSE;
 			ListView_SortItemsEx(PNListView, &PNListCompareFunc, 0);
+
+			RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+			wsprintfW(szBuffer, T_NAMESPACEOBJECTCNT, ListView_GetItemCount(PNListView));
+			SetDlgItemText(PNDialog, ID_PNAMESPACESINFO, szBuffer);
 		}
 		else {
-			ShowWindow(GetDlgItem(PNDialog, ID_PNAMESPACESNOTALL), SW_SHOW);
+			SetDlgItemText(PNDialog, ID_PNAMESPACESINFO, T_NAMESPACEQUERYFAILED);
 		}
 	}
 }

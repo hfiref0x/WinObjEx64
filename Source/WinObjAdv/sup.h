@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.11
+*  VERSION:     1.30
 *
-*  DATE:        10 Mar 2015
+*  DATE:        04 Sept 2015
 *
 *  Common header file for the program support routines.
 *
@@ -170,8 +170,13 @@ HIMAGELIST supLoadImageList(
 	UINT LastId
 	);
 
-INT supGetObjectIndexByTypeName(
+UINT supGetObjectIndexByTypeName(
 	_In_ LPCWSTR lpTypeName
+	);
+
+UINT supGetObjectNameIndexByTypeIndex(
+	_In_ PVOID Object,
+	_In_ UCHAR TypeIndex
 	);
 
 VOID supRunAsAdmin(

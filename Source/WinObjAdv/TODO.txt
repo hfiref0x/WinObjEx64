@@ -1,2 +1,0 @@
-LP) Recheck Dxgk* objects win10 after win10 release
-LP) More objects icons and descriptions

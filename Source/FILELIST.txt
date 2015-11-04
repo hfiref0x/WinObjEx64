@@ -12,6 +12,9 @@ extras.h
 extrasPipes.c - Pipes dialog
 extrasPipes.h
 
+extrasPN.c - private namespaces
+extrasPN.h
+
 extrasUSD.c - UserSharedData dialog
 extrasUSD.h
 

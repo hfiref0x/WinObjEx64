@@ -4,13 +4,11 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.20
+*  VERSION:     1.21
 *
-*  DATE:        04 Sept 2015
+*  DATE:        17 Sept 2015
 *
 *  Common header file for the ntos API functions and definitions.
-*
-*  ONLY program required types and definitions listed.
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -3481,6 +3479,117 @@ VOID NTAPI RtlSetLastWin32Error(
 	LONG Win32Error
 	);
 
+PVOID NTAPI RtlAllocateHeap(
+	_In_ PVOID HeapHandle,
+	_In_ ULONG Flags,
+	_In_ SIZE_T Size
+	);
+
+BOOLEAN NTAPI RtlFreeHeap(
+	_In_ PVOID HeapHandle,
+	_In_ ULONG Flags,
+	_In_ PVOID BaseAddress
+	);
+
+BOOLEAN NTAPI RtlValidSid(
+	PSID Sid
+	);
+
+BOOLEAN NTAPI RtlEqualSid(
+	PSID Sid1,
+	PSID Sid2
+	);
+
+BOOLEAN NTAPI RtlEqualPrefixSid(
+	PSID Sid1,
+	PSID Sid2
+	);
+
+ULONG NTAPI RtlLengthRequiredSid(
+	ULONG SubAuthorityCount
+	);
+
+PVOID NTAPI RtlFreeSid(
+	IN PSID Sid
+	);
+
+NTSTATUS NTAPI RtlAllocateAndInitializeSid(
+	IN PSID_IDENTIFIER_AUTHORITY IdentifierAuthority,
+	IN UCHAR SubAuthorityCount,
+	IN ULONG SubAuthority0,
+	IN ULONG SubAuthority1,
+	IN ULONG SubAuthority2,
+	IN ULONG SubAuthority3,
+	IN ULONG SubAuthority4,
+	IN ULONG SubAuthority5,
+	IN ULONG SubAuthority6,
+	IN ULONG SubAuthority7,
+	OUT PSID *Sid
+	);
+                                          
+NTSTATUS NTAPI RtlInitializeSid(                                  
+	PSID Sid,                                      
+	PSID_IDENTIFIER_AUTHORITY IdentifierAuthority,  
+	UCHAR SubAuthorityCount                         
+	);                                              
+
+PSID_IDENTIFIER_AUTHORITY NTAPI RtlIdentifierAuthoritySid(
+	PSID Sid
+	);
+
+PULONG NTAPI RtlSubAuthoritySid(                               
+	PSID Sid,                                       
+	ULONG SubAuthority                              
+	);                                              
+
+PUCHAR NTAPI
+RtlSubAuthorityCountSid(
+	PSID Sid
+	);
+
+ULONG NTAPI RtlLengthSid(
+	PSID Sid
+	);
+
+NTSTATUS NTAPI RtlCopySid(
+	ULONG DestinationSidLength,
+	PSID DestinationSid,
+	PSID SourceSid
+	);
+
+NTSTATUS NTAPI RtlCopySidAndAttributesArray(
+	ULONG ArrayLength,
+	PSID_AND_ATTRIBUTES Source,
+	ULONG TargetSidBufferSize,
+	PSID_AND_ATTRIBUTES TargetArrayElement,
+	PSID TargetSid,
+	PSID *NextTargetSid,
+	PULONG RemainingTargetSidSize
+	);
+
+NTSTATUS NTAPI RtlLengthSidAsUnicodeString(
+	PSID Sid,
+	PULONG StringLength
+	);
+
+NTSTATUS NTAPI RtlConvertSidToUnicodeString(
+	PUNICODE_STRING UnicodeString,
+	PSID Sid,
+	BOOLEAN AllocateDestinationString
+	);
+
+NTSTATUS NTAPI RtlFormatCurrentUserKeyPath(
+	_Out_ PUNICODE_STRING CurrentUserKeyPath
+	);
+
+VOID NTAPI RtlFreeUnicodeString(
+	PUNICODE_STRING UnicodeString
+	);
+
+VOID NTAPI RtlFreeAnsiString(
+	PANSI_STRING AnsiString
+	);
+
 ULONG DbgPrint(
 	_In_ PCH Format,
 	...
@@ -3601,6 +3710,13 @@ NTSTATUS NTAPI NtQueryTimer(
 	_Out_opt_  PULONG ReturnLength
 	);
 
+NTSTATUS NTAPI NtCreateSymbolicLinkObject(
+	_Out_   PHANDLE LinkHandle,
+	_In_    ACCESS_MASK DesiredAccess,
+	_In_    POBJECT_ATTRIBUTES ObjectAttributes,
+	_In_    PUNICODE_STRING LinkTarget
+	);
+
 NTSTATUS WINAPI NtOpenSymbolicLinkObject(
 	_Out_	PHANDLE LinkHandle,
 	_In_	ACCESS_MASK DesiredAccess,
@@ -3712,6 +3828,24 @@ NTSTATUS NTAPI NtQueryKey(
 	_Out_opt_	PVOID KeyInformation,
 	_In_		ULONG Length,
 	_Out_		PULONG ResultLength
+	);
+
+NTSTATUS NTAPI NtQueryValueKey(
+	_In_       HANDLE KeyHandle,
+	_In_       PUNICODE_STRING ValueName,
+	_In_       KEY_VALUE_INFORMATION_CLASS KeyValueInformationClass,
+	_Out_      PVOID KeyValueInformation,
+	_In_       ULONG Length,
+	_Out_      PULONG ResultLength
+	);
+
+NTSTATUS NTAPI NtDeleteKey(
+	_In_       HANDLE KeyHandle
+	);
+
+NTSTATUS NTAPI NtDeleteValueKey(
+	_In_       HANDLE KeyHandle,
+	_In_       PUNICODE_STRING ValueName
 	);
 
 NTSTATUS NTAPI NtOpenJobObject(

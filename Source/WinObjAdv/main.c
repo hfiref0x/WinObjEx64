@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.30
 *
-*  DATE:        31 Aug 2015
+*  DATE:        27 Oct 2015
 *
 *  Program entry point and main window handler.
 *
@@ -311,7 +311,9 @@ LRESULT MainWindowHandleWMCommand(
 		break;
 
 	case ID_EXTRAS_PRIVATENAMESPACES:
-		extrasShowPrivateNamespacesDialog(hwnd);
+		if (g_kdctx.osver.dwBuildNumber <= 10240) {
+			extrasShowPrivateNamespacesDialog(hwnd);
+		}
 		break;
 
 	case ID_HELP_ABOUT:
@@ -979,6 +981,11 @@ void WinObjExMain()
 			if (SHGetStockIconInfo(SIID_SHIELD, SHGSI_ICON | SHGFI_SMALLICON, &sii) == S_OK) {
 				supSetMenuIcon(hMenu, ID_FILE_RUNASADMIN, (ULONG_PTR)sii.hIcon);
 			}
+		}
+
+		//unsupported
+		if (g_kdctx.osver.dwBuildNumber > 10240) {
+			DeleteMenu(GetSubMenu(GetMenu(MainWindow), 4), ID_EXTRAS_PRIVATENAMESPACES, MF_BYCOMMAND);
 		}
 
 		//load listview images

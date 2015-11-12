@@ -1,0 +1,447 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="ldasm">
+      <UniqueIdentifier>{ebbe4f4f-0990-4d15-beda-0af23ffbb97e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="minirtl">
+      <UniqueIdentifier>{1f87af63-dc0b-4a32-88ee-e9e15a1041c8}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="aboutDlg.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="excepth.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="extras.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="extrasPipes.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="extrasPN.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="extrasUSD.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="findDlg.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="instdrv.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="kldbg.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="list.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="main.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="propBasic.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="propDesktop.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="propDlg.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="propDriver.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="propObjectDump.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="propProcess.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="propSecurity.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="propType.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sup.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="treelist.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ldasm\ldasm.c">
+      <Filter>ldasm</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\_strcat.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\_strcmp.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\_strcmpi.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\_strcpy.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\_strend.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\_strlen.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\_strncmp.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\_strncmpi.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\_strncpy.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\_strstr.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\_strstri.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\hextou64.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\hextoul.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\i64tostr.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\itostr.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\strtoi.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\strtoi64.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\strtou64.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\strtoul.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\u64tohex.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\u64tostr.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\ultohex.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="minirtl\ultostr.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="extrasSSDT.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="testunit.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Resource.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="aboutDlg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="excepth.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="extras.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="extrasPipes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="extrasPN.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="extrasUSD.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="findDlg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="global.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="instdrv.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="kldbg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="list.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ntos.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="propBasic.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="propBasicConsts.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="propDesktop.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="propDlg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="propDriver.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="propDriverConsts.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="propObjectDump.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="propObjectDumpConsts.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="propProcess.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="propSecurity.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="propSecurityConsts.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="propType.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sup.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="supConsts.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="treelist.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ui.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ldasm\ldasm.h">
+      <Filter>ldasm</Filter>
+    </ClInclude>
+    <ClInclude Include="minirtl\minirtl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="minirtl\rtltypes.h">
+      <Filter>minirtl</Filter>
+    </ClInclude>
+    <ClInclude Include="extrasSSDT.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="testunit.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="propTypeConsts.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="rsrc\100.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\101.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\102.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\103.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\104.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\105.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\106.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\107.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\108.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\109.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\110.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\111.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\112.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\113.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\114.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\115.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\116.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\117.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\118.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\119.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\120.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\121.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\122.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\123.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\124.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\125.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\126.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\127.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\128.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\129.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\130.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\131.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\132.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\133.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\134.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\6001.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\6002.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\135.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\136.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\137.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\138.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\139.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\pipe.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\140.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\141.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\142.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\143.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\144.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\145.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\146.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\147.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\148.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\149.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsrc\Bitmap_125.bmp">
+      <Filter>Resource Files</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="rsrc\kldbgdrv.sys">
+      <Filter>Resource Files</Filter>
+    </None>
+  </ItemGroup>
+</Project>

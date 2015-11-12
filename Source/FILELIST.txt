@@ -9,6 +9,9 @@ excepth.h
 extras.c - extras menu handler
 extras.h
 
+extrasSSDT.c - KiServiceTable list
+extrasSSDT.h
+
 extrasPipes.c - Pipes dialog
 extrasPipes.h
 
@@ -67,6 +70,9 @@ propTypeConsts.h - known object access rights converted to strings listed here
 sup.c - support api set and !!!!string array of known objects
 sup.h - !!!!object type indexes here
 supConsts.h
+
+testunit.c - all objects test code here
+testunit.h
 
 treelist.c - systreeview32 combined with sysheader32 control
 treelist.h

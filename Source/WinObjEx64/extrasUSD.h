@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASUSD.H
 *
-*  VERSION:     1.30
+*  VERSION:     1.32
 *
-*  DATE:        03 Aug 2015
+*  DATE:        12 Nov 2015
 *
 *  Common header file for Extras User Shared Data dialog.
 *
@@ -16,6 +16,7 @@
 * PARTICULAR PURPOSE.
 *
 *******************************************************************************/
+#pragma once
 
 static LPWSTR T_PROCESSOR_FEATURES[] = {
 	L"PF_FLOATING_POINT_PRECISION_ERRATA",

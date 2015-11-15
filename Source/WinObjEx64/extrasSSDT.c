@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     1.31
+*  VERSION:     1.32
 *
-*  DATE:        12 Nov 2015
+*  DATE:        14 Nov 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -361,10 +361,8 @@ VOID SdtListTable(
 	PUTable                 Dump = NULL;
 	PRTL_PROCESS_MODULES    pModules = NULL;
 	PVOID                   Module = NULL; 
-	PIMAGE_DOS_HEADER       dosh; 
-	PIMAGE_FILE_HEADER      fileh;
-	PIMAGE_OPTIONAL_HEADER  popth;
-	PIMAGE_EXPORT_DIRECTORY pexp;
+	PIMAGE_EXPORT_DIRECTORY pexp = NULL;
+	PIMAGE_NT_HEADERS       NtHeaders = NULL;
 	DWORD                   ETableVA;
 	PDWORD                  names, functions;
 	PWORD                   ordinals;
@@ -387,7 +385,12 @@ VOID SdtListTable(
 			//if table empty, dump and prepare table
 			if (g_SdtTable == NULL) {
 
-				Module = LoadLibraryEx(TEXT("ntdll.dll"), 0, DONT_RESOLVE_DLL_REFERENCES);
+				if (g_NtdllModule == NULL) {
+					Module = GetModuleHandle(TEXT("ntdll.dll"));
+				} else {
+					Module = g_NtdllModule;
+				}
+
 				if (Module == NULL)
 					break;
 
@@ -400,14 +403,15 @@ VOID SdtListTable(
 				if (!supDumpSyscallTableConverted(&g_kdctx, &Dump))
 					break;
 
-				dosh = (PIMAGE_DOS_HEADER)Module;
-				fileh = (PIMAGE_FILE_HEADER)((PBYTE)dosh + sizeof(DWORD) + dosh->e_lfanew);
-				popth = (PIMAGE_OPTIONAL_HEADER)((PBYTE)fileh + sizeof(IMAGE_FILE_HEADER));
-				ETableVA = popth->DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
-				pexp = (PIMAGE_EXPORT_DIRECTORY)((PBYTE)dosh + ETableVA);
-				names = (PDWORD)((PBYTE)dosh + pexp->AddressOfNames), 
-				functions = (PDWORD)((PBYTE)dosh + pexp->AddressOfFunctions);
-				ordinals = (PWORD)((PBYTE)dosh + pexp->AddressOfNameOrdinals);
+				NtHeaders = RtlImageNtHeader(Module);
+				if (NtHeaders == NULL)
+					break;
+
+				ETableVA = NtHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
+				pexp = (PIMAGE_EXPORT_DIRECTORY)((PBYTE)Module + ETableVA);
+				names = (PDWORD)((PBYTE)Module + pexp->AddressOfNames),
+				functions = (PDWORD)((PBYTE)Module + pexp->AddressOfFunctions);
+				ordinals = (PWORD)((PBYTE)Module + pexp->AddressOfNameOrdinals);
 
 				//walk for Nt stubs
 				g_cSdtTable = 0;
@@ -517,6 +521,8 @@ VOID extrasCreateSSDTDialog(
 	if (g_wobjDialogs[WOBJ_SSDTDLG_IDX]) {
 		if (IsIconic(g_wobjDialogs[WOBJ_SSDTDLG_IDX]))
 			ShowWindow(g_wobjDialogs[WOBJ_SSDTDLG_IDX], SW_RESTORE);
+		else
+			SetActiveWindow(g_wobjDialogs[WOBJ_SSDTDLG_IDX]);
 		return;
 	}
 

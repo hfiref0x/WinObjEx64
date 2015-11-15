@@ -4,9 +4,9 @@
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.31
+*  VERSION:     1.32
 *
-*  DATE:        11 Nov 2015
+*  DATE:        12 Nov 2015
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -34,6 +34,7 @@
 #include <ntstatus.h>
 #include "ntos.h"
 #include "kldbg.h"
+#include "ldr\ldr.h"
 #include "ui.h"
 #include "sup.h"
 #include "supConsts.h"

@@ -205,6 +205,7 @@
     <ClCompile Include="instdrv.c" />
     <ClCompile Include="kldbg.c" />
     <ClCompile Include="ldasm\ldasm.c" />
+    <ClCompile Include="ldr\ldr.c" />
     <ClCompile Include="list.c" />
     <ClCompile Include="main.c" />
     <ClCompile Include="minirtl\hextou64.c" />
@@ -258,6 +259,7 @@
     <ClInclude Include="instdrv.h" />
     <ClInclude Include="kldbg.h" />
     <ClInclude Include="ldasm\ldasm.h" />
+    <ClInclude Include="ldr\ldr.h" />
     <ClInclude Include="list.h" />
     <ClInclude Include="minirtl\minirtl.h" />
     <ClInclude Include="minirtl\rtltypes.h" />

@@ -527,11 +527,11 @@ PVOID supGetSystemInfo(
 		if (status == STATUS_INFO_LENGTH_MISMATCH) {
 			HeapFree(GetProcessHeap(), 0, Buffer);
 			Size *= 2;
-		}
-		c++;
-		if (c > 100) {
-			status = STATUS_SECRET_TOO_LONG;
-			break;
+			c++;
+			if (c > 100) {
+				status = STATUS_SECRET_TOO_LONG;
+				break;
+			}
 		}
 	} while (status == STATUS_INFO_LENGTH_MISMATCH);
 
@@ -1121,6 +1121,61 @@ BOOL supQueryKnownDllsLink(
 }
 
 /*
+* supMapNtdllCopy
+*
+* Purpose:
+*
+* Load copy of ntdll from disk.
+*
+*/
+VOID supMapNtdllCopy(
+	VOID
+	)
+{
+	BOOL cond = FALSE;
+	HANDLE hFile = INVALID_HANDLE_VALUE, hFileMapping = NULL;
+	PVOID ImagePtr = NULL;
+	WCHAR szDllPath[MAX_PATH + 20];
+
+	do {
+		
+		RtlSecureZeroMemory(szDllPath, sizeof(szDllPath));
+		if (GetSystemDirectory(szDllPath, MAX_PATH) == 0)
+			break;
+
+		_strcat(szDllPath, TEXT("\\ntdll.dll"));
+
+		hFile = CreateFile(szDllPath, GENERIC_READ,
+			FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
+			OPEN_EXISTING, 0, NULL);
+		
+		if (hFile == INVALID_HANDLE_VALUE)
+			break;
+
+		hFileMapping = CreateFileMapping(hFile, NULL, PAGE_READONLY, 0, 0, NULL);
+		if (hFileMapping == NULL)
+			break;
+
+		ImagePtr = MapViewOfFile(hFileMapping, FILE_MAP_READ, 0, 0, 0);
+		if (ImagePtr == NULL)
+			break;
+
+		g_NtdllModule = peldrLoadImage(ImagePtr, NULL);
+
+		CloseHandle(hFile);
+		hFile = INVALID_HANDLE_VALUE;
+
+	} while (cond);
+
+	if (hFile != INVALID_HANDLE_VALUE) 
+		CloseHandle(hFile);
+
+	if (hFileMapping != NULL)
+		CloseHandle(hFileMapping);
+
+}
+
+/*
 * supInit
 *
 * Purpose:
@@ -1141,6 +1196,7 @@ VOID supInit(
 
 	if (IsFullAdmin != FALSE) {
 		g_enumParams.scmSnapshot = supCreateSCMSnapshot(&g_enumParams.scmNumberOfEntries);
+		supMapNtdllCopy();
 	}
 
 	g_enumParams.sapiDB = sapiCreateSetupDBSnapshot();
@@ -1177,7 +1233,9 @@ VOID supShutdown(
 	if (g_lpKnownDlls64) HeapFree(GetProcessHeap(), 0, g_lpKnownDlls64);
 
 	if (g_SdtTable) HeapFree(GetProcessHeap(), 0, g_SdtTable);
-	if (g_NtdllModule) FreeLibrary(g_NtdllModule);
+	if (g_NtdllModule) {
+		VirtualFree(g_NtdllModule, 0, MEM_RELEASE);
+	}
 }
 
 /*

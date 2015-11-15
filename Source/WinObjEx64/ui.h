@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.31
 *
-*  DATE:        11 Nov 2015
+*  DATE:        12 Nov 2015
 *
 *  Common header file for the user interface.
 *
@@ -33,7 +33,7 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 	_In_ DWORD_PTR dwData
 	);
 
-#define PROGRAM_VERSION            L"1.3.1"
+#define PROGRAM_VERSION            L"1.3.2"
 #define PROGRAM_NAME               L"Windows Object Explorer 64-bit"
 #define PROFRAM_NAME_AND_TITLE     L"Object Explorer for Windows 7/8/8.1/10"
 #define MAINWINDOWCLASSNAME        L"WinObjEx64Class"

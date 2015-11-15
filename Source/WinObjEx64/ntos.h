@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.23
+*  VERSION:     1.24
 *
-*  DATE:        12 Nov 2015
+*  DATE:        13 Nov 2015
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -3661,6 +3661,10 @@ NTSTATUS NTAPI RtlDecompressBuffer(
 	_In_ PUCHAR CompressedBuffer,
 	_In_ ULONG CompressedBufferSize,
 	_Out_ PULONG FinalUncompressedSize
+	);
+
+PIMAGE_NT_HEADERS NTAPI RtlImageNtHeader(
+	IN PVOID Base
 	);
 
 ULONG DbgPrint(

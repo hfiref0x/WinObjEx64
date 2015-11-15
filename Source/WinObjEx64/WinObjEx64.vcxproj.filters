@@ -19,6 +19,9 @@
     <Filter Include="minirtl">
       <UniqueIdentifier>{1f87af63-dc0b-4a32-88ee-e9e15a1041c8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="ldr">
+      <UniqueIdentifier>{26b58504-6440-41a5-9f49-307f33ed8630}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="aboutDlg.c">
@@ -162,6 +165,9 @@
     <ClCompile Include="testunit.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ldr\ldr.c">
+      <Filter>ldr</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc">
@@ -273,6 +279,9 @@
     </ClInclude>
     <ClInclude Include="propTypeConsts.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ldr\ldr.h">
+      <Filter>ldr</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

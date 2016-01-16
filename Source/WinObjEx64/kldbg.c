@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.31
+*  VERSION:     1.33
 *
-*  DATE:        09 Nov 2015 
+*  DATE:        18 Nov 2015 
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -334,14 +334,14 @@ PVOID ObFindObpPrivateNamespaceLookupTable(
 }
 
 /*
-* kdFindKiSystemTable
+* kdFindKiServiceTable
 *
 * Purpose:
 *
 * Find system service table pointer from ntoskrnl image.
 *
 */
-VOID kdFindKiSystemTable(
+VOID kdFindKiServiceTable(
 	_In_ ULONG_PTR MappedImageBase,
 	_In_ ULONG MappedImageSize,
 	_In_ ULONG_PTR KernelImageBase,
@@ -1525,8 +1525,8 @@ VOID pkdQuerySystemInformation(
 		//find namespace table
 		Context->ObpPrivateNamespaceLookupTable = ObFindObpPrivateNamespaceLookupTable(Context, (ULONG_PTR)MappedKernel, ModuleSize, KernelBase);
 
-		//find KiSystemTable
-		kdFindKiSystemTable((ULONG_PTR)MappedKernel, ModuleSize, KernelBase, &Context->KiServiceTableAddress, &Context->KiServiceLimit);
+		//find KiServiceTable
+		kdFindKiServiceTable((ULONG_PTR)MappedKernel, ModuleSize, KernelBase, &Context->KiServiceTableAddress, &Context->KiServiceLimit);
 
 
 #ifdef _DEBUG

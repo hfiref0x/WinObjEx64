@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.31
+*  VERSION:     1.33
 *
-*  DATE:        11 Nov 2015
+*  DATE:        18 Nov 2015
 *
 *  Common header file for the Kernel Debugger Driver support.
 *

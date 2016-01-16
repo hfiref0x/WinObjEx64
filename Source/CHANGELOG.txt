@@ -1,21 +1,17 @@
-v 1.3.1
+v 1.3.3
 kiservicetable dump for all supported Windows versions
 some code revision and corrections
 
 v 1.3.0
 official support for Windows 10
-private namespeaces (menu -> extras)
-
+private namespaces (menu -> extras)
 
 v 1.2.0
-
 added KUSER_SHARED_DATA dump (menu -> extras)
 code revision and corrections
 ported to msvc 2015
 
-
 v 1.1.0
-
 added popup menu for Process page 
 added file properties dialog for Process page 
 added descriptions for more object types 

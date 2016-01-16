@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPN.C
 *
-*  VERSION:     1.31
+*  VERSION:     1.33
 *
-*  DATE:        11 Nov 2015
+*  DATE:        01 Dec 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -22,8 +22,8 @@
 
 EXTRASCONTEXT PnDlgContext;
 
-#define T_NAMESPACEID          TEXT("Ns%lu")
-#define T_NAMESPACEOBJECTCNT   TEXT("Total Object(s): %lu")
+#define T_NAMESPACEID          TEXT("Ns%I64x")
+#define T_NAMESPACEOBJECTCNT   TEXT("Total Object(s): %ld")
 #define T_NAMESPACEQUERYFAILED TEXT("Unable to list namespaces! Make sure you run this program as Admin and Windows is in a DEBUG mode.")
 
 /*
@@ -88,7 +88,7 @@ BOOL PNDlgQueryInfo(
 	LPCWSTR       TypeName;
 	WCHAR         szBuffer[MAX_PATH + 1];
 
-
+	RtlSecureZeroMemory(&PrivateObjectList, sizeof(LIST_ENTRY));
 	bResult = ObListCreate(&PrivateObjectList, TRUE);
 	if (bResult == FALSE) {
 		return bResult;

@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     1.32
+*  VERSION:     1.33
 *
-*  DATE:        14 Nov 2015
+*  DATE:        01 Dec 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -374,10 +374,9 @@ VOID SdtListTable(
 	ULONG number, i;
 	INT index;
 
-	do {
+	__try {
 
-		__try {
-
+		do {
 			pModules = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation);
 			if (pModules == NULL)
 				break;
@@ -387,7 +386,8 @@ VOID SdtListTable(
 
 				if (g_NtdllModule == NULL) {
 					Module = GetModuleHandle(TEXT("ntdll.dll"));
-				} else {
+				}
+				else {
 					Module = g_NtdllModule;
 				}
 
@@ -410,7 +410,7 @@ VOID SdtListTable(
 				ETableVA = NtHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
 				pexp = (PIMAGE_EXPORT_DIRECTORY)((PBYTE)Module + ETableVA);
 				names = (PDWORD)((PBYTE)Module + pexp->AddressOfNames),
-				functions = (PDWORD)((PBYTE)Module + pexp->AddressOfFunctions);
+					functions = (PDWORD)((PBYTE)Module + pexp->AddressOfFunctions);
 				ordinals = (PWORD)((PBYTE)Module + pexp->AddressOfNameOrdinals);
 
 				//walk for Nt stubs
@@ -425,7 +425,7 @@ VOID SdtListTable(
 						number = *(ULONG*)((UCHAR*)addr + 4);
 
 						if (number < g_kdctx.KiServiceLimit) {
-							MultiByteToWideChar(CP_ACP, 0, name, (INT)_strlen_a(name), 
+							MultiByteToWideChar(CP_ACP, 0, name, (INT)_strlen_a(name),
 								g_SdtTable[g_cSdtTable].Name, MAX_PATH);
 
 							g_SdtTable[g_cSdtTable].ServiceId = number;
@@ -435,11 +435,12 @@ VOID SdtListTable(
 					}//tN
 				}//for
 				HeapFree(GetProcessHeap(), 0, Dump);
+				Dump = NULL;
 			}
 
 			//list table
 			for (i = 0; i < g_cSdtTable; i++) {
-				
+
 				//ServiceId
 				RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
 				lvitem.mask = LVIF_TEXT | LVIF_IMAGE;
@@ -447,7 +448,7 @@ VOID SdtListTable(
 				lvitem.iItem = MAXINT;
 				lvitem.iImage = 0;
 				RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-				wsprintf(szBuffer, L"%d",g_SdtTable[i].ServiceId);
+				wsprintf(szBuffer, L"%d", g_SdtTable[i].ServiceId);
 				lvitem.pszText = szBuffer;
 				index = ListView_InsertItem(SdtDlgContext.ListView, &lvitem);
 
@@ -462,7 +463,7 @@ VOID SdtListTable(
 				lvitem.mask = LVIF_TEXT;
 				lvitem.iSubItem = 2;
 				RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-				wsprintf(szBuffer, L"0x%p", g_SdtTable[i].Address);
+				wsprintf(szBuffer, L"0x%p", (PVOID)g_SdtTable[i].Address);
 				lvitem.pszText = szBuffer;
 				lvitem.iItem = index;
 				ListView_SetItem(SdtDlgContext.ListView, &lvitem);
@@ -471,7 +472,7 @@ VOID SdtListTable(
 				lvitem.mask = LVIF_TEXT;
 				lvitem.iSubItem = 3;
 				RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-				
+
 				number = supFindModuleEntryByAddress(pModules, (PVOID)g_SdtTable[i].Address);
 				if (number == (ULONG)-1) {
 					_strcpy(szBuffer, TEXT("Unknown Module"));
@@ -484,21 +485,25 @@ VOID SdtListTable(
 						szBuffer,
 						MAX_PATH);
 				}
-				
+
 				lvitem.pszText = szBuffer;
 				lvitem.iItem = index;
 				ListView_SetItem(SdtDlgContext.ListView, &lvitem);
 			}
 
-		}
-		__except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
-			return;
-		}
+		} while (cond);
+	}
 
-	} while (cond);
-	
+	__except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
+		return;
+	}
+
 	if (pModules) {
 		HeapFree(GetProcessHeap(), 0, pModules);
+	}
+
+	if (Dump) {
+		HeapFree(GetProcessHeap(), 0, Dump);
 	}
 }
 

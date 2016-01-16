@@ -4,9 +4,9 @@
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     1.31
+*  VERSION:     1.33
 *
-*  DATE:        10 Nov 2015
+*  DATE:        01 Dec 2015
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -119,8 +119,8 @@ VOID AboutDialogInit(
 #if (_MSC_VER == 1900) //2015
 #if (_MSC_FULL_VER == 190023026) //2015 RTM
 	_strcpy(buf, L"MSVC 2015");
-#elif (_MSC_FULL_VER == 190023419) // 2015 Update 1 RC
-	_strcpy(buf, L"MSVC 2015 Update 1 RC");
+#elif (_MSC_FULL_VER == 190023506) // 2015 Update 1
+	_strcpy(buf, L"MSVC 2015 Update 1");
 #endif
 #else
 #if (_MSC_VER == 1800) //2013

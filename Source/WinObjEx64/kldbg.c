@@ -17,11 +17,7 @@
 *
 *******************************************************************************/
 #include "global.h"
-#include <Shlwapi.h>
 #include "ldasm\ldasm.h"
-
-//include for PathFileExists API
-#pragma comment(lib, "shlwapi.lib")
 
 //number of buckets in the object directory
 #define NUMBEROFBUCKETS 0x25
@@ -1639,10 +1635,6 @@ VOID kdInit(
 				}
 				// load service driver and open handle for it
 				g_kdctx.IsOurLoad = scmLoadDeviceDriver(KLDBGDRV, szDrvPath, &g_kdctx.hDevice);
-				if (g_kdctx.IsOurLoad) {
-					// driver file is no longer needed
-					DeleteFile(szDrvPath);
-				}
 			}
 		}
 	}
@@ -1669,6 +1661,8 @@ VOID kdShutdown(
 	VOID
 	)
 {
+	WCHAR szDrvPath[MAX_PATH + 1];
+
 	DeleteCriticalSection(&g_kdctx.ListLock);
 
 	if (g_kdctx.hDevice == NULL)
@@ -1690,5 +1684,10 @@ VOID kdShutdown(
 	// windbg recreates service and drops file everytime when kernel debug starts
 	if (g_kdctx.IsOurLoad) {
 		scmUnloadDeviceDriver(KLDBGDRV);
+		// driver file is no longer needed
+		RtlSecureZeroMemory(&szDrvPath, sizeof(szDrvPath));
+		_strcpy(szDrvPath, L"\\\\?\\globalroot\\systemroot\\system32");
+		_strcat(szDrvPath, KLDBGDRVSYS);	
+		DeleteFile(szDrvPath);
 	}
 }

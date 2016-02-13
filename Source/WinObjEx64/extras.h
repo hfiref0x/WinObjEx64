@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       EXTRAS.H
 *
-*  VERSION:     1.31
+*  VERSION:     1.40
 *
-*  DATE:        11 Nov 2015
+*  DATE:        13 Feb 2016
 *
 *  Common header file for Extras dialogs.
 *
@@ -27,6 +27,26 @@ typedef struct _EXTRASCONTEXT {
 	BOOL bInverseSort;
 } EXTRASCONTEXT, *PEXTRASCONTEXT;
 
+typedef INT(CALLBACK *DlgCompareFunction)(
+	_In_ LPARAM lParam1,
+	_In_ LPARAM lParam2,
+	_In_ LPARAM lParamSort
+	);
+
+VOID extrasDlgHandleNotify(
+	_In_ LPNMLISTVIEW nhdr,
+	_In_ EXTRASCONTEXT *Context,
+	_In_ DlgCompareFunction CompareFunc
+	);
+
+VOID extrasSimpleListResize(
+	_In_ HWND hwndDlg
+	);
+
+VOID extrasSetDlgIcon(
+	_In_ HWND hwndDlg
+	);
+
 VOID extrasShowPipeDialog(
 	_In_ HWND hwndParent
 	);
@@ -40,5 +60,9 @@ VOID extrasShowPrivateNamespacesDialog(
 	);
 
 VOID extrasShowSSDTDialog(
+	_In_ HWND hwndParent
+	);
+
+VOID extrasShowDriversDialog(
 	_In_ HWND hwndParent
 	);

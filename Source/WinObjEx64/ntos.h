@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.29
+*  VERSION:     1.35
 *
-*  DATE:        15 Jan 2016
+*  DATE:        12 Feb 2016
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -108,6 +108,13 @@
 #define ZwCurrentThread()	 NtCurrentThread()
 
 //
+// Define special ByteOffset parameters for read and write operations
+//
+
+#define FILE_WRITE_TO_END_OF_FILE       0xffffffff
+#define FILE_USE_FILE_POINTER_POSITION  0xfffffffe
+
+//
 // This is the maximum MaximumLength for a UNICODE_STRING.
 //
 
@@ -191,6 +198,36 @@ typedef struct _SEMAPHORE_BASIC_INFORMATION {
 */
 
 /*
+** FileCache and MemoryList START
+*/
+
+typedef enum _SYSTEM_MEMORY_LIST_COMMAND {
+	MemoryCaptureAccessedBits,
+	MemoryCaptureAndResetAccessedBits,
+	MemoryEmptyWorkingSets,
+	MemoryFlushModifiedList,
+	MemoryPurgeStandbyList,
+	MemoryPurgeLowPriorityStandbyList,
+	MemoryCommandMax
+} SYSTEM_MEMORY_LIST_COMMAND;
+
+typedef struct _SYSTEM_FILECACHE_INFORMATION {
+	SIZE_T CurrentSize;
+	SIZE_T PeakSize;
+	ULONG PageFaultCount;
+	SIZE_T MinimumWorkingSet;
+	SIZE_T MaximumWorkingSet;
+	SIZE_T CurrentSizeIncludingTransitionInPages;
+	SIZE_T PeakSizeIncludingTransitionInPages;
+	ULONG TransitionRePurposeCount;
+	ULONG Flags;
+} SYSTEM_FILECACHE_INFORMATION, *PSYSTEM_FILECACHE_INFORMATION;
+
+/*
+** FileCache and MemoryList END
+*/
+
+/*
 ** Processes START
 */
 
@@ -250,6 +287,11 @@ typedef enum _KWAIT_REASON {
 	MaximumWaitReason
 } KWAIT_REASON;
 
+typedef VOID KSTART_ROUTINE(
+	_In_ PVOID StartContext
+	);
+typedef KSTART_ROUTINE *PKSTART_ROUTINE;
+
 typedef struct _CLIENT_ID {
 	HANDLE UniqueProcess;
 	HANDLE UniqueThread;
@@ -304,6 +346,26 @@ typedef struct _SYSTEM_PROCESSES_INFORMATION {
 	IO_COUNTERS IoCounters;
 	SYSTEM_THREAD_INFORMATION Threads[1];
 } SYSTEM_PROCESSES_INFORMATION, *PSYSTEM_PROCESSES_INFORMATION;
+
+#if defined(_WIN64)
+typedef ULONG SYSINF_PAGE_COUNT;
+#else
+typedef SIZE_T SYSINF_PAGE_COUNT;
+#endif
+
+typedef struct _SYSTEM_BASIC_INFORMATION {
+	ULONG Reserved;
+	ULONG TimerResolution;
+	ULONG PageSize;
+	SYSINF_PAGE_COUNT NumberOfPhysicalPages;
+	SYSINF_PAGE_COUNT LowestPhysicalPageNumber;
+	SYSINF_PAGE_COUNT HighestPhysicalPageNumber;
+	ULONG AllocationGranularity;
+	ULONG_PTR MinimumUserModeAddress;
+	ULONG_PTR MaximumUserModeAddress;
+	ULONG_PTR ActiveProcessorsAffinityMask;
+	CCHAR NumberOfProcessors;
+} SYSTEM_BASIC_INFORMATION, *PSYSTEM_BASIC_INFORMATION;
 
 typedef enum _PROCESSINFOCLASS {
 	ProcessBasicInformation = 0,
@@ -3505,9 +3567,9 @@ VOID(NTAPI *PLDR_LOADED_MODULE_ENUMERATION_CALLBACK_FUNCTION)(
 	);
 
 NTSTATUS NTAPI LdrEnumerateLoadedModules(
-	_In_ ULONG Flags,
-	_In_ PLDR_LOADED_MODULE_ENUMERATION_CALLBACK_FUNCTION CallbackFunction,
-	_In_ PVOID Context
+	_In_opt_ ULONG Flags,
+	_In_     PLDR_LOADED_MODULE_ENUMERATION_CALLBACK_FUNCTION CallbackFunction,
+	_In_opt_ PVOID Context
 	);
 
 NTSTATUS NTAPI LdrGetProcedureAddress(
@@ -3572,6 +3634,10 @@ ULONG NTAPI CsrGetProcessId(
 /*
 ** Runtime Library API START
 */
+
+ULONG NTAPI RtlRandomEx(
+	_Inout_ PULONG Seed
+	);
 
 PVOID NTAPI RtlAddVectoredExceptionHandler(
 	_In_ ULONG First,
@@ -3668,6 +3734,40 @@ NTSTATUS NTAPI RtlExpandEnvironmentStrings_U(
 
 VOID NTAPI RtlSetLastWin32Error(
 	LONG Win32Error
+	);
+
+typedef NTSTATUS
+(NTAPI * PRTL_HEAP_COMMIT_ROUTINE)(
+	IN PVOID Base,
+	IN OUT PVOID *CommitAddress,
+	IN OUT PSIZE_T CommitSize
+	);
+
+typedef struct _RTL_HEAP_PARAMETERS {
+	ULONG Length;
+	SIZE_T SegmentReserve;
+	SIZE_T SegmentCommit;
+	SIZE_T DeCommitFreeBlockThreshold;
+	SIZE_T DeCommitTotalFreeThreshold;
+	SIZE_T MaximumAllocationSize;
+	SIZE_T VirtualMemoryThreshold;
+	SIZE_T InitialCommit;
+	SIZE_T InitialReserve;
+	PRTL_HEAP_COMMIT_ROUTINE CommitRoutine;
+	SIZE_T Reserved[2];
+} RTL_HEAP_PARAMETERS, *PRTL_HEAP_PARAMETERS;
+
+PVOID NTAPI RtlCreateHeap(
+	_In_ ULONG Flags,
+	_In_opt_ PVOID HeapBase,
+	_In_opt_ SIZE_T ReserveSize,
+	_In_opt_ SIZE_T CommitSize,
+	_In_opt_ PVOID Lock,
+	_In_opt_ PRTL_HEAP_PARAMETERS Parameters 
+	);
+
+PVOID NTAPI RtlDestroyHeap(
+	_In_ PVOID HeapHandle
 	);
 
 PVOID NTAPI RtlAllocateHeap(
@@ -3923,6 +4023,211 @@ ULONG DbgPrint(
 /*
 ** Runtime Library API END
 */
+
+/*
+** Generic AVL API START
+*/
+typedef ULONG CLONG;
+
+typedef enum _TABLE_SEARCH_RESULT {
+	TableEmptyTree,
+	TableFoundNode,
+	TableInsertAsLeft,
+	TableInsertAsRight
+} TABLE_SEARCH_RESULT;
+
+typedef enum _RTL_GENERIC_COMPARE_RESULTS {
+	GenericLessThan,
+	GenericGreaterThan,
+	GenericEqual
+} RTL_GENERIC_COMPARE_RESULTS;
+
+typedef struct _RTL_AVL_TABLE RTL_AVL_TABLE;
+typedef struct PRTL_AVL_TABLE *_RTL_AVL_TABLE;
+
+typedef RTL_GENERIC_COMPARE_RESULTS(NTAPI *PRTL_AVL_COMPARE_ROUTINE)(
+	_In_  _RTL_AVL_TABLE *Table,
+	_In_ PVOID FirstStruct,
+	_In_ PVOID SecondStruct
+	);
+
+typedef PVOID(NTAPI *PRTL_AVL_ALLOCATE_ROUTINE)(
+	_In_ _RTL_AVL_TABLE *Table,
+	_In_ ULONG ByteSize
+	);
+
+typedef VOID(NTAPI *PRTL_AVL_FREE_ROUTINE)(
+	_In_  _RTL_AVL_TABLE *Table,
+	_In_ _Post_invalid_ PVOID Buffer
+	);
+
+typedef NTSTATUS(NTAPI *PRTL_AVL_MATCH_FUNCTION)(
+	_In_  _RTL_AVL_TABLE *Table,
+	_In_ PVOID UserData,
+	_In_ PVOID MatchData
+	);
+
+typedef struct _RTL_BALANCED_LINKS {
+	struct _RTL_BALANCED_LINKS *Parent;
+	struct _RTL_BALANCED_LINKS *LeftChild;
+	struct _RTL_BALANCED_LINKS *RightChild;
+	CHAR Balance;
+	UCHAR Reserved[3];
+} RTL_BALANCED_LINKS, *PRTL_BALANCED_LINKS;
+
+typedef struct _RTL_AVL_TABLE {
+	RTL_BALANCED_LINKS BalancedRoot;
+	PVOID OrderedPointer;
+	ULONG WhichOrderedElement;
+	ULONG NumberGenericTableElements;
+	ULONG DepthOfTree;
+	PRTL_BALANCED_LINKS RestartKey;
+	ULONG DeleteCount;
+	PRTL_AVL_COMPARE_ROUTINE CompareRoutine;
+	PRTL_AVL_ALLOCATE_ROUTINE AllocateRoutine;
+	PRTL_AVL_FREE_ROUTINE FreeRoutine;
+	PVOID TableContext;
+} RTL_AVL_TABLE, *PRTL_AVL_TABLE;
+
+VOID NTAPI RtlInitializeGenericTableAvl(
+	_Out_ PRTL_AVL_TABLE Table,
+	_In_ PRTL_AVL_COMPARE_ROUTINE CompareRoutine,
+	_In_ PRTL_AVL_ALLOCATE_ROUTINE AllocateRoutine,
+	_In_ PRTL_AVL_FREE_ROUTINE FreeRoutine,
+	_In_opt_ PVOID TableContext
+	);
+
+PVOID NTAPI RtlInsertElementGenericTableAvl(
+	_In_ PRTL_AVL_TABLE Table,
+	_In_reads_bytes_(BufferSize) PVOID Buffer,
+	_In_ CLONG BufferSize,
+	_Out_opt_ PBOOLEAN NewElement
+	);
+
+PVOID NTAPI RtlInsertElementGenericTableFullAvl(
+	_In_ PRTL_AVL_TABLE Table,
+	_In_reads_bytes_(BufferSize) PVOID Buffer,
+	_In_ CLONG BufferSize,
+	_Out_opt_ PBOOLEAN NewElement,
+	_In_ PVOID NodeOrParent,
+	_In_ TABLE_SEARCH_RESULT SearchResult
+	);
+
+BOOLEAN NTAPI RtlDeleteElementGenericTableAvl(
+	_In_ PRTL_AVL_TABLE Table,
+	_In_ PVOID Buffer
+	);
+
+PVOID NTAPI RtlLookupElementGenericTableAvl(
+	_In_ PRTL_AVL_TABLE Table,
+	_In_ PVOID Buffer
+	);
+
+PVOID NTAPI RtlLookupElementGenericTableFullAvl(
+	_In_ PRTL_AVL_TABLE Table,
+	_In_ PVOID Buffer,
+	_Out_ PVOID *NodeOrParent,
+	_Out_ TABLE_SEARCH_RESULT *SearchResult
+	);
+
+PVOID NTAPI RtlEnumerateGenericTableAvl(
+	_In_ PRTL_AVL_TABLE Table,
+	_In_ BOOLEAN Restart
+	);
+
+PVOID NTAPI RtlEnumerateGenericTableWithoutSplayingAvl(
+	_In_ PRTL_AVL_TABLE Table,
+	_Inout_ PVOID *RestartKey
+	);
+
+PVOID NTAPI RtlLookupFirstMatchingElementGenericTableAvl(
+	_In_ PRTL_AVL_TABLE Table,
+	_In_ PVOID Buffer,
+	_Out_ PVOID *RestartKey
+	);
+
+PVOID NTAPI RtlEnumerateGenericTableLikeADirectory(
+	_In_ PRTL_AVL_TABLE Table,
+	_In_opt_ PRTL_AVL_MATCH_FUNCTION MatchFunction,
+	_In_opt_ PVOID MatchData,
+	_In_ ULONG NextFlag,
+	_Inout_ PVOID *RestartKey,
+	_Inout_ PULONG DeleteCount,
+	_In_ PVOID Buffer
+	);
+
+PVOID NTAPI RtlGetElementGenericTableAvl(
+	_In_ PRTL_AVL_TABLE Table,
+	_In_ ULONG I
+	);
+
+ULONG NTAPI RtlNumberGenericTableElementsAvl(
+	_In_ PRTL_AVL_TABLE Table
+	);
+
+BOOLEAN NTAPI RtlIsGenericTableEmptyAvl(
+	_In_ PRTL_AVL_TABLE Table
+	);
+
+/*
+** Generic Avl END
+*/
+
+/*
+** Critical Section START
+*/
+#define LOGICAL ULONG
+
+NTSTATUS NTAPI RtlEnterCriticalSection(
+	PRTL_CRITICAL_SECTION CriticalSection
+	);
+
+NTSTATUS NTAPI RtlLeaveCriticalSection(
+	PRTL_CRITICAL_SECTION CriticalSection
+	);
+
+LOGICAL NTAPI RtlIsCriticalSectionLocked(
+	IN PRTL_CRITICAL_SECTION CriticalSection
+	);
+
+LOGICAL NTAPI RtlIsCriticalSectionLockedByThread(
+	IN PRTL_CRITICAL_SECTION CriticalSection
+	);
+
+ULONG NTAPI RtlGetCriticalSectionRecursionCount(
+	IN PRTL_CRITICAL_SECTION CriticalSection
+	);
+
+LOGICAL NTAPI RtlTryEnterCriticalSection(
+	PRTL_CRITICAL_SECTION CriticalSection
+	);
+
+NTSTATUS NTAPI RtlInitializeCriticalSection(
+	PRTL_CRITICAL_SECTION CriticalSection
+	);
+
+VOID NTAPI RtlEnableEarlyCriticalSectionEventCreation(
+	VOID
+	);
+
+NTSTATUS NTAPI RtlInitializeCriticalSectionAndSpinCount(
+	PRTL_CRITICAL_SECTION CriticalSection,
+	ULONG SpinCount
+	);
+
+ULONG NTAPI RtlSetCriticalSectionSpinCount(
+	PRTL_CRITICAL_SECTION CriticalSection,
+	ULONG SpinCount
+	);
+
+NTSTATUS NTAPI RtlDeleteCriticalSection(
+	PRTL_CRITICAL_SECTION CriticalSection
+	);
+
+/*
+** Critical Section END
+*/
+
 
 /*
 ** Loader API START

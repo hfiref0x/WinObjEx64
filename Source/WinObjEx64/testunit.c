@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     1.31
+*  VERSION:     1.40
 *
-*  DATE:        11 Nov 2015
+*  DATE:        13 Feb 2016
 *
 *  Test code used while debug.
 *
@@ -47,7 +47,9 @@ VOID TestTimer(
 	liDueTime.QuadPart = -1000000000000LL;
 
 	hTimer = CreateWaitableTimer(NULL, TRUE, L"TestTimer");
-	SetWaitableTimer(hTimer, &liDueTime, 0, NULL, NULL, 0);
+	if (hTimer) {
+		SetWaitableTimer(hTimer, &liDueTime, 0, NULL, NULL, 0);
+	}
 }
 
 VOID TestTransaction(

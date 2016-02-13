@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     1.33
+*  VERSION:     1.40
 *
-*  DATE:        01 Dec 2015
+*  DATE:        13 Feb 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -23,31 +23,6 @@ EXTRASCONTEXT SdtDlgContext;
 PSERVICETABLEENTRY g_SdtTable;
 ULONG g_cSdtTable;
 PVOID g_NtdllModule;
-
-/*
-* SdtResize
-*
-* Purpose:
-*
-* Dialog resize handler.
-*
-*/
-VOID SdtResize(
-	HWND hwndDlg
-	)
-{
-	RECT r1;
-	HWND hwnd;
-	RtlSecureZeroMemory(&r1, sizeof(r1));
-
-	hwnd = GetDlgItem(hwndDlg, ID_EXTRASLIST);
-	GetClientRect(hwndDlg, &r1);
-
-	SetWindowPos(hwnd, 0, 0, 0,
-		r1.right - 16,
-		r1.bottom - 16,
-		SWP_NOMOVE | SWP_NOZORDER);
-}
 
 /*
 * SdtDlgCompareFunc
@@ -123,9 +98,6 @@ INT CALLBACK SdtDlgCompareFunc(
 		break;
 	}
 
-
-
-
 Done:
 	if (lpItem1) {
 		HeapFree(GetProcessHeap(), 0, lpItem1);
@@ -134,56 +106,6 @@ Done:
 		HeapFree(GetProcessHeap(), 0, lpItem2);
 	}
 	return nResult;
-}
-
-/*
-* SdtDlgHandleNotify
-*
-* Purpose:
-*
-* WM_NOTIFY processing for SdtDlg listview.
-*
-*/
-VOID SdtDlgHandleNotify(
-	LPNMLISTVIEW	nhdr
-	)
-{
-	LVCOLUMNW		col;
-	INT				c, k;
-
-	if (nhdr == NULL)
-		return;
-
-	if (nhdr->hdr.idFrom != ID_EXTRASLIST)
-		return;
-
-	switch (nhdr->hdr.code) {
-
-	case LVN_COLUMNCLICK:
-
-		SdtDlgContext.bInverseSort = !SdtDlgContext.bInverseSort;
-		SdtDlgContext.lvColumnToSort = ((NMLISTVIEW *)nhdr)->iSubItem;
-		ListView_SortItemsEx(SdtDlgContext.ListView, &SdtDlgCompareFunc, SdtDlgContext.lvColumnToSort);
-
-		RtlSecureZeroMemory(&col, sizeof(col));
-		col.mask = LVCF_IMAGE;
-		col.iImage = -1;
-
-		for (c = 0; c < SdtDlgContext.lvColumnCount; c++)
-			ListView_SetColumn(SdtDlgContext.ListView, c, &col);
-
-		k = ImageList_GetImageCount(ListViewImages);
-		if (SdtDlgContext.bInverseSort)
-			col.iImage = k - 2;
-		else
-			col.iImage = k - 1;
-
-		ListView_SetColumn(SdtDlgContext.ListView, ((NMLISTVIEW *)nhdr)->iSubItem, &col);
-		break;
-
-	default:
-		break;
-	}
 }
 
 /*
@@ -314,11 +236,11 @@ INT_PTR CALLBACK SdtDialogProc(
 		break;
 
 	case WM_NOTIFY:
-		SdtDlgHandleNotify(nhdr);
+		extrasDlgHandleNotify(nhdr, &SdtDlgContext, &SdtDlgCompareFunc);
 		break;
 
 	case WM_SIZE:
-		SdtResize(hwndDlg);
+		extrasSimpleListResize(hwndDlg);
 		break;
 
 	case WM_CLOSE:
@@ -410,7 +332,7 @@ VOID SdtListTable(
 				ETableVA = NtHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
 				pexp = (PIMAGE_EXPORT_DIRECTORY)((PBYTE)Module + ETableVA);
 				names = (PDWORD)((PBYTE)Module + pexp->AddressOfNames),
-					functions = (PDWORD)((PBYTE)Module + pexp->AddressOfFunctions);
+				functions = (PDWORD)((PBYTE)Module + pexp->AddressOfFunctions);
 				ordinals = (PWORD)((PBYTE)Module + pexp->AddressOfNameOrdinals);
 
 				//walk for Nt stubs
@@ -446,9 +368,9 @@ VOID SdtListTable(
 				lvitem.mask = LVIF_TEXT | LVIF_IMAGE;
 				lvitem.iSubItem = 0;
 				lvitem.iItem = MAXINT;
-				lvitem.iImage = 0;
+				lvitem.iImage = TYPE_DEVICE; //imagelist id
 				RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-				wsprintf(szBuffer, L"%d", g_SdtTable[i].ServiceId);
+				ultostr(g_SdtTable[i].ServiceId, szBuffer);
 				lvitem.pszText = szBuffer;
 				index = ListView_InsertItem(SdtDlgContext.ListView, &lvitem);
 
@@ -460,16 +382,16 @@ VOID SdtListTable(
 				ListView_SetItem(SdtDlgContext.ListView, &lvitem);
 
 				//Address
-				lvitem.mask = LVIF_TEXT;
 				lvitem.iSubItem = 2;
 				RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-				wsprintf(szBuffer, L"0x%p", (PVOID)g_SdtTable[i].Address);
+				szBuffer[0] = L'0';
+				szBuffer[1] = L'x';
+				u64tohex(g_SdtTable[i].Address, &szBuffer[2]);
 				lvitem.pszText = szBuffer;
 				lvitem.iItem = index;
 				ListView_SetItem(SdtDlgContext.ListView, &lvitem);
 
 				//Module
-				lvitem.mask = LVIF_TEXT;
 				lvitem.iSubItem = 3;
 				RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
 
@@ -520,7 +442,6 @@ VOID extrasCreateSSDTDialog(
 	)
 {
 	LVCOLUMNW   col;
-	HANDLE      hIcon;
 
 	//allow only one dialog
 	if (g_wobjDialogs[WOBJ_SSDTDLG_IDX]) {
@@ -543,11 +464,7 @@ VOID extrasCreateSSDTDialog(
 
 	SetWindowText(SdtDlgContext.hwndDlg, TEXT("System Service Table"));
 
-	hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN), IMAGE_ICON, 0, 0, LR_SHARED);
-	if (hIcon) {
-		SetClassLongPtr(SdtDlgContext.hwndDlg, GCLP_HICON, (LONG_PTR)hIcon);
-		DestroyIcon(hIcon);
-	}
+	extrasSetDlgIcon(SdtDlgContext.hwndDlg);
 
 	SdtDlgContext.ListView = GetDlgItem(SdtDlgContext.hwndDlg, ID_EXTRASLIST);
 	if (SdtDlgContext.ListView) {
@@ -556,7 +473,7 @@ VOID extrasCreateSSDTDialog(
 		ListView_SetExtendedListViewStyle(SdtDlgContext.ListView,
 			LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
 
-		//create ObjectList columns
+		//columns
 		RtlSecureZeroMemory(&col, sizeof(col));
 		col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
 		col.iSubItem = 1;

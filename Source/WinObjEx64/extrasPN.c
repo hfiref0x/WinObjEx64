@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       EXTRASPN.C
 *
-*  VERSION:     1.33
+*  VERSION:     1.40
 *
-*  DATE:        01 Dec 2015
+*  DATE:        13 Feb 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -122,7 +122,6 @@ BOOL PNDlgQueryInfo(
 			ListView_SetItem(PnDlgContext.ListView, &lvitem);
 
 			//Namespace id
-			lvitem.mask = LVIF_TEXT;
 			lvitem.iSubItem = 2;
 			lvitem.iItem = index;
 			RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));

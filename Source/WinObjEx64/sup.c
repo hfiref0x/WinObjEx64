@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.31
+*  VERSION:     1.40
 *
-*  DATE:        12 Nov 2015
+*  DATE:        13 Feb 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -2406,7 +2406,7 @@ BOOL supSaveDialogExecute(
 * Create new file and write buffer to it.
 *
 */
-ULONG_PTR supWriteBufferToFile(
+SIZE_T supWriteBufferToFile(
 	_In_ PWSTR lpFileName,
 	_In_ PVOID Buffer,
 	_In_ SIZE_T Size,
@@ -2414,19 +2414,19 @@ ULONG_PTR supWriteBufferToFile(
 	_In_ BOOL Append
 	)
 {
-	NTSTATUS Status;
-	DWORD dwFlag;
-	HANDLE hFile = NULL;
-	OBJECT_ATTRIBUTES attr;
-	UNICODE_STRING NtFileName;
-	IO_STATUS_BLOCK IoStatus;
-	LARGE_INTEGER Position;
-	ACCESS_MASK DesiredAccess;
-	PLARGE_INTEGER pPosition = NULL;
-
-	ULONG_PTR nBlocks, BlockIndex, BytesWritten = 0;
-	ULONG BlockSize, RemainingSize;
-	PBYTE ptr = (PBYTE)Buffer;
+	NTSTATUS           Status;
+	DWORD              dwFlag;
+	HANDLE             hFile = NULL;
+	OBJECT_ATTRIBUTES  attr;
+	UNICODE_STRING     NtFileName;
+	IO_STATUS_BLOCK    IoStatus;
+	LARGE_INTEGER      Position;
+	ACCESS_MASK        DesiredAccess;
+	PLARGE_INTEGER     pPosition = NULL;
+	ULONG_PTR          nBlocks, BlockIndex;
+	ULONG              BlockSize, RemainingSize;
+	PBYTE              ptr = (PBYTE)Buffer;
+	SIZE_T             BytesWritten = 0;
 
 	if (RtlDosPathNameToNtPathName_U(lpFileName, &NtFileName, NULL, NULL) == FALSE)
 		return 0;
@@ -2452,30 +2452,39 @@ ULONG_PTR supWriteBufferToFile(
 		pPosition = NULL;
 
 		if (Append == TRUE) {
-			Position.LowPart = 0xFFFFFFFF;
+			Position.LowPart = FILE_WRITE_TO_END_OF_FILE;
 			Position.HighPart = -1;
 			pPosition = &Position;
 		}
 
-		BlockSize = 0x7FFFFFFF;
-		nBlocks = (Size / BlockSize);
-		for (BlockIndex = 0; BlockIndex < nBlocks; BlockIndex++) {
-
+		if (Size < 0x80000000) {
+			BlockSize = (ULONG)Size;
 			Status = NtWriteFile(hFile, 0, NULL, NULL, &IoStatus, ptr, BlockSize, pPosition, NULL);
 			if (!NT_SUCCESS(Status))
 				__leave;
 
-			ptr += BlockSize;
 			BytesWritten += IoStatus.Information;
 		}
-		RemainingSize = Size % BlockSize;
-		if (RemainingSize != 0) {
-			Status = NtWriteFile(hFile, 0, NULL, NULL, &IoStatus, ptr, RemainingSize, pPosition, NULL);
-			if (!NT_SUCCESS(Status))
-				__leave;
-			BytesWritten += IoStatus.Information;
-		}
+		else {
+			BlockSize = 0x7FFFFFFF;
+			nBlocks = (Size / BlockSize);
+			for (BlockIndex = 0; BlockIndex < nBlocks; BlockIndex++) {
 
+				Status = NtWriteFile(hFile, 0, NULL, NULL, &IoStatus, ptr, BlockSize, pPosition, NULL);
+				if (!NT_SUCCESS(Status))
+					__leave;
+
+				ptr += BlockSize;
+				BytesWritten += IoStatus.Information;
+			}
+			RemainingSize = Size % BlockSize;
+			if (RemainingSize != 0) {
+				Status = NtWriteFile(hFile, 0, NULL, NULL, &IoStatus, ptr, RemainingSize, pPosition, NULL);
+				if (!NT_SUCCESS(Status))
+					__leave;
+				BytesWritten += IoStatus.Information;
+			}
+		}
 	}
 	__finally {
 		if (hFile != NULL) {
@@ -2486,4 +2495,3 @@ ULONG_PTR supWriteBufferToFile(
 	}
 	return BytesWritten;
 }
-

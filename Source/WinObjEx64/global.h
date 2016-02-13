@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.32
+*  VERSION:     1.40
 *
-*  DATE:        12 Nov 2015
+*  DATE:        13 Feb 2016
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -21,6 +21,10 @@
 #pragma warning(disable: 4005) // macro redefinition
 #pragma warning(disable: 4201) // nonstandard extension used : nameless struct/union
 #pragma warning(disable: 6102) // Using %s from failed function call at line %u
+
+#if !defined UNICODE
+#error ANSI build is not supported
+#endif
 
 #if (_MSC_VER >= 1900)
 #pragma warning(disable: 4091) // 'typedef ': ignored on left of '' when no variable is declared

@@ -198,6 +198,7 @@
     <ClCompile Include="aboutDlg.c" />
     <ClCompile Include="excepth.c" />
     <ClCompile Include="extras.c" />
+    <ClCompile Include="extrasDrivers.c" />
     <ClCompile Include="extrasPipes.c" />
     <ClCompile Include="extrasPN.c" />
     <ClCompile Include="extrasSSDT.c" />
@@ -251,6 +252,7 @@
     <ClInclude Include="aboutDlg.h" />
     <ClInclude Include="excepth.h" />
     <ClInclude Include="extras.h" />
+    <ClInclude Include="extrasDrivers.h" />
     <ClInclude Include="extrasPipes.h" />
     <ClInclude Include="extrasPN.h" />
     <ClInclude Include="extrasSSDT.h" />

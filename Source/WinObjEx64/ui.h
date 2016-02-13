@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.33
+*  VERSION:     1.40
 *
-*  DATE:        01 Dec 2015
+*  DATE:        13 Feb 2016
 *
 *  Common header file for the user interface.
 *
@@ -33,7 +33,7 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 	_In_ DWORD_PTR dwData
 	);
 
-#define PROGRAM_VERSION            L"1.3.3"
+#define PROGRAM_VERSION            L"1.4.0"
 #define PROGRAM_NAME               L"Windows Object Explorer 64-bit"
 #define PROFRAM_NAME_AND_TITLE     L"Object Explorer for Windows 7/8/8.1/10"
 #define MAINWINDOWCLASSNAME        L"WinObjEx64Class"
@@ -45,14 +45,16 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 #define T_COPYTEXTROW              L"Copy Row Selection"
 #define T_COPYVALUE                L"Copy Value Field Text"
 #define T_SAVETOFILE               L"Save list to File"
+#define T_DUMPDRIVER               L"Dump Driver"
 
-#define WOBJ_MAX_DIALOGS 5
+#define WOBJ_MAX_DIALOGS 6
 
 #define WOBJ_FINDDLG_IDX 0
 #define WOBJ_PIPEDLG_IDX 1
 #define WOBJ_USDDLG_IDX  2
 #define WOBJ_PNDLG_IDX   3
 #define WOBJ_SSDTDLG_IDX 4
+#define WOBJ_DRVDLG_IDX  5
 
 HWND g_wobjDialogs[WOBJ_MAX_DIALOGS];
 

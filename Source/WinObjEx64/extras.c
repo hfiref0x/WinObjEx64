@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       EXTRAS.C
 *
-*  VERSION:     1.31
+*  VERSION:     1.40
 *
-*  DATE:        11 Nov 2015
+*  DATE:        13 Feb 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -18,10 +18,110 @@
 #include "global.h"
 #include "propDlg.h"
 #include "propSecurity.h"
+#include "extras.h"
 #include "extrasPipes.h"
 #include "extrasUSD.h"
 #include "extrasPN.h"
 #include "extrasSSDT.h"
+#include "extrasDrivers.h"
+
+/*
+* extrasSimpleListResize
+*
+* Purpose:
+*
+* Common resize handler for list only dialogs.
+*
+*/
+VOID extrasSimpleListResize(
+	_In_ HWND hwndDlg
+	)
+{
+	RECT r1;
+	HWND hwnd;
+	RtlSecureZeroMemory(&r1, sizeof(r1));
+
+	hwnd = GetDlgItem(hwndDlg, ID_EXTRASLIST);
+	GetClientRect(hwndDlg, &r1);
+
+	SetWindowPos(hwnd, 0, 0, 0,
+		r1.right - 16,
+		r1.bottom - 16,
+		SWP_NOMOVE | SWP_NOZORDER);
+}
+
+/*
+* extrasDlgHandleNotify
+*
+* Purpose:
+*
+* Common WM_NOTIFY processing for list only dialogs.
+*
+*/
+VOID extrasDlgHandleNotify(
+	_In_ LPNMLISTVIEW nhdr,
+	_In_ EXTRASCONTEXT *Context,
+	_In_ DlgCompareFunction CompareFunc
+	)
+{
+	LVCOLUMNW		col;
+	INT				c, k;
+
+	if ((nhdr == NULL) || (Context == NULL))
+		return;
+
+	if (nhdr->hdr.idFrom != ID_EXTRASLIST)
+		return;
+
+	switch (nhdr->hdr.code) {
+
+	case LVN_COLUMNCLICK:
+
+		Context->bInverseSort = !Context->bInverseSort;
+		Context->lvColumnToSort = ((NMLISTVIEW *)nhdr)->iSubItem;
+		ListView_SortItemsEx(Context->ListView, CompareFunc, Context->lvColumnToSort);
+
+		RtlSecureZeroMemory(&col, sizeof(col));
+		col.mask = LVCF_IMAGE;
+		col.iImage = -1;
+
+		for (c = 0; c < Context->lvColumnCount; c++)
+			ListView_SetColumn(Context->ListView, c, &col);
+
+		k = ImageList_GetImageCount(ListViewImages);
+		if (Context->bInverseSort)
+			col.iImage = k - 2;
+		else
+			col.iImage = k - 1;
+
+		ListView_SetColumn(Context->ListView, ((NMLISTVIEW *)nhdr)->iSubItem, &col);
+		break;
+
+	default:
+		break;
+	}
+}
+
+/*
+* extrasSetDlgIcon
+*
+* Purpose:
+*
+* Extras dialog icon.
+*
+*/
+VOID extrasSetDlgIcon(
+	_In_ HWND hwndDlg
+	)
+{
+	HANDLE hIcon;
+
+	hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN), IMAGE_ICON, 0, 0, LR_SHARED);
+	if (hIcon) {
+		SetClassLongPtr(hwndDlg, GCLP_HICON, (LONG_PTR)hIcon);
+		DestroyIcon(hIcon);
+	}
+}
 
 /*
 * extrasShowPipeDialog
@@ -81,4 +181,19 @@ VOID extrasShowSSDTDialog(
 	)
 {
 	extrasCreateSSDTDialog(hwndParent);
+}
+
+/*
+* extrasShowDriversDialog
+*
+* Purpose:
+*
+* Display Drivers list dialog.
+*
+*/
+VOID extrasShowDriversDialog(
+	_In_ HWND hwndParent
+	)
+{
+	extrasCreateDriversDialog(hwndParent);
 }

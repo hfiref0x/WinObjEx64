@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.31
+*  VERSION:     1.40
 *
-*  DATE:        11 Nov 2015
+*  DATE:        13 Feb 2016
 *
 *  Program entry point and main window handler.
 *
@@ -338,6 +338,11 @@ LRESULT MainWindowHandleWMCommand(
 #ifndef _DEBUG
 		}
 #endif
+		break;
+
+	//Extras -> Drivers
+	case ID_EXTRAS_DRIVERS:
+		extrasShowDriversDialog(hwnd);
 		break;
 
 	case ID_HELP_ABOUT:

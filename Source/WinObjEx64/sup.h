@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.31
+*  VERSION:     1.40
 *
-*  DATE:        11 Nov 2015
+*  DATE:        13 Feb 2016
 *
 *  Common header file for the program support routines.
 *
@@ -361,3 +361,5 @@ ULONG_PTR supWriteBufferToFile(
 	_In_ BOOL Flush,
 	_In_ BOOL Append
 	);
+
+#define PathFileExists(lpszPath) (GetFileAttributes(lpszPath) != (DWORD)-1)

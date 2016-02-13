@@ -168,6 +168,9 @@
     <ClCompile Include="ldr\ldr.c">
       <Filter>ldr</Filter>
     </ClCompile>
+    <ClCompile Include="extrasDrivers.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc">
@@ -282,6 +285,9 @@
     </ClInclude>
     <ClInclude Include="ldr\ldr.h">
       <Filter>ldr</Filter>
+    </ClInclude>
+    <ClInclude Include="extrasDrivers.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

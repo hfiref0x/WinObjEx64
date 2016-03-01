@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.40
+*  VERSION:     1.41
 *
-*  DATE:        13 Feb 2016
+*  DATE:        01 Mar 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -94,10 +94,10 @@ BOOL supInitTreeListForDump(
 	_Inout_ HWND *pTreeListHwnd
 	)
 {
-	ATOM		TreeListAtom;
-	HWND		TreeList;
-	HDITEM		hdritem;
-	RECT		rc;
+	ATOM     TreeListAtom;
+	HWND     TreeList;
+	HDITEM   hdritem;
+	RECT     rc;
 
 	if ((pTreeListAtom == NULL) || (pTreeListHwnd == NULL)) {
 		return FALSE;
@@ -150,7 +150,7 @@ VOID supClipboardCopy(
 {
 	LPWSTR  lptstrCopy;
 	HGLOBAL hglbCopy;
-	SIZE_T	dwSize;
+	SIZE_T  dwSize;
 
 	if (OpenClipboard(NULL)) {
 		EmptyClipboard();
@@ -183,9 +183,10 @@ BOOL supQueryObjectFromHandle(
 	_Inout_opt_ UCHAR *TypeIndex
 	)
 {
-	BOOL bFound = FALSE;
-	ULONG i;
-	DWORD CurrentProcessId = GetCurrentProcessId();
+	BOOL   bFound = FALSE;
+	ULONG  i;
+	DWORD  CurrentProcessId = GetCurrentProcessId();
+	
 	PSYSTEM_HANDLE_INFORMATION pHandles;
 
 	if (Address == NULL) {
@@ -252,11 +253,9 @@ BOOL supDumpSyscallTableConverted(
 	_Inout_ PUTable *Table
 	)
 {
-	ULONG memIO = 0;
-	BOOL bResult = FALSE, cond = FALSE;
-
-	PULONG KiServiceTableDumped = NULL;
-	ULONG ServiceId;
+	ULONG   ServiceId, memIO = 0;
+	BOOL    bResult = FALSE, cond = FALSE;
+	PULONG  KiServiceTableDumped = NULL;
 	PUTable ConvertedTable;
 
 	if ((Context == NULL) || (Table == NULL))
@@ -308,12 +307,12 @@ VOID supShowHelp(
 	VOID
 	)
 {
-	DWORD dwSize;
-	HKEY hKey;
+	DWORD   dwSize;
+	HKEY    hKey;
 	LRESULT lRet;
-	HANDLE hHtmlOcx;
-	WCHAR szOcxPath[MAX_PATH + 1];
-	WCHAR szHelpFile[MAX_PATH * 2];
+	HANDLE  hHtmlOcx;
+	WCHAR   szOcxPath[MAX_PATH + 1];
+	WCHAR   szHelpFile[MAX_PATH * 2];
 
 	RtlSecureZeroMemory(&szOcxPath, sizeof(szOcxPath));
 	RtlSecureZeroMemory(szHelpFile, sizeof(szHelpFile));
@@ -397,7 +396,7 @@ HICON supGetMainIcon(
 	_In_ INT cy
 	)
 {
-	HMODULE hModule;
+	HMODULE      hModule;
 	ENUMICONINFO pin;
 
 	pin.cx = cx;
@@ -510,10 +509,10 @@ PVOID supGetSystemInfo(
 	_In_ SYSTEM_INFORMATION_CLASS InfoClass
 	)
 {
-	INT			c = 0;
-	PVOID		Buffer = NULL;
-	ULONG		Size	= 0x1000;
-	NTSTATUS	status;
+	INT         c = 0;
+	PVOID       Buffer = NULL;
+	ULONG       Size = 0x1000;
+	NTSTATUS    status;
 	ULONG       memIO;
 
 	do {
@@ -560,10 +559,10 @@ PVOID supGetObjectTypesInfo(
 	VOID
 	)
 {
-	INT			c = 0;
-	PVOID		Buffer = NULL;
-	ULONG		Size = 0x1000;
-	NTSTATUS	status;
+	INT         c = 0;
+	PVOID       Buffer = NULL;
+	ULONG       Size = 0x1000;
+	NTSTATUS    status;
 	ULONG       memIO;
 
 	do {
@@ -616,9 +615,9 @@ LPWSTR supGetItemText(
 	_Inout_opt_ PSIZE_T lpSize
 	)
 {
+	INT     len;
+	LPARAM  sz = 0;
 	LV_ITEM item;
-	INT len;
-	LPARAM sz;
 
 	RtlSecureZeroMemory(&item, sizeof(item));
 
@@ -664,9 +663,10 @@ HIMAGELIST supLoadImageList(
 	UINT LastId
 	)
 {
-	UINT i;
+	UINT       i;
 	HIMAGELIST list;
-	HICON hIcon;
+	HICON      hIcon;
+
 	list = ImageList_Create(16, 16, ILC_COLOR32 | ILC_MASK, 42, 8);
 	if (list) {
 		for (i = FirstId; i <= LastId; i++) {
@@ -695,10 +695,11 @@ UINT supGetObjectNameIndexByTypeIndex(
 	_In_ UCHAR TypeIndex
 	)
 {
-	UINT Index;
-	ULONG i;
-	BOOL bFound = FALSE;
-	POBJECT_TYPE_INFORMATION pObject;
+	UINT   Index;
+	ULONG  i;
+	BOOL   bFound = FALSE;
+
+	POBJECT_TYPE_INFORMATION   pObject;
 	POBJECT_TYPE_INFORMATION_8 pObject8;
 
 	if (Object == NULL) {
@@ -840,11 +841,11 @@ BOOL supUserIsFullAdmin(
 	VOID
 	)
 {
-	BOOL bResult = FALSE, cond = FALSE;
-	HANDLE hToken = NULL;
+	BOOL     bResult = FALSE, cond = FALSE;
+	HANDLE   hToken = NULL;
 	NTSTATUS status;
-	DWORD i, Attributes;
-	ULONG ReturnLength = 0;
+	DWORD    i, Attributes;
+	ULONG    ReturnLength = 0;
 
 	PTOKEN_GROUPS pTkGroups;
 
@@ -960,7 +961,7 @@ VOID supHandleObjectPopupMenu(
 	)
 {
 	HMENU hMenu;
-	UINT uEnable = MF_BYCOMMAND | MF_GRAYED;
+	UINT  uEnable = MF_BYCOMMAND | MF_GRAYED;
 
 	hMenu = CreatePopupMenu();
 	if (hMenu == NULL) return;
@@ -1070,18 +1071,14 @@ BOOL supQueryKnownDllsLink(
 	PVOID *lpKnownDllsBuffer
 	)
 {
-	BOOL				bResult;
-	HANDLE				hLink;
-	SIZE_T				memIO;
-	ULONG				bytesNeeded;
-	NTSTATUS			status;
-	UNICODE_STRING		KnownDlls;
+	BOOL                bResult = FALSE, cond = FALSE;
+	HANDLE              hLink = NULL;
+	SIZE_T              memIO;
+	ULONG               bytesNeeded;
+	NTSTATUS            status;
+	UNICODE_STRING      KnownDlls;
 	OBJECT_ATTRIBUTES   Obja;
-	LPWSTR				lpDataBuffer = NULL;
-	BOOL				cond = FALSE;
-
-	bResult = FALSE;
-	hLink = NULL;
+	LPWSTR              lpDataBuffer = NULL;
 
 	do {
 		InitializeObjectAttributes(&Obja, ObjectName, OBJ_CASE_INSENSITIVE, NULL, NULL);
@@ -1132,10 +1129,10 @@ VOID supMapNtdllCopy(
 	VOID
 	)
 {
-	BOOL cond = FALSE;
+	BOOL   cond = FALSE;
 	HANDLE hFile = INVALID_HANDLE_VALUE, hFileMapping = NULL;
-	PVOID ImagePtr = NULL;
-	WCHAR szDllPath[MAX_PATH + 20];
+	PVOID  ImagePtr = NULL;
+	WCHAR  szDllPath[MAX_PATH + 20];
 
 	do {
 		
@@ -1250,7 +1247,7 @@ VOID supQueryKnownDlls(
 	VOID
 	)
 {
-	UNICODE_STRING		KnownDlls;
+	UNICODE_STRING KnownDlls;
 
 	g_lpKnownDlls32 = NULL;
 	g_lpKnownDlls64 = NULL;
@@ -1277,9 +1274,9 @@ BOOL supEnablePrivilege(
 	_In_ BOOL	fEnable
 	)
 {
-	BOOL bResult = FALSE;
-	NTSTATUS status;
-	HANDLE hToken;
+	BOOL             bResult = FALSE;
+	NTSTATUS         status;
+	HANDLE           hToken;
 	TOKEN_PRIVILEGES TokenPrivileges;
 
 	status = NtOpenProcessToken(
@@ -1322,11 +1319,11 @@ BOOL supQueryLinkTarget(
 	_In_		DWORD cbBuffer //size of buffer in bytes
 	)
 {
-	BOOL				bResult = FALSE;
-	HANDLE				hLink = NULL;
-	DWORD				cLength = 0;
-	NTSTATUS			status;
-	UNICODE_STRING		InfoString;
+	BOOL                bResult = FALSE;
+	HANDLE              hLink = NULL;
+	DWORD               cLength = 0;
+	NTSTATUS            status;
+	UNICODE_STRING      InfoString;
 	OBJECT_ATTRIBUTES   Obja;
 
 	if (
@@ -1424,10 +1421,10 @@ PVOID supCreateSCMSnapshot(
 	PSIZE_T lpNumberOfEntries
 	)
 {
-	BOOL cond = FALSE, bResult = FALSE;
+	BOOL      cond = FALSE, bResult = FALSE;
 	SC_HANDLE schSCManager;
-	DWORD dwBytesNeeded, dwServicesReturned, dwSize, dwSlack;
-	PVOID Services = NULL;
+	DWORD     dwBytesNeeded, dwServicesReturned, dwSize, dwSlack;
+	PVOID     Services = NULL;
 
 	if (lpNumberOfEntries) {
 		*lpNumberOfEntries = 0;
@@ -1504,12 +1501,11 @@ PVOID sapiCreateSetupDBSnapshot(
 	VOID
 	)
 {
-	BOOL cond = FALSE;
-	PSAPIDBOBJ sObj;
+	BOOL            cond = FALSE;
+	DWORD           i, DataType = 0, DataSize, ReturnedDataSize = 0;
+	PSAPIDBOBJ      sObj;
 	SP_DEVINFO_DATA DeviceInfoData;
-	DWORD i, DataType = 0;
-	DWORD DataSize, ReturnedDataSize = 0;
-	PSAPIDBENTRY Entry;
+	PSAPIDBENTRY    Entry;
 
 	sObj = VirtualAlloc(NULL, sizeof(SAPIDBOBJ), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 	if (sObj == NULL)
@@ -1611,7 +1607,7 @@ VOID sapiFreeSnapshot(
 	_In_ PVOID Snapshot
 	)
 {
-	PSAPIDBOBJ pObj;
+	PSAPIDBOBJ   pObj;
 	PSAPIDBENTRY Entry;
 
 	if (Snapshot == NULL)
@@ -1654,7 +1650,7 @@ BOOL WINAPI supEnumEnableChildWindows(
 	_In_  LPARAM lParam
 	)
 {
-	RECT r1;
+	RECT   r1;
 	LPRECT lpRect = (LPRECT)lParam;
 
 	if (GetWindowRect(hwnd, &r1)) {
@@ -1677,7 +1673,7 @@ BOOL WINAPI supEnumHideChildWindows(
 	_In_  LPARAM lParam
 	)
 {
-	RECT r1;
+	RECT   r1;
 	LPRECT lpRect = (LPRECT)lParam;
 
 	if (GetWindowRect(hwnd, &r1)) {
@@ -1708,7 +1704,7 @@ BOOL supQueryWinstationDescription(
 	_In_	DWORD ccBuffer //size of buffer in chars
 	)
 {
-	BOOL bFound = FALSE;
+	BOOL   bFound = FALSE;
 	LPWSTR lpType;
 
 	if ((lpWindowStationName == NULL) || (Buffer == NULL) || (ccBuffer < MAX_PATH))
@@ -1799,8 +1795,9 @@ BOOL supFindModuleNameByAddress(
 	)
 {
 	ULONG i, c;
-	PRTL_PROCESS_MODULE_INFORMATION pModule;
 	WCHAR szBuffer[MAX_PATH + 1];
+
+	PRTL_PROCESS_MODULE_INFORMATION pModule;
 
 	if (
 		(Address == NULL) || 
@@ -1864,8 +1861,9 @@ BOOL supQueryTypeInfo(
 	_In_	DWORD ccBuffer //size of buffer in chars
 	)
 {
-	BOOL bResult = FALSE;
+	BOOL  bResult = FALSE;
 	ULONG i, nPool;
+
 	POBJECT_TYPE_INFORMATION pObject;
 
 	if ((g_pObjectTypesInfo == NULL) || (Buffer == NULL) ) {
@@ -1931,15 +1929,15 @@ BOOL supQueryDeviceDescription(
 	_In_	DWORD ccBuffer //size of buffer in chars
 	)
 {
-	BOOL bResult, bIsRoot;
-	SIZE_T Length;
-	LPWSTR lpFullDeviceName;
-	PSAPIDBOBJ pObj;
-
-	PLIST_ENTRY Entry;
+	BOOL         bResult, bIsRoot;
+	SIZE_T       Length;
+	LPWSTR       lpFullDeviceName;
+	PSAPIDBOBJ   pObj;
+	PLIST_ENTRY  Entry;
 	PSAPIDBENTRY Item;
 
 	bResult = FALSE;
+
 	if (
 		(lpDeviceName == NULL) ||
 		(Buffer == NULL) || 
@@ -2010,19 +2008,22 @@ BOOL supQueryDriverDescription(
 	_In_	DWORD ccBuffer //size of buffer in chars
 	)
 {
-	BOOL bResult, cond = FALSE;
-	LPWSTR lpServiceName = NULL;
-	LPWSTR lpDisplayName = NULL;
-	LPENUM_SERVICE_STATUS_PROCESS pInfo = NULL;
-	SIZE_T i, sz;
+	BOOL    bResult, cond = FALSE;
+	LPWSTR  lpServiceName = NULL;
+	LPWSTR  lpDisplayName = NULL;
+	SIZE_T  i, sz;
 
-	LPTRANSLATE	lpTranslate = NULL;
-	PVOID vinfo = FALSE;
-	DWORD dwSize, dwHandle;
+	PVOID   vinfo = FALSE;
+	DWORD   dwSize, dwHandle;
 	LRESULT lRet;
-	HKEY hKey = NULL;
-	WCHAR szBuffer[MAX_PATH * 2];
-	WCHAR szImagePath[MAX_PATH + 1];
+	HKEY    hKey = NULL;
+
+	WCHAR   szBuffer[MAX_PATH * 2];
+	WCHAR   szImagePath[MAX_PATH + 1];
+
+	LPTRANSLATE	                  lpTranslate = NULL;
+	LPENUM_SERVICE_STATUS_PROCESS pInfo = NULL;
+
 
 	bResult = FALSE;
 	if (
@@ -2148,18 +2149,18 @@ BOOL supQuerySectionFileInfo(
 	_In_		DWORD ccBuffer //size of buffer in chars
 	)
 {
-	HANDLE						hSection;
-	PVOID						vinfo;
-	LPWSTR						pcValue, lpszFileName, lpszKnownDlls;
-	LPTRANSLATE					lpTranslate;
-	SIZE_T						cLength = 0;
-	NTSTATUS					status;
-	DWORD						dwHandle = 0, dwSize, dwInfoSize;
-	BOOL						bResult, cond = FALSE;
-	OBJECT_ATTRIBUTES			Obja;
-	SECTION_BASIC_INFORMATION	sbi;
-	SECTION_IMAGE_INFORMATION	sii;
-	WCHAR						szQueryBlock[MAX_PATH];
+	BOOL                        bResult, cond = FALSE;
+	HANDLE                      hSection;
+	PVOID                       vinfo;
+	LPWSTR                      pcValue, lpszFileName, lpszKnownDlls;
+	LPTRANSLATE                 lpTranslate;
+	SIZE_T                      cLength = 0;
+	NTSTATUS                    status;
+	DWORD                       dwHandle = 0, dwSize, dwInfoSize;
+	OBJECT_ATTRIBUTES           Obja;
+	SECTION_BASIC_INFORMATION   sbi;
+	SECTION_IMAGE_INFORMATION   sii;
+	WCHAR                       szQueryBlock[MAX_PATH];
 
 	bResult = FALSE;
 	if (
@@ -2283,8 +2284,8 @@ HANDLE supOpenDirectory(
 	_In_ LPWSTR lpDirectory
 	)
 {
-	HANDLE hDirectory;
-	UNICODE_STRING ustr;
+	HANDLE            hDirectory;
+	UNICODE_STRING    ustr;
 	OBJECT_ATTRIBUTES obja;
 
 	if (lpDirectory == NULL) {
@@ -2313,10 +2314,10 @@ HANDLE supOpenDirectoryForObject(
 	_In_ LPWSTR lpDirectory
 	)
 {
+	BOOL   needFree = FALSE;
 	HANDLE hDirectory;
 	SIZE_T i, l, rdirLen, ldirSz;
 	LPWSTR SingleDirName, LookupDirName;
-	BOOL needFree = FALSE;
 
 	if (
 		(lpObjectName == NULL) ||
@@ -2383,7 +2384,7 @@ BOOL supSaveDialogExecute(
 	_In_ LPWSTR lpDialogFilter
 	)
 {
-	OPENFILENAMEW tag1;
+	OPENFILENAME tag1;
 
 	RtlSecureZeroMemory(&tag1, sizeof(OPENFILENAMEW));
 
@@ -2494,4 +2495,81 @@ SIZE_T supWriteBufferToFile(
 		RtlFreeUnicodeString(&NtFileName);
 	}
 	return BytesWritten;
+}
+
+/*
+* supCreateSzGripWindow
+*
+* Purpose:
+*
+* Create size grip and attach it to owner window.
+*
+*/
+HWND supCreateSzGripWindow(
+	_In_ HWND hwndOwner
+	)
+{
+	HWND hwnd;
+	RECT clientRect;
+
+	GetClientRect(hwndOwner, &clientRect);
+	clientRect.left = clientRect.right - GRIPPER_SIZE;
+	clientRect.top = clientRect.bottom - GRIPPER_SIZE;
+
+	hwnd = CreateWindowEx(0, WC_SCROLLBAR, NULL,
+		WS_CHILD | WS_VISIBLE | SBS_SIZEGRIP | WS_CLIPSIBLINGS,
+		clientRect.left, clientRect.top,
+		GRIPPER_SIZE, GRIPPER_SIZE, hwndOwner, NULL, g_hInstance, NULL);
+
+	return hwnd;
+}
+
+/*
+* supSzGripWindowOnResize
+*
+* Purpose:
+*
+* Must be called in WM_SIZE for sizegrip window proper reposition.
+*
+*/
+VOID supSzGripWindowOnResize(
+	_In_ HWND hwndOwner,
+	_In_ HWND hwndSizeGrip
+	)
+{
+	RECT clientRect;
+
+	GetClientRect(hwndOwner, &clientRect);
+	SetWindowPos(hwndSizeGrip, NULL, 
+		clientRect.right - GRIPPER_SIZE, clientRect.bottom - GRIPPER_SIZE,
+		GRIPPER_SIZE, GRIPPER_SIZE, 
+		SWP_NOZORDER | SWP_SHOWWINDOW);
+}
+
+/*
+* supIsProcess32bit
+*
+* Purpose:
+*
+* Return TRUE if process is wow64.
+*
+*/
+BOOL supIsProcess32bit(
+	_In_ HANDLE hProcess
+	)
+{
+	NTSTATUS                           status;
+	PROCESS_EXTENDED_BASIC_INFORMATION pebi;
+
+	if (hProcess == NULL) {
+		return FALSE;
+	}
+
+	RtlSecureZeroMemory(&pebi, sizeof(pebi));
+	pebi.Size = sizeof(PROCESS_EXTENDED_BASIC_INFORMATION);
+	status = NtQueryInformationProcess(hProcess, ProcessBasicInformation, &pebi, sizeof(pebi), NULL);
+	if (NT_SUCCESS(status)) {
+		return (pebi.IsWow64Process == 1);
+	}
+	return FALSE;
 }

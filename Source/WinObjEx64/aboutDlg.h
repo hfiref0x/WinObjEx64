@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       ABOUTDLG.H
 *
-*  VERSION:     1.31
+*  VERSION:     1.41
 *
-*  DATE:        11 Nov 2015
+*  DATE:        01 Mar 2016
 *
 *  Common header file for the About Dialog.
 *
@@ -18,9 +18,9 @@
 *******************************************************************************/
 #pragma once
 
-LRESULT CALLBACK AboutDialogProc(
-	HWND hwndDlg,
-	UINT uMsg,
-	WPARAM wParam,
-	LPARAM lParam
+INT_PTR CALLBACK AboutDialogProc(
+	_In_ HWND   hwndDlg,
+	_In_ UINT   uMsg,
+	_In_ WPARAM wParam,
+	_In_ LPARAM lParam
 	);

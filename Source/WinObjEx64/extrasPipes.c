@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       EXTRASPIPES.C
 *
-*  VERSION:     1.31
+*  VERSION:     1.41
 *
-*  DATE:        10 Nov 2015
+*  DATE:        01 Mar 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -21,7 +21,7 @@
 #include "propSecurity.h"
 
 //named pipes root
-#define T_DEVICE_NAMED_PIPE L"\\Device\\NamedPipe\\"
+#define T_DEVICE_NAMED_PIPE TEXT("\\Device\\NamedPipe\\")
 
 EXTRASCONTEXT PipeDlgContext;
 
@@ -43,13 +43,13 @@ VOID PipeDisplayError(
 	)
 {
 	DWORD dwLastError;
-	WCHAR szBuffer[MAX_PATH + 1];
+	WCHAR szBuffer[MAX_PATH * 2];
 
 	dwLastError = GetLastError();
 	ShowWindow(GetDlgItem(hwndDlg, ID_PIPE_QUERYFAIL), SW_SHOW);
 
 	RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-	_strcpy(szBuffer, L"Cannot open pipe because: ");
+	_strcpy(szBuffer, TEXT("Cannot open pipe because: "));
 	FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, dwLastError,
 		0, _strend(szBuffer), MAX_PATH, NULL);
 	SetDlgItemText(hwndDlg, ID_PIPE_QUERYFAIL, szBuffer);
@@ -68,8 +68,8 @@ LPWSTR PipeCreateFullName(
 	_In_ LPWSTR lpObjectName
 	)
 {
-	LPWSTR	lpFullName;
-	SIZE_T	sz;
+	LPWSTR lpFullName = NULL;
+	SIZE_T sz;
 
 	if (lpObjectName == NULL) {
 		return NULL;
@@ -77,9 +77,10 @@ LPWSTR PipeCreateFullName(
 
 	sz = (_strlen(T_DEVICE_NAMED_PIPE) + _strlen(lpObjectName)) * sizeof(WCHAR) +
 		sizeof(UNICODE_NULL);
+
 	lpFullName = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sz);
 	if (lpFullName == NULL) {
-		return lpFullName;
+		return NULL;
 	}
 
 	_strcpy(lpFullName, T_DEVICE_NAMED_PIPE);
@@ -101,12 +102,12 @@ BOOL CALLBACK PipeOpenObjectMethod(
 	_In_	ACCESS_MASK	DesiredAccess
 	)
 {
-	BOOL				bResult = FALSE;
-	HANDLE				hObject;
-	NTSTATUS			status;
-	OBJECT_ATTRIBUTES	obja;
-	UNICODE_STRING		uStr;
-	IO_STATUS_BLOCK		iost;
+	BOOL                bResult = FALSE;
+	HANDLE              hObject;
+	NTSTATUS            status;
+	OBJECT_ATTRIBUTES   obja;
+	UNICODE_STRING      uStr;
+	IO_STATUS_BLOCK     iost;
 
 	if (
 		(Context == NULL) ||
@@ -145,11 +146,11 @@ VOID PipeQueryInfo(
 	HWND hwndDlg
 	)
 {
-	LPWSTR						lpType;
-	HANDLE						hPipe;
-	NTSTATUS					status;
-	WCHAR						szBuffer[MAX_PATH];
-	IO_STATUS_BLOCK				iost;
+	LPWSTR                      lpType;
+	HANDLE                      hPipe;
+	NTSTATUS                    status;
+	WCHAR                       szBuffer[MAX_PATH];
+	IO_STATUS_BLOCK             iost;
 	FILE_PIPE_LOCAL_INFORMATION fpli;
 
 	//validate context
@@ -183,28 +184,28 @@ VOID PipeQueryInfo(
 	if (NT_SUCCESS(status)) {
 
 		//Type
-		lpType = L"?";
+		lpType = TEXT("?");
 		switch (fpli.NamedPipeType) {
 		case FILE_PIPE_BYTE_STREAM_TYPE:
-			lpType = L"Byte stream";
+			lpType = TEXT("Byte stream");
 			break;
 		case FILE_PIPE_MESSAGE_TYPE:
-			lpType = L"Message";
+			lpType = TEXT("Message");
 			break;
 		}
 		SetDlgItemText(hwndDlg, ID_PIPE_TYPEMODE, lpType);
 
 		//AccessMode
-		lpType = L"?";
+		lpType = TEXT("?");
 		switch (fpli.NamedPipeConfiguration) {
 		case FILE_PIPE_INBOUND:
-			lpType = L"Inbound";
+			lpType = TEXT("Inbound");
 			break;
 		case FILE_PIPE_OUTBOUND:
-			lpType = L"Outbound";
+			lpType = TEXT("Outbound");
 			break;
 		case FILE_PIPE_FULL_DUPLEX:
-			lpType = L"Duplex";
+			lpType = TEXT("Duplex");
 			break;
 		}
 		SetDlgItemText(hwndDlg, ID_PIPE_ACCESSMODE, lpType);
@@ -217,7 +218,7 @@ VOID PipeQueryInfo(
 		//MaximumInstances
 		RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
 		if (fpli.MaximumInstances == MAXDWORD) {
-			_strcpy(szBuffer, L"Unlimited");
+			_strcpy(szBuffer, TEXT("Unlimited"));
 		}
 		else {
 			ultostr(fpli.MaximumInstances, szBuffer);
@@ -262,9 +263,9 @@ INT_PTR CALLBACK PipeTypeDialogProc(
 	_In_  LPARAM lParam
 	)
 {
-	HDC hDc;
-	PAINTSTRUCT Paint;
-	PROPSHEETPAGE *pSheet = NULL;
+	HDC               hDc;
+	PAINTSTRUCT       Paint;
+	PROPSHEETPAGE    *pSheet = NULL;
 	PROP_OBJECT_INFO *Context = NULL;
 
 	switch (uMsg) {
@@ -317,12 +318,12 @@ VOID PipeDlgShowProperties(
 	_In_ INT iItem
 	)
 {
-	INT					nPages = 0;
-	PROP_OBJECT_INFO	*Context;
-	HPROPSHEETPAGE		SecurityPage = NULL;
-	PROPSHEETPAGE		Page;
-	PROPSHEETHEADER		PropHeader;
-	WCHAR				szCaption[MAX_PATH];
+	INT                 nPages = 0;
+	PROP_OBJECT_INFO   *Context;
+	HPROPSHEETPAGE      SecurityPage = NULL;
+	PROPSHEETPAGE       Page;
+	PROPSHEETHEADER     PropHeader;
+	WCHAR               szCaption[MAX_PATH];
 
 	Context = propContextCreate(NULL, NULL, NULL, NULL);
 	if (Context == NULL) {
@@ -341,7 +342,7 @@ VOID PipeDlgShowProperties(
 	Page.hInstance = g_hInstance;
 	Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_PIPE);
 	Page.pfnDlgProc = PipeTypeDialogProc;
-	Page.pszTitle = L"Pipe";
+	Page.pszTitle = TEXT("Pipe");
 	Page.lParam = (LPARAM)Context;
 	epsp[nPages++] = CreatePropertySheetPage(&Page);
 
@@ -363,7 +364,7 @@ VOID PipeDlgShowProperties(
 	//
 	//Create property sheet
 	//
-	_strcpy(szCaption, L"Pipe Properties");
+	_strcpy(szCaption, TEXT("Pipe Properties"));
 	RtlSecureZeroMemory(&PropHeader, sizeof(PropHeader));
 	PropHeader.dwSize = sizeof(PropHeader);
 	PropHeader.phpage = epsp;
@@ -393,7 +394,7 @@ INT CALLBACK PipeDlgCompareFunc(
 	)
 {
 	LPWSTR lpItem1, lpItem2;
-	INT nResult = 0;
+	INT    nResult = 0;
 
 	lpItem1 = supGetItemText(PipeDlgContext.ListView, (INT)lParam1, (INT)lParamSort, NULL);
 	lpItem2 = supGetItemText(PipeDlgContext.ListView, (INT)lParam2, (INT)lParamSort, NULL);
@@ -439,8 +440,8 @@ VOID PipeDlgHandleNotify(
 	LPARAM lParam
 	)
 {
-	LVCOLUMNW		col;
-	LPNMHDR			nhdr = (LPNMHDR)lParam;
+	LVCOLUMN col;
+	LPNMHDR  nhdr = (LPNMHDR)lParam;
 
 	if (nhdr == NULL)
 		return;
@@ -488,16 +489,16 @@ VOID PipeDlgHandleNotify(
 VOID PipeDlgQueryInfo(
 	)
 {
-	BOOL						cond = FALSE, cond2 = TRUE;
-	BOOLEAN						bRestartScan;
-	HANDLE						hObject = NULL;
-	FILE_DIRECTORY_INFORMATION	*DirectoryInfo = NULL;
-	NTSTATUS					status;
-	OBJECT_ATTRIBUTES			obja;
-	UNICODE_STRING				uStr;
-	IO_STATUS_BLOCK				iost;
-	LVITEMW						lvitem;
-	INT							c;
+	BOOL                        cond = FALSE, cond2 = TRUE;
+	BOOLEAN                     bRestartScan;
+	HANDLE                      hObject = NULL;
+	FILE_DIRECTORY_INFORMATION *DirectoryInfo = NULL;
+	NTSTATUS                    status;
+	OBJECT_ATTRIBUTES           obja;
+	UNICODE_STRING              uStr;
+	IO_STATUS_BLOCK             iost;
+	LVITEM                      lvitem;
+	INT                         c;
 
 	do {
 
@@ -540,8 +541,6 @@ VOID PipeDlgQueryInfo(
 			//Name
 			RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
 			lvitem.mask = LVIF_TEXT | LVIF_IMAGE;
-			lvitem.iImage = 0;
-			lvitem.iSubItem = 0;
 			lvitem.pszText = DirectoryInfo->FileName;
 			lvitem.iItem = MAXINT;
 			ListView_InsertItem(PipeDlgContext.ListView, &lvitem);
@@ -617,8 +616,8 @@ VOID extrasCreatePipeDialog(
 	_In_ HWND hwndParent
 	)
 {
-	LVCOLUMNW	col;
-	HICON		hIcon;
+	LVCOLUMN col;
+	HICON    hIcon;
 
 	//allow only one dialog
 	if (g_wobjDialogs[WOBJ_PIPEDLG_IDX]) {
@@ -667,7 +666,7 @@ VOID extrasCreatePipeDialog(
 		RtlSecureZeroMemory(&col, sizeof(col));
 		col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
 		col.iSubItem = 1;
-		col.pszText = L"Name";
+		col.pszText = TEXT("Name");
 		col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
 		col.iOrder = 0;
 		col.iImage = 2;

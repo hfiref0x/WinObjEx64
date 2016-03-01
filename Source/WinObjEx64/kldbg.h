@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.33
+*  VERSION:     1.41
 *
-*  DATE:        18 Nov 2015
+*  DATE:        01 Mar 2016
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -123,25 +123,25 @@ POBJINFO ObQueryObject(
 	);
 
 BOOL ObDumpTypeInfo(
-	_In_ ULONG_PTR ObjectAddress,
+	_In_    ULONG_PTR ObjectAddress,
 	_Inout_ POBJECT_TYPE_COMPATIBLE ObjectTypeInfo
 	);
 
 LPWSTR ObQueryNameString(
-	ULONG_PTR NameInfoAddress,
-	PSIZE_T ReturnLength
+	_In_      ULONG_PTR NameInfoAddress,
+	_Out_opt_ PSIZE_T ReturnLength
 	);
 
 BOOL ObHeaderToNameInfoAddress(
-	_In_ UCHAR ObjectInfoMask,
-	_In_ ULONG_PTR ObjectAddress,
+	_In_    UCHAR ObjectInfoMask,
+	_In_    ULONG_PTR ObjectAddress,
 	_Inout_ PULONG_PTR HeaderAddress,
-	_In_ OBJ_HEADER_INFO_FLAG InfoFlag
+	_In_    OBJ_HEADER_INFO_FLAG InfoFlag
 	);
 
 BOOL ObListCreate(
 	_Inout_ PLIST_ENTRY ListHead,
-	_In_ BOOL fNamespace
+	_In_    BOOL fNamespace
 	);
 
 VOID ObListDestroy(
@@ -154,9 +154,9 @@ POBJREF ObListFindByAddress(
 	);
 
 BOOL kdReadSystemMemory(
-	_In_ ULONG_PTR Address,
+	_In_    ULONG_PTR Address,
 	_Inout_ PVOID Buffer,
-	_In_ ULONG BufferSize
+	_In_    ULONG BufferSize
 	);
 
 VOID kdInit(

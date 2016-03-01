@@ -1,12 +1,12 @@
 /************************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015, translated from Microsoft sources/debugger
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016, translated from Microsoft sources/debugger
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.35
+*  VERSION:     1.37
 *
-*  DATE:        12 Feb 2016
+*  DATE:        18 Feb 2016
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -297,6 +297,16 @@ typedef struct _CLIENT_ID {
 	HANDLE UniqueThread;
 } CLIENT_ID, *PCLIENT_ID;
 
+typedef struct _CLIENT_ID64 {
+	ULONG64 UniqueProcess;
+	ULONG64 UniqueThread;
+} CLIENT_ID64, *PCLIENT_ID64;
+
+typedef struct _CLIENT_ID32 {
+	ULONG32 UniqueProcess;
+	ULONG32 UniqueThread;
+} CLIENT_ID32, *PCLIENT_ID32;
+
 typedef struct _VM_COUNTERS {
 	SIZE_T PeakVirtualSize;
 	SIZE_T VirtualSize;
@@ -432,6 +442,52 @@ typedef enum _PROCESSINFOCLASS {
 	ProcessProtectionInformation = 61,
 	MaxProcessInfoClass = 62
 } PROCESSINFOCLASS;
+
+typedef enum _THREADINFOCLASS {
+	ThreadBasicInformation,
+	ThreadTimes,
+	ThreadPriority,
+	ThreadBasePriority,
+	ThreadAffinityMask,
+	ThreadImpersonationToken,
+	ThreadDescriptorTableEntry,
+	ThreadEnableAlignmentFaultFixup,
+	ThreadEventPair,
+	ThreadQuerySetWin32StartAddress,
+	ThreadZeroTlsCell,
+	ThreadPerformanceCount,
+	ThreadAmILastThread,
+	ThreadIdealProcessor,
+	ThreadPriorityBoost,
+	ThreadSetTlsArrayAddress,
+	ThreadIsIoPending,
+	ThreadHideFromDebugger,
+	ThreadBreakOnTermination,
+	ThreadSwitchLegacyState,
+	ThreadIsTerminated,
+	ThreadLastSystemCall,
+	ThreadIoPriority,
+	ThreadCycleTime,
+	ThreadPagePriority,
+	ThreadActualBasePriority,
+	ThreadTebInformation,
+	ThreadCSwitchMon,
+	ThreadCSwitchPmu,
+	ThreadWow64Context,
+	ThreadGroupInformation,
+	ThreadUmsInformation,
+	ThreadCounterProfiling,
+	ThreadIdealProcessorEx,
+	ThreadCpuAccountingInformation,
+	ThreadSuspendCount,
+	ThreadHeterogeneousCpuPolicy,
+	ThreadContainerId,
+	ThreadNameInformation,
+	ThreadProperty,
+	ThreadSelectedCpuSets,
+	ThreadSystemThreadInformation,
+	MaxThreadInfoClass
+} THREADINFOCLASS;
 
 typedef struct _PROCESS_BASIC_INFORMATION {
 	NTSTATUS ExitStatus;
@@ -2927,8 +2983,338 @@ typedef struct _SYSTEM_FIRMWARE_TABLE_INFORMATION {
 //
 //  PEB/TEB
 //
-typedef struct _PEB_LDR_DATA
-{
+#define GDI_HANDLE_BUFFER_SIZE32  34
+#define GDI_HANDLE_BUFFER_SIZE64  60
+
+#if !defined(_M_X64)
+#define GDI_HANDLE_BUFFER_SIZE      GDI_HANDLE_BUFFER_SIZE32
+#else
+#define GDI_HANDLE_BUFFER_SIZE      GDI_HANDLE_BUFFER_SIZE64
+#endif
+
+typedef ULONG GDI_HANDLE_BUFFER32[GDI_HANDLE_BUFFER_SIZE32];
+typedef ULONG GDI_HANDLE_BUFFER64[GDI_HANDLE_BUFFER_SIZE64];
+typedef ULONG GDI_HANDLE_BUFFER[GDI_HANDLE_BUFFER_SIZE];
+
+#define RTL_MAX_DRIVE_LETTERS 32
+#define RTL_DRIVE_LETTER_VALID (USHORT)0x0001
+
+#define GDI_MAX_HANDLE_COUNT 0x4000
+
+// 32-bit definitions
+typedef struct _STRING32 {
+	USHORT Length;
+	USHORT MaximumLength;
+	ULONG Buffer;
+} STRING32;
+typedef STRING32 *PSTRING32;
+
+typedef STRING32 UNICODE_STRING32;
+
+#if (_MSC_VER < 1300) && !defined(_WINDOWS_)
+typedef struct LIST_ENTRY32 {
+	DWORD Flink;
+	DWORD Blink;
+} LIST_ENTRY32;
+typedef LIST_ENTRY32 *PLIST_ENTRY32;
+
+typedef struct LIST_ENTRY64 {
+	ULONGLONG Flink;
+	ULONGLONG Blink;
+} LIST_ENTRY64;
+typedef LIST_ENTRY64 *PLIST_ENTRY64;
+#endif
+
+#define WOW64_POINTER(Type) ULONG
+
+typedef struct _PEB_LDR_DATA32 {
+	ULONG Length;
+	BOOLEAN Initialized;
+	WOW64_POINTER(HANDLE) SsHandle;
+	LIST_ENTRY32 InLoadOrderModuleList;
+	LIST_ENTRY32 InMemoryOrderModuleList;
+	LIST_ENTRY32 InInitializationOrderModuleList;
+	WOW64_POINTER(PVOID) EntryInProgress;
+	BOOLEAN ShutdownInProgress;
+	WOW64_POINTER(HANDLE) ShutdownThreadId;
+} PEB_LDR_DATA32, *PPEB_LDR_DATA32;
+
+#define LDR_DATA_TABLE_ENTRY_SIZE_WINXP32 FIELD_OFFSET( LDR_DATA_TABLE_ENTRY32, ForwarderLinks )
+
+typedef struct _LDR_DATA_TABLE_ENTRY32 {
+	LIST_ENTRY32 InLoadOrderLinks;
+	LIST_ENTRY32 InMemoryOrderLinks;
+	LIST_ENTRY32 InInitializationOrderLinks;
+	WOW64_POINTER(PVOID) DllBase;
+	WOW64_POINTER(PVOID) EntryPoint;
+	ULONG SizeOfImage;
+	UNICODE_STRING32 FullDllName;
+	UNICODE_STRING32 BaseDllName;
+	ULONG Flags;
+	USHORT LoadCount;
+	USHORT TlsIndex;
+	union
+	{
+		LIST_ENTRY32 HashLinks;
+		struct
+		{
+			WOW64_POINTER(PVOID) SectionPointer;
+			ULONG CheckSum;
+		};
+	};
+	union
+	{
+		ULONG TimeDateStamp;
+		WOW64_POINTER(PVOID) LoadedImports;
+	};
+	WOW64_POINTER(PVOID) EntryPointActivationContext;
+	WOW64_POINTER(PVOID) PatchInformation;
+	LIST_ENTRY32 ForwarderLinks;
+	LIST_ENTRY32 ServiceTagLinks;
+	LIST_ENTRY32 StaticLinks;
+	WOW64_POINTER(PVOID) ContextInformation;
+	WOW64_POINTER(ULONG_PTR) OriginalBase;
+	LARGE_INTEGER LoadTime;
+} LDR_DATA_TABLE_ENTRY32, *PLDR_DATA_TABLE_ENTRY32;
+
+typedef struct _CURDIR32 {
+	UNICODE_STRING32 DosPath;
+	WOW64_POINTER(HANDLE) Handle;
+} CURDIR32, *PCURDIR32;
+
+typedef struct _RTL_DRIVE_LETTER_CURDIR32 {
+	USHORT Flags;
+	USHORT Length;
+	ULONG TimeStamp;
+	STRING32 DosPath;
+} RTL_DRIVE_LETTER_CURDIR32, *PRTL_DRIVE_LETTER_CURDIR32;
+
+typedef struct _RTL_USER_PROCESS_PARAMETERS32 {
+	ULONG MaximumLength;
+	ULONG Length;
+
+	ULONG Flags;
+	ULONG DebugFlags;
+
+	WOW64_POINTER(HANDLE) ConsoleHandle;
+	ULONG ConsoleFlags;
+	WOW64_POINTER(HANDLE) StandardInput;
+	WOW64_POINTER(HANDLE) StandardOutput;
+	WOW64_POINTER(HANDLE) StandardError;
+
+	CURDIR32 CurrentDirectory;
+	UNICODE_STRING32 DllPath;
+	UNICODE_STRING32 ImagePathName;
+	UNICODE_STRING32 CommandLine;
+	WOW64_POINTER(PVOID) Environment;
+
+	ULONG StartingX;
+	ULONG StartingY;
+	ULONG CountX;
+	ULONG CountY;
+	ULONG CountCharsX;
+	ULONG CountCharsY;
+	ULONG FillAttribute;
+
+	ULONG WindowFlags;
+	ULONG ShowWindowFlags;
+	UNICODE_STRING32 WindowTitle;
+	UNICODE_STRING32 DesktopInfo;
+	UNICODE_STRING32 ShellInfo;
+	UNICODE_STRING32 RuntimeData;
+	RTL_DRIVE_LETTER_CURDIR32 CurrentDirectories[RTL_MAX_DRIVE_LETTERS];
+
+	ULONG EnvironmentSize;
+	ULONG EnvironmentVersion;
+} RTL_USER_PROCESS_PARAMETERS32, *PRTL_USER_PROCESS_PARAMETERS32;
+
+typedef struct _PEB32 {
+	BOOLEAN InheritedAddressSpace;
+	BOOLEAN ReadImageFileExecOptions;
+	BOOLEAN BeingDebugged;
+	union
+	{
+		BOOLEAN BitField;
+		struct
+		{
+			BOOLEAN ImageUsesLargePages : 1;
+			BOOLEAN IsProtectedProcess : 1;
+			BOOLEAN IsLegacyProcess : 1;
+			BOOLEAN IsImageDynamicallyRelocated : 1;
+			BOOLEAN SkipPatchingUser32Forwarders : 1;
+			BOOLEAN SpareBits : 3;
+		};
+	};
+	WOW64_POINTER(HANDLE) Mutant;
+
+	WOW64_POINTER(PVOID) ImageBaseAddress;
+	WOW64_POINTER(PPEB_LDR_DATA) Ldr;
+	WOW64_POINTER(PRTL_USER_PROCESS_PARAMETERS) ProcessParameters;
+	WOW64_POINTER(PVOID) SubSystemData;
+	WOW64_POINTER(PVOID) ProcessHeap;
+	WOW64_POINTER(PRTL_CRITICAL_SECTION) FastPebLock;
+	WOW64_POINTER(PVOID) AtlThunkSListPtr;
+	WOW64_POINTER(PVOID) IFEOKey;
+	union
+	{
+		ULONG CrossProcessFlags;
+		struct
+		{
+			ULONG ProcessInJob : 1;
+			ULONG ProcessInitializing : 1;
+			ULONG ProcessUsingVEH : 1;
+			ULONG ProcessUsingVCH : 1;
+			ULONG ProcessUsingFTH : 1;
+			ULONG ReservedBits0 : 27;
+		};
+		ULONG EnvironmentUpdateCount;
+	};
+	union
+	{
+		WOW64_POINTER(PVOID) KernelCallbackTable;
+		WOW64_POINTER(PVOID) UserSharedInfoPtr;
+	};
+	ULONG SystemReserved[1];
+	ULONG AtlThunkSListPtr32;
+	WOW64_POINTER(PVOID) ApiSetMap;
+	ULONG TlsExpansionCounter;
+	WOW64_POINTER(PVOID) TlsBitmap;
+	ULONG TlsBitmapBits[2];
+	WOW64_POINTER(PVOID) ReadOnlySharedMemoryBase;
+	WOW64_POINTER(PVOID) HotpatchInformation;
+	WOW64_POINTER(PPVOID) ReadOnlyStaticServerData;
+	WOW64_POINTER(PVOID) AnsiCodePageData;
+	WOW64_POINTER(PVOID) OemCodePageData;
+	WOW64_POINTER(PVOID) UnicodeCaseTableData;
+
+	ULONG NumberOfProcessors;
+	ULONG NtGlobalFlag;
+
+	LARGE_INTEGER CriticalSectionTimeout;
+	WOW64_POINTER(SIZE_T) HeapSegmentReserve;
+	WOW64_POINTER(SIZE_T) HeapSegmentCommit;
+	WOW64_POINTER(SIZE_T) HeapDeCommitTotalFreeThreshold;
+	WOW64_POINTER(SIZE_T) HeapDeCommitFreeBlockThreshold;
+
+	ULONG NumberOfHeaps;
+	ULONG MaximumNumberOfHeaps;
+	WOW64_POINTER(PPVOID) ProcessHeaps;
+
+	WOW64_POINTER(PVOID) GdiSharedHandleTable;
+	WOW64_POINTER(PVOID) ProcessStarterHelper;
+	ULONG GdiDCAttributeList;
+
+	WOW64_POINTER(PRTL_CRITICAL_SECTION) LoaderLock;
+
+	ULONG OSMajorVersion;
+	ULONG OSMinorVersion;
+	USHORT OSBuildNumber;
+	USHORT OSCSDVersion;
+	ULONG OSPlatformId;
+	ULONG ImageSubsystem;
+	ULONG ImageSubsystemMajorVersion;
+	ULONG ImageSubsystemMinorVersion;
+	WOW64_POINTER(ULONG_PTR) ImageProcessAffinityMask;
+	GDI_HANDLE_BUFFER32 GdiHandleBuffer;
+	WOW64_POINTER(PVOID) PostProcessInitRoutine;
+
+	WOW64_POINTER(PVOID) TlsExpansionBitmap;
+	ULONG TlsExpansionBitmapBits[32];
+
+	ULONG SessionId;
+
+	// Rest of structure not included.
+} PEB32, *PPEB32;
+
+#define GDI_BATCH_BUFFER_SIZE 310
+
+typedef struct _GDI_TEB_BATCH32 {
+	ULONG Offset;
+	WOW64_POINTER(ULONG_PTR) HDC;
+	ULONG Buffer[GDI_BATCH_BUFFER_SIZE];
+} GDI_TEB_BATCH32, *PGDI_TEB_BATCH32;
+
+#if (_MSC_VER < 1300) && !defined(_WINDOWS_)
+//
+// 32 and 64 bit specific version for wow64 and the debugger
+//
+typedef struct _NT_TIB32 {
+	DWORD ExceptionList;
+	DWORD StackBase;
+	DWORD StackLimit;
+	DWORD SubSystemTib;
+	union {
+		DWORD FiberData;
+		DWORD Version;
+	};
+	DWORD ArbitraryUserPointer;
+	DWORD Self;
+} NT_TIB32, *PNT_TIB32;
+
+typedef struct _NT_TIB64 {
+	DWORD64 ExceptionList;
+	DWORD64 StackBase;
+	DWORD64 StackLimit;
+	DWORD64 SubSystemTib;
+	union {
+		DWORD64 FiberData;
+		DWORD Version;
+	};
+	DWORD64 ArbitraryUserPointer;
+	DWORD64 Self;
+} NT_TIB64, *PNT_TIB64;
+#endif
+
+typedef struct _TEB32 {
+	NT_TIB32 NtTib;
+
+	WOW64_POINTER(PVOID) EnvironmentPointer;
+	CLIENT_ID32 ClientId;
+	WOW64_POINTER(PVOID) ActiveRpcHandle;
+	WOW64_POINTER(PVOID) ThreadLocalStoragePointer;
+	WOW64_POINTER(PPEB) ProcessEnvironmentBlock;
+
+	ULONG LastErrorValue;
+	ULONG CountOfOwnedCriticalSections;
+	WOW64_POINTER(PVOID) CsrClientThread;
+	WOW64_POINTER(PVOID) Win32ThreadInfo;
+	ULONG User32Reserved[26];
+	ULONG UserReserved[5];
+	WOW64_POINTER(PVOID) WOW32Reserved;
+	LCID CurrentLocale;
+	ULONG FpSoftwareStatusRegister;
+	WOW64_POINTER(PVOID) SystemReserved1[54];
+	NTSTATUS ExceptionCode;
+	WOW64_POINTER(PVOID) ActivationContextStackPointer;
+	BYTE SpareBytes[36];
+	ULONG TxFsContext;
+
+	GDI_TEB_BATCH32 GdiTebBatch;
+	CLIENT_ID32 RealClientId;
+	WOW64_POINTER(HANDLE) GdiCachedProcessHandle;
+	ULONG GdiClientPID;
+	ULONG GdiClientTID;
+	WOW64_POINTER(PVOID) GdiThreadLocalInfo;
+	WOW64_POINTER(ULONG_PTR) Win32ClientInfo[62];
+	WOW64_POINTER(PVOID) glDispatchTable[233];
+	WOW64_POINTER(ULONG_PTR) glReserved1[29];
+	WOW64_POINTER(PVOID) glReserved2;
+	WOW64_POINTER(PVOID) glSectionInfo;
+	WOW64_POINTER(PVOID) glSection;
+	WOW64_POINTER(PVOID) glTable;
+	WOW64_POINTER(PVOID) glCurrentRC;
+	WOW64_POINTER(PVOID) glContext;
+
+	NTSTATUS LastStatusValue;
+	UNICODE_STRING32 StaticUnicodeString;
+	WCHAR StaticUnicodeBuffer[261];
+
+	WOW64_POINTER(PVOID) DeallocationStack;
+	WOW64_POINTER(PVOID) TlsSlots[64];
+	LIST_ENTRY32 TlsLinks;
+} TEB32, *PTEB32;
+
+typedef struct _PEB_LDR_DATA {
 	ULONG Length;
 	BOOLEAN Initialized;
 	HANDLE SsHandle;
@@ -2940,8 +3326,7 @@ typedef struct _PEB_LDR_DATA
 	HANDLE ShutdownThreadId;
 } PEB_LDR_DATA, *PPEB_LDR_DATA;
 
-typedef struct _GDI_HANDLE_ENTRY
-{
+typedef struct _GDI_HANDLE_ENTRY {
 	union
 	{
 		PVOID Object;
@@ -2963,10 +3348,7 @@ typedef struct _GDI_HANDLE_ENTRY
 	PVOID UserPointer;
 } GDI_HANDLE_ENTRY, *PGDI_HANDLE_ENTRY;
 
-#define GDI_MAX_HANDLE_COUNT 0x4000
-
-typedef struct _GDI_SHARED_MEMORY
-{
+typedef struct _GDI_SHARED_MEMORY {
 	GDI_HANDLE_ENTRY Handles[GDI_MAX_HANDLE_COUNT];
 } GDI_SHARED_MEMORY, *PGDI_SHARED_MEMORY;
 
@@ -2993,9 +3375,6 @@ typedef struct _RTL_DRIVE_LETTER_CURDIR
 	ULONG TimeStamp;
 	STRING DosPath;
 } RTL_DRIVE_LETTER_CURDIR, *PRTL_DRIVE_LETTER_CURDIR;
-
-#define RTL_MAX_DRIVE_LETTERS 32
-#define RTL_DRIVE_LETTER_VALID (USHORT)0x0001
 
 typedef struct _RTL_USER_PROCESS_PARAMETERS
 {
@@ -3036,19 +3415,6 @@ typedef struct _RTL_USER_PROCESS_PARAMETERS
 	ULONG EnvironmentSize;
 	ULONG EnvironmentVersion;
 } RTL_USER_PROCESS_PARAMETERS, *PRTL_USER_PROCESS_PARAMETERS;
-
-#define GDI_HANDLE_BUFFER_SIZE32  34
-#define GDI_HANDLE_BUFFER_SIZE64  60
-
-#if !defined(_M_X64)
-#define GDI_HANDLE_BUFFER_SIZE      GDI_HANDLE_BUFFER_SIZE32
-#else
-#define GDI_HANDLE_BUFFER_SIZE      GDI_HANDLE_BUFFER_SIZE64
-#endif
-
-typedef ULONG GDI_HANDLE_BUFFER32[GDI_HANDLE_BUFFER_SIZE32];
-typedef ULONG GDI_HANDLE_BUFFER64[GDI_HANDLE_BUFFER_SIZE64];
-typedef ULONG GDI_HANDLE_BUFFER[GDI_HANDLE_BUFFER_SIZE];
 
 typedef struct _PEB
 {
@@ -3556,6 +3922,42 @@ typedef struct _KUSER_SHARED_DATA_COMPAT {
 */
 
 /*
+**  RTL START
+*/
+
+typedef NTSTATUS(*PUSER_PROCESS_START_ROUTINE)(
+	PRTL_USER_PROCESS_PARAMETERS ProcessParameters
+	);
+
+typedef NTSTATUS(*PUSER_THREAD_START_ROUTINE)(
+	PVOID ThreadParameter
+	);
+
+typedef struct _RTL_USER_PROCESS_INFORMATION {
+	ULONG Length;
+	HANDLE Process;
+	HANDLE Thread;
+	CLIENT_ID ClientId;
+	SECTION_IMAGE_INFORMATION ImageInformation;
+} RTL_USER_PROCESS_INFORMATION, *PRTL_USER_PROCESS_INFORMATION;
+
+//
+// This structure is used only by Wow64 processes. The offsets
+// of structure elements should the same as viewed by a native Win64 application.
+//
+typedef struct _RTL_USER_PROCESS_INFORMATION64 {
+	ULONG Length;
+	LONGLONG Process;
+	LONGLONG Thread;
+	CLIENT_ID64 ClientId;
+	SECTION_IMAGE_INFORMATION64 ImageInformation;
+} RTL_USER_PROCESS_INFORMATION64, *PRTL_USER_PROCESS_INFORMATION64;
+
+/*
+**  RTL END
+*/
+
+/*
 **  LDR START
 */
 
@@ -3563,13 +3965,44 @@ typedef
 VOID(NTAPI *PLDR_LOADED_MODULE_ENUMERATION_CALLBACK_FUNCTION)(
 	_In_ PCLDR_DATA_TABLE_ENTRY DataTableEntry,
 	_In_ PVOID Context,
-	_In_ OUT BOOLEAN *StopEnumeration
+	_Inout_ BOOLEAN *StopEnumeration
+	);
+
+NTSTATUS NTAPI LdrAccessResource(
+	_In_ PVOID DllHandle,
+	_In_ CONST IMAGE_RESOURCE_DATA_ENTRY* ResourceDataEntry,
+	_Out_opt_ PVOID *Address,
+	_Out_opt_ PULONG Size
+	);
+
+NTSTATUS NTAPI LdrAddRefDll(
+	ULONG Flags,
+	PVOID DllHandle
 	);
 
 NTSTATUS NTAPI LdrEnumerateLoadedModules(
 	_In_opt_ ULONG Flags,
 	_In_     PLDR_LOADED_MODULE_ENUMERATION_CALLBACK_FUNCTION CallbackFunction,
 	_In_opt_ PVOID Context
+	);
+
+NTSTATUS NTAPI LdrFindResource_U(
+	_In_ PVOID DllHandle,
+	_In_ CONST ULONG_PTR* ResourceIdPath,
+	_In_ ULONG ResourceIdPathLength,
+	_Out_ PIMAGE_RESOURCE_DATA_ENTRY *ResourceDataEntry
+	);
+
+NTSTATUS NTAPI LdrFindEntryForAddress(
+	_In_ PVOID Address,
+	_Out_ PLDR_DATA_TABLE_ENTRY *TableEntry
+	);
+
+NTSTATUS NTAPI LdrGetDllHandle(
+	_In_opt_ PCWSTR DllPath OPTIONAL,
+	_In_opt_ PULONG DllCharacteristics OPTIONAL,
+	_In_ PCUNICODE_STRING DllName,
+	_Out_ PVOID *DllHandle
 	);
 
 NTSTATUS NTAPI LdrGetProcedureAddress(
@@ -3586,34 +4019,14 @@ NTSTATUS NTAPI LdrLoadDll(
 	_Out_    PVOID *DllHandle
 	);
 
+NTSTATUS NTAPI LdrQueryProcessModuleInformation(
+	_Out_     PRTL_PROCESS_MODULES ModuleInformation,
+	_In_      ULONG ModuleInformationLength,
+	_Out_opt_ PULONG ReturnLength 
+	);
+
 NTSTATUS NTAPI LdrUnloadDll(
 	_In_ PVOID DllHandle
-	);
-
-NTSTATUS NTAPI LdrGetDllHandle(
-	_In_opt_ PCWSTR DllPath OPTIONAL,
-	_In_opt_ PULONG DllCharacteristics OPTIONAL,
-	_In_ PCUNICODE_STRING DllName,
-	_Out_ PVOID *DllHandle
-	);
-
-NTSTATUS NTAPI LdrFindResource_U(
-	_In_ PVOID DllHandle,
-	_In_ CONST ULONG_PTR* ResourceIdPath,
-	_In_ ULONG ResourceIdPathLength,
-	_Out_ PIMAGE_RESOURCE_DATA_ENTRY *ResourceDataEntry
-	);
-
-NTSTATUS NTAPI LdrAccessResource(
-	_In_ PVOID DllHandle,
-	_In_ CONST IMAGE_RESOURCE_DATA_ENTRY* ResourceDataEntry,
-	_Out_opt_ PVOID *Address,
-	_Out_opt_ PULONG Size
-	);
-
-NTSTATUS NTAPI LdrFindEntryForAddress(
-	_In_ PVOID Address,
-	_Out_ PLDR_DATA_TABLE_ENTRY *TableEntry
 	);
 
 /*
@@ -3634,6 +4047,41 @@ ULONG NTAPI CsrGetProcessId(
 /*
 ** Runtime Library API START
 */
+
+NTSTATUS NTAPI RtlCreateUserProcess(
+	PUNICODE_STRING NtImagePathName,
+	ULONG Attributes,
+	PRTL_USER_PROCESS_PARAMETERS ProcessParameters,
+	PSECURITY_DESCRIPTOR ProcessSecurityDescriptor,
+	PSECURITY_DESCRIPTOR ThreadSecurityDescriptor,
+	HANDLE ParentProcess,
+	BOOLEAN InheritHandles,
+	HANDLE DebugPort,
+	HANDLE ExceptionPort,
+	PRTL_USER_PROCESS_INFORMATION ProcessInformation
+	);
+
+NTSTATUS NTAPI RtlCreateUserThread(
+	HANDLE Process,
+	PSECURITY_DESCRIPTOR ThreadSecurityDescriptor,
+	BOOLEAN CreateSuspended,
+	ULONG StackZeroBits,
+	SIZE_T MaximumStackSize OPTIONAL,
+	SIZE_T InitialStackSize OPTIONAL,
+	PUSER_THREAD_START_ROUTINE StartAddress,
+	PVOID Parameter,
+	PHANDLE Thread,
+	PCLIENT_ID ClientId
+	);
+
+VOID NTAPI RtlExitUserThread(
+	IN NTSTATUS ExitStatus
+	);
+
+VOID NTAPI RtlFreeUserThreadStack(
+	HANDLE hProcess,
+	HANDLE hThread
+	);
 
 ULONG NTAPI RtlRandomEx(
 	_Inout_ PULONG Seed
@@ -4732,6 +5180,14 @@ NTSTATUS NTAPI NtTerminateProcess(
 	_In_		NTSTATUS ExitStatus
 	);
 
+NTSTATUS NTAPI NtSuspendProcess(
+	_In_        HANDLE ProcessHandle
+	);
+
+NTSTATUS NTAPI NtResumeProcess(
+	_In_        HANDLE ProcessHandle
+	);
+
 NTSTATUS NTAPI NtSuspendThread(
 	_In_		HANDLE ThreadHandle,
 	_Out_opt_	PULONG PreviousSuspendCount
@@ -4749,6 +5205,11 @@ NTSTATUS NTAPI NtOpenThread(
 	_In_opt_    PCLIENT_ID ClientId
 	);
 
+NTSTATUS NTAPI NtTerminateThread(
+	_In_opt_    HANDLE ThreadHandle,
+	_In_        NTSTATUS ExitStatus
+	);
+
 NTSTATUS NTAPI NtImpersonateThread(
 	_In_        HANDLE ServerThreadHandle,
 	_In_        HANDLE ClientThreadHandle,
@@ -4763,6 +5224,21 @@ NTSTATUS NTAPI NtSetContextThread(
 NTSTATUS NTAPI NtGetContextThread(
 	_In_        HANDLE ThreadHandle,
 	_Inout_     PCONTEXT ThreadContext
+	);
+
+NTSTATUS NTAPI NtQueryInformationThread(
+	_In_       HANDLE ThreadHandle,
+	_In_       THREADINFOCLASS ThreadInformationClass,
+	_Out_      PVOID ThreadInformation,
+	_In_       ULONG ThreadInformationLength,
+	_Out_opt_  PULONG ReturnLength
+	);
+
+NTSTATUS NTAPI NtSetInformationThread(
+	_In_       HANDLE ThreadHandle,
+	_In_       THREADINFOCLASS ThreadInformationClass,
+	_In_       PVOID ThreadInformation,
+	_In_       ULONG ThreadInformationLength
 	);
 
 NTSTATUS NTAPI NtQueryInformationProcess(
@@ -4955,4 +5431,26 @@ NTSTATUS NTAPI NtAcceptConnectPort(
 	_In_			BOOLEAN AcceptConnection,
 	_Inout_opt_		PPORT_VIEW ServerView,
 	_Out_opt_		PREMOTE_PORT_VIEW ClientView
+	);
+
+typedef
+VOID
+(*PPS_APC_ROUTINE) (
+	_In_opt_ PVOID ApcArgument1,
+	_In_opt_ PVOID ApcArgument2,
+	_In_opt_ PVOID ApcArgument3
+	);
+
+NTSTATUS NTAPI NtQueueApcThread(
+	_In_ HANDLE ThreadHandle,
+	_In_ PPS_APC_ROUTINE ApcRoutine,
+	_In_opt_ PVOID ApcArgument1,
+	_In_opt_ PVOID ApcArgument2,
+	_In_opt_ PVOID ApcArgument3
+	);
+
+NTSTATUS NTAPI NtWaitForSingleObject(
+	_In_ HANDLE Handle,
+	_In_ BOOLEAN Alertable,
+	_In_opt_ PLARGE_INTEGER Timeout
 	);

@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.40
+*  VERSION:     1.41
 *
-*  DATE:        13 Feb 2016
+*  DATE:        01 Mar 2016
 *
 *  Common header file for the program support routines.
 *
@@ -31,6 +31,12 @@ typedef struct _ENUMICONINFO {
 	HICON hIcon;
 	INT cx, cy;
 } ENUMICONINFO, *PENUMICONINFO;
+
+//
+// Gripper window size
+//
+#define GRIPPER_SIZE 11
+
 
 //
 // Type icons starts from 300
@@ -360,6 +366,19 @@ ULONG_PTR supWriteBufferToFile(
 	_In_ SIZE_T Size,
 	_In_ BOOL Flush,
 	_In_ BOOL Append
+	);
+
+HWND supCreateSzGripWindow(
+	_In_ HWND hwndOwner
+	);
+
+VOID supSzGripWindowOnResize(
+	_In_ HWND hwndOwner,
+	_In_ HWND hwndSizeGrip
+	);
+
+BOOL supIsProcess32bit(
+	_In_ HANDLE hProcess
 	);
 
 #define PathFileExists(lpszPath) (GetFileAttributes(lpszPath) != (DWORD)-1)

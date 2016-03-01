@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.33
+*  VERSION:     1.41
 *
-*  DATE:        18 Nov 2015 
+*  DATE:        01 Mar 2016 
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -98,8 +98,8 @@ BOOL ObHeaderToNameInfoAddress(
 	_In_ OBJ_HEADER_INFO_FLAG InfoFlag
 	)
 {
+	BYTE      HeaderOffset;
 	ULONG_PTR Address;
-	BYTE HeaderOffset;
 	
 	if (HeaderAddress == NULL)
 		return FALSE;
@@ -136,8 +136,8 @@ UCHAR ObDecodeTypeIndex(
 	_In_ UCHAR EncodedTypeIndex
 	)
 {
+	UCHAR          TypeIndex;
 	POBJECT_HEADER ObjectHeader;
-	UCHAR TypeIndex;
 
 	if (g_kdctx.ObHeaderCookie == 0) {
 		return EncodedTypeIndex;
@@ -166,8 +166,8 @@ UCHAR ObFindHeaderCookie(
 	_In_ ULONG_PTR KernelImageBase
 	)
 {
-	UCHAR ObHeaderCookie = 0;
-	BOOL cond = FALSE;
+	BOOL      cond = FALSE;
+	UCHAR     ObHeaderCookie = 0;
 	ULONG_PTR Address = 0, KmAddress;
 
 	UINT        c;
@@ -346,11 +346,12 @@ VOID kdFindKiServiceTable(
 	)
 {
 
-	BOOL cond = FALSE, bFound = FALSE;
-	ULONG_PTR Address = 0;
+	BOOL         cond = FALSE, bFound = FALSE;
 	UINT         c, SignatureSize;
 	LONG         rel = 0;
+	ULONG_PTR    Address = 0;
 	ldasm_data	 ld;
+
 	KSERVICE_TABLE_DESCRIPTOR KeSystemDescriptorTable;
 
 	if (
@@ -470,12 +471,12 @@ BOOL ObGetDirectoryObjectAddress(
 	_Inout_opt_ PUCHAR lpTypeIndex
 	)
 {
-	OBJECT_ATTRIBUTES	objattr;
-	UNICODE_STRING		objname;
-	HANDLE				hDirectory = NULL;
-	NTSTATUS			status;
-	BOOL				bFound = FALSE;
-	LPWSTR				lpTarget;
+	BOOL                bFound = FALSE;
+	HANDLE              hDirectory = NULL;
+	NTSTATUS            status;
+	LPWSTR              lpTarget;
+	OBJECT_ATTRIBUTES   objattr;
+	UNICODE_STRING      objname;
 
 	if (lpRootAddress == NULL)
 		return bFound;
@@ -507,12 +508,13 @@ BOOL ObGetDirectoryObjectAddress(
 *
 */
 LPWSTR ObQueryNameString(
-	ULONG_PTR NameInfoAddress,
-	PSIZE_T ReturnLength
+	_In_ ULONG_PTR NameInfoAddress,
+	_Out_opt_ PSIZE_T ReturnLength
 	)
 {
-	ULONG fLen;
+	ULONG  fLen;
 	LPWSTR lpObjectName;
+	
 	OBJECT_HEADER_NAME_INFO NameInfo;
 
 	RtlSecureZeroMemory(&NameInfo, sizeof(OBJECT_HEADER_NAME_INFO));
@@ -552,18 +554,16 @@ POBJINFO ObWalkDirectory(
 	_In_ ULONG_PTR DirectoryAddress
 	)
 {
-	POBJINFO lpData;
-	LPWSTR lpObjectName;
-
-	OBJECT_HEADER ObjectHeader;
-	OBJECT_DIRECTORY DirObject;
-	OBJECT_DIRECTORY_ENTRY Entry;
+	BOOL      bFound;
+	INT       c;
+	SIZE_T    retSize;
+	POBJINFO  lpData;
+	LPWSTR    lpObjectName;
 	ULONG_PTR ObjectHeaderAddress, item0, item1, InfoHeaderAddress;
 
-	BOOL bFound;
-
-	INT c;
-	SIZE_T retSize;
+	OBJECT_HEADER          ObjectHeader;
+	OBJECT_DIRECTORY       DirObject;
+	OBJECT_DIRECTORY_ENTRY Entry;
 
 	__try {
 
@@ -574,7 +574,7 @@ POBJINFO ObWalkDirectory(
 		if (!kdReadSystemMemory(DirectoryAddress, &DirObject, sizeof(OBJECT_DIRECTORY))) {
 
 #ifdef _DEBUG
-			OutputDebugStringW(L"kdReadSystemMemory(DirectoryAddress) failed");
+			OutputDebugString(L"kdReadSystemMemory(DirectoryAddress) failed");
 #endif
 			return NULL;
 		}
@@ -593,7 +593,7 @@ POBJINFO ObWalkDirectory(
 			if (!kdReadSystemMemory(ObjectHeaderAddress, &ObjectHeader, sizeof(OBJECT_HEADER))) {
 
 #ifdef _DEBUG
-				OutputDebugStringW(L"kdReadSystemMemory(ObjectHeaderAddress) failed");
+				OutputDebugString(L"kdReadSystemMemory(ObjectHeaderAddress) failed");
 #endif
 
 				return NULL;
@@ -631,7 +631,7 @@ POBJINFO ObWalkDirectory(
 					if (!kdReadSystemMemory(item1, &Entry, sizeof(OBJECT_DIRECTORY_ENTRY))) {
 
 #ifdef _DEBUG
-						OutputDebugStringW(L"kdReadSystemMemory(OBJECT_DIRECTORY_ENTRY) failed");
+						OutputDebugString(L"kdReadSystemMemory(OBJECT_DIRECTORY_ENTRY) failed");
 #endif
 						break;
 					}		
@@ -642,7 +642,7 @@ POBJINFO ObWalkDirectory(
 					if (!kdReadSystemMemory(ObjectHeaderAddress, &ObjectHeader, sizeof(OBJECT_HEADER))) {
 
 #ifdef _DEBUG
-						OutputDebugStringW(L"kdReadSystemMemory(ObjectHeaderAddress) failed");
+						OutputDebugString(L"kdReadSystemMemory(ObjectHeaderAddress) failed");
 #endif
 						goto NextItem;
 					}
@@ -714,10 +714,10 @@ POBJINFO ObQueryObject(
 	_In_ LPWSTR lpObjectName
 	)
 {
-	ULONG_PTR DirectoryAddress;
-	SIZE_T i, l, rdirLen, ldirSz;
-	LPWSTR SingleDirName, LookupDirName;
-	BOOL needFree = FALSE;
+	BOOL       needFree = FALSE;
+	ULONG_PTR  DirectoryAddress;
+	SIZE_T     i, l, rdirLen, ldirSz;
+	LPWSTR     SingleDirName, LookupDirName;
 	
 	if (
 		(lpObjectName == NULL) ||
@@ -817,18 +817,16 @@ VOID ObWalkDirectoryRecursiveEx(
 	UCHAR DirectoryTypeIndex
 	)
 {
-	POBJREF lpListEntry;
-	LPWSTR lpObjectName, lpDirectoryName;
+	UCHAR      ObjectTypeIndex;
+	INT        c;
+	SIZE_T     dirLen, fLen, rdirLen, retSize;
+	ULONG_PTR  ObjectHeaderAddress, item0, item1, InfoHeaderAddress;
+	POBJREF    lpListEntry;
+	LPWSTR     lpObjectName, lpDirectoryName;
 
 	OBJECT_HEADER ObjectHeader;
 	OBJECT_DIRECTORY DirObject;
 	OBJECT_DIRECTORY_ENTRY Entry;
-	ULONG_PTR ObjectHeaderAddress, item0, item1, InfoHeaderAddress;
-
-	INT c;
-	UCHAR ObjectTypeIndex;
-
-	SIZE_T dirLen, fLen, rdirLen, retSize;
 
 	RtlSecureZeroMemory(&DirObject, sizeof(OBJECT_DIRECTORY));
 	if (!kdReadSystemMemory(DirectoryAddress, &DirObject, sizeof(OBJECT_DIRECTORY)))
@@ -966,22 +964,19 @@ BOOL ObWalkPrivateNamespaceTable(
 	_In_ ULONG_PTR TableAddress
 	)
 {
-	OBJECT_HEADER ObjectHeader;
-	OBJECT_DIRECTORY DirObject;
-	OBJECT_DIRECTORY_ENTRY Entry;
+	BOOL          EntryFound;
+	INT           c, d;
+	SIZE_T        retSize = 0;
+	ULONG_PTR     ObjectHeaderAddress, item0, item1, InfoHeaderAddress, NameSpaceIdMax = 0L;
+	PLIST_ENTRY   Current, Head, FindEntry;
+	POBJREF       lpListEntry, ObjectInfo;
+	LPWSTR        lpObjectName = NULL;
 
-	ULONG_PTR ObjectHeaderAddress, item0, item1, InfoHeaderAddress, NameSpaceIdMax = 0L;
-
+	OBJECT_HEADER                ObjectHeader;
+	OBJECT_DIRECTORY             DirObject;
+	OBJECT_DIRECTORY_ENTRY       Entry;
 	OBJECT_NAMESPACE_LOOKUPTABLE LookupTable;
-	OBJECT_NAMESPACE_ENTRY LookupEntry;
-	PLIST_ENTRY Current, Head, FindEntry;
-
-	POBJREF lpListEntry, ObjectInfo;
-	LPWSTR lpObjectName = NULL;
-	SIZE_T retSize = 0;
-	INT c, d;
-
-	BOOL EntryFound;
+	OBJECT_NAMESPACE_ENTRY       LookupEntry;
 
 	if (
 		(ListHead == NULL) ||
@@ -1241,9 +1236,9 @@ POBJREF ObListFindByAddress(
 	_In_ ULONG_PTR	 ObjectAddress
 	)
 {
-	BOOL			bFound;
-	POBJREF			ObjectInfo;
-	PLIST_ENTRY		Entry;
+	BOOL         bFound;
+	POBJREF      ObjectInfo;
+	PLIST_ENTRY  Entry;
 
 	if (ListHead == NULL)
 		return NULL;
@@ -1284,10 +1279,10 @@ PVOID kdQueryIopInvalidDeviceRequest(
 	VOID
 	)
 {
-	PVOID			pHandler;
-	POBJINFO		pSelfObj;
-	ULONG_PTR		drvObjectAddress;
-	DRIVER_OBJECT	drvObject;
+	PVOID           pHandler;
+	POBJINFO        pSelfObj;
+	ULONG_PTR       drvObjectAddress;
+	DRIVER_OBJECT   drvObject;
 
 	pHandler = NULL;
 	pSelfObj = ObQueryObject(L"\\Driver", KLDBGDRV);
@@ -1314,13 +1309,12 @@ BOOL kdIsDebugBoot(
 	VOID
 	)
 {
-	HKEY hKey;
-	LPWSTR lpszBootOptions = NULL;
+	BOOL    cond = FALSE, bResult = FALSE;
+	HKEY    hKey;
+	LPWSTR  lpszBootOptions = NULL;
 	LRESULT lRet;
-	SIZE_T memIO;
-	DWORD dwSize;
-	BOOL cond = FALSE;
-	BOOL bResult = FALSE;
+	SIZE_T  memIO;
+	DWORD   dwSize;
 	
 	do {
 
@@ -1367,9 +1361,9 @@ BOOL kdReadSystemMemory(
 	_In_ ULONG BufferSize
 	)
 {
-	KLDBG kldbg;
+	DWORD          bytesIO = 0;
+	KLDBG          kldbg;
 	SYSDBG_VIRTUAL dbgRequest;
-	DWORD bytesIO = 0;
 
 	if (g_kdctx.hDevice == NULL)
 		return FALSE;
@@ -1408,12 +1402,12 @@ BOOL kdExtractDriver(
 	LPCTSTR lpType
 	)
 {
-	HRSRC hResInfo = NULL;
+	HRSRC   hResInfo = NULL;
 	HGLOBAL hResData = NULL;
-	PVOID pData;
-	BOOL bResult = FALSE;
-	DWORD dwSize = 0;
-	HANDLE hFile = INVALID_HANDLE_VALUE;
+	PVOID   pData;
+	BOOL    bResult = FALSE;
+	DWORD   dwSize = 0;
+	HANDLE  hFile = INVALID_HANDLE_VALUE;
 
 	hResInfo = FindResource(g_hInstance, lpName, lpType);
 	if (hResInfo == NULL) return bResult;
@@ -1555,10 +1549,9 @@ DWORD WINAPI kdQueryProc(
 	_In_  LPVOID lpParameter
 	)
 {
-	BOOL			bResult = FALSE;
-	PKLDBGCONTEXT	Context = (PKLDBGCONTEXT)lpParameter;
-
-
+	BOOL            bResult = FALSE;
+	PKLDBGCONTEXT   Context = (PKLDBGCONTEXT)lpParameter;
+	
 	//validate pointer
 	if (Context == NULL) {
 		return FALSE;
@@ -1661,7 +1654,7 @@ VOID kdShutdown(
 	VOID
 	)
 {
-	WCHAR szDrvPath[MAX_PATH + 1];
+	WCHAR szDrvPath[MAX_PATH];
 
 	DeleteCriticalSection(&g_kdctx.ListLock);
 

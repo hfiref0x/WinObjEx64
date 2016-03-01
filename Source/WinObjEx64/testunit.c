@@ -4,9 +4,9 @@
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     1.40
+*  VERSION:     1.41
 *
-*  DATE:        13 Feb 2016
+*  DATE:        01 Mar 2016
 *
 *  Test code used while debug.
 *
@@ -29,7 +29,8 @@ VOID TestIoCompletion(
 	)
 {
 	OBJECT_ATTRIBUTES obja;
-	UNICODE_STRING ustr;
+	UNICODE_STRING    ustr;
+
 	//IoCompletion
 	RtlInitUnicodeString(&ustr, L"\\BaseNamedObjects\\TestCompletion");
 	InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
@@ -41,7 +42,7 @@ VOID TestTimer(
 	VOID
 	)
 {
-	HANDLE hTimer = NULL;
+	HANDLE        hTimer = NULL;
 	LARGE_INTEGER liDueTime;
 
 	liDueTime.QuadPart = -1000000000000LL;
@@ -56,9 +57,9 @@ VOID TestTransaction(
 	VOID
 	)
 {
-
 	OBJECT_ATTRIBUTES obja;
-	UNICODE_STRING ustr;
+	UNICODE_STRING    ustr;
+
 	//TmTx
 	RtlInitUnicodeString(&ustr, L"\\BaseNamedObjects\\TestTransaction");
 	InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
@@ -69,14 +70,13 @@ VOID TestPrivateNamespace(
 	VOID
 	)
 {
-	HANDLE hBoundaryDescriptor = NULL;
-	BOOL cond = FALSE;
+	BOOL                cond = FALSE;
+	HANDLE              hBoundaryDescriptor = NULL;
 	SECURITY_ATTRIBUTES sa;
-
-	BYTE localAdminSID[SECURITY_MAX_SID_SIZE];
-	PSID pLocalAdminSID = &localAdminSID;
-	DWORD cbSID = sizeof(localAdminSID);
-	CHAR text[1000];
+	BYTE                localAdminSID[SECURITY_MAX_SID_SIZE];
+	PSID                pLocalAdminSID = &localAdminSID;
+	DWORD               cbSID = sizeof(localAdminSID);
+	CHAR                text[1000];
 
 	do {
 		RtlSecureZeroMemory(&localAdminSID, sizeof(localAdminSID));
@@ -112,7 +112,6 @@ VOID TestPrivateNamespace(
 		g_TestMutex = CreateMutex(NULL, FALSE, TEXT("Mynamespace2\\TestMutex"));
 
 	} while (cond);
-
 }
 
 VOID TestStart(
@@ -139,4 +138,3 @@ VOID TestStop(
 		ClosePrivateNamespace(g_TestNamespace, PRIVATE_NAMESPACE_FLAG_DESTROY);
 	}
 }
-

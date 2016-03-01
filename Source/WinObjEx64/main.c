@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.40
+*  VERSION:     1.41
 *
-*  DATE:        13 Feb 2016
+*  DATE:        01 Mar 2016
 *
 *  Program entry point and main window handler.
 *
@@ -59,8 +59,8 @@ INT CALLBACK MainWindowObjectListCompareFunc(
 	_In_ LPARAM lParamSort
 	)
 {
+	INT    nResult = 0;
 	LPWSTR lpItem1, lpItem2;
-	INT nResult = 0;
 	
 	lpItem1 = supGetItemText(ObjectList, (INT)lParam1, (INT)lParamSort, NULL);
 	lpItem2 = supGetItemText(ObjectList, (INT)lParam2, (INT)lParamSort, NULL);
@@ -105,8 +105,8 @@ VOID MainWindowHandleObjectTreeProp(
 	_In_ HWND hwnd
 	)
 {
-	TV_ITEM		tvi;
-	WCHAR		szBuffer[MAX_PATH + 1];
+	TV_ITEM tvi;
+	WCHAR   szBuffer[MAX_PATH + 1];
 
 	if (g_PropWindow != NULL)
 		return;
@@ -140,8 +140,8 @@ VOID MainWindowHandleObjectListProp(
 	_In_ HWND hwnd
 	)
 {
-	INT nSelected;
-	LPWSTR	lpItemText, lpType, lpDesc = NULL;
+	INT     nSelected;
+	LPWSTR  lpItemText, lpType, lpDesc = NULL;
 
 	if (g_PropWindow != NULL)
 		return;
@@ -187,8 +187,8 @@ VOID MainWindowOnRefresh(
 	_In_ HWND hwnd
 	)
 {
-	LPWSTR	CurrentObject;
-	SIZE_T	len;
+	LPWSTR  CurrentObject;
+	SIZE_T  len;
 
 	UNREFERENCED_PARAMETER(hwnd);
 
@@ -246,9 +246,8 @@ LRESULT MainWindowHandleWMCommand(
 	_In_ LPARAM lParam
 	)
 {
-	LPWSTR		lpItemText;
-	HWND		hwndFocus;
-
+	LPWSTR  lpItemText;
+	HWND    hwndFocus;
 
 	UNREFERENCED_PARAMETER(lParam);
 
@@ -372,11 +371,11 @@ VOID MainWindowTreeViewSelChanged(
 	_In_ LPNMTREEVIEWW trhdr
 	)
 {
-	WCHAR			text[MAX_PATH + 2];
-	HTREEITEM		hitem, root;
-	TVITEMEXW		sitem;
-	POE_LIST_ITEM	list = NULL, prevlist = NULL;
-	SIZE_T			p = 1; // size of empty string buffer in characters
+	WCHAR           text[MAX_PATH + 2];
+	HTREEITEM       hitem, root;
+	TVITEMEX        sitem;
+	POE_LIST_ITEM   list = NULL, prevlist = NULL;
+	SIZE_T          p = 1; // size of empty string buffer in characters
 
 	if (trhdr == NULL)
 		return;
@@ -461,18 +460,18 @@ LRESULT MainWindowHandleWMNotify(
 	_In_ LPARAM lParam
 	)
 {
-	INT				c, k;
-	LPNMHDR			hdr = (LPNMHDR)lParam;
-	LPTOOLTIPTEXT	lpttt;
-	LPNMLISTVIEW	lvn;
-	LPNMTREEVIEW	lpnmTreeView;
-	LPWSTR			str;
-	SIZE_T			lcp;
-	LVITEMW			lvitem;
-	LVCOLUMNW		col;
-	TVHITTESTINFO	hti;
-	POINT			pt;
-	WCHAR			item_string[MAX_PATH + 1];
+	INT             c, k;
+	LPNMHDR         hdr = (LPNMHDR)lParam;
+	LPTOOLTIPTEXT   lpttt;
+	LPNMLISTVIEW    lvn;
+	LPNMTREEVIEW    lpnmTreeView;
+	LPWSTR          str;
+	SIZE_T          lcp;
+	LVITEM          lvitem;
+	LVCOLUMN        col;
+	TVHITTESTINFO   hti;
+	POINT           pt;
+	WCHAR           item_string[MAX_PATH + 1];
 
 	UNREFERENCED_PARAMETER(wParam);
 
@@ -507,11 +506,11 @@ LRESULT MainWindowHandleWMNotify(
 				if (TreeView_HitTest(hdr->hwndFrom, &hti) &&
 					(hti.flags & (TVHT_ONITEM | TVHT_ONITEMRIGHT))) {
 					SelectedTreeItem = hti.hItem;
-					if (hdr->code == NM_RCLICK) {
+				//	if (hdr->code == NM_RCLICK) {
 						TreeView_SelectItem(ObjectTree, SelectedTreeItem);
 						SendMessageW(StatusBar, WM_SETTEXT, 0, (LPARAM)CurrentObjectPath);
 						supHandleTreePopupMenu(hwnd, &pt);
-					}
+				//	}
 				}
 				break;
 			}
@@ -662,10 +661,10 @@ LRESULT CALLBACK MainWindowProc(
 	_In_ LPARAM lParam
 	)
 {
-	INT					mark;
-	RECT				ToolBarRect, crc;
+	INT                 mark;
+	RECT                ToolBarRect, crc;
+	LPDRAWITEMSTRUCT    pds;
 	LPMEASUREITEMSTRUCT pms;
-	LPDRAWITEMSTRUCT	pds;
 
 	switch (uMsg) {
 	case WM_CONTEXTMENU:
@@ -803,17 +802,17 @@ BOOL MainDlgMsgHandler(
 */
 void WinObjExMain()
 {
-	MSG						msg1;
-	WNDCLASSEX				wincls;
-	BOOL					IsFullAdmin = FALSE, rv = TRUE, cond = FALSE;
-	ATOM					class_atom = 0;
-	INITCOMMONCONTROLSEX	icc;
-	LVCOLUMNW				col;
-	SHSTOCKICONINFO			sii;
-	HMENU					hMenu;
-	HACCEL					hAccTable = 0;
-	WCHAR					szWindowTitle[100];
-	HANDLE					tmpb;
+	MSG                     msg1;
+	WNDCLASSEX              wincls;
+	BOOL                    IsFullAdmin = FALSE, rv = TRUE, cond = FALSE;
+	ATOM                    class_atom = 0;
+	INITCOMMONCONTROLSEX    icc;
+	LVCOLUMN                col;
+	SHSTOCKICONINFO         sii;
+	HMENU                   hMenu;
+	HACCEL                  hAccTable = 0;
+	WCHAR                   szWindowTitle[100];
+	HANDLE                  hIcon;
 
 #ifdef _DEBUG
 	TestStart();
@@ -867,7 +866,7 @@ void WinObjExMain()
 			break;
 
 		StatusBar = CreateWindowEx(0, STATUSCLASSNAME, NULL,
-			WS_VISIBLE | WS_CHILD, 0, 0, 0, 0, MainWindow, (HMENU)1001, g_hInstance, NULL);
+			WS_VISIBLE | WS_CHILD, 0, 0, 0, 0, MainWindow, NULL, g_hInstance, NULL);
 
 		ObjectTree = CreateWindowEx(WS_EX_CLIENTEDGE, WC_TREEVIEW, NULL,
 			WS_VISIBLE | WS_CHILD | WS_TABSTOP | TVS_DISABLEDRAGDROP | TVS_HASBUTTONS | 
@@ -929,15 +928,15 @@ void WinObjExMain()
 		//load listview images
 		ListViewImages = supLoadImageList(g_hInstance, IDI_ICON_DEVICE, IDI_ICON_UNKNOWN);
 		if (ListViewImages) {
-			tmpb = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
-			if (tmpb) {
-				ImageList_ReplaceIcon(ListViewImages, -1, tmpb);
-				DestroyIcon(tmpb);
+			hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+			if (hIcon) {
+				ImageList_ReplaceIcon(ListViewImages, -1, hIcon);
+				DestroyIcon(hIcon);
 			}
-			tmpb = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
-			if (tmpb) {
-				ImageList_ReplaceIcon(ListViewImages, -1, tmpb);
-				DestroyIcon(tmpb);
+			hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+			if (hIcon) {
+				ImageList_ReplaceIcon(ListViewImages, -1, hIcon);
+				DestroyIcon(hIcon);
 			}
 			ListView_SetImageList(ObjectList, ListViewImages, LVSIL_SMALL);
 		}
@@ -994,7 +993,7 @@ void WinObjExMain()
 		RtlSecureZeroMemory(&col, sizeof(col));
 		col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
 		col.iSubItem = 1;
-		col.pszText = L"Name";
+		col.pszText = TEXT("Name");
 		col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
 		col.iOrder = 0;
 		col.iImage = -1;
@@ -1005,14 +1004,14 @@ void WinObjExMain()
 		ListView_InsertColumn(ObjectList, 1, &col);
 
 		col.iSubItem = 2;
-		col.pszText = L"Type";
+		col.pszText = TEXT("Type");
 		col.iOrder = 1;
 		col.iImage = -1;
 		col.cx = 100;
 		ListView_InsertColumn(ObjectList, 2, &col);
 
 		col.iSubItem = 3;
-		col.pszText = L"Additional Information";
+		col.pszText = TEXT("Additional Information");
 		col.iOrder = 2;
 		col.iImage = -1;
 		col.cx = 170;
@@ -1066,7 +1065,6 @@ void WinObjExMain()
 */
 void main()
 {
-
 	__security_init_cookie();
 
 	WinObjExMain();

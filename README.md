@@ -2,6 +2,8 @@
 #WinObjEx64
 ## Windows Object Explorer 64-bit
 
+<img src="https://raw.githubusercontent.com/hfiref0x/WinObjEx64/master/Screenshots/MainWindow.png" width="600" />
+
 WinObjEx64 is an advanced utility that lets you explore the Windows Object Manager namespace. For certain object types, you can double-click on it or use the "Properties..." toolbar button to get more information, such as description, attributes, resource usage etc. WinObjEx64 let you view and edit object-related security information if you have required access rights.
 
 # System Requirements

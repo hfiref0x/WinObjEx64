@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       LIST.C
 *
-*  VERSION:     1.12
+*  VERSION:     1.41
 *
-*  DATE:        26 May 2015
+*  DATE:        01 Mar 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -56,12 +56,12 @@ VOID ListToObject(
 	_In_ LPWSTR ObjectName
 	)
 {
-	HTREEITEM	lastfound, item;
-	WCHAR		object[MAX_PATH + 1], sobject[MAX_PATH + 1];
-	int			i, s;
-	LVITEMW		lvitem;
-	TVITEMEXW	ritem;
-	BOOL		currentfound = FALSE;
+	BOOL        currentfound = FALSE;
+	INT         i, s;
+	HTREEITEM   lastfound, item;
+	LVITEM      lvitem;
+	TVITEMEX    ritem;
+	WCHAR       object[MAX_PATH + 1], sobject[MAX_PATH + 1];
 
 	if (ObjectName == NULL)
 		return;
@@ -148,7 +148,7 @@ HTREEITEM AddTreeViewItem(
 	_In_opt_ HTREEITEM Root
 	)
 {
-	TVINSERTSTRUCTW	item;
+	TVINSERTSTRUCT	item;
 
 	RtlSecureZeroMemory(&item, sizeof(item));
 	item.hParent = Root;
@@ -178,14 +178,14 @@ VOID ListObjectDirectoryTree(
 	_In_opt_ HTREEITEM ViewRootHandle
 	)
 {
-	OBJECT_ATTRIBUTES	objattr;
-	UNICODE_STRING		objname;
-	HANDLE				hDirectory = NULL;
-	NTSTATUS			status;
-	ULONG				ctx, rlen;
-	BOOL				cond = TRUE;
+	BOOL                cond = TRUE;
+	NTSTATUS            status;
+	ULONG               ctx, rlen;
+	HANDLE              hDirectory = NULL;
+	OBJECT_ATTRIBUTES   objattr;
+	UNICODE_STRING      objname;
 
-	POBJECT_DIRECTORY_INFORMATION	objinf;
+	POBJECT_DIRECTORY_INFORMATION  objinf;
 
 	ViewRootHandle = AddTreeViewItem(SubDirName, ViewRootHandle);
 	RtlSecureZeroMemory(&objname, sizeof(objname));
@@ -239,11 +239,11 @@ VOID AddListViewItem(
 	_In_ PENUM_PARAMS lpEnumParams
 	)
 {
-	BOOL		bFound = FALSE;
-	INT			index;
-	SIZE_T		cch;
-	LVITEMW		lvitem;
-	WCHAR		szBuffer[MAX_PATH + 1];
+	BOOL    bFound = FALSE;
+	INT     index;
+	SIZE_T  cch;
+	LVITEM  lvitem;
+	WCHAR   szBuffer[MAX_PATH + 1];
 
 	if (!objinf) return;
 
@@ -336,12 +336,12 @@ VOID ListObjectsInDirectory(
 	_In_ PENUM_PARAMS lpEnumParams
 	)
 {
-	OBJECT_ATTRIBUTES	objattr;
-	UNICODE_STRING		objname;
-	HANDLE				hDirectory = NULL;
-	NTSTATUS			status;
-	ULONG				ctx, rlen;
-	BOOL				cond = TRUE;
+	BOOL                cond = TRUE;
+	NTSTATUS            status;
+	ULONG               ctx, rlen;
+	HANDLE              hDirectory = NULL;
+	OBJECT_ATTRIBUTES   objattr;
+	UNICODE_STRING      objname;
 
 	POBJECT_DIRECTORY_INFORMATION	objinf;
 
@@ -398,17 +398,18 @@ VOID FindObject(
 	_In_ PFO_LIST_ITEM *List
 	)
 {
-	OBJECT_ATTRIBUTES	objattr;
-	UNICODE_STRING		objname;
-	HANDLE				hDirectory = NULL;
-	NTSTATUS			status;
-	ULONG				ctx, rlen;
-	size_t				sdlen;
-	BOOL				cond = TRUE;
-	PFO_LIST_ITEM		tmp;
-	LPWSTR				newdir;
+	BOOL                cond = TRUE;
+	NTSTATUS            status;
+	ULONG               ctx, rlen;
+	HANDLE              hDirectory = NULL;
+	SIZE_T              sdlen;
+	LPWSTR              newdir;
+	OBJECT_ATTRIBUTES   objattr;
+	UNICODE_STRING      objname;
+	PFO_LIST_ITEM       tmp;
 
 	POBJECT_DIRECTORY_INFORMATION	objinf;
+
 	RtlSecureZeroMemory(&objname, sizeof(objname));
 	RtlInitUnicodeString(&objname, DirName);
 	sdlen = _strlen(DirName);

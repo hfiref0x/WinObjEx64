@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       PROPPROCESS.C
 *
-*  VERSION:     1.30
+*  VERSION:     1.41
 *
-*  DATE:        31 Aug 2015
+*  DATE:        01 Mar 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -45,9 +45,9 @@ INT CALLBACK ProcessListCompareFunc(
 	_In_ LPARAM lParamSort
 	)
 {
-	LPWSTR lpItem1, lpItem2;
-	INT nResult, k;
-	SIZE_T sz1, sz2;
+	INT       nResult, k;
+	LPWSTR    lpItem1, lpItem2;
+	SIZE_T    sz1, sz2;
 	ULONG_PTR Value1, Value2;
 
 	sz1 = 0;
@@ -106,14 +106,14 @@ VOID ProcessShowProperties(
 	INT iItem
 	)
 {
-	LPWSTR				Buffer;
-	DWORD				dwProcessId;
-	ULONG				bytesNeeded;
-	HANDLE				hProcess;
-	NTSTATUS			status;
-	PUNICODE_STRING		dynUstr;
-	OBJECT_ATTRIBUTES	obja;
-	CLIENT_ID			cid;
+	LPWSTR              Buffer;
+	DWORD               dwProcessId;
+	ULONG               bytesNeeded;
+	HANDLE              hProcess;
+	NTSTATUS            status;
+	PUNICODE_STRING     dynUstr;
+	OBJECT_ATTRIBUTES   obja;
+	CLIENT_ID           cid;
 
 	__try {
 		//query process id
@@ -157,7 +157,6 @@ VOID ProcessShowProperties(
 	}
 }
 
-
 /*
 * ProcessListHandleNotify
 *
@@ -171,9 +170,9 @@ VOID ProcessListHandleNotify(
 	LPARAM lParam
 	)
 {
-	LVCOLUMNW		col;
-	INT				c;
-	LPNMHDR			nhdr = (LPNMHDR)lParam;
+	INT        c;
+	LVCOLUMN   col;
+	LPNMHDR    nhdr = (LPNMHDR)lParam;
 
 	if (nhdr == NULL)
 		return;
@@ -212,7 +211,6 @@ VOID ProcessListHandleNotify(
 	}
 }
 
-
 /*
 * ProcessQueryInfo
 *
@@ -227,16 +225,14 @@ BOOL ProcessQueryInfo(
 	_Out_ BOOL *pbIs32
 	)
 {
-	BOOL				bResult = FALSE, bIconFound, bWow64State;
-	ULONG				bytesNeeded;
-	HANDLE				hProcess;
-	NTSTATUS			status;
-	PVOID				Buffer;
-	PUNICODE_STRING		dynUstr;
-	OBJECT_ATTRIBUTES	obja;
-	CLIENT_ID			cid;
-
-	PROCESS_EXTENDED_BASIC_INFORMATION pebi;
+	BOOL               bResult = FALSE, bIconFound;
+	ULONG              bytesNeeded;
+	HANDLE             hProcess;
+	NTSTATUS           status;
+	PVOID              Buffer;
+	PUNICODE_STRING    dynUstr;
+	CLIENT_ID          cid;
+	OBJECT_ATTRIBUTES  obja;
 
 	if ((pProcessIcon == NULL) || (pbIs32 == NULL)) {
 		return bResult;
@@ -245,7 +241,6 @@ BOOL ProcessQueryInfo(
 	*pProcessIcon = NULL;
 	*pbIs32 = FALSE;
 
-	bWow64State = FALSE;
 	bIconFound = FALSE;
 	__try {
 		cid.UniqueProcess = (HANDLE)ProcessId;
@@ -276,20 +271,14 @@ BOOL ProcessQueryInfo(
 		}
 
 		//query if this is wow64 process
-		RtlSecureZeroMemory(&pebi, sizeof(pebi));
-		pebi.Size = sizeof(PROCESS_EXTENDED_BASIC_INFORMATION);
-		status = NtQueryInformationProcess(hProcess, ProcessBasicInformation, &pebi, sizeof(pebi), NULL);
-		if (NT_SUCCESS(status)) {
-			*pbIs32 = (pebi.IsWow64Process);
-			bWow64State = TRUE;
-		}
+		*pbIs32 = supIsProcess32bit(hProcess);
 
 		NtClose(hProcess);
 	}
 	__except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
 		return FALSE;
 	}
-	bResult = (bIconFound && bWow64State);
+	bResult = (bIconFound);
 	return bResult;
 }
 
@@ -306,11 +295,11 @@ VOID ProcessListAddItem(
 	_In_ PSYSTEM_HANDLE_TABLE_ENTRY_INFO phti
 	)
 {
-	BOOL			bIsWow64;
-	INT				nIndex, iImage;
-	LVITEMW			lvitem;
-	HICON			hIcon;
-	WCHAR			szBuffer[MAX_PATH * 2];
+	BOOL     bIsWow64;
+	INT      nIndex, iImage;
+	HICON    hIcon;
+	LVITEM   lvitem;
+	WCHAR    szBuffer[MAX_PATH * 2];
 
 	if ((phti == NULL) || (ProcessesList == NULL)) {
 		return;
@@ -399,16 +388,15 @@ VOID ProcessListSetInfo(
 	_In_ HWND hwndDlg
 	)
 {
-	BOOL							cond = FALSE;
-	UCHAR							ObjectTypeIndex;
-	ULONG							i;
-	DWORD							CurrentProcessId = GetCurrentProcessId();
-	ULONG_PTR						ObjectAddress;
-	HICON							hIcon;
-	ACCESS_MASK						DesiredAccess;
-	PVOID							ProcessesList;
-	HANDLE							hObject, tmpb;
-	PSYSTEM_HANDLE_INFORMATION		pHandles;
+	BOOL                         cond = FALSE;
+	UCHAR                        ObjectTypeIndex;
+	ULONG                        i;
+	DWORD                        CurrentProcessId = GetCurrentProcessId();
+	ULONG_PTR                    ObjectAddress;
+	ACCESS_MASK                  DesiredAccess;
+	PVOID                        ProcessesList;
+	HANDLE                       hObject, hIcon;
+	PSYSTEM_HANDLE_INFORMATION   pHandles;
 
 	if (Context == NULL) {
 		return;
@@ -433,15 +421,15 @@ VOID ProcessListSetInfo(
 		DestroyIcon(hIcon);
 	}
 	//sort images
-	tmpb = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
-	if (tmpb) {
-		ImageList_ReplaceIcon(ProcessImageList, -1, tmpb);
-		DestroyIcon(tmpb);
+	hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+	if (hIcon) {
+		ImageList_ReplaceIcon(ProcessImageList, -1, hIcon);
+		DestroyIcon(hIcon);
 	}
-	tmpb = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
-	if (tmpb) {
-		ImageList_ReplaceIcon(ProcessImageList, -1, tmpb);
-		DestroyIcon(tmpb);
+	hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+	if (hIcon) {
+		ImageList_ReplaceIcon(ProcessImageList, -1, hIcon);
+		DestroyIcon(hIcon);
 	}
 
 	//check if additional info available
@@ -576,7 +564,7 @@ VOID ProcessListCreate(
 	_In_ HWND hwndDlg
 	)
 {
-	LVCOLUMNW	col;
+	LVCOLUMN col;
 
 	ProcessList = GetDlgItem(hwndDlg, ID_PROCESSLIST);
 	if (ProcessList == NULL)
@@ -591,34 +579,30 @@ VOID ProcessListCreate(
 
 	RtlSecureZeroMemory(&col, sizeof(col));
 	col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
-	col.iSubItem = 1;
-	col.pszText = L"Process";
+	col.iSubItem++;
+	col.pszText = TEXT("Process");
 	col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
-	col.iOrder = 0;
 	col.iImage = 2;
 	col.cx = 160;
-	ListView_InsertColumn(ProcessList, 1, &col);
+	ListView_InsertColumn(ProcessList, col.iSubItem, &col);
 
-	col.iSubItem = 2;
-	col.pszText = L"ID";
-	col.iOrder = 1;
+	col.iSubItem++;
+	col.pszText = TEXT("ID");
+	col.iOrder++;
 	col.iImage = -1;
 	col.cx = 60;
-	ListView_InsertColumn(ProcessList, 2, &col);
+	ListView_InsertColumn(ProcessList, col.iSubItem, &col);
 
-	col.iSubItem = 3;
-	col.pszText = L"Handle";
-	col.iOrder = 2;
-	col.iImage = -1;
+	col.iSubItem++;
+	col.pszText = TEXT("Handle");
+	col.iOrder++;
 	col.cx = 80;
-	ListView_InsertColumn(ProcessList, 3, &col);
+	ListView_InsertColumn(ProcessList, col.iSubItem, &col);
 
-	col.iSubItem = 4;
-	col.pszText = L"Access";
-	col.iOrder = 3;
-	col.iImage = -1;
-	col.cx = 80;
-	ListView_InsertColumn(ProcessList, 4, &col);
+	col.iSubItem++;
+	col.pszText = TEXT("Access");
+	col.iOrder++;
+	ListView_InsertColumn(ProcessList, col.iSubItem, &col);
 }
 
 /*
@@ -661,10 +645,10 @@ VOID ProcessCopyText(
 	_In_ HWND hwndDlg
 	)
 {
-	INT		nSelection, i;
-	SIZE_T	cbText, sz;
-	LPWSTR	lpText, lpItemText[4];
-	HWND	hwndList;
+	INT     nSelection, i;
+	SIZE_T  cbText, sz;
+	LPWSTR  lpText, lpItemText[4];
+	HWND    hwndList;
 
 
 	hwndList = GetDlgItem(hwndDlg, ID_PROCESSLIST);
@@ -739,7 +723,7 @@ INT_PTR CALLBACK ProcessListDialogProc(
 	_In_  LPARAM lParam
 	)
 {
-	PROPSHEETPAGE *pSheet = NULL;
+	PROPSHEETPAGE    *pSheet = NULL;
 	PROP_OBJECT_INFO *Context = NULL;
 
 	switch (uMsg) {

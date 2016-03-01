@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     1.12
+*  VERSION:     1.41
 *
-*  DATE:        26 May 2015
+*  DATE:        01 Mar 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -36,13 +36,13 @@ VOID propSetDefaultInfo(
 	HANDLE hObject
 	)
 {
-	BOOL cond = FALSE;
-	HWND hwndCB;
+	BOOL     cond = FALSE;
+	INT      i;
+	HWND     hwndCB;
 	NTSTATUS status;
-	ULONG bytesNeeded;
-	INT i;
+	ULONG    bytesNeeded;
+	WCHAR    szBuffer[100];
 
-	WCHAR szBuffer[100];
 	OBJECT_BASIC_INFORMATION obi;
 	POBJECT_TYPE_INFORMATION poti = NULL;
 
@@ -142,7 +142,7 @@ VOID propBasicQueryDirectory(
 	_In_ HWND hwndDlg
 	)
 {
-	HANDLE	hObject;
+	HANDLE hObject;
 
 	if (Context == NULL) {
 		return;
@@ -174,12 +174,12 @@ VOID propBasicQuerySemaphore(
 	_In_ BOOL ExtendedInfoAvailable
 	)
 {
-	HANDLE							hObject;
-	NTSTATUS						status;
-	ULONG							bytesNeeded;
+	NTSTATUS  status;
+	ULONG     bytesNeeded;
+	HANDLE    hObject;
+	WCHAR	  szBuffer[MAX_PATH + 1];
 
-	SEMAPHORE_BASIC_INFORMATION		sbi;
-	WCHAR							szBuffer[MAX_PATH + 1];
+	SEMAPHORE_BASIC_INFORMATION sbi;
 
 	SetDlgItemText(hwndDlg, ID_SEMAPHORECURRENT, T_CannotQuery);
 	SetDlgItemText(hwndDlg, ID_SEMAPHOREMAXCOUNT, T_CannotQuery);
@@ -194,9 +194,9 @@ VOID propBasicQuerySemaphore(
 		return;
 	}
 
+	RtlSecureZeroMemory(&sbi, sizeof(SEMAPHORE_BASIC_INFORMATION));
 	status = NtQuerySemaphore(hObject, SemaphoreBasicInformation, &sbi, 
 		sizeof(SEMAPHORE_BASIC_INFORMATION), &bytesNeeded);
-
 	if (NT_SUCCESS(status)) {
 
 		//Current count
@@ -232,9 +232,10 @@ VOID propBasicQueryIoCompletion(
 	_In_ BOOL ExtendedInfoAvailable
 	)
 {
-	HANDLE							hObject;
-	NTSTATUS						status;
-	ULONG							bytesNeeded;
+	NTSTATUS status;
+	ULONG    bytesNeeded;
+	HANDLE   hObject;
+	
 	IO_COMPLETION_BASIC_INFORMATION iobi;
 
 	SetDlgItemText(hwndDlg, ID_IOCOMPLETIONSTATE, T_CannotQuery);
@@ -249,6 +250,7 @@ VOID propBasicQueryIoCompletion(
 		return;
 	}
 
+	RtlSecureZeroMemory(&iobi, sizeof(IO_COMPLETION_BASIC_INFORMATION));
 	status = NtQueryIoCompletion(hObject, IoCompletionBasicInformation, &iobi, 
 		sizeof(iobi), &bytesNeeded);
 
@@ -279,14 +281,14 @@ VOID propBasicQueryTimer(
 	_In_ BOOL ExtendedInfoAvailable
 	)
 {
-	HANDLE						hObject;
-	NTSTATUS					status;
-	ULONG						bytesNeeded;
+	NTSTATUS    status;
+	ULONG       bytesNeeded;
+	HANDLE      hObject;
+	ULONGLONG   ConvertedSeconds, Hours;
+	CSHORT      Minutes, Seconds;
+	WCHAR       szBuffer[MAX_PATH + 1];
 
-	TIMER_BASIC_INFORMATION		tbi;
-	ULONGLONG					ConvertedSeconds, Hours;
-	CSHORT						Minutes, Seconds;
-	WCHAR						szBuffer[MAX_PATH + 1];
+	TIMER_BASIC_INFORMATION tbi;
 
 	SetDlgItemText(hwndDlg, ID_TIMERSTATE, T_CannotQuery);
 	SetDlgItemText(hwndDlg, ID_TIMERREMAINING, T_CannotQuery);
@@ -301,6 +303,7 @@ VOID propBasicQueryTimer(
 		return;
 	}
 
+	RtlSecureZeroMemory(&tbi, sizeof(TIMER_BASIC_INFORMATION));
 	status = NtQueryTimer(hObject, TimerBasicInformation, &tbi, 
 		sizeof(TIMER_BASIC_INFORMATION), &bytesNeeded);
 
@@ -350,12 +353,11 @@ VOID propBasicQueryEvent(
 	_In_ BOOL ExtendedInfoAvailable
 	)
 {
-	HANDLE						hObject;
-	LPWSTR						lpInfo;
-	NTSTATUS					status;
-	ULONG						bytesNeeded;
-
-	EVENT_BASIC_INFORMATION		ebi;
+	NTSTATUS status;
+	ULONG    bytesNeeded;
+	HANDLE   hObject;
+	LPWSTR   lpInfo;
+	EVENT_BASIC_INFORMATION	ebi;
 
 	SetDlgItemText(hwndDlg, ID_EVENTTYPE, T_CannotQuery);
 	SetDlgItemText(hwndDlg, ID_EVENTSTATE, T_CannotQuery);
@@ -370,7 +372,7 @@ VOID propBasicQueryEvent(
 		return;
 	}
 
-	RtlSecureZeroMemory(&ebi, sizeof(ebi));
+	RtlSecureZeroMemory(&ebi, sizeof(EVENT_BASIC_INFORMATION));
 	status = NtQueryEvent(hObject, EventBasicInformation, &ebi, 
 		sizeof(EVENT_BASIC_INFORMATION), &bytesNeeded);
 
@@ -427,14 +429,14 @@ VOID propBasicQuerySymlink(
 	_In_ BOOL ExtendedInfoAvailable
 	)
 {
-	HANDLE						hObject;
-	LPWSTR						lpLinkTarget;
-	NTSTATUS					status;
-	ULONG						bytesNeeded;
+	NTSTATUS    status;
+	ULONG       bytesNeeded;
+	HANDLE      hObject;
+	LPWSTR      lpLinkTarget;
+	TIME_FIELDS	SystemTime;
+	WCHAR       szBuffer[MAX_PATH];
 
-	TIME_FIELDS					SystemTime;
-	OBJECT_BASIC_INFORMATION	obi;
-	WCHAR						szBuffer[MAX_PATH + 1];
+	OBJECT_BASIC_INFORMATION obi;
 
 	SetDlgItemText(hwndDlg, ID_OBJECT_SYMLINK_TARGET, T_CannotQuery);
 	SetDlgItemText(hwndDlg, ID_OBJECT_SYMLINK_CREATION, T_CannotQuery);
@@ -457,7 +459,7 @@ VOID propBasicQuerySymlink(
 	}
 
 	//Query Link Creation Time
-	RtlSecureZeroMemory(&obi, sizeof(obi));
+	RtlSecureZeroMemory(&obi, sizeof(OBJECT_BASIC_INFORMATION));
 
 	status = NtQueryObject(hObject, ObjectBasicInformation, &obi, 
 		sizeof(OBJECT_BASIC_INFORMATION), &bytesNeeded);
@@ -505,13 +507,13 @@ VOID propBasicQueryKey(
 	_In_ BOOL ExtendedInfoAvailable
 	)
 {
-	HANDLE					hObject;
-	NTSTATUS				status;
-	ULONG					bytesNeeded;
+	NTSTATUS    status;
+	ULONG       bytesNeeded;
+	HANDLE      hObject;
+	TIME_FIELDS	SystemTime;
+	WCHAR       szBuffer[MAX_PATH];
 
-	KEY_FULL_INFORMATION	kfi;
-	TIME_FIELDS				SystemTime;
-	WCHAR					szBuffer[MAX_PATH + 1];
+	KEY_FULL_INFORMATION  kfi;
 
 	SetDlgItemText(hwndDlg, ID_KEYSUBKEYS, T_CannotQuery);
 	SetDlgItemText(hwndDlg, ID_KEYVALUES, T_CannotQuery);
@@ -527,7 +529,7 @@ VOID propBasicQueryKey(
 		return;
 	}
 
-	RtlSecureZeroMemory(&kfi, sizeof(kfi));
+	RtlSecureZeroMemory(&kfi, sizeof(KEY_FULL_INFORMATION));
 	status = NtQueryKey(hObject, KeyFullInformation, &kfi, 
 		sizeof(KEY_FULL_INFORMATION), &bytesNeeded);
 
@@ -589,10 +591,12 @@ VOID propBasicQueryMutant(
 	_In_ BOOL ExtendedInfoAvailable
 	)
 {
-	HANDLE						hObject;
-	NTSTATUS					status;
-	MUTANT_BASIC_INFORMATION	mbi;
-	WCHAR						szBuffer[MAX_PATH + 1];
+	NTSTATUS status;
+	ULONG    bytesNeeded;
+	HANDLE   hObject;
+	WCHAR    szBuffer[MAX_PATH];
+
+	MUTANT_BASIC_INFORMATION mbi;
 
 	SetDlgItemText(hwndDlg, ID_MUTANTABANDONED, T_CannotQuery);
 	SetDlgItemText(hwndDlg, ID_MUTANTSTATE, T_CannotQuery);
@@ -610,8 +614,7 @@ VOID propBasicQueryMutant(
 	RtlSecureZeroMemory(&mbi, sizeof(MUTANT_BASIC_INFORMATION));
 
 	status = NtQueryMutant(hObject, MutantBasicInformation, &mbi, 
-		sizeof(MUTANT_BASIC_INFORMATION), NULL);
-
+		sizeof(MUTANT_BASIC_INFORMATION), &bytesNeeded);
 	if (NT_SUCCESS(status)) {
 
 		//Abandoned
@@ -648,17 +651,16 @@ VOID propBasicQuerySection(
 	_In_ BOOL ExtendedInfoAvailable
 	)
 {
-	HANDLE						hObject;
-	NTSTATUS					status;
-	SIZE_T						bytesNeeded;
-	LPWSTR						lpType;
-	BOOL						bSet;
+	BOOL      bSet;
+	NTSTATUS  status;
+	HANDLE    hObject;
+	SIZE_T    bytesNeeded;
+	LPWSTR    lpType;
+	RECT      rGB;
+	WCHAR     szBuffer[MAX_PATH * 2];
 
-	RECT						rGB;
-
-	SECTION_BASIC_INFORMATION	sbi;
-	SECTION_IMAGE_INFORMATION	sii;
-	WCHAR						szBuffer[MAX_PATH * 2];
+	SECTION_BASIC_INFORMATION sbi;
+	SECTION_IMAGE_INFORMATION sii;
 
 	SetDlgItemText(hwndDlg, ID_SECTION_ATTR, T_CannotQuery);
 	SetDlgItemText(hwndDlg, ID_SECTIONSIZE, T_CannotQuery);
@@ -677,8 +679,7 @@ VOID propBasicQuerySection(
 	szBuffer[0] = 0;
 
 	//query basic information
-	RtlSecureZeroMemory(&sbi, sizeof(sbi));
-
+	RtlSecureZeroMemory(&sbi, sizeof(SECTION_BASIC_INFORMATION));
 	status = NtQuerySection(hObject, SectionBasicInformation, &sbi, 
 		sizeof(SECTION_BASIC_INFORMATION), &bytesNeeded);
 
@@ -739,8 +740,7 @@ VOID propBasicQuerySection(
 		//query image information
 		if ((sbi.AllocationAttributes & SEC_IMAGE) && (sbi.AllocationAttributes & SEC_FILE)) {
 
-			RtlSecureZeroMemory(&sii, sizeof(sii));
-
+			RtlSecureZeroMemory(&sii, sizeof(SECTION_IMAGE_INFORMATION));
 			status = NtQuerySection(hObject, SectionImageInformation, &sii, 
 				sizeof(SECTION_IMAGE_INFORMATION), &bytesNeeded);
 
@@ -800,6 +800,9 @@ VOID propBasicQuerySection(
 				case IMAGE_SUBSYSTEM_EFI_RUNTIME_DRIVER:
 					lpType = L"EFI Runtime Driver";
 					break;
+				case IMAGE_SUBSYSTEM_WINDOWS_BOOT_APPLICATION:
+					lpType = L"Windows Boot Application";
+					break;
 				}
 				SetDlgItemText(hwndDlg, ID_IMAGE_SUBSYSTEM, lpType);
 
@@ -839,9 +842,9 @@ VOID propBasicQueryWindowStation(
 	_In_ BOOL ExtendedInfoAvailable
 	)
 {
-	HWINSTA				hObject;
-	USEROBJECTFLAGS		userFlags;
-	DWORD				bytesNeeded;
+	DWORD           bytesNeeded;
+	HWINSTA         hObject;
+	USEROBJECTFLAGS userFlags;
 
 	SetDlgItemText(hwndDlg, ID_WINSTATIONVISIBLE, T_CannotQuery);
 
@@ -885,8 +888,8 @@ VOID propBasicQueryDriver(
 	_In_ HWND hwndDlg
 	)
 {
-	RECT	rGB;
-	LPWSTR	lpItemText;
+	RECT    rGB;
+	LPWSTR  lpItemText;
 
 	if (Context == NULL) {
 		return;
@@ -917,8 +920,8 @@ VOID propBasicQueryDevice(
 	_In_ HWND hwndDlg
 	)
 {
-	RECT	rGB;
-	LPWSTR	lpItemText;
+	RECT    rGB;
+	LPWSTR  lpItemText;
 
 	if (Context == NULL) {
 		return;
@@ -952,19 +955,19 @@ VOID propBasicQueryJob(
 	_In_ BOOL ExtendedInfoAvailable
 	)
 {
-	BOOL		cond = FALSE;
-	DWORD		i, pid;
-	HWND		hwndCB;
-	HANDLE		hObject;
-	NTSTATUS	status;
-	ULONG		bytesNeeded;
-	PVOID		ProcessList;
-	WCHAR		szProcessName[MAX_PATH + 1];
-	WCHAR		szBuffer[MAX_PATH * 2];
+	BOOL        cond = FALSE;
+	DWORD       i, pid;
+	HWND        hwndCB;
+	HANDLE      hObject;
+	NTSTATUS    status;
+	ULONG       bytesNeeded;
+	PVOID       ProcessList;
+	WCHAR       szProcessName[MAX_PATH + 1];
+	WCHAR       szBuffer[MAX_PATH * 2];
 	TIME_FIELDS SystemTime;
 
-	JOBOBJECT_BASIC_ACCOUNTING_INFORMATION	jbai;
-	PJOBOBJECT_BASIC_PROCESS_ID_LIST		pJobProcList;
+	JOBOBJECT_BASIC_ACCOUNTING_INFORMATION jbai;
+	PJOBOBJECT_BASIC_PROCESS_ID_LIST       pJobProcList;
 
 	SetDlgItemText(hwndDlg, ID_JOBTOTALPROCS, T_CannotQuery);
 	SetDlgItemText(hwndDlg, ID_JOBACTIVEPROCS, T_CannotQuery);
@@ -984,7 +987,7 @@ VOID propBasicQueryJob(
 	}
 
 	//query basic information
-	RtlSecureZeroMemory(&jbai, sizeof(jbai));
+	RtlSecureZeroMemory(&jbai, sizeof(JOBOBJECT_BASIC_ACCOUNTING_INFORMATION));
 	status = NtQueryInformationJobObject(hObject, JobObjectBasicAccountingInformation, 
 		&jbai, sizeof(JOBOBJECT_BASIC_ACCOUNTING_INFORMATION), &bytesNeeded);
 	if (NT_SUCCESS(status)) {
@@ -1108,9 +1111,9 @@ VOID propSetBasicInfoEx(
 	_In_ POBJINFO InfoObject
 	)
 {
-	INT			i;
-	HWND		hwndCB;
-	WCHAR		szBuffer[MAX_PATH + 1];
+	INT     i;
+	HWND    hwndCB;
+	WCHAR   szBuffer[MAX_PATH];
 
 	if (InfoObject == NULL)
 		return;
@@ -1181,11 +1184,11 @@ VOID propBasicQueryDesktop(
 	_In_ HWND hwndDlg
 	)
 {
-	BOOL		bExtendedInfoAvailable;
-	HANDLE		hDesktop;
-	ULONG_PTR	ObjectAddress, HeaderAddress, InfoHeaderAddress;
-	WCHAR		szBuffer[MAX_PATH + 1];
-	OBJINFO		InfoObject;
+	BOOL        bExtendedInfoAvailable;
+	HANDLE      hDesktop;
+	ULONG_PTR   ObjectAddress, HeaderAddress, InfoHeaderAddress;
+	WCHAR       szBuffer[MAX_PATH + 1];
+	OBJINFO     InfoObject;
 
 	if (Context == NULL) {
 		return;
@@ -1194,7 +1197,6 @@ VOID propBasicQueryDesktop(
 	//
 	//Restriction: 
 	//This will open only current winsta desktops
-	//Consider rewrite when ExSM will be available
 	//
 
 	hDesktop = NULL;
@@ -1263,8 +1265,8 @@ VOID propSetBasicInfo(
 	_In_ HWND hwndDlg
 	)
 {
+	BOOL     ExtendedInfoAvailable = FALSE;
 	POBJINFO InfoObject = NULL;
-	BOOL ExtendedInfoAvailable = FALSE;
 
 	if (Context == NULL) {
 		return;
@@ -1367,9 +1369,9 @@ INT_PTR CALLBACK BasicPropDialogProc(
 	_In_  LPARAM lParam
 	)
 {
-	HDC hDc;
-	PAINTSTRUCT Paint;
-	PROPSHEETPAGE *pSheet = NULL;
+	HDC               hDc;
+	PAINTSTRUCT       Paint;
+	PROPSHEETPAGE    *pSheet = NULL;
 	PROP_OBJECT_INFO *Context = NULL;
 
 	switch (uMsg) {

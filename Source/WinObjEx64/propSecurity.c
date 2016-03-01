@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       PROPSECURITY.C
 *
-*  VERSION:     1.11
+*  VERSION:     1.41
 *
-*  DATE:        10 Mar 2015
+*  DATE:        01 Mar 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -304,12 +304,12 @@ HRESULT STDMETHODCALLTYPE GetSecurity(
 	BOOL fDefault
 	)
 {
-	HRESULT					hResult;
-	HANDLE					hObject;
-	ULONG					bytesNeeded;
-	NTSTATUS				status;
-	ACCESS_MASK				DesiredAccess;
-	PSECURITY_DESCRIPTOR	PSD;
+	HRESULT                hResult;
+	HANDLE                 hObject;
+	ULONG                  bytesNeeded;
+	NTSTATUS               status;
+	ACCESS_MASK            DesiredAccess;
+	PSECURITY_DESCRIPTOR   PSD;
 
 	if (fDefault) {
 		return E_NOTIMPL;
@@ -366,9 +366,9 @@ HRESULT STDMETHODCALLTYPE SetSecurity(
 	PSECURITY_DESCRIPTOR pSecurityDescriptor
 	)
 {
-	HANDLE			hObject = NULL;
-	NTSTATUS		status;
-	ACCESS_MASK		DesiredAccess;
+	NTSTATUS       status;
+	HANDLE         hObject = NULL;
+	ACCESS_MASK    DesiredAccess;
 
 	DesiredAccess = propGetObjectAccessMask(SecurityInformation, TRUE);
 	if (!This->OpenObjectMethod(This->ObjectContext, &hObject, DesiredAccess)) {
@@ -455,14 +455,14 @@ HRESULT propSecurityConstructor(
 	_In_				ULONG psiFlags
 	)
 {
-	BOOL						cond = FALSE;
-	ULONG						bytesNeeded = 0L;
-	NTSTATUS					status;
-	SIZE_T						Size;
-	HRESULT						hResult;
-	HANDLE						hObject = NULL;
-	SI_ACCESS					*TypeAccessTable = NULL;
-	POBJECT_TYPE_INFORMATION	TypeInfo = NULL;
+	BOOL                        cond = FALSE;
+	ULONG                       bytesNeeded = 0L;
+	NTSTATUS                    status;
+	SIZE_T                      Size;
+	HRESULT                     hResult;
+	HANDLE                      hObject = NULL;
+	SI_ACCESS                  *TypeAccessTable = NULL;
+	POBJECT_TYPE_INFORMATION    TypeInfo = NULL;
 
 	do {
 		This->OpenObjectMethod = OpenObjectMethod;

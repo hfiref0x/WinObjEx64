@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPN.C
 *
-*  VERSION:     1.40
+*  VERSION:     1.41
 *
-*  DATE:        13 Feb 2016
+*  DATE:        01 Mar 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -41,7 +41,7 @@ INT CALLBACK PNListCompareFunc(
 	)
 {
 	LPWSTR lpItem1, lpItem2;
-	INT nResult = 0;
+	INT    nResult = 0;
 
 	lpItem1 = supGetItemText(PnDlgContext.ListView, (INT)lParam1, (INT)lParamSort, NULL);
 	lpItem2 = supGetItemText(PnDlgContext.ListView, (INT)lParam2, (INT)lParamSort, NULL);
@@ -84,7 +84,7 @@ BOOL PNDlgQueryInfo(
 	BOOL          bResult = FALSE;
 	POBJREF       ObjectInfo;
 	PLIST_ENTRY   Entry;
-	LVITEMW       lvitem;
+	LVITEM        lvitem;
 	LPCWSTR       TypeName;
 	WCHAR         szBuffer[MAX_PATH + 1];
 
@@ -147,8 +147,8 @@ VOID PNDlgHandleNotify(
 	LPNMLISTVIEW	nhdr
 	)
 {
-	LVCOLUMNW		col;
-	INT				c, k;
+	LVCOLUMN col;
+	INT      c, k;
 
 	if (nhdr == NULL)
 		return;
@@ -157,7 +157,6 @@ VOID PNDlgHandleNotify(
 		return;
 
 	switch (nhdr->hdr.code) {
-
 
 	case LVN_COLUMNCLICK:
 		
@@ -239,8 +238,8 @@ VOID extrasCreatePNDialog(
 	_In_ HWND hwndParent
 	)
 {
-	LVCOLUMNW   col;
-	WCHAR       szBuffer[MAX_PATH + 1];
+	LVCOLUMN col;
+	WCHAR    szBuffer[MAX_PATH];
 
 
 	//allow only one dialog
@@ -268,35 +267,34 @@ VOID extrasCreatePNDialog(
 		//create ObjectList columns
 		RtlSecureZeroMemory(&col, sizeof(col));
 		col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
-		col.iSubItem = 1;
-		col.pszText = L"Name";
+		col.iSubItem++;
+		col.pszText = TEXT("Name");
 		col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
-		col.iOrder = 0;
 		col.iImage = ImageList_GetImageCount(ListViewImages) - 1;
 		col.cx = 400;
-		ListView_InsertColumn(PnDlgContext.ListView, 1, &col);
+		ListView_InsertColumn(PnDlgContext.ListView, col.iSubItem, &col);
 
-		col.iSubItem = 2;
-		col.pszText = L"Type";
+		col.iSubItem++;
+		col.pszText = TEXT("Type");
 		col.iOrder = 1;
 		col.iImage = -1;
 		col.cx = 100;
-		ListView_InsertColumn(PnDlgContext.ListView, 2, &col);
+		ListView_InsertColumn(PnDlgContext.ListView, col.iSubItem, &col);
 
-		col.iSubItem = 3;
-		col.pszText = L"Namespace";
+		col.iSubItem++;
+		col.pszText = TEXT("Namespace");
 		col.iOrder = 2;
 		col.iImage = -1;
 		col.cx = 100;
-		ListView_InsertColumn(PnDlgContext.ListView, 3, &col);
+		ListView_InsertColumn(PnDlgContext.ListView, col.iSubItem, &col);
 
 		//remember columns count
-		PnDlgContext.lvColumnCount = 3;
+		PnDlgContext.lvColumnCount = col.iSubItem;
 
 		if (PNDlgQueryInfo()) {
 			ListView_SortItemsEx(PnDlgContext.ListView, &PNListCompareFunc, 0);
 			RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-			wsprintfW(szBuffer, T_NAMESPACEOBJECTCNT, ListView_GetItemCount(PnDlgContext.ListView));
+			wsprintf(szBuffer, T_NAMESPACEOBJECTCNT, ListView_GetItemCount(PnDlgContext.ListView));
 			SetDlgItemText(PnDlgContext.hwndDlg, ID_PNAMESPACESINFO, szBuffer);
 		}
 		else {

@@ -618,6 +618,29 @@ LRESULT CALLBACK TreeListWindowProc(
 		SetFocus((HWND)GetWindowLongPtr(hwnd, TL_TREECONTROL_SLOT));
 		break;
 
+	case WM_SIZE:
+		result = DefWindowProc(hwnd, uMsg, wParam, lParam);
+		RtlSecureZeroMemory(&hr, sizeof(hr));
+		GetClientRect(hwnd, &hr);
+
+		RtlSecureZeroMemory(&ncm, sizeof(ncm));
+		ncm.cbSize = sizeof(ncm) - sizeof(int);
+		if (SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(ncm) - sizeof(int), &ncm, 0)) {
+			cx = ncm.iCaptionHeight;
+		}
+		else {
+			cx = 20;
+		}
+		HeaderControl = (HWND)GetWindowLongPtr(hwnd, TL_HEADERCONTROL_SLOT);
+		TreeControl = (HWND)GetWindowLongPtr(hwnd, TL_TREECONTROL_SLOT);
+
+		SetWindowPos(HeaderControl, NULL, 0, 0, hr.right, cx, SWP_NOMOVE);
+		SetWindowPos(TreeControl, NULL, 0, 0, hr.right, hr.bottom - cx, SWP_NOMOVE);
+
+		UpdateWindow(HeaderControl);
+		UpdateWindow(TreeControl);
+		return result;
+
 	case WM_CREATE:
 		hheap = HeapCreate(0, 0, 0);
 		if (hheap == NULL)

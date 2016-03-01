@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     1.40
+*  VERSION:     1.41
 *
-*  DATE:        13 Feb 2016
+*  DATE:        01 Mar 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -38,9 +38,9 @@ INT CALLBACK SdtDlgCompareFunc(
 	_In_ LPARAM lParamSort
 	)
 {
-	LPWSTR lpItem1, lpItem2;
-	INT nResult = 0;
-	ULONG id1, id2;
+	INT       nResult = 0;
+	LPWSTR    lpItem1, lpItem2;
+	ULONG     id1, id2;
 	ULONG_PTR ad1, ad2;
 
 	lpItem1 = supGetItemText(SdtDlgContext.ListView, (INT)lParam1, (INT)lParamSort, NULL);
@@ -151,15 +151,12 @@ VOID SdtSaveListToFile(
 	)
 {
 	
-	WCHAR ch;
-	INT BufferSize = 0;
-	INT	numitems;
-	INT	row, subitem;
-	SIZE_T sz, k;
-	LPWSTR pItem = NULL;
-	HCURSOR hSaveCursor;
-	HCURSOR hHourGlass;
-	WCHAR szTempBuffer[MAX_PATH + 1];
+	WCHAR   ch;
+	INT	    row, subitem, numitems, BufferSize = 0;
+	SIZE_T  sz, k;
+	LPWSTR  pItem = NULL;
+	HCURSOR hSaveCursor, hHourGlass;
+	WCHAR   szTempBuffer[MAX_PATH + 1];
 
 	RtlSecureZeroMemory(szTempBuffer, sizeof(szTempBuffer));
 
@@ -240,10 +237,11 @@ INT_PTR CALLBACK SdtDialogProc(
 		break;
 
 	case WM_SIZE:
-		extrasSimpleListResize(hwndDlg);
+		extrasSimpleListResize(hwndDlg, SdtDlgContext.SizeGrip);
 		break;
 
 	case WM_CLOSE:
+		if (SdtDlgContext.SizeGrip) DestroyWindow(SdtDlgContext.SizeGrip);
 		DestroyWindow(hwndDlg);
 		g_wobjDialogs[WOBJ_SSDTDLG_IDX] = NULL;
 		return TRUE;
@@ -288,7 +286,7 @@ VOID SdtListTable(
 	DWORD                   ETableVA;
 	PDWORD                  names, functions;
 	PWORD                   ordinals;
-	LVITEMW                 lvitem;
+	LVITEM                  lvitem;
 	WCHAR                   szBuffer[MAX_PATH + 1];
 
 	char *name;
@@ -441,7 +439,7 @@ VOID extrasCreateSSDTDialog(
 	_In_ HWND hwndParent
 	)
 {
-	LVCOLUMNW   col;
+	LVCOLUMN  col;
 
 	//allow only one dialog
 	if (g_wobjDialogs[WOBJ_SSDTDLG_IDX]) {
@@ -462,6 +460,8 @@ VOID extrasCreateSSDTDialog(
 
 	g_wobjDialogs[WOBJ_SSDTDLG_IDX] = SdtDlgContext.hwndDlg;	
 
+	SdtDlgContext.SizeGrip = supCreateSzGripWindow(SdtDlgContext.hwndDlg);
+
 	SetWindowText(SdtDlgContext.hwndDlg, TEXT("System Service Table"));
 
 	extrasSetDlgIcon(SdtDlgContext.hwndDlg);
@@ -476,37 +476,34 @@ VOID extrasCreateSSDTDialog(
 		//columns
 		RtlSecureZeroMemory(&col, sizeof(col));
 		col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
-		col.iSubItem = 1;
-		col.pszText = L"Id";
+		col.iSubItem++;
+		col.pszText = TEXT("Id");
 		col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
-		col.iOrder = 0;
 		col.iImage = ImageList_GetImageCount(ListViewImages) - 1;
 		col.cx = 80;
-		ListView_InsertColumn(SdtDlgContext.ListView, 1, &col);
+		ListView_InsertColumn(SdtDlgContext.ListView, col.iSubItem, &col);
 
-		col.iSubItem = 2;
-		col.pszText = L"Service Name";
-		col.iOrder = 1;
+		col.iSubItem++;
+		col.pszText = TEXT("Service Name");
+		col.iOrder++;
 		col.iImage = -1;
 		col.cx = 200;
-		ListView_InsertColumn(SdtDlgContext.ListView, 2, &col);
+		ListView_InsertColumn(SdtDlgContext.ListView, col.iSubItem, &col);
 
-		col.iSubItem = 3;
-		col.pszText = L"Address";
-		col.iOrder = 2;
-		col.iImage = -1;
+		col.iSubItem++;
+		col.pszText = TEXT("Address");
+		col.iOrder++;
 		col.cx = 130;
-		ListView_InsertColumn(SdtDlgContext.ListView, 3, &col);
+		ListView_InsertColumn(SdtDlgContext.ListView, col.iSubItem, &col);
 
-		col.iSubItem = 4;
-		col.pszText = L"Module";
-		col.iOrder = 3;
-		col.iImage = -1;
+		col.iSubItem++;
+		col.pszText = TEXT("Module");
+		col.iOrder++;
 		col.cx = 200;
-		ListView_InsertColumn(SdtDlgContext.ListView, 4, &col);
+		ListView_InsertColumn(SdtDlgContext.ListView, col.iSubItem, &col);
 
 		//remember columns count
-		SdtDlgContext.lvColumnCount = 4;
+		SdtDlgContext.lvColumnCount = col.iSubItem;
 
 		SdtListTable();
 		SendMessage(SdtDlgContext.hwndDlg, WM_SIZE, 0, 0);

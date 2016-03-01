@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRAS.C
 *
-*  VERSION:     1.40
+*  VERSION:     1.41
 *
-*  DATE:        13 Feb 2016
+*  DATE:        01 Mar 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,7 +17,6 @@
 
 #include "global.h"
 #include "propDlg.h"
-#include "propSecurity.h"
 #include "extras.h"
 #include "extrasPipes.h"
 #include "extrasUSD.h"
@@ -34,20 +33,29 @@
 *
 */
 VOID extrasSimpleListResize(
-	_In_ HWND hwndDlg
+	_In_ HWND hwndDlg,
+	_In_ HWND hwndSzGrip
 	)
 {
 	RECT r1;
 	HWND hwnd;
+	INT  cy;
+
 	RtlSecureZeroMemory(&r1, sizeof(r1));
 
 	hwnd = GetDlgItem(hwndDlg, ID_EXTRASLIST);
 	GetClientRect(hwndDlg, &r1);
 
+	cy = r1.bottom - 16;
+	if (hwndSzGrip != 0) 
+		cy -= GRIPPER_SIZE;
+
 	SetWindowPos(hwnd, 0, 0, 0,
 		r1.right - 16,
-		r1.bottom - 16,
+		cy,
 		SWP_NOMOVE | SWP_NOZORDER);
+
+	supSzGripWindowOnResize(hwndDlg, hwndSzGrip);
 }
 
 /*
@@ -64,8 +72,8 @@ VOID extrasDlgHandleNotify(
 	_In_ DlgCompareFunction CompareFunc
 	)
 {
-	LVCOLUMNW		col;
-	INT				c, k;
+	LVCOLUMN col;
+	INT      c, k;
 
 	if ((nhdr == NULL) || (Context == NULL))
 		return;

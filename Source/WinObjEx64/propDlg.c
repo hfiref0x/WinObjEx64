@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       PROPDLG.C
 *
-*  VERSION:     1.11
+*  VERSION:     1.41
 *
-*  DATE:        10 Mar 2015
+*  DATE:        01 Mar 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -52,12 +52,12 @@ BOOL propOpenCurrentObject(
 	_In_	ACCESS_MASK	DesiredAccess
 	)
 {
-	BOOL				bResult;
-	HANDLE				hObject, hDirectory;
-	NTSTATUS			status;
-	UNICODE_STRING		ustr;
-	OBJECT_ATTRIBUTES	obja;
-	IO_STATUS_BLOCK		iost;
+	BOOL                bResult;
+	HANDLE              hObject, hDirectory;
+	NTSTATUS            status;
+	UNICODE_STRING      ustr;
+	OBJECT_ATTRIBUTES   obja;
+	IO_STATUS_BLOCK     iost;
 
 	bResult = FALSE;
 	if (Context == NULL) {
@@ -242,7 +242,7 @@ PPROP_OBJECT_INFO propContextCreate(
 	LPWSTR lpDescription
 	)
 {
-	BOOL bSelectedObject = FALSE, bSelectedDirectory = FALSE;
+	BOOL              bSelectedObject = FALSE, bSelectedDirectory = FALSE;
 	PROP_OBJECT_INFO *Context;
 
 	__try {
@@ -437,13 +437,13 @@ VOID propCreateDialog(
 	_In_opt_ LPWSTR lpDescription
 	)
 {
-	INT					nPages;
-	HWND				hwndDlg;
-	PROP_OBJECT_INFO	*propContext = NULL;
-	HPROPSHEETPAGE		SecurityPage;
-	PROPSHEETPAGE		Page;
-	PROPSHEETHEADER		PropHeader;
-	WCHAR				szCaption[MAX_PATH * 2];
+	INT                 nPages;
+	HWND                hwndDlg;
+	PROP_OBJECT_INFO   *propContext = NULL;
+	HPROPSHEETPAGE      SecurityPage;
+	PROPSHEETPAGE       Page;
+	PROPSHEETHEADER     PropHeader;
+	WCHAR               szCaption[MAX_PATH * 2];
 
 	if ((hwndParent == NULL) ||
 		(lpObjectName == NULL) ||

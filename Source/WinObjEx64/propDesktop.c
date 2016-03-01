@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       PROPDESKTOP.C
 *
-*  VERSION:     1.12
+*  VERSION:     1.41
 *
-*  DATE:        26 May 2015
+*  DATE:        01 Mar 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -42,18 +42,16 @@ BOOL CALLBACK DesktopListEnumProc(
 	_In_  LPARAM lParam
 	)
 {
+	BOOL              bSucc;
+	INT	              nIndex;
+	DWORD             bytesNeeded, dwDesktopHeapSize;
+	LPWSTR            lpName, StringSid;
+	PSID              pSID;
+	SIZE_T            sz;
+	HDESK             hDesktop;
 	PROP_OBJECT_INFO *Context;
-
-	BOOL		bSucc;
-	INT			nIndex;
-	DWORD		bytesNeeded, dwDesktopHeapSize;
-	LPWSTR		lpName;
-	PSID		pSID;
-	SIZE_T		sz;
-	HDESK		hDesktop;
-	LPWSTR		StringSid;
-	LVITEMW		lvitem;
-	WCHAR		szBuffer[MAX_PATH];
+	LVITEM            lvitem;
+	WCHAR             szBuffer[MAX_PATH];
 
 	Context = (PROP_OBJECT_INFO*)lParam;
 	if (Context == NULL) {
@@ -152,8 +150,8 @@ VOID DesktopListSetInfo(
 	_In_ HWND hwndDlg
 	)
 {
-	BOOL		bResult = FALSE;
-	HWINSTA		hObject;
+	BOOL    bResult = FALSE;
+	HWINSTA hObject;
 
 	if (Context == NULL) {
 		return;
@@ -183,8 +181,8 @@ VOID DesktopListCreate(
 	_In_ HWND hwndDlg
 	)
 {
-	LVCOLUMNW	col;
-	HANDLE		tmpb;
+	LVCOLUMN col;
+	HANDLE   hImage;
 
 	DesktopList = GetDlgItem(hwndDlg, ID_DESKTOPSLIST);
 	if (DesktopList == NULL)
@@ -194,22 +192,22 @@ VOID DesktopListCreate(
 	if (DesktopImageList) {
 
 		//desktop image
-		tmpb = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_DESKTOP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
-		if (tmpb) {
-			ImageList_ReplaceIcon(DesktopImageList, -1, tmpb);
-			DestroyIcon(tmpb);
+		hImage = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_DESKTOP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+		if (hImage) {
+			ImageList_ReplaceIcon(DesktopImageList, -1, hImage);
+			DestroyIcon(hImage);
 		}
 
 		//sort images
-		tmpb = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
-		if (tmpb) {
-			ImageList_ReplaceIcon(DesktopImageList, -1, tmpb);
-			DestroyIcon(tmpb);
+		hImage = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+		if (hImage) {
+			ImageList_ReplaceIcon(DesktopImageList, -1, hImage);
+			DestroyIcon(hImage);
 		}
-		tmpb = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
-		if (tmpb) {
-			ImageList_ReplaceIcon(DesktopImageList, -1, tmpb);
-			DestroyIcon(tmpb);
+		hImage = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+		if (hImage) {
+			ImageList_ReplaceIcon(DesktopImageList, -1, hImage);
+			DestroyIcon(hImage);
 		}
 
 		ListView_SetImageList(DesktopList, DesktopImageList, LVSIL_SMALL);
@@ -221,26 +219,26 @@ VOID DesktopListCreate(
 	RtlSecureZeroMemory(&col, sizeof(col));
 	col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
 	col.iSubItem = 1;
-	col.pszText = L"Name";
+	col.pszText = TEXT("Name");
 	col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
 	col.iOrder = 0;
 	col.iImage = 2;
 	col.cx = 200;
-	ListView_InsertColumn(DesktopList, 1, &col);
+	ListView_InsertColumn(DesktopList, col.iSubItem, &col);
 
 	col.iSubItem = 2;
-	col.pszText = L"SID";
+	col.pszText = TEXT("SID");
 	col.iOrder = 1;
 	col.iImage = -1;
 	col.cx = 100;
-	ListView_InsertColumn(DesktopList, 2, &col);
+	ListView_InsertColumn(DesktopList, col.iSubItem, &col);
 
 	col.iSubItem = 3;
-	col.pszText = L"Heap Size";
+	col.pszText = TEXT("Heap Size");
 	col.iOrder = 2;
 	col.iImage = -1;
 	col.cx = 100;
-	ListView_InsertColumn(DesktopList, 3, &col);
+	ListView_InsertColumn(DesktopList, col.iSubItem, &col);
 }
 
 /*
@@ -257,24 +255,37 @@ INT CALLBACK DesktopListCompareFunc(
 	_In_ LPARAM lParamSort
 	)
 {
+	INT    nResult;
 	LPWSTR lpItem1, lpItem2;
-	INT nResult;
 
 	lpItem1 = supGetItemText(DesktopList, (INT)lParam1, (INT)lParamSort, NULL);
-	if (lpItem1 == NULL)
-		return 0;
-
 	lpItem2 = supGetItemText(DesktopList, (INT)lParam2, (INT)lParamSort, NULL);
-	if (lpItem2 == NULL)
-		return 0;
+
+	if ((lpItem1 == NULL) && (lpItem2 == NULL)) {
+		nResult = 0;
+		goto Done;
+	}
+	if ((lpItem1 == NULL) && (lpItem2 != NULL)) {
+		nResult = (bDesktopListSortInverse) ? 1 : -1;
+		goto Done;
+	}
+	if ((lpItem2 == NULL) && (lpItem1 != NULL)) {
+		nResult = (bDesktopListSortInverse) ? -1 : 1;
+		goto Done;
+	}
 
 	if (bDesktopListSortInverse)
 		nResult = _strcmpi(lpItem2, lpItem1);
 	else
 		nResult = _strcmpi(lpItem1, lpItem2);
 
-	HeapFree(GetProcessHeap(), 0, lpItem1);
-	HeapFree(GetProcessHeap(), 0, lpItem2);
+Done:
+	if (lpItem1) {
+		HeapFree(GetProcessHeap(), 0, lpItem1);
+	}
+	if (lpItem2) {
+		HeapFree(GetProcessHeap(), 0, lpItem2);
+	}
 	return nResult;
 }
 
@@ -291,10 +302,10 @@ VOID DesktopListHandleNotify(
 	LPNMLISTVIEW	nhdr
 	)
 {
-	LVCOLUMNW	col;
-	INT			c;
-	SIZE_T		sz, i, l;
-	LPWSTR		lpItemText, lpName;
+	INT      c;
+	SIZE_T   sz, i, l;
+	LPWSTR   lpItemText, lpName;
+	LVCOLUMN col;
 
 	if (nhdr == NULL) {
 		return;
@@ -371,8 +382,8 @@ INT_PTR CALLBACK DesktopListDialogProc(
 	_In_  LPARAM lParam
 	)
 {
-	LPNMLISTVIEW	nhdr = NULL;
-	PROPSHEETPAGE *pSheet;
+	LPNMLISTVIEW      nhdr = NULL;
+	PROPSHEETPAGE    *pSheet;
 	PROP_OBJECT_INFO *Context = NULL;
 
 	switch (uMsg) {

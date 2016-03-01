@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       PROPDRIVER.C
 *
-*  VERSION:     1.12
+*  VERSION:     1.41
 *
-*  DATE:        26 May 2015
+*  DATE:        01 Maê 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -51,18 +51,17 @@ VOID DriverSetInfo(
 	HWND hwndDlg
 	)
 {
-	BOOL					cond = FALSE, bResult, fGroup, bRet;
-	INT						nEndOfList, nEnd, nStart;
-	DWORD					i, bytesNeeded, dwServices, dwGroups;
-	LPWSTR					lpType;
-	SC_HANDLE				SchSCManager;
-	SC_HANDLE				schService;
+	BOOL                    cond = FALSE, bResult, fGroup, bRet;
+	INT                     nEndOfList, nEnd, nStart;
+	DWORD                   i, bytesNeeded, dwServices, dwGroups;
+	LPWSTR                  lpType;
+	SC_HANDLE               SchSCManager, schService;
 	LPENUM_SERVICE_STATUS   lpDependencies = NULL;
-	LPQUERY_SERVICE_CONFIG	psci;
-	LPSERVICE_DESCRIPTION	psd;
-	SERVICE_STATUS_PROCESS 	ssp;
+	LPQUERY_SERVICE_CONFIG  psci;
+	LPSERVICE_DESCRIPTION   psd;
+	SERVICE_STATUS_PROCESS  ssp;
 	ENUM_SERVICE_STATUS     ess;
-	WCHAR					szBuffer[MAX_PATH + 1];
+	WCHAR                   szBuffer[MAX_PATH + 1];
 	
 	if (Context == NULL) {
 		ShowWindow(GetDlgItem(hwndDlg, IDC_QUERYFAIL), TRUE);
@@ -405,15 +404,14 @@ VOID DriverJumpToKey(
 	PROP_OBJECT_INFO *Context
 	)
 {
-	BOOL				cond = FALSE;
-	DWORD				dwProcessId;
-	WCHAR				*ch, *ckey;
-	HWND				regeditHwnd, regeditMainHwnd;
-	SIZE_T				sz;
-	LPWSTR				lpRegPath;
-	HANDLE				hRegeditProcess; 
-	SHELLEXECUTEINFO	seinfo;
-
+	BOOL              cond = FALSE;
+	DWORD             dwProcessId;
+	WCHAR            *ch, *ckey;
+	HWND              regeditHwnd, regeditMainHwnd;
+	SIZE_T            sz;
+	LPWSTR            lpRegPath;
+	HANDLE            hRegeditProcess; 
+	SHELLEXECUTEINFO  seinfo;
 
 	if (Context == NULL) {
 		return;
@@ -532,7 +530,7 @@ INT_PTR CALLBACK DriverRegistryDialogProc(
 	_In_  LPARAM lParam
 	)
 {
-	PROPSHEETPAGE *pSheet = NULL;
+	PROPSHEETPAGE    *pSheet = NULL;
 	PROP_OBJECT_INFO *Context = NULL;
 
 	switch (uMsg) {

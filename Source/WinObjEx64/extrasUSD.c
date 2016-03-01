@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       EXTRASUSD.C
 *
-*  VERSION:     1.31
+*  VERSION:     1.41
 *
-*  DATE:        11 Nov 2015
+*  DATE:        01 Mar 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -75,7 +75,7 @@ VOID UsdDumpSharedRegion(
 		//
 
 		h_tviRootItem = TreeListAddItem(UsdTreeList, NULL, TVIF_TEXT | TVIF_STATE, TVIS_EXPANDED,
-			TVIS_EXPANDED, L"KUSER_SHARED_DATA", NULL);
+			TVIS_EXPANDED, TEXT("KUSER_SHARED_DATA"), NULL);
 		if (h_tviRootItem == NULL) {
 			break;
 		}
@@ -84,32 +84,32 @@ VOID UsdDumpSharedRegion(
 		RtlSecureZeroMemory(&subitems, sizeof(subitems));
 		subitems.Text[0] = pData->NtSystemRoot;
 		subitems.Count = 1;
-		TreeListAddItem(UsdTreeList, h_tviRootItem, TVIF_TEXT | TVIF_STATE, 0, 0, L"NtSystemRoot", &subitems);
+		TreeListAddItem(UsdTreeList, h_tviRootItem, TVIF_TEXT | TVIF_STATE, 0, 0, TEXT("NtSystemRoot"), &subitems);
 
 		//NtProductType
 		switch (pData->NtProductType) {
 		case NtProductWinNt:
-			lpType = L"NtProductWinNt";
+			lpType = TEXT("NtProductWinNt");
 			break;
 		case NtProductLanManNt:
-			lpType = L"NtProductLanManNt";
+			lpType = TEXT("NtProductLanManNt");
 			break;
 		case NtProductServer:
-			lpType = L"NtProductServer";
+			lpType = TEXT("NtProductServer");
 			break;	
 		default:
 			lpType = T_UnknownType;
 			break;
 		}
-		ObDumpUlong(UsdTreeList, h_tviRootItem, L"NtProductType", lpType, pData->NtProductType, FALSE, FALSE, 0, 0);
-		ObDumpByte(UsdTreeList, h_tviRootItem, L"ProductTypeIsValid", NULL, pData->ProductTypeIsValid, 0, 0, TRUE);
+		ObDumpUlong(UsdTreeList, h_tviRootItem, TEXT("NtProductType"), lpType, pData->NtProductType, FALSE, FALSE, 0, 0);
+		ObDumpByte(UsdTreeList, h_tviRootItem, TEXT("ProductTypeIsValid"), NULL, pData->ProductTypeIsValid, 0, 0, TRUE);
 		
 		//Version
-		ObDumpUlong(UsdTreeList, h_tviRootItem, L"NtMajorVersion", NULL, pData->NtMajorVersion, FALSE, FALSE, 0, 0);
-		ObDumpUlong(UsdTreeList, h_tviRootItem, L"NtMinorVersion", NULL, pData->NtMinorVersion, FALSE, FALSE, 0, 0);
+		ObDumpUlong(UsdTreeList, h_tviRootItem, TEXT("NtMajorVersion"), NULL, pData->NtMajorVersion, FALSE, FALSE, 0, 0);
+		ObDumpUlong(UsdTreeList, h_tviRootItem, TEXT("NtMinorVersion"), NULL, pData->NtMinorVersion, FALSE, FALSE, 0, 0);
 
 		//ProcessorFeatures
-		h_tviSubItem = TreeListAddItem(UsdTreeList, h_tviRootItem, TVIF_TEXT | TVIF_STATE, 0, 0, L"ProcessorFeatures", NULL);
+		h_tviSubItem = TreeListAddItem(UsdTreeList, h_tviRootItem, TVIF_TEXT | TVIF_STATE, 0, 0, TEXT("ProcessorFeatures"), NULL);
 		if (h_tviSubItem) {
 			for (i = 0; i < PROCESSOR_FEATURE_MAX; i++) {
 				if (pData->ProcessorFeatures[i]) {
@@ -133,16 +133,16 @@ VOID UsdDumpSharedRegion(
 		//AlternativeArchitecture
 		switch (pData->AlternativeArchitecture) {
 		case StandardDesign:
-			lpType = L"StandardDesign";
+			lpType = TEXT("StandardDesign");
 			break;
 		case NEC98x86:
-			lpType = L"NEC98x86";
+			lpType = TEXT("NEC98x86");
 			break;
 		default: 
 			lpType = T_UnknownType;
 			break;
 		}
-		ObDumpUlong(UsdTreeList, h_tviRootItem, L"AlternativeArchitecture", lpType, pData->AlternativeArchitecture, FALSE, FALSE, 0, 0);
+		ObDumpUlong(UsdTreeList, h_tviRootItem, TEXT("AlternativeArchitecture"), lpType, pData->AlternativeArchitecture, FALSE, FALSE, 0, 0);
 
 		//SuiteMask
 		RtlSecureZeroMemory(&subitems, sizeof(subitems));
@@ -172,13 +172,13 @@ VOID UsdDumpSharedRegion(
 		}
 
 		//KdDebuggerEnabled
-		ObDumpByte(UsdTreeList, h_tviRootItem, L"KdDebuggerEnabled", NULL, pData->KdDebuggerEnabled, 0, 0, TRUE);
+		ObDumpByte(UsdTreeList, h_tviRootItem, TEXT("KdDebuggerEnabled"), NULL, pData->KdDebuggerEnabled, 0, 0, TRUE);
 
 		//MitigationPolicies
-		ObDumpByte(UsdTreeList, h_tviRootItem, L"MitigationPolicies", NULL, pData->MitigationPolicies, 0, 0, FALSE);
+		ObDumpByte(UsdTreeList, h_tviRootItem, TEXT("MitigationPolicies"), NULL, pData->MitigationPolicies, 0, 0, FALSE);
 
 		//SafeBootMode
-		ObDumpByte(UsdTreeList, h_tviRootItem, L"SafeBootMode", NULL, pData->SafeBootMode, 0, 0, TRUE);
+		ObDumpByte(UsdTreeList, h_tviRootItem, TEXT("SafeBootMode"), NULL, pData->SafeBootMode, 0, 0, TRUE);
 
 		//SharedDataFlags
 		RtlSecureZeroMemory(&subitems, sizeof(subitems));
@@ -188,7 +188,7 @@ VOID UsdDumpSharedRegion(
 		ultohex_w(pData->SharedDataFlags, &szValue[2]);
 		subitems.Text[0] = szValue;
 		subitems.Count = 1;
-		h_tviSubItem = TreeListAddItem(UsdTreeList, h_tviRootItem, TVIF_TEXT | TVIF_STATE, 0, 0, L"SharedDataFlags", &subitems);
+		h_tviSubItem = TreeListAddItem(UsdTreeList, h_tviRootItem, TVIF_TEXT | TVIF_STATE, 0, 0, TEXT("SharedDataFlags"), &subitems);
 		if (h_tviSubItem) {
 			for (i = 0; i < 9; i++) {
 				if (GET_BIT(pData->SharedDataFlags, i)) {

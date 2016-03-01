@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     1.20
+*  VERSION:     1.41
 *
-*  DATE:        26 July 2015
+*  DATE:        01 Mar 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -43,8 +43,8 @@ HTREEITEM TreeListAddItem(
 	PVOID subitems
 	)
 {
-	TVINSERTSTRUCT	tvitem;
-	PTL_SUBITEMS	si = (PTL_SUBITEMS)subitems;
+	TVINSERTSTRUCT  tvitem;
+	PTL_SUBITEMS    si = (PTL_SUBITEMS)subitems;
 
 	RtlSecureZeroMemory(&tvitem, sizeof(tvitem));
 	tvitem.hParent = hParent;
@@ -67,7 +67,8 @@ VOID ObDumpShowError(
 	HWND hwndDlg
 	)
 {
-	RECT	rGB;
+	RECT rGB;
+
 	if (GetWindowRect(hwndDlg, &rGB)) {
 		EnumChildWindows(hwndDlg, supEnumHideChildWindows, (LPARAM)&rGB);
 	}
@@ -92,8 +93,8 @@ VOID ObDumpAddress(
 	COLORREF FontColor
 	)
 {
-	TL_SUBITEMS_FIXED	subitems;
-	WCHAR				szValue[100];
+	TL_SUBITEMS_FIXED  subitems;
+	WCHAR              szValue[100];
 	
 	RtlSecureZeroMemory(&subitems, sizeof(subitems));
 	subitems.Count = 2;
@@ -140,8 +141,8 @@ VOID ObDumpAddressWithModule(
 	ULONG SelfDriverSize
 	)
 {
-	TL_SUBITEMS_FIXED	subitems;
-	WCHAR				szValue[100], szModuleName[MAX_PATH * 2];
+	TL_SUBITEMS_FIXED   subitems;
+	WCHAR               szValue[100], szModuleName[MAX_PATH * 2];
 
 	RtlSecureZeroMemory(&subitems, sizeof(subitems));
 	subitems.Count = 2;
@@ -199,8 +200,8 @@ VOID ObDumpByte(
 	BOOL IsBool
 	)
 {
-	TL_SUBITEMS_FIXED	subitems;
-	WCHAR				szValue[100];
+	TL_SUBITEMS_FIXED   subitems;
+	WCHAR               szValue[100];
 
 	RtlSecureZeroMemory(&subitems, sizeof(subitems));
 
@@ -254,8 +255,8 @@ VOID ObDumpUlong(
 	COLORREF FontColor
 	)
 {
-	TL_SUBITEMS_FIXED	subitems;
-	WCHAR				szValue[100];
+	TL_SUBITEMS_FIXED   subitems;
+	WCHAR               szValue[100];
 
 	RtlSecureZeroMemory(&szValue, sizeof(szValue));
 	RtlSecureZeroMemory(&subitems, sizeof(subitems));
@@ -316,9 +317,9 @@ VOID ObDumpULargeInteger(
 	PULARGE_INTEGER Value
 	)
 {
-	TL_SUBITEMS_FIXED	subitems;
-	HTREEITEM			h_tviSubItem;
-	WCHAR				szValue[100];
+	HTREEITEM           h_tviSubItem;
+	TL_SUBITEMS_FIXED   subitems;
+	WCHAR               szValue[100];
 
 	h_tviSubItem = TreeListAddItem(g_TreeList, hParent, TVIF_TEXT | TVIF_STATE, TVIS_EXPANDED,
 		0, ListEntryName, NULL);
@@ -366,9 +367,9 @@ VOID ObDumpListEntry(
 	PLIST_ENTRY ListEntry
 	)
 {
-	TL_SUBITEMS_FIXED	subitems;
-	HTREEITEM			h_tviSubItem;
-	WCHAR				szValue[100];
+	HTREEITEM           h_tviSubItem;
+	TL_SUBITEMS_FIXED   subitems;
+	WCHAR               szValue[100];
 
 	h_tviSubItem = TreeListAddItem(g_TreeList, hParent, TVIF_TEXT | TVIF_STATE, TVIS_EXPANDED,
 		0, ListEntryName, NULL);
@@ -377,6 +378,7 @@ VOID ObDumpListEntry(
 		return;
 	}
 
+	//add list entry item to treelist and exit if listentry is null
 	if (ListEntry == NULL) {
 		return;
 	}
@@ -427,11 +429,11 @@ VOID ObDumpUnicodeString(
 	BOOL NeedDump
 	)
 {
-	LPWSTR				lpObjectName;
-	TL_SUBITEMS_FIXED	subitems;
-	HTREEITEM			h_tviSubItem;
-	UNICODE_STRING		uStr;
-	WCHAR				szValue[100];
+	LPWSTR              lpObjectName;
+	HTREEITEM           h_tviSubItem;
+	TL_SUBITEMS_FIXED   subitems;
+	UNICODE_STRING      uStr;
+	WCHAR               szValue[100];
 
 	RtlSecureZeroMemory(&uStr, sizeof(uStr));
 	RtlSecureZeroMemory(&subitems, sizeof(subitems));
@@ -583,28 +585,23 @@ VOID ObDumpDriverObject(
 	_In_ HWND hwndDlg
 	)
 {
-	BOOL					cond, bOkay;
-	INT						i, j;
-	HTREEITEM				h_tviRootItem, h_tviSubItem;
-
-	PVOID					pModules, pObj;
-	POBJREF					LookupObject;
-	LPWSTR					lpType;
-
-	DRIVER_OBJECT			drvObject;
-	DRIVER_EXTENSION		drvExtension;
-	FAST_IO_DISPATCH		fastIoDispatch;
-	LDR_DATA_TABLE_ENTRY	ldrEntry, ntosEntry;
-	TL_SUBITEMS_FIXED		subitems;
-
-	COLORREF				BgColor;
-
-	WCHAR					szValue1[MAX_PATH + 1];
+	BOOL                    cond, bOkay;
+	INT                     i, j;
+	HTREEITEM               h_tviRootItem, h_tviSubItem;
+	PVOID                   pModules, pObj;
+	POBJREF                 LookupObject;
+	LPWSTR                  lpType;
+	DRIVER_OBJECT           drvObject;
+	DRIVER_EXTENSION        drvExtension;
+	FAST_IO_DISPATCH        fastIoDispatch;
+	LDR_DATA_TABLE_ENTRY    ldrEntry, ntosEntry;
+	TL_SUBITEMS_FIXED       subitems;
+	COLORREF                BgColor;
+	WCHAR                   szValue1[MAX_PATH + 1];
 
 	if (Context == NULL) {
 		return;
 	}
-
 
 	bOkay = FALSE;
 	cond = FALSE;
@@ -963,20 +960,16 @@ VOID ObDumpDeviceObject(
 	_In_ HWND hwndDlg
 	)
 {
-	BOOL					bOkay;
-	INT						i, j;
-	HTREEITEM				h_tviRootItem, h_tviWcb, h_tviSubItem, h_tviWaitEntry;
-
-	POBJREF					LookupObject;
-	LPWSTR					lpType;
-
-	TL_SUBITEMS_FIXED		subitems;
-	DEVICE_OBJECT			devObject;
-	DEVOBJ_EXTENSION		devObjExt;
-
-
-	COLORREF				BgColor;
-	WCHAR					szValue1[MAX_PATH + 1];
+	BOOL                    bOkay;
+	INT                     i, j;
+	HTREEITEM               h_tviRootItem, h_tviWcb, h_tviSubItem, h_tviWaitEntry;
+	POBJREF                 LookupObject;
+	LPWSTR                  lpType;
+	TL_SUBITEMS_FIXED       subitems;
+	DEVICE_OBJECT           devObject;
+	DEVOBJ_EXTENSION        devObjExt;
+	COLORREF                BgColor;
+	WCHAR                   szValue1[MAX_PATH + 1];
 
 	if (Context == NULL) {
 		return;
@@ -1417,18 +1410,14 @@ VOID ObDumpDirectoryObject(
 	_In_ HWND hwndDlg
 	)
 {
-	INT						i;
-	HTREEITEM				h_tviRootItem, h_tviSubItem, h_tviEntry;
-
-	LPWSTR					lpType;
-
-	OBJECT_DIRECTORY		dirObject;
-	OBJECT_DIRECTORY_ENTRY	dirEntry;
-	LIST_ENTRY				ChainLink;
-
-	TL_SUBITEMS_FIXED		subitems;
-
-	WCHAR					szId[MAX_PATH + 1], szValue[MAX_PATH + 1];
+	INT                     i;
+	HTREEITEM               h_tviRootItem, h_tviSubItem, h_tviEntry;
+	LPWSTR                  lpType;
+	OBJECT_DIRECTORY        dirObject;
+	OBJECT_DIRECTORY_ENTRY  dirEntry;
+	LIST_ENTRY              ChainLink;
+	TL_SUBITEMS_FIXED       subitems;
+	WCHAR                   szId[MAX_PATH + 1], szValue[MAX_PATH + 1];
 
 	if (Context == NULL) {
 		return;
@@ -1571,19 +1560,16 @@ VOID ObDumpSyncObject(
 	HWND hwndDlg
 	)
 {
-	HTREEITEM				h_tviRootItem;
-	LPWSTR					lpType = NULL, lpDescType = NULL, lpDesc1 = NULL, lpDesc2 = NULL;
-
-	KMUTANT					*Mutant = NULL;
-	KEVENT					*Event = NULL;
-	KSEMAPHORE				*Semaphore = NULL;
-	KTIMER					*Timer = NULL;
-	DISPATCHER_HEADER		*Header = NULL;
-
-	PVOID					Object = NULL;
-	ULONG					ObjectSize = 0UL;
-
-	WCHAR					szValue[MAX_PATH + 1];
+	HTREEITEM            h_tviRootItem;
+	LPWSTR               lpType = NULL, lpDescType = NULL, lpDesc1 = NULL, lpDesc2 = NULL;
+	KMUTANT             *Mutant = NULL;
+	KEVENT              *Event = NULL;
+	KSEMAPHORE          *Semaphore = NULL;
+	KTIMER              *Timer = NULL;
+	DISPATCHER_HEADER   *Header = NULL;
+	PVOID                Object = NULL;
+	ULONG                ObjectSize = 0UL;
+	WCHAR                szValue[MAX_PATH + 1];
 
 	if (Context == NULL) {
 		return;
@@ -1769,21 +1755,18 @@ VOID ObDumpObjectType(
 	HWND hwndDlg
 	)
 {
-	BOOL					cond, bOkay;
-	INT						i, j;
-
-	HTREEITEM				h_tviRootItem, h_tviSubItem, h_tviGenericMapping;
-	LPWSTR					lpType = NULL;
-	POBJINFO				pObject = NULL;
-	PRTL_PROCESS_MODULES	pModulesList = NULL;
-	PVOID					TypeProcs[MAX_KNOWN_OBJECT_TYPE_PROCEDURES];
-	OBJECT_TYPE_COMPATIBLE	ObjectTypeDump;
-	TL_SUBITEMS_FIXED		subitems;
-	WCHAR					szValue[MAX_PATH + 1];
-
-	PVOID					SelfDriverBase;
-	ULONG					SelfDriverSize;
-
+	BOOL                    cond, bOkay;
+	INT                     i, j;
+	HTREEITEM               h_tviRootItem, h_tviSubItem, h_tviGenericMapping;
+	LPWSTR                  lpType = NULL;
+	POBJINFO                pObject = NULL;
+	PRTL_PROCESS_MODULES    pModulesList = NULL;
+	OBJECT_TYPE_COMPATIBLE  ObjectTypeDump;
+	TL_SUBITEMS_FIXED       subitems;
+	WCHAR                   szValue[MAX_PATH + 1];
+	PVOID                   TypeProcs[MAX_KNOWN_OBJECT_TYPE_PROCEDURES];
+	PVOID                   SelfDriverBase;
+	ULONG                   SelfDriverSize;
 
 	if (Context == NULL) {
 		return;
@@ -1960,10 +1943,9 @@ VOID ObDumpQueueObject(
 	HWND hwndDlg
 	)
 {
-	HTREEITEM				h_tviRootItem;
-	LPWSTR					lpDesc2;
-	KQUEUE					Queue;
-
+	HTREEITEM h_tviRootItem;
+	LPWSTR    lpDesc2;
+	KQUEUE    Queue;
 
 	if (Context == NULL) {
 		return;
@@ -2054,15 +2036,16 @@ VOID ObjectDumpCopyValue(
 	VOID
 	)
 {
-	TVITEMEX				itemex;
-	TL_SUBITEMS_FIXED		*subitems;
-	TCHAR					textbuf[MAX_PATH + 1];
-	SIZE_T					cbText;
-	LPWSTR					lpText;
+	SIZE_T             cbText;
+	LPWSTR             lpText;
+	TL_SUBITEMS_FIXED *subitems;
+	TVITEMEX           itemex;
+	WCHAR              textbuf[MAX_PATH + 1];
 
 	__try {
 
 		RtlSecureZeroMemory(&itemex, sizeof(itemex));	
+		RtlSecureZeroMemory(textbuf, sizeof(textbuf));
 		subitems = NULL;
 		itemex.mask = TVIF_TEXT;
 		itemex.hItem = TreeView_GetSelection(g_TreeList);
@@ -2099,11 +2082,10 @@ INT_PTR CALLBACK ObjectDumpDialogProc(
 	_In_  LPARAM lParam
 	)
 {
-	UNREFERENCED_PARAMETER(wParam);
-
-
-	PROPSHEETPAGE *pSheet = NULL;
+	PROPSHEETPAGE    *pSheet = NULL;
 	PROP_OBJECT_INFO *Context = NULL;
+
+	UNREFERENCED_PARAMETER(wParam);
 
 	switch (uMsg) {
 

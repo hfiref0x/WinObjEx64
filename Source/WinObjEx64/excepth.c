@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       EXCEPTH.C
 *
-*  VERSION:     1.20
+*  VERSION:     1.41
 *
-*  DATE:        23 July 2015
+*  DATE:        01 Mar 2016
 *
 *  Exception handler routines.
 *
@@ -41,24 +41,25 @@ pfnMiniDumpWriteDump pMiniDumpWriteDump;
 *
 */
 BOOL exceptWriteDump(
-	EXCEPTION_POINTERS *ExceptionPointers,
-	ULONGLONG IdFile
+	_In_ EXCEPTION_POINTERS *ExceptionPointers,
+	_In_ ULONGLONG IdFile
 	)
 {
-	BOOL bResult;
+	BOOL   bResult;
 	HANDLE hDbgHelp, hFile;
-	DWORD dwRetVal;
+	DWORD  dwRetVal;
+	WCHAR  szTemp[MAX_PATH * 2];
+
 	MINIDUMP_EXCEPTION_INFORMATION mdei;
-	WCHAR szTemp[MAX_PATH * 2];
 
 	bResult = FALSE;
-	hDbgHelp = GetModuleHandle(L"dbghelp.dll");
+	hDbgHelp = GetModuleHandle(TEXT("dbghelp.dll"));
 	if (hDbgHelp == NULL) {
 		RtlSecureZeroMemory(szTemp, sizeof(szTemp));
 		if (!GetSystemDirectory(szTemp, MAX_PATH)) {
 			return bResult;
 		}
-		_strcat(szTemp, L"\\dbghelp.dll");
+		_strcat(szTemp, TEXT("\\dbghelp.dll"));
 
 		hDbgHelp = LoadLibraryEx(szTemp, 0, 0);
 		if (hDbgHelp == NULL) {
@@ -76,9 +77,9 @@ BOOL exceptWriteDump(
 	if (dwRetVal > MAX_PATH || (dwRetVal == 0)) {
 		return bResult;
 	}
-	_strcat(szTemp, L"wobjex");
+	_strcat(szTemp, TEXT("wobjex"));
 	u64tostr(IdFile, _strend(szTemp));
-	_strcat(szTemp, L".dmp");
+	_strcat(szTemp, TEXT(".dmp"));
 
 	hFile = CreateFile(szTemp, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 	if (hFile != INVALID_HANDLE_VALUE) {
@@ -100,23 +101,23 @@ BOOL exceptWriteDump(
 *
 */
 VOID exceptShowException(
-	EXCEPTION_POINTERS *ExceptionPointers
+	_In_ EXCEPTION_POINTERS *ExceptionPointers
 	)
 {
-	WCHAR szMessage[MAX_PATH * 2];
+	WCHAR     szMessage[MAX_PATH * 2];
 	ULONGLONG IdFile;
 
 	RtlSecureZeroMemory(&szMessage, sizeof(szMessage));
-	_strcpy(szMessage, L"Sorry, exception occurred at address: \n0x");
+	_strcpy(szMessage, TEXT("Sorry, exception occurred at address: \n0x"));
 	u64tohex((ULONG_PTR)ExceptionPointers->ExceptionRecord->ExceptionAddress, _strend(szMessage));
 
 	if (ExceptionPointers->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {
 		switch (ExceptionPointers->ExceptionRecord->ExceptionInformation[0]) {
 		case 0:
-			_strcat(szMessage, L"\n\nAttempt to read at address: \n0x");
+			_strcat(szMessage, TEXT("\n\nAttempt to read at address: \n0x"));
 			break;
 		case 1:
-			_strcat(szMessage, L"\n\nAttempt to write at address: \n0x");
+			_strcat(szMessage, TEXT("\n\nAttempt to write at address: \n0x"));
 			break;
 		}
 		u64tohex(ExceptionPointers->ExceptionRecord->ExceptionInformation[1], _strend(szMessage));
@@ -124,11 +125,11 @@ VOID exceptShowException(
 	IdFile = GetTickCount64();
 
 	if (exceptWriteDump(ExceptionPointers, IdFile)) {
-		_strcat(szMessage, L"\n\nMinidump wobjex");
+		_strcat(szMessage, TEXT("\n\nMinidump wobjex"));
 		u64tostr(IdFile, _strend(szMessage));
-		_strcat(szMessage, L".dmp is in %TEMP% directory");
+		_strcat(szMessage, TEXT(".dmp is in %TEMP% directory"));
 	}
-	_strcat(szMessage, L"\n\nPlease report this to the developers, thanks");
+	_strcat(szMessage, TEXT("\n\nPlease report this to the developers, thanks"));
 	MessageBox(GetForegroundWindow(), szMessage, NULL, MB_ICONERROR);
 }
 
@@ -141,8 +142,8 @@ VOID exceptShowException(
 *
 */
 INT exceptFilter(
-	UINT ExceptionCode,
-	EXCEPTION_POINTERS *ExceptionPointers
+	_In_ UINT ExceptionCode,
+	_In_ EXCEPTION_POINTERS *ExceptionPointers
 	)
 {
 	if (ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {

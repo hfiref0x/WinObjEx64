@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       FINDDLG.C
 *
-*  VERSION:     1.31
+*  VERSION:     1.41
 *
-*  DATE:        11 Nov 2015
+*  DATE:        01 Mar 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -18,6 +18,7 @@
 #include "findDlg.h"
 
 static HWND FindDlgList;
+static HWND FindDlgGrip = 0;
 
 static LONG sizes_init = 0, dx1, dx2, dx3, dx4, dx5, dx6, dx7, dx8, dx9, dx10, dx11, dx12, dx13;
 
@@ -42,8 +43,8 @@ INT CALLBACK FindDlgCompareFunc(
 	_In_ LPARAM lParamSort
 	)
 {
+	INT    nResult;
 	LPWSTR lpItem1, lpItem2;
-	INT nResult;
 	
 	lpItem1 = supGetItemText(FindDlgList, (INT)lParam1, (INT)lParamSort, NULL);
 	if (lpItem1 == NULL)
@@ -77,8 +78,8 @@ VOID FindDlgAddListItem(
 	_In_ LPWSTR	TypeName
 	)
 {
-	LVITEMW				lvitem;
-	int					index;
+	INT     index;
+	LVITEM  lvitem;
 
 	RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
 
@@ -108,9 +109,10 @@ VOID FindDlgResize(
 	HWND hwndDlg
 	)
 {
-	RECT r1, r2;
-	HWND hwnd;
+	RECT  r1, r2;
+	HWND  hwnd;
 	POINT p0;
+
 	GetClientRect(hwndDlg, &r2);
 
 	if (sizes_init == 0) {
@@ -199,6 +201,8 @@ VOID FindDlgResize(
 		SetWindowPos(hwnd, 0, r2.right - dx12, dx13, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
 	}
 
+	supSzGripWindowOnResize(FindDialog, FindDlgGrip);
+
 	RedrawWindow(hwndDlg, NULL, 0, RDW_ERASE | RDW_INVALIDATE | RDW_ERASENOW);
 }
 
@@ -214,9 +218,9 @@ VOID FindDlgHandleNotify(
 	LPNMLISTVIEW	nhdr
 	)
 {
-	LPWSTR			lpItemText;
-	LVCOLUMNW		col;
-	INT				c, k;
+	INT      c, k;
+	LPWSTR   lpItemText;
+	LVCOLUMN col;
 
 	if (nhdr == NULL)
 		return;
@@ -278,11 +282,11 @@ INT_PTR CALLBACK FindDlgProc(
 	_In_  LPARAM lParam
 	)
 {
-	WCHAR			search_string[MAX_PATH + 1], type_name[MAX_PATH + 1];
-	LPWSTR			pnamestr = (LPWSTR)search_string, ptypestr = (LPWSTR)type_name;
-	PFO_LIST_ITEM	flist, plist;
-	ULONG			cci;
-	LPNMLISTVIEW	nhdr = (LPNMLISTVIEW)lParam;
+	WCHAR           search_string[MAX_PATH + 1], type_name[MAX_PATH + 1];
+	LPWSTR          pnamestr = (LPWSTR)search_string, ptypestr = (LPWSTR)type_name;
+	PFO_LIST_ITEM   flist, plist;
+	ULONG           cci;
+	LPNMLISTVIEW    nhdr = (LPNMLISTVIEW)lParam;
 
 	switch (uMsg) {
 	case WM_NOTIFY:
@@ -306,6 +310,7 @@ INT_PTR CALLBACK FindDlgProc(
 		break;
 
 	case WM_CLOSE:
+		if (FindDlgGrip) DestroyWindow(FindDlgGrip);
 		DestroyWindow(hwndDlg);
 		FindDialog = NULL;
 		g_wobjDialogs[WOBJ_FINDDLG_IDX] = NULL;
@@ -313,8 +318,7 @@ INT_PTR CALLBACK FindDlgProc(
 
 	case WM_COMMAND:
 		if (LOWORD(wParam) == IDCANCEL) {
-			DestroyWindow(hwndDlg);
-			FindDialog = NULL;
+			SendMessage(hwndDlg, WM_CLOSE, 0, 0);
 			return TRUE;
 		}
 
@@ -373,11 +377,12 @@ VOID FindDlgAddTypes(
 	HWND hwnd
 	)
 {
-	ULONG                       i;
-	HWND                        hComboBox;
-	SIZE_T                      sz;
-	LPWSTR                      lpType;
-	POBJECT_TYPE_INFORMATION    pObject;
+	ULONG  i;
+	HWND   hComboBox;
+	SIZE_T sz;
+	LPWSTR lpType;
+
+	POBJECT_TYPE_INFORMATION  pObject;
 
 	hComboBox = GetDlgItem(hwnd, ID_SEARCH_TYPE);
 	if (hComboBox == NULL) {
@@ -436,8 +441,8 @@ VOID FindDlgCreate(
 	_In_ HWND hwndParent
 	)
 {
-	LVCOLUMNW	col;
-	HICON		hIcon;
+	LVCOLUMN col;
+	HICON    hIcon;
 
 	//do not allow second copy
 	if (g_wobjDialogs[WOBJ_FINDDLG_IDX]) {
@@ -450,6 +455,8 @@ VOID FindDlgCreate(
 		return;
 	}
 	g_wobjDialogs[WOBJ_FINDDLG_IDX] = FindDialog;
+
+	FindDlgGrip = supCreateSzGripWindow(FindDialog);
 
 	//set dialog icon, because we use shared dlg template this icon must be
 	//removed after use, see aboutDlg/propDlg.
@@ -468,7 +475,7 @@ VOID FindDlgCreate(
 		RtlSecureZeroMemory(&col, sizeof(col));
 		col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
 		col.iSubItem = 1;
-		col.pszText = L"Name";
+		col.pszText = TEXT("Name");
 		col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
 		col.iOrder = 0;
 		col.iImage = ImageList_GetImageCount(ListViewImages) - 1;
@@ -476,7 +483,7 @@ VOID FindDlgCreate(
 		ListView_InsertColumn(FindDlgList, 1, &col);
 
 		col.iSubItem = 2;
-		col.pszText = L"Type";
+		col.pszText = TEXT("Type");
 		col.iOrder = 1;
 		col.iImage = -1;
 		col.cx = 100;

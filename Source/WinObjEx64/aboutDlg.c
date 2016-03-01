@@ -4,9 +4,9 @@
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     1.40
+*  VERSION:     1.41
 *
-*  DATE:        13 Feb 2016
+*  DATE:        01 Mar 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -16,8 +16,8 @@
 *******************************************************************************/
 #include "global.h"
 
-#define T_SECUREBOOTSTATEKEY	L"System\\CurrentControlSet\\Control\\SecureBoot\\State"
-#define T_SECUREBOOTSTATEVALUE	L"UEFISecureBootEnabled"
+#define T_SECUREBOOTSTATEKEY    L"System\\CurrentControlSet\\Control\\SecureBoot\\State"
+#define T_SECUREBOOTSTATEVALUE  L"UEFISecureBootEnabled"
 
 /*
 * AboutDialogQuerySecureBootState
@@ -31,11 +31,11 @@ BOOL AboutDialogQuerySecureBootState(
 	_In_ PBOOLEAN pbSecureBoot
 	)
 {
-	BOOL cond = FALSE, bResult = FALSE;
+	BOOL    cond = FALSE, bResult = FALSE;
 	BOOLEAN bSecureBoot = FALSE;
-	HKEY hKey;
-	DWORD dwState, dwSize, returnLength;
-	LRESULT lRet;
+	HKEY    hKey;
+	DWORD   dwState, dwSize, returnLength;
+	LSTATUS lRet;
 
 	//first attempt, query firmware environment variable, will not work if not fulladmin
 	do {
@@ -80,6 +80,17 @@ BOOL AboutDialogQuerySecureBootState(
 
 	} while (cond);
 
+	if (bResult) {
+		return bResult;
+	}
+
+	//third attempt, query state from user shared data
+	dwState = USER_SHARED_DATA->DbgSecureBootEnabled;
+	if (pbSecureBoot) {
+		*pbSecureBoot = (dwState == 1);
+	}
+	bResult = TRUE;
+
 	return bResult;
 }
 
@@ -95,12 +106,13 @@ VOID AboutDialogInit(
 	HWND hwndDlg
 	)
 {
+	BOOLEAN  bSecureBoot = FALSE;
+	ULONG    returnLength;
 	NTSTATUS status;
-	WCHAR buf[MAX_PATH];
-	BOOLEAN bSecureBoot = FALSE;
-	ULONG returnLength;
+	HANDLE   hImage;
+	WCHAR    buf[MAX_PATH];
+
 	SYSTEM_BOOT_ENVIRONMENT_INFORMATION sbei;
-	HANDLE hImage;
 
 	SetDlgItemText(hwndDlg, ID_ABOUT_PROGRAM, PROFRAM_NAME_AND_TITLE);
 	SetDlgItemText(hwndDlg, ID_ABOUT_BUILDINFO, PROGRAM_VERSION);
@@ -150,13 +162,13 @@ VOID AboutDialogInit(
 	SetDlgItemText(hwndDlg, ID_ABOUT_BUILDDATE, buf);
 
 	// fill OS name
-	wsprintfW(buf, L"Windows NT %1u.%1u (build %u",
+	wsprintf(buf, TEXT("Windows NT %1u.%1u (build %u"),
 		g_kdctx.osver.dwMajorVersion, g_kdctx.osver.dwMinorVersion, g_kdctx.osver.dwBuildNumber);
 	if (g_kdctx.osver.szCSDVersion[0]) {
-		wsprintfW(_strend(buf), L", %ws)", g_kdctx.osver.szCSDVersion);
+		wsprintf(_strend(buf), TEXT(", %ws)"), g_kdctx.osver.szCSDVersion);
 	}
 	else {
-		_strcat(buf, L")");
+		_strcat(buf, TEXT(")"));
 	}
 	SetDlgItemText(hwndDlg, ID_ABOUT_OSNAME, buf);
 
@@ -165,16 +177,18 @@ VOID AboutDialogInit(
 	RtlSecureZeroMemory(&sbei, sizeof(sbei));
 	status = NtQuerySystemInformation(SystemBootEnvironmentInformation, &sbei, sizeof(sbei), &returnLength);
 	if (NT_SUCCESS(status)) {
-
-		wsprintfW(buf, L"%ws mode",
-			((sbei.FirmwareType == FirmwareTypeUefi) ? L"UEFI" : ((sbei.FirmwareType == FirmwareTypeBios) ? L"BIOS" : L"Unknown")));
+		wsprintf(buf, TEXT("%ws mode"),
+			((sbei.FirmwareType == FirmwareTypeUefi) ? TEXT("UEFI") : ((sbei.FirmwareType == FirmwareTypeBios) ? TEXT("BIOS") : TEXT("Unknown"))));
 	
 		if (sbei.FirmwareType == FirmwareTypeUefi) {
 			bSecureBoot = FALSE;
 			if (AboutDialogQuerySecureBootState(&bSecureBoot)) {
-				wsprintfW(_strend(buf), L" with%ws SecureBoot", (bSecureBoot == TRUE) ? L"" : L"out");
+				wsprintf(_strend(buf), TEXT(" with%ws SecureBoot"), (bSecureBoot == TRUE) ? TEXT("") : TEXT("out"));
 			}
 		}
+	}
+	else {
+		_strcpy(buf, TEXT("Unknown"));
 	}
 	SetDlgItemText(hwndDlg, ID_ABOUT_ADVINFO, buf);
 
@@ -191,11 +205,11 @@ VOID AboutDialogInit(
 * During WM_INITDIALOG centers window and initializes system info
 *
 */
-LRESULT CALLBACK AboutDialogProc(
-	HWND hwndDlg,
-	UINT uMsg,
-	WPARAM wParam,
-	LPARAM lParam
+INT_PTR CALLBACK AboutDialogProc(
+	_In_ HWND   hwndDlg,
+	_In_ UINT   uMsg,
+	_In_ WPARAM wParam,
+	_In_ LPARAM lParam
 	)
 {
 	UNREFERENCED_PARAMETER(lParam);

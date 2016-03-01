@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015, portions (C) Mark Russinovich, FileMon
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016, portions (C) Mark Russinovich, FileMon
 *
 *  TITLE:       INSTDRV.C
 *
-*  VERSION:     1.11
+*  VERSION:     1.41
 *
-*  DATE:        10 Mar 2015
+*  DATE:        01 Mar 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -138,16 +138,32 @@ BOOL scmStopDriver(
 	_In_ LPCTSTR DriverName
 	)
 {
-	SC_HANDLE       schService;
 	BOOL            ret;
+	INT             iRetryCount;
+	SC_HANDLE       schService;
 	SERVICE_STATUS  serviceStatus;
 
+	ret = FALSE;
 	schService = OpenService(SchSCManager, DriverName, SERVICE_ALL_ACCESS);
 	if (schService == NULL) {
-		return FALSE;
+		return ret;
 	}
 
-	ret = ControlService(schService, SERVICE_CONTROL_STOP, &serviceStatus);
+	iRetryCount = 5;
+	do {
+		SetLastError(0);
+
+		ret = ControlService(schService, SERVICE_CONTROL_STOP, &serviceStatus);
+		if (ret == TRUE)
+			break;
+
+		if (GetLastError() != ERROR_DEPENDENT_SERVICES_RUNNING)
+			break;
+
+		Sleep(1000);
+		iRetryCount--;
+	} while (iRetryCount);
+
 	CloseServiceHandle(schService);
 
 	return ret;
@@ -197,8 +213,8 @@ BOOL scmUnloadDeviceDriver(
 	_In_ LPCTSTR Name
 	)
 {
-	SC_HANDLE	schSCManager;
-	BOOL		bResult = FALSE;
+	SC_HANDLE schSCManager;
+	BOOL      bResult = FALSE;
 
 	if (Name == NULL) {
 		return bResult;
@@ -230,8 +246,8 @@ BOOL scmLoadDeviceDriver(
 	_Inout_		PHANDLE lphDevice
 	)
 {
-	SC_HANDLE	schSCManager;
-	BOOL		bResult = FALSE;
+	SC_HANDLE schSCManager;
+	BOOL      bResult = FALSE;
 
 	if (Name == NULL) {
 		return bResult;

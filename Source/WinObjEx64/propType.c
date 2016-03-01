@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       PROPTYPE.C
 *
-*  VERSION:     1.11
+*  VERSION:     1.41
 *
-*  DATE:        10 Mar 2015
+*  DATE:        01 Mar 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -34,9 +34,9 @@ VOID propSetTypeFlagValue(
 	_In_ DWORD	Value
 	)
 {
-	INT			nIndex;
-	LVITEMW		lvitem;
-	WCHAR		szBuffer[MAX_PATH];
+	INT    nIndex;
+	LVITEM lvitem;
+	WCHAR  szBuffer[MAX_PATH];
 
 	if (lpFlag == NULL)
 		return;
@@ -74,8 +74,8 @@ VOID propSetTypeDecodeValue(
 	_In_ INT TypeIndex
 	)
 {
-	INT	i, Count;
-	DWORD u;
+	INT	        i, Count;
+	DWORD       u;
 	PVALUE_DESC Desc = NULL;
 
 	switch (TypeIndex) {
@@ -295,8 +295,9 @@ VOID propSetTypeFlags(
 	DWORD ObjectFlags
 	)
 {
-	INT i;
+	INT  i;
 	HWND hwndCB;
+
 	if (ObjectFlags == 0)
 		return;
 
@@ -327,9 +328,9 @@ VOID propSetTypeAttributes(
 	_In_ POBJECT_TYPE_COMPATIBLE ObjectTypeDump
 	)
 {
-	HWND		hListAttrbites;
-	LRESULT		nIndex;
-	WCHAR		szBuffer[MAX_PATH + 1];
+	LRESULT nIndex;
+	HWND    hListAttrbites;
+	WCHAR   szBuffer[MAX_PATH + 1];
 
 	if (ObjectTypeDump == NULL)
 		return;
@@ -402,11 +403,10 @@ VOID propSetTypeDecodedAttributes(
 	_In_ HWND hwndDlg
 	)
 {
-	HWND			hListAttrbites;
-	HWND			hListRights;
-	LRESULT			curSel;
-	DWORD			i, dwFlags, a_Count;
-	PVALUE_DESC		a_Desc;
+	HWND            hListRights, hListAttrbites;
+	LRESULT         curSel;
+	DWORD           i, dwFlags, a_Count;
+	PVALUE_DESC     a_Desc;
 
 	if (Context == NULL) {
 		return;
@@ -473,8 +473,8 @@ VOID propSetTypeListView(
 	_In_ HWND hwndDlg
 	)
 {
-	HWND		hListRights;
-	LVCOLUMNW	col;
+	HWND        hListRights;
+	LVCOLUMN    col;
 
 	hListRights = GetDlgItem(hwndDlg, ID_TYPE_ACL_LIST);
 	if (hListRights == NULL)
@@ -486,17 +486,17 @@ VOID propSetTypeListView(
 	RtlSecureZeroMemory(&col, sizeof(col));
 	col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH;
 	col.iSubItem = 1;
-	col.pszText = L"Flag";
+	col.pszText = TEXT("Flag");
 	col.fmt = LVCFMT_LEFT;
 	col.iOrder = 0;
 	col.cx = 190;
-	ListView_InsertColumn(hListRights, 1, &col);
+	ListView_InsertColumn(hListRights, col.iSubItem, &col);
 
 	col.iSubItem = 2;
-	col.pszText = L"Value";
+	col.pszText = TEXT("Value");
 	col.iOrder = 1;
 	col.cx = 80;
-	ListView_InsertColumn(hListRights, 2, &col);
+	ListView_InsertColumn(hListRights, col.iSubItem, &col);
 }
 
 /*
@@ -514,12 +514,13 @@ BOOL propQueryTypeInfo(
 	_Inout_ POBJECT_TYPE_COMPATIBLE pObjectTypeDump
 	)
 {
-	BOOL bResult = FALSE, cond = FALSE;
-	ULONG i;
-	SIZE_T sz;
-	LPWSTR lpType;
+	BOOL     bResult = FALSE, cond = FALSE;
+	ULONG    i;
+	SIZE_T   sz;
+	LPWSTR   lpType;
+	
 	POBJECT_TYPES_INFORMATION pObjectTypes = NULL;
-	POBJECT_TYPE_INFORMATION pObject;
+	POBJECT_TYPE_INFORMATION  pObject;
 
 	if (
 		(pObjectTypeDump == NULL) ||
@@ -598,13 +599,13 @@ VOID propSetTypeInfo(
 	_In_ HWND hwndDlg
 	)
 {
-	BOOL						bOkay;
-	INT							i, nIndex;
-	POBJINFO					pObject = NULL;
-	LPCWSTR						lpTypeDescription = NULL;
-	OBJECT_TYPE_COMPATIBLE		ObjectTypeDump;
-	WCHAR						szBuffer[MAX_PATH + 1];
-	WCHAR						szType[MAX_PATH * 2];
+	BOOL                       bOkay;
+	INT                        i, nIndex;
+	POBJINFO                   pObject = NULL;
+	LPCWSTR                    lpTypeDescription = NULL;
+	OBJECT_TYPE_COMPATIBLE     ObjectTypeDump;
+	WCHAR                      szBuffer[MAX_PATH];
+	WCHAR                      szType[MAX_PATH * 2];
 
 	if (Context == NULL) {
 		return;
@@ -756,9 +757,9 @@ INT_PTR CALLBACK TypePropDialogProc(
 	_In_  LPARAM lParam
 	)
 {
-	HDC				hDc;
-	PAINTSTRUCT		Paint;
-	PROPSHEETPAGE *pSheet = NULL;
+	HDC               hDc;
+	PAINTSTRUCT       Paint;
+	PROPSHEETPAGE    *pSheet = NULL;
 	PROP_OBJECT_INFO *Context = NULL;
 
 	switch (uMsg) {

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       EXTRASUSD.H
 *
-*  VERSION:     1.32
+*  VERSION:     1.41
 *
-*  DATE:        12 Nov 2015
+*  DATE:        01 Mar 2015
 *
 *  Common header file for Extras User Shared Data dialog.
 *

@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
-*  VERSION:     1.41
+*  VERSION:     1.42
 *
-*  DATE:        01 Mar 2016
+*  DATE:        12 Mar 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -174,6 +174,9 @@ VOID DrvListDrivers(
 
 			pModule = &pModulesList->Modules[i];
 
+            if ((ULONG_PTR)pModule->ImageBase < g_kdctx.SystemRangeStart)
+                continue;
+
 			RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
 
 			//LoadOrder
@@ -312,6 +315,46 @@ Done:
 }
 
 /*
+* DriversHandleNotify
+*
+* Purpose:
+*
+* Common WM_NOTIFY processing for Driver list dialogs.
+*
+*/
+VOID CALLBACK DriversHandleNotify(
+    _In_ LPNMLISTVIEW nhdr,
+    _In_ EXTRASCONTEXT *Context,
+    _In_opt_ PVOID CustomParameter
+    )
+{
+    LPWSTR  lpItem;
+    INT     mark;
+    WCHAR   szBuffer[MAX_PATH + 1];
+
+    UNREFERENCED_PARAMETER(CustomParameter);
+
+    if ((nhdr == NULL) || (Context == NULL))
+        return;
+
+    if (nhdr->hdr.idFrom != ID_EXTRASLIST)
+        return;
+
+    if (nhdr->hdr.code == NM_DBLCLK) {
+        mark = ListView_GetSelectionMark(Context->ListView);
+        if (mark >= 0) {
+            lpItem = supGetItemText(Context->ListView, mark, 4, NULL);
+            if (lpItem) {
+                RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));              
+                if (supGetWin32FileName(lpItem, szBuffer, MAX_PATH))
+                    supShowProperties(Context->hwndDlg, szBuffer);
+                HeapFree(GetProcessHeap(), 0, lpItem);
+            }
+        }       
+    }
+}
+
+/*
 * DriversDialogProc
 *
 * Purpose:
@@ -342,7 +385,7 @@ INT_PTR CALLBACK DriversDialogProc(
 		break;
 
 	case WM_NOTIFY:
-		extrasDlgHandleNotify(nhdr, &DrvDlgContext, &DrvDlgCompareFunc);
+		extrasDlgHandleNotify(nhdr, &DrvDlgContext, &DrvDlgCompareFunc, DriversHandleNotify, NULL);
 		break;
 
 	case WM_SIZE:

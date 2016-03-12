@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.41
+*  VERSION:     1.42
 *
-*  DATE:        01 Mar 2016
+*  DATE:        10 Mar 2016
 *
 *  Program entry point and main window handler.
 *
@@ -915,10 +915,13 @@ void WinObjExMain()
 			if (SHGetStockIconInfo(SIID_SHIELD, SHGSI_ICON | SHGFI_SMALLICON, &sii) == S_OK) {
 				supSetMenuIcon(hMenu, ID_FILE_RUNASADMIN, (ULONG_PTR)sii.hIcon);
 			}
-			//require driver usage, remove
-			DeleteMenu(GetSubMenu(GetMenu(MainWindow), 4), ID_EXTRAS_SSDT, MF_BYCOMMAND);
-			DeleteMenu(GetSubMenu(GetMenu(MainWindow), 4), ID_EXTRAS_PRIVATENAMESPACES, MF_BYCOMMAND);
 		}
+
+        if (g_kdctx.hDevice == NULL) {
+            //require driver usage, remove
+            DeleteMenu(GetSubMenu(GetMenu(MainWindow), 4), ID_EXTRAS_SSDT, MF_BYCOMMAND);
+            DeleteMenu(GetSubMenu(GetMenu(MainWindow), 4), ID_EXTRAS_PRIVATENAMESPACES, MF_BYCOMMAND);
+        }
 
 		//unsupported
 		if (g_kdctx.osver.dwBuildNumber > 10240) {
@@ -1065,8 +1068,7 @@ void WinObjExMain()
 */
 void main()
 {
-	__security_init_cookie();
-
+	__security_init_cookie();   
 	WinObjExMain();
 	ExitProcess(0);
 }

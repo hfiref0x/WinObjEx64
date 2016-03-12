@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRAS.H
 *
-*  VERSION:     1.41
+*  VERSION:     1.42
 *
-*  DATE:        28 Feb 2016
+*  DATE:        11 Mar 2016
 *
 *  Common header file for Extras dialogs.
 *
@@ -34,11 +34,19 @@ typedef INT(CALLBACK *DlgCompareFunction)(
 	_In_ LPARAM lParamSort
 	);
 
+typedef VOID(CALLBACK *CustomNotifyFunction)(
+    _In_ LPNMLISTVIEW nhdr,
+    _In_ EXTRASCONTEXT *Context,
+    _In_ PVOID Parameter
+    );
+
 VOID extrasDlgHandleNotify(
-	_In_ LPNMLISTVIEW nhdr,
-	_In_ EXTRASCONTEXT *Context,
-	_In_ DlgCompareFunction CompareFunc
-	);
+    _In_ LPNMLISTVIEW nhdr,
+    _In_ EXTRASCONTEXT *Context,
+    _In_ DlgCompareFunction CompareFunc,
+    _In_opt_ CustomNotifyFunction CustomHandler,
+    _In_opt_ PVOID CustomParameter
+    );
 
 VOID extrasSimpleListResize(
 	_In_ HWND hwndDlg,

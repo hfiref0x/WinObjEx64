@@ -1,3 +1,6 @@
+v1.4.2
+some cleanup, properties for drivers
+
 v 1.4.1
 some cleanup, rtls update
 

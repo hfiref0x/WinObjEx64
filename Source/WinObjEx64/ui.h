@@ -4,9 +4,9 @@
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.41
+*  VERSION:     1.42
 *
-*  DATE:        01 Mar 2016
+*  DATE:        10 Mar 2016
 *
 *  Common header file for the user interface.
 *
@@ -33,19 +33,19 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 	_In_ DWORD_PTR dwData
 	);
 
-#define PROGRAM_VERSION            L"1.4.1"
-#define PROGRAM_NAME               L"Windows Object Explorer 64-bit"
-#define PROFRAM_NAME_AND_TITLE     L"Object Explorer for Windows 7/8/8.1/10"
-#define MAINWINDOWCLASSNAME        L"WinObjEx64Class"
+#define PROGRAM_VERSION         L"1.4.2"
+#define PROGRAM_NAME            L"Windows Object Explorer 64-bit"
+#define PROFRAM_NAME_AND_TITLE  L"Object Explorer for Windows 7/8/8.1/10"
+#define MAINWINDOWCLASSNAME     L"WinObjEx64Class"
 
 
-#define T_PROPERTIES               L"Properties...\tEnter"
-#define T_GOTOLINKTARGET           L"Go To Link Target\tCtrl+->"
-#define T_RUNASADMIN               L"R&un as Administrator"
-#define T_COPYTEXTROW              L"Copy Row Selection"
-#define T_COPYVALUE                L"Copy Value Field Text"
-#define T_SAVETOFILE               L"Save list to File"
-#define T_DUMPDRIVER               L"Dump Driver"
+#define T_PROPERTIES            L"Properties...\tEnter"
+#define T_GOTOLINKTARGET        L"Go To Link Target\tCtrl+->"
+#define T_RUNASADMIN            L"R&un as Administrator"
+#define T_COPYTEXTROW           L"Copy Row Selection"
+#define T_COPYVALUE             L"Copy Value Field Text"
+#define T_SAVETOFILE            L"Save list to File"
+#define T_DUMPDRIVER            L"Dump Driver"
 
 #define WOBJ_MAX_DIALOGS  6
 

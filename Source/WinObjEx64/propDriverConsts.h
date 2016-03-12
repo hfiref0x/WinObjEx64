@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015
+*  (C) COPYRIGHT AUTHORS, 2015 - 2016
 *
 *  TITLE:       PROPDRIVERCONSTS.H
 *
-*  VERSION:     1.31
+*  VERSION:     1.42
 *
-*  DATE:        11 Nov 2015
+*  DATE:        11 Mar 2016
 *
 *  Common header file for Driver property sheet.
 *
@@ -18,5 +18,5 @@
 *******************************************************************************/
 #pragma once
 
-#define REGEDITWNDCLASS			L"RegEdit_RegEdit"
-#define REGISTRYSERVICESKEY		L"\\HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\%ws"
+#define REGEDITWNDCLASS         L"RegEdit_RegEdit"
+#define REGISTRYSERVICESKEY     L"\\HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\%ws"

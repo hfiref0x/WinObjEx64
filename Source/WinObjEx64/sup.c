@@ -2573,3 +2573,146 @@ BOOL supIsProcess32bit(
 	}
 	return FALSE;
 }
+
+/*
+* supQuerySystemRangeStart
+*
+* Purpose:
+*
+* Return MmSystemRangeStart value.
+*
+*/
+ULONG_PTR supQuerySystemRangeStart(
+    VOID
+    )
+{
+    NTSTATUS  status;
+    ULONG_PTR SystemRangeStart = 0;
+    ULONG     memIO = 0;
+
+    status = NtQuerySystemInformation(SystemRangeStartInformation, (PVOID)&SystemRangeStart, sizeof(ULONG_PTR), &memIO);
+    if (!NT_SUCCESS(status)) {
+		SetLastError(RtlNtStatusToDosError(status));
+	}
+    return SystemRangeStart;
+}
+
+/*
+* supConvertFileName
+*
+* Purpose:
+*
+* Translate Nt path name to Dos path name.
+*
+*/
+BOOL supConvertFileName(
+    _In_ LPWSTR NtFileName,
+    _In_ LPWSTR DosFileName,
+    _In_ SIZE_T ccDosFileName
+    )
+{
+    BOOL    bSuccess = FALSE, bFound = FALSE;
+    WCHAR   szDrive[3];
+    WCHAR   szName[MAX_PATH]; //for the device partition name
+    WCHAR   szTemp[DBUFFER_SIZE]; //for the disk array
+    UINT    uNameLen = 0;
+    WCHAR  *p = szTemp;
+    SIZE_T  l = 0, k = 0;
+
+    if ((NtFileName == NULL) || (DosFileName == NULL) || (ccDosFileName < 4))
+        return bSuccess;
+
+    _strcpy(szDrive, TEXT(" :"));
+    RtlSecureZeroMemory(szTemp, sizeof(szTemp));
+    if (GetLogicalDriveStrings(DBUFFER_SIZE - 1, szTemp)) {
+        do {
+            *szDrive = *p;
+            RtlSecureZeroMemory(szName, sizeof(szName));
+            if (QueryDosDevice(szDrive, szName, MAX_PATH)) {
+                uNameLen = (UINT)_strlen(szName);
+                if (uNameLen < MAX_PATH) {
+                    bFound = (_strncmp(NtFileName, szName, uNameLen) == 0);
+                    if (bFound && *(NtFileName + uNameLen) == TEXT('\\')) {
+                       
+                        _strcpy(DosFileName, szDrive);
+                        l = _strlen(DosFileName);
+                        k = _strlen(NtFileName);
+                        _strncpy(&DosFileName[l], ccDosFileName - l, NtFileName + uNameLen, k - uNameLen);
+                        
+                        bSuccess = TRUE;
+                        break;
+                    }
+                }
+            }
+            while (*p++);
+        } while (!bFound && *p); // end of string
+    }
+    return bSuccess;
+}
+
+/*
+* supGetWin32FileName
+*
+* Purpose:
+*
+* Query filename by handle.
+*
+*/
+BOOL supGetWin32FileName(
+    _In_ LPWSTR FileName,
+    _Inout_ LPWSTR Win32FileName,
+    _In_ SIZE_T ccWin32FileName
+    )
+{
+    BOOL                bCond = FALSE, bResult = FALSE;
+    NTSTATUS            status = STATUS_UNSUCCESSFUL;
+    HANDLE              hFile = NULL;
+    UNICODE_STRING      NtFileName;
+    OBJECT_ATTRIBUTES   obja;
+    IO_STATUS_BLOCK     iost;
+    ULONG               memIO;
+    BYTE               *Buffer = NULL;
+
+    do {
+
+        if (ccWin32FileName < MAX_PATH)
+            break;
+
+        RtlInitUnicodeString(&NtFileName, FileName);
+        InitializeObjectAttributes(&obja, &NtFileName, OBJ_CASE_INSENSITIVE, 0, NULL);
+
+        status = NtCreateFile(&hFile, SYNCHRONIZE, &obja, &iost, NULL, 0,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, FILE_OPEN,
+            FILE_SYNCHRONOUS_IO_NONALERT | FILE_NON_DIRECTORY_FILE, NULL, 0);
+
+        if (!NT_SUCCESS(status))
+            break;
+
+        memIO = 0;
+        status = NtQueryObject(hFile, ObjectNameInformation, NULL, 0, &memIO);
+        if (status != STATUS_INFO_LENGTH_MISMATCH)
+            break;
+
+        Buffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, memIO);
+        if (Buffer == NULL)
+            break;
+
+        status = NtQueryObject(hFile, ObjectNameInformation, Buffer, memIO, NULL);
+        if (!NT_SUCCESS(status))
+            break;       
+
+        if (!supConvertFileName(((PUNICODE_STRING)Buffer)->Buffer, Win32FileName, ccWin32FileName))
+            break;
+
+        bResult = TRUE;
+
+    } while (bCond);
+
+    if (hFile)
+        NtClose(hFile);
+
+    if (Buffer != NULL)
+        HeapFree(GetProcessHeap(), 0, Buffer);
+
+    return bResult;
+}

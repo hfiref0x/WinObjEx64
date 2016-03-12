@@ -233,7 +233,7 @@ INT_PTR CALLBACK SdtDialogProc(
 		break;
 
 	case WM_NOTIFY:
-		extrasDlgHandleNotify(nhdr, &SdtDlgContext, &SdtDlgCompareFunc);
+		extrasDlgHandleNotify(nhdr, &SdtDlgContext, &SdtDlgCompareFunc, NULL, NULL);
 		break;
 
 	case WM_SIZE:

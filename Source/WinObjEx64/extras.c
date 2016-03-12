@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRAS.C
 *
-*  VERSION:     1.41
+*  VERSION:     1.42
 *
-*  DATE:        01 Mar 2016
+*  DATE:        11 Mar 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -69,13 +69,15 @@ VOID extrasSimpleListResize(
 VOID extrasDlgHandleNotify(
 	_In_ LPNMLISTVIEW nhdr,
 	_In_ EXTRASCONTEXT *Context,
-	_In_ DlgCompareFunction CompareFunc
+	_In_ DlgCompareFunction CompareFunc,
+    _In_opt_ CustomNotifyFunction CustomHandler,
+    _In_opt_ PVOID CustomParameter
 	)
 {
-	LVCOLUMN col;
-	INT      c, k;
+    INT      c, k;
+    LVCOLUMN col;
 
-	if ((nhdr == NULL) || (Context == NULL))
+	if ((nhdr == NULL) || (Context == NULL) || (CompareFunc == NULL))
 		return;
 
 	if (nhdr->hdr.idFrom != ID_EXTRASLIST)
@@ -108,6 +110,10 @@ VOID extrasDlgHandleNotify(
 	default:
 		break;
 	}
+
+    if (CustomHandler) {
+        CustomHandler(nhdr, Context, CustomParameter);
+    }
 }
 
 /*

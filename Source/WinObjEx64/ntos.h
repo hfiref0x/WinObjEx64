@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.37
+*  VERSION:     1.39
 *
-*  DATE:        18 Feb 2016
+*  DATE:        11 Mar 2016
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -3713,6 +3713,18 @@ typedef struct _TEB
 	PVOID ResourceRetValue;
 } TEB, *PTEB;
 
+typedef struct _PROCESS_DEVICEMAP_INFORMATION {
+    union {
+        struct {
+            HANDLE DirectoryHandle;
+        } Set;
+        struct {
+            ULONG DriveMap;
+            UCHAR DriveType[32];
+        } Query;
+    };
+} PROCESS_DEVICEMAP_INFORMATION, *PPROCESS_DEVICEMAP_INFORMATION;
+
 __inline struct _PEB * NtCurrentPeb() { return NtCurrentTeb()->ProcessEnvironmentBlock; }
 
 /*
@@ -4463,6 +4475,57 @@ NTSTATUS NTAPI RtlAdjustPrivilege(
 	PBOOLEAN WasEnabled
 	);
 
+//
+// preallocated heap-growable buffers
+//
+typedef struct _RTL_BUFFER {
+    PUCHAR    Buffer;
+    PUCHAR    StaticBuffer;
+    SIZE_T    Size;
+    SIZE_T    StaticSize;
+    SIZE_T    ReservedForAllocatedSize; // for future doubling
+    PVOID     ReservedForIMalloc; // for future pluggable growth
+} RTL_BUFFER, *PRTL_BUFFER;
+
+typedef struct _RTL_UNICODE_STRING_BUFFER {
+    UNICODE_STRING String;
+    RTL_BUFFER     ByteBuffer;
+    UCHAR          MinimumStaticBufferForTerminalNul[sizeof(WCHAR)];
+} RTL_UNICODE_STRING_BUFFER, *PRTL_UNICODE_STRING_BUFFER;
+
+NTSTATUS NTAPI RtlNtPathNameToDosPathName(
+    _In_ ULONG Flags,
+    _Inout_ PRTL_UNICODE_STRING_BUFFER Path,
+    _Out_opt_ PULONG Disposition,
+    _Inout_opt_ PWSTR* FilePart
+    );
+
+ULONG NTAPI RtlIsDosDeviceName_U(
+    PCWSTR DosFileName
+    );
+
+ULONG NTAPI RtlGetFullPathName_U(
+    __in PCWSTR lpFileName,
+    __in ULONG nBufferLength,
+    __out_bcount(nBufferLength) PWSTR lpBuffer,
+    __out_opt PWSTR *lpFilePart
+    );
+
+typedef enum _RTL_PATH_TYPE {
+    RtlPathTypeUnknown,         // 0
+    RtlPathTypeUncAbsolute,     // 1
+    RtlPathTypeDriveAbsolute,   // 2
+    RtlPathTypeDriveRelative,   // 3
+    RtlPathTypeRooted,          // 4
+    RtlPathTypeRelative,        // 5
+    RtlPathTypeLocalDevice,     // 6
+    RtlPathTypeRootLocalDevice  // 7
+} RTL_PATH_TYPE;
+
+RTL_PATH_TYPE NTAPI RtlDetermineDosPathNameType_U(
+    PCWSTR DosFileName
+    );
+
 ULONG DbgPrint(
 	_In_ PCH Format,
 	...
@@ -4729,6 +4792,12 @@ NTSTATUS WINAPI NtQuerySystemInformation(
 	_Inout_    PVOID SystemInformation,
 	_In_       ULONG SystemInformationLength,
 	_Out_opt_  PULONG ReturnLength
+	);
+
+NTSTATUS NTAPI NtSetSystemInformation(
+	_In_       SYSTEM_INFORMATION_CLASS SystemInformationClass,
+	_In_opt_   PVOID SystemInformation,
+	_In_       ULONG SystemInformationLength
 	);
 
 NTSTATUS NTAPI NtCreateMutant(

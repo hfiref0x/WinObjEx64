@@ -48,9 +48,14 @@ typedef struct _ENUMICONINFO {
 #define SET_BIT(Integer, Bit) ((Integer) |= 1 << (Bit))
 #define CLEAR_BIT(Integer, Bit) ((Integer) &= ~(1 << (Bit)))
 
-/*
-** Object Type Indexes Used By Program Only
-*/
+//
+// Conversion buffer size
+//
+#define DBUFFER_SIZE                 512
+
+//
+// Object Type Indexes Used By Program Only
+//
 
 #define TYPE_DEVICE                 0
 #define TYPE_DRIVER                 1
@@ -380,5 +385,15 @@ VOID supSzGripWindowOnResize(
 BOOL supIsProcess32bit(
 	_In_ HANDLE hProcess
 	);
+
+ULONG_PTR supQuerySystemRangeStart(
+    VOID
+    );
+
+BOOL supGetWin32FileName(
+    _In_ LPWSTR FileName,
+    _Inout_ LPWSTR Win32FileName,
+    _In_ SIZE_T ccWin32FileName
+    );
 
 #define PathFileExists(lpszPath) (GetFileAttributes(lpszPath) != (DWORD)-1)

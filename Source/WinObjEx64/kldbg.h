@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.41
+*  VERSION:     1.42
 *
-*  DATE:        01 Mar 2016
+*  DATE:        10 Mar 2016
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -25,6 +25,7 @@
 #define KLDBGDRVSYS             L"\\drivers\\kldbgdrv.sys"
 #define RegControlKey           L"System\\CurrentControlSet\\Control"
 #define RegStartOptionsValue    L"SystemStartOptions"
+#define NTOSFOLDERSYSTEM32      L"\\\\?\\globalroot\\systemroot\\system32" //no slash at end
 
 typedef ULONG_PTR *PUTable;
 

@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.41
+*  VERSION:     1.42
 *
-*  DATE:        01 Mar 2016 
+*  DATE:        10 Mar 2016 
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -427,33 +427,6 @@ VOID kdFindKiServiceTable(
 		return;
 	}
 	return;
-}
-
-/*
-* ObQuerySystemRangeStartValue
-*
-* Purpose:
-*
-* Read MmSystemRangeStart from kernel memory
-*
-*/
-ULONG_PTR ObQuerySystemRangeStartValue(
-	_In_ ULONG_PTR MappedImageBase,
-	_In_ ULONG_PTR KernelImageBase
-	)
-{
-	ULONG_PTR KmAddress, Value = 0;
-
-	if ((MappedImageBase == 0) || (KernelImageBase == 0))
-		return 0;
-
-	KmAddress = (ULONG_PTR)GetProcAddress((HMODULE)MappedImageBase, "MmSystemRangeStart");
-	if (KmAddress == 0) {
-		return 0;
-	}
-	KmAddress = KernelImageBase + KmAddress - MappedImageBase;
-	kdReadSystemMemory(KmAddress, &Value, sizeof(ULONG_PTR));
-	return Value;
 }
 
 /*
@@ -1435,95 +1408,63 @@ BOOL kdExtractDriver(
 * Purpose:
 *
 * Thread worker subroutine.
-* Finds MmSystemRangeStart once during program startup.
 *
 */
 VOID pkdQuerySystemInformation(
 	_In_ LPVOID lpParameter
 	)
 {
-	BOOL                      cond = FALSE;
-	ULONG                     rl = 0;
-	PKLDBGCONTEXT             Context = (PKLDBGCONTEXT)lpParameter;
-	PVOID                     MappedKernel = NULL;
-	ULONG_PTR                 KernelBase = 0L;
-	PRTL_PROCESS_MODULES      miSpace = NULL;
-	CHAR                      KernelFullPathName[MAX_PATH * 2];
-	ULONG                     ModuleSize;
-	PLIST_ENTRY               Head, Next;
-	PLDR_DATA_TABLE_ENTRY     Entry;
+	BOOL                    cond = FALSE;
+	ULONG                   ModuleSize;
+	PVOID                   MappedKernel = NULL;
+	ULONG_PTR               KernelBase = 0L;
+	PKLDBGCONTEXT           Context = (PKLDBGCONTEXT)lpParameter;
+    PIMAGE_NT_HEADERS       NtHeaders;
+    PRTL_PROCESS_MODULES    miSpace = NULL;
+	WCHAR                   NtOskrnlFullPathName[MAX_PATH * 2];
 
 	do {
 
 		miSpace = supGetSystemInfo(SystemModuleInformation);
-		if (miSpace == NULL) {
+		if (miSpace == NULL) 
 			break;
-		}
 
-		if (miSpace->NumberOfModules == 0) {
+		if (miSpace->NumberOfModules == 0)
 			break;
-		}
 
-		rl = GetSystemDirectoryA(KernelFullPathName, MAX_PATH);
-		if (rl == 0) {
-			break;
-		}
-
-		KernelFullPathName[rl] = (CHAR)'\\';
-		_strcpy_a(&KernelFullPathName[rl + 1],
-			(const char*)&miSpace->Modules[0].FullPathName[miSpace->Modules[0].OffsetToFileName]);
 		KernelBase = (ULONG_PTR)miSpace->Modules[0].ImageBase;
+
+		_strcpy(NtOskrnlFullPathName, NTOSFOLDERSYSTEM32);
+		_strcat(NtOskrnlFullPathName, TEXT("\\"));
+		MultiByteToWideChar(CP_ACP, 0,	
+			(LPCSTR)&miSpace->Modules[0].FullPathName[miSpace->Modules[0].OffsetToFileName],
+			-1, _strend(NtOskrnlFullPathName), MAX_PATH);
+
 		HeapFree(GetProcessHeap(), 0, miSpace);
 		miSpace = NULL;
 
-		MappedKernel = LoadLibraryExA(KernelFullPathName, NULL, DONT_RESOLVE_DLL_REFERENCES);
-		if (MappedKernel == NULL) {
+		MappedKernel = LoadLibraryEx(NtOskrnlFullPathName, NULL, DONT_RESOLVE_DLL_REFERENCES);
+		if (MappedKernel == NULL)
 			break;
-		}
-
-		//find sizeof ntoskrnl image
-		ModuleSize = 0;
-		EnterCriticalSection((PRTL_CRITICAL_SECTION)NtCurrentPeb()->LoaderLock);
-		Head = &NtCurrentPeb()->Ldr->InLoadOrderModuleList;
-		Next = Head->Flink;
-
-		while (Next != Head) {
-			Entry = CONTAINING_RECORD(Next, LDR_DATA_TABLE_ENTRY, InLoadOrderLinks);
-			if (Entry->DllBase == (PVOID)MappedKernel) {
-				ModuleSize = (ULONG)Entry->SizeOfImage;
-				break;
-			}
-			Next = Next->Flink;
-		}
-		LeaveCriticalSection((PRTL_CRITICAL_SECTION)NtCurrentPeb()->LoaderLock);
-
-		//query MmSystemRangeStart value
-		Context->SystemRangeStart = ObQuerySystemRangeStartValue((ULONG_PTR)MappedKernel, KernelBase);
-		if (Context->SystemRangeStart == 0) {		
-			if (Context->osver.dwBuildNumber < 9200) {
-				Context->SystemRangeStart = MM_SYSTEM_RANGE_START_7;
-			}
-			else {
-				Context->SystemRangeStart = MM_SYSTEM_RANGE_START_8;
-			}
-		}
 
 		//find and remember ObHeaderCookie
 		if (Context->osver.dwMajorVersion >= 10) {
 			Context->ObHeaderCookie = ObFindHeaderCookie(Context, (ULONG_PTR)MappedKernel, KernelBase);
 		}
-		//find namespace table
-		Context->ObpPrivateNamespaceLookupTable = ObFindObpPrivateNamespaceLookupTable(Context, (ULONG_PTR)MappedKernel, ModuleSize, KernelBase);
 
-		//find KiServiceTable
-		kdFindKiServiceTable((ULONG_PTR)MappedKernel, ModuleSize, KernelBase, &Context->KiServiceTableAddress, &Context->KiServiceLimit);
-
-
-#ifdef _DEBUG
-//		RtlSecureZeroMemory(&KernelFullPathName, sizeof(KernelFullPathName));
-//		u64tohex_a((ULONG_PTR)Context->ObpPrivateNamespaceLookupTable, KernelFullPathName);
-//		OutputDebugStringA(KernelFullPathName);
-#endif
+		NtHeaders = RtlImageNtHeader(MappedKernel);
+		if (NtHeaders) {
+			ModuleSize = NtHeaders->OptionalHeader.SizeOfImage;
+			if (ModuleSize != 0) {
+				//find KiServiceTable
+				kdFindKiServiceTable((ULONG_PTR)MappedKernel, ModuleSize, KernelBase, &Context->KiServiceTableAddress, &Context->KiServiceLimit);
+			
+				//find namespace table
+				if (Context->osver.dwBuildNumber <= 10240) {
+					Context->ObpPrivateNamespaceLookupTable = ObFindObpPrivateNamespaceLookupTable(Context, (ULONG_PTR)MappedKernel, ModuleSize, KernelBase);
+				}	
+			}
+		}
 
 	} while (cond);
 
@@ -1558,7 +1499,7 @@ DWORD WINAPI kdQueryProc(
 	}
 
 	//check if this is initial call
-	if (Context->SystemRangeStart == 0) {
+	if (Context->KiServiceTableAddress == 0) {
 		pkdQuerySystemInformation(Context);
 	}
 
@@ -1588,7 +1529,7 @@ VOID kdInit(
 
 	//
 	// Minimum supported client is windows 7
-	// Query version info in global context and  
+	// Query version info in global context, system range start value and  
 	// if version below Win7 - leave
 	//
 	g_kdctx.osver.dwOSVersionInfoSize = sizeof(g_kdctx.osver);
@@ -1602,6 +1543,15 @@ VOID kdInit(
 	}
 
 	ObGetDirectoryObjectAddress(NULL, &g_kdctx.DirectoryRootAddress, &g_kdctx.DirectoryTypeIndex);
+	g_kdctx.SystemRangeStart = supQuerySystemRangeStart();
+	if (g_kdctx.SystemRangeStart == 0) {
+		if (g_kdctx.osver.dwBuildNumber < 9200) {
+			g_kdctx.SystemRangeStart = MM_SYSTEM_RANGE_START_7;
+		}
+		else {
+			g_kdctx.SystemRangeStart = MM_SYSTEM_RANGE_START_8;
+		}
+	}
 
 	// no admin rights, leave
 	if (IsFullAdmin == FALSE)
@@ -1679,7 +1629,7 @@ VOID kdShutdown(
 		scmUnloadDeviceDriver(KLDBGDRV);
 		// driver file is no longer needed
 		RtlSecureZeroMemory(&szDrvPath, sizeof(szDrvPath));
-		_strcpy(szDrvPath, L"\\\\?\\globalroot\\systemroot\\system32");
+		_strcpy(szDrvPath, NTOSFOLDERSYSTEM32);
 		_strcat(szDrvPath, KLDBGDRVSYS);	
 		DeleteFile(szDrvPath);
 	}

@@ -13,14 +13,14 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="ldasm">
-      <UniqueIdentifier>{ebbe4f4f-0990-4d15-beda-0af23ffbb97e}</UniqueIdentifier>
-    </Filter>
     <Filter Include="minirtl">
       <UniqueIdentifier>{1f87af63-dc0b-4a32-88ee-e9e15a1041c8}</UniqueIdentifier>
     </Filter>
     <Filter Include="ldr">
       <UniqueIdentifier>{26b58504-6440-41a5-9f49-307f33ed8630}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="hde">
+      <UniqueIdentifier>{b8b6096c-f90d-41f3-a643-a53ee0fae82b}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -86,9 +86,6 @@
     </ClCompile>
     <ClCompile Include="treelist.c">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ldasm\ldasm.c">
-      <Filter>ldasm</Filter>
     </ClCompile>
     <ClCompile Include="minirtl\_strcat.c">
       <Filter>minirtl</Filter>
@@ -170,6 +167,9 @@
     </ClCompile>
     <ClCompile Include="extrasDrivers.c">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="hde\hde64.c">
+      <Filter>hde</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -265,9 +265,6 @@
     <ClInclude Include="ui.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ldasm\ldasm.h">
-      <Filter>ldasm</Filter>
-    </ClInclude>
     <ClInclude Include="minirtl\minirtl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -288,6 +285,15 @@
     </ClInclude>
     <ClInclude Include="extrasDrivers.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="hde\hde64.h">
+      <Filter>hde</Filter>
+    </ClInclude>
+    <ClInclude Include="hde\table64.h">
+      <Filter>hde</Filter>
+    </ClInclude>
+    <ClInclude Include="hde\pstdint.h">
+      <Filter>hde</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

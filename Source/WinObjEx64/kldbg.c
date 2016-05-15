@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.42
+*  VERSION:     1.43
 *
-*  DATE:        10 Mar 2016 
+*  DATE:        30 Mar 2016 
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -17,7 +17,7 @@
 *
 *******************************************************************************/
 #include "global.h"
-#include "ldasm\ldasm.h"
+#include "hde\hde64.h"
 
 //number of buckets in the object directory
 #define NUMBEROFBUCKETS 0x25
@@ -166,13 +166,12 @@ UCHAR ObFindHeaderCookie(
 	_In_ ULONG_PTR KernelImageBase
 	)
 {
-	BOOL      cond = FALSE;
-	UCHAR     ObHeaderCookie = 0;
-	ULONG_PTR Address = 0, KmAddress;
-
-	UINT        c;
-	LONG         rel = 0;
-	ldasm_data	 ld;
+	BOOL       cond = FALSE;
+	UCHAR      ObHeaderCookie = 0;
+	ULONG_PTR  Address = 0, KmAddress;
+	UINT       c;
+	LONG       rel = 0;
+    hde64s     hs;
 
 	if (Context == NULL)
 		return 0;
@@ -187,6 +186,7 @@ UCHAR ObFindHeaderCookie(
 			}
 
 			c = 0;
+            RtlSecureZeroMemory(&hs, sizeof(hs));
 			do {
 				//movzx   ecx, byte ptr cs:ObHeaderCookie
 				if ((*(PBYTE)(Address + c) == 0x0f) &&
@@ -196,7 +196,12 @@ UCHAR ObFindHeaderCookie(
 					rel = *(PLONG)(Address + c + 3);
 					break;
 				}
-				c += ldasm((void*)(Address + c), &ld, 1);
+
+                hde64_disasm((void*)(Address + c), &hs);
+                if (hs.flags & F_ERROR)
+                    break;
+                c += hs.len;
+
 			} while (c < 256);
 			KmAddress = Address + c + 7 + rel;
 
@@ -246,7 +251,7 @@ PVOID ObFindObpPrivateNamespaceLookupTable(
 
 	LONG       rel = 0;
 	ULONG_PTR  Address = 0L;
-	ldasm_data ld;
+    hde64s     hs;
 
 	__try {
 
@@ -299,6 +304,8 @@ PVOID ObFindObpPrivateNamespaceLookupTable(
 			Address = MappedImageBase + c;
 			c = 0;
 
+            RtlSecureZeroMemory(&hs, sizeof(hs));
+
 			do {
 				//lea rax, ObpPrivateNamespaceLookupTable
 				if ((*(PBYTE)(Address + c) == 0x48) &&
@@ -308,7 +315,12 @@ PVOID ObFindObpPrivateNamespaceLookupTable(
 					rel = *(PLONG)(Address + c + 3);
 					break;
 				}
-				c += ldasm((void*)(Address + c), &ld, 1);
+
+                hde64_disasm((void*)(Address + c), &hs);
+                if (hs.flags & F_ERROR)
+                    break;
+                c += hs.len;
+
 			} while (c < 128);
 
 			Address = Address + c + 7 + rel;
@@ -350,7 +362,7 @@ VOID kdFindKiServiceTable(
 	UINT         c, SignatureSize;
 	LONG         rel = 0;
 	ULONG_PTR    Address = 0;
-	ldasm_data	 ld;
+    hde64s       hs;
 
 	KSERVICE_TABLE_DESCRIPTOR KeSystemDescriptorTable;
 
@@ -389,6 +401,7 @@ VOID kdFindKiServiceTable(
 			//set new scan position, next level search pattern not included, skip
 			Address = MappedImageBase + c + SignatureSize;
 			c = 0;
+            RtlSecureZeroMemory(&hs, sizeof(hs));
 
 			do {
 				//lea r10, KeServiceDescriptorTable
@@ -399,8 +412,13 @@ VOID kdFindKiServiceTable(
 					rel = *(PLONG)(Address + c + 3);
 					break;
 				}
-				c += ldasm((void*)(Address + c), &ld, 1);
-			} while (c < 128);
+
+                hde64_disasm((void*)(Address + c), &hs);
+                if (hs.flags & F_ERROR)
+                    break;
+                c += hs.len;
+
+            } while (c < 128);
 
 			Address = Address + c + 7 + rel;
 			Address = KernelImageBase + Address - MappedImageBase;

@@ -7,3 +7,6 @@ WaitCompletionPacket
 Silo (r3 interface removed in 10240 release, object removed in TH2 builds)
 NetworkNamespace - managed by NDIS.sys
 Partition - memory manager object, partition is a new type of dynamic server partitioning scheme that goes beyond NUMA. It's basically a set of nodes plus an IO Bus.
+VirtualKey - new rs1 object
+PsSiloContextPaged
+PsSiloContextNonPaged

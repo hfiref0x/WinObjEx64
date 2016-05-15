@@ -204,9 +204,9 @@
     <ClCompile Include="extrasSSDT.c" />
     <ClCompile Include="extrasUSD.c" />
     <ClCompile Include="findDlg.c" />
+    <ClCompile Include="hde\hde64.c" />
     <ClCompile Include="instdrv.c" />
     <ClCompile Include="kldbg.c" />
-    <ClCompile Include="ldasm\ldasm.c" />
     <ClCompile Include="ldr\ldr.c" />
     <ClCompile Include="list.c" />
     <ClCompile Include="main.c" />
@@ -259,9 +259,11 @@
     <ClInclude Include="extrasUSD.h" />
     <ClInclude Include="findDlg.h" />
     <ClInclude Include="global.h" />
+    <ClInclude Include="hde\hde64.h" />
+    <ClInclude Include="hde\pstdint.h" />
+    <ClInclude Include="hde\table64.h" />
     <ClInclude Include="instdrv.h" />
     <ClInclude Include="kldbg.h" />
-    <ClInclude Include="ldasm\ldasm.h" />
     <ClInclude Include="ldr\ldr.h" />
     <ClInclude Include="list.h" />
     <ClInclude Include="minirtl\minirtl.h" />

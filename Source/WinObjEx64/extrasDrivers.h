@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASDRIVERS.H
 *
-*  VERSION:     1.40
+*  VERSION:     1.44
 *
-*  DATE:        13 Feb 2016
+*  DATE:        17 July 2016
 *
 *  Common header file for Drivers dialog.
 *
@@ -19,5 +19,5 @@
 #pragma once
 
 VOID extrasCreateDriversDialog(
-	_In_ HWND hwndParent
-	);
+    _In_ HWND hwndParent
+);

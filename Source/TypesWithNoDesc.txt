@@ -5,8 +5,11 @@ RawInputManager - DirectX Kernel Subsystem object, Window Manager for phones
 UserApcReserve - same as NtQueueApc except using reserve process allocated memory
 WaitCompletionPacket
 Silo (r3 interface removed in 10240 release, object removed in TH2 builds)
-NetworkNamespace - managed by NDIS.sys
+NetworkNamespace - managed by NDIS.sys (renamed to NdisCmState in RS1)
 Partition - memory manager object, partition is a new type of dynamic server partitioning scheme that goes beyond NUMA. It's basically a set of nodes plus an IO Bus.
-VirtualKey - new rs1 object
-PsSiloContextPaged
-PsSiloContextNonPaged
+VRegConfigurationContext - new RS1 object
+VirtualKey - new RS1 object
+PsSiloContextPaged - new RS1 object
+PsSiloContextNonPaged - new RS1 object
+RegistryTransaction - new RS1 object
+CoreMessagining - new RS1 object

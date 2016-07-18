@@ -32,11 +32,11 @@ Feb/22/2016
 #define TLSTYLE_COLAUTOEXPAND	0x01
 
 typedef struct _TL_SUBITEMS {
-	ULONG		ColorFlags;
-	COLORREF	BgColor;
-	COLORREF	FontColor;
-	ULONG		Count;
-	LPTSTR		Text[1];
+    ULONG		ColorFlags;
+    COLORREF	BgColor;
+    COLORREF	FontColor;
+    ULONG		Count;
+    LPTSTR		Text[1];
 } TL_SUBITEMS, *PTL_SUBITEMS;
 
 ATOM InitializeTreeListControl();

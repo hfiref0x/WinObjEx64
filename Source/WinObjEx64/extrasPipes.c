@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPIPES.C
 *
-*  VERSION:     1.41
+*  VERSION:     1.44
 *
-*  DATE:        01 Mar 2016
+*  DATE:        17 July 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -14,7 +14,6 @@
 * PARTICULAR PURPOSE.
 *
 *******************************************************************************/
-
 #include "global.h"
 #include "extras.h"
 #include "propDlg.h"
@@ -39,20 +38,20 @@ HPROPSHEETPAGE epsp[EXTRAS_MAX_PAGE];//pipe, security
 *
 */
 VOID PipeDisplayError(
-	HWND hwndDlg
-	)
+    HWND hwndDlg
+)
 {
-	DWORD dwLastError;
-	WCHAR szBuffer[MAX_PATH * 2];
+    DWORD dwLastError;
+    WCHAR szBuffer[MAX_PATH * 2];
 
-	dwLastError = GetLastError();
-	ShowWindow(GetDlgItem(hwndDlg, ID_PIPE_QUERYFAIL), SW_SHOW);
+    dwLastError = GetLastError();
+    ShowWindow(GetDlgItem(hwndDlg, ID_PIPE_QUERYFAIL), SW_SHOW);
 
-	RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-	_strcpy(szBuffer, TEXT("Cannot open pipe because: "));
-	FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, dwLastError,
-		0, _strend(szBuffer), MAX_PATH, NULL);
-	SetDlgItemText(hwndDlg, ID_PIPE_QUERYFAIL, szBuffer);
+    RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+    _strcpy(szBuffer, TEXT("Cannot open pipe because: "));
+    FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, dwLastError,
+        0, _strend(szBuffer), MAX_PATH, NULL);
+    SetDlgItemText(hwndDlg, ID_PIPE_QUERYFAIL, szBuffer);
 }
 
 /*
@@ -65,27 +64,27 @@ VOID PipeDisplayError(
 *
 */
 LPWSTR PipeCreateFullName(
-	_In_ LPWSTR lpObjectName
-	)
+    _In_ LPWSTR lpObjectName
+)
 {
-	LPWSTR lpFullName = NULL;
-	SIZE_T sz;
+    LPWSTR lpFullName = NULL;
+    SIZE_T sz;
 
-	if (lpObjectName == NULL) {
-		return NULL;
-	}
+    if (lpObjectName == NULL) {
+        return NULL;
+    }
 
-	sz = (_strlen(T_DEVICE_NAMED_PIPE) + _strlen(lpObjectName)) * sizeof(WCHAR) +
-		sizeof(UNICODE_NULL);
+    sz = (_strlen(T_DEVICE_NAMED_PIPE) + _strlen(lpObjectName)) * sizeof(WCHAR) +
+        sizeof(UNICODE_NULL);
 
-	lpFullName = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sz);
-	if (lpFullName == NULL) {
-		return NULL;
-	}
+    lpFullName = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sz);
+    if (lpFullName == NULL) {
+        return NULL;
+    }
 
-	_strcpy(lpFullName, T_DEVICE_NAMED_PIPE);
-	_strcat(lpFullName, lpObjectName);
-	return lpFullName;
+    _strcpy(lpFullName, T_DEVICE_NAMED_PIPE);
+    _strcat(lpFullName, lpObjectName);
+    return lpFullName;
 }
 
 /*
@@ -97,40 +96,40 @@ LPWSTR PipeCreateFullName(
 *
 */
 BOOL CALLBACK PipeOpenObjectMethod(
-	_In_	PROP_OBJECT_INFO *Context,
-	_Inout_ PHANDLE	phObject,
-	_In_	ACCESS_MASK	DesiredAccess
-	)
+    _In_	PROP_OBJECT_INFO *Context,
+    _Inout_ PHANDLE	phObject,
+    _In_	ACCESS_MASK	DesiredAccess
+)
 {
-	BOOL                bResult = FALSE;
-	HANDLE              hObject;
-	NTSTATUS            status;
-	OBJECT_ATTRIBUTES   obja;
-	UNICODE_STRING      uStr;
-	IO_STATUS_BLOCK     iost;
+    BOOL                bResult = FALSE;
+    HANDLE              hObject;
+    NTSTATUS            status;
+    OBJECT_ATTRIBUTES   obja;
+    UNICODE_STRING      uStr;
+    IO_STATUS_BLOCK     iost;
 
-	if (
-		(Context == NULL) ||
-		(phObject == NULL)
-		)
-	{
-		return bResult;
-	}
-	*phObject = NULL;
+    if (
+        (Context == NULL) ||
+        (phObject == NULL)
+        )
+    {
+        return bResult;
+    }
+    *phObject = NULL;
 
-	RtlSecureZeroMemory(&uStr, sizeof(uStr));
-	RtlInitUnicodeString(&uStr, Context->lpCurrentObjectPath);
-	InitializeObjectAttributes(&obja, &uStr, OBJ_CASE_INSENSITIVE, NULL, NULL);
-	hObject = NULL;
-	status = NtOpenFile(&hObject, DesiredAccess, &obja, &iost,
-		FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, 0);
+    RtlSecureZeroMemory(&uStr, sizeof(uStr));
+    RtlInitUnicodeString(&uStr, Context->lpCurrentObjectPath);
+    InitializeObjectAttributes(&obja, &uStr, OBJ_CASE_INSENSITIVE, NULL, NULL);
+    hObject = NULL;
+    status = NtOpenFile(&hObject, DesiredAccess, &obja, &iost,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, 0);
 
-	if (NT_SUCCESS(status)) {
-		*phObject = hObject;
-	}
-	SetLastError(RtlNtStatusToDosError(status));
-	bResult = (NT_SUCCESS(status) && (hObject != NULL));
-	return bResult;
+    if (NT_SUCCESS(status)) {
+        *phObject = hObject;
+    }
+    SetLastError(RtlNtStatusToDosError(status));
+    bResult = (NT_SUCCESS(status) && (hObject != NULL));
+    return bResult;
 }
 
 /*
@@ -142,110 +141,110 @@ BOOL CALLBACK PipeOpenObjectMethod(
 *
 */
 VOID PipeQueryInfo(
-	PROP_OBJECT_INFO *Context,
-	HWND hwndDlg
-	)
+    PROP_OBJECT_INFO *Context,
+    HWND hwndDlg
+)
 {
-	LPWSTR                      lpType;
-	HANDLE                      hPipe;
-	NTSTATUS                    status;
-	WCHAR                       szBuffer[MAX_PATH];
-	IO_STATUS_BLOCK             iost;
-	FILE_PIPE_LOCAL_INFORMATION fpli;
+    LPWSTR                      lpType;
+    HANDLE                      hPipe;
+    NTSTATUS                    status;
+    WCHAR                       szBuffer[MAX_PATH];
+    IO_STATUS_BLOCK             iost;
+    FILE_PIPE_LOCAL_INFORMATION fpli;
 
-	//validate context
-	if (Context == NULL) {
-		SetLastError(ERROR_NOT_ENOUGH_MEMORY);
-		PipeDisplayError(hwndDlg);
-		return;
-	}
-	if (
-		(Context->lpObjectName == NULL) ||
-		(Context->lpCurrentObjectPath == NULL)
-		)
-	{
-		SetLastError(ERROR_OBJECT_NOT_FOUND);
-		PipeDisplayError(hwndDlg);
-		return;
-	}
+    //validate context
+    if (Context == NULL) {
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        PipeDisplayError(hwndDlg);
+        return;
+    }
+    if (
+        (Context->lpObjectName == NULL) ||
+        (Context->lpCurrentObjectPath == NULL)
+        )
+    {
+        SetLastError(ERROR_OBJECT_NOT_FOUND);
+        PipeDisplayError(hwndDlg);
+        return;
+    }
 
-	SetDlgItemText(hwndDlg, ID_PIPE_FULLPATH, Context->lpCurrentObjectPath);
+    SetDlgItemText(hwndDlg, ID_PIPE_FULLPATH, Context->lpCurrentObjectPath);
 
-	//open pipe
-	hPipe = NULL;
-	if (!PipeOpenObjectMethod(Context, &hPipe, GENERIC_READ)) {
-		//on error display last win32 error
-		PipeDisplayError(hwndDlg);
-		return;
-	}
+    //open pipe
+    hPipe = NULL;
+    if (!PipeOpenObjectMethod(Context, &hPipe, GENERIC_READ)) {
+        //on error display last win32 error
+        PipeDisplayError(hwndDlg);
+        return;
+    }
 
-	RtlSecureZeroMemory(&fpli, sizeof(fpli));
-	status = NtQueryInformationFile(hPipe, &iost, &fpli, sizeof(fpli), FilePipeLocalInformation);
-	if (NT_SUCCESS(status)) {
+    RtlSecureZeroMemory(&fpli, sizeof(fpli));
+    status = NtQueryInformationFile(hPipe, &iost, &fpli, sizeof(fpli), FilePipeLocalInformation);
+    if (NT_SUCCESS(status)) {
 
-		//Type
-		lpType = TEXT("?");
-		switch (fpli.NamedPipeType) {
-		case FILE_PIPE_BYTE_STREAM_TYPE:
-			lpType = TEXT("Byte stream");
-			break;
-		case FILE_PIPE_MESSAGE_TYPE:
-			lpType = TEXT("Message");
-			break;
-		}
-		SetDlgItemText(hwndDlg, ID_PIPE_TYPEMODE, lpType);
+        //Type
+        lpType = TEXT("?");
+        switch (fpli.NamedPipeType) {
+        case FILE_PIPE_BYTE_STREAM_TYPE:
+            lpType = TEXT("Byte stream");
+            break;
+        case FILE_PIPE_MESSAGE_TYPE:
+            lpType = TEXT("Message");
+            break;
+        }
+        SetDlgItemText(hwndDlg, ID_PIPE_TYPEMODE, lpType);
 
-		//AccessMode
-		lpType = TEXT("?");
-		switch (fpli.NamedPipeConfiguration) {
-		case FILE_PIPE_INBOUND:
-			lpType = TEXT("Inbound");
-			break;
-		case FILE_PIPE_OUTBOUND:
-			lpType = TEXT("Outbound");
-			break;
-		case FILE_PIPE_FULL_DUPLEX:
-			lpType = TEXT("Duplex");
-			break;
-		}
-		SetDlgItemText(hwndDlg, ID_PIPE_ACCESSMODE, lpType);
+        //AccessMode
+        lpType = TEXT("?");
+        switch (fpli.NamedPipeConfiguration) {
+        case FILE_PIPE_INBOUND:
+            lpType = TEXT("Inbound");
+            break;
+        case FILE_PIPE_OUTBOUND:
+            lpType = TEXT("Outbound");
+            break;
+        case FILE_PIPE_FULL_DUPLEX:
+            lpType = TEXT("Duplex");
+            break;
+        }
+        SetDlgItemText(hwndDlg, ID_PIPE_ACCESSMODE, lpType);
 
-		//CurrentInstances
-		RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-		ultostr(fpli.CurrentInstances, szBuffer);
-		SetDlgItemText(hwndDlg, ID_PIPE_CURINSTANCES, szBuffer);
+        //CurrentInstances
+        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+        ultostr(fpli.CurrentInstances, szBuffer);
+        SetDlgItemText(hwndDlg, ID_PIPE_CURINSTANCES, szBuffer);
 
-		//MaximumInstances
-		RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-		if (fpli.MaximumInstances == MAXDWORD) {
-			_strcpy(szBuffer, TEXT("Unlimited"));
-		}
-		else {
-			ultostr(fpli.MaximumInstances, szBuffer);
-		}
-		SetDlgItemText(hwndDlg, ID_PIPE_MAXINSTANCES, szBuffer);
+        //MaximumInstances
+        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+        if (fpli.MaximumInstances == MAXDWORD) {
+            _strcpy(szBuffer, TEXT("Unlimited"));
+        }
+        else {
+            ultostr(fpli.MaximumInstances, szBuffer);
+        }
+        SetDlgItemText(hwndDlg, ID_PIPE_MAXINSTANCES, szBuffer);
 
-		//InboundQuota
-		RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-		ultostr(fpli.InboundQuota, szBuffer);
-		SetDlgItemText(hwndDlg, ID_PIPE_INBUFFER, szBuffer);
+        //InboundQuota
+        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+        ultostr(fpli.InboundQuota, szBuffer);
+        SetDlgItemText(hwndDlg, ID_PIPE_INBUFFER, szBuffer);
 
-		//OutboundQuota
-		RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-		ultostr(fpli.OutboundQuota, szBuffer);
-		SetDlgItemText(hwndDlg, ID_PIPE_OUTBUFFER, szBuffer);
+        //OutboundQuota
+        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+        ultostr(fpli.OutboundQuota, szBuffer);
+        SetDlgItemText(hwndDlg, ID_PIPE_OUTBUFFER, szBuffer);
 
-		//WriteQuotaAvailable
-		RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-		ultostr(fpli.WriteQuotaAvailable, szBuffer);
-		SetDlgItemText(hwndDlg, ID_PIPE_WRITEQUOTAAVAIL, szBuffer);
-	}
-	else {
-		//show detail on query error
-		SetLastError(RtlNtStatusToDosError(status));
-		PipeDisplayError(hwndDlg);
-	}
-	NtClose(hPipe);
+        //WriteQuotaAvailable
+        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+        ultostr(fpli.WriteQuotaAvailable, szBuffer);
+        SetDlgItemText(hwndDlg, ID_PIPE_WRITEQUOTAAVAIL, szBuffer);
+    }
+    else {
+        //show detail on query error
+        SetLastError(RtlNtStatusToDosError(status));
+        PipeDisplayError(hwndDlg);
+    }
+    NtClose(hPipe);
 }
 
 /*
@@ -257,52 +256,52 @@ VOID PipeQueryInfo(
 *
 */
 INT_PTR CALLBACK PipeTypeDialogProc(
-	_In_  HWND hwndDlg,
-	_In_  UINT uMsg,
-	_In_  WPARAM wParam,
-	_In_  LPARAM lParam
-	)
+    _In_  HWND hwndDlg,
+    _In_  UINT uMsg,
+    _In_  WPARAM wParam,
+    _In_  LPARAM lParam
+)
 {
-	HDC               hDc;
-	PAINTSTRUCT       Paint;
-	PROPSHEETPAGE    *pSheet = NULL;
-	PROP_OBJECT_INFO *Context = NULL;
+    HDC               hDc;
+    PAINTSTRUCT       Paint;
+    PROPSHEETPAGE    *pSheet = NULL;
+    PROP_OBJECT_INFO *Context = NULL;
 
-	switch (uMsg) {
+    switch (uMsg) {
 
-	case WM_INITDIALOG:
-		pSheet = (PROPSHEETPAGE *)lParam;
-		if (pSheet) {
-			SetProp(hwndDlg, T_PROPCONTEXT, (HANDLE)pSheet->lParam);
-		}
-		return 1;
-		break;
+    case WM_INITDIALOG:
+        pSheet = (PROPSHEETPAGE *)lParam;
+        if (pSheet) {
+            SetProp(hwndDlg, T_PROPCONTEXT, (HANDLE)pSheet->lParam);
+        }
+        return 1;
+        break;
 
-	case WM_SHOWWINDOW:
-		if (wParam) {
-			Context = GetProp(hwndDlg, T_PROPCONTEXT);
-			if (Context) {
-				PipeQueryInfo(Context, hwndDlg);
-			}
-		}
-		return 1;
-		break;
+    case WM_SHOWWINDOW:
+        if (wParam) {
+            Context = GetProp(hwndDlg, T_PROPCONTEXT);
+            if (Context) {
+                PipeQueryInfo(Context, hwndDlg);
+            }
+        }
+        return 1;
+        break;
 
-	case WM_PAINT:
-		hDc = BeginPaint(hwndDlg, &Paint);
-		if (hDc) {		
-			ImageList_Draw(PipeDlgContext.ImageList, 0, hDc, 24, 34, ILD_NORMAL | ILD_TRANSPARENT);
-			EndPaint(hwndDlg, &Paint);
-		}
-		return 1;
-		break;
+    case WM_PAINT:
+        hDc = BeginPaint(hwndDlg, &Paint);
+        if (hDc) {
+            ImageList_Draw(PipeDlgContext.ImageList, 0, hDc, 24, 34, ILD_NORMAL | ILD_TRANSPARENT);
+            EndPaint(hwndDlg, &Paint);
+        }
+        return 1;
+        break;
 
-	case WM_DESTROY:
-		RemoveProp(hwndDlg, T_PROPCONTEXT);
-		break;
+    case WM_DESTROY:
+        RemoveProp(hwndDlg, T_PROPCONTEXT);
+        break;
 
-	}
-	return 0;
+    }
+    return 0;
 }
 
 /*
@@ -315,68 +314,68 @@ INT_PTR CALLBACK PipeTypeDialogProc(
 *
 */
 VOID PipeDlgShowProperties(
-	_In_ INT iItem
-	)
+    _In_ INT iItem
+)
 {
-	INT                 nPages = 0;
-	PROP_OBJECT_INFO   *Context;
-	HPROPSHEETPAGE      SecurityPage = NULL;
-	PROPSHEETPAGE       Page;
-	PROPSHEETHEADER     PropHeader;
-	WCHAR               szCaption[MAX_PATH];
+    INT                 nPages = 0;
+    PROP_OBJECT_INFO   *Context;
+    HPROPSHEETPAGE      SecurityPage = NULL;
+    PROPSHEETPAGE       Page;
+    PROPSHEETHEADER     PropHeader;
+    WCHAR               szCaption[MAX_PATH];
 
-	Context = propContextCreate(NULL, NULL, NULL, NULL);
-	if (Context == NULL) {
-		return;
-	}
+    Context = propContextCreate(NULL, NULL, NULL, NULL);
+    if (Context == NULL) {
+        return;
+    }
 
-	Context->lpObjectName = supGetItemText(PipeDlgContext.ListView, iItem, 0, NULL);
-	Context->lpCurrentObjectPath = PipeCreateFullName(Context->lpObjectName);
+    Context->lpObjectName = supGetItemText(PipeDlgContext.ListView, iItem, 0, NULL);
+    Context->lpCurrentObjectPath = PipeCreateFullName(Context->lpObjectName);
 
-	//
-	//Create Pipe Page
-	//
-	RtlSecureZeroMemory(&Page, sizeof(Page));
-	Page.dwSize = sizeof(PROPSHEETPAGE);
-	Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
-	Page.hInstance = g_hInstance;
-	Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_PIPE);
-	Page.pfnDlgProc = PipeTypeDialogProc;
-	Page.pszTitle = TEXT("Pipe");
-	Page.lParam = (LPARAM)Context;
-	epsp[nPages++] = CreatePropertySheetPage(&Page);
+    //
+    //Create Pipe Page
+    //
+    RtlSecureZeroMemory(&Page, sizeof(Page));
+    Page.dwSize = sizeof(PROPSHEETPAGE);
+    Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
+    Page.hInstance = g_hInstance;
+    Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_PIPE);
+    Page.pfnDlgProc = PipeTypeDialogProc;
+    Page.pszTitle = TEXT("Pipe");
+    Page.lParam = (LPARAM)Context;
+    epsp[nPages++] = CreatePropertySheetPage(&Page);
 
-	//
-	//Create Security Dialog if available
-	//
-	SecurityPage = propSecurityCreatePage(
-		Context,
-		(POPENOBJECTMETHOD)&PipeOpenObjectMethod,
-		NULL, //use default close method
-		SI_EDIT_AUDITS | SI_EDIT_OWNER | SI_EDIT_PERMS |
-		SI_ADVANCED | SI_NO_ACL_PROTECT | SI_NO_TREE_APPLY |
-		SI_PAGE_TITLE
-		);
-	if (SecurityPage != NULL) {
-		epsp[nPages++] = SecurityPage;
-	}
+    //
+    //Create Security Dialog if available
+    //
+    SecurityPage = propSecurityCreatePage(
+        Context,
+        (POPENOBJECTMETHOD)&PipeOpenObjectMethod,
+        NULL, //use default close method
+        SI_EDIT_AUDITS | SI_EDIT_OWNER | SI_EDIT_PERMS |
+        SI_ADVANCED | SI_NO_ACL_PROTECT | SI_NO_TREE_APPLY |
+        SI_PAGE_TITLE
+    );
+    if (SecurityPage != NULL) {
+        epsp[nPages++] = SecurityPage;
+    }
 
-	//
-	//Create property sheet
-	//
-	_strcpy(szCaption, TEXT("Pipe Properties"));
-	RtlSecureZeroMemory(&PropHeader, sizeof(PropHeader));
-	PropHeader.dwSize = sizeof(PropHeader);
-	PropHeader.phpage = epsp;
-	PropHeader.nPages = nPages;
-	PropHeader.dwFlags = PSH_DEFAULT | PSH_NOCONTEXTHELP;
-	PropHeader.nStartPage = 0;
-	PropHeader.hwndParent = PipeDlgContext.hwndDlg;
-	PropHeader.hInstance = g_hInstance;
-	PropHeader.pszCaption = szCaption;
+    //
+    //Create property sheet
+    //
+    _strcpy(szCaption, TEXT("Pipe Properties"));
+    RtlSecureZeroMemory(&PropHeader, sizeof(PropHeader));
+    PropHeader.dwSize = sizeof(PropHeader);
+    PropHeader.phpage = epsp;
+    PropHeader.nPages = nPages;
+    PropHeader.dwFlags = PSH_DEFAULT | PSH_NOCONTEXTHELP;
+    PropHeader.nStartPage = 0;
+    PropHeader.hwndParent = PipeDlgContext.hwndDlg;
+    PropHeader.hInstance = g_hInstance;
+    PropHeader.pszCaption = szCaption;
 
-	PropertySheet(&PropHeader);
-	propContextDestroy(Context);
+    PropertySheet(&PropHeader);
+    propContextDestroy(Context);
 }
 
 /*
@@ -388,44 +387,44 @@ VOID PipeDlgShowProperties(
 *
 */
 INT CALLBACK PipeDlgCompareFunc(
-	_In_ LPARAM lParam1,
-	_In_ LPARAM lParam2,
-	_In_ LPARAM lParamSort
-	)
+    _In_ LPARAM lParam1,
+    _In_ LPARAM lParam2,
+    _In_ LPARAM lParamSort
+)
 {
-	LPWSTR lpItem1, lpItem2;
-	INT    nResult = 0;
+    LPWSTR lpItem1, lpItem2;
+    INT    nResult = 0;
 
-	lpItem1 = supGetItemText(PipeDlgContext.ListView, (INT)lParam1, (INT)lParamSort, NULL);
-	lpItem2 = supGetItemText(PipeDlgContext.ListView, (INT)lParam2, (INT)lParamSort, NULL);
+    lpItem1 = supGetItemText(PipeDlgContext.ListView, (INT)lParam1, (INT)lParamSort, NULL);
+    lpItem2 = supGetItemText(PipeDlgContext.ListView, (INT)lParam2, (INT)lParamSort, NULL);
 
-	if ((lpItem1 == NULL) && (lpItem2 == NULL)) {
-		nResult = 0;
-		goto Done;
-	}
-	
-	if ((lpItem1 == NULL) && (lpItem2 != NULL)) {
-		nResult = (PipeDlgContext.bInverseSort) ? 1 : -1;
-		goto Done;
-	}
-	if ((lpItem2 == NULL) && (lpItem1 != NULL)) {
-		nResult = (PipeDlgContext.bInverseSort) ? -1 : 1;
-		goto Done;
-	}
+    if ((lpItem1 == NULL) && (lpItem2 == NULL)) {
+        nResult = 0;
+        goto Done;
+    }
 
-	if (PipeDlgContext.bInverseSort)
-		nResult = _strcmpi(lpItem2, lpItem1);
-	else
-		nResult = _strcmpi(lpItem1, lpItem2);
+    if ((lpItem1 == NULL) && (lpItem2 != NULL)) {
+        nResult = (PipeDlgContext.bInverseSort) ? 1 : -1;
+        goto Done;
+    }
+    if ((lpItem2 == NULL) && (lpItem1 != NULL)) {
+        nResult = (PipeDlgContext.bInverseSort) ? -1 : 1;
+        goto Done;
+    }
+
+    if (PipeDlgContext.bInverseSort)
+        nResult = _strcmpi(lpItem2, lpItem1);
+    else
+        nResult = _strcmpi(lpItem1, lpItem2);
 
 Done:
-	if (lpItem1) {
-		HeapFree(GetProcessHeap(), 0, lpItem1);
-	}
-	if (lpItem2) {
-		HeapFree(GetProcessHeap(), 0, lpItem2);
-	}
-	return nResult;
+    if (lpItem1) {
+        HeapFree(GetProcessHeap(), 0, lpItem1);
+    }
+    if (lpItem2) {
+        HeapFree(GetProcessHeap(), 0, lpItem2);
+    }
+    return nResult;
 }
 
 /*
@@ -437,45 +436,45 @@ Done:
 *
 */
 VOID PipeDlgHandleNotify(
-	LPARAM lParam
-	)
+    LPARAM lParam
+)
 {
-	LVCOLUMN col;
-	LPNMHDR  nhdr = (LPNMHDR)lParam;
+    LVCOLUMN col;
+    LPNMHDR  nhdr = (LPNMHDR)lParam;
 
-	if (nhdr == NULL)
-		return;
+    if (nhdr == NULL)
+        return;
 
-	if (nhdr->idFrom != ID_PIPESLIST)
-		return;
+    if (nhdr->idFrom != ID_PIPESLIST)
+        return;
 
-	switch (nhdr->code) {
+    switch (nhdr->code) {
 
-	case LVN_COLUMNCLICK:
-		PipeDlgContext.bInverseSort = !PipeDlgContext.bInverseSort;
-		ListView_SortItemsEx(PipeDlgContext.ListView, &PipeDlgCompareFunc, 0);
+    case LVN_COLUMNCLICK:
+        PipeDlgContext.bInverseSort = !PipeDlgContext.bInverseSort;
+        ListView_SortItemsEx(PipeDlgContext.ListView, &PipeDlgCompareFunc, 0);
 
-		RtlSecureZeroMemory(&col, sizeof(col));
-		col.mask = LVCF_IMAGE;
-		col.iImage = -1;
+        RtlSecureZeroMemory(&col, sizeof(col));
+        col.mask = LVCF_IMAGE;
+        col.iImage = -1;
 
-		ListView_SetColumn(PipeDlgContext.ListView, 0, &col);
+        ListView_SetColumn(PipeDlgContext.ListView, 0, &col);
 
-		if (PipeDlgContext.bInverseSort)
-			col.iImage = 1;
-		else
-			col.iImage = 2;
+        if (PipeDlgContext.bInverseSort)
+            col.iImage = 1;
+        else
+            col.iImage = 2;
 
-		ListView_SetColumn(PipeDlgContext.ListView, 0, &col);
-		break;
+        ListView_SetColumn(PipeDlgContext.ListView, 0, &col);
+        break;
 
-	case NM_DBLCLK:
-		PipeDlgShowProperties(((LPNMITEMACTIVATE)lParam)->iItem);
-		break;
+    case NM_DBLCLK:
+        PipeDlgShowProperties(((LPNMITEMACTIVATE)lParam)->iItem);
+        break;
 
-	default:
-		break;
-	}
+    default:
+        break;
+    }
 }
 
 /*
@@ -487,81 +486,82 @@ VOID PipeDlgHandleNotify(
 *
 */
 VOID PipeDlgQueryInfo(
-	)
+    VOID
+)
 {
-	BOOL                        cond = FALSE, cond2 = TRUE;
-	BOOLEAN                     bRestartScan;
-	HANDLE                      hObject = NULL;
-	FILE_DIRECTORY_INFORMATION *DirectoryInfo = NULL;
-	NTSTATUS                    status;
-	OBJECT_ATTRIBUTES           obja;
-	UNICODE_STRING              uStr;
-	IO_STATUS_BLOCK             iost;
-	LVITEM                      lvitem;
-	INT                         c;
+    BOOL                        cond = FALSE, cond2 = TRUE;
+    BOOLEAN                     bRestartScan;
+    HANDLE                      hObject = NULL;
+    FILE_DIRECTORY_INFORMATION *DirectoryInfo = NULL;
+    NTSTATUS                    status;
+    OBJECT_ATTRIBUTES           obja;
+    UNICODE_STRING              uStr;
+    IO_STATUS_BLOCK             iost;
+    LVITEM                      lvitem;
+    INT                         c;
 
-	do {
+    do {
 
-		RtlSecureZeroMemory(&uStr, sizeof(uStr));
-		RtlInitUnicodeString(&uStr, T_DEVICE_NAMED_PIPE);
-		InitializeObjectAttributes(&obja, &uStr, OBJ_CASE_INSENSITIVE, NULL, NULL);
-		status = NtOpenFile(&hObject, FILE_LIST_DIRECTORY, &obja, &iost,
-			FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, FILE_SUPERSEDE);
-		if (!NT_SUCCESS(status)) {
-			break;
-		}
+        RtlSecureZeroMemory(&uStr, sizeof(uStr));
+        RtlInitUnicodeString(&uStr, T_DEVICE_NAMED_PIPE);
+        InitializeObjectAttributes(&obja, &uStr, OBJ_CASE_INSENSITIVE, NULL, NULL);
+        status = NtOpenFile(&hObject, FILE_LIST_DIRECTORY, &obja, &iost,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, FILE_SUPERSEDE);
+        if (!NT_SUCCESS(status)) {
+            break;
+        }
 
-		DirectoryInfo = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 0x1000);
-		if (DirectoryInfo == NULL) {
-			break;
-		}
+        DirectoryInfo = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 0x1000);
+        if (DirectoryInfo == NULL) {
+            break;
+        }
 
-		c = 0;
-		bRestartScan = TRUE;
-		while (cond2) {
+        c = 0;
+        bRestartScan = TRUE;
+        while (cond2) {
 
-			RtlSecureZeroMemory(&iost, sizeof(iost));
+            RtlSecureZeroMemory(&iost, sizeof(iost));
 
-			status = NtQueryDirectoryFile(hObject, NULL, NULL, NULL, &iost,
-				DirectoryInfo, 0x1000, FileDirectoryInformation,
-				TRUE, //ReturnSingleEntry
-				NULL,
-				bRestartScan //RestartScan
-				);
+            status = NtQueryDirectoryFile(hObject, NULL, NULL, NULL, &iost,
+                DirectoryInfo, 0x1000, FileDirectoryInformation,
+                TRUE, //ReturnSingleEntry
+                NULL,
+                bRestartScan //RestartScan
+            );
 
-			if (
-				(!NT_SUCCESS(status)) ||
-				(!NT_SUCCESS(iost.Status)) ||
-				(iost.Information == 0)
-				)
-			{
-				break;
-			}
+            if (
+                (!NT_SUCCESS(status)) ||
+                (!NT_SUCCESS(iost.Status)) ||
+                (iost.Information == 0)
+                )
+            {
+                break;
+            }
 
-			//Name
-			RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
-			lvitem.mask = LVIF_TEXT | LVIF_IMAGE;
-			lvitem.pszText = DirectoryInfo->FileName;
-			lvitem.iItem = MAXINT;
-			ListView_InsertItem(PipeDlgContext.ListView, &lvitem);
-			bRestartScan = FALSE;
-			RtlSecureZeroMemory(DirectoryInfo, 0x1000);
+            //Name
+            RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
+            lvitem.mask = LVIF_TEXT | LVIF_IMAGE;
+            lvitem.pszText = DirectoryInfo->FileName;
+            lvitem.iItem = MAXINT;
+            ListView_InsertItem(PipeDlgContext.ListView, &lvitem);
+            bRestartScan = FALSE;
+            RtlSecureZeroMemory(DirectoryInfo, 0x1000);
 
-			c++;
-			if (c > 0x1000) {//its a trap
-				break;
-			}
-		}
+            c++;
+            if (c > 0x1000) {//its a trap
+                break;
+            }
+        }
 
-	} while (cond);
+    } while (cond);
 
-	if (DirectoryInfo != NULL) {
-		HeapFree(GetProcessHeap(), 0, DirectoryInfo);
-	}
+    if (DirectoryInfo != NULL) {
+        HeapFree(GetProcessHeap(), 0, DirectoryInfo);
+    }
 
-	if (hObject) {
-		NtClose(hObject);
-	}
+    if (hObject) {
+        NtClose(hObject);
+    }
 }
 
 /*
@@ -573,35 +573,35 @@ VOID PipeDlgQueryInfo(
 *
 */
 INT_PTR CALLBACK PipeDlgProc(
-	_In_  HWND hwndDlg,
-	_In_  UINT uMsg,
-	_In_  WPARAM wParam,
-	_In_  LPARAM lParam
-	)
+    _In_  HWND hwndDlg,
+    _In_  UINT uMsg,
+    _In_  WPARAM wParam,
+    _In_  LPARAM lParam
+)
 {
-	switch (uMsg) {
-	case WM_NOTIFY:
-		PipeDlgHandleNotify(lParam);
-		break;
+    switch (uMsg) {
+    case WM_NOTIFY:
+        PipeDlgHandleNotify(lParam);
+        break;
 
-	case WM_INITDIALOG:
-		supCenterWindow(hwndDlg);
-		break;
+    case WM_INITDIALOG:
+        supCenterWindow(hwndDlg);
+        break;
 
-	case WM_CLOSE:
-		DestroyWindow(hwndDlg);
-		g_wobjDialogs[WOBJ_PIPEDLG_IDX] = NULL;
-		ImageList_Destroy(PipeDlgContext.ImageList);
-		return TRUE;
+    case WM_CLOSE:
+        DestroyWindow(hwndDlg);
+        g_wobjDialogs[WOBJ_PIPEDLG_IDX] = NULL;
+        ImageList_Destroy(PipeDlgContext.ImageList);
+        return TRUE;
 
-	case WM_COMMAND:
-		if (LOWORD(wParam) == IDCANCEL) {
-			SendMessage(hwndDlg, WM_CLOSE, 0, 0);
-			return TRUE;
-		}
-		break;
-	}
-	return FALSE;
+    case WM_COMMAND:
+        if (LOWORD(wParam) == IDCANCEL) {
+            SendMessage(hwndDlg, WM_CLOSE, 0, 0);
+            return TRUE;
+        }
+        break;
+    }
+    return FALSE;
 }
 
 /*
@@ -613,67 +613,67 @@ INT_PTR CALLBACK PipeDlgProc(
 *
 */
 VOID extrasCreatePipeDialog(
-	_In_ HWND hwndParent
-	)
+    _In_ HWND hwndParent
+)
 {
-	LVCOLUMN col;
-	HICON    hIcon;
+    LVCOLUMN col;
+    HICON    hIcon;
 
-	//allow only one dialog
-	if (g_wobjDialogs[WOBJ_PIPEDLG_IDX]) {
-		SetActiveWindow(g_wobjDialogs[WOBJ_PIPEDLG_IDX]);
-		return;
-	}
+    //allow only one dialog
+    if (g_wobjDialogs[WOBJ_PIPEDLG_IDX]) {
+        SetActiveWindow(g_wobjDialogs[WOBJ_PIPEDLG_IDX]);
+        return;
+    }
 
-	RtlSecureZeroMemory(&PipeDlgContext, sizeof(PipeDlgContext));
-	PipeDlgContext.hwndDlg = CreateDialogParam(g_hInstance, MAKEINTRESOURCE(IDD_DIALOG_PIPES),
-		hwndParent, &PipeDlgProc, 0);
+    RtlSecureZeroMemory(&PipeDlgContext, sizeof(PipeDlgContext));
+    PipeDlgContext.hwndDlg = CreateDialogParam(g_hInstance, MAKEINTRESOURCE(IDD_DIALOG_PIPES),
+        hwndParent, &PipeDlgProc, 0);
 
-	if (PipeDlgContext.hwndDlg == NULL) {
-		return;
-	}
-	g_wobjDialogs[WOBJ_PIPEDLG_IDX] = PipeDlgContext.hwndDlg;
+    if (PipeDlgContext.hwndDlg == NULL) {
+        return;
+    }
+    g_wobjDialogs[WOBJ_PIPEDLG_IDX] = PipeDlgContext.hwndDlg;
 
-	//setup dlg listview
-	PipeDlgContext.ListView = GetDlgItem(PipeDlgContext.hwndDlg, ID_PIPESLIST);
-	if (PipeDlgContext.ListView) {
-		PipeDlgContext.ImageList = ImageList_Create(16, 16, ILC_COLOR32 | ILC_MASK, 42, 8);
-		if (PipeDlgContext.ImageList) {
+    //setup dlg listview
+    PipeDlgContext.ListView = GetDlgItem(PipeDlgContext.hwndDlg, ID_PIPESLIST);
+    if (PipeDlgContext.ListView) {
+        PipeDlgContext.ImageList = ImageList_Create(16, 16, ILC_COLOR32 | ILC_MASK, 42, 8);
+        if (PipeDlgContext.ImageList) {
 
-			//set default app icon
-			hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_PIPE), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
-			if (hIcon) {
-				ImageList_ReplaceIcon(PipeDlgContext.ImageList, -1, hIcon);
-				DestroyIcon(hIcon);
-			}
-			//sort images
-			hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
-			if (hIcon) {
-				ImageList_ReplaceIcon(PipeDlgContext.ImageList, -1, hIcon);
-				DestroyIcon(hIcon);
-			}
-			hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
-			if (hIcon) {
-				ImageList_ReplaceIcon(PipeDlgContext.ImageList, -1, hIcon);
-				DestroyIcon(hIcon);
-			}
-			ListView_SetImageList(PipeDlgContext.ListView, PipeDlgContext.ImageList, LVSIL_SMALL);
-		}
+            //set default app icon
+            hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_PIPE), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+            if (hIcon) {
+                ImageList_ReplaceIcon(PipeDlgContext.ImageList, -1, hIcon);
+                DestroyIcon(hIcon);
+            }
+            //sort images
+            hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+            if (hIcon) {
+                ImageList_ReplaceIcon(PipeDlgContext.ImageList, -1, hIcon);
+                DestroyIcon(hIcon);
+            }
+            hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+            if (hIcon) {
+                ImageList_ReplaceIcon(PipeDlgContext.ImageList, -1, hIcon);
+                DestroyIcon(hIcon);
+            }
+            ListView_SetImageList(PipeDlgContext.ListView, PipeDlgContext.ImageList, LVSIL_SMALL);
+        }
 
-		ListView_SetExtendedListViewStyle(PipeDlgContext.ListView,
-			LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
+        ListView_SetExtendedListViewStyle(PipeDlgContext.ListView,
+            LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
 
-		RtlSecureZeroMemory(&col, sizeof(col));
-		col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
-		col.iSubItem = 1;
-		col.pszText = TEXT("Name");
-		col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
-		col.iOrder = 0;
-		col.iImage = 2;
-		col.cx = 500;
-		ListView_InsertColumn(PipeDlgContext.ListView, 1, &col);
+        RtlSecureZeroMemory(&col, sizeof(col));
+        col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
+        col.iSubItem = 1;
+        col.pszText = TEXT("Name");
+        col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
+        col.iOrder = 0;
+        col.iImage = 2;
+        col.cx = 500;
+        ListView_InsertColumn(PipeDlgContext.ListView, 1, &col);
 
-		PipeDlgQueryInfo();
-		ListView_SortItemsEx(PipeDlgContext.ListView, &PipeDlgCompareFunc, 0);
-	}
+        PipeDlgQueryInfo();
+        ListView_SortItemsEx(PipeDlgContext.ListView, &PipeDlgCompareFunc, 0);
+    }
 }

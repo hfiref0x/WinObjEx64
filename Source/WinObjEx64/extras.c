@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRAS.C
 *
-*  VERSION:     1.42
+*  VERSION:     1.44
 *
-*  DATE:        11 Mar 2016
+*  DATE:        17 July 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -14,7 +14,6 @@
 * PARTICULAR PURPOSE.
 *
 *******************************************************************************/
-
 #include "global.h"
 #include "propDlg.h"
 #include "extras.h"
@@ -33,29 +32,29 @@
 *
 */
 VOID extrasSimpleListResize(
-	_In_ HWND hwndDlg,
-	_In_ HWND hwndSzGrip
-	)
+    _In_ HWND hwndDlg,
+    _In_ HWND hwndSzGrip
+)
 {
-	RECT r1;
-	HWND hwnd;
-	INT  cy;
+    RECT r1;
+    HWND hwnd;
+    INT  cy;
 
-	RtlSecureZeroMemory(&r1, sizeof(r1));
+    RtlSecureZeroMemory(&r1, sizeof(r1));
 
-	hwnd = GetDlgItem(hwndDlg, ID_EXTRASLIST);
-	GetClientRect(hwndDlg, &r1);
+    hwnd = GetDlgItem(hwndDlg, ID_EXTRASLIST);
+    GetClientRect(hwndDlg, &r1);
 
-	cy = r1.bottom - 16;
-	if (hwndSzGrip != 0) 
-		cy -= GRIPPER_SIZE;
+    cy = r1.bottom - 16;
+    if (hwndSzGrip != 0)
+        cy -= GRIPPER_SIZE;
 
-	SetWindowPos(hwnd, 0, 0, 0,
-		r1.right - 16,
-		cy,
-		SWP_NOMOVE | SWP_NOZORDER);
+    SetWindowPos(hwnd, 0, 0, 0,
+        r1.right - 16,
+        cy,
+        SWP_NOMOVE | SWP_NOZORDER);
 
-	supSzGripWindowOnResize(hwndDlg, hwndSzGrip);
+    supSzGripWindowOnResize(hwndDlg, hwndSzGrip);
 }
 
 /*
@@ -67,49 +66,49 @@ VOID extrasSimpleListResize(
 *
 */
 VOID extrasDlgHandleNotify(
-	_In_ LPNMLISTVIEW nhdr,
-	_In_ EXTRASCONTEXT *Context,
-	_In_ DlgCompareFunction CompareFunc,
+    _In_ LPNMLISTVIEW nhdr,
+    _In_ EXTRASCONTEXT *Context,
+    _In_ DlgCompareFunction CompareFunc,
     _In_opt_ CustomNotifyFunction CustomHandler,
     _In_opt_ PVOID CustomParameter
-	)
+)
 {
     INT      c, k;
     LVCOLUMN col;
 
-	if ((nhdr == NULL) || (Context == NULL) || (CompareFunc == NULL))
-		return;
+    if ((nhdr == NULL) || (Context == NULL) || (CompareFunc == NULL))
+        return;
 
-	if (nhdr->hdr.idFrom != ID_EXTRASLIST)
-		return;
+    if (nhdr->hdr.idFrom != ID_EXTRASLIST)
+        return;
 
-	switch (nhdr->hdr.code) {
+    switch (nhdr->hdr.code) {
 
-	case LVN_COLUMNCLICK:
+    case LVN_COLUMNCLICK:
 
-		Context->bInverseSort = !Context->bInverseSort;
-		Context->lvColumnToSort = ((NMLISTVIEW *)nhdr)->iSubItem;
-		ListView_SortItemsEx(Context->ListView, CompareFunc, Context->lvColumnToSort);
+        Context->bInverseSort = !Context->bInverseSort;
+        Context->lvColumnToSort = ((NMLISTVIEW *)nhdr)->iSubItem;
+        ListView_SortItemsEx(Context->ListView, CompareFunc, Context->lvColumnToSort);
 
-		RtlSecureZeroMemory(&col, sizeof(col));
-		col.mask = LVCF_IMAGE;
-		col.iImage = -1;
+        RtlSecureZeroMemory(&col, sizeof(col));
+        col.mask = LVCF_IMAGE;
+        col.iImage = -1;
 
-		for (c = 0; c < Context->lvColumnCount; c++)
-			ListView_SetColumn(Context->ListView, c, &col);
+        for (c = 0; c < Context->lvColumnCount; c++)
+            ListView_SetColumn(Context->ListView, c, &col);
 
-		k = ImageList_GetImageCount(ListViewImages);
-		if (Context->bInverseSort)
-			col.iImage = k - 2;
-		else
-			col.iImage = k - 1;
+        k = ImageList_GetImageCount(ListViewImages);
+        if (Context->bInverseSort)
+            col.iImage = k - 2;
+        else
+            col.iImage = k - 1;
 
-		ListView_SetColumn(Context->ListView, ((NMLISTVIEW *)nhdr)->iSubItem, &col);
-		break;
+        ListView_SetColumn(Context->ListView, ((NMLISTVIEW *)nhdr)->iSubItem, &col);
+        break;
 
-	default:
-		break;
-	}
+    default:
+        break;
+    }
 
     if (CustomHandler) {
         CustomHandler(nhdr, Context, CustomParameter);
@@ -125,16 +124,16 @@ VOID extrasDlgHandleNotify(
 *
 */
 VOID extrasSetDlgIcon(
-	_In_ HWND hwndDlg
-	)
+    _In_ HWND hwndDlg
+)
 {
-	HANDLE hIcon;
+    HANDLE hIcon;
 
-	hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN), IMAGE_ICON, 0, 0, LR_SHARED);
-	if (hIcon) {
-		SetClassLongPtr(hwndDlg, GCLP_HICON, (LONG_PTR)hIcon);
-		DestroyIcon(hIcon);
-	}
+    hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN), IMAGE_ICON, 0, 0, LR_SHARED);
+    if (hIcon) {
+        SetClassLongPtr(hwndDlg, GCLP_HICON, (LONG_PTR)hIcon);
+        DestroyIcon(hIcon);
+    }
 }
 
 /*
@@ -146,10 +145,10 @@ VOID extrasSetDlgIcon(
 *
 */
 VOID extrasShowPipeDialog(
-	_In_ HWND hwndParent
-	)
+    _In_ HWND hwndParent
+)
 {
-	extrasCreatePipeDialog(hwndParent);
+    extrasCreatePipeDialog(hwndParent);
 }
 
 /*
@@ -161,10 +160,10 @@ VOID extrasShowPipeDialog(
 *
 */
 VOID extrasShowUserSharedDataDialog(
-	_In_ HWND hwndParent
-	)
+    _In_ HWND hwndParent
+)
 {
-	extrasCreateUsdDialog(hwndParent);
+    extrasCreateUsdDialog(hwndParent);
 }
 
 /*
@@ -176,10 +175,10 @@ VOID extrasShowUserSharedDataDialog(
 *
 */
 VOID extrasShowPrivateNamespacesDialog(
-	_In_ HWND hwndParent
-	)
+    _In_ HWND hwndParent
+)
 {
-	extrasCreatePNDialog(hwndParent);
+    extrasCreatePNDialog(hwndParent);
 }
 
 /*
@@ -191,10 +190,10 @@ VOID extrasShowPrivateNamespacesDialog(
 *
 */
 VOID extrasShowSSDTDialog(
-	_In_ HWND hwndParent
-	)
+    _In_ HWND hwndParent
+)
 {
-	extrasCreateSSDTDialog(hwndParent);
+    extrasCreateSSDTDialog(hwndParent);
 }
 
 /*
@@ -206,8 +205,8 @@ VOID extrasShowSSDTDialog(
 *
 */
 VOID extrasShowDriversDialog(
-	_In_ HWND hwndParent
-	)
+    _In_ HWND hwndParent
+)
 {
-	extrasCreateDriversDialog(hwndParent);
+    extrasCreateDriversDialog(hwndParent);
 }

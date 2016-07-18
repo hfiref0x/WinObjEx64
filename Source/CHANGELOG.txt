@@ -1,3 +1,10 @@
+v1.4.4
+FltConnectionPort object dump added
+some rearrange with switching to VS 2015 U3
+
+v1.4.3
+hde instead of ldasm
+
 v1.4.2
 some cleanup, properties for drivers
 

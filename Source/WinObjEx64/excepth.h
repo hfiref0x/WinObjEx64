@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXCEPTH.H
 *
-*  VERSION:     1.41
+*  VERSION:     1.44
 *
-*  DATE:        01 Mar 2016
+*  DATE:        17 July 2016
 *
 *  Common header file for the exception handling routines.
 *
@@ -19,6 +19,6 @@
 #pragma once
 
 INT exceptFilter(
-	_In_ UINT ExceptionCode,
-	_In_ EXCEPTION_POINTERS *ExceptionPointers
-	);
+    _In_ UINT ExceptionCode,
+    _In_ EXCEPTION_POINTERS *ExceptionPointers
+);

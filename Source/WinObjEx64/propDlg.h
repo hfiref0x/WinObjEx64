@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDLG.H
 *
-*  VERSION:     1.41
+*  VERSION:     1.44
 *
-*  DATE:        01 Mar 2016
+*  DATE:        17 July 2016
 *
 *  Common header file for properties dialog.
 *
@@ -20,25 +20,25 @@
 
 //global properties variable type
 typedef struct _PROP_OBJECT_INFO {
-	BOOL	IsType; //TRUE if selected object is object type
-	INT		TypeIndex;
-	INT		RealTypeIndex;//save index for type
-	DWORD	ObjectFlags;//Object specific flags
-	LPWSTR	lpObjectName;
-	LPWSTR	lpObjectType;
-	LPWSTR  lpCurrentObjectPath;
-	LPWSTR	lpDescription; //description from main list (3rd column)
-	OBJINFO	ObjectInfo; //object dump related structures
+    BOOL	IsType; //TRUE if selected object is object type
+    INT		TypeIndex;
+    INT		RealTypeIndex;//save index for type
+    DWORD	ObjectFlags;//Object specific flags
+    LPWSTR	lpObjectName;
+    LPWSTR	lpObjectType;
+    LPWSTR  lpCurrentObjectPath;
+    LPWSTR	lpDescription; //description from main list (3rd column)
+    OBJINFO	ObjectInfo; //object dump related structures
 } PROP_OBJECT_INFO, *PPROP_OBJECT_INFO;
 
 typedef struct _VALUE_DESC {
-	LPWSTR	lpDescription;
-	DWORD	dwValue;
+    LPWSTR	lpDescription;
+    DWORD	dwValue;
 } VALUE_DESC, *PVALUE_DESC;
 
 typedef struct _PROCEDURE_DESC {
-	LPWSTR	lpDescription;
-	PVOID	Procedure;
+    LPWSTR	lpDescription;
+    PVOID	Procedure;
 } PROCEDURE_DESC, *PPROCEDURE_DESC;
 
 //externs for global properties variables
@@ -67,25 +67,25 @@ extern HWND g_SubPropWindow;
 */
 
 BOOL propOpenCurrentObject(
-	_In_	PROP_OBJECT_INFO *Context,
-	_Inout_ PHANDLE	phObject,
-	_In_	ACCESS_MASK	DesiredAccess
-	);
+    _In_	PROP_OBJECT_INFO *Context,
+    _Inout_ PHANDLE	phObject,
+    _In_	ACCESS_MASK	DesiredAccess
+);
 
 VOID propCreateDialog(
-	_In_ HWND hwndParent,
-	_In_ LPWSTR lpObjectName,
-	_In_ LPCWSTR lpObjectType,
-	_In_opt_ LPWSTR lpDescription
-	);
+    _In_ HWND hwndParent,
+    _In_ LPWSTR lpObjectName,
+    _In_ LPCWSTR lpObjectType,
+    _In_opt_ LPWSTR lpDescription
+);
 
 PPROP_OBJECT_INFO propContextCreate(
-	LPWSTR lpObjectName,
-	LPCWSTR lpObjectType,
-	LPWSTR lpCurrentObjectPath,
-	LPWSTR lpDescription
-	);
+    LPWSTR lpObjectName,
+    LPCWSTR lpObjectType,
+    LPWSTR lpCurrentObjectPath,
+    LPWSTR lpDescription
+);
 
 VOID propContextDestroy(
-	PROP_OBJECT_INFO *Context
-	);
+    PROP_OBJECT_INFO *Context
+);

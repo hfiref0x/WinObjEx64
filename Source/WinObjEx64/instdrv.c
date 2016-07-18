@@ -4,9 +4,9 @@
 *
 *  TITLE:       INSTDRV.C
 *
-*  VERSION:     1.41
+*  VERSION:     1.44
 *
-*  DATE:        01 Mar 2016
+*  DATE:        17 July 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -25,33 +25,33 @@
 *
 */
 BOOL scmInstallDriver(
-	_In_ SC_HANDLE SchSCManager,
-	_In_ LPCTSTR DriverName,
-	_In_opt_ LPCTSTR ServiceExe
-	)
+    _In_ SC_HANDLE SchSCManager,
+    _In_ LPCTSTR DriverName,
+    _In_opt_ LPCTSTR ServiceExe
+)
 {
-	SC_HANDLE  schService;
+    SC_HANDLE  schService;
 
-	schService = CreateService(SchSCManager, // SCManager database
-		DriverName,           // name of service
-		DriverName,           // name to display
-		SERVICE_ALL_ACCESS,    // desired access
-		SERVICE_KERNEL_DRIVER, // service type
-		SERVICE_DEMAND_START,  // start type
-		SERVICE_ERROR_NORMAL,  // error control type
-		ServiceExe,            // service's binary
-		NULL,                  // no load ordering group
-		NULL,                  // no tag identifier
-		NULL,                  // no dependencies
-		NULL,                  // LocalSystem account
-		NULL                   // no password
-		);
-	if (schService == NULL) {
-		return FALSE;
-	}
+    schService = CreateService(SchSCManager, // SCManager database
+        DriverName,           // name of service
+        DriverName,           // name to display
+        SERVICE_ALL_ACCESS,    // desired access
+        SERVICE_KERNEL_DRIVER, // service type
+        SERVICE_DEMAND_START,  // start type
+        SERVICE_ERROR_NORMAL,  // error control type
+        ServiceExe,            // service's binary
+        NULL,                  // no load ordering group
+        NULL,                  // no tag identifier
+        NULL,                  // no dependencies
+        NULL,                  // LocalSystem account
+        NULL                   // no password
+    );
+    if (schService == NULL) {
+        return FALSE;
+    }
 
-	CloseServiceHandle(schService);
-	return TRUE;
+    CloseServiceHandle(schService);
+    return TRUE;
 }
 
 /*
@@ -63,26 +63,26 @@ BOOL scmInstallDriver(
 *
 */
 BOOL scmStartDriver(
-	_In_ SC_HANDLE SchSCManager,
-	_In_ LPCTSTR DriverName
-	)
+    _In_ SC_HANDLE SchSCManager,
+    _In_ LPCTSTR DriverName
+)
 {
-	SC_HANDLE  schService;
-	BOOL       ret;
+    SC_HANDLE  schService;
+    BOOL       ret;
 
-	schService = OpenService(SchSCManager,
-		DriverName,
-		SERVICE_ALL_ACCESS
-		);
-	if (schService == NULL)
-		return FALSE;
+    schService = OpenService(SchSCManager,
+        DriverName,
+        SERVICE_ALL_ACCESS
+    );
+    if (schService == NULL)
+        return FALSE;
 
-	ret = StartService(schService, 0, NULL)
-		|| GetLastError() == ERROR_SERVICE_ALREADY_RUNNING;
+    ret = StartService(schService, 0, NULL)
+        || GetLastError() == ERROR_SERVICE_ALREADY_RUNNING;
 
-	CloseServiceHandle(schService);
+    CloseServiceHandle(schService);
 
-	return ret;
+    return ret;
 }
 
 /*
@@ -94,35 +94,35 @@ BOOL scmStartDriver(
 *
 */
 BOOL scmOpenDevice(
-	_In_ LPCTSTR DriverName,
-	_Inout_opt_ PHANDLE lphDevice
-	)
+    _In_ LPCTSTR DriverName,
+    _Inout_opt_ PHANDLE lphDevice
+)
 {
-	TCHAR    completeDeviceName[64];
-	HANDLE   hDevice;
+    TCHAR    completeDeviceName[64];
+    HANDLE   hDevice;
 
-	RtlSecureZeroMemory(completeDeviceName, sizeof(completeDeviceName));
-	wsprintf(completeDeviceName, TEXT("\\\\.\\%s"), DriverName);
+    RtlSecureZeroMemory(completeDeviceName, sizeof(completeDeviceName));
+    wsprintf(completeDeviceName, TEXT("\\\\.\\%s"), DriverName);
 
-	hDevice = CreateFile(completeDeviceName,
-		GENERIC_READ | GENERIC_WRITE,
-		0,
-		NULL,
-		OPEN_EXISTING,
-		FILE_ATTRIBUTE_NORMAL,
-		NULL
-		);
-	if (hDevice == INVALID_HANDLE_VALUE)
-		return FALSE;
+    hDevice = CreateFile(completeDeviceName,
+        GENERIC_READ | GENERIC_WRITE,
+        0,
+        NULL,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        NULL
+    );
+    if (hDevice == INVALID_HANDLE_VALUE)
+        return FALSE;
 
-	if (lphDevice) {
-		*lphDevice = hDevice;
-	}
-	else {
-		CloseHandle(hDevice);
-	}
+    if (lphDevice) {
+        *lphDevice = hDevice;
+    }
+    else {
+        CloseHandle(hDevice);
+    }
 
-	return TRUE;
+    return TRUE;
 }
 
 /*
@@ -134,39 +134,39 @@ BOOL scmOpenDevice(
 *
 */
 BOOL scmStopDriver(
-	_In_ SC_HANDLE SchSCManager,
-	_In_ LPCTSTR DriverName
-	)
+    _In_ SC_HANDLE SchSCManager,
+    _In_ LPCTSTR DriverName
+)
 {
-	BOOL            ret;
-	INT             iRetryCount;
-	SC_HANDLE       schService;
-	SERVICE_STATUS  serviceStatus;
+    BOOL            ret;
+    INT             iRetryCount;
+    SC_HANDLE       schService;
+    SERVICE_STATUS  serviceStatus;
 
-	ret = FALSE;
-	schService = OpenService(SchSCManager, DriverName, SERVICE_ALL_ACCESS);
-	if (schService == NULL) {
-		return ret;
-	}
+    ret = FALSE;
+    schService = OpenService(SchSCManager, DriverName, SERVICE_ALL_ACCESS);
+    if (schService == NULL) {
+        return ret;
+    }
 
-	iRetryCount = 5;
-	do {
-		SetLastError(0);
+    iRetryCount = 5;
+    do {
+        SetLastError(0);
 
-		ret = ControlService(schService, SERVICE_CONTROL_STOP, &serviceStatus);
-		if (ret == TRUE)
-			break;
+        ret = ControlService(schService, SERVICE_CONTROL_STOP, &serviceStatus);
+        if (ret == TRUE)
+            break;
 
-		if (GetLastError() != ERROR_DEPENDENT_SERVICES_RUNNING)
-			break;
+        if (GetLastError() != ERROR_DEPENDENT_SERVICES_RUNNING)
+            break;
 
-		Sleep(1000);
-		iRetryCount--;
-	} while (iRetryCount);
+        Sleep(1000);
+        iRetryCount--;
+    } while (iRetryCount);
 
-	CloseServiceHandle(schService);
+    CloseServiceHandle(schService);
 
-	return ret;
+    return ret;
 }
 
 /*
@@ -178,27 +178,19 @@ BOOL scmStopDriver(
 *
 */
 BOOL scmRemoveDriver(
-	_In_ SC_HANDLE SchSCManager,
-	_In_ LPCTSTR DriverName
-	)
+    _In_ SC_HANDLE SchSCManager,
+    _In_ LPCTSTR DriverName
+)
 {
-	SC_HANDLE  schService;
-	BOOL       bResult = FALSE;
+    SC_HANDLE  schService;
+    BOOL       bResult = FALSE;
 
-	schService = OpenService(SchSCManager,
-		DriverName,
-		SERVICE_ALL_ACCESS
-		);
-
-	if (schService == NULL) {
-		return bResult;
-	}
-
-	bResult = DeleteService(schService);
-
-	CloseServiceHandle(schService);
-
-	return bResult;
+    schService = OpenService(SchSCManager, DriverName, SERVICE_ALL_ACCESS);
+    if (schService) {
+        bResult = DeleteService(schService);
+        CloseServiceHandle(schService);
+    }
+    return bResult;
 }
 
 /*
@@ -210,26 +202,23 @@ BOOL scmRemoveDriver(
 *
 */
 BOOL scmUnloadDeviceDriver(
-	_In_ LPCTSTR Name
-	)
+    _In_ LPCTSTR Name
+)
 {
-	SC_HANDLE schSCManager;
-	BOOL      bResult = FALSE;
+    SC_HANDLE schSCManager;
+    BOOL      bResult = FALSE;
 
-	if (Name == NULL) {
-		return bResult;
-	}
+    if (Name == NULL) {
+        return bResult;
+    }
 
-	schSCManager = OpenSCManager(NULL,
-		NULL,
-		SC_MANAGER_ALL_ACCESS
-		);
-	if (schSCManager) {
-		scmStopDriver(schSCManager, Name);
-		bResult = scmRemoveDriver(schSCManager, Name);
-		CloseServiceHandle(schSCManager);
-	}
-	return bResult;
+    schSCManager = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
+    if (schSCManager) {
+        scmStopDriver(schSCManager, Name);
+        bResult = scmRemoveDriver(schSCManager, Name);
+        CloseServiceHandle(schSCManager);
+    }
+    return bResult;
 }
 
 /*
@@ -241,25 +230,25 @@ BOOL scmUnloadDeviceDriver(
 *
 */
 BOOL scmLoadDeviceDriver(
-	_In_		LPCTSTR Name,
-	_In_opt_	LPCTSTR Path,
-	_Inout_		PHANDLE lphDevice
-	)
+    _In_		LPCTSTR Name,
+    _In_opt_	LPCTSTR Path,
+    _Inout_		PHANDLE lphDevice
+)
 {
-	SC_HANDLE schSCManager;
-	BOOL      bResult = FALSE;
+    SC_HANDLE schSCManager;
+    BOOL      bResult = FALSE;
 
-	if (Name == NULL) {
-		return bResult;
-	}
+    if (Name == NULL) {
+        return bResult;
+    }
 
-	schSCManager = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
-	if (schSCManager) {
-		scmRemoveDriver(schSCManager, Name);
-		scmInstallDriver(schSCManager, Name, Path);
-		scmStartDriver(schSCManager, Name);
-		bResult = scmOpenDevice(Name, lphDevice);
-		CloseServiceHandle(schSCManager);
-	}
-	return bResult;
+    schSCManager = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
+    if (schSCManager) {
+        scmRemoveDriver(schSCManager, Name);
+        scmInstallDriver(schSCManager, Name, Path);
+        scmStartDriver(schSCManager, Name);
+        bResult = scmOpenDevice(Name, lphDevice);
+        CloseServiceHandle(schSCManager);
+    }
+    return bResult;
 }

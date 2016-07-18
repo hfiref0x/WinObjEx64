@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPSECURITY.H
 *
-*  VERSION:     1.41
+*  VERSION:     1.44
 *
-*  DATE:        01 Mar 2016
+*  DATE:        17 July 2016
 *
 *  Common header file for Security property sheet.
 *
@@ -25,30 +25,30 @@ typedef struct _ObjectSecurityVtbl ObjectSecurityVtbl, *PObjectSecurityVtbl;
 
 //custom open object method
 typedef BOOL(CALLBACK *POPENOBJECTMETHOD)(
-	_In_	PROP_OBJECT_INFO *Context,
-	_Inout_ PHANDLE	phObject,
-	_In_	ACCESS_MASK	DesiredAccess
-	);
+    _In_	PROP_OBJECT_INFO *Context,
+    _Inout_ PHANDLE	phObject,
+    _In_	ACCESS_MASK	DesiredAccess
+    );
 
 //future use, currently the same as propDefaultCloseObject
 typedef VOID(CALLBACK *PCLOSEOBJECTMETHOD)(
-	_In_ PVOID SelfPtrReserved,//do not use
-	_In_ HANDLE hObject
-	);
+    _In_ PVOID SelfPtrReserved,//do not use
+    _In_ HANDLE hObject
+    );
 
 //class
 typedef struct _IObjectSecurity {
-	ObjectSecurityVtbl* lpVtbl;
-	ULONG RefCount;
-	ULONG psiFlags;
-	ULONG dwAccessMax;
-	GENERIC_MAPPING GenericMapping;
-	ACCESS_MASK ValidAccessMask;
-	HINSTANCE hInstance;
-	PROP_OBJECT_INFO *ObjectContext;
-	PSI_ACCESS AccessTable;//dynamically allocated access table
-	POPENOBJECTMETHOD OpenObjectMethod;
-	PCLOSEOBJECTMETHOD CloseObjectMethod;
+    ObjectSecurityVtbl* lpVtbl;
+    ULONG RefCount;
+    ULONG psiFlags;
+    ULONG dwAccessMax;
+    GENERIC_MAPPING GenericMapping;
+    ACCESS_MASK ValidAccessMask;
+    HINSTANCE hInstance;
+    PROP_OBJECT_INFO *ObjectContext;
+    PSI_ACCESS AccessTable;//dynamically allocated access table
+    POPENOBJECTMETHOD OpenObjectMethod;
+    PCLOSEOBJECTMETHOD CloseObjectMethod;
 } IObjectSecurity, *PIObjectSecurity;
 
 
@@ -62,39 +62,39 @@ typedef ULONG(STDMETHODCALLTYPE *pRelease)(IObjectSecurity * This);
 typedef HRESULT(STDMETHODCALLTYPE *pGetObjectInformation)(IObjectSecurity * This, PSI_OBJECT_INFO pObjectInfo);
 
 typedef HRESULT(STDMETHODCALLTYPE *pGetSecurity)(IObjectSecurity * This, SECURITY_INFORMATION RequestedInformation,
-	PSECURITY_DESCRIPTOR *ppSecurityDescriptor, BOOL fDefault);
+    PSECURITY_DESCRIPTOR *ppSecurityDescriptor, BOOL fDefault);
 
 typedef HRESULT(STDMETHODCALLTYPE *pSetSecurity)(IObjectSecurity * This, SECURITY_INFORMATION SecurityInformation,
-	PSECURITY_DESCRIPTOR pSecurityDescriptor);
+    PSECURITY_DESCRIPTOR pSecurityDescriptor);
 
 typedef HRESULT(STDMETHODCALLTYPE *pGetAccessRights)(IObjectSecurity * This, const GUID* pguidObjectType,
-	DWORD dwFlagsB, PSI_ACCESS *ppAccess, ULONG *pcAccesses, ULONG *piDefaultAccess);
+    DWORD dwFlagsB, PSI_ACCESS *ppAccess, ULONG *pcAccesses, ULONG *piDefaultAccess);
 
 typedef HRESULT(STDMETHODCALLTYPE *pMapGeneric)(IObjectSecurity * This, const GUID *pguidObjectType,
-	UCHAR *pAceFlags, ACCESS_MASK *pMask);
+    UCHAR *pAceFlags, ACCESS_MASK *pMask);
 
 typedef HRESULT(STDMETHODCALLTYPE *pGetInheritTypes)(IObjectSecurity * This, PSI_INHERIT_TYPE *ppInheritTypes,
-	ULONG *pcInheritTypes);
+    ULONG *pcInheritTypes);
 
 typedef HRESULT(STDMETHODCALLTYPE *pPropertySheetPageCallback)(IObjectSecurity * This, HWND hwnd,
-	UINT uMsg, SI_PAGE_TYPE uPage);
+    UINT uMsg, SI_PAGE_TYPE uPage);
 
 typedef struct _ObjectSecurityVtbl {
-	pQueryInterface				QueryInterface;
-	pAddRef						AddRef;
-	pRelease					Release;
-	pGetObjectInformation		GetObjectInformation;
-	pGetSecurity				GetSecurity;
-	pSetSecurity				SetSecurity;
-	pGetAccessRights			GetAccessRights;
-	pMapGeneric					MapGeneric;
-	pGetInheritTypes			GetInheritTypes;
-	pPropertySheetPageCallback	PropertySheetPageCallback;
+    pQueryInterface				QueryInterface;
+    pAddRef						AddRef;
+    pRelease					Release;
+    pGetObjectInformation		GetObjectInformation;
+    pGetSecurity				GetSecurity;
+    pSetSecurity				SetSecurity;
+    pGetAccessRights			GetAccessRights;
+    pMapGeneric					MapGeneric;
+    pGetInheritTypes			GetInheritTypes;
+    pPropertySheetPageCallback	PropertySheetPageCallback;
 } ObjectSecurityVtbl, *PObjectSecurityVtbl;
 
 HPROPSHEETPAGE propSecurityCreatePage(
-	_In_		PROP_OBJECT_INFO *Context,
-	_In_		POPENOBJECTMETHOD OpenObjectMethod,
-	_In_opt_	PCLOSEOBJECTMETHOD CloseObjectMethod,
-	_In_		ULONG psiFlags
-	);
+    _In_		PROP_OBJECT_INFO *Context,
+    _In_		POPENOBJECTMETHOD OpenObjectMethod,
+    _In_opt_	PCLOSEOBJECTMETHOD CloseObjectMethod,
+    _In_		ULONG psiFlags
+);

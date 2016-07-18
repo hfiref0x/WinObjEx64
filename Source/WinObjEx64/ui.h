@@ -4,9 +4,9 @@
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.42
+*  VERSION:     1.44
 *
-*  DATE:        10 Mar 2016
+*  DATE:        17 July 2016
 *
 *  Common header file for the user interface.
 *
@@ -22,18 +22,18 @@
 #define SplitterMargin        80
 
 typedef	struct _OE_LIST_ITEM {
-	struct _OE_LIST_ITEM *Prev;
-	HTREEITEM	TreeItem;
+    struct _OE_LIST_ITEM *Prev;
+    HTREEITEM	TreeItem;
 } OE_LIST_ITEM, *POE_LIST_ITEM;
 
 typedef HWND(WINAPI *pfnHtmlHelpW)(
-	_In_opt_ HWND hwndCaller,
-	_In_ LPCWSTR pszFile,
-	_In_ UINT uCommand,
-	_In_ DWORD_PTR dwData
-	);
+    _In_opt_ HWND hwndCaller,
+    _In_ LPCWSTR pszFile,
+    _In_ UINT uCommand,
+    _In_ DWORD_PTR dwData
+    );
 
-#define PROGRAM_VERSION         L"1.4.2"
+#define PROGRAM_VERSION         L"1.4.4"
 #define PROGRAM_NAME            L"Windows Object Explorer 64-bit"
 #define PROFRAM_NAME_AND_TITLE  L"Object Explorer for Windows 7/8/8.1/10"
 #define MAINWINDOWCLASSNAME     L"WinObjEx64Class"

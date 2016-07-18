@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPBASICCONSTS.H
 *
-*  VERSION:     1.41
+*  VERSION:     1.44
 *
-*  DATE:        01 Mar 2016
+*  DATE:        17 July 2016
 *
 *  Consts header file for Basic property sheet.
 *
@@ -20,28 +20,28 @@
 
 //Calendar
 LPCWSTR Months[12] = {
-	L"Jan",
-	L"Feb",
-	L"Mar",
-	L"Apr",
-	L"May",
-	L"Jun",
-	L"Jul",
-	L"Aug",
-	L"Sep",
-	L"Oct",
-	L"Nov",
-	L"Dec"
+    L"Jan",
+    L"Feb",
+    L"Mar",
+    L"Apr",
+    L"May",
+    L"Jun",
+    L"Jul",
+    L"Aug",
+    L"Sep",
+    L"Oct",
+    L"Nov",
+    L"Dec"
 };
 
 //OBJECT_HEADER Flags
 LPCWSTR T_ObjectFlags[8] = {
-	L"NewObject",
-	L"KernelObject",
-	L"KernelOnlyAccess",
-	L"Exclusive",
-	L"Permanent",
-	L"DefSecurityQuota",
-	L"SingleHandleEntry",
-	L"DeletedInline"
+    L"NewObject",
+    L"KernelObject",
+    L"KernelOnlyAccess",
+    L"Exclusive",
+    L"Permanent",
+    L"DefSecurityQuota",
+    L"SingleHandleEntry",
+    L"DeletedInline"
 };

@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPIPES.H
 *
-*  VERSION:     1.41
+*  VERSION:     1.44
 *
-*  DATE:        01 Mar 2016
+*  DATE:        17 July 2016
 *
 *  Common header file for Pipes dialog.
 *
@@ -19,5 +19,5 @@
 #pragma once
 
 VOID extrasCreatePipeDialog(
-	_In_ HWND hwndParent
-	);
+    _In_ HWND hwndParent
+);

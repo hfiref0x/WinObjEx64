@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUPCONSTS.H
 *
-*  VERSION:     1.41
+*  VERSION:     1.44
 *
-*  DATE:        01 Mar 2016
+*  DATE:        17 July 2016
 *
 *  Consts header file for support unit.
 *

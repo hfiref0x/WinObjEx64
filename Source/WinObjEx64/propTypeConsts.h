@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPTYPECONSTS.H
 *
-*  VERSION:     1.44
+*  VERSION:     1.45
 *
-*  DATE:        17 July 2016
+*  DATE:        07 Aug 2016
 *
 *  Consts header file for Type property sheet.
 *
@@ -400,6 +400,13 @@ static VALUE_DESC a_PcwProp[MAX_KNOWN_PCWOBJECT_ATTRIBUTES] = {
 static VALUE_DESC a_CompositionProp[MAX_KNOWN_COMPOSITION_ATTRIBUTES] = {
     { L"COMPOSITIONSURFACE_READ", 0x0001L },
     { L"COMPOSITIONSURFACE_WRITE", 0x0002L }
+};
+
+//Known Memory Partition Access Rights
+#define MAX_KNOWN_MEMPARTITION_ATTRIBUTES 2
+static VALUE_DESC a_MemPartProp[MAX_KNOWN_MEMPARTITION_ATTRIBUTES] = {
+    { L"MEMORY_PARTITION_QUERY_ACCESS", MEMORY_PARTITION_QUERY_ACCESS },
+    { L"MEMORY_PARTITION_MODIFY_ACCESS", MEMORY_PARTITION_MODIFY_ACCESS }
 };
 
 //Known Object Type Initializers

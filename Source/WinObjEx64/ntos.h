@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.48
+*  VERSION:     1.49
 *
-*  DATE:        17 July 2016
+*  DATE:        06 Aug 2016
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -108,6 +108,18 @@
 #define TRACELOG_CREATE_INPROC        0x0200
 #define TRACELOG_ACCESS_REALTIME      0x0400
 #define TRACELOG_REGISTER_GUIDS       0x0800
+
+//
+// Partition Specific Access Rights.
+//
+
+#define MEMORY_PARTITION_QUERY_ACCESS  0x0001
+#define MEMORY_PARTITION_MODIFY_ACCESS 0x0002
+
+#define MEMORY_PARTITION_ALL_ACCESS (STANDARD_RIGHTS_REQUIRED |         \
+                                     SYNCHRONIZE |                      \
+                                     MEMORY_PARTITION_QUERY_ACCESS |    \
+                                     MEMORY_PARTITION_MODIFY_ACCESS)
 
 #define NtCurrentThread() ( (HANDLE)(LONG_PTR) -2 )
 #define NtCurrentProcess() ( (HANDLE)(LONG_PTR) -1 )
@@ -211,6 +223,19 @@ typedef struct _SEMAPHORE_BASIC_INFORMATION {
 
 /*
 ** Semaphore END
+*/
+
+/*
+** Kernel Debugger START
+*/
+
+typedef struct _SYSTEM_KERNEL_DEBUGGER_INFORMATION {
+    BOOLEAN KernelDebuggerEnabled;
+    BOOLEAN KernelDebuggerNotPresent;
+} SYSTEM_KERNEL_DEBUGGER_INFORMATION, *PSYSTEM_KERNEL_DEBUGGER_INFORMATION;
+
+/*
+** Kernel Debugger END
 */
 
 /*
@@ -4181,7 +4206,8 @@ typedef struct _KUSER_SHARED_DATA_COMPAT {
 			ULONG DbgConsoleBrokerEnabled : 1;
 			ULONG DbgSecureBootEnabled : 1;
 			ULONG DbgMultiSessionSku : 1;
-			ULONG SpareBits : 23;
+            ULONG DbgMultiUsersInSessionSku : 1;
+			ULONG SpareBits : 22;
 		};
 	};
 

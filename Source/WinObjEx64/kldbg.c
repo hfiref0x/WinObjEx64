@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.44
+*  VERSION:     1.45
 *
-*  DATE:        17 July 2016 
+*  DATE:        06 Aug 2016 
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -1299,42 +1299,12 @@ BOOL kdIsDebugBoot(
     VOID
 )
 {
-    BOOL    cond = FALSE, bResult = FALSE;
-    HKEY    hKey;
-    LPWSTR  lpszBootOptions = NULL;
-    LRESULT lRet;
-    SIZE_T  memIO;
-    DWORD   dwSize;
+    ULONG rl = 0;
+    SYSTEM_KERNEL_DEBUGGER_INFORMATION kdInfo;
 
-    do {
-
-        lRet = RegOpenKeyExW(HKEY_LOCAL_MACHINE, RegControlKey, 0, KEY_QUERY_VALUE, &hKey);
-        if (lRet != ERROR_SUCCESS)
-            break;
-
-        dwSize = 0;
-        lRet = RegQueryValueExW(hKey, RegStartOptionsValue, NULL, NULL, (LPBYTE)NULL, &dwSize);
-        if (lRet != ERROR_SUCCESS)
-            break;
-
-        memIO = dwSize + sizeof(WCHAR);
-        lpszBootOptions = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, memIO);
-        if (lpszBootOptions == NULL)
-            break;
-
-        lRet = RegQueryValueExW(hKey, RegStartOptionsValue, NULL, NULL, (LPBYTE)lpszBootOptions, &dwSize);
-        if (lRet != ERROR_SUCCESS)
-            break;
-
-        if (_strstri(lpszBootOptions, L"DEBUG") != NULL)
-            bResult = TRUE;
-
-        RegCloseKey(hKey);
-        HeapFree(GetProcessHeap(), 0, lpszBootOptions);
-
-    } while (cond);
-
-    return bResult;
+    RtlSecureZeroMemory(&kdInfo, sizeof(kdInfo));
+    NtQuerySystemInformation(SystemKernelDebuggerInformation, &kdInfo, sizeof(kdInfo), &rl);
+    return kdInfo.KernelDebuggerEnabled;
 }
 
 /*

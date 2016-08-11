@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASUSD.H
 *
-*  VERSION:     1.44
+*  VERSION:     1.45
 *
-*  DATE:        17 July 2016
+*  DATE:        06 Aug 2016
 *
 *  Common header file for Extras User Shared Data dialog.
 *
@@ -55,7 +55,8 @@ static LPWSTR T_PROCESSOR_FEATURES[] = {
     L""
 };
 
-static LPCWSTR T_SharedDataFlags[9] = {
+#define MAX_KNOWN_SHAREDDATAFLAGS 10
+static LPCWSTR T_SharedDataFlags[MAX_KNOWN_SHAREDDATAFLAGS] = {
     L"DbgErrorPortPresent",
     L"DbgElevationEnabled",
     L"DbgVirtEnabled",
@@ -64,7 +65,8 @@ static LPCWSTR T_SharedDataFlags[9] = {
     L"DbgDynProcessorEnabled",
     L"DbgConsoleBrokerEnabled",
     L"DbgSecureBootEnabled",
-    L"DbgMultiSessionSku"
+    L"DbgMultiSessionSku",
+    L"DbgMultiUsersInSessionSku"
 };
 
 #define MAX_KNOWN_SUITEMASKS 18

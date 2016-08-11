@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASUSD.C
 *
-*  VERSION:     1.44
+*  VERSION:     1.45
 *
-*  DATE:        17 July 2016
+*  DATE:        06 Aug 2016
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -189,7 +189,7 @@ VOID UsdDumpSharedRegion(
         subitems.Count = 1;
         h_tviSubItem = TreeListAddItem(UsdTreeList, h_tviRootItem, TVIF_TEXT | TVIF_STATE, 0, 0, TEXT("SharedDataFlags"), &subitems);
         if (h_tviSubItem) {
-            for (i = 0; i < 9; i++) {
+            for (i = 0; i < MAX_KNOWN_SHAREDDATAFLAGS; i++) {
                 if (GET_BIT(pData->SharedDataFlags, i)) {
                     RtlSecureZeroMemory(&subitems, sizeof(subitems));
                     RtlSecureZeroMemory(&szValue, sizeof(szValue));

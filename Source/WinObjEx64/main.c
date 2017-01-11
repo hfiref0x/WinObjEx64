@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2016
+*  (C) COPYRIGHT AUTHORS, 2015 - 2017
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.44
+*  VERSION:     1.45
 *
-*  DATE:        17 July 2016
+*  DATE:        11 Jan 2017
 *
 *  Program entry point and main window handler.
 *
@@ -801,7 +801,7 @@ void WinObjExMain()
 {
     MSG                     msg1;
     WNDCLASSEX              wincls;
-    BOOL                    IsFullAdmin = FALSE, rv = TRUE, cond = FALSE;
+    BOOL                    IsFullAdmin = FALSE, IsWine = FALSE, rv = TRUE, cond = FALSE;
     ATOM                    class_atom = 0;
     INITCOMMONCONTROLSEX    icc;
     LVCOLUMN                col;
@@ -826,7 +826,16 @@ void WinObjExMain()
 
     // do not move anywhere
     IsFullAdmin = supUserIsFullAdmin();
+
+    // check compatibility
+    IsWine = supIsWine();
+    if (IsWine != FALSE) {
+        IsFullAdmin = FALSE;
+    }
     supInit(IsFullAdmin);
+
+    // do not move anywhere
+    g_kdctx.IsWine = IsWine;
 
     //create main window and it components
     wincls.cbSize = sizeof(WNDCLASSEX);
@@ -850,6 +859,10 @@ void WinObjExMain()
         _strcpy(szWindowTitle, PROGRAM_NAME);
         if (IsFullAdmin != FALSE) {
             _strcat(szWindowTitle, L" (Administrator)");
+        }
+
+        if (IsWine != FALSE) {
+            _strcat(szWindowTitle, L" (Wine emulation)");
         }
 
         MainWindow = CreateWindowEx(0, MAKEINTATOM(class_atom), szWindowTitle,
@@ -902,7 +915,7 @@ void WinObjExMain()
         }
 
         //not enough user rights, insert run as admin menu entry and hide admin only stuff
-        if (IsFullAdmin == FALSE) {
+        if ((IsFullAdmin == FALSE) && (g_kdctx.IsWine == FALSE)) {
             hMenu = GetSubMenu(GetMenu(MainWindow), 0);
             InsertMenu(hMenu, 0, MF_BYPOSITION, ID_FILE_RUNASADMIN, T_RUNASADMIN);
             InsertMenu(hMenu, 1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
@@ -923,6 +936,11 @@ void WinObjExMain()
         //unsupported
         if (g_kdctx.osver.dwBuildNumber > 10240) {
             DeleteMenu(GetSubMenu(GetMenu(MainWindow), 4), ID_EXTRAS_PRIVATENAMESPACES, MF_BYCOMMAND);
+        }
+
+        //wine unsupported
+        if (g_kdctx.IsWine != FALSE) {
+            DeleteMenu(GetSubMenu(GetMenu(MainWindow), 4), ID_EXTRAS_DRIVERS, MF_BYCOMMAND);
         }
 
         //load listview images

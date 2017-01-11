@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2016
+*  (C) COPYRIGHT AUTHORS, 2015 - 2017
 *
 *  TITLE:       PROPSECURITY.H
 *
-*  VERSION:     1.44
+*  VERSION:     1.45
 *
-*  DATE:        17 July 2016
+*  DATE:        11 Jan 2017
 *
 *  Common header file for Security property sheet.
 *

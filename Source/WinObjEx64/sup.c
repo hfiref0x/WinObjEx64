@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2016
+*  (C) COPYRIGHT AUTHORS, 2015 - 2017
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.44
+*  VERSION:     1.45
 *
-*  DATE:        29 June 2016
+*  DATE:        11 Jan 2017
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1197,7 +1197,6 @@ VOID supInit(
     }
 
     g_enumParams.sapiDB = sapiCreateSetupDBSnapshot();
-
     g_pObjectTypesInfo = supGetObjectTypesInfo();
 }
 
@@ -2719,4 +2718,30 @@ BOOL supGetWin32FileName(
         HeapFree(GetProcessHeap(), 0, Buffer);
 
     return bResult;
+}
+
+/*
+* supIsWine
+*
+* Purpose:
+*
+* Detect Wine presense.
+*
+*/
+BOOL supIsWine(
+    VOID
+)
+{
+    HANDLE hNtdll;
+    FARPROC  WineVersion = NULL;
+
+    hNtdll = GetModuleHandle(TEXT("ntdll.dll"));
+
+    if (hNtdll) {
+        WineVersion = (FARPROC)GetProcAddress(hNtdll, "wine_get_version");
+        if (WineVersion != NULL)
+            return TRUE;
+    }
+
+    return FALSE;
 }

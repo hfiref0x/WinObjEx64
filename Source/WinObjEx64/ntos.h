@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.49
+*  VERSION:     1.50
 *
-*  DATE:        06 Aug 2016
+*  DATE:        01 Dec 2016
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -4206,8 +4206,7 @@ typedef struct _KUSER_SHARED_DATA_COMPAT {
 			ULONG DbgConsoleBrokerEnabled : 1;
 			ULONG DbgSecureBootEnabled : 1;
 			ULONG DbgMultiSessionSku : 1;
-            ULONG DbgMultiUsersInSessionSku : 1;
-			ULONG SpareBits : 22;
+			ULONG SpareBits : 23;
 		};
 	};
 
@@ -5847,6 +5846,14 @@ NTSTATUS NTAPI NtQuerySecurityObject(
 	_In_	ULONG Length,
 	_Out_	PULONG LengthNeeded
 	);
+
+NTSTATUS NTAPI NtQueryLicenseValue(
+    _In_ PUNICODE_STRING ValueName,
+    _Out_opt_ PULONG Type,
+    _Out_writes_bytes_to_opt_(DataSize, *ResultDataSize) PVOID Data,
+    _In_ ULONG DataSize,
+    _Out_ PULONG ResultDataSize
+);
 
 NTSTATUS NtCreateIoCompletion(
 	_Out_		PHANDLE IoCompletionHandle,

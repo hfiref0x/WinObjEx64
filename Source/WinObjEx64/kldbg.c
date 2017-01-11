@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2016
+*  (C) COPYRIGHT AUTHORS, 2015 - 2017
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
 *  VERSION:     1.45
 *
-*  DATE:        06 Aug 2016 
+*  DATE:        11 Jan 2017 
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *

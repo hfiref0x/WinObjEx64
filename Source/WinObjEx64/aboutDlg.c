@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2016
+*  (C) COPYRIGHT AUTHORS, 2015 - 2017
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     1.44
+*  VERSION:     1.45
 *
-*  DATE:        28 June 2016
+*  DATE:        11 Jan 2017
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -137,6 +137,8 @@ VOID AboutDialogInit(
     _strcpy(buf, L"MSVC 2015 Update 2");
 #elif (_MSC_FULL_VER == 190024210) // 2015 Update 3
     _strcpy(buf, L"MSVC 2015 Update 3");
+#elif (_MSC_FULL_VER == 190024215) // 2015 Update 3 with Cumulative Servicing Release
+    _strcpy(buf, L"MSVC 2015 Update 3 CSR");
 #endif
 #else
 #if (_MSC_VER == 1800) //2013
@@ -157,6 +159,9 @@ VOID AboutDialogInit(
     _strcpy(buf, L"Unknown Compiler");
 #endif
 #endif
+    if (buf[0] == 0) {
+        ultostr(_MSC_FULL_VER, buf);
+    }
     SetDlgItemText(hwndDlg, ID_ABOUT_COMPILERINFO, buf);
 
     RtlSecureZeroMemory(buf, sizeof(buf));

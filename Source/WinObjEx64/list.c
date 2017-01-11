@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2016
+*  (C) COPYRIGHT AUTHORS, 2015 - 2017
 *
 *  TITLE:       LIST.C
 *
-*  VERSION:     1.44
+*  VERSION:     1.45
 *
-*  DATE:        17 July 2016
+*  DATE:        11 Jan 2017
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -192,15 +192,30 @@ VOID ListObjectDirectoryTree(
     RtlInitUnicodeString(&objname, SubDirName);
     InitializeObjectAttributes(&objattr, &objname, OBJ_CASE_INSENSITIVE, RootHandle, NULL);
     status = NtOpenDirectoryObject(&hDirectory, DIRECTORY_QUERY, &objattr);
-    if (!NT_SUCCESS(status))
+    if (!NT_SUCCESS(status)) {
         return;
+    }
 
     ctx = 0;
     do {
-        rlen = 0;
-        status = NtQueryDirectoryObject(hDirectory, NULL, 0, TRUE, FALSE, &ctx, &rlen);
-        if (status != STATUS_BUFFER_TOO_SMALL)
-            break;
+
+        //
+        //Wine implementation of NtQueryDirectoryObject interface is very basic and incomplete.
+        //It doesn't work if no input buffer specified and does not return required buffer size.
+        //
+        if (g_kdctx.IsWine) {
+
+            rlen = 1024 * 64;
+
+        }
+        else {
+
+            rlen = 0;
+            status = NtQueryDirectoryObject(hDirectory, NULL, 0, TRUE, FALSE, &ctx, &rlen);
+            if (status != STATUS_BUFFER_TOO_SMALL)
+                break;
+
+        }
 
         objinf = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (SIZE_T)rlen);
         if (objinf == NULL)
@@ -358,10 +373,23 @@ VOID ListObjectsInDirectory(
 
     ctx = 0;
     do {
-        rlen = 0;
-        status = NtQueryDirectoryObject(hDirectory, NULL, 0, TRUE, FALSE, &ctx, &rlen);
-        if (status != STATUS_BUFFER_TOO_SMALL)
-            break;
+
+        //
+        //Wine implementation of NtQueryDirectoryObject interface is very basic and incomplete.
+        //It doesn't work if no input buffer specified and does not return required buffer size.
+        //
+        if (g_kdctx.IsWine) {
+
+            rlen = 1024 * 64;
+        }
+        else {
+
+            rlen = 0;
+            status = NtQueryDirectoryObject(hDirectory, NULL, 0, TRUE, FALSE, &ctx, &rlen);
+            if (status != STATUS_BUFFER_TOO_SMALL)
+                break;
+
+        }
 
         objinf = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (SIZE_T)rlen);
         if (objinf == NULL)
@@ -420,10 +448,16 @@ VOID FindObject(
 
     ctx = 0;
     do {
-        rlen = 0;
-        status = NtQueryDirectoryObject(hDirectory, NULL, 0, TRUE, FALSE, &ctx, &rlen);
-        if (status != STATUS_BUFFER_TOO_SMALL)
-            break;
+
+        if (g_kdctx.IsWine != FALSE) {
+            rlen = 1024 * 64;
+        }
+        else {
+            rlen = 0;
+            status = NtQueryDirectoryObject(hDirectory, NULL, 0, TRUE, FALSE, &ctx, &rlen);
+            if (status != STATUS_BUFFER_TOO_SMALL)
+                break;
+        }
 
         objinf = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (SIZE_T)rlen);
         if (objinf == NULL)

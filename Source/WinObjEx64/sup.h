@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2016
+*  (C) COPYRIGHT AUTHORS, 2015 - 2017
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.44
+*  VERSION:     1.45
 *
-*  DATE:        17 July 2016
+*  DATE:        11 Jan 2017
 *
 *  Common header file for the program support routines.
 *
@@ -90,19 +90,19 @@ typedef struct _ENUMICONINFO {
 #define TYPE_TMTM                   32
 #define TYPE_TMRM                   33
 #define TYPE_TMEN                   34
-#define TYPE_PCWOBJECT				35
-#define TYPE_FLTCONN_PORT			36
-#define TYPE_FLTCOMM_PORT			37
-#define TYPE_POWER_REQUEST			38
-#define TYPE_ETWCONSUMER			39
-#define TYPE_TPWORKERFACTORY		40
-#define TYPE_COMPOSITION			41
-#define TYPE_IRTIMER				42
-#define TYPE_DXGKSHAREDRES			43
-#define TYPE_DXGKSHAREDSWAPCHAIN	44
-#define TYPE_DXGKSHAREDSYNC			45
+#define TYPE_PCWOBJECT              35
+#define TYPE_FLTCONN_PORT           36
+#define TYPE_FLTCOMM_PORT           37
+#define TYPE_POWER_REQUEST          38
+#define TYPE_ETWCONSUMER            39
+#define TYPE_TPWORKERFACTORY        40
+#define TYPE_COMPOSITION            41
+#define TYPE_IRTIMER                42
+#define TYPE_DXGKSHAREDRES          43
+#define TYPE_DXGKSHAREDSWAPCHAIN    44
+#define TYPE_DXGKSHAREDSYNC         45
 #define TYPE_UNKNOWN                46
-#define TYPE_MAX					47
+#define TYPE_MAX                    47
 
 typedef struct _LANGANDCODEPAGE {
     WORD wLanguage;
@@ -392,6 +392,10 @@ BOOL supGetWin32FileName(
     _In_ LPWSTR FileName,
     _Inout_ LPWSTR Win32FileName,
     _In_ SIZE_T ccWin32FileName
+);
+
+BOOL supIsWine(
+    VOID
 );
 
 #define PathFileExists(lpszPath) (GetFileAttributes(lpszPath) != (DWORD)-1)

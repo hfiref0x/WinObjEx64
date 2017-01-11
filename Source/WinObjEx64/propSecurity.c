@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2016
+*  (C) COPYRIGHT AUTHORS, 2015 - 2017
 *
 *  TITLE:       PROPSECURITY.C
 *
-*  VERSION:     1.44
+*  VERSION:     1.45
 *
-*  DATE:        17 July 2016
+*  DATE:        11 Jan 2017
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -209,13 +209,16 @@ VOID propDefaultCloseObject(
     if (hObject == NULL) {
         return;
     }
-    if (This->ObjectContext->TypeIndex == TYPE_WINSTATION) {
-        CloseWindowStation(hObject);
-        hObject = NULL;
-    }
-    if (This->ObjectContext->TypeIndex == TYPE_DESKTOP) {
-        CloseDesktop(hObject);
-        hObject = NULL;
+
+    if (This->ObjectContext != NULL) {
+        if (This->ObjectContext->TypeIndex == TYPE_WINSTATION) {
+            CloseWindowStation(hObject);
+            hObject = NULL;
+        }
+        if (This->ObjectContext->TypeIndex == TYPE_DESKTOP) {
+            CloseDesktop(hObject);
+            hObject = NULL;
+        }
     }
     if (hObject) {
         NtClose(hObject);
@@ -492,9 +495,9 @@ HRESULT propSecurityConstructor(
             break;
         }
 
-        if (!NT_SUCCESS(NtQueryObject(hObject, ObjectTypeInformation, TypeInfo,
-            bytesNeeded, &bytesNeeded)))
-        {
+        status = NtQueryObject(hObject, ObjectTypeInformation, TypeInfo,
+            bytesNeeded, &bytesNeeded);
+        if (!NT_SUCCESS(status)) {
             hResult = HRESULT_FROM_WIN32(RtlNtStatusToDosError(status));
             break;
         }

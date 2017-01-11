@@ -31,6 +31,6 @@ For a changelog see program help file -> History or changelog.txt in Source dire
 # Authors
 
 
-(c) 2015 - 2016 WinObjEx64 Project
+(c) 2015 - 2017 WinObjEx64 Project
 
 Original WinObjEx (c) 2003 - 2005 Four-F

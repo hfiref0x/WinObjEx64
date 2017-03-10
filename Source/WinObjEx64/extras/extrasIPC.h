@@ -1,14 +1,14 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2017
 *
-*  TITLE:       ABOUTDLG.H
+*  TITLE:       EXTRASIPC.H
 *
 *  VERSION:     1.46
 *
-*  DATE:        05 Mar 2017
+*  DATE:        09 Mar 2017
 *
-*  Common header file for the About Dialog.
+*  Common header file for InterProcess Communication mecahisms dialog.
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -18,9 +18,12 @@
 *******************************************************************************/
 #pragma once
 
-INT_PTR CALLBACK AboutDialogProc(
-    _In_ HWND   hwndDlg,
-    _In_ UINT   uMsg,
-    _In_ WPARAM wParam,
-    _In_ LPARAM lParam
+typedef enum _IPC_DIALOG_MODE {
+    IpcModeNamedPipes = 1,
+    IpcModeMailshots = 2
+} IPC_DIALOG_MODE;
+
+VOID extrasCreateIpcDialog(
+    _In_ HWND hwndParent,
+    _In_ IPC_DIALOG_MODE Mode
 );

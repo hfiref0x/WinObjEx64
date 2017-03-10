@@ -6,10 +6,11 @@ UserApcReserve - same as NtQueueApc except using reserve process allocated memor
 WaitCompletionPacket
 Silo (r3 interface removed in 10240 release, object removed in TH2 builds)
 NetworkNamespace - managed by NDIS.sys (renamed to NdisCmState in RS1)
-Partition - memory manager object, partition is a new type of dynamic server partitioning scheme that goes beyond NUMA. It's basically a set of nodes plus an IO Bus.
 VRegConfigurationContext - new RS1 object
-VirtualKey - new RS1 object
+VirtualKey - new RS1 object (not present in RS2)
 PsSiloContextPaged - new RS1 object
 PsSiloContextNonPaged - new RS1 object
 RegistryTransaction - new RS1 object
 CoreMessagining - new RS1 object
+ActivityReference - new RS2 object
+EtwSessionDemuxEntry - new Win10 object

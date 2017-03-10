@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.45
+*  VERSION:     1.46
 *
-*  DATE:        11 Jan 2017
+*  DATE:        31 Jan 2017
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -39,6 +39,10 @@ typedef enum _OBJ_HEADER_INFO_FLAG {
 } OBJ_HEADER_INFO_FLAG;
 
 typedef struct _KLDBGCONTEXT {
+
+    //Is user full admin
+    BOOL IsFullAdmin;
+
     //we loaded driver?
     BOOL IsOurLoad;
 
@@ -161,6 +165,14 @@ BOOL kdReadSystemMemory(
     _In_    ULONG_PTR Address,
     _Inout_ PVOID Buffer,
     _In_    ULONG BufferSize
+);
+
+_Success_(return == TRUE)
+BOOL kdReadSystemMemoryEx(
+    _In_ ULONG_PTR Address,
+    _Inout_ PVOID Buffer,
+    _In_ ULONG BufferSize,
+    _Out_opt_ PULONG NumberOfBytesRead
 );
 
 VOID kdInit(

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2016
+*  (C) COPYRIGHT AUTHORS, 2015 - 2017
 *
 *  TITLE:       EXCEPTH.C
 *
-*  VERSION:     1.44
+*  VERSION:     1.46
 *
-*  DATE:        17 July 2016
+*  DATE:        04 Mar 2017
 *
 *  Exception handler routines.
 *
@@ -47,20 +47,20 @@ BOOL exceptWriteDump(
     BOOL   bResult;
     HANDLE hDbgHelp, hFile;
     DWORD  dwRetVal;
-    WCHAR  szTemp[MAX_PATH * 2];
+    WCHAR  szFileName[MAX_PATH * 2];
 
     MINIDUMP_EXCEPTION_INFORMATION mdei;
 
     bResult = FALSE;
     hDbgHelp = GetModuleHandle(TEXT("dbghelp.dll"));
     if (hDbgHelp == NULL) {
-        RtlSecureZeroMemory(szTemp, sizeof(szTemp));
-        if (!GetSystemDirectory(szTemp, MAX_PATH)) {
+        RtlSecureZeroMemory(szFileName, sizeof(szFileName));
+        if (!GetSystemDirectory(szFileName, MAX_PATH)) {
             return bResult;
         }
-        _strcat(szTemp, TEXT("\\dbghelp.dll"));
+        _strcat(szFileName, TEXT("\\dbghelp.dll"));
 
-        hDbgHelp = LoadLibraryEx(szTemp, 0, 0);
+        hDbgHelp = LoadLibraryEx(szFileName, 0, 0);
         if (hDbgHelp == NULL) {
             return bResult;
         }
@@ -71,16 +71,16 @@ BOOL exceptWriteDump(
         return bResult;
     }
 
-    RtlSecureZeroMemory(szTemp, sizeof(szTemp));
-    dwRetVal = GetTempPath(MAX_PATH, szTemp);
+    RtlSecureZeroMemory(szFileName, sizeof(szFileName));
+    dwRetVal = GetTempPath(MAX_PATH, szFileName);
     if (dwRetVal > MAX_PATH || (dwRetVal == 0)) {
         return bResult;
     }
-    _strcat(szTemp, TEXT("wobjex"));
-    u64tostr(IdFile, _strend(szTemp));
-    _strcat(szTemp, TEXT(".dmp"));
+    _strcat(szFileName, TEXT("wobjex"));
+    u64tostr(IdFile, _strend(szFileName));
+    _strcat(szFileName, TEXT(".dmp"));
 
-    hFile = CreateFile(szTemp, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
+    hFile = CreateFile(szFileName, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
     if (hFile != INVALID_HANDLE_VALUE) {
         mdei.ThreadId = GetCurrentThreadId();
         mdei.ExceptionPointers = ExceptionPointers;

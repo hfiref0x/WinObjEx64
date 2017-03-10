@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.45
+*  VERSION:     1.46
 *
-*  DATE:        11 Jan 2017
+*  DATE:        07 Mar 2017
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -16,12 +16,9 @@
 *******************************************************************************/
 #include "global.h"
 #include "treelist.h"
-#include "extrasSSDT.h"
+#include "extras\extrasSSDT.h"
 #include <cfgmgr32.h>
 #include <setupapi.h>
-
-#pragma comment(lib, "Version.lib")
-#pragma comment(lib, "Setupapi.lib")
 
 //used while objects enumeration in listview
 ENUM_PARAMS	g_enumParams;
@@ -29,57 +26,9 @@ ENUM_PARAMS	g_enumParams;
 //types collection
 POBJECT_TYPES_INFORMATION g_pObjectTypesInfo = NULL;
 
-//Known object type names
-LPCWSTR T_ObjectNames[TYPE_MAX] = {
-    L"Device",						//0
-    L"Driver",						//1
-    L"Section",						//2
-    L"ALPC Port",					//3
-    L"SymbolicLink",				//4
-    L"Key",							//5
-    L"Event",						//6
-    L"Job",							//7
-    L"Mutant",						//8
-    L"KeyedEvent",					//9
-    L"Type",						//10
-    L"Directory",					//11
-    L"WindowStation",				//12
-    L"Callback",					//13
-    L"Semaphore",					//14
-    L"WaitablePort",				//15
-    L"Timer",						//16
-    L"Session",						//17
-    L"Controller",					//18
-    L"Profile",						//19
-    L"EventPair",					//20
-    L"Desktop",						//21
-    L"File",						//22
-    L"WMIGuid",						//23
-    L"DebugObject",					//24
-    L"IoCompletion",				//25
-    L"Process",						//26
-    L"Adapter",						//27
-    L"Token",						//28
-    L"EtwRegistration",				//29
-    L"Thread",						//30
-    L"TmTx",						//31
-    L"TmTm",						//32
-    L"TmRm",						//33
-    L"TmEn",						//34
-    L"PcwObject",					//35
-    L"FilterConnectionPort",		//36
-    L"FilterCommunicationPort",		//37
-    L"PowerRequest",				//38
-    L"EtwConsumer",					//39
-    L"TpWorkerFactory",				//40
-    L"Composition",					//41
-    L"IRTimer",						//42
-    L"DxgkSharedResource",			//43
-    L"DxgkSharedSwapChainObject",	//44
-    L"DxgkSharedSyncObject",		//45
-    L""								//46
-};
-
+//Dll path for known dlls
+LPWSTR	g_lpKnownDlls32;
+LPWSTR	g_lpKnownDlls64;
 /*
 * supInitTreeListForDump
 *
@@ -211,7 +160,6 @@ BOOL supQueryObjectFromHandle(
                         bFound = TRUE;
                     }
                     break;
-
                 }
             }
         }
@@ -253,44 +201,43 @@ BOOL supDumpSyscallTableConverted(
     _Inout_ PUTable *Table
 )
 {
-    ULONG   ServiceId, memIO = 0;
-    BOOL    bResult = FALSE, cond = FALSE;
+    ULONG   ServiceId, memIO, bytesRead;
+    BOOL    bResult = FALSE;
     PULONG  KiServiceTableDumped = NULL;
     PUTable ConvertedTable;
 
     if ((Context == NULL) || (Table == NULL))
         return bResult;
 
-    do {
-
-        if (Context->KiServiceTableAddress == 0)
-            break;
+    __try {
+        if ((Context->KiServiceTableAddress == 0) || (Context->KiServiceLimit == 0))
+            __leave;
 
         memIO = Context->KiServiceLimit * sizeof(ULONG_PTR);
         KiServiceTableDumped = (PULONG)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, memIO);
         if (KiServiceTableDumped == NULL)
-            break;
+            __leave;
 
-        if (!kdReadSystemMemory(Context->KiServiceTableAddress, (PVOID)KiServiceTableDumped, memIO))
-            break;
+        bytesRead = 0;
+        if (!kdReadSystemMemoryEx(Context->KiServiceTableAddress, (PVOID)KiServiceTableDumped, memIO, &bytesRead))
+            __leave;
 
-        ConvertedTable = (PULONG_PTR)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, memIO);
-        if (ConvertedTable == NULL)
-            break;
-
-        *Table = ConvertedTable;
-
-        for (ServiceId = 0; ServiceId < Context->KiServiceLimit; ServiceId++) {
-            ConvertedTable[ServiceId] = supSyscallTableEntryToAddress(KiServiceTableDumped, ServiceId,
-                Context->KiServiceTableAddress);
+        if (bytesRead > 16) {
+            ConvertedTable = (PULONG_PTR)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytesRead);
+            if (ConvertedTable) {
+                *Table = ConvertedTable;
+                for (ServiceId = 0; ServiceId < Context->KiServiceLimit; ServiceId++) {
+                    ConvertedTable[ServiceId] = supSyscallTableEntryToAddress(KiServiceTableDumped, ServiceId,
+                        Context->KiServiceTableAddress);
+                }
+                bResult = TRUE;
+            }
         }
-
-        bResult = TRUE;
-
-    } while (cond);
-
-    if (KiServiceTableDumped != NULL) {
-        HeapFree(GetProcessHeap(), 0, KiServiceTableDumped);
+    }
+    __finally {
+        if (KiServiceTableDumped != NULL) {
+            HeapFree(GetProcessHeap(), 0, KiServiceTableDumped);
+        }
     }
     return bResult;
 }
@@ -667,7 +614,7 @@ HIMAGELIST supLoadImageList(
     HIMAGELIST list;
     HICON      hIcon;
 
-    list = ImageList_Create(16, 16, ILC_COLOR32 | ILC_MASK, 42, 8);
+    list = ImageList_Create(16, 16, ILC_COLOR32 | ILC_MASK, TYPE_UNKNOWN, 8);
     if (list) {
         for (i = FirstId; i <= LastId; i++) {
             hIcon = LoadImage(hInst, MAKEINTRESOURCE(i), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR);
@@ -687,7 +634,7 @@ HIMAGELIST supLoadImageList(
 *
 * Returns object index of known type.
 *
-* Known type names listed in sup.c T_ObjectNames, and known object indexes listed in sup.h as TYPE_*
+* Known type names listed in objects.c, objects.h
 *
 */
 UINT supGetObjectNameIndexByTypeIndex(
@@ -702,35 +649,41 @@ UINT supGetObjectNameIndexByTypeIndex(
     POBJECT_TYPE_INFORMATION   pObject;
     POBJECT_TYPE_INFORMATION_8 pObject8;
 
-    if (Object == NULL) {
+    __try {
+
+        if (Object == NULL) {
+            return TYPE_UNKNOWN;
+        }
+
+        Index = ObDecodeTypeIndex(Object, TypeIndex);
+
+        pObject = (POBJECT_TYPE_INFORMATION)&g_pObjectTypesInfo->TypeInformation;
+        for (i = 0; i < g_pObjectTypesInfo->NumberOfTypes; i++) {
+
+            if (g_kdctx.osver.dwBuildNumber >= 9200) {
+                pObject8 = (POBJECT_TYPE_INFORMATION_8)pObject;
+                if (pObject8->TypeIndex == Index) {
+                    bFound = TRUE;
+                }
+            }
+            else {
+                if (i + 2 == Index) {
+                    bFound = TRUE;
+                }
+            }
+
+            if (bFound) {
+                return supGetObjectIndexByTypeName(pObject->TypeName.Buffer);
+            }
+
+            pObject = (POBJECT_TYPE_INFORMATION)((PCHAR)(pObject + 1) +
+                ALIGN_UP(pObject->TypeName.MaximumLength, sizeof(ULONG_PTR)));
+        }
+
+    }
+    __except(exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
         return TYPE_UNKNOWN;
     }
-
-    Index = ObDecodeTypeIndex(Object, TypeIndex);
-
-    pObject = (POBJECT_TYPE_INFORMATION)&g_pObjectTypesInfo->TypeInformation;
-    for (i = 0; i < g_pObjectTypesInfo->NumberOfTypes; i++) {
-
-        if (g_kdctx.osver.dwBuildNumber >= 9200) {
-            pObject8 = (POBJECT_TYPE_INFORMATION_8)pObject;
-            if (pObject8->TypeIndex == Index) {
-                bFound = TRUE;
-            }
-        }
-        else {
-            if (i + 2 == Index) {
-                bFound = TRUE;
-            }
-        }
-
-        if (bFound) {
-            return supGetObjectIndexByTypeName(pObject->TypeName.Buffer);
-        }
-
-        pObject = (POBJECT_TYPE_INFORMATION)((PCHAR)(pObject + 1) +
-            ALIGN_UP(pObject->TypeName.MaximumLength, sizeof(ULONG_PTR)));
-    }
-
     return TYPE_UNKNOWN;
 }
 
@@ -742,7 +695,7 @@ UINT supGetObjectNameIndexByTypeIndex(
 *
 * Returns object index of known type.
 *
-* Known type names listed in sup.c T_ObjectNames, and known object indexes listed in sup.h as TYPE_*
+* Known type names listed in objects.c, objects.h
 *
 */
 UINT supGetObjectIndexByTypeName(
@@ -756,7 +709,7 @@ UINT supGetObjectIndexByTypeName(
     }
 
     for (nIndex = TYPE_DEVICE; nIndex < TYPE_UNKNOWN; nIndex++) {
-        if (_strcmpi(lpTypeName, T_ObjectNames[nIndex]) == 0)
+        if (_strcmpi(lpTypeName, g_lpObjectNames[nIndex]) == 0)
             return nIndex;
     }
 
@@ -768,6 +721,15 @@ UINT supGetObjectIndexByTypeName(
     if (_strcmpi(lpTypeName, L"CompositionSurface") == 0) {
         return TYPE_COMPOSITION;
     }
+
+    //
+    // In Win10 TH1 the following ntos object was named 
+    // NetworkNamespace, later in Win10 updates MS renamed it to
+    // NdisCmState, handle this.
+    //
+/*    if (_strcmpi(lpTypeName, L"NetworkNamespace") == 0) {
+        return TYPE_NDISCMSTATE;
+    }*/
 
     return TYPE_UNKNOWN;
 }
@@ -917,7 +879,7 @@ BOOL supIsSymlink(
     WCHAR ItemText[MAX_PATH + 1];
     RtlSecureZeroMemory(ItemText, sizeof(ItemText));
     ListView_GetItemText(ObjectList, iItem, 1, ItemText, MAX_PATH);
-    return (_strcmpi(ItemText, T_ObjectNames[TYPE_SYMLINK]) == 0);
+    return (_strcmpi(ItemText, g_lpObjectNames[TYPE_SYMLINK]) == 0);
 }
 
 /*
@@ -1198,6 +1160,8 @@ VOID supInit(
 
     g_enumParams.sapiDB = sapiCreateSetupDBSnapshot();
     g_pObjectTypesInfo = supGetObjectTypesInfo();
+
+    ExApiSetInit();
 }
 
 /*
@@ -1843,8 +1807,8 @@ BOOL supFindModuleNameByAddress(
     return FALSE;
 }
 
-#include "propDlg.h"
-#include "propTypeConsts.h"
+#include "props\propDlg.h"
+#include "props\propTypeConsts.h"
 
 /*
 * supQueryTypeInfo
@@ -1930,7 +1894,7 @@ BOOL supQueryDeviceDescription(
 {
     BOOL         bResult, bIsRoot;
     SIZE_T       Length;
-    LPWSTR       lpFullDeviceName;
+    LPWSTR       lpFullDeviceName = NULL;
     PSAPIDBOBJ   pObj;
     PLIST_ENTRY  Entry;
     PSAPIDBENTRY Item;
@@ -1951,11 +1915,8 @@ BOOL supQueryDeviceDescription(
 
     EnterCriticalSection(&pObj->objCS);
 
-    lpFullDeviceName = NULL;
-
-    Length = (_strlen(lpDeviceName) * sizeof(WCHAR)) +
-        (_strlen(CurrentObjectPath) * sizeof(WCHAR)) + (2 * sizeof(WCHAR)) + sizeof(UNICODE_NULL);
-
+    //CurrentObjectPath + \\ + lpDeviceName + \0
+    Length = (3 + _strlen(lpDeviceName) + _strlen(CurrentObjectPath)) * sizeof(WCHAR);
     lpFullDeviceName = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, Length);
     if (lpFullDeviceName != NULL) {
 
@@ -2222,9 +2183,7 @@ BOOL supQuerySectionFileInfo(
 
         // allocate memory buffer to store full filename
         // KnownDlls + \\ + Object->Name + \0 
-        cLength = (_strlen(lpszKnownDlls) * sizeof(WCHAR)) +
-            (_strlen(ObjectName->Buffer) * sizeof(WCHAR)) + 2 * sizeof(WCHAR);
-
+        cLength = (2 + _strlen(lpszKnownDlls) + _strlen(ObjectName->Buffer)) * sizeof(WCHAR);
         lpszFileName = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, cLength);
         if (lpszFileName == NULL)
             break;
@@ -2681,6 +2640,7 @@ BOOL supGetWin32FileName(
         if (ccWin32FileName < MAX_PATH)
             break;
 
+        RtlSecureZeroMemory(&NtFileName, sizeof(NtFileName));
         RtlInitUnicodeString(&NtFileName, FileName);
         InitializeObjectAttributes(&obja, &NtFileName, OBJ_CASE_INSENSITIVE, 0, NULL);
 

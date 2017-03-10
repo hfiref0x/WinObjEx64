@@ -4,9 +4,9 @@
 *
 *  TITLE:       LIST.C
 *
-*  VERSION:     1.45
+*  VERSION:     1.46
 *
-*  DATE:        11 Jan 2017
+*  DATE:        02 Mar 2017
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -204,17 +204,13 @@ VOID ListObjectDirectoryTree(
         //It doesn't work if no input buffer specified and does not return required buffer size.
         //
         if (g_kdctx.IsWine) {
-
             rlen = 1024 * 64;
-
         }
         else {
-
             rlen = 0;
             status = NtQueryDirectoryObject(hDirectory, NULL, 0, TRUE, FALSE, &ctx, &rlen);
             if (status != STATUS_BUFFER_TOO_SMALL)
                 break;
-
         }
 
         objinf = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (SIZE_T)rlen);
@@ -227,7 +223,7 @@ VOID ListObjectDirectoryTree(
             break;
         }
 
-        if (_strncmpi(objinf->TypeName.Buffer, T_ObjectNames[TYPE_DIRECTORY],
+        if (_strncmpi(objinf->TypeName.Buffer, g_lpObjectNames[TYPE_DIRECTORY],
             objinf->TypeName.Length / sizeof(WCHAR)) == 0)
         {
             ListObjectDirectoryTree(objinf->Name.Buffer, hDirectory, ViewRootHandle);
@@ -280,21 +276,21 @@ VOID AddListViewItem(
     RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
 
     //check SymbolicLink
-    if (_strncmpi(objinf->TypeName.Buffer, T_ObjectNames[TYPE_SYMLINK], cch) == 0) {
+    if (_strncmpi(objinf->TypeName.Buffer, g_lpObjectNames[TYPE_SYMLINK], cch) == 0) {
         bFound = supQueryLinkTarget(hObjectRootDirectory,
             &objinf->Name, szBuffer, MAX_PATH * sizeof(WCHAR));
         goto Done;
     }
 
     //check Section
-    if (_strncmpi(objinf->TypeName.Buffer, T_ObjectNames[TYPE_SECTION], cch) == 0) {
+    if (_strncmpi(objinf->TypeName.Buffer, g_lpObjectNames[TYPE_SECTION], cch) == 0) {
         bFound = supQuerySectionFileInfo(hObjectRootDirectory,
             &objinf->Name, szBuffer, MAX_PATH);
         goto Done;
     }
 
     //check Driver
-    if (_strncmpi(objinf->TypeName.Buffer, T_ObjectNames[TYPE_DRIVER], cch) == 0) {
+    if (_strncmpi(objinf->TypeName.Buffer, g_lpObjectNames[TYPE_DRIVER], cch) == 0) {
         bFound = supQueryDriverDescription(
             objinf->Name.Buffer,
             lpEnumParams->scmSnapshot,
@@ -305,7 +301,7 @@ VOID AddListViewItem(
     }
 
     //check Device
-    if (_strncmpi(objinf->TypeName.Buffer, T_ObjectNames[TYPE_DEVICE], cch) == 0) {
+    if (_strncmpi(objinf->TypeName.Buffer, g_lpObjectNames[TYPE_DEVICE], cch) == 0) {
         bFound = supQueryDeviceDescription(
             objinf->Name.Buffer,
             lpEnumParams->sapiDB,
@@ -315,14 +311,14 @@ VOID AddListViewItem(
     }
 
     //check WindowStation
-    if (_strncmpi(objinf->TypeName.Buffer, T_ObjectNames[TYPE_WINSTATION], cch) == 0) {
+    if (_strncmpi(objinf->TypeName.Buffer, g_lpObjectNames[TYPE_WINSTATION], cch) == 0) {
         bFound = supQueryWinstationDescription(objinf->Name.Buffer,
             szBuffer, MAX_PATH);
         goto Done;
     }
 
     //check Type
-    if (_strncmpi(objinf->TypeName.Buffer, T_ObjectNames[TYPE_TYPE], cch) == 0) {
+    if (_strncmpi(objinf->TypeName.Buffer, g_lpObjectNames[TYPE_TYPE], cch) == 0) {
         bFound = supQueryTypeInfo(objinf->Name.Buffer,
             szBuffer, MAX_PATH);
         //		goto Done;
@@ -379,16 +375,13 @@ VOID ListObjectsInDirectory(
         //It doesn't work if no input buffer specified and does not return required buffer size.
         //
         if (g_kdctx.IsWine) {
-
             rlen = 1024 * 64;
         }
         else {
-
             rlen = 0;
             status = NtQueryDirectoryObject(hDirectory, NULL, 0, TRUE, FALSE, &ctx, &rlen);
             if (status != STATUS_BUFFER_TOO_SMALL)
                 break;
-
         }
 
         objinf = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (SIZE_T)rlen);
@@ -500,7 +493,7 @@ VOID FindObject(
                 *List = tmp;
             };
 
-        if (_strcmpi(objinf->TypeName.Buffer, T_ObjectNames[TYPE_DIRECTORY]) == 0) {
+        if (_strcmpi(objinf->TypeName.Buffer, g_lpObjectNames[TYPE_DIRECTORY]) == 0) {
 
             newdir = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (sdlen + 4) * sizeof(WCHAR) +
                 objinf->Name.Length);

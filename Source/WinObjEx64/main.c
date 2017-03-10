@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.45
+*  VERSION:     1.46
 *
-*  DATE:        11 Jan 2017
+*  DATE:        07 Mar 2017
 *
 *  Program entry point and main window handler.
 *
@@ -17,28 +17,12 @@
 *
 *******************************************************************************/
 #define OEMRESOURCE
-#include  <process.h>
 #include "global.h"
 #include "aboutDlg.h"
 #include "findDlg.h"
-#include "propDlg.h"
-#include "extras.h"
-#include "testunit.h"
-
-#pragma comment(lib, "comctl32.lib")
-
-#if !defined UNICODE
-#error ANSI build is not supported
-#endif
-
-#if (_MSC_VER >= 1900) 
-#ifdef _DEBUG
-#pragma comment(lib, "vcruntimed.lib")
-#pragma comment(lib, "ucrtd.lib")
-#else
-#pragma comment(lib, "libvcruntime.lib")
-#endif
-#endif
+#include "props\propDlg.h"
+#include "extras\extras.h"
+#include "tests\testunit.h"
 
 static LONG	SplitterPos = 180;
 static LONG	SortColumn = 0;
@@ -59,7 +43,7 @@ INT CALLBACK MainWindowObjectListCompareFunc(
 )
 {
     INT    nResult = 0;
-    LPWSTR lpItem1, lpItem2;
+    LPWSTR lpItem1 = NULL, lpItem2 = NULL;
 
     lpItem1 = supGetItemText(ObjectList, (INT)lParam1, (INT)lParamSort, NULL);
     lpItem2 = supGetItemText(ObjectList, (INT)lParam2, (INT)lParamSort, NULL);
@@ -83,12 +67,9 @@ INT CALLBACK MainWindowObjectListCompareFunc(
         nResult = _strcmpi(lpItem1, lpItem2);
 
 Done:
-    if (lpItem1) {
-        HeapFree(GetProcessHeap(), 0, lpItem1);
-    }
-    if (lpItem2) {
-        HeapFree(GetProcessHeap(), 0, lpItem2);
-    }
+    if (lpItem1) HeapFree(GetProcessHeap(), 0, lpItem1);
+    if (lpItem2) HeapFree(GetProcessHeap(), 0, lpItem2);
+
     return nResult;
 }
 
@@ -123,7 +104,7 @@ VOID MainWindowHandleObjectTreeProp(
     tvi.mask = TVIF_TEXT;
     tvi.hItem = SelectedTreeItem;
     if (TreeView_GetItem(ObjectTree, &tvi)) {
-        propCreateDialog(hwnd, szBuffer, T_ObjectNames[TYPE_DIRECTORY], NULL);
+        propCreateDialog(hwnd, szBuffer, g_lpObjectNames[TYPE_DIRECTORY], NULL);
     }
 }
 
@@ -186,7 +167,7 @@ VOID MainWindowOnRefresh(
     _In_ HWND hwnd
 )
 {
-    LPWSTR  CurrentObject;
+    LPWSTR  CurrentObject = NULL;
     SIZE_T  len;
 
     UNREFERENCED_PARAMETER(hwnd);
@@ -307,6 +288,11 @@ LRESULT MainWindowHandleWMCommand(
         //Extras -> Pipes
     case ID_EXTRAS_PIPES:
         extrasShowPipeDialog(hwnd);
+        break;
+
+        //Extras -> Mailslots
+    case ID_EXTRAS_MAILSLOTS:
+        extrasShowMailslotsDialog(hwnd);
         break;
 
         //Extras -> UserSharedData
@@ -530,20 +516,22 @@ LRESULT MainWindowHandleWMNotify(
                 RtlSecureZeroMemory(&item_string, sizeof(item_string));
                 ListView_GetItemText(ObjectList, lvn->iItem, 0, item_string, MAX_PATH);
                 lcp = _strlen(CurrentObjectPath);
-                str = HeapAlloc(GetProcessHeap(), 0, (lcp + _strlen(item_string) + 4) * sizeof(WCHAR));
-                if (str == NULL)
-                    break;
-                _strcpy(str, CurrentObjectPath);
+                if (lcp) {
+                    str = HeapAlloc(GetProcessHeap(), 0, (lcp + sizeof(item_string) + 4) * sizeof(WCHAR));
+                    if (str == NULL)
+                        break;
+                    _strcpy(str, CurrentObjectPath);
 
-                if ((str[0] == '\\') && (str[1] == 0)) {
-                    _strcpy(str + lcp, item_string);
+                    if ((str[0] == '\\') && (str[1] == 0)) {
+                        _strcpy(str + lcp, item_string);
+                    }
+                    else {
+                        str[lcp] = '\\';
+                        _strcpy(str + lcp + 1, item_string);
+                    }
+                    SendMessageW(StatusBar, WM_SETTEXT, 0, (LPARAM)str);
+                    HeapFree(GetProcessHeap(), 0, str);
                 }
-                else {
-                    str[lcp] = '\\';
-                    _strcpy(str + lcp + 1, item_string);
-                }
-                SendMessageW(StatusBar, WM_SETTEXT, 0, (LPARAM)str);
-                HeapFree(GetProcessHeap(), 0, str);
                 break;
 
                 //handle sort by column
@@ -811,10 +799,6 @@ void WinObjExMain()
     WCHAR                   szWindowTitle[100];
     HANDLE                  hIcon;
 
-#ifdef _DEBUG
-    TestStart();
-#endif
-
     pHtmlHelpW = NULL;
     CurrentObjectPath = NULL;
     bSortInverse = FALSE;
@@ -835,7 +819,12 @@ void WinObjExMain()
     supInit(IsFullAdmin);
 
     // do not move anywhere
+    g_kdctx.IsFullAdmin = IsFullAdmin;
     g_kdctx.IsWine = IsWine;
+
+#ifdef _DEBUG
+    TestStart();
+#endif
 
     //create main window and it components
     wincls.cbSize = sizeof(WNDCLASSEX);
@@ -989,7 +978,14 @@ void WinObjExMain()
                     (ULONG_PTR)ImageList_ExtractIcon(g_hInstance, ToolBarMenuImages, 2));
             }
 
-            //set extras-pipe menu image
+            //set extras-mailslots menu image
+            hMenu = GetSubMenu(GetMenu(MainWindow), 4);
+            if (hMenu) {
+                supSetMenuIcon(hMenu, ID_EXTRAS_MAILSLOTS,
+                    (ULONG_PTR)ImageList_ExtractIcon(g_hInstance, ToolBarMenuImages, 5));
+            }
+
+            //set extras-pipes menu image
             hMenu = GetSubMenu(GetMenu(MainWindow), 4);
             if (hMenu) {
                 supSetMenuIcon(hMenu, ID_EXTRAS_PIPES,

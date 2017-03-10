@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.45
+*  VERSION:     1.46
 *
-*  DATE:        11 Jan 2017
+*  DATE:        02 Mar 2017
 *
 *  Common header file for the program support routines.
 *
@@ -52,58 +52,6 @@ typedef struct _ENUMICONINFO {
 //
 #define DBUFFER_SIZE                 512
 
-//
-// Object Type Indexes Used By Program Only
-//
-#define TYPE_DEVICE                 0
-#define TYPE_DRIVER                 1
-#define TYPE_SECTION                2
-#define TYPE_PORT                   3
-#define TYPE_SYMLINK                4
-#define TYPE_KEY                    5
-#define TYPE_EVENT                  6
-#define TYPE_JOB                    7
-#define TYPE_MUTANT                 8
-#define TYPE_KEYEDEVENT             9
-#define TYPE_TYPE                   10
-#define TYPE_DIRECTORY              11
-#define TYPE_WINSTATION             12
-#define TYPE_CALLBACK               13
-#define TYPE_SEMAPHORE              14
-#define TYPE_WAITABLEPORT           15
-#define TYPE_TIMER                  16
-#define TYPE_SESSION                17
-#define TYPE_CONTROLLER				18
-#define TYPE_PROFILE				19
-#define TYPE_EVENTPAIR				20
-#define TYPE_DESKTOP                21
-#define TYPE_FILE                   22
-#define TYPE_WMIGUID                23
-#define TYPE_DEBUGOBJECT            24
-#define TYPE_IOCOMPLETION           25
-#define TYPE_PROCESS                26
-#define TYPE_ADAPTER                27
-#define TYPE_TOKEN                  28
-#define TYPE_ETWREGISTRATION        29
-#define TYPE_THREAD			        30
-#define TYPE_TMTX                   31
-#define TYPE_TMTM                   32
-#define TYPE_TMRM                   33
-#define TYPE_TMEN                   34
-#define TYPE_PCWOBJECT              35
-#define TYPE_FLTCONN_PORT           36
-#define TYPE_FLTCOMM_PORT           37
-#define TYPE_POWER_REQUEST          38
-#define TYPE_ETWCONSUMER            39
-#define TYPE_TPWORKERFACTORY        40
-#define TYPE_COMPOSITION            41
-#define TYPE_IRTIMER                42
-#define TYPE_DXGKSHAREDRES          43
-#define TYPE_DXGKSHAREDSWAPCHAIN    44
-#define TYPE_DXGKSHAREDSYNC         45
-#define TYPE_UNKNOWN                46
-#define TYPE_MAX                    47
-
 typedef struct _LANGANDCODEPAGE {
     WORD wLanguage;
     WORD wCodePage;
@@ -122,13 +70,8 @@ typedef struct _SAPIDBENTRY {
     LPWSTR lpDeviceDesc;
 } SAPIDBENTRY, *PSAPIDBENTRY;
 
-extern LPCWSTR T_ObjectNames[TYPE_MAX];
 extern ENUM_PARAMS	g_enumParams;
 extern POBJECT_TYPES_INFORMATION g_pObjectTypesInfo;
-
-//global variables
-LPWSTR	g_lpKnownDlls32;
-LPWSTR	g_lpKnownDlls64;
 
 BOOL supInitTreeListForDump(
     _In_  HWND  hwndParent,

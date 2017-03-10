@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2016
+*  (C) COPYRIGHT AUTHORS, 2015 - 2017
 *
 *  TITLE:       FINDDLG.C
 *
-*  VERSION:     1.44
+*  VERSION:     1.46
 *
-*  DATE:        17 July 2016
+*  DATE:        02 Mar 2017
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -43,24 +43,25 @@ INT CALLBACK FindDlgCompareFunc(
     _In_ LPARAM lParamSort
 )
 {
-    INT    nResult;
-    LPWSTR lpItem1, lpItem2;
+    INT    nResult = 0;
+    LPWSTR lpItem1 = NULL, lpItem2 = NULL;
 
     lpItem1 = supGetItemText(FindDlgList, (INT)lParam1, (INT)lParamSort, NULL);
     if (lpItem1 == NULL)
-        return 0;
+        goto Done;
 
     lpItem2 = supGetItemText(FindDlgList, (INT)lParam2, (INT)lParamSort, NULL);
     if (lpItem2 == NULL)
-        return 0;
+        goto Done;
 
     if (bFindDlgSortInverse)
         nResult = _strcmpi(lpItem2, lpItem1);
     else
         nResult = _strcmpi(lpItem1, lpItem2);
 
-    HeapFree(GetProcessHeap(), 0, lpItem1);
-    HeapFree(GetProcessHeap(), 0, lpItem2);
+Done:
+    if (lpItem1) HeapFree(GetProcessHeap(), 0, lpItem1);
+    if (lpItem2) HeapFree(GetProcessHeap(), 0, lpItem2);
     return nResult;
 }
 

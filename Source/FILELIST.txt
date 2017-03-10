@@ -15,8 +15,8 @@ extrasDrivers.h
 extrasSSDT.c - KiServiceTable list
 extrasSSDT.h
 
-extrasPipes.c - Pipes dialog
-extrasPipes.h
+extrasIPC.c - Pipes and mailslots dialog
+extrasIPC.h
 
 extrasPN.c - private namespaces
 extrasPN.h
@@ -40,6 +40,9 @@ main.c - program entry point and initialization routines, main window dialog pro
 
 minirtl.c - set of reimplemented rtl routines
 minirtl.h
+
+objects.c - known objects names array
+objects.h - known objects indexes
 
 propBasic.c - property sheet "Basic" handlers, including window procedures
 propBasic.h
@@ -70,8 +73,8 @@ propType.c - property sheet "Type" handlers, including window procedure for "Pro
 propType.h
 propTypeConsts.h - known object access rights converted to strings listed here
 
-sup.c - support api set and !!!!string array of known objects
-sup.h - !!!!object type indexes here
+sup.c - support api set
+sup.h
 supConsts.h
 
 testunit.c - all objects test code here

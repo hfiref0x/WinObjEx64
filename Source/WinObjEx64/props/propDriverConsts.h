@@ -2,13 +2,13 @@
 *
 *  (C) COPYRIGHT AUTHORS, 2015 - 2017
 *
-*  TITLE:       ABOUTDLG.H
+*  TITLE:       PROPDRIVERCONSTS.H
 *
 *  VERSION:     1.46
 *
-*  DATE:        05 Mar 2017
+*  DATE:        07 Mar 2017
 *
-*  Common header file for the About Dialog.
+*  Common header file for Driver property sheet.
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -18,9 +18,6 @@
 *******************************************************************************/
 #pragma once
 
-INT_PTR CALLBACK AboutDialogProc(
-    _In_ HWND   hwndDlg,
-    _In_ UINT   uMsg,
-    _In_ WPARAM wParam,
-    _In_ LPARAM lParam
-);
+#define REGEDITWNDCLASS           L"RegEdit_RegEdit"
+#define PROPDRVREGSERVICESKEY     L"\\HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\%ws"
+#define PROPDRVREGSERVICESKEYLEN  sizeof(REGISTRYSERVICESKEY) - sizeof(WCHAR)

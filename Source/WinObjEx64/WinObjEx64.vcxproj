@@ -1,13 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
-    <ProjectConfiguration Include="Debug|Win32">
-      <Configuration>Debug</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Release|Win32">
-      <Configuration>Release</Configuration>
-      <Platform>Win32</Platform>
+    <ProjectConfiguration Include="ReleaseSigned|x64">
+      <Configuration>ReleaseSigned</Configuration>
+      <Platform>x64</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
@@ -25,19 +21,6 @@
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
-    <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
-    <CharacterSet>Unicode</CharacterSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
-    <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>Unicode</CharacterSet>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
@@ -51,16 +34,17 @@
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseSigned|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
   <ImportGroup Label="Shared">
-  </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -68,42 +52,27 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseSigned|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LinkIncremental>true</LinkIncremental>
-    <OutDir>.\output\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>.\output\$(Platform)\$(Configuration)\</IntDir>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <OutDir>.\output\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>.\output\$(Platform)\$(Configuration)\</IntDir>
-    <CodeAnalysisRuleSet>..\..\..\Program Files (x86)\Microsoft Visual Studio 14.0\Team Tools\Static Analysis Tools\Rule Sets\SecurityRules.ruleset</CodeAnalysisRuleSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <LinkIncremental>false</LinkIncremental>
-    <OutDir>.\output\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>.\output\$(Platform)\$(Configuration)\</IntDir>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>.\output\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>.\output\$(Platform)\$(Configuration)\</IntDir>
-    <CodeAnalysisRuleSet>SecurityRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <ClCompile>
-      <PrecompiledHeader>
-      </PrecompiledHeader>
-      <WarningLevel>Level3</WarningLevel>
-      <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <SDLCheck>true</SDLCheck>
-    </ClCompile>
-    <Link>
-      <SubSystem>Windows</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
-    </Link>
-  </ItemDefinitionGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseSigned|x64'">
+    <OutDir>.\output\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>.\output\$(Platform)\$(Configuration)\</IntDir>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <PostBuildEventUseInBuild>true</PostBuildEventUseInBuild>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <PrecompiledHeader>
@@ -117,6 +86,7 @@
       <BrowseInformation>true</BrowseInformation>
       <CompileAs>CompileAsC</CompileAs>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\treelist;$(ProjectDir)\props;$(ProjectDir)\extras;$(ProjectDir)\ntos</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -129,30 +99,12 @@
     </Link>
     <Manifest>
       <SuppressStartupBanner>false</SuppressStartupBanner>
-      <AdditionalManifestFiles>obex.manifest</AdditionalManifestFiles>
+      <AdditionalManifestFiles>rsrc\obex.manifest</AdditionalManifestFiles>
       <EnableDpiAwareness>true</EnableDpiAwareness>
     </Manifest>
     <Bscmake>
       <SuppressStartupBanner>false</SuppressStartupBanner>
     </Bscmake>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
-      <PrecompiledHeader>
-      </PrecompiledHeader>
-      <Optimization>MaxSpeed</Optimization>
-      <FunctionLevelLinking>true</FunctionLevelLinking>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <SDLCheck>true</SDLCheck>
-    </ClCompile>
-    <Link>
-      <SubSystem>Windows</SubSystem>
-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <OptimizeReferences>true</OptimizeReferences>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
-    </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -172,6 +124,7 @@
       <ExpandAttributedSource>true</ExpandAttributedSource>
       <AssemblerOutput>All</AssemblerOutput>
       <CompileAs>CompileAsC</CompileAs>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\treelist;$(ProjectDir)\props;$(ProjectDir)\extras;$(ProjectDir)\ntos</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -187,22 +140,80 @@
     </Link>
     <Manifest>
       <SuppressStartupBanner>false</SuppressStartupBanner>
-      <AdditionalManifestFiles>obex.manifest</AdditionalManifestFiles>
+      <AdditionalManifestFiles>rsrc\obex.manifest</AdditionalManifestFiles>
       <EnableDpiAwareness>true</EnableDpiAwareness>
     </Manifest>
     <Bscmake>
       <SuppressStartupBanner>false</SuppressStartupBanner>
     </Bscmake>
+    <CustomBuildStep>
+      <Command>
+      </Command>
+    </CustomBuildStep>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseSigned|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>Full</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>true</SDLCheck>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <StringPooling>true</StringPooling>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
+      <ExpandAttributedSource>true</ExpandAttributedSource>
+      <AssemblerOutput>All</AssemblerOutput>
+      <CompileAs>CompileAsC</CompileAs>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\treelist;$(ProjectDir)\props;$(ProjectDir)\extras;$(ProjectDir)\ntos</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>No</GenerateDebugInformation>
+      <Version>6.0</Version>
+      <SuppressStartupBanner>false</SuppressStartupBanner>
+      <GenerateMapFile>true</GenerateMapFile>
+      <MapExports>true</MapExports>
+      <EntryPointSymbol>main</EntryPointSymbol>
+      <SetChecksum>true</SetChecksum>
+      <AdditionalOptions>/INTEGRITYCHECK %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+    <Manifest>
+      <SuppressStartupBanner>false</SuppressStartupBanner>
+      <AdditionalManifestFiles>rsrc\obex.manifest</AdditionalManifestFiles>
+      <EnableDpiAwareness>true</EnableDpiAwareness>
+    </Manifest>
+    <Bscmake>
+      <SuppressStartupBanner>false</SuppressStartupBanner>
+    </Bscmake>
+    <CustomBuildStep>
+      <Command>
+      </Command>
+    </CustomBuildStep>
+    <PostBuildEvent>
+      <Command>\Certs\SignWinObjEx64.cmd .\output\$(Platform)\$(Configuration)\WinObjEx64.exe</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="aboutDlg.c" />
     <ClCompile Include="excepth.c" />
-    <ClCompile Include="extras.c" />
-    <ClCompile Include="extrasDrivers.c" />
-    <ClCompile Include="extrasPipes.c" />
-    <ClCompile Include="extrasPN.c" />
-    <ClCompile Include="extrasSSDT.c" />
-    <ClCompile Include="extrasUSD.c" />
+    <ClCompile Include="extapi.c" />
+    <ClCompile Include="extras\extras.c" />
+    <ClCompile Include="extras\extrasDrivers.c" />
+    <ClCompile Include="extras\extrasIPC.c" />
+    <ClCompile Include="extras\extrasPN.c" />
+    <ClCompile Include="extras\extrasSSDT.c" />
+    <ClCompile Include="extras\extrasUSD.c" />
     <ClCompile Include="findDlg.c" />
     <ClCompile Include="hde\hde64.c" />
     <ClCompile Include="instdrv.c" />
@@ -233,16 +244,17 @@
     <ClCompile Include="minirtl\_strncpy.c" />
     <ClCompile Include="minirtl\_strstr.c" />
     <ClCompile Include="minirtl\_strstri.c" />
-    <ClCompile Include="propBasic.c" />
-    <ClCompile Include="propDesktop.c" />
-    <ClCompile Include="propDlg.c" />
-    <ClCompile Include="propDriver.c" />
-    <ClCompile Include="propObjectDump.c" />
-    <ClCompile Include="propProcess.c" />
-    <ClCompile Include="propSecurity.c" />
-    <ClCompile Include="propType.c" />
+    <ClCompile Include="objects.c" />
+    <ClCompile Include="props\propBasic.c" />
+    <ClCompile Include="props\propDesktop.c" />
+    <ClCompile Include="props\propDlg.c" />
+    <ClCompile Include="props\propDriver.c" />
+    <ClCompile Include="props\propObjectDump.c" />
+    <ClCompile Include="props\propProcess.c" />
+    <ClCompile Include="props\propSecurity.c" />
+    <ClCompile Include="props\propType.c" />
     <ClCompile Include="sup.c" />
-    <ClCompile Include="testunit.c" />
+    <ClCompile Include="tests\testunit.c" />
     <ClCompile Include="treelist.c" />
   </ItemGroup>
   <ItemGroup>
@@ -251,12 +263,13 @@
   <ItemGroup>
     <ClInclude Include="aboutDlg.h" />
     <ClInclude Include="excepth.h" />
-    <ClInclude Include="extras.h" />
-    <ClInclude Include="extrasDrivers.h" />
-    <ClInclude Include="extrasPipes.h" />
-    <ClInclude Include="extrasPN.h" />
-    <ClInclude Include="extrasSSDT.h" />
-    <ClInclude Include="extrasUSD.h" />
+    <ClInclude Include="extapi.h" />
+    <ClInclude Include="extras\extras.h" />
+    <ClInclude Include="extras\extrasDrivers.h" />
+    <ClInclude Include="extras\extrasIPC.h" />
+    <ClInclude Include="extras\extrasPN.h" />
+    <ClInclude Include="extras\extrasSSDT.h" />
+    <ClInclude Include="extras\extrasUSD.h" />
     <ClInclude Include="findDlg.h" />
     <ClInclude Include="global.h" />
     <ClInclude Include="hde\hde64.h" />
@@ -268,25 +281,25 @@
     <ClInclude Include="list.h" />
     <ClInclude Include="minirtl\minirtl.h" />
     <ClInclude Include="minirtl\rtltypes.h" />
-    <ClInclude Include="ntos.h" />
-    <ClInclude Include="propBasic.h" />
-    <ClInclude Include="propBasicConsts.h" />
-    <ClInclude Include="propDesktop.h" />
-    <ClInclude Include="propDlg.h" />
-    <ClInclude Include="propDriver.h" />
-    <ClInclude Include="propDriverConsts.h" />
-    <ClInclude Include="propObjectDump.h" />
-    <ClInclude Include="propObjectDumpConsts.h" />
-    <ClInclude Include="propProcess.h" />
-    <ClInclude Include="propSecurity.h" />
-    <ClInclude Include="propSecurityConsts.h" />
-    <ClInclude Include="propType.h" />
-    <ClInclude Include="propTypeConsts.h" />
+    <ClInclude Include="ntos\ntos.h" />
+    <ClInclude Include="objects.h" />
+    <ClInclude Include="props\propBasic.h" />
+    <ClInclude Include="props\propBasicConsts.h" />
+    <ClInclude Include="props\propDesktop.h" />
+    <ClInclude Include="props\propDlg.h" />
+    <ClInclude Include="props\propDriver.h" />
+    <ClInclude Include="props\propDriverConsts.h" />
+    <ClInclude Include="props\propObjectDump.h" />
+    <ClInclude Include="props\propObjectDumpConsts.h" />
+    <ClInclude Include="props\propProcess.h" />
+    <ClInclude Include="props\propSecurity.h" />
+    <ClInclude Include="props\propSecurityConsts.h" />
+    <ClInclude Include="props\propType.h" />
+    <ClInclude Include="props\propTypeConsts.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="sup.h" />
     <ClInclude Include="supConsts.h" />
-    <ClInclude Include="testunit.h" />
-    <ClInclude Include="treelist.h" />
+    <ClInclude Include="tests\testunit.h" />
     <ClInclude Include="ui.h" />
   </ItemGroup>
   <ItemGroup>
@@ -339,10 +352,11 @@
     <Image Include="rsrc\146.ico" />
     <Image Include="rsrc\147.ico" />
     <Image Include="rsrc\148.ico" />
-    <Image Include="rsrc\149.ico" />
     <Image Include="rsrc\6001.ico" />
     <Image Include="rsrc\6002.ico" />
     <Image Include="rsrc\Bitmap_125.bmp" />
+    <Image Include="rsrc\icon1.ico" />
+    <Image Include="rsrc\mailslot.ico" />
     <Image Include="rsrc\pipe.ico" />
   </ItemGroup>
   <ItemGroup>

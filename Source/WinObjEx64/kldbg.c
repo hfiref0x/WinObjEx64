@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.45
+*  VERSION:     1.46
 *
-*  DATE:        11 Jan 2017 
+*  DATE:        07 Mar 2017 
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -494,7 +494,7 @@ BOOL ObGetDirectoryObjectAddress(
 *
 * Purpose:
 *
-* Reads object name from kernel memory
+* Reads object name from kernel memory, returned buffer must be freed with HeapFree
 *
 */
 LPWSTR ObQueryNameString(
@@ -503,29 +503,28 @@ LPWSTR ObQueryNameString(
 )
 {
     ULONG  fLen;
-    LPWSTR lpObjectName;
+    LPWSTR lpObjectName = NULL;
 
     OBJECT_HEADER_NAME_INFO NameInfo;
 
+    if (ReturnLength)
+        *ReturnLength = 0;
+
     RtlSecureZeroMemory(&NameInfo, sizeof(OBJECT_HEADER_NAME_INFO));
-    if (!kdReadSystemMemory(NameInfoAddress, &NameInfo, sizeof(OBJECT_HEADER_NAME_INFO)))
-        return NULL;
-
-    fLen = NameInfo.Name.Length + sizeof(UNICODE_NULL);
-    lpObjectName = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, fLen);
-    if (lpObjectName == NULL)
-        return NULL;
-
-    NameInfoAddress = (ULONG_PTR)NameInfo.Name.Buffer;
-    if (!kdReadSystemMemory(NameInfoAddress, lpObjectName, NameInfo.Name.Length)) {
-        if (ReturnLength) {
-            *ReturnLength = 0;
+    if (kdReadSystemMemory(NameInfoAddress, &NameInfo, sizeof(OBJECT_HEADER_NAME_INFO))) {
+        fLen = NameInfo.Name.Length + sizeof(UNICODE_NULL);
+        lpObjectName = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, fLen);
+        if (lpObjectName != NULL) {
+            NameInfoAddress = (ULONG_PTR)NameInfo.Name.Buffer;
+            if (kdReadSystemMemory(NameInfoAddress, lpObjectName, NameInfo.Name.Length)) {
+                if (ReturnLength)
+                    *ReturnLength = fLen;
+            }
+            else {
+                HeapFree(GetProcessHeap(), 0, lpObjectName);
+                lpObjectName = NULL;
+            }
         }
-        HeapFree(GetProcessHeap(), 0, lpObjectName);
-        return NULL;
-    }
-    if (ReturnLength) {
-        *ReturnLength = fLen;
     }
     return lpObjectName;
 }
@@ -1308,22 +1307,28 @@ BOOL kdIsDebugBoot(
 }
 
 /*
-* kdReadSystemMemory
+* kdReadSystemMemoryEx
 *
 * Purpose:
 *
 * Wrapper around SysDbgReadVirtual request to the KLDBGDRV
 *
 */
-BOOL kdReadSystemMemory(
+_Success_(return == TRUE)
+BOOL kdReadSystemMemoryEx(
     _In_ ULONG_PTR Address,
     _Inout_ PVOID Buffer,
-    _In_ ULONG BufferSize
+    _In_ ULONG BufferSize,
+    _Out_opt_ PULONG NumberOfBytesRead
 )
 {
+    BOOL           bResult = FALSE;
     DWORD          bytesIO = 0;
     KLDBG          kldbg;
     SYSDBG_VIRTUAL dbgRequest;
+
+    if (NumberOfBytesRead)
+        *NumberOfBytesRead = 0;
 
     if (g_kdctx.hDevice == NULL)
         return FALSE;
@@ -1344,8 +1349,30 @@ BOOL kdReadSystemMemory(
     kldbg.OutputBuffer = &dbgRequest;
     kldbg.OutputBufferSize = sizeof(SYSDBG_VIRTUAL);
 
-    return DeviceIoControl(g_kdctx.hDevice, IOCTL_KD_PASS_THROUGH, &kldbg,
+    bResult = DeviceIoControl(g_kdctx.hDevice, IOCTL_KD_PASS_THROUGH, &kldbg,
         sizeof(kldbg), &dbgRequest, sizeof(dbgRequest), &bytesIO, NULL);
+
+    if (NumberOfBytesRead)
+        *NumberOfBytesRead = bytesIO;
+
+    return bResult;
+}
+
+/*
+* kdReadSystemMemory
+*
+* Purpose:
+*
+* Wrapper around kdReadSystemMemoryEx
+*
+*/
+BOOL kdReadSystemMemory(
+    _In_ ULONG_PTR Address,
+    _Inout_ PVOID Buffer,
+    _In_ ULONG BufferSize
+)
+{
+    return kdReadSystemMemoryEx(Address, Buffer, BufferSize, NULL);
 }
 
 /*
@@ -1357,9 +1384,9 @@ BOOL kdReadSystemMemory(
 *
 */
 BOOL kdExtractDriver(
-    LPCTSTR lpExtractTo,
-    LPCTSTR lpName,
-    LPCTSTR lpType
+    _In_ LPCWSTR lpExtractTo,
+    _In_ LPCWSTR lpName,
+    _In_ LPCWSTR lpType
 )
 {
     HRSRC   hResInfo = NULL;

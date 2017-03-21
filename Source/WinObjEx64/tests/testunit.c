@@ -4,9 +4,9 @@
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     1.46
+*  VERSION:     1.47
 *
-*  DATE:        10 Mar 2017
+*  DATE:        18 Mar 2017
 *
 *  Test code used while debug.
 *
@@ -20,9 +20,17 @@
 #include <intrin.h>
 #include <aclapi.h>
 
+
 HANDLE g_TestIoCompletion = NULL, g_TestTransaction = NULL;
 HANDLE g_TestNamespace = NULL, g_TestMutex = NULL;
 HANDLE g_TestMailslot = NULL;
+
+VOID TestApiPort(
+    VOID
+)
+{
+    
+}
 
 VOID TestMailslot(
     VOID
@@ -232,6 +240,7 @@ VOID TestStart(
     VOID
 )
 {
+    TestApiPort();
     TestMailslot();
     TestPartition();
     TestPrivateNamespace();

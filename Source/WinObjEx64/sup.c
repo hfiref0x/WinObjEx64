@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.46
+*  VERSION:     1.47
 *
-*  DATE:        07 Mar 2017
+*  DATE:        21 Mar 2017
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -213,7 +213,7 @@ BOOL supDumpSyscallTableConverted(
         if ((Context->KiServiceTableAddress == 0) || (Context->KiServiceLimit == 0))
             __leave;
 
-        memIO = Context->KiServiceLimit * sizeof(ULONG_PTR);
+        memIO = (ULONG)(Context->KiServiceLimit * sizeof(ULONG_PTR));
         KiServiceTableDumped = (PULONG)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, memIO);
         if (KiServiceTableDumped == NULL)
             __leave;
@@ -1068,9 +1068,7 @@ BOOL supQueryKnownDllsLink(
             KnownDlls.MaximumLength = (USHORT)bytesNeeded + sizeof(UNICODE_NULL);
             bResult = NT_SUCCESS(NtQuerySymbolicLinkObject(hLink, &KnownDlls, NULL));
             if (bResult) {
-                if (lpKnownDllsBuffer) {
-                    *lpKnownDllsBuffer = lpDataBuffer;
-                }
+                *lpKnownDllsBuffer = lpDataBuffer;
             }
         }
 
@@ -1304,7 +1302,7 @@ BOOL supQueryLinkTarget(
         return bResult;
     }
 
-    cLength = (cbBuffer - sizeof(UNICODE_NULL));
+    cLength = (DWORD)(cbBuffer - sizeof(UNICODE_NULL));
     if (cLength >= MAX_USTRING) {
         cLength = MAX_USTRING - sizeof(UNICODE_NULL);
     }
@@ -1420,7 +1418,7 @@ PVOID supCreateSCMSnapshot(
             if (GetLastError() == ERROR_MORE_DATA) {
                 // allocate memory block with page aligned size
                 VirtualFree(Services, 0, MEM_RELEASE);
-                dwSize = dwBytesNeeded + sizeof(ENUM_SERVICE_STATUS_PROCESS);
+                dwSize = (DWORD)(dwBytesNeeded + sizeof(ENUM_SERVICE_STATUS_PROCESS));
                 dwSlack = dwSize % 0x1000;
                 if (dwSlack > 0) dwSize = dwSize + 0x1000 - dwSlack;
 
@@ -2397,7 +2395,7 @@ SIZE_T supWriteBufferToFile(
     DesiredAccess = FILE_WRITE_ACCESS | SYNCHRONIZE;
     dwFlag = FILE_OVERWRITE_IF;
 
-    if (Append == TRUE) {
+    if (Append != FALSE) {
         DesiredAccess |= FILE_READ_ACCESS;
         dwFlag = FILE_OPEN_IF;
     }
@@ -2414,7 +2412,7 @@ SIZE_T supWriteBufferToFile(
 
         pPosition = NULL;
 
-        if (Append == TRUE) {
+        if (Append != FALSE) {
             Position.LowPart = FILE_WRITE_TO_END_OF_FILE;
             Position.HighPart = -1;
             pPosition = &Position;
@@ -2440,7 +2438,7 @@ SIZE_T supWriteBufferToFile(
                 ptr += BlockSize;
                 BytesWritten += IoStatus.Information;
             }
-            RemainingSize = Size % BlockSize;
+            RemainingSize = (ULONG)(Size % BlockSize);
             if (RemainingSize != 0) {
                 Status = NtWriteFile(hFile, 0, NULL, NULL, &IoStatus, ptr, RemainingSize, pPosition, NULL);
                 if (!NT_SUCCESS(Status))
@@ -2451,7 +2449,7 @@ SIZE_T supWriteBufferToFile(
     }
     __finally {
         if (hFile != NULL) {
-            if (Flush == TRUE) NtFlushBuffersFile(hFile, &IoStatus);
+            if (Flush != FALSE) NtFlushBuffersFile(hFile, &IoStatus);
             NtClose(hFile);
         }
         RtlFreeUnicodeString(&NtFileName);

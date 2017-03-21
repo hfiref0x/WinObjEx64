@@ -322,6 +322,9 @@
     <ClInclude Include="extras\extrasIPC.h">
       <Filter>Header Files\extras</Filter>
     </ClInclude>
+    <ClInclude Include="ntos\ntalpc.h">
+      <Filter>Header Files\ntos</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="rsrc\100.ico">

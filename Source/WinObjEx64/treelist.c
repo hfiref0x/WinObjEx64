@@ -53,7 +53,7 @@ VOID TreeListUpdateTooltips(
     HTREEITEM   item = TreeView_GetRoot(TreeControl);
     RECT        rc, subrc;
     TOOLINFO    tool;
-    ULONG       i = 0;
+    ULONG       i = 0, c;
     LONG        cx;
     TVITEMEX    itemex;
 
@@ -61,9 +61,11 @@ VOID TreeListUpdateTooltips(
     Header_GetItemRect(Header, 0, &rc);
     cx = rc.right;
 
+    c = (ULONG)SendMessage(ToolTips, TTM_GETTOOLCOUNT, 0, 0);
     RtlSecureZeroMemory(&tool, sizeof(tool));
     tool.cbSize = sizeof(tool);
-    while (SendMessage(ToolTips, TTM_ENUMTOOLS, i, (LPARAM)&tool)) {
+
+    while (SendMessage(ToolTips, TTM_ENUMTOOLS, i, (LPARAM)&tool) && (i < c)) {
         if (!TreeView_GetItemRect(TreeControl, (HTREEITEM)(tool.uId - tool.lParam), &rc, FALSE)) {
             SendMessage(ToolTips, TTM_DELTOOL, 0, (LPARAM)&tool);
             continue;

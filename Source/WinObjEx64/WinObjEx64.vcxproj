@@ -281,6 +281,7 @@
     <ClInclude Include="list.h" />
     <ClInclude Include="minirtl\minirtl.h" />
     <ClInclude Include="minirtl\rtltypes.h" />
+    <ClInclude Include="ntos\ntalpc.h" />
     <ClInclude Include="ntos\ntos.h" />
     <ClInclude Include="objects.h" />
     <ClInclude Include="props\propBasic.h" />

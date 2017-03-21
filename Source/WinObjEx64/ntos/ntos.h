@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.61
+*  VERSION:     1.62
 *
-*  DATE:        09 Mar 2017
+*  DATE:        21 Mar 2017
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -4080,21 +4080,22 @@ typedef struct _LPC_CLIENT_DIED_MSG {
 	LARGE_INTEGER CreateTime;
 } LPC_CLIENT_DIED_MSG, *PLPC_CLIENT_DIED_MSG;
 
+//#pragma pack(push, 1)
 typedef struct _PORT_VIEW {
 	ULONG Length;
 	HANDLE SectionHandle;
 	ULONG SectionOffset;
-	ULONG ViewSize;
+	SIZE_T ViewSize;
 	PVOID ViewBase;
 	PVOID ViewRemoteBase;
 } PORT_VIEW, *PPORT_VIEW;
 
 typedef struct _REMOTE_PORT_VIEW {
 	ULONG Length;
-	ULONG ViewSize;
+	SIZE_T ViewSize;
 	PVOID ViewBase;
 } REMOTE_PORT_VIEW, *PREMOTE_PORT_VIEW;
-
+//#pragma pack(pop)
 /*
 ** ALPC END
 */
@@ -4434,12 +4435,54 @@ NTSTATUS NTAPI LdrQueryImageFileKeyOption(
 **  LDR END
 */
 
+typedef PVOID PHEAD;
+
+typedef struct _HANDLEENTRY {
+    PHEAD   phead;  // Pointer to the Object.
+    PVOID   pOwner; // PTI or PPI
+    BYTE    bType;  // Object handle type
+    BYTE    bFlags; // Flags
+    WORD    wUniq;  // Access count.
+} HANDLEENTRY, *PHANDLEENTRY;
+
+typedef struct _SERVERINFO {
+    WORD            wRIPFlags;
+    WORD            wSRVIFlags;
+    WORD            wRIPPID;
+    WORD            wRIPError;
+    ULONG           cHandleEntries;
+    // incomplete
+} SERVERINFO, *PSERVERINFO;
+
+typedef struct _SHAREDINFO {
+    PSERVERINFO		psi;
+    PHANDLEENTRY	aheList;
+    ULONG			HeEntrySize;
+    // incomplete
+} SHAREDINFO, *PSHAREDINFO;
+
+typedef struct _USERCONNECT
+{
+    ULONG ulVersion;
+    ULONG ulCurrentVersion;
+    DWORD dwDispatchCount;
+    SHAREDINFO siClient;
+} USERCONNECT, *PUSERCONNECT;
+
 /*
 ** Csr Runtime START
 */
 
 ULONG NTAPI CsrGetProcessId(
 	);
+
+NTSTATUS NTAPI CsrClientConnectToServer(
+    _In_ PWSTR ObjectDirectory,  
+    _In_ ULONG ServerDllIndex,
+    _Inout_ PVOID ConnectionInformation,
+    _Inout_ PULONG ConnectionInformationLength, 
+    _Out_ PBOOLEAN CalledFromServer
+);
 
 /*
 ** Csr Runtime END
@@ -6149,4 +6192,16 @@ NTSTATUS NTAPI NtCreateMailslotFile(
     _In_ ULONG MailslotQuota,
     _In_ ULONG MaximumMessageSize,
     _In_ PLARGE_INTEGER ReadTimeout
+);
+
+NTSTATUS NTAPI NtSecureConnectPort(
+    _Out_ PHANDLE PortHandle,
+    _In_ PUNICODE_STRING PortName,
+    _In_ PSECURITY_QUALITY_OF_SERVICE SecurityQos,
+    _Inout_opt_ PPORT_VIEW ClientView,
+    _In_opt_ PSID RequiredServerSid,
+    _Inout_opt_ PREMOTE_PORT_VIEW ServerView,
+    _Out_opt_ PULONG MaxMessageLength,
+    _Inout_opt_ PVOID ConnectionInformation,
+    _Inout_opt_ PULONG ConnectionInformationLength
 );

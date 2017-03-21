@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.46
+*  VERSION:     1.47
 *
-*  DATE:        07 Mar 2017
+*  DATE:        21 Mar 2017
 *
 *  Program entry point and main window handler.
 *
@@ -978,16 +978,11 @@ void WinObjExMain()
                     (ULONG_PTR)ImageList_ExtractIcon(g_hInstance, ToolBarMenuImages, 2));
             }
 
-            //set extras-mailslots menu image
+            //set extras-mailslots/pipes menu image
             hMenu = GetSubMenu(GetMenu(MainWindow), 4);
             if (hMenu) {
                 supSetMenuIcon(hMenu, ID_EXTRAS_MAILSLOTS,
                     (ULONG_PTR)ImageList_ExtractIcon(g_hInstance, ToolBarMenuImages, 5));
-            }
-
-            //set extras-pipes menu image
-            hMenu = GetSubMenu(GetMenu(MainWindow), 4);
-            if (hMenu) {
                 supSetMenuIcon(hMenu, ID_EXTRAS_PIPES,
                     (ULONG_PTR)ImageList_ExtractIcon(g_hInstance, ToolBarMenuImages, 6));
             }

@@ -4,9 +4,9 @@
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.46
+*  VERSION:     1.47
 *
-*  DATE:        05 Mar 2017
+*  DATE:        21 Mar 2017
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -61,6 +61,7 @@
 #include <sddl.h>
 #include "minirtl\minirtl.h"
 #include "ntos\ntos.h"
+#include "ntos\ntalpc.h"
 #include "objects.h"
 #include "kldbg.h"
 #include "ldr\ldr.h"

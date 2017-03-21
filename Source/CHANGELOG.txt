@@ -1,3 +1,6 @@
+v1.4.7
+corrections
+
 v1.4.6
 Parition, DxghCurrentDxgProcessObject objects description added
 added mailslots viewer dialog

@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     1.46
+*  VERSION:     1.47
 *
-*  DATE:        04 Mar 2017
+*  DATE:        21 Mar 2017
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -2056,10 +2056,7 @@ VOID ObDumpFltServerPort(
         ObDumpUlong(g_TreeList, h_tviRootItem, L"NumberOfConnections", NULL, FltServerPortObject.NumberOfConnections, TRUE, FALSE, 0, 0);
         ObDumpUlong(g_TreeList, h_tviRootItem, L"MaxConnections", NULL, FltServerPortObject.MaxConnections, TRUE, FALSE, 0, 0);
 
-        if (pModules) {
-            HeapFree(GetProcessHeap(), 0, pModules);
-        }
-
+        HeapFree(GetProcessHeap(), 0, pModules);
     }
     __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
         return;

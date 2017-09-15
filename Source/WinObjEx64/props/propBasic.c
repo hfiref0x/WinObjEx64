@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     1.46
+*  VERSION:     1.50
 *
-*  DATE:        04 Mar 2017
+*  DATE:        04 Aug 2017
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -76,11 +76,11 @@ VOID propSetDefaultInfo(
         SetDlgItemText(hwndDlg, ID_OBJECT_PP_CHARGE, szBuffer);
 
         //Attributes
-        if (obi.Attributes != 0) {
-            hwndCB = GetDlgItem(hwndDlg, IDC_OBJECT_FLAGS);
-            EnableWindow(hwndCB, (obi.Attributes > 0) ? TRUE : FALSE);
+        hwndCB = GetDlgItem(hwndDlg, IDC_OBJECT_FLAGS);
+        if (hwndCB) {
             SendMessage(hwndCB, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
-            if (hwndCB) {
+            EnableWindow(hwndCB, (obi.Attributes > 0) ? TRUE : FALSE);
+            if (obi.Attributes != 0) {
                 for (i = 0; i < 8; i++) {
                     if (GET_BIT(obi.Attributes, i)) SendMessage(hwndCB, CB_ADDSTRING,
                         (WPARAM)0, (LPARAM)T_ObjectFlags[i]);

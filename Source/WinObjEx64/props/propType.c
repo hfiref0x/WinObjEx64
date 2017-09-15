@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPTYPE.C
 *
-*  VERSION:     1.46
+*  VERSION:     1.50
 *
-*  DATE:        05 Mar 2017
+*  DATE:        10 Aug 2017
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -301,15 +301,15 @@ VOID propSetTypeFlags(
 {
     INT  i;
     HWND hwndCB;
-
-    if (ObjectFlags == 0)
-        return;
+    BOOL bObjectFlagsSet = FALSE;
 
     hwndCB = GetDlgItem(hwndDlg, IDC_TYPE_FLAGS);
     if (hwndCB) {
-        EnableWindow(hwndCB, (ObjectFlags > 0) ? TRUE : FALSE);
+        bObjectFlagsSet = (ObjectFlags != 0);
+        EnableWindow(hwndCB, bObjectFlagsSet);
         SendMessage(hwndCB, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
-        if (ObjectFlags) {
+        if (bObjectFlagsSet) {
+            EnableWindow(hwndCB, TRUE);
             for (i = 0; i < 8; i++) {
                 if (GET_BIT(ObjectFlags, i)) SendMessage(hwndCB, CB_ADDSTRING,
                     (WPARAM)0, (LPARAM)T_ObjectTypeFlags[i]);

@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
-*  VERSION:     1.46
+*  VERSION:     1.50
 *
-*  DATE:        04 Mar 2017
+*  DATE:        10 Aug 2017
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -244,9 +244,23 @@ INT CALLBACK DrvDlgCompareFunc(
     INT       nResult = 0;
     ULONG     id1, id2;
     ULONG_PTR ad1, ad2;
+    SIZE_T    ItemLength1 = 0, ItemLength2 = 0;
 
-    lpItem1 = supGetItemText(DlgContext.ListView, (INT)lParam1, (INT)lParamSort, NULL);
-    lpItem2 = supGetItemText(DlgContext.ListView, (INT)lParam2, (INT)lParamSort, NULL);
+    lpItem1 = supGetItemText(
+        DlgContext.ListView, 
+        (INT)lParam1, 
+        (INT)lParamSort, 
+        &ItemLength1);
+
+    ItemLength1 /= sizeof(WCHAR);
+
+    lpItem2 = supGetItemText(
+        DlgContext.ListView, 
+        (INT)lParam2, 
+        (INT)lParamSort, 
+        &ItemLength2);
+
+    ItemLength2 /= sizeof(WCHAR);
 
     if ((lpItem1 == NULL) && (lpItem2 == NULL)) {
         nResult = 0;
@@ -260,13 +274,12 @@ INT CALLBACK DrvDlgCompareFunc(
     if ((lpItem2 == NULL) && (lpItem1 != NULL)) {
         nResult = (DlgContext.bInverseSort) ? -1 : 1;
         goto Done;
-    }
+    }  
 
     switch (lParamSort) {
 
-        //sort Load Order, Size
-    case 0:
-    case 3:
+    case 0: //sort Load Order
+    case 3: //sort Size
         id1 = strtoul(lpItem1);
         id2 = strtoul(lpItem2);
 
@@ -276,23 +289,27 @@ INT CALLBACK DrvDlgCompareFunc(
             nResult = id1 > id2;
 
         break;
+   
+    case 2:  //sort Address
 
-        //sort Address
-    case 2:
+        if ((ItemLength1 > 1) && (ItemLength2 > 1)) {
 
-        ad1 = hextou64(&lpItem1[2]);
-        ad2 = hextou64(&lpItem2[2]);
+            ad1 = hextou64(&lpItem1[2]);
+            ad2 = hextou64(&lpItem2[2]);
 
-        if (DlgContext.bInverseSort)
-            nResult = ad1 < ad2;
+            if (DlgContext.bInverseSort)
+                nResult = ad1 < ad2;
+            else
+                nResult = ad1 > ad2;
+
+        }
         else
-            nResult = ad1 > ad2;
+            nResult = 0;
 
         break;
 
-        //sort Name, Module
-    case 1:
-    case 4:
+    case 1:  //sort Name
+    case 4:  //sort Module
     default:
         if (DlgContext.bInverseSort)
             nResult = _strcmpi(lpItem2, lpItem1);

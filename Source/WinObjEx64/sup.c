@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.47
+*  VERSION:     1.50
 *
-*  DATE:        21 Mar 2017
+*  DATE:        10 Aug 2017
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -449,7 +449,7 @@ VOID supCenterWindow(
 * Returns buffer with system information by given InfoClass.
 *
 * Returned buffer must be freed with HeapFree after usage.
-* Function will return error after 100 attempts.
+* Function will return error after 20 attempts.
 *
 */
 PVOID supGetSystemInfo(
@@ -472,9 +472,10 @@ PVOID supGetSystemInfo(
         }
         if (status == STATUS_INFO_LENGTH_MISMATCH) {
             HeapFree(GetProcessHeap(), 0, Buffer);
+            Buffer = NULL;
             Size *= 2;
             c++;
-            if (c > 100) {
+            if (c > 20) {
                 status = STATUS_SECRET_TOO_LONG;
                 break;
             }
@@ -499,7 +500,7 @@ PVOID supGetSystemInfo(
 * Returns buffer with system types information.
 *
 * Returned buffer must be freed with HeapFree after usage.
-* Function will return error after 100 attempts.
+* Function will return error after 5 attempts.
 *
 */
 PVOID supGetObjectTypesInfo(
@@ -520,20 +521,18 @@ PVOID supGetObjectTypesInfo(
         else {
             return NULL;
         }
-        if (NT_SUCCESS(status)) {
-            break;
-        }
-        else {
-            Size = memIO;
+
+        if (status == STATUS_INFO_LENGTH_MISMATCH) {
             HeapFree(GetProcessHeap(), 0, Buffer);
             Buffer = NULL;
+            Size = memIO;
+            c++;
+            if (c > 5) {
+                status = STATUS_SECRET_TOO_LONG;
+                break;
+            }
         }
-        c++;
-        if (c > 100) {
-            status = STATUS_SECRET_TOO_LONG;
-            break;
-        }
-    } while (status != STATUS_SUCCESS);
+    } while (status == STATUS_INFO_LENGTH_MISMATCH);
 
     if (NT_SUCCESS(status)) {
         return Buffer;
@@ -1929,18 +1928,18 @@ BOOL supQueryDeviceDescription(
         // enumerate devices
         Entry = pObj->sapiDBHead.Flink;
         while (Entry && Entry != &pObj->sapiDBHead) {
+            
             Item = CONTAINING_RECORD(Entry, SAPIDBENTRY, ListEntry);
-            if (Item != NULL) {
-                if (Item->lpDeviceName != NULL) {
-                    if (_strcmpi(lpFullDeviceName, Item->lpDeviceName) == 0) {
-                        if (Item->lpDeviceDesc != NULL) {
-                            _strncpy(Buffer, ccBuffer, Item->lpDeviceDesc, _strlen(Item->lpDeviceDesc));
-                        }
-                        bResult = TRUE;
-                        break;
+            if (Item->lpDeviceName != NULL) {
+                if (_strcmpi(lpFullDeviceName, Item->lpDeviceName) == 0) {
+                    if (Item->lpDeviceDesc != NULL) {
+                        _strncpy(Buffer, ccBuffer, Item->lpDeviceDesc, _strlen(Item->lpDeviceDesc));
                     }
+                    bResult = TRUE;
+                    break;
                 }
             }
+
             Entry = Entry->Flink;
         }
         HeapFree(GetProcessHeap(), 0, lpFullDeviceName);

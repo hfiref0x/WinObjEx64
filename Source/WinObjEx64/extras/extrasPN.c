@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPN.C
 *
-*  VERSION:     1.46
+*  VERSION:     1.50
 *
-*  DATE:        04 Mar 2017
+*  DATE:        10 Aug 2017
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -100,38 +100,38 @@ BOOL PNDlgQueryInfo(
     ObjectInfo = NULL;
     Entry = PrivateObjectList.Flink;
     while ((Entry != NULL) && (Entry != &PrivateObjectList)) {
+
         ObjectInfo = CONTAINING_RECORD(Entry, OBJREF, ListEntry);
-        if (ObjectInfo) {
 
-            ConvertedTypeIndex = supGetObjectNameIndexByTypeIndex(
-                (PVOID)ObjectInfo->ObjectAddress, ObjectInfo->TypeIndex);
+        ConvertedTypeIndex = supGetObjectNameIndexByTypeIndex(
+            (PVOID)ObjectInfo->ObjectAddress, ObjectInfo->TypeIndex);
 
-            TypeName = g_lpObjectNames[ConvertedTypeIndex];
+        TypeName = g_lpObjectNames[ConvertedTypeIndex];
 
-            //Name
-            RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
-            lvitem.mask = LVIF_TEXT | LVIF_IMAGE;
-            lvitem.iSubItem = 0;
-            lvitem.iItem = MAXINT;
-            lvitem.iImage = ConvertedTypeIndex;
-            lvitem.pszText = ObjectInfo->ObjectName;
-            index = ListView_InsertItem(DlgContext.ListView, &lvitem);
+        //Name
+        RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
+        lvitem.mask = LVIF_TEXT | LVIF_IMAGE;
+        lvitem.iSubItem = 0;
+        lvitem.iItem = MAXINT;
+        lvitem.iImage = ConvertedTypeIndex;
+        lvitem.pszText = ObjectInfo->ObjectName;
+        index = ListView_InsertItem(DlgContext.ListView, &lvitem);
 
-            //Type
-            lvitem.mask = LVIF_TEXT;
-            lvitem.iSubItem = 1;
-            lvitem.pszText = (LPWSTR)TypeName;
-            lvitem.iItem = index;
-            ListView_SetItem(DlgContext.ListView, &lvitem);
+        //Type
+        lvitem.mask = LVIF_TEXT;
+        lvitem.iSubItem = 1;
+        lvitem.pszText = (LPWSTR)TypeName;
+        lvitem.iItem = index;
+        ListView_SetItem(DlgContext.ListView, &lvitem);
 
-            //Namespace id
-            lvitem.iSubItem = 2;
-            lvitem.iItem = index;
-            RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-            wsprintf(szBuffer, T_NAMESPACEID, ObjectInfo->NamespaceId);
-            lvitem.pszText = szBuffer;
-            ListView_SetItem(DlgContext.ListView, &lvitem);
-        }
+        //Namespace id
+        lvitem.iSubItem = 2;
+        lvitem.iItem = index;
+        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+        wsprintf(szBuffer, T_NAMESPACEID, ObjectInfo->NamespaceId);
+        lvitem.pszText = szBuffer;
+        ListView_SetItem(DlgContext.ListView, &lvitem);
+
         Entry = Entry->Flink;
     }
     ObListDestroy(&PrivateObjectList);

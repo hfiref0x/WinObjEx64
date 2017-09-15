@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.46
+*  VERSION:     1.50
 *
-*  DATE:        31 Jan 2017
+*  DATE:        17 June 2017
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -19,13 +19,20 @@
 #pragma once
 
 #define IOCTL_KD_PASS_THROUGH CTL_CODE(FILE_DEVICE_UNKNOWN, 0x1, METHOD_NEITHER, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
-#define OBJECT_SHIFT 8
 
+#ifdef _USE_OWN_DRIVER 
+#define KLDBGDRV                L"wodbgdrv"
+#define KLDBGDRVSYS             L"\\drivers\\wodbgdrv.sys"
+#else
 #define KLDBGDRV                L"kldbgdrv"
 #define KLDBGDRVSYS             L"\\drivers\\kldbgdrv.sys"
+#endif
+
 #define RegControlKey           L"System\\CurrentControlSet\\Control"
 #define RegStartOptionsValue    L"SystemStartOptions"
 #define NTOSFOLDERSYSTEM32      L"\\\\?\\globalroot\\systemroot\\system32" //no slash at end
+
+#define OBJECT_SHIFT 8
 
 typedef ULONG_PTR *PUTable;
 
@@ -67,6 +74,10 @@ typedef struct _KLDBGCONTEXT {
 
     //address of PrivateNamespaceLookupTable
     PVOID ObpPrivateNamespaceLookupTable;
+
+    //ntoskrnl base and size
+    PVOID NtOsBase;
+    ULONG NtOsSize;
 
     //value of nt!KiServiceLimit
     ULONG KiServiceLimit;
@@ -117,68 +128,58 @@ typedef struct _OBJREF {
 } OBJREF, *POBJREF;
 
 DWORD WINAPI kdQueryProc(
-    _In_  LPVOID lpParameter
-);
+    _In_  LPVOID lpParameter);
 
 UCHAR ObDecodeTypeIndex(
     _In_ PVOID Object,
-    _In_ UCHAR EncodedTypeIndex
-);
+    _In_ UCHAR EncodedTypeIndex);
 
 POBJINFO ObQueryObject(
     _In_ LPWSTR lpDirectory,
-    _In_ LPWSTR lpObjectName
-);
+    _In_ LPWSTR lpObjectName);
 
 BOOL ObDumpTypeInfo(
     _In_    ULONG_PTR ObjectAddress,
-    _Inout_ POBJECT_TYPE_COMPATIBLE ObjectTypeInfo
-);
+    _Inout_ POBJECT_TYPE_COMPATIBLE ObjectTypeInfo);
 
 LPWSTR ObQueryNameString(
     _In_      ULONG_PTR NameInfoAddress,
-    _Out_opt_ PSIZE_T ReturnLength
-);
+    _Out_opt_ PSIZE_T ReturnLength);
 
 BOOL ObHeaderToNameInfoAddress(
     _In_    UCHAR ObjectInfoMask,
     _In_    ULONG_PTR ObjectAddress,
     _Inout_ PULONG_PTR HeaderAddress,
-    _In_    OBJ_HEADER_INFO_FLAG InfoFlag
-);
+    _In_    OBJ_HEADER_INFO_FLAG InfoFlag);
 
 BOOL ObListCreate(
     _Inout_ PLIST_ENTRY ListHead,
-    _In_    BOOL fNamespace
-);
+    _In_    BOOL fNamespace);
 
 VOID ObListDestroy(
-    _In_ PLIST_ENTRY ListHead
-);
+    _In_ PLIST_ENTRY ListHead);
 
 POBJREF ObListFindByAddress(
     _In_ PLIST_ENTRY ListHead,
-    _In_ ULONG_PTR	 ObjectAddress
-);
+    _In_ ULONG_PTR	 ObjectAddress);
 
 BOOL kdReadSystemMemory(
     _In_    ULONG_PTR Address,
     _Inout_ PVOID Buffer,
-    _In_    ULONG BufferSize
-);
+    _In_    ULONG BufferSize);
 
 _Success_(return == TRUE)
 BOOL kdReadSystemMemoryEx(
     _In_ ULONG_PTR Address,
     _Inout_ PVOID Buffer,
     _In_ ULONG BufferSize,
-    _Out_opt_ PULONG NumberOfBytesRead
-);
+    _Out_opt_ PULONG NumberOfBytesRead);
+
+BOOL kdAddressInNtOsImage(
+    _In_ PVOID Address);
 
 VOID kdInit(
-    BOOL IsFullAdmin
-);
+    BOOL IsFullAdmin);
 
 VOID kdShutdown(
-    VOID
-);
+    VOID);

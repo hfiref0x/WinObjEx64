@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.47
+*  VERSION:     1.50
 *
-*  DATE:        21 Mar 2017
+*  DATE:        10 Apr 2017
 *
 *  Program entry point and main window handler.
 *
@@ -666,7 +666,7 @@ LRESULT CALLBACK MainWindowProc(
         if ((HWND)wParam == ObjectList) {
             mark = ListView_GetSelectionMark(ObjectList);
 
-            if ((DWORD)lParam == MAKELPARAM(-1, -1)) {
+            if (lParam == MAKELPARAM(-1, -1)) {
                 ListView_GetItemRect(ObjectList, mark, &crc, TRUE);
                 crc.top = crc.bottom;
                 ClientToScreen(ObjectList, (LPPOINT)&crc);

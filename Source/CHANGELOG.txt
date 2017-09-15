@@ -1,20 +1,12 @@
-v1.4.7
-corrections
-
-v1.4.6
-Parition, DxghCurrentDxgProcessObject objects description added
+v1.5.0
+added Partition, DxghCurrentDxgProcessObject objects description
 added mailslots viewer dialog
-some code revision and bugfixes
-
-v1.4.5 hotfix
-fixed wine behavior along with some bugs
-
-v1.4.5
-added file properties for drivers (menu -> extras -> Drivers) 
-added FltConnectionPort object dump 
-switched to hde instead of ldasm 
-rtls updated, switched to VS2015 U3 
-note: Windows 10 RS1 (14393 release) supported as well as TH1(10240)/TH2(10586) 
+added file properties for drivers (menu -> extras -> Drivers)
+added FltConnectionPort object dump
+switched to hde instead of ldasm
+fixed Wine behavior along with some bugs
+rtls updated, switched to VS2015 U3
+note: Windows 10 RS2 (15063), RS1 (14393) supported as well as TH1(10240)/TH2(10586), RS3 supported (16288+ build)
 
 v 1.4.0
 drivers list and dump (menu -> extras)

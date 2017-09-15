@@ -29,7 +29,6 @@ VOID TestApiPort(
     VOID
 )
 {
-    
 }
 
 VOID TestMailslot(

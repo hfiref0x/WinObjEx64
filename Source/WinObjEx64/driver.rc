@@ -1,0 +1,8 @@
+#include "resource.h"
+#include "winres.h"
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+#ifndef _UseOwnDriver
+IDR_KDBGDRV SYS "..\\drvstore\\kldbgdrv.sys"
+#else
+IDR_KDBGDRV SYS "..\\drvstore\\wodbgdrv.sys"
+#endif

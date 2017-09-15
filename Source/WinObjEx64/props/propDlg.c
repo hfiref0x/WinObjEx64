@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDLG.C
 *
-*  VERSION:     1.46
+*  VERSION:     1.50
 *
-*  DATE:        03 Mar 2017
+*  DATE:        03 Aug 2017
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -119,7 +119,7 @@ BOOL propOpenCurrentObject(
         SetLastError(RtlNtStatusToDosError(status));
 
         bResult = ((NT_SUCCESS(status)) && (hObject != NULL));
-        if (bResult && phObject) {
+        if (bResult) {
             *phObject = hObject;
         }
 
@@ -134,7 +134,7 @@ BOOL propOpenCurrentObject(
     if (Context->TypeIndex == TYPE_WINSTATION) {
         hObject = OpenWindowStation(Context->lpObjectName, FALSE, DesiredAccess); //WINSTA_READATTRIBUTES for query
         bResult = (hObject != NULL);
-        if (bResult && phObject) {
+        if (bResult) {
             *phObject = hObject;
         }
         return bResult;
@@ -144,7 +144,7 @@ BOOL propOpenCurrentObject(
     if (Context->TypeIndex == TYPE_DESKTOP) {
         hObject = OpenDesktop(Context->lpObjectName, 0, FALSE, DesiredAccess); //DESKTOP_READOBJECTS for query
         bResult = (hObject != NULL);
-        if (bResult && phObject) {
+        if (bResult) {
             *phObject = hObject;
         }
         return bResult;
@@ -224,7 +224,7 @@ BOOL propOpenCurrentObject(
     NtClose(hDirectory);
 
     bResult = ((NT_SUCCESS(status)) && (hObject != NULL));
-    if (bResult && phObject) {
+    if (bResult) {
         *phObject = hObject;
     }
     return bResult;

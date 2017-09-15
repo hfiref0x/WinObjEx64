@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.46
+*  VERSION:     1.50
 *
-*  DATE:        07 Mar 2017 
+*  DATE:        17 June 2017 
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -207,9 +207,8 @@ UCHAR ObFindHeaderCookie(
 
             KmAddress = KernelImageBase + KmAddress - MappedImageBase;
 
-            if (KmAddress < Context->SystemRangeStart) {
+            if (!kdAddressInNtOsImage((PVOID)KmAddress))
                 break;
-            }
 
             if (!kdReadSystemMemory(KmAddress, &ObHeaderCookie, sizeof(ObHeaderCookie))) {
                 break;
@@ -296,7 +295,6 @@ PVOID ObFindObpPrivateNamespaceLookupTable(
 
             //signature not found
             if (bFound == FALSE) {
-                Address = 0;
                 return 0;
             }
 
@@ -422,7 +420,7 @@ VOID kdFindKiServiceTable(
             Address = Address + c + 7 + rel;
             Address = KernelImageBase + Address - MappedImageBase;
 
-            if (Address < g_kdctx.SystemRangeStart)
+            if (!kdAddressInNtOsImage((PVOID)Address))
                 break;
 
             RtlSecureZeroMemory(&KeSystemDescriptorTable,
@@ -822,7 +820,7 @@ VOID ObWalkDirectoryRecursiveEx(
         return;
 
     if (lpRootDirectory != NULL) {
-        rdirLen = _strlen(lpRootDirectory) * sizeof(WCHAR);
+        rdirLen = (1 + _strlen(lpRootDirectory)) * sizeof(WCHAR);
     }
     else {
         rdirLen = 0;
@@ -1046,12 +1044,10 @@ BOOL ObWalkPrivateNamespaceTable(
                                     FindEntry = ListHead->Flink;
                                     while ((FindEntry != NULL) && (FindEntry != ListHead)) {
                                         ObjectInfo = CONTAINING_RECORD(FindEntry, OBJREF, ListEntry);
-                                        if (ObjectInfo) {
-                                            if (lpListEntry->NamespaceDirectoryAddress == ObjectInfo->NamespaceDirectoryAddress) {
-                                                lpListEntry->NamespaceId = ObjectInfo->NamespaceId;
-                                                EntryFound = TRUE;
-                                                break;
-                                            }
+                                        if (lpListEntry->NamespaceDirectoryAddress == ObjectInfo->NamespaceDirectoryAddress) {
+                                            lpListEntry->NamespaceId = ObjectInfo->NamespaceId;
+                                            EntryFound = TRUE;
+                                            break;
                                         }
                                         FindEntry = FindEntry->Flink;
                                     }
@@ -1239,11 +1235,9 @@ POBJREF ObListFindByAddress(
     Entry = ListHead->Flink;
     while ((Entry != NULL) && (Entry != ListHead)) {
         ObjectInfo = CONTAINING_RECORD(Entry, OBJREF, ListEntry);
-        if (ObjectInfo) {
-            if (ObjectInfo->ObjectAddress == ObjectAddress) {
-                bFound = TRUE;
-                break;
-            }
+        if (ObjectInfo->ObjectAddress == ObjectAddress) {
+            bFound = TRUE;
+            break;
         }
         Entry = Entry->Flink;
     }
@@ -1280,6 +1274,12 @@ PVOID kdQueryIopInvalidDeviceRequest(
         RtlSecureZeroMemory(&drvObject, sizeof(drvObject));
         if (kdReadSystemMemory(drvObjectAddress, &drvObject, sizeof(drvObject))) {
             pHandler = drvObject.MajorFunction[IRP_MJ_CREATE_MAILSLOT];
+
+            //
+            // IopInvalidDeviceRequest is an routine inside ntoskrnl.
+            //
+            if (!kdAddressInNtOsImage(pHandler))
+                pHandler = NULL;
         }
         HeapFree(GetProcessHeap(), 0, pSelfObj);
     }
@@ -1431,7 +1431,6 @@ VOID pkdQuerySystemInformation(
     BOOL                    cond = FALSE;
     ULONG                   ModuleSize;
     PVOID                   MappedKernel = NULL;
-    ULONG_PTR               KernelBase = 0L;
     PKLDBGCONTEXT           Context = (PKLDBGCONTEXT)lpParameter;
     PIMAGE_NT_HEADERS       NtHeaders;
     PRTL_PROCESS_MODULES    miSpace = NULL;
@@ -1446,7 +1445,8 @@ VOID pkdQuerySystemInformation(
         if (miSpace->NumberOfModules == 0)
             break;
 
-        KernelBase = (ULONG_PTR)miSpace->Modules[0].ImageBase;
+        Context->NtOsBase = miSpace->Modules[0].ImageBase; //loaded kernel base
+        Context->NtOsSize = miSpace->Modules[0].ImageSize; //loaded kernel size
 
         _strcpy(NtOskrnlFullPathName, NTOSFOLDERSYSTEM32);
         _strcat(NtOskrnlFullPathName, TEXT("\\"));
@@ -1463,19 +1463,31 @@ VOID pkdQuerySystemInformation(
 
         //find and remember ObHeaderCookie
         if (Context->osver.dwMajorVersion >= 10) {
-            Context->ObHeaderCookie = ObFindHeaderCookie(Context, (ULONG_PTR)MappedKernel, KernelBase);
+            
+            Context->ObHeaderCookie = ObFindHeaderCookie(Context, 
+                (ULONG_PTR)MappedKernel, 
+                (ULONG_PTR)Context->NtOsBase);
+        
         }
 
         NtHeaders = RtlImageNtHeader(MappedKernel);
         if (NtHeaders) {
             ModuleSize = NtHeaders->OptionalHeader.SizeOfImage;
             if (ModuleSize != 0) {
+
                 //find KiServiceTable
-                kdFindKiServiceTable((ULONG_PTR)MappedKernel, ModuleSize, KernelBase, &Context->KiServiceTableAddress, &Context->KiServiceLimit);
+                kdFindKiServiceTable((ULONG_PTR)MappedKernel, 
+                    ModuleSize, 
+                    (ULONG_PTR)Context->NtOsBase, 
+                    &Context->KiServiceTableAddress, 
+                    &Context->KiServiceLimit);
 
                 //find namespace table
                 if (Context->osver.dwBuildNumber <= 10240) {
-                    Context->ObpPrivateNamespaceLookupTable = ObFindObpPrivateNamespaceLookupTable(Context, (ULONG_PTR)MappedKernel, ModuleSize, KernelBase);
+                    Context->ObpPrivateNamespaceLookupTable = ObFindObpPrivateNamespaceLookupTable(Context, 
+                        (ULONG_PTR)MappedKernel, 
+                        ModuleSize, 
+                        (ULONG_PTR)Context->NtOsBase);
                 }
             }
         }
@@ -1488,6 +1500,23 @@ VOID pkdQuerySystemInformation(
     if (miSpace != NULL) {
         HeapFree(GetProcessHeap(), 0, miSpace);
     }
+}
+
+/*
+* kdAddressInNtOsImage
+*
+* Purpose:
+*
+* Test if given address in range of ntoskrnl.
+*
+*/
+BOOL kdAddressInNtOsImage(
+    _In_ PVOID Address
+)
+{
+    return IN_REGION(Address, 
+        g_kdctx.NtOsBase, 
+        g_kdctx.NtOsSize);
 }
 
 /*
@@ -1571,9 +1600,12 @@ VOID kdInit(
     if (IsFullAdmin == FALSE)
         return;
 
+
+#ifndef _USE_OWN_DRIVER
     // check if system booted in the debug mode
     if (kdIsDebugBoot() == FALSE)
         return;
+#endif
 
     // test privilege assigned and continue to load/open kldbg driver
     if (supEnablePrivilege(SE_DEBUG_PRIVILEGE, TRUE)) {
@@ -1594,6 +1626,7 @@ VOID kdInit(
                 g_kdctx.IsOurLoad = scmLoadDeviceDriver(KLDBGDRV, szDrvPath, &g_kdctx.hDevice);
             }
         }
+
     }
 
     //query global variable and dump object directory if driver support available.

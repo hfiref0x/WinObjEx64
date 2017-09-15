@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     1.46
+*  VERSION:     1.50
 *
-*  DATE:        07 Mar 2017
+*  DATE:        10 Aug 2017
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -41,9 +41,22 @@ INT CALLBACK SdtDlgCompareFunc(
     LPWSTR    lpItem1 = NULL, lpItem2 = NULL;
     ULONG     id1, id2;
     ULONG_PTR ad1, ad2;
+    SIZE_T ItemLength1 = 0, ItemLength2 = 0;
 
-    lpItem1 = supGetItemText(DlgContext.ListView, (INT)lParam1, (INT)lParamSort, NULL);
-    lpItem2 = supGetItemText(DlgContext.ListView, (INT)lParam2, (INT)lParamSort, NULL);
+    lpItem1 = supGetItemText(
+        DlgContext.ListView, 
+        (INT)lParam1, 
+        (INT)lParamSort, &ItemLength1);
+
+    ItemLength1 /= sizeof(WCHAR);
+
+    lpItem2 = supGetItemText(
+        DlgContext.ListView, 
+        (INT)lParam2, 
+        (INT)lParamSort, 
+        &ItemLength2);
+
+    ItemLength2 /= sizeof(WCHAR);
 
     if ((lpItem1 == NULL) && (lpItem2 == NULL)) {
         nResult = 0;
@@ -74,13 +87,19 @@ INT CALLBACK SdtDlgCompareFunc(
 
     case 2: //sort Address
 
-        ad1 = hextou64(&lpItem1[2]);
-        ad2 = hextou64(&lpItem2[2]);
+        if ((ItemLength1 > 1) && (ItemLength2 > 1)) {
 
-        if (DlgContext.bInverseSort)
-            nResult = ad1 < ad2;
+            ad1 = hextou64(&lpItem1[2]);
+            ad2 = hextou64(&lpItem2[2]);
+
+            if (DlgContext.bInverseSort)
+                nResult = ad1 < ad2;
+            else
+                nResult = ad1 > ad2;
+
+        }
         else
-            nResult = ad1 > ad2;
+            nResult = 0;
 
         break;
 

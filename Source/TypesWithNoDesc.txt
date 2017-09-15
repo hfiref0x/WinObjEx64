@@ -1,7 +1,7 @@
 DmaAdapter
 DmaDomain
 IoCompletionReserve - same as IoCompletion except using reserve process allocated memory
-RawInputManager - DirectX Kernel Subsystem object, Window Manager for phones
+RawInputManager - DirectX Kernel Subsystem object
 UserApcReserve - same as NtQueueApc except using reserve process allocated memory
 WaitCompletionPacket
 Silo (r3 interface removed in 10240 release, object removed in TH2 builds)

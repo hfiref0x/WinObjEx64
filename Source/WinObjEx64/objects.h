@@ -4,9 +4,9 @@
 *
 *  TITLE:       OBJECTS.H
 *
-*  VERSION:     1.46
+*  VERSION:     1.50
 *
-*  DATE:        02 Mar 2017
+*  DATE:        20 June 2017
 *
 *  Header file for internal Windows objects handling.
 *

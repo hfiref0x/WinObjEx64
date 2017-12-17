@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.50
+*  VERSION:     1.51
 *
-*  DATE:        17 June 2017 
+*  DATE:        05 Dec 2017 
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -349,7 +349,6 @@ PVOID ObFindObpPrivateNamespaceLookupTable(
 */
 VOID kdFindKiServiceTable(
     _In_ ULONG_PTR MappedImageBase,
-    _In_ ULONG MappedImageSize,
     _In_ ULONG_PTR KernelImageBase,
     _Inout_ ULONG_PTR *KiServiceTablePtr,
     _Inout_ ULONG *KiServiceLimit
@@ -358,33 +357,57 @@ VOID kdFindKiServiceTable(
     BOOL         cond = FALSE, bFound = FALSE;
     UINT         c, SignatureSize;
     LONG         rel = 0;
-    ULONG_PTR    Address = 0;
+    ULONG        i, SectionSize;
+    ULONG_PTR    Address = 0, SectionBase = 0;
     hde64s       hs;
 
-    KSERVICE_TABLE_DESCRIPTOR KeSystemDescriptorTable;
+    PIMAGE_NT_HEADERS NtHeaders;
+    IMAGE_SECTION_HEADER *SectionTableEntry;
 
-    if (
-        (KiServiceLimit == NULL) ||
-        (KiServiceTablePtr == NULL) ||
-        (MappedImageSize == 0) ||
-        (MappedImageBase == 0) ||
-        (KernelImageBase == 0)
-        )
-    {
-        return;
-    }
+    KSERVICE_TABLE_DESCRIPTOR KeSystemDescriptorTable;
 
     __try {
 
         do {
 
-            SignatureSize = sizeof(KiSystemServiceStartPattern);
+            NtHeaders = RtlImageNtHeader((PVOID)MappedImageBase);
+            if (NtHeaders == NULL)
+                break;
 
-            for (c = 0; c < MappedImageSize - SignatureSize; c++) {
+            SectionTableEntry = (PIMAGE_SECTION_HEADER)((PCHAR)NtHeaders +
+                sizeof(ULONG) +
+                sizeof(IMAGE_FILE_HEADER) +
+                NtHeaders->FileHeader.SizeOfOptionalHeader);
+
+            SectionBase = 0;
+            SectionSize = 0;
+
+            i = NtHeaders->FileHeader.NumberOfSections;
+            while (i > 0) {
+                if (*(PULONG)SectionTableEntry->Name == 'xet.')
+                    if ((SectionTableEntry->Name[4] == 't') &&
+                        (SectionTableEntry->Name[5] == 0))
+                    {
+                        SectionBase = ((ULONG_PTR)MappedImageBase + SectionTableEntry->VirtualAddress);
+                        SectionSize = SectionTableEntry->Misc.VirtualSize;
+                        break;
+                    }
+                i -= 1;
+                SectionTableEntry += 1;
+            }
+
+            if ((SectionBase == 0) || (SectionSize == 0))
+                break;
+
+            SignatureSize = sizeof(KiSystemServiceStartPattern);
+            if (SignatureSize > SectionSize)
+                break;
+
+            for (c = 0; c < SectionSize - SignatureSize; c++) {
 
                 //find  KiSystemServiceStart signature 
                 if (RtlCompareMemory(
-                    ((PBYTE)MappedImageBase + c),
+                    ((PBYTE)SectionBase + c),
                     KiSystemServiceStartPattern, SignatureSize) == SignatureSize)
                 {
                     bFound = TRUE;
@@ -396,7 +419,7 @@ VOID kdFindKiServiceTable(
                 break;
 
             //set new scan position, next level search pattern not included, skip
-            Address = MappedImageBase + c + SignatureSize;
+            Address = SectionBase + c + SignatureSize;
             c = 0;
             RtlSecureZeroMemory(&hs, sizeof(hs));
 
@@ -1196,12 +1219,10 @@ VOID ObListDestroy(
 
         ObjectEntry = CONTAINING_RECORD(ListHead->Flink, OBJREF, ListEntry);
         RemoveEntryList(ListHead->Flink);
-        if (ObjectEntry) {
-            if (ObjectEntry->ObjectName) {
-                HeapFree(GetProcessHeap(), 0, ObjectEntry->ObjectName);
-            }
-            HeapFree(GetProcessHeap(), 0, ObjectEntry);
+        if (ObjectEntry->ObjectName) {
+            HeapFree(GetProcessHeap(), 0, ObjectEntry->ObjectName);
         }
+        HeapFree(GetProcessHeap(), 0, ObjectEntry);
     }
 
     LeaveCriticalSection(&g_kdctx.ListLock);
@@ -1276,7 +1297,7 @@ PVOID kdQueryIopInvalidDeviceRequest(
             pHandler = drvObject.MajorFunction[IRP_MJ_CREATE_MAILSLOT];
 
             //
-            // IopInvalidDeviceRequest is an routine inside ntoskrnl.
+            // IopInvalidDeviceRequest is a routine inside ntoskrnl.
             //
             if (!kdAddressInNtOsImage(pHandler))
                 pHandler = NULL;
@@ -1477,7 +1498,6 @@ VOID pkdQuerySystemInformation(
 
                 //find KiServiceTable
                 kdFindKiServiceTable((ULONG_PTR)MappedKernel, 
-                    ModuleSize, 
                     (ULONG_PTR)Context->NtOsBase, 
                     &Context->KiServiceTableAddress, 
                     &Context->KiServiceLimit);

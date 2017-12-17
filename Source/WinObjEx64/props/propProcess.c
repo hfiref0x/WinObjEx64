@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPPROCESS.C
 *
-*  VERSION:     1.46
+*  VERSION:     1.51
 *
-*  DATE:        04 Mar 2017
+*  DATE:        02 Dec 2017
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -23,7 +23,7 @@
 //page imagelist
 HIMAGELIST ProcessImageList = NULL;
 //page listview
-HWND ProcessList = NULL;
+HWND g_hwndProcessList = NULL;
 //column to sort
 static LONG	ProcessListSortColumn = 0;
 //sort direction
@@ -49,12 +49,12 @@ INT CALLBACK ProcessListCompareFunc(
     ULONG_PTR Value1, Value2;
 
     sz1 = 0;
-    lpItem1 = supGetItemText(ProcessList, (INT)lParam1, (INT)lParamSort, &sz1);
+    lpItem1 = supGetItemText(g_hwndProcessList, (INT)lParam1, (INT)lParamSort, &sz1);
     if (lpItem1 == NULL) //can't be 0 for this dialog
         goto Done;
 
     sz2 = 0;
-    lpItem2 = supGetItemText(ProcessList, (INT)lParam2, (INT)lParamSort, &sz2);
+    lpItem2 = supGetItemText(g_hwndProcessList, (INT)lParam2, (INT)lParamSort, &sz2);
     if (lpItem2 == NULL) //can't be 0 for this dialog
         goto Done;
 
@@ -116,7 +116,7 @@ VOID ProcessShowProperties(
 
     __try {
         //query process id
-        Buffer = supGetItemText(ProcessList, iItem, 1, NULL);
+        Buffer = supGetItemText(g_hwndProcessList, iItem, 1, NULL);
         if (Buffer) {
             dwProcessId = strtoul(Buffer);
             HeapFree(GetProcessHeap(), 0, Buffer);
@@ -184,21 +184,21 @@ VOID ProcessListHandleNotify(
     case LVN_COLUMNCLICK:
         bProcessListSortInverse = !bProcessListSortInverse;
         ProcessListSortColumn = ((NMLISTVIEW *)nhdr)->iSubItem;
-        ListView_SortItemsEx(ProcessList, &ProcessListCompareFunc, ProcessListSortColumn);
+        ListView_SortItemsEx(g_hwndProcessList, &ProcessListCompareFunc, ProcessListSortColumn);
 
         RtlSecureZeroMemory(&col, sizeof(col));
         col.mask = LVCF_IMAGE;
         col.iImage = -1;
 
         for (c = 0; c < PROCESSLIST_COLUMN_COUNT; c++)
-            ListView_SetColumn(ProcessList, c, &col);
+            ListView_SetColumn(g_hwndProcessList, c, &col);
 
         if (bProcessListSortInverse)
             col.iImage = 1;
         else
             col.iImage = 2;
 
-        ListView_SetColumn(ProcessList, ((NMLISTVIEW *)nhdr)->iSubItem, &col);
+        ListView_SetColumn(g_hwndProcessList, ((NMLISTVIEW *)nhdr)->iSubItem, &col);
         break;
 
     case NM_DBLCLK:
@@ -341,7 +341,7 @@ VOID ProcessListAddItem(
     lvitem.iSubItem = 0;
     lvitem.pszText = szBuffer;
     lvitem.iItem = MAXINT;
-    nIndex = ListView_InsertItem(ProcessList, &lvitem);
+    nIndex = ListView_InsertItem(g_hwndProcessList, &lvitem);
 
     //ID
     RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
@@ -350,7 +350,7 @@ VOID ProcessListAddItem(
     lvitem.iSubItem = 1;
     lvitem.pszText = szBuffer;
     lvitem.iItem = nIndex;
-    ListView_SetItem(ProcessList, &lvitem);
+    ListView_SetItem(g_hwndProcessList, &lvitem);
 
     //Value
     RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
@@ -360,7 +360,7 @@ VOID ProcessListAddItem(
     lvitem.iSubItem = 2;
     lvitem.pszText = szBuffer;
     lvitem.iItem = nIndex;
-    ListView_SetItem(ProcessList, &lvitem);
+    ListView_SetItem(g_hwndProcessList, &lvitem);
 
     //GrantedAccess
     RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
@@ -370,7 +370,7 @@ VOID ProcessListAddItem(
     lvitem.iSubItem = 3;
     lvitem.pszText = szBuffer;
     lvitem.iItem = nIndex;
-    ListView_SetItem(ProcessList, &lvitem);
+    ListView_SetItem(g_hwndProcessList, &lvitem);
 }
 
 /*
@@ -539,7 +539,7 @@ VOID ProcessListSetInfo(
     if (pHandles) {
         HeapFree(GetProcessHeap(), 0, pHandles);
     }
-    if (ProcessList) {
+    if (ProcessesList) {
         HeapFree(GetProcessHeap(), 0, ProcessesList);
     }
     if (Context->TypeIndex == TYPE_WINSTATION && hObject) {
@@ -568,16 +568,16 @@ VOID ProcessListCreate(
 {
     LVCOLUMN col;
 
-    ProcessList = GetDlgItem(hwndDlg, ID_PROCESSLIST);
-    if (ProcessList == NULL)
+    g_hwndProcessList = GetDlgItem(hwndDlg, ID_PROCESSLIST);
+    if (g_hwndProcessList == NULL)
         return;
 
     ProcessImageList = ImageList_Create(16, 16, ILC_COLOR32 | ILC_MASK, 32, 8);
     if (ProcessImageList) {
-        ListView_SetImageList(ProcessList, ProcessImageList, LVSIL_SMALL);
+        ListView_SetImageList(g_hwndProcessList, ProcessImageList, LVSIL_SMALL);
     }
 
-    ListView_SetExtendedListViewStyle(ProcessList, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
+    ListView_SetExtendedListViewStyle(g_hwndProcessList, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
 
     RtlSecureZeroMemory(&col, sizeof(col));
     col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
@@ -586,25 +586,25 @@ VOID ProcessListCreate(
     col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
     col.iImage = 2;
     col.cx = 160;
-    ListView_InsertColumn(ProcessList, col.iSubItem, &col);
+    ListView_InsertColumn(g_hwndProcessList, col.iSubItem, &col);
 
     col.iSubItem++;
     col.pszText = TEXT("ID");
     col.iOrder++;
     col.iImage = -1;
     col.cx = 60;
-    ListView_InsertColumn(ProcessList, col.iSubItem, &col);
+    ListView_InsertColumn(g_hwndProcessList, col.iSubItem, &col);
 
     col.iSubItem++;
     col.pszText = TEXT("Handle");
     col.iOrder++;
     col.cx = 80;
-    ListView_InsertColumn(ProcessList, col.iSubItem, &col);
+    ListView_InsertColumn(g_hwndProcessList, col.iSubItem, &col);
 
     col.iSubItem++;
     col.pszText = TEXT("Access");
     col.iOrder++;
-    ListView_InsertColumn(ProcessList, col.iSubItem, &col);
+    ListView_InsertColumn(g_hwndProcessList, col.iSubItem, &col);
 }
 
 /*
@@ -761,9 +761,9 @@ INT_PTR CALLBACK ProcessListDialogProc(
             SetProp(hwndDlg, T_PROPCONTEXT, (HANDLE)Context);
 
             ProcessListCreate(hwndDlg);
-            if (ProcessList) {
+            if (g_hwndProcessList) {
                 ProcessListSetInfo(Context, hwndDlg);
-                ListView_SortItemsEx(ProcessList, &ProcessListCompareFunc, ProcessListSortColumn);
+                ListView_SortItemsEx(g_hwndProcessList, &ProcessListCompareFunc, ProcessListSortColumn);
             }
 
         }

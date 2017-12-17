@@ -34,7 +34,7 @@
 #define USERSRV_SERVERDLL_INDEX         3
 #define USERSRV_FIRST_API_NUMBER        1024
 
-#define CSR_CSRSS_SECTION_SIZE          64 * 1024
+#define CSR_CSRSS_SECTION_SIZE          65536
 
 typedef enum _ALPC_PORT_INFORMATION_CLASS
 {

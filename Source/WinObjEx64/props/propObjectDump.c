@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     1.47
+*  VERSION:     1.51
 *
-*  DATE:        21 Mar 2017
+*  DATE:        02 Dec 2017
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1773,6 +1773,10 @@ VOID ObDumpObjectType(
 
     __try {
 
+        pModulesList = supGetSystemInfo(SystemModuleInformation);
+        if (pModulesList == NULL)
+            return;
+
         bOkay = FALSE;
         cond = FALSE;
 
@@ -1790,10 +1794,6 @@ VOID ObDumpObjectType(
             g_TreeList = 0;
             g_TreeListAtom = 0;
             if (!supInitTreeListForDump(hwndDlg, &g_TreeListAtom, &g_TreeList))
-                break;
-
-            pModulesList = supGetSystemInfo(SystemModuleInformation);
-            if (pModulesList == NULL)
                 break;
 
             bOkay = TRUE;

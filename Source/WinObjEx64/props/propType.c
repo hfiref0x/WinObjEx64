@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPTYPE.C
 *
-*  VERSION:     1.50
+*  VERSION:     1.51
 *
-*  DATE:        10 Aug 2017
+*  DATE:        02 Dec 2017
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -253,10 +253,12 @@ VOID propSetTypeDecodeValue(
     }
 
     //list for selected type
-    for (i = 0; i < Count; i++) {
-        if (Value & Desc[i].dwValue) {
-            propSetTypeFlagValue(hListView, Desc[i].lpDescription, Desc[i].dwValue);
-            Value &= ~Desc[i].dwValue;
+    if (Desc) {
+        for (i = 0; i < Count; i++) {
+            if (Value & Desc[i].dwValue) {
+                propSetTypeFlagValue(hListView, Desc[i].lpDescription, Desc[i].dwValue);
+                Value &= ~Desc[i].dwValue;
+            }
         }
     }
 

@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     1.50
+*  VERSION:     1.51
 *
-*  DATE:        10 Aug 2017
+*  DATE:        02 Dec 2017
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -41,26 +41,27 @@ INT CALLBACK SdtDlgCompareFunc(
     LPWSTR    lpItem1 = NULL, lpItem2 = NULL;
     ULONG     id1, id2;
     ULONG_PTR ad1, ad2;
-    SIZE_T ItemLength1 = 0, ItemLength2 = 0;
+
+    SIZE_T cbItem1 = 0, cbItem2 = 0;
+
+    USHORT AddressPrefix;
 
     lpItem1 = supGetItemText(
         DlgContext.ListView, 
         (INT)lParam1, 
-        (INT)lParamSort, &ItemLength1);
-
-    ItemLength1 /= sizeof(WCHAR);
+        (INT)lParamSort, 
+        &cbItem1);
 
     lpItem2 = supGetItemText(
         DlgContext.ListView, 
         (INT)lParam2, 
         (INT)lParamSort, 
-        &ItemLength2);
+        &cbItem2);
 
-    ItemLength2 /= sizeof(WCHAR);
-
-    if ((lpItem1 == NULL) && (lpItem2 == NULL)) {
-        nResult = 0;
-        goto Done;
+    if ((lpItem1 == NULL) &&
+        (lpItem2 == NULL))
+    {
+        return 0;
     }
 
     if ((lpItem1 == NULL) && (lpItem2 != NULL)) {
@@ -87,19 +88,32 @@ INT CALLBACK SdtDlgCompareFunc(
 
     case 2: //sort Address
 
-        if ((ItemLength1 > 1) && (ItemLength2 > 1)) {
-
-            ad1 = hextou64(&lpItem1[2]);
-            ad2 = hextou64(&lpItem2[2]);
-
-            if (DlgContext.bInverseSort)
-                nResult = ad1 < ad2;
-            else
-                nResult = ad1 > ad2;
-
-        }
-        else
+        if ((cbItem1 / sizeof(WCHAR) != MAX_ADDRESS_TEXT_LENGTH) &&
+            (cbItem2 / sizeof(WCHAR) != MAX_ADDRESS_TEXT_LENGTH))
+        {
             nResult = 0;
+            break;
+        }
+
+        ad1 = 0;
+        ad2 = 0;
+
+        if (lpItem1) {
+            AddressPrefix = supIsAddressPrefix(lpItem1, cbItem1);
+            if (AddressPrefix == 2)
+                ad1 = hextou64(&lpItem1[AddressPrefix]);
+        }
+
+        if (lpItem2) {
+            AddressPrefix = supIsAddressPrefix(lpItem2, cbItem2);
+            if (AddressPrefix == 2)
+                ad2 = hextou64(&lpItem2[AddressPrefix]);
+        }
+
+        if (DlgContext.bInverseSort)
+            nResult = ad1 < ad2;
+        else
+            nResult = ad1 > ad2;
 
         break;
 
@@ -424,18 +438,18 @@ VOID SdtListTable(
             }
 
         } while (cond);
+
+        if (pModules) {
+            HeapFree(GetProcessHeap(), 0, pModules);
+        }
+
+        if (Dump) {
+            HeapFree(GetProcessHeap(), 0, Dump);
+        }
     }
 
     __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
         return;
-    }
-
-    if (pModules) {
-        HeapFree(GetProcessHeap(), 0, pModules);
-    }
-
-    if (Dump) {
-        HeapFree(GetProcessHeap(), 0, Dump);
     }
 }
 

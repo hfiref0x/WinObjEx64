@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.50
+*  VERSION:     1.51
 *
-*  DATE:        10 Aug 2017
+*  DATE:        02 Dec 2017
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1438,7 +1438,7 @@ PVOID supCreateSCMSnapshot(
 
         // also return actual number of services
         if (lpNumberOfEntries) {
-            *lpNumberOfEntries = dwServicesReturned;
+            *lpNumberOfEntries = (SIZE_T)dwServicesReturned;
         }
 
         CloseServiceHandle(schSCManager);
@@ -1585,11 +1585,9 @@ VOID sapiFreeSnapshot(
         if (pObj->sapiDBHead.Flink == NULL) break;
         Entry = CONTAINING_RECORD(pObj->sapiDBHead.Flink, SAPIDBENTRY, ListEntry);
         RemoveEntryList(pObj->sapiDBHead.Flink);
-        if (Entry) {
-            if (Entry->lpDeviceDesc) HeapFree(GetProcessHeap(), 0, Entry->lpDeviceDesc);
-            if (Entry->lpDeviceName) HeapFree(GetProcessHeap(), 0, Entry->lpDeviceName);
-            HeapFree(GetProcessHeap(), 0, Entry);
-        }
+        if (Entry->lpDeviceDesc) HeapFree(GetProcessHeap(), 0, Entry->lpDeviceDesc);
+        if (Entry->lpDeviceName) HeapFree(GetProcessHeap(), 0, Entry->lpDeviceName);
+        HeapFree(GetProcessHeap(), 0, Entry);
     }
 
     LeaveCriticalSection(&pObj->objCS);
@@ -1648,6 +1646,20 @@ BOOL WINAPI supEnumHideChildWindows(
 #define T_WINSTA_LOCALSERVICE L"-0x0-3e5$"
 #define T_WINSTA_NETWORK_SERVICE L"-0x0-3e4$"
 
+typedef struct _WINSTA_DESC_ARRAY {
+    LPWSTR lpszWinSta;
+    LPWSTR lpszDesc;
+} WINSTA_DESC_ARRAY, *PWINSTA_DESC_ARRAY;
+
+#define MAX_KNOWN_WINSTA_DESCRIPTIONS 4
+
+WINSTA_DESC_ARRAY g_WinstaDescArray[MAX_KNOWN_WINSTA_DESCRIPTIONS] = {
+    { T_WINSTA_SYSTEM, L"System" },
+    { T_WINSTA_ANONYMOUS, L"Anonymous" },
+    { T_WINSTA_LOCALSERVICE, L"Local Service" },
+    { T_WINSTA_NETWORK_SERVICE, L"Network Service" }
+};
+
 /*
 * supQueryWinstationDescription
 *
@@ -1667,33 +1679,30 @@ BOOL supQueryWinstationDescription(
     BOOL   bFound = FALSE;
     LPWSTR lpType;
 
+    ULONG entryId;
+
     if ((lpWindowStationName == NULL) || (Buffer == NULL) || (ccBuffer < MAX_PATH))
         return bFound;
 
     lpType = NULL;
-    if (_strstri(lpWindowStationName, T_WINSTA_SYSTEM) != NULL) {
-        lpType = L"System";
-        bFound = TRUE;
-        goto Done;
+
+    for (entryId = 0; entryId < MAX_KNOWN_WINSTA_DESCRIPTIONS; entryId++) {
+        
+        if (_strstri(lpWindowStationName, 
+            g_WinstaDescArray[entryId].lpszWinSta) != NULL) 
+        {
+            lpType = g_WinstaDescArray[entryId].lpszDesc;
+            bFound = TRUE;
+            break;
+        }
+
     }
-    if (_strstri(lpWindowStationName, T_WINSTA_ANONYMOUS) != NULL) {
-        lpType = L"Anonymous";
-        bFound = TRUE;
-        goto Done;
-    }
-    if (_strstri(lpWindowStationName, T_WINSTA_LOCALSERVICE) != NULL) {
-        lpType = L"Local Service";
-        bFound = TRUE;
-        goto Done;
-    }
-    if (_strstri(lpWindowStationName, T_WINSTA_NETWORK_SERVICE) != NULL) {
-        lpType = L"Network Service";
-        bFound = TRUE;
-    }
-Done:
-    if (bFound) {
-        wsprintf(Buffer, L"%s logon session", lpType);
-    }
+
+    if (lpType == NULL)
+        lpType = T_UnknownType;
+
+    wsprintf(Buffer, L"%s logon session", lpType);
+
     return bFound;
 }
 
@@ -2701,4 +2710,49 @@ BOOL supIsWine(
     }
 
     return FALSE;
+}
+
+typedef union {
+    WCHAR Name[sizeof(DWORD) / sizeof(WCHAR)];
+    DWORD Alignment;
+} DWORDALIGNEDNAME;
+
+const DWORDALIGNEDNAME AddressNamePrefixLowCase = { L'0', L'x' };
+const DWORDALIGNEDNAME AddressNamePrefixUpCase = { L'0', L'X' };
+const UNICODE_STRING AddressNameLowCase = {
+    sizeof(AddressNamePrefixLowCase),
+    sizeof(AddressNamePrefixLowCase),
+    (PWSTR)&AddressNamePrefixLowCase
+};
+const UNICODE_STRING AddressNameUpCase = {
+    sizeof(AddressNamePrefixUpCase),
+    sizeof(AddressNamePrefixUpCase),
+    (PWSTR)&AddressNamePrefixUpCase
+};
+
+/*
+* supIsAddressPrefix
+*
+* Purpose:
+*
+* Return offset to Address name in case if given lpName is in Address Prefix Format.
+*
+*/
+USHORT supIsAddressPrefix(
+    _In_ LPWSTR lpName,
+    _In_ SIZE_T cbName
+)
+{
+    if ((cbName >= AddressNameLowCase.Length) &&
+        (*(PDWORD)(lpName) == AddressNamePrefixLowCase.Alignment)) 
+    {
+        return AddressNameLowCase.Length / sizeof(WCHAR);
+    }
+    if ((cbName >= AddressNameUpCase.Length) &&
+        (*(PDWORD)(lpName) == AddressNamePrefixUpCase.Alignment))
+    {
+        return AddressNameUpCase.Length / sizeof(WCHAR);
+    }
+
+    return 0;
 }

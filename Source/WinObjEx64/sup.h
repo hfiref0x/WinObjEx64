@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.46
+*  VERSION:     1.51
 *
-*  DATE:        02 Mar 2017
+*  DATE:        02 Dec 2017
 *
 *  Common header file for the program support routines.
 *
@@ -40,8 +40,8 @@ typedef struct _ENUMICONINFO {
 //
 // Type icons starts from 300
 //
-#define ID_FROM_VALUE(id) (id - 300)
-#define ID_TO_VALUE(id) (id + 300)
+#define ID_FROM_VALUE(id) ((id) - 300)
+#define ID_TO_VALUE(id) ((id) + 300)
 
 #define GET_BIT(Integer, Bit) (((Integer) >> (Bit)) & 0x1)
 #define SET_BIT(Integer, Bit) ((Integer) |= 1 << (Bit))
@@ -339,6 +339,11 @@ BOOL supGetWin32FileName(
 
 BOOL supIsWine(
     VOID
+);
+
+USHORT supIsAddressPrefix(
+    _In_ LPWSTR lpName,
+    _In_ SIZE_T cbName
 );
 
 #define PathFileExists(lpszPath) (GetFileAttributes(lpszPath) != (DWORD)-1)

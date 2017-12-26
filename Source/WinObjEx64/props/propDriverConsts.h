@@ -20,4 +20,4 @@
 
 #define REGEDITWNDCLASS           L"RegEdit_RegEdit"
 #define PROPDRVREGSERVICESKEY     L"\\HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\%ws"
-#define PROPDRVREGSERVICESKEYLEN  sizeof(REGISTRYSERVICESKEY) - sizeof(WCHAR)
+#define PROPDRVREGSERVICESKEYLEN  sizeof(PROPDRVREGSERVICESKEY) - sizeof(WCHAR)

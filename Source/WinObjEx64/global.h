@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.51
+*  VERSION:     1.52
 *
-*  DATE:        02 Dec 2017
+*  DATE:        08 Jan 2018
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -65,7 +65,6 @@
 #include "ntos\ntalpc.h"
 #include "objects.h"
 #include "kldbg.h"
-#include "ldr\ldr.h"
 #include "ui.h"
 #include "sup.h"
 #include "supConsts.h"
@@ -76,5 +75,18 @@
 #include "tests\testunit.h"
 #include "resource.h"
 
-//project global variable
-HINSTANCE g_hInstance;
+typedef struct _WINOBJ_GLOBALS {
+    HINSTANCE hInstance;
+    HANDLE Heap;
+    HANDLE hNtdllModule;
+    LPWSTR CurrentObjectPath;
+    pfnHtmlHelpW HtmlHelpW;
+    HWND AuxDialogs[WOBJ_MAX_DIALOGS];
+    CRITICAL_SECTION Lock;
+    RTL_OSVERSIONINFOW osver;
+    WCHAR szTempDirectory[MAX_PATH + 1]; //not including backslash
+    WCHAR szWindowsDirectory[MAX_PATH + 1]; //not including backslash
+    WCHAR szSystemDirectory[MAX_PATH + 1]; //not including backslash
+} WINOBJ_GLOBALS, *PWINOBJ_GLOBALS;
+
+WINOBJ_GLOBALS g_WinObj;

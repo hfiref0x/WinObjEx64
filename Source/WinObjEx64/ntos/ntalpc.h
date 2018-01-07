@@ -1,12 +1,12 @@
 /************************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017, translated from Microsoft sources/debugger
+*  (C) COPYRIGHT AUTHORS, 2017 - 2018, translated from Microsoft sources/debugger
 *
 *  TITLE:       NTALPC.H
 *
-*  VERSION:     1.62
+*  VERSION:     1.80
 *
-*  DATE:        21 Mar 2017
+*  DATE:        08 Jan 2018
 *
 *  Common header file for the ntos ALPC/CSR related functions and definitions.
 *
@@ -36,8 +36,7 @@
 
 #define CSR_CSRSS_SECTION_SIZE          65536
 
-typedef enum _ALPC_PORT_INFORMATION_CLASS
-{
+typedef enum _ALPC_PORT_INFORMATION_CLASS {
     AlpcBasicInformation,
     AlpcPortInformation,
     AlpcAssociateCompletionPortInformation,
@@ -48,11 +47,12 @@ typedef enum _ALPC_PORT_INFORMATION_CLASS
     AlpcUnregisterCompletionListInformation,
     AlpcAdjustCompletionListConcurrencyCountInformation,
     AlpcRegisterCallbackInformation,
-    AlpcCompletionListRundownInformation
+    AlpcCompletionListRundownInformation,
+    AlpcWaitForPortReferences,
+    MaxAlpcInformation
 } ALPC_PORT_INFORMATION_CLASS;
 
-typedef struct _ALPC_SERVER_INFORMATION
-{
+typedef struct _ALPC_SERVER_INFORMATION {
     union
     {
         struct
@@ -68,8 +68,7 @@ typedef struct _ALPC_SERVER_INFORMATION
     };
 } ALPC_SERVER_INFORMATION, *PALPC_SERVER_INFORMATION;
 
-typedef struct _ALPC_PORT_ATTRIBUTES
-{
+typedef struct _ALPC_PORT_ATTRIBUTES {
     ULONG Flags;
     SECURITY_QUALITY_OF_SERVICE SecurityQos;
     SIZE_T MaxMessageLength;
@@ -84,17 +83,24 @@ typedef struct _ALPC_PORT_ATTRIBUTES
 #endif
 } ALPC_PORT_ATTRIBUTES, *PALPC_PORT_ATTRIBUTES;
 
-typedef struct _ALPC_BASIC_INFORMATION
-{
+typedef struct _ALPC_BASIC_INFORMATION {
     ULONG Flags;
     ULONG SequenceNo;
     PVOID PortContext;
 } ALPC_BASIC_INFORMATION, *PALPC_BASIC_INFORMATION;
 
+NTSTATUS NTAPI NtAlpcCreatePort(
+    _Out_ PHANDLE PortHandle,
+    _In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
+    _In_opt_ PALPC_PORT_ATTRIBUTES PortAttributes);
+
+NTSTATUS NTAPI NtAlpcDisconnectPort(
+    _In_ HANDLE PortHandle,
+    _In_ ULONG Flags);
+
 NTSTATUS NTAPI NtAlpcQueryInformation(
-    __in HANDLE                      PortHandle,
-    __in ALPC_PORT_INFORMATION_CLASS PortInformationClass,
-    __out_bcount(Length) PVOID       PortInformation,
-    __in ULONG                       Length,
-    __out_opt PULONG                 ReturnLength
-);
+    _In_ HANDLE PortHandle,
+    _In_ ALPC_PORT_INFORMATION_CLASS PortInformationClass,
+    _Inout_updates_bytes_to_(Length, *ReturnLength) PVOID PortInformation,
+    _In_ ULONG Length,
+    _Out_opt_ PULONG ReturnLength);

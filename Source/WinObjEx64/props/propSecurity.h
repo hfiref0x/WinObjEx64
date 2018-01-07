@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       PROPSECURITY.H
 *
-*  VERSION:     1.45
+*  VERSION:     1.52
 *
-*  DATE:        11 Jan 2017
+*  DATE:        08 Jan 2018
 *
 *  Common header file for Security property sheet.
 *
@@ -25,9 +25,9 @@ typedef struct _ObjectSecurityVtbl ObjectSecurityVtbl, *PObjectSecurityVtbl;
 
 //custom open object method
 typedef BOOL(CALLBACK *POPENOBJECTMETHOD)(
-    _In_	PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO *Context,
     _Inout_ PHANDLE	phObject,
-    _In_	ACCESS_MASK	DesiredAccess
+    _In_ ACCESS_MASK DesiredAccess
     );
 
 //future use, currently the same as propDefaultCloseObject
@@ -54,47 +54,73 @@ typedef struct _IObjectSecurity {
 
 //Vtbl prototypes
 
-typedef HRESULT(STDMETHODCALLTYPE *pQueryInterface)(IObjectSecurity * This, REFIID riid, void **ppvObject);
-typedef ULONG(STDMETHODCALLTYPE *pAddRef)(IObjectSecurity * This);
-typedef ULONG(STDMETHODCALLTYPE *pRelease)(IObjectSecurity * This);
+typedef HRESULT(STDMETHODCALLTYPE *pQueryInterface)(
+    _In_ IObjectSecurity * This,
+    _In_ REFIID riid,
+    _Out_ void **ppvObject);
+
+typedef ULONG(STDMETHODCALLTYPE *pAddRef)(
+    _In_ IObjectSecurity * This);
+
+typedef ULONG(STDMETHODCALLTYPE *pRelease)(
+    _In_ IObjectSecurity * This);
 
 // *** ISecurityInformation methods ***
-typedef HRESULT(STDMETHODCALLTYPE *pGetObjectInformation)(IObjectSecurity * This, PSI_OBJECT_INFO pObjectInfo);
+typedef HRESULT(STDMETHODCALLTYPE *pGetObjectInformation)(
+    _In_ IObjectSecurity * This,
+    _Out_ PSI_OBJECT_INFO pObjectInfo);
 
-typedef HRESULT(STDMETHODCALLTYPE *pGetSecurity)(IObjectSecurity * This, SECURITY_INFORMATION RequestedInformation,
-    PSECURITY_DESCRIPTOR *ppSecurityDescriptor, BOOL fDefault);
+typedef HRESULT(STDMETHODCALLTYPE *pGetSecurity)(
+    _In_ IObjectSecurity * This,
+    _In_ SECURITY_INFORMATION RequestedInformation,
+    _Out_ PSECURITY_DESCRIPTOR *ppSecurityDescriptor,
+    _In_ BOOL fDefault);
 
-typedef HRESULT(STDMETHODCALLTYPE *pSetSecurity)(IObjectSecurity * This, SECURITY_INFORMATION SecurityInformation,
-    PSECURITY_DESCRIPTOR pSecurityDescriptor);
+typedef HRESULT(STDMETHODCALLTYPE *pSetSecurity)(
+    _In_ IObjectSecurity * This,
+    _In_ SECURITY_INFORMATION SecurityInformation,
+    _In_ PSECURITY_DESCRIPTOR pSecurityDescriptor);
 
-typedef HRESULT(STDMETHODCALLTYPE *pGetAccessRights)(IObjectSecurity * This, const GUID* pguidObjectType,
-    DWORD dwFlagsB, PSI_ACCESS *ppAccess, ULONG *pcAccesses, ULONG *piDefaultAccess);
+typedef HRESULT(STDMETHODCALLTYPE *pGetAccessRights)(
+    _In_ IObjectSecurity * This,
+    _In_ const GUID* pguidObjectType,
+    _In_ DWORD dwFlags,
+    _Out_ PSI_ACCESS *ppAccess,
+    _Out_ ULONG *pcAccesses,
+    _Out_ ULONG *piDefaultAccess);
 
-typedef HRESULT(STDMETHODCALLTYPE *pMapGeneric)(IObjectSecurity * This, const GUID *pguidObjectType,
-    UCHAR *pAceFlags, ACCESS_MASK *pMask);
+typedef HRESULT(STDMETHODCALLTYPE *pMapGeneric)(
+    _In_ IObjectSecurity * This,
+    _In_ const GUID *pguidObjectType,
+    _In_ UCHAR *pAceFlags,
+    _In_ ACCESS_MASK *pMask);
 
-typedef HRESULT(STDMETHODCALLTYPE *pGetInheritTypes)(IObjectSecurity * This, PSI_INHERIT_TYPE *ppInheritTypes,
-    ULONG *pcInheritTypes);
+typedef HRESULT(STDMETHODCALLTYPE *pGetInheritTypes)(
+    _In_ IObjectSecurity * This,
+    _Out_ PSI_INHERIT_TYPE *ppInheritTypes,
+    _Out_ ULONG *pcInheritTypes);
 
-typedef HRESULT(STDMETHODCALLTYPE *pPropertySheetPageCallback)(IObjectSecurity * This, HWND hwnd,
-    UINT uMsg, SI_PAGE_TYPE uPage);
+typedef HRESULT(STDMETHODCALLTYPE *pPropertySheetPageCallback)(
+    _In_ IObjectSecurity * This,
+    _In_ HWND hwnd,
+    _In_ UINT uMsg,
+    _In_ SI_PAGE_TYPE uPage);
 
 typedef struct _ObjectSecurityVtbl {
-    pQueryInterface				QueryInterface;
-    pAddRef						AddRef;
-    pRelease					Release;
-    pGetObjectInformation		GetObjectInformation;
-    pGetSecurity				GetSecurity;
-    pSetSecurity				SetSecurity;
-    pGetAccessRights			GetAccessRights;
-    pMapGeneric					MapGeneric;
-    pGetInheritTypes			GetInheritTypes;
-    pPropertySheetPageCallback	PropertySheetPageCallback;
+    pQueryInterface             QueryInterface;
+    pAddRef                     AddRef;
+    pRelease                    Release;
+    pGetObjectInformation       GetObjectInformation;
+    pGetSecurity                GetSecurity;
+    pSetSecurity                SetSecurity;
+    pGetAccessRights            GetAccessRights;
+    pMapGeneric                 MapGeneric;
+    pGetInheritTypes            GetInheritTypes;
+    pPropertySheetPageCallback  PropertySheetPageCallback;
 } ObjectSecurityVtbl, *PObjectSecurityVtbl;
 
 HPROPSHEETPAGE propSecurityCreatePage(
-    _In_		PROP_OBJECT_INFO *Context,
-    _In_		POPENOBJECTMETHOD OpenObjectMethod,
-    _In_opt_	PCLOSEOBJECTMETHOD CloseObjectMethod,
-    _In_		ULONG psiFlags
-);
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ POPENOBJECTMETHOD OpenObjectMethod,
+    _In_opt_ PCLOSEOBJECTMETHOD CloseObjectMethod,
+    _In_ ULONG psiFlags);

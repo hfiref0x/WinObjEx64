@@ -16,9 +16,6 @@
     <Filter Include="minirtl">
       <UniqueIdentifier>{1f87af63-dc0b-4a32-88ee-e9e15a1041c8}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ldr">
-      <UniqueIdentifier>{26b58504-6440-41a5-9f49-307f33ed8630}</UniqueIdentifier>
-    </Filter>
     <Filter Include="hde">
       <UniqueIdentifier>{b8b6096c-f90d-41f3-a643-a53ee0fae82b}</UniqueIdentifier>
     </Filter>
@@ -37,7 +34,7 @@
     <Filter Include="Header Files\props">
       <UniqueIdentifier>{cab45665-92a9-4c9f-b47c-a1a940fb17c4}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\ntos">
+    <Filter Include="ntos">
       <UniqueIdentifier>{621f3500-b7f1-418f-8901-7eff2d8c3a2d}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -137,9 +134,6 @@
     </ClCompile>
     <ClCompile Include="minirtl\ultostr.c">
       <Filter>minirtl</Filter>
-    </ClCompile>
-    <ClCompile Include="ldr\ldr.c">
-      <Filter>ldr</Filter>
     </ClCompile>
     <ClCompile Include="hde\hde64.c">
       <Filter>hde</Filter>
@@ -241,9 +235,6 @@
     <ClInclude Include="minirtl\rtltypes.h">
       <Filter>minirtl</Filter>
     </ClInclude>
-    <ClInclude Include="ldr\ldr.h">
-      <Filter>ldr</Filter>
-    </ClInclude>
     <ClInclude Include="hde\hde64.h">
       <Filter>hde</Filter>
     </ClInclude>
@@ -317,13 +308,13 @@
       <Filter>Header Files\props</Filter>
     </ClInclude>
     <ClInclude Include="ntos\ntos.h">
-      <Filter>Header Files\ntos</Filter>
+      <Filter>ntos</Filter>
     </ClInclude>
     <ClInclude Include="extras\extrasIPC.h">
       <Filter>Header Files\extras</Filter>
     </ClInclude>
     <ClInclude Include="ntos\ntalpc.h">
-      <Filter>Header Files\ntos</Filter>
+      <Filter>ntos</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

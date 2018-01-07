@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2016
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       PROPDESKTOP.H
 *
-*  VERSION:     1.44
+*  VERSION:     1.52
 *
-*  DATE:        17 July 2016
+*  DATE:        08 Jan 2018
 *
 *  Common header file for Desktops property sheet.
 *
@@ -19,8 +19,7 @@
 #pragma once
 
 INT_PTR CALLBACK DesktopListDialogProc(
-    _In_  HWND hwndDlg,
-    _In_  UINT uMsg,
-    _In_  WPARAM wParam,
-    _In_  LPARAM lParam
-);
+    _In_ HWND hwndDlg,
+    _In_ UINT uMsg,
+    _In_ WPARAM wParam,
+    _In_ LPARAM lParam);

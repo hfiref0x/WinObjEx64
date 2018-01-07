@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       PROPOBJECTDUMP.H
 *
-*  VERSION:     1.46
+*  VERSION:     1.52
 *
-*  DATE:        05 Mar 2017
+*  DATE:        08 Jan 2018
 *
 *  Common header file for the object dump support.
 *
@@ -20,79 +20,69 @@
 
 VOID ObDumpDriverObject(
     _In_ PROP_OBJECT_INFO *Context,
-    _In_ HWND hwndDlg
-);
+    _In_ HWND hwndDlg);
 
 VOID ObDumpDeviceObject(
     _In_ PROP_OBJECT_INFO *Context,
-    _In_ HWND hwndDlg
-);
+    _In_ HWND hwndDlg);
 
 VOID ObDumpDirectoryObject(
     _In_ PROP_OBJECT_INFO *Context,
-    _In_ HWND hwndDlg
-);
+    _In_ HWND hwndDlg);
 
 INT_PTR CALLBACK ObjectDumpDialogProc(
     _In_  HWND hwndDlg,
     _In_  UINT uMsg,
     _In_  WPARAM wParam,
-    _In_  LPARAM lParam
-);
+    _In_  LPARAM lParam);
 
 VOID ObDumpUlong(
-    HWND TreeList,
-    HTREEITEM hParent,
-    LPWSTR lpszName,
-    LPWSTR lpszDesc,
-    ULONG Value,
-    BOOL HexDump,
-    BOOL IsUShort,
-    COLORREF BgColor,
-    COLORREF FontColor
-);
+    _In_ HWND TreeList,
+    _In_ HTREEITEM hParent,
+    _In_ LPWSTR lpszName,
+    _In_opt_ LPWSTR lpszDesc, //additional text to be displayed
+    _In_ ULONG Value,
+    _In_ BOOL HexDump,
+    _In_ BOOL IsUShort,
+    _In_opt_ COLORREF BgColor,
+    _In_opt_ COLORREF FontColor);
 
 VOID ObDumpByte(
-    HWND TreeList,
-    HTREEITEM hParent,
-    LPWSTR lpszName,
-    LPWSTR lpszDesc,
-    BYTE Value,
-    COLORREF BgColor,
-    COLORREF FontColor,
-    BOOL IsBool
-);
+    _In_ HWND TreeList,
+    _In_ HTREEITEM hParent,
+    _In_ LPWSTR lpszName,
+    _In_opt_ LPWSTR lpszDesc,
+    _In_ BYTE Value,
+    _In_opt_ COLORREF BgColor,
+    _In_opt_ COLORREF FontColor,
+    _In_ BOOL IsBool);
 
 VOID ObDumpAddress(
-    HWND TreeList,
-    HTREEITEM hParent,
-    LPWSTR lpszName,
-    LPWSTR lpszDesc,
-    PVOID Address,
-    COLORREF BgColor,
-    COLORREF FontColor
-);
+    _In_ HWND TreeList,
+    _In_ HTREEITEM hParent,
+    _In_ LPWSTR lpszName,
+    _In_opt_ LPWSTR lpszDesc,
+    _In_opt_ PVOID Address,
+    _In_ COLORREF BgColor,
+    _In_ COLORREF FontColor);
 
 VOID ObDumpULargeInteger(
-    HWND TreeList,
-    HTREEITEM hParent,
-    LPWSTR ListEntryName,
-    PULARGE_INTEGER Value
-);
+    _In_ HWND TreeList,
+    _In_ HTREEITEM hParent,
+    _In_ LPWSTR ListEntryName,
+    _In_opt_ PULARGE_INTEGER Value);
 
 VOID ObDumpListEntry(
-    HWND TreeList,
-    HTREEITEM hParent,
-    LPWSTR ListEntryName,
-    PLIST_ENTRY ListEntry
-);
+    _In_ HWND TreeList,
+    _In_ HTREEITEM hParent,
+    _In_ LPWSTR ListEntryName,
+    _In_opt_ PLIST_ENTRY ListEntry);
 
 HTREEITEM TreeListAddItem(
-    HWND TreeList,
-    HTREEITEM hParent,
-    UINT mask,
-    UINT state,
-    UINT stateMask,
-    LPWSTR pszText,
-    PVOID subitems
-);
+    _In_ HWND TreeList,
+    _In_opt_ HTREEITEM hParent,
+    _In_ UINT mask,
+    _In_ UINT state,
+    _In_ UINT stateMask,
+    _In_opt_ LPWSTR pszText,
+    _In_opt_ PVOID subitems);

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       OBJECTS.H
 *
-*  VERSION:     1.50
+*  VERSION:     1.52
 *
-*  DATE:        20 June 2017
+*  DATE:        08 Jan 2018
 *
 *  Header file for internal Windows objects handling.
 *

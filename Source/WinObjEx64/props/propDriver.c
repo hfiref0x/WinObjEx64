@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       PROPDRIVER.C
 *
-*  VERSION:     1.46
+*  VERSION:     1.52
 *
-*  DATE:        04 Mar 2017
+*  DATE:        08 Jan 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -15,6 +15,7 @@
 *
 *******************************************************************************/
 #include "global.h"
+#include "supConsts.h"
 #include "propDriverConsts.h"
 #include "propObjectDump.h"
 
@@ -27,8 +28,8 @@
 *
 */
 BOOL WINAPI DriverShowChildWindows(
-    _In_  HWND hwnd,
-    _In_  LPARAM lParam
+    _In_ HWND hwnd,
+    _In_ LPARAM lParam
 )
 {
     ShowWindow(hwnd, (INT)lParam);
@@ -44,57 +45,44 @@ BOOL WINAPI DriverShowChildWindows(
 *
 */
 VOID DriverSetInfo(
-    PROP_OBJECT_INFO *Context,
-    HWND hwndDlg
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ HWND hwndDlg
 )
 {
-    BOOL                    cond = FALSE, bResult, fGroup, bRet;
+    BOOL                    cond = FALSE, bResult = FALSE, fGroup, bRet;
     INT                     nEndOfList, nEnd, nStart;
     DWORD                   i, bytesNeeded, dwServices, dwGroups;
     LPWSTR                  lpType;
-    SC_HANDLE               SchSCManager, schService;
+    SC_HANDLE               SchSCManager = NULL, schService = NULL;
     LPENUM_SERVICE_STATUS   lpDependencies = NULL;
-    LPQUERY_SERVICE_CONFIG  psci;
+    LPQUERY_SERVICE_CONFIG  psci = NULL;
     LPSERVICE_DESCRIPTION   psd;
     SERVICE_STATUS_PROCESS  ssp;
     ENUM_SERVICE_STATUS     ess;
     WCHAR                   szBuffer[MAX_PATH + 1];
 
-    if (Context == NULL) {
-        ShowWindow(GetDlgItem(hwndDlg, IDC_QUERYFAIL), TRUE);
-        return;
-    }
-
     __try {
 
         ShowWindow(GetDlgItem(hwndDlg, IDC_QUERYFAIL), FALSE);
 
-        psci = NULL;
-        SchSCManager = NULL;
-        bResult = FALSE;
-
         do {
             SchSCManager = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT | SC_MANAGER_ENUMERATE_SERVICE);
-            if (SchSCManager == NULL) {
+            if (SchSCManager == NULL)
                 break;
-            }
 
             schService = OpenService(SchSCManager, Context->lpObjectName,
                 SERVICE_QUERY_CONFIG | SERVICE_QUERY_STATUS | SERVICE_ENUMERATE_DEPENDENTS);
-            if (schService == NULL) {
+            if (schService == NULL)
                 break;
-            }
 
             bytesNeeded = 0;
             bResult = QueryServiceConfig(schService, NULL, 0, &bytesNeeded);
-            if ((bResult == FALSE) && (bytesNeeded == 0)) {
+            if ((bResult == FALSE) && (bytesNeeded == 0))
                 break;
-            }
 
-            psci = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytesNeeded);
-            if (psci == NULL) {
+            psci = supHeapAlloc(bytesNeeded);
+            if (psci == NULL)
                 break;
-            }
 
             //disable comboboxes
             EnableWindow(GetDlgItem(hwndDlg, IDC_SERVICE_DEPENDENTSERVICES), FALSE);
@@ -233,15 +221,15 @@ VOID DriverSetInfo(
                 bRet = FALSE;
                 SetDlgItemText(hwndDlg, ID_SERVICE_DESCRIPTION, L"");
                 bytesNeeded = 0x1000;
-                psd = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytesNeeded);
+                psd = supHeapAlloc(bytesNeeded);
                 if (psd) {
 
                     bRet = QueryServiceConfig2(schService, SERVICE_CONFIG_DESCRIPTION,
                         (LPBYTE)psd, bytesNeeded, &bytesNeeded);
 
                     if ((bRet == FALSE) && (bytesNeeded != 0)) {
-                        HeapFree(GetProcessHeap(), 0, psd);
-                        psd = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytesNeeded);
+                        supHeapFree(psd);
+                        psd = supHeapAlloc(bytesNeeded);
                     }
                     if (psd) {
                         //set description or hide window
@@ -251,7 +239,7 @@ VOID DriverSetInfo(
                         if (bRet) {
                             SetDlgItemText(hwndDlg, IDC_SERVICE_DESCRIPTION, psd->lpDescription);
                         }
-                        HeapFree(GetProcessHeap(), 0, psd);
+                        supHeapFree(psd);
                     }
                 }
                 if (bRet == FALSE) {
@@ -329,49 +317,60 @@ VOID DriverSetInfo(
                     bRet = FALSE;
 
                     //avoid SCM unexpected behaviour by using preallocated buffer
-                    lpDependencies = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytesNeeded);
+                    lpDependencies = supHeapAlloc(bytesNeeded);
                     if (lpDependencies) {
+
                         bRet = EnumDependentServices(schService, SERVICE_STATE_ALL, lpDependencies,
                             bytesNeeded, &bytesNeeded, &dwServices);
 
                         if (bRet && (GetLastError() == ERROR_MORE_DATA)) {
                             //more memory needed for enum
-                            HeapFree(GetProcessHeap(), 0, lpDependencies);
+                            supHeapFree(lpDependencies);
                             dwServices = 0;
-                            lpDependencies = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytesNeeded);
+                            lpDependencies = supHeapAlloc(bytesNeeded);
                             if (lpDependencies) {
-                                bRet = EnumDependentServices(schService, SERVICE_STATE_ALL,
-                                    lpDependencies, bytesNeeded, &bytesNeeded,
+
+                                bRet = EnumDependentServices(schService,
+                                    SERVICE_STATE_ALL,
+                                    lpDependencies,
+                                    bytesNeeded,
+                                    &bytesNeeded,
                                     &dwServices);
+
                             }
                         }
-                        //list dependents
-                        if (bRet && dwServices) {
-                            for (i = 0; i < dwServices; i++) {
-                                ess = *(lpDependencies + i);
-                                SendDlgItemMessage(hwndDlg, IDC_SERVICE_DEPENDENTSERVICES, CB_ADDSTRING,
-                                    (WPARAM)0, (LPARAM)ess.lpServiceName);
+
+                        if (lpDependencies) {
+                            //list dependents
+                            if (bRet && dwServices) {
+                                for (i = 0; i < dwServices; i++) {
+                                    ess = *(lpDependencies + i);
+                                    SendDlgItemMessage(hwndDlg, IDC_SERVICE_DEPENDENTSERVICES, CB_ADDSTRING,
+                                        (WPARAM)0, (LPARAM)ess.lpServiceName);
+                                }
+                                //enable combobox and set current selection to the first item
+                                EnableWindow(GetDlgItem(hwndDlg, IDC_SERVICE_DEPENDENTSERVICES), TRUE);
+                                SendDlgItemMessage(hwndDlg, IDC_SERVICE_DEPENDENTSERVICES, CB_SETCURSEL,
+                                    (WPARAM)0, (LPARAM)0);
                             }
-                            //enable combobox and set current selection to the first item
-                            EnableWindow(GetDlgItem(hwndDlg, IDC_SERVICE_DEPENDENTSERVICES), TRUE);
-                            SendDlgItemMessage(hwndDlg, IDC_SERVICE_DEPENDENTSERVICES, CB_SETCURSEL,
-                                (WPARAM)0, (LPARAM)0);
+                            supHeapFree(lpDependencies);
                         }
-                        HeapFree(GetProcessHeap(), 0, lpDependencies);
                     }
                 } //if (psi->lpDependencies)
             } //bResult != FALSE
 
             CloseServiceHandle(schService);
+            schService = NULL;
         } while (cond);
 
-        if (psci != NULL) {
-            HeapFree(GetProcessHeap(), 0, psci);
-        }
+        if (psci != NULL)
+            supHeapFree(psci);
 
-        if (SchSCManager) {
+        if (schService)
+            CloseServiceHandle(schService);
+
+        if (SchSCManager)
             CloseServiceHandle(SchSCManager);
-        }
 
         if (bResult == FALSE) {
             EnumChildWindows(hwndDlg, DriverShowChildWindows, SW_HIDE);
@@ -398,50 +397,56 @@ VOID DriverSetInfo(
 *
 */
 VOID DriverJumpToKey(
-    PROP_OBJECT_INFO *Context
+    _In_ PROP_OBJECT_INFO *Context
 )
 {
     BOOL              cond = FALSE;
     DWORD             dwProcessId;
-    WCHAR            *ch, *ckey;
+    WCHAR            *ch;
     HWND              regeditHwnd, regeditMainHwnd;
-    SIZE_T            BufferLength, ObjectNameLength;
-    LPWSTR            lpRegPath;
-    HANDLE            hRegeditProcess;
+    SIZE_T            sz;
+    LPWSTR            lpRegPath = NULL;
+    HANDLE            hRegeditProcess = NULL;
     SHELLEXECUTEINFO  seinfo;
 
-    if (Context == NULL) {
-        return;
-    }
-
-    hRegeditProcess = NULL;
-    lpRegPath = NULL;
+    WCHAR             szBuffer[MAX_PATH * 2];
 
     do {
 
-        ObjectNameLength = _strlen(Context->lpObjectName);
-        if (ObjectNameLength == 0)
+        sz = _strlen(Context->lpObjectName);
+        if (sz == 0)
             break;
 
-        //create regkeypath buffer to navigate for  
-        BufferLength = PROPDRVREGSERVICESKEYLEN;
-        BufferLength += (1 + ObjectNameLength) * sizeof(WCHAR);
-        lpRegPath = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, BufferLength);
-        if (lpRegPath == NULL) {
+        //
+        // Create regkeypath buffer to navigate for.
+        //
+        sz += PROPDRVREGSERVICESKEYLEN;
+        sz = (1 + sz) * sizeof(WCHAR);
+        lpRegPath = supHeapAlloc(sz);
+        if (lpRegPath == NULL)
             break;
-        }
-        wsprintf(lpRegPath, PROPDRVREGSERVICESKEY, Context->lpObjectName);
 
+        _strcpy(lpRegPath, PROPDRVREGSERVICESKEY);
+        _strcat(lpRegPath, Context->lpObjectName);
+
+        //
+        // Start RegEdit.
+        //
+        // If it already started then open process for sync.
+        //
         regeditHwnd = NULL;
-
-        //open RegEdit
         regeditMainHwnd = FindWindow(REGEDITWNDCLASS, NULL);
         if (regeditMainHwnd == NULL) {
+
+            _strcpy(szBuffer, g_WinObj.szWindowsDirectory);
+            _strcat(szBuffer, L"\\");
+            _strcat(szBuffer, REGEDIT_EXE);
+
             RtlSecureZeroMemory(&seinfo, sizeof(seinfo));
             seinfo.cbSize = sizeof(seinfo);
             seinfo.fMask = SEE_MASK_NOCLOSEPROCESS;
-            seinfo.lpVerb = L"open";
-            seinfo.lpFile = L"regedit.exe";
+            seinfo.lpVerb = SHELL_OPEN_VERB;
+            seinfo.lpFile = szBuffer;
             seinfo.nShow = SW_SHOWNORMAL;
             ShellExecuteEx(&seinfo);
             hRegeditProcess = seinfo.hProcess;
@@ -452,17 +457,23 @@ VOID DriverJumpToKey(
             regeditMainHwnd = FindWindow(REGEDITWNDCLASS, NULL);
         }
         else {
-            //open regedit process for sync
+            //
+            // Regedit already started, open process for sync.
+            //
             dwProcessId = 0;
             GetWindowThreadProcessId(regeditMainHwnd, &dwProcessId);
             hRegeditProcess = OpenProcess(SYNCHRONIZE, FALSE, dwProcessId);
         }
-        //check if we failed to launch regedit
-        if ((hRegeditProcess == NULL) || (regeditMainHwnd == NULL)) {
-            break;
-        }
 
-        //restore regedit window
+        //
+        // Check if we failed to launch regedit.
+        //
+        if ((hRegeditProcess == NULL) || (regeditMainHwnd == NULL))
+            break;
+
+        //
+        // Restore regedit window.
+        //
         if (IsIconic(regeditMainHwnd)) {
             ShowWindow(regeditMainHwnd, SW_RESTORE);
         }
@@ -473,41 +484,54 @@ VOID DriverJumpToKey(
         SetFocus(regeditMainHwnd);
         WaitForInputIdle(hRegeditProcess, 10000);
 
-        //get treeview
+        //
+        // Get treeview window.
+        //
         regeditHwnd = FindWindowEx(regeditMainHwnd, NULL, WC_TREEVIEW, NULL);
-        if (regeditHwnd == NULL) {
+        if (regeditHwnd == NULL)
             break;
-        }
 
-        //set focus on treeview
+        //
+        // Set focus on treeview.
+        //
         SetForegroundWindow(regeditHwnd);
         SetFocus(regeditHwnd);
 
-        //go to the tree root 
+        //
+        // Go to the tree root.
+        //
         SendMessage(regeditHwnd, WM_KEYDOWN, VK_HOME, 0);
 
-        //open path
+        //
+        // Open path, expand if needed, select item.
+        //
         for (ch = lpRegPath; *ch; ++ch) {
-            //expand if needed
+
             if (*ch == L'\\') {
                 SendMessage(regeditHwnd, WM_KEYDOWN, VK_RIGHT, 0);
                 WaitForInputIdle(hRegeditProcess, 1000);
             }
             else {
-                //select item
-                ckey = (WCHAR*)CharUpper((LPWSTR)(UINT)*ch);
-                SendMessage(regeditHwnd, WM_CHAR, (WPARAM)ckey, (LPARAM)0);
+
+                SendMessage(regeditHwnd,
+                    WM_CHAR,
+                    (WPARAM)CharUpper((LPWSTR)(UINT)*ch), //-V204
+                    (LPARAM)0);
+
                 WaitForInputIdle(hRegeditProcess, 1000);
             }
         }
 
+        //
+        // Update window focus.
+        //
         SetForegroundWindow(regeditMainHwnd);
         SetFocus(regeditMainHwnd);
 
     } while (cond);
 
     if (lpRegPath) {
-        HeapFree(GetProcessHeap(), 0, lpRegPath);
+        supHeapFree(lpRegPath);
     }
     if (hRegeditProcess) {
         CloseHandle(hRegeditProcess);

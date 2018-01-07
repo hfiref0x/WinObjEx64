@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2016
+*  (C) COPYRIGHT AUTHORS, 2016 - 2018
 *
 *  TITLE:       EXTRASDRIVERS.H
 *
-*  VERSION:     1.44
+*  VERSION:     1.52
 *
-*  DATE:        17 July 2016
+*  DATE:        08 Jan 2018
 *
 *  Common header file for Drivers dialog.
 *
@@ -19,5 +19,4 @@
 #pragma once
 
 VOID extrasCreateDriversDialog(
-    _In_ HWND hwndParent
-);
+    _In_ HWND hwndParent);

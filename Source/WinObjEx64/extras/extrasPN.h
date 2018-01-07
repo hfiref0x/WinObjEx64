@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2016
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       EXTRASPN.H
 *
-*  VERSION:     1.44
+*  VERSION:     1.52
 *
-*  DATE:        17 July 2016
+*  DATE:        08 Jan 2018
 *
 *  Common header file for Extras Private Namespaces dialog.
 *
@@ -19,5 +19,4 @@
 #pragma once
 
 VOID extrasCreatePNDialog(
-    _In_ HWND hwndParent
-);
+    _In_ HWND hwndParent);

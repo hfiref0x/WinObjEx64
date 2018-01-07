@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     1.51
+*  VERSION:     1.52
 *
-*  DATE:        02 Dec 2017
+*  DATE:        08 Jan 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -19,9 +19,8 @@
 #include "extrasSSDT.h"
 
 EXTRASCONTEXT DlgContext;
-PSERVICETABLEENTRY g_SdtTable;
-ULONG g_cSdtTable;
-PVOID g_NtdllModule;
+PSERVICETABLEENTRY g_SdtTable = NULL;
+ULONG g_cSdtTable = 0;
 
 /*
 * SdtDlgCompareFunc
@@ -88,8 +87,8 @@ INT CALLBACK SdtDlgCompareFunc(
 
     case 2: //sort Address
 
-        if ((cbItem1 / sizeof(WCHAR) != MAX_ADDRESS_TEXT_LENGTH) &&
-            (cbItem2 / sizeof(WCHAR) != MAX_ADDRESS_TEXT_LENGTH))
+        if ((cbItem1 / sizeof(WCHAR) != MAX_ADDRESS_TEXT_LENGTH64) &&
+            (cbItem2 / sizeof(WCHAR) != MAX_ADDRESS_TEXT_LENGTH64))
         {
             nResult = 0;
             break;
@@ -128,8 +127,8 @@ INT CALLBACK SdtDlgCompareFunc(
     }
 
 Done:
-    if (lpItem1) HeapFree(GetProcessHeap(), 0, lpItem1);
-    if (lpItem2) HeapFree(GetProcessHeap(), 0, lpItem2);
+    if (lpItem1) supHeapFree(lpItem1);
+    if (lpItem2) supHeapFree(lpItem2);
 
     return nResult;
 }
@@ -153,13 +152,11 @@ VOID SdtHandlePopupMenu(
         return;
 
     hMenu = CreatePopupMenu();
-    if (hMenu == NULL)
-        return;
-
-    InsertMenu(hMenu, 0, MF_BYCOMMAND, ID_OBJECT_COPY, T_SAVETOFILE);
-
-    TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, hwndDlg, NULL);
-    DestroyMenu(hMenu);
+    if (hMenu == NULL) {
+        InsertMenu(hMenu, 0, MF_BYCOMMAND, ID_OBJECT_COPY, T_SAVETOFILE);
+        TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, hwndDlg, NULL);
+        DestroyMenu(hMenu);
+    }
 }
 
 WCHAR output[0x2000];
@@ -176,7 +173,6 @@ VOID SdtSaveListToFile(
     _In_ HWND hwndDlg
 )
 {
-
     WCHAR   ch;
     INT	    row, subitem, numitems, BufferSize = 0;
     SIZE_T  sz, k;
@@ -189,7 +185,7 @@ VOID SdtSaveListToFile(
     _strcpy(szTempBuffer, TEXT("list.txt"));
     if (supSaveDialogExecute(hwndDlg, (LPWSTR)&szTempBuffer, TEXT("Text files\0*.txt\0\0"))) {
 
-        hHourGlass = LoadCursorW(NULL, IDC_WAIT);
+        hHourGlass = LoadCursor(NULL, IDC_WAIT);
 
         ch = (WCHAR)0xFEFF;
         supWriteBufferToFile(szTempBuffer, &ch, sizeof(WCHAR), FALSE, FALSE);
@@ -207,7 +203,7 @@ VOID SdtSaveListToFile(
                 pItem = supGetItemText(DlgContext.ListView, row, subitem, &sz);
                 if (pItem) {
                     _strcat(output, pItem);
-                    HeapFree(GetProcessHeap(), 0, pItem);
+                    supHeapFree(pItem);
                 }
                 if (subitem == 1) {
                     for (k = 54; k > sz / sizeof(WCHAR); k--) {
@@ -269,7 +265,7 @@ INT_PTR CALLBACK SdtDialogProc(
     case WM_CLOSE:
         if (DlgContext.SizeGrip) DestroyWindow(DlgContext.SizeGrip);
         DestroyWindow(hwndDlg);
-        g_wobjDialogs[WOBJ_SSDTDLG_IDX] = NULL;
+        g_WinObj.AuxDialogs[WOBJ_SSDTDLG_IDX] = NULL;
         return TRUE;
 
     case WM_COMMAND:
@@ -304,7 +300,7 @@ VOID SdtListTable(
 )
 {
     BOOL                    cond = FALSE;
-    PUTable                 Dump = NULL;
+    PUTable                 TableDump = NULL;
     PRTL_PROCESS_MODULES    pModules = NULL;
     PVOID                   Module = NULL;
     PIMAGE_EXPORT_DIRECTORY pexp = NULL;
@@ -330,23 +326,21 @@ VOID SdtListTable(
             //if table empty, dump and prepare table
             if (g_SdtTable == NULL) {
 
-                if (g_NtdllModule == NULL) {
+                if (g_WinObj.hNtdllModule == NULL) {
                     Module = GetModuleHandle(TEXT("ntdll.dll"));
                 }
                 else {
-                    Module = g_NtdllModule;
+                    Module = g_WinObj.hNtdllModule;
                 }
 
                 if (Module == NULL)
                     break;
 
-                g_SdtTable = (PSERVICETABLEENTRY)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY,
-                    sizeof(SERVICETABLEENTRY) * g_kdctx.KiServiceLimit);
-
+                g_SdtTable = (PSERVICETABLEENTRY)supHeapAlloc(sizeof(SERVICETABLEENTRY) * g_kdctx.KiServiceLimit);
                 if (g_SdtTable == NULL)
                     break;
 
-                if (!supDumpSyscallTableConverted(&g_kdctx, &Dump))
+                if (!supDumpSyscallTableConverted(&g_kdctx, &TableDump))
                     break;
 
                 NtHeaders = RtlImageNtHeader(Module);
@@ -375,13 +369,32 @@ VOID SdtListTable(
                                 g_SdtTable[g_cSdtTable].Name, MAX_PATH);
 
                             g_SdtTable[g_cSdtTable].ServiceId = number;
-                            g_SdtTable[g_cSdtTable].Address = Dump[number];
+                            g_SdtTable[g_cSdtTable].Address = TableDump[number];
+                            TableDump[number] = 0;
                             g_cSdtTable++;
                         }
+
                     }//tN
                 }//for
-                HeapFree(GetProcessHeap(), 0, Dump);
-                Dump = NULL;
+
+                //
+                // Temporary workaround for NtQuerySystemTime.
+                // (not implemented in user mode as syscall only as query to shared data, still exist in SSDT)
+                //  
+                //  This will produce incorrect result if more like that services will be added.
+                //
+                for (i = 0; i < g_kdctx.KiServiceLimit; i++) {
+                    if (TableDump[i] != 0) {
+                        g_SdtTable[g_cSdtTable].ServiceId = i;
+                        g_SdtTable[g_cSdtTable].Address = TableDump[i];
+                        _strcpy(g_SdtTable[g_cSdtTable].Name, L"NtQuerySystemTime");
+                        g_cSdtTable++;
+                        break;
+                    }
+                }
+                
+                supHeapFree(TableDump);
+                TableDump = NULL;
             }
 
             //list table
@@ -440,14 +453,13 @@ VOID SdtListTable(
         } while (cond);
 
         if (pModules) {
-            HeapFree(GetProcessHeap(), 0, pModules);
+            supHeapFree(pModules);
         }
 
-        if (Dump) {
-            HeapFree(GetProcessHeap(), 0, Dump);
+        if (TableDump) {
+            supHeapFree(TableDump);
         }
     }
-
     __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
         return;
     }
@@ -468,23 +480,23 @@ VOID extrasCreateSSDTDialog(
     LVCOLUMN  col;
 
     //allow only one dialog
-    if (g_wobjDialogs[WOBJ_SSDTDLG_IDX]) {
-        if (IsIconic(g_wobjDialogs[WOBJ_SSDTDLG_IDX]))
-            ShowWindow(g_wobjDialogs[WOBJ_SSDTDLG_IDX], SW_RESTORE);
+    if (g_WinObj.AuxDialogs[WOBJ_SSDTDLG_IDX]) {
+        if (IsIconic(g_WinObj.AuxDialogs[WOBJ_SSDTDLG_IDX]))
+            ShowWindow(g_WinObj.AuxDialogs[WOBJ_SSDTDLG_IDX], SW_RESTORE);
         else
-            SetActiveWindow(g_wobjDialogs[WOBJ_SSDTDLG_IDX]);
+            SetActiveWindow(g_WinObj.AuxDialogs[WOBJ_SSDTDLG_IDX]);
         return;
     }
 
     RtlSecureZeroMemory(&DlgContext, sizeof(DlgContext));
-    DlgContext.hwndDlg = CreateDialogParam(g_hInstance, MAKEINTRESOURCE(IDD_DIALOG_EXTRASLIST),
+    DlgContext.hwndDlg = CreateDialogParam(g_WinObj.hInstance, MAKEINTRESOURCE(IDD_DIALOG_EXTRASLIST),
         hwndParent, &SdtDialogProc, 0);
 
     if (DlgContext.hwndDlg == NULL) {
         return;
     }
 
-    g_wobjDialogs[WOBJ_SSDTDLG_IDX] = DlgContext.hwndDlg;
+    g_WinObj.AuxDialogs[WOBJ_SSDTDLG_IDX] = DlgContext.hwndDlg;
 
     DlgContext.SizeGrip = supCreateSzGripWindow(DlgContext.hwndDlg);
 
@@ -495,7 +507,7 @@ VOID extrasCreateSSDTDialog(
     DlgContext.ListView = GetDlgItem(DlgContext.hwndDlg, ID_EXTRASLIST);
     if (DlgContext.ListView) {
 
-        ListView_SetImageList(DlgContext.ListView, ListViewImages, LVSIL_SMALL);
+        ListView_SetImageList(DlgContext.ListView, g_ListViewImages, LVSIL_SMALL);
         ListView_SetExtendedListViewStyle(DlgContext.ListView,
             LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
 
@@ -505,7 +517,7 @@ VOID extrasCreateSSDTDialog(
         col.iSubItem++;
         col.pszText = TEXT("Id");
         col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
-        col.iImage = ImageList_GetImageCount(ListViewImages) - 1;
+        col.iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
         col.cx = 80;
         ListView_InsertColumn(DlgContext.ListView, col.iSubItem, &col);
 

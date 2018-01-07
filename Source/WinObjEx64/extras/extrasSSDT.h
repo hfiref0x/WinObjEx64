@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2016
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       EXTRASSSDT.H
 *
-*  VERSION:     1.44
+*  VERSION:     1.52
 *
-*  DATE:        17 July 2016
+*  DATE:        08 Jan 2018
 *
 *  Common header file for KiServiceTable dialog.
 *
@@ -21,13 +21,10 @@
 typedef struct _SERVICETABLEENTRY {
     ULONG ServiceId;
     ULONG_PTR Address;
-    wchar_t Name[MAX_PATH + 1];
+    WCHAR Name[MAX_PATH + 1];
 } SERVICETABLEENTRY, *PSERVICETABLEENTRY;
 
 extern PSERVICETABLEENTRY g_SdtTable;
-extern ULONG g_cSdtTable;
-extern PVOID g_NtdllModule;
 
 VOID extrasCreateSSDTDialog(
-    _In_ HWND hwndParent
-);
+    _In_ HWND hwndParent);

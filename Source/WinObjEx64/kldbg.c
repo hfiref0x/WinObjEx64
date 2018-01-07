@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.51
+*  VERSION:     1.52
 *
-*  DATE:        05 Dec 2017 
+*  DATE:        08 Jan 2018
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -54,8 +54,8 @@ BYTE  KiSystemServiceStartPattern[] = { 0x8B, 0xF8, 0xC1, 0xEF, 0x07, 0x83, 0xE7
 *
 */
 BYTE ObGetObjectHeaderOffset(
-    BYTE InfoMask,
-    OBJ_HEADER_INFO_FLAG Flag
+    _In_ BYTE InfoMask,
+    _In_ OBJ_HEADER_INFO_FLAG Flag
 )
 {
     BYTE OffsetMask, HeaderOffset = 0;
@@ -237,7 +237,6 @@ UCHAR ObFindHeaderCookie(
 *
 */
 PVOID ObFindObpPrivateNamespaceLookupTable(
-    _In_ PKLDBGCONTEXT Context,
     _In_ ULONG_PTR MappedImageBase,
     _In_ ULONG MappedImageSize,
     _In_ ULONG_PTR KernelImageBase
@@ -254,19 +253,9 @@ PVOID ObFindObpPrivateNamespaceLookupTable(
 
     __try {
 
-        if (
-            (MappedImageBase == 0) ||
-            (Context == NULL) ||
-            (MappedImageSize == 0) ||
-            (KernelImageBase == 0)
-            )
-        {
-            return 0;
-        }
-
         do {
 
-            switch (Context->osver.dwBuildNumber) {
+            switch (g_WinObj.osver.dwBuildNumber) {
 
             case 9200:
                 Signature = NamespacePattern8;
@@ -479,7 +468,7 @@ VOID kdFindKiServiceTable(
 BOOL ObGetDirectoryObjectAddress(
     _In_opt_ LPWSTR lpDirectory,
     _Inout_ PULONG_PTR lpRootAddress,
-    _Inout_opt_ PUCHAR lpTypeIndex
+    _Inout_opt_ PUSHORT lpTypeIndex
 )
 {
     BOOL                bFound = FALSE;
@@ -515,7 +504,7 @@ BOOL ObGetDirectoryObjectAddress(
 *
 * Purpose:
 *
-* Reads object name from kernel memory, returned buffer must be freed with HeapFree
+* Reads object name from kernel memory, returned buffer must be freed with supHeapFree
 *
 */
 LPWSTR ObQueryNameString(
@@ -534,7 +523,7 @@ LPWSTR ObQueryNameString(
     RtlSecureZeroMemory(&NameInfo, sizeof(OBJECT_HEADER_NAME_INFO));
     if (kdReadSystemMemory(NameInfoAddress, &NameInfo, sizeof(OBJECT_HEADER_NAME_INFO))) {
         fLen = NameInfo.Name.Length + sizeof(UNICODE_NULL);
-        lpObjectName = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, fLen);
+        lpObjectName = supHeapAlloc(fLen);
         if (lpObjectName != NULL) {
             NameInfoAddress = (ULONG_PTR)NameInfo.Name.Buffer;
             if (kdReadSystemMemory(NameInfoAddress, lpObjectName, NameInfo.Name.Length)) {
@@ -542,7 +531,7 @@ LPWSTR ObQueryNameString(
                     *ReturnLength = fLen;
             }
             else {
-                HeapFree(GetProcessHeap(), 0, lpObjectName);
+                supHeapFree(lpObjectName);
                 lpObjectName = NULL;
             }
         }
@@ -556,7 +545,7 @@ LPWSTR ObQueryNameString(
 * Purpose:
 *
 * Walks given directory and looks for specified object inside
-* Returned object must be freed wtih HeapFree when no longer needed.
+* Returned object must be freed wtih supHeapFree when no longer needed.
 *
 */
 POBJINFO ObWalkDirectory(
@@ -609,7 +598,7 @@ POBJINFO ObWalkDirectory(
                 return NULL;
             }
 
-            lpData = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(OBJINFO));
+            lpData = supHeapAlloc(sizeof(OBJINFO));
             if (lpData == NULL)
                 return NULL;
 
@@ -671,12 +660,12 @@ POBJINFO ObWalkDirectory(
 
                     //compare full object names
                     bFound = (_strcmpi(lpObjectName, lpObjectToFind) == 0);
-                    HeapFree(GetProcessHeap(), 0, lpObjectName);
+                    supHeapFree(lpObjectName);
                     if (bFound == FALSE) {
                         goto NextItem;
                     }
                     //identical, allocate item info and copy it
-                    lpData = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(OBJINFO));
+                    lpData = supHeapAlloc(sizeof(OBJINFO));
                     if (lpData) {
 
                         lpData->ObjectAddress = (ULONG_PTR)Entry.Object;
@@ -716,7 +705,7 @@ POBJINFO ObWalkDirectory(
 *
 * Look for object inside specified directory
 * If object is directory look for it in upper directory
-* Returned object memory must be released with HeapFree when object is no longer needed.
+* Returned object memory must be released with supHeapFree when object is no longer needed.
 *
 */
 POBJINFO ObQueryObject(
@@ -761,7 +750,7 @@ POBJINFO ObQueryObject(
             //  e.g. lpDirectory = \ObjectTypes, lpObjectName = ObjectTypes then lpDirectory = \ 
             //
             ldirSz = rdirLen * sizeof(WCHAR) + sizeof(UNICODE_NULL);
-            LookupDirName = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, ldirSz);
+            LookupDirName = supHeapAlloc(ldirSz);
             if (LookupDirName == NULL)
                 return NULL;
 
@@ -780,7 +769,7 @@ POBJINFO ObQueryObject(
         if (ObGetDirectoryObjectAddress(LookupDirName, &DirectoryAddress, NULL)) {
 
             if (needFree)
-                HeapFree(GetProcessHeap(), 0, LookupDirName);
+                supHeapFree(LookupDirName);
 
             //
             // 4) Find object in directory by name (case insensitive)
@@ -820,11 +809,11 @@ BOOL ObDumpTypeInfo(
 *
 */
 VOID ObWalkDirectoryRecursiveEx(
-    BOOL fIsRoot,
-    PLIST_ENTRY ListHead,
-    LPWSTR lpRootDirectory,
-    ULONG_PTR DirectoryAddress,
-    UCHAR DirectoryTypeIndex
+    _In_ BOOL fIsRoot,
+    _In_ PLIST_ENTRY ListHead,
+    _In_opt_ LPWSTR lpRootDirectory,
+    _In_ ULONG_PTR DirectoryAddress,
+    _In_ USHORT DirectoryTypeIndex
 )
 {
     UCHAR      ObjectTypeIndex;
@@ -883,7 +872,7 @@ VOID ObWalkDirectoryRecursiveEx(
                         }
 
                         //allocate list entry
-                        lpListEntry = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(OBJREF));
+                        lpListEntry = supHeapAlloc(sizeof(OBJREF));
                         if (lpListEntry) {
 
                             //save object address
@@ -898,7 +887,7 @@ VOID ObWalkDirectoryRecursiveEx(
                                     (2 * sizeof(WCHAR)) +
                                     rdirLen + sizeof(UNICODE_NULL);
 
-                                lpListEntry->ObjectName = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, fLen);
+                                lpListEntry->ObjectName = supHeapAlloc(fLen);
                                 if (lpListEntry->ObjectName) {
                                     _strcpy(lpListEntry->ObjectName, lpRootDirectory);
                                     if (fIsRoot == FALSE) {
@@ -924,7 +913,7 @@ VOID ObWalkDirectoryRecursiveEx(
                             }
 
                             dirLen = fLen + rdirLen + (2 * sizeof(WCHAR)) + sizeof(UNICODE_NULL);
-                            lpDirectoryName = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, dirLen);
+                            lpDirectoryName = supHeapAlloc(dirLen);
                             if (lpDirectoryName) {
                                 _strcpy(lpDirectoryName, lpRootDirectory);
                                 if (fIsRoot == FALSE) {
@@ -938,13 +927,13 @@ VOID ObWalkDirectoryRecursiveEx(
                             ObWalkDirectoryRecursiveEx(FALSE, ListHead, lpDirectoryName, (ULONG_PTR)Entry.Object, DirectoryTypeIndex);
 
                             if (lpDirectoryName) {
-                                HeapFree(GetProcessHeap(), 0, lpDirectoryName);
+                                supHeapFree(lpDirectoryName);
                                 lpDirectoryName = NULL;
                             }
                         }
 
                         if (lpObjectName) {
-                            HeapFree(GetProcessHeap(), 0, lpObjectName);
+                            supHeapFree(lpObjectName);
                             lpObjectName = NULL;
                         }
 
@@ -1051,7 +1040,7 @@ BOOL ObWalkPrivateNamespaceTable(
                                 }
 
                                 //allocate list entry
-                                lpListEntry = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(OBJREF));
+                                lpListEntry = supHeapAlloc(sizeof(OBJREF));
                                 if (lpListEntry) {
 
                                     //save object address
@@ -1080,7 +1069,7 @@ BOOL ObWalkPrivateNamespaceTable(
 
                                     //copy object name
                                     if (lpObjectName) {
-                                        lpListEntry->ObjectName = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, retSize);
+                                        lpListEntry->ObjectName = supHeapAlloc(retSize);
                                         if (lpListEntry->ObjectName) {
                                             _strcpy(lpListEntry->ObjectName, lpObjectName);
                                         }
@@ -1090,7 +1079,7 @@ BOOL ObWalkPrivateNamespaceTable(
 
                                 //free memory allocated for object name
                                 if (lpObjectName) {
-                                    HeapFree(GetProcessHeap(), 0, lpObjectName);
+                                    supHeapFree(lpObjectName);
                                     lpObjectName = NULL;
                                 }
 
@@ -1138,7 +1127,7 @@ BOOL ObListCreate(
         return bResult;
     }
 
-    EnterCriticalSection(&g_kdctx.ListLock);
+    RtlEnterCriticalSection(&g_kdctx.ListLock);
 
     __try {
 
@@ -1184,7 +1173,7 @@ BOOL ObListCreate(
         bResult = FALSE;
     }
 
-    LeaveCriticalSection(&g_kdctx.ListLock);
+    RtlLeaveCriticalSection(&g_kdctx.ListLock);
 
     return bResult;
 }
@@ -1203,29 +1192,26 @@ VOID ObListDestroy(
 {
     POBJREF ObjectEntry;
 
-    if (
-        (g_kdctx.hDevice == NULL) ||
-        (ListHead == NULL)
-        )
-    {
+    if (g_kdctx.hDevice == NULL)
         return;
-    }
 
-    EnterCriticalSection(&g_kdctx.ListLock);
+    RtlEnterCriticalSection(&g_kdctx.ListLock);
 
-    while (!IsListEmpty(ListHead)) {
-        if (ListHead->Flink == NULL)
-            break;
+    if (ListHead) {
+        while (!IsListEmpty(ListHead)) {
+            if (ListHead->Flink == NULL)
+                break;
 
-        ObjectEntry = CONTAINING_RECORD(ListHead->Flink, OBJREF, ListEntry);
-        RemoveEntryList(ListHead->Flink);
-        if (ObjectEntry->ObjectName) {
-            HeapFree(GetProcessHeap(), 0, ObjectEntry->ObjectName);
+            ObjectEntry = CONTAINING_RECORD(ListHead->Flink, OBJREF, ListEntry);
+            RemoveEntryList(ListHead->Flink);
+            if (ObjectEntry->ObjectName) {
+                supHeapFree(ObjectEntry->ObjectName);
+            }
+            supHeapFree(ObjectEntry);
         }
-        HeapFree(GetProcessHeap(), 0, ObjectEntry);
     }
 
-    LeaveCriticalSection(&g_kdctx.ListLock);
+    RtlLeaveCriticalSection(&g_kdctx.ListLock);
 }
 
 /*
@@ -1249,7 +1235,7 @@ POBJREF ObListFindByAddress(
     if (ListHead == NULL)
         return NULL;
 
-    EnterCriticalSection(&g_kdctx.ListLock);
+    RtlEnterCriticalSection(&g_kdctx.ListLock);
 
     ObjectInfo = NULL;
     bFound = FALSE;
@@ -1263,7 +1249,7 @@ POBJREF ObListFindByAddress(
         Entry = Entry->Flink;
     }
 
-    LeaveCriticalSection(&g_kdctx.ListLock);
+    RtlLeaveCriticalSection(&g_kdctx.ListLock);
     return (bFound) ? ObjectInfo : NULL;
 }
 
@@ -1302,7 +1288,7 @@ PVOID kdQueryIopInvalidDeviceRequest(
             if (!kdAddressInNtOsImage(pHandler))
                 pHandler = NULL;
         }
-        HeapFree(GetProcessHeap(), 0, pSelfObj);
+        supHeapFree(pSelfObj);
     }
     return pHandler;
 }
@@ -1417,13 +1403,13 @@ BOOL kdExtractDriver(
     DWORD   dwSize = 0;
     HANDLE  hFile = INVALID_HANDLE_VALUE;
 
-    hResInfo = FindResource(g_hInstance, lpName, lpType);
+    hResInfo = FindResource(g_WinObj.hInstance, lpName, lpType);
     if (hResInfo == NULL) return bResult;
 
-    dwSize = SizeofResource(g_hInstance, hResInfo);
+    dwSize = SizeofResource(g_WinObj.hInstance, hResInfo);
     if (dwSize == 0) return bResult;
 
-    hResData = LoadResource(g_hInstance, hResInfo);
+    hResData = LoadResource(g_WinObj.hInstance, hResInfo);
     if (hResData == NULL) return bResult;
 
     pData = LockResource(hResData);
@@ -1469,13 +1455,13 @@ VOID pkdQuerySystemInformation(
         Context->NtOsBase = miSpace->Modules[0].ImageBase; //loaded kernel base
         Context->NtOsSize = miSpace->Modules[0].ImageSize; //loaded kernel size
 
-        _strcpy(NtOskrnlFullPathName, NTOSFOLDERSYSTEM32);
+        _strcpy(NtOskrnlFullPathName, g_WinObj.szSystemDirectory);
         _strcat(NtOskrnlFullPathName, TEXT("\\"));
         MultiByteToWideChar(CP_ACP, 0,
             (LPCSTR)&miSpace->Modules[0].FullPathName[miSpace->Modules[0].OffsetToFileName],
             -1, _strend(NtOskrnlFullPathName), MAX_PATH);
 
-        HeapFree(GetProcessHeap(), 0, miSpace);
+        supHeapFree(miSpace);
         miSpace = NULL;
 
         MappedKernel = LoadLibraryEx(NtOskrnlFullPathName, NULL, DONT_RESOLVE_DLL_REFERENCES);
@@ -1483,7 +1469,7 @@ VOID pkdQuerySystemInformation(
             break;
 
         //find and remember ObHeaderCookie
-        if (Context->osver.dwMajorVersion >= 10) {
+        if (g_WinObj.osver.dwMajorVersion >= 10) {
             
             Context->ObHeaderCookie = ObFindHeaderCookie(Context, 
                 (ULONG_PTR)MappedKernel, 
@@ -1503,8 +1489,8 @@ VOID pkdQuerySystemInformation(
                     &Context->KiServiceLimit);
 
                 //find namespace table
-                if (Context->osver.dwBuildNumber <= 10240) {
-                    Context->ObpPrivateNamespaceLookupTable = ObFindObpPrivateNamespaceLookupTable(Context, 
+                if (g_WinObj.osver.dwBuildNumber <= 10240) {
+                    Context->ObpPrivateNamespaceLookupTable = ObFindObpPrivateNamespaceLookupTable( 
                         (ULONG_PTR)MappedKernel, 
                         ModuleSize, 
                         (ULONG_PTR)Context->NtOsBase);
@@ -1518,7 +1504,7 @@ VOID pkdQuerySystemInformation(
         FreeLibrary(MappedKernel);
     }
     if (miSpace != NULL) {
-        HeapFree(GetProcessHeap(), 0, miSpace);
+        supHeapFree(miSpace);
     }
 }
 
@@ -1550,7 +1536,7 @@ BOOL kdAddressInNtOsImage(
 *
 */
 DWORD WINAPI kdQueryProc(
-    _In_  LPVOID lpParameter
+    _In_ LPVOID lpParameter
 )
 {
     BOOL            bResult = FALSE;
@@ -1578,9 +1564,6 @@ DWORD WINAPI kdQueryProc(
 *
 * Enable Debug Privilege and open/load KLDBGDRV driver
 *
-* If there is no DEBUG mode OS flag or OS version is below than Windows 7
-* this routine only query windows version to the global context variable.
-*
 */
 VOID kdInit(
     BOOL IsFullAdmin
@@ -1592,14 +1575,11 @@ VOID kdInit(
 
     //
     // Minimum supported client is windows 7
-    // Query version info in global context, system range start value and  
-    // if version below Win7 - leave
+    // Query system range start value and if version below Win7 - leave
     //
-    g_kdctx.osver.dwOSVersionInfoSize = sizeof(g_kdctx.osver);
-    RtlGetVersion(&g_kdctx.osver);
     if (
-        (g_kdctx.osver.dwMajorVersion < 6) || //any lower other vista
-        ((g_kdctx.osver.dwMajorVersion == 6) && (g_kdctx.osver.dwMinorVersion == 0))//vista
+        (g_WinObj.osver.dwMajorVersion < 6) || //any lower other vista
+        ((g_WinObj.osver.dwMajorVersion == 6) && (g_WinObj.osver.dwMinorVersion == 0))//vista
         )
     {
         return;
@@ -1608,7 +1588,7 @@ VOID kdInit(
     ObGetDirectoryObjectAddress(NULL, &g_kdctx.DirectoryRootAddress, &g_kdctx.DirectoryTypeIndex);
     g_kdctx.SystemRangeStart = supQuerySystemRangeStart();
     if (g_kdctx.SystemRangeStart == 0) {
-        if (g_kdctx.osver.dwBuildNumber < 9200) {
+        if (g_WinObj.osver.dwBuildNumber < 9200) {
             g_kdctx.SystemRangeStart = MM_SYSTEM_RANGE_START_7;
         }
         else {
@@ -1635,23 +1615,22 @@ VOID kdInit(
 
             // no such device exist, construct filepath and check if driver already present
             RtlSecureZeroMemory(szDrvPath, sizeof(szDrvPath));
-            if (GetSystemDirectory(szDrvPath, MAX_PATH)) {
-                _strcat(szDrvPath, KLDBGDRVSYS);
+            _strcpy(szDrvPath, g_WinObj.szSystemDirectory);
+            _strcat(szDrvPath, KLDBGDRVSYS);
 
-                // if no file exists, extract it to the drivers directory
-                if (!PathFileExists(szDrvPath)) {
-                    kdExtractDriver(szDrvPath, MAKEINTRESOURCE(IDR_KDBGDRV), L"SYS");
-                }
-                // load service driver and open handle for it
-                g_kdctx.IsOurLoad = scmLoadDeviceDriver(KLDBGDRV, szDrvPath, &g_kdctx.hDevice);
+            // if no file exists, extract it to the drivers directory
+            if (!PathFileExists(szDrvPath)) {
+                kdExtractDriver(szDrvPath, MAKEINTRESOURCE(IDR_KDBGDRV), L"SYS");
             }
+            // load service driver and open handle for it
+            g_kdctx.IsOurLoad = scmLoadDeviceDriver(KLDBGDRV, szDrvPath, &g_kdctx.hDevice);
         }
 
     }
 
     //query global variable and dump object directory if driver support available.
     if (g_kdctx.hDevice != NULL) {
-        InitializeCriticalSection(&g_kdctx.ListLock);
+        RtlInitializeCriticalSection(&g_kdctx.ListLock);
         g_kdctx.hThreadWorker = CreateThread(NULL, 0, kdQueryProc, &g_kdctx, 0, NULL);
         g_kdctx.IopInvalidDeviceRequest = kdQueryIopInvalidDeviceRequest();
     }
@@ -1673,7 +1652,7 @@ VOID kdShutdown(
 {
     WCHAR szDrvPath[MAX_PATH];
 
-    DeleteCriticalSection(&g_kdctx.ListLock);
+    RtlDeleteCriticalSection(&g_kdctx.ListLock);
 
     if (g_kdctx.hDevice == NULL)
         return;
@@ -1690,13 +1669,16 @@ VOID kdShutdown(
 
     ObListDestroy(&g_kdctx.ObjectList);
 
-    // driver was loaded, unload it
-    // windbg recreates service and drops file everytime when kernel debug starts
+    //
+    // Driver was loaded, unload it.
+    // Windbg recreates service and drops file everytime when kernel debug starts.
+    // Windbg behavior untested in win10.
+    //
     if (g_kdctx.IsOurLoad) {
         scmUnloadDeviceDriver(KLDBGDRV);
         // driver file is no longer needed
         RtlSecureZeroMemory(&szDrvPath, sizeof(szDrvPath));
-        _strcpy(szDrvPath, NTOSFOLDERSYSTEM32);
+        _strcpy(szDrvPath, g_WinObj.szSystemDirectory);
         _strcat(szDrvPath, KLDBGDRVSYS);
         DeleteFile(szDrvPath);
     }

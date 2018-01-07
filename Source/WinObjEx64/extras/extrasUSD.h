@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2016
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       EXTRASUSD.H
 *
-*  VERSION:     1.45
+*  VERSION:     1.52
 *
-*  DATE:        06 Aug 2016
+*  DATE:        08 Jan 2018
 *
 *  Common header file for Extras User Shared Data dialog.
 *
@@ -55,7 +55,7 @@ static LPWSTR T_PROCESSOR_FEATURES[] = {
     L""
 };
 
-#define MAX_KNOWN_SHAREDDATAFLAGS 10
+#define MAX_KNOWN_SHAREDDATAFLAGS 11
 static LPCWSTR T_SharedDataFlags[MAX_KNOWN_SHAREDDATAFLAGS] = {
     L"DbgErrorPortPresent",
     L"DbgElevationEnabled",
@@ -66,7 +66,8 @@ static LPCWSTR T_SharedDataFlags[MAX_KNOWN_SHAREDDATAFLAGS] = {
     L"DbgConsoleBrokerEnabled",
     L"DbgSecureBootEnabled",
     L"DbgMultiSessionSku",
-    L"DbgMultiUsersInSessionSku"
+    L"DbgMultiUsersInSessionSku",
+    L"DbgStateSeparationEnabled"
 };
 
 #define MAX_KNOWN_SUITEMASKS 18
@@ -92,5 +93,4 @@ static VALUE_DESC SuiteMasks[MAX_KNOWN_SUITEMASKS] = {
 };
 
 VOID extrasCreateUsdDialog(
-    _In_ HWND hwndParent
-);
+    _In_ HWND hwndParent);

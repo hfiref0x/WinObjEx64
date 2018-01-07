@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       PROPOBJECTDUMPCONSTS.H
 *
-*  VERSION:     1.46
+*  VERSION:     1.52
 *
-*  DATE:        07 Mar 2017
+*  DATE:        08 Jan 2018
 *
 *  Consts header file for Object Dump module.
 *

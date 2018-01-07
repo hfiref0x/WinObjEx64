@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       EXTRAS.C
 *
-*  VERSION:     1.46
+*  VERSION:     1.52
 *
-*  DATE:        09 Mar 2017
+*  DATE:        08 Jan 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -96,7 +96,7 @@ VOID extrasDlgHandleNotify(
         for (c = 0; c < Context->lvColumnCount; c++)
             ListView_SetColumn(Context->ListView, c, &col);
 
-        k = ImageList_GetImageCount(ListViewImages);
+        k = ImageList_GetImageCount(g_ListViewImages);
         if (Context->bInverseSort)
             col.iImage = k - 2;
         else
@@ -128,7 +128,7 @@ VOID extrasSetDlgIcon(
 {
     HANDLE hIcon;
 
-    hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN), IMAGE_ICON, 0, 0, LR_SHARED);
+    hIcon = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN), IMAGE_ICON, 0, 0, LR_SHARED);
     if (hIcon) {
         SetClassLongPtr(hwndDlg, GCLP_HICON, (LONG_PTR)hIcon);
         DestroyIcon(hIcon);

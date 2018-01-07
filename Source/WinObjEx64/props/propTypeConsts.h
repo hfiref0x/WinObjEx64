@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2016
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       PROPTYPECONSTS.H
 *
-*  VERSION:     1.45
+*  VERSION:     1.52
 *
-*  DATE:        07 Aug 2016
+*  DATE:        08 Jan 2018
 *
 *  Consts header file for Type property sheet.
 *

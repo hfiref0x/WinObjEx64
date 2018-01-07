@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       PROPSECURITY.C
 *
-*  VERSION:     1.46
+*  VERSION:     1.52
 *
-*  DATE:        04 Mar 2017
+*  DATE:        08 Jan 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -63,7 +63,7 @@ BOOL propSecurityObjectSupported(
 *
 */
 PSI_ACCESS propGetAccessTable(
-    IObjectSecurity * This
+    _In_ IObjectSecurity * This
 )
 {
     SI_ACCESS *AccessTable = NULL;
@@ -225,15 +225,13 @@ VOID propDefaultCloseObject(
 }
 
 HRESULT STDMETHODCALLTYPE QueryInterface(
-    IObjectSecurity * This,
-    REFIID riid,
-    void **ppvObject
+    _In_ IObjectSecurity * This,
+    _In_ REFIID riid,
+    _Out_ void **ppvObject
 )
 {
-    if (
-        IsEqualIID(riid, &IID_ISecurityInformation) ||
-        IsEqualIID(riid, &IID_IUnknown)
-        )
+    if (IsEqualIID(riid, &IID_ISecurityInformation) ||
+        IsEqualIID(riid, &IID_IUnknown))
     {
         *ppvObject = This;
         This->lpVtbl->AddRef(This);
@@ -245,7 +243,7 @@ HRESULT STDMETHODCALLTYPE QueryInterface(
 }
 
 ULONG STDMETHODCALLTYPE AddRef(
-    IObjectSecurity * This
+    _In_ IObjectSecurity * This
 )
 {
     This->RefCount++;
@@ -253,40 +251,40 @@ ULONG STDMETHODCALLTYPE AddRef(
 }
 
 ULONG STDMETHODCALLTYPE Release(
-    IObjectSecurity * This
+    _In_ IObjectSecurity * This
 )
 {
     This->RefCount--;
 
     if (This->RefCount == 0) {
         if (This->AccessTable) {
-            HeapFree(GetProcessHeap(), 0, This->AccessTable);
+            supHeapFree(This->AccessTable);
         }
-        HeapFree(GetProcessHeap(), 0, This);
+        supHeapFree(This);
         return S_OK;
     }
     return This->RefCount;
 }
 
 HRESULT STDMETHODCALLTYPE GetObjectInformation(
-    IObjectSecurity * This,
-    PSI_OBJECT_INFO pObjectInfo
+    _In_ IObjectSecurity * This,
+    _Out_ PSI_OBJECT_INFO pObjectInfo
 )
 {
     pObjectInfo->dwFlags = This->psiFlags;
     pObjectInfo->hInstance = This->hInstance;
-    pObjectInfo->pszPageTitle = L"Security";
+    pObjectInfo->pszPageTitle = TEXT("Security");
     pObjectInfo->pszObjectName = This->ObjectContext->lpObjectName;
     return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE GetAccessRights(
-    IObjectSecurity * This,
-    const GUID* pguidObjectType,
-    DWORD dwFlags,
-    PSI_ACCESS *ppAccess,
-    ULONG *pcAccesses,
-    ULONG *piDefaultAccess
+    _In_ IObjectSecurity * This,
+    _In_ const GUID* pguidObjectType,
+    _In_ DWORD dwFlags,
+    _Out_ PSI_ACCESS *ppAccess,
+    _Out_ ULONG *pcAccesses,
+    _Out_ ULONG *piDefaultAccess
 )
 {
     UNREFERENCED_PARAMETER(pguidObjectType);
@@ -300,10 +298,10 @@ HRESULT STDMETHODCALLTYPE GetAccessRights(
 }
 
 HRESULT STDMETHODCALLTYPE GetSecurity(
-    IObjectSecurity * This,
-    SECURITY_INFORMATION RequestedInformation,
-    PSECURITY_DESCRIPTOR *ppSecurityDescriptor,
-    BOOL fDefault
+    _In_ IObjectSecurity * This,
+    _In_ SECURITY_INFORMATION RequestedInformation,
+    _Out_ PSECURITY_DESCRIPTOR *ppSecurityDescriptor,
+    _In_ BOOL fDefault
 )
 {
     HRESULT                hResult;
@@ -363,9 +361,9 @@ Done:
 }
 
 HRESULT STDMETHODCALLTYPE SetSecurity(
-    IObjectSecurity * This,
-    SECURITY_INFORMATION SecurityInformation,
-    PSECURITY_DESCRIPTOR pSecurityDescriptor
+    _In_ IObjectSecurity * This,
+    _In_ SECURITY_INFORMATION SecurityInformation,
+    _In_ PSECURITY_DESCRIPTOR pSecurityDescriptor
 )
 {
     NTSTATUS       status;
@@ -385,10 +383,10 @@ HRESULT STDMETHODCALLTYPE SetSecurity(
 }
 
 HRESULT STDMETHODCALLTYPE MapGeneric(
-    IObjectSecurity * This,
-    const GUID *pguidObjectType,
-    UCHAR *pAceFlags,
-    ACCESS_MASK *pMask
+    _In_ IObjectSecurity * This,
+    _In_ const GUID *pguidObjectType,
+    _In_ UCHAR *pAceFlags,
+    _In_ ACCESS_MASK *pMask
 )
 {
     UNREFERENCED_PARAMETER(pguidObjectType);
@@ -399,9 +397,9 @@ HRESULT STDMETHODCALLTYPE MapGeneric(
 }
 
 HRESULT STDMETHODCALLTYPE GetInheritTypes(
-    IObjectSecurity * This,
-    PSI_INHERIT_TYPE *ppInheritTypes,
-    ULONG *pcInheritTypes
+    _In_ IObjectSecurity * This,
+    _Out_ PSI_INHERIT_TYPE *ppInheritTypes,
+    _Out_ ULONG *pcInheritTypes
 )
 {
     UNREFERENCED_PARAMETER(This);
@@ -412,10 +410,10 @@ HRESULT STDMETHODCALLTYPE GetInheritTypes(
 }
 
 HRESULT STDMETHODCALLTYPE PropertySheetPageCallback(
-    IObjectSecurity * This,
-    HWND hwnd,
-    UINT uMsg,
-    SI_PAGE_TYPE uPage
+    _In_ IObjectSecurity * This,
+    _In_ HWND hwnd,
+    _In_ UINT uMsg,
+    _In_ SI_PAGE_TYPE uPage
 )
 {
     UNREFERENCED_PARAMETER(This);
@@ -449,11 +447,11 @@ ObjectSecurityVtbl g_Vtbl = {
 *
 */
 HRESULT propSecurityConstructor(
-    IObjectSecurity		*This,
-    _In_				PROP_OBJECT_INFO *Context,
-    _In_				POPENOBJECTMETHOD OpenObjectMethod,
-    _In_opt_			PCLOSEOBJECTMETHOD CloseObjectMethod,
-    _In_				ULONG psiFlags
+    _In_ IObjectSecurity *This,
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ POPENOBJECTMETHOD OpenObjectMethod,
+    _In_opt_ PCLOSEOBJECTMETHOD CloseObjectMethod,
+    _In_ ULONG psiFlags
 )
 {
     BOOL                        cond = FALSE;
@@ -488,7 +486,7 @@ HRESULT propSecurityConstructor(
             break;
         }
 
-        TypeInfo = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytesNeeded);
+        TypeInfo = supHeapAlloc(bytesNeeded);
         if (TypeInfo == NULL) {
             hResult = HRESULT_FROM_WIN32(GetLastError());
             break;
@@ -504,19 +502,19 @@ HRESULT propSecurityConstructor(
         This->GenericMapping = TypeInfo->GenericMapping;
         This->ValidAccessMask = TypeInfo->ValidAccessMask;
 
-        HeapFree(GetProcessHeap(), 0, TypeInfo);
+        supHeapFree(TypeInfo);
         TypeInfo = NULL;
 
         This->lpVtbl = &g_Vtbl;
         This->ObjectContext = Context;
-        This->hInstance = g_hInstance;
+        This->hInstance = g_WinObj.hInstance;
         This->psiFlags = psiFlags;
 
         TypeAccessTable = propGetAccessTable(This);
 
         //allocate access table
         Size = (MAX_KNOWN_GENERAL_ACCESS_VALUE + This->dwAccessMax) * sizeof(SI_ACCESS);
-        This->AccessTable = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, Size);
+        This->AccessTable = supHeapAlloc(Size);
         if (This->AccessTable == NULL) {
             hResult = HRESULT_FROM_WIN32(GetLastError());
             break;
@@ -558,7 +556,7 @@ HRESULT propSecurityConstructor(
     //cleanup
     This->CloseObjectMethod(This, hObject);
     if (TypeInfo) {
-        HeapFree(GetProcessHeap(), 0, TypeInfo);
+        supHeapFree(TypeInfo);
     }
     return hResult;
 }
@@ -579,12 +577,13 @@ HRESULT propSecurityConstructor(
 *
 * Page close call sequence:
 * PropertySheetPageCallback->Release.
+*
 */
 HPROPSHEETPAGE propSecurityCreatePage(
-    _In_		PROP_OBJECT_INFO *Context,
-    _In_		POPENOBJECTMETHOD OpenObjectMethod,
-    _In_opt_	PCLOSEOBJECTMETHOD CloseObjectMethod,
-    _In_		ULONG psiFlags
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ POPENOBJECTMETHOD OpenObjectMethod,
+    _In_opt_ PCLOSEOBJECTMETHOD CloseObjectMethod,
+    _In_ ULONG psiFlags
 )
 {
     IObjectSecurity *psi;
@@ -601,16 +600,17 @@ HPROPSHEETPAGE propSecurityCreatePage(
         return NULL;
     }
 
-    psi = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(IObjectSecurity));
-    if (psi == NULL) {
+    psi = supHeapAlloc(sizeof(IObjectSecurity));
+    if (psi == NULL)
         return NULL;
-    }
 
-    if (propSecurityConstructor(psi, Context,
-            OpenObjectMethod, CloseObjectMethod,
-            psiFlags) != S_OK)
+    if (propSecurityConstructor(psi, 
+        Context,
+        OpenObjectMethod, 
+        CloseObjectMethod,
+        psiFlags) != S_OK)
     {
-        HeapFree(GetProcessHeap(), 0, psi);
+        supHeapFree(psi);
         return NULL;
     }
 

@@ -1,3 +1,6 @@
+v1.5.2
+internal rearrange
+
 v1.5.1
 bugfixes
 

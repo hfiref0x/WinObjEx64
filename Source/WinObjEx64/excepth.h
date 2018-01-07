@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2016
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       EXCEPTH.H
 *
-*  VERSION:     1.44
+*  VERSION:     1.52
 *
-*  DATE:        17 July 2016
+*  DATE:        08 Jan 2018
 *
 *  Common header file for the exception handling routines.
 *
@@ -20,5 +20,4 @@
 
 INT exceptFilter(
     _In_ UINT ExceptionCode,
-    _In_ EXCEPTION_POINTERS *ExceptionPointers
-);
+    _In_ EXCEPTION_POINTERS *ExceptionPointers);

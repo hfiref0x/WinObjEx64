@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     1.51
+*  VERSION:     1.52
 *
-*  DATE:        02 Dec 2017
+*  DATE:        08 Jan 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -33,13 +33,13 @@ ATOM g_TreeListAtom;
 *
 */
 HTREEITEM TreeListAddItem(
-    HWND TreeList,
-    HTREEITEM hParent,
-    UINT mask,
-    UINT state,
-    UINT stateMask,
-    LPWSTR pszText,
-    PVOID subitems
+    _In_ HWND TreeList,
+    _In_opt_ HTREEITEM hParent,
+    _In_ UINT mask,
+    _In_ UINT state,
+    _In_ UINT stateMask,
+    _In_opt_ LPWSTR pszText,
+    _In_opt_ PVOID subitems
 )
 {
     TVINSERTSTRUCT  tvitem;
@@ -63,7 +63,7 @@ HTREEITEM TreeListAddItem(
 *
 */
 VOID ObDumpShowError(
-    HWND hwndDlg
+    _In_ HWND hwndDlg
 )
 {
     RECT rGB;
@@ -83,13 +83,13 @@ VOID ObDumpShowError(
 *
 */
 VOID ObDumpAddress(
-    HWND TreeList,
-    HTREEITEM hParent,
-    LPWSTR lpszName,
-    LPWSTR lpszDesc, //additional text to be displayed
-    PVOID Address,
-    COLORREF BgColor,
-    COLORREF FontColor
+    _In_ HWND TreeList,
+    _In_ HTREEITEM hParent,
+    _In_ LPWSTR lpszName,
+    _In_opt_ LPWSTR lpszDesc, //additional text to be displayed
+    _In_opt_ PVOID Address,
+    _In_ COLORREF BgColor,
+    _In_ COLORREF FontColor
 )
 {
     TL_SUBITEMS_FIXED  subitems;
@@ -132,12 +132,12 @@ VOID ObDumpAddress(
 *
 */
 VOID ObDumpAddressWithModule(
-    HTREEITEM hParent,
-    LPWSTR lpszName,
-    PVOID Address,
-    PVOID pModules,
-    PVOID SelfDriverBase,
-    ULONG SelfDriverSize
+    _In_ HTREEITEM hParent,
+    _In_ LPWSTR lpszName,
+    _In_opt_ PVOID Address,
+    _In_ PVOID pModules,
+    _In_opt_ PVOID SelfDriverBase,
+    _In_opt_ ULONG SelfDriverSize
 )
 {
     TL_SUBITEMS_FIXED   subitems;
@@ -189,14 +189,14 @@ VOID ObDumpAddressWithModule(
 *
 */
 VOID ObDumpByte(
-    HWND TreeList,
-    HTREEITEM hParent,
-    LPWSTR lpszName,
-    LPWSTR lpszDesc,
-    BYTE Value,
-    COLORREF BgColor,
-    COLORREF FontColor,
-    BOOL IsBool
+    _In_ HWND TreeList,
+    _In_ HTREEITEM hParent,
+    _In_ LPWSTR lpszName,
+    _In_opt_ LPWSTR lpszDesc,
+    _In_ BYTE Value,
+    _In_opt_ COLORREF BgColor,
+    _In_opt_ COLORREF FontColor,
+    _In_ BOOL IsBool
 )
 {
     TL_SUBITEMS_FIXED   subitems;
@@ -215,7 +215,7 @@ VOID ObDumpByte(
         _strcpy(szValue, (BOOL)(Value) ? L"TRUE" : L"FALSE");
     }
     else {
-        wsprintfW(szValue, FORMAT_HEXBYTE, Value);
+        wsprintf(szValue, FORMAT_HEXBYTE, Value);
     }
 
     subitems.Text[0] = szValue;
@@ -243,15 +243,15 @@ VOID ObDumpByte(
 *
 */
 VOID ObDumpUlong(
-    HWND TreeList,
-    HTREEITEM hParent,
-    LPWSTR lpszName,
-    LPWSTR lpszDesc, //additional text to be displayed
-    ULONG Value,
-    BOOL HexDump,
-    BOOL IsUShort,
-    COLORREF BgColor,
-    COLORREF FontColor
+    _In_ HWND TreeList,
+    _In_ HTREEITEM hParent,
+    _In_ LPWSTR lpszName,
+    _In_opt_ LPWSTR lpszDesc, //additional text to be displayed
+    _In_ ULONG Value,
+    _In_ BOOL HexDump,
+    _In_ BOOL IsUShort,
+    _In_opt_ COLORREF BgColor,
+    _In_opt_ COLORREF FontColor
 )
 {
     TL_SUBITEMS_FIXED   subitems;
@@ -310,10 +310,10 @@ VOID ObDumpUlong(
 *
 */
 VOID ObDumpULargeInteger(
-    HWND TreeList,
-    HTREEITEM hParent,
-    LPWSTR ListEntryName,
-    PULARGE_INTEGER Value
+    _In_ HWND TreeList,
+    _In_ HTREEITEM hParent,
+    _In_ LPWSTR ListEntryName,
+    _In_opt_ PULARGE_INTEGER Value
 )
 {
     HTREEITEM           h_tviSubItem;
@@ -327,6 +327,7 @@ VOID ObDumpULargeInteger(
         return;
     }
 
+    //add large integer entry item to treelist and exit if value is null
     if (Value == NULL) {
         return;
     }
@@ -360,10 +361,10 @@ VOID ObDumpULargeInteger(
 *
 */
 VOID ObDumpListEntry(
-    HWND TreeList,
-    HTREEITEM hParent,
-    LPWSTR ListEntryName,
-    PLIST_ENTRY ListEntry
+    _In_ HWND TreeList,
+    _In_ HTREEITEM hParent,
+    _In_ LPWSTR ListEntryName,
+    _In_opt_ PLIST_ENTRY ListEntry
 )
 {
     HTREEITEM           h_tviSubItem;
@@ -422,10 +423,10 @@ VOID ObDumpListEntry(
 *
 */
 VOID ObDumpUnicodeString(
-    HTREEITEM hParent,
-    LPWSTR StringName,
-    PUNICODE_STRING pString,
-    BOOL NeedDump
+    _In_ HTREEITEM hParent,
+    _In_ LPWSTR StringName,
+    _In_opt_ PUNICODE_STRING pString,
+    _In_ BOOL NeedDump
 )
 {
     LPWSTR              lpObjectName;
@@ -457,9 +458,16 @@ VOID ObDumpUnicodeString(
         }
     }
     else {
-        uStr.Buffer = pString->Buffer;
-        uStr.Length = pString->Length;
-        uStr.MaximumLength = pString->MaximumLength;
+        if (pString) {
+            uStr.Buffer = pString->Buffer;
+            uStr.Length = pString->Length;
+            uStr.MaximumLength = pString->MaximumLength;
+        }
+        else {
+            uStr.Buffer = NULL;
+            uStr.Length = 0;
+            uStr.MaximumLength = 0;
+        }
     }
     h_tviSubItem = TreeListAddItem(g_TreeList, hParent, TVIF_TEXT | TVIF_STATE, TVIS_EXPANDED,
         0, StringName, NeedDump ? &subitems : NULL);
@@ -509,9 +517,7 @@ VOID ObDumpUnicodeString(
         subitems.Text[0] = szValue;
 
         //dump unicode string buffer
-        lpObjectName = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY,
-            uStr.Length + sizeof(UNICODE_NULL));
-
+        lpObjectName = supHeapAlloc(uStr.Length + sizeof(UNICODE_NULL));
         if (lpObjectName) {
             kdReadSystemMemory((ULONG_PTR)uStr.Buffer,
                 lpObjectName, uStr.Length);
@@ -523,8 +529,7 @@ VOID ObDumpUnicodeString(
         0, L"Buffer", &subitems);
 
     if (lpObjectName) {
-        HeapFree(GetProcessHeap(), 0, lpObjectName);
-        lpObjectName = NULL;
+        supHeapFree(lpObjectName);
     }
 }
 
@@ -537,18 +542,14 @@ VOID ObDumpUnicodeString(
 *
 */
 VOID ObDumpDispatcherHeader(
-    HTREEITEM hParent,
-    DISPATCHER_HEADER *Header,
-    LPWSTR lpDescType,
-    LPWSTR lpDescSignalState,
-    LPWSTR lpDescSize
+    _In_ HTREEITEM hParent,
+    _In_ DISPATCHER_HEADER *Header,
+    _In_opt_ LPWSTR lpDescType,
+    _In_opt_ LPWSTR lpDescSignalState,
+    _In_opt_ LPWSTR lpDescSize
 )
 {
     HTREEITEM h_tviSubItem;
-
-    if (Header == NULL) {
-        return;
-    }
 
     h_tviSubItem = TreeListAddItem(g_TreeList, hParent, TVIF_TEXT | TVIF_STATE, 0,
         0, L"Header", NULL);
@@ -803,7 +804,7 @@ VOID ObDumpDriverObject(
 
             //InInitializationOrderLinks/InProgressLinks
             lpType = L"InInitializationOrderLinks";
-            if (g_kdctx.osver.dwBuildNumber >= 9600) {
+            if (g_WinObj.osver.dwBuildNumber >= 9600) {
                 lpType = L"InProgressLinks";
             }
             ObDumpListEntry(g_TreeList, h_tviRootItem, lpType, &ldrEntry.DUMMYUNION0.InInitializationOrderLinks);
@@ -828,7 +829,7 @@ VOID ObDumpDriverObject(
 
             //LoadCount
             lpType = L"ObsoleteLoadCount";
-            if (g_kdctx.osver.dwBuildNumber < 9200) {
+            if (g_WinObj.osver.dwBuildNumber < 9200) {
                 lpType = L"LoadCount";
             }
             ObDumpUlong(g_TreeList, h_tviRootItem, lpType, NULL, ldrEntry.ObsoleteLoadCount, TRUE, TRUE, 0, 0);
@@ -843,7 +844,7 @@ VOID ObDumpDriverObject(
             ObDumpUlong(g_TreeList, h_tviRootItem, L"CheckSum", NULL, ldrEntry.DUMMYUNION1.CheckSum, TRUE, FALSE, 0, 0);
 
             //LoadedImports
-            if (g_kdctx.osver.dwBuildNumber < 9200) {
+            if (g_WinObj.osver.dwBuildNumber < 9200) {
                 ObDumpAddress(g_TreeList, h_tviRootItem, L"LoadedImports", NULL, ldrEntry.DUMMYUNION2.LoadedImports, 0, 0);
             }
 
@@ -937,7 +938,7 @@ VOID ObDumpDriverObject(
         //Cleanup
         //
         if (pModules) {
-            HeapFree(GetProcessHeap(), 0, pModules);
+            supHeapFree(pModules);
         }
 
     }
@@ -1555,8 +1556,8 @@ VOID ObDumpDirectoryObject(
 *
 */
 VOID ObDumpSyncObject(
-    PROP_OBJECT_INFO *Context,
-    HWND hwndDlg
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ HWND hwndDlg
 )
 {
     HTREEITEM            h_tviRootItem;
@@ -1596,7 +1597,7 @@ VOID ObDumpSyncObject(
 
         }
 
-        Object = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, ObjectSize);
+        Object = supHeapAlloc(ObjectSize);
         if (Object == NULL) {
             ObDumpShowError(hwndDlg);
             return;
@@ -1605,7 +1606,7 @@ VOID ObDumpSyncObject(
         //dump object
         if (!kdReadSystemMemory(Context->ObjectInfo.ObjectAddress, Object, ObjectSize)) {
             ObDumpShowError(hwndDlg);
-            HeapFree(GetProcessHeap(), 0, Object);
+            supHeapFree(Object);
             return;
         }
 
@@ -1613,7 +1614,7 @@ VOID ObDumpSyncObject(
         g_TreeListAtom = 0;
         if (!supInitTreeListForDump(hwndDlg, &g_TreeListAtom, &g_TreeList)) {
             ObDumpShowError(hwndDlg);
-            HeapFree(GetProcessHeap(), 0, Object);
+            supHeapFree(Object);
             return;
         }
 
@@ -1707,6 +1708,12 @@ VOID ObDumpSyncObject(
 
         }
 
+        if (Header == NULL) {
+            ObDumpShowError(hwndDlg);
+            supHeapFree(Object);
+            return;
+        }
+
         h_tviRootItem = TreeListAddItem(g_TreeList, NULL, TVIF_TEXT | TVIF_STATE, TVIS_EXPANDED,
             TVIS_EXPANDED, lpType, NULL);
 
@@ -1742,7 +1749,7 @@ VOID ObDumpSyncObject(
 
         }
 
-        HeapFree(GetProcessHeap(), 0, Object);
+        supHeapFree(Object);
     }
     __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
         return;
@@ -1750,8 +1757,8 @@ VOID ObDumpSyncObject(
 }
 
 VOID ObDumpObjectType(
-    PROP_OBJECT_INFO *Context,
-    HWND hwndDlg
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ HWND hwndDlg
 )
 {
     BOOL                    cond, bOkay;
@@ -1802,7 +1809,7 @@ VOID ObDumpObjectType(
 
         //we don't need it anymore
         if (pObject) {
-            HeapFree(GetProcessHeap(), 0, pObject);
+            supHeapFree(pObject);
         }
 
         //
@@ -1922,7 +1929,7 @@ VOID ObDumpObjectType(
             }
         }
 
-        HeapFree(GetProcessHeap(), 0, pModulesList);
+        supHeapFree(pModulesList);
     }
     __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
         return;
@@ -1938,8 +1945,8 @@ VOID ObDumpObjectType(
 *
 */
 VOID ObDumpQueueObject(
-    PROP_OBJECT_INFO *Context,
-    HWND hwndDlg
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ HWND hwndDlg
 )
 {
     HTREEITEM h_tviRootItem;
@@ -2003,8 +2010,8 @@ VOID ObDumpQueueObject(
 *
 */
 VOID ObDumpFltServerPort(
-    PROP_OBJECT_INFO *Context,
-    HWND hwndDlg
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ HWND hwndDlg
 )
 {
     HTREEITEM h_tviRootItem;
@@ -2056,7 +2063,7 @@ VOID ObDumpFltServerPort(
         ObDumpUlong(g_TreeList, h_tviRootItem, L"NumberOfConnections", NULL, FltServerPortObject.NumberOfConnections, TRUE, FALSE, 0, 0);
         ObDumpUlong(g_TreeList, h_tviRootItem, L"MaxConnections", NULL, FltServerPortObject.MaxConnections, TRUE, FALSE, 0, 0);
 
-        HeapFree(GetProcessHeap(), 0, pModules);
+        supHeapFree(pModules);
     }
     __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
         return;

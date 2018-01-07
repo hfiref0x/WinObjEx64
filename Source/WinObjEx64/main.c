@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.50
+*  VERSION:     1.52
 *
-*  DATE:        10 Apr 2017
+*  DATE:        08 Jan 2018
 *
 *  Program entry point and main window handler.
 *
@@ -27,6 +27,8 @@
 static LONG	SplitterPos = 180;
 static LONG	SortColumn = 0;
 HTREEITEM	SelectedTreeItem = NULL;
+BOOL        bMainWndSortInverse = FALSE;
+HWND        hwndToolBar = NULL, hwndSplitter = NULL, hwndStatusBar = NULL, MainWindow = NULL;
 
 /*
 * MainWindowObjectListCompareFunc
@@ -45,30 +47,30 @@ INT CALLBACK MainWindowObjectListCompareFunc(
     INT    nResult = 0;
     LPWSTR lpItem1 = NULL, lpItem2 = NULL;
 
-    lpItem1 = supGetItemText(ObjectList, (INT)lParam1, (INT)lParamSort, NULL);
-    lpItem2 = supGetItemText(ObjectList, (INT)lParam2, (INT)lParamSort, NULL);
+    lpItem1 = supGetItemText(g_hwndObjectList, (INT)lParam1, (INT)lParamSort, NULL);
+    lpItem2 = supGetItemText(g_hwndObjectList, (INT)lParam2, (INT)lParamSort, NULL);
 
     if ((lpItem1 == NULL) && (lpItem2 == NULL)) {
         nResult = 0;
         goto Done;
     }
     if ((lpItem1 == NULL) && (lpItem2 != NULL)) {
-        nResult = (bSortInverse) ? 1 : -1;
+        nResult = (bMainWndSortInverse) ? 1 : -1;
         goto Done;
     }
     if ((lpItem2 == NULL) && (lpItem1 != NULL)) {
-        nResult = (bSortInverse) ? -1 : 1;
+        nResult = (bMainWndSortInverse) ? -1 : 1;
         goto Done;
     }
 
-    if (bSortInverse)
+    if (bMainWndSortInverse)
         nResult = _strcmpi(lpItem2, lpItem1);
     else
         nResult = _strcmpi(lpItem1, lpItem2);
 
 Done:
-    if (lpItem1) HeapFree(GetProcessHeap(), 0, lpItem1);
-    if (lpItem2) HeapFree(GetProcessHeap(), 0, lpItem2);
+    if (lpItem1) supHeapFree(lpItem1);
+    if (lpItem2) supHeapFree(lpItem2);
 
     return nResult;
 }
@@ -103,7 +105,7 @@ VOID MainWindowHandleObjectTreeProp(
     tvi.cchTextMax = MAX_PATH;
     tvi.mask = TVIF_TEXT;
     tvi.hItem = SelectedTreeItem;
-    if (TreeView_GetItem(ObjectTree, &tvi)) {
+    if (TreeView_GetItem(g_hwndObjectTree, &tvi)) {
         propCreateDialog(hwnd, szBuffer, g_lpObjectNames[TYPE_DIRECTORY], NULL);
     }
 }
@@ -127,31 +129,31 @@ VOID MainWindowHandleObjectListProp(
         return;
 
     //nothing selected, go away
-    if (ListView_GetSelectedCount(ObjectList) == 0) {
+    if (ListView_GetSelectedCount(g_hwndObjectList) == 0) {
         return;
     }
 
-    nSelected = ListView_GetSelectionMark(ObjectList);
+    nSelected = ListView_GetSelectionMark(g_hwndObjectList);
     if (nSelected == -1) {
         return;
     }
 
-    lpItemText = supGetItemText(ObjectList, nSelected, 0, NULL);
+    lpItemText = supGetItemText(g_hwndObjectList, nSelected, 0, NULL);
     if (lpItemText) {
-        lpType = supGetItemText(ObjectList, nSelected, 1, NULL);
+        lpType = supGetItemText(g_hwndObjectList, nSelected, 1, NULL);
         if (lpType) {
 
             //lpDesc is not important, we can work if it NULL
-            lpDesc = supGetItemText(ObjectList, nSelected, 2, NULL);
+            lpDesc = supGetItemText(g_hwndObjectList, nSelected, 2, NULL);
 
             propCreateDialog(hwnd, lpItemText, lpType, lpDesc);
 
             if (lpDesc) {
-                HeapFree(GetProcessHeap(), 0, lpDesc);
+                supHeapFree(lpDesc);
             }
-            HeapFree(GetProcessHeap(), 0, lpType);
+            supHeapFree(lpType);
         }
-        HeapFree(GetProcessHeap(), 0, lpItemText);
+        supHeapFree(lpItemText);
     }
 }
 
@@ -167,7 +169,7 @@ VOID MainWindowOnRefresh(
     _In_ HWND hwnd
 )
 {
-    LPWSTR  CurrentObject = NULL;
+    LPWSTR  CurrentPath = NULL;
     SIZE_T  len;
 
     UNREFERENCED_PARAMETER(hwnd);
@@ -188,25 +190,24 @@ VOID MainWindowOnRefresh(
             &g_kdctx, 0, NULL);
     }
 
-    supFreeSCMSnapshot(g_enumParams.scmSnapshot);
-    sapiFreeSnapshot(g_enumParams.sapiDB);
-    RtlSecureZeroMemory(&g_enumParams, sizeof(g_enumParams));
-    g_enumParams.scmSnapshot = supCreateSCMSnapshot(&g_enumParams.scmNumberOfEntries);
-    g_enumParams.sapiDB = sapiCreateSetupDBSnapshot();
-    g_enumParams.lpSubDirName = CurrentObjectPath;
+    supFreeSCMSnapshot();
+    sapiFreeSnapshot();
 
-    len = _strlen(CurrentObjectPath);
-    CurrentObject = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (len + 1) * sizeof(WCHAR));
-    if (CurrentObject)
-        _strcpy(CurrentObject, CurrentObjectPath);
+    supCreateSCMSnapshot();
+    sapiCreateSetupDBSnapshot();
 
-    TreeView_DeleteAllItems(ObjectTree);
+    len = _strlen(g_WinObj.CurrentObjectPath);
+    CurrentPath = supHeapAlloc((len + 1) * sizeof(WCHAR));
+    if (CurrentPath)
+        _strcpy(CurrentPath, g_WinObj.CurrentObjectPath);
+
+    TreeView_DeleteAllItems(g_hwndObjectTree);
     ListObjectDirectoryTree(L"\\", NULL, NULL);
-    TreeView_SelectItem(ObjectTree, TreeView_GetRoot(ObjectTree));
+    TreeView_SelectItem(g_hwndObjectTree, TreeView_GetRoot(g_hwndObjectTree));
 
-    if (CurrentObject) {
-        ListToObject(CurrentObject);
-        HeapFree(GetProcessHeap(), 0, CurrentObject);
+    if (CurrentPath) {
+        ListToObject(CurrentPath);
+        supHeapFree(CurrentPath);
     }
 
     supSetWaitCursor(FALSE);
@@ -243,16 +244,16 @@ LRESULT MainWindowHandleWMCommand(
 
     case ID_OBJECT_PROPERTIES:
         hwndFocus = GetFocus();
-        if (hwndFocus == ObjectList) {
+        if (hwndFocus == g_hwndObjectList) {
             MainWindowHandleObjectListProp(hwnd);
         }
-        if (hwndFocus == ObjectTree) {
+        if (hwndFocus == g_hwndObjectTree) {
             MainWindowHandleObjectTreeProp(hwnd);
         }
         break;
 
     case ID_OBJECT_GOTOLINKTARGET:
-        lpItemText = supGetItemText(ObjectList, ListView_GetSelectionMark(ObjectList), 2, NULL);
+        lpItemText = supGetItemText(g_hwndObjectList, ListView_GetSelectionMark(g_hwndObjectList), 2, NULL);
         if (lpItemText) {
             if (_strcmpi(lpItemText, L"\\??") == 0) {
                 ListToObject(L"\\GLOBAL??");
@@ -260,19 +261,17 @@ LRESULT MainWindowHandleWMCommand(
             else {
                 ListToObject(lpItemText);
             }
-            HeapFree(GetProcessHeap(), 0, lpItemText);
+            supHeapFree(lpItemText);
         }
         else {
-            lpItemText = supGetItemText(ObjectList, ListView_GetSelectionMark(ObjectList), 0, NULL);
+            lpItemText = supGetItemText(g_hwndObjectList, ListView_GetSelectionMark(g_hwndObjectList), 0, NULL);
             if (lpItemText) {
-                if (
-                    (_strcmpi(lpItemText, L"GLOBALROOT") == 0) &&
-                    (_strcmpi(CurrentObjectPath, L"\\GLOBAL??") == 0)
-                    )
+                if ((_strcmpi(lpItemText, L"GLOBALROOT") == 0) &&
+                    (_strcmpi(g_WinObj.CurrentObjectPath, L"\\GLOBAL??") == 0))
                 {
                     ListToObject(L"\\");
                 }
-                HeapFree(GetProcessHeap(), 0, lpItemText);
+                supHeapFree(lpItemText);
             }
         }
         break;
@@ -302,7 +301,7 @@ LRESULT MainWindowHandleWMCommand(
 
         //Extras -> Private Namespaces
     case ID_EXTRAS_PRIVATENAMESPACES:
-        if (g_kdctx.osver.dwBuildNumber <= 10240) {
+        if (g_WinObj.osver.dwBuildNumber <= 10240) {
 
             //feature require driver usage
             if (g_kdctx.hDevice != NULL) {
@@ -330,7 +329,7 @@ LRESULT MainWindowHandleWMCommand(
         break;
 
     case ID_HELP_ABOUT:
-        DialogBoxParam(g_hInstance, MAKEINTRESOURCE(IDD_DIALOG_ABOUT),
+        DialogBoxParam(g_WinObj.hInstance, MAKEINTRESOURCE(IDD_DIALOG_ABOUT),
             hwnd, (DLGPROC)&AboutDialogProc, 0);
         break;
 
@@ -368,8 +367,8 @@ VOID MainWindowTreeViewSelChanged(
     if (!trhdr->itemNew.hItem)
         return;
 
-    if (CurrentObjectPath != NULL)
-        HeapFree(GetProcessHeap(), 0, CurrentObjectPath);
+    if (g_WinObj.CurrentObjectPath != NULL)
+        supHeapFree(g_WinObj.CurrentObjectPath);
 
     root = TreeView_GetRoot(trhdr->hdr.hwndFrom);
 
@@ -387,7 +386,7 @@ VOID MainWindowTreeViewSelChanged(
 
         p += _strlen(text) + 1; //+1 for '\'
 
-        list = HeapAlloc(GetProcessHeap(), 0, sizeof(OE_LIST_ITEM));
+        list = supHeapAlloc(sizeof(OE_LIST_ITEM));
         if (list) {
             list->Prev = prevlist;
             list->TreeItem = hitem;
@@ -396,17 +395,17 @@ VOID MainWindowTreeViewSelChanged(
     }
 
     if (list == NULL) {
-        CurrentObjectPath = HeapAlloc(GetProcessHeap(), 0, 2 * sizeof(WCHAR));
-        if (CurrentObjectPath) {
-            CurrentObjectPath[0] = L'\\';
-            CurrentObjectPath[1] = 0;
+        g_WinObj.CurrentObjectPath = supHeapAlloc(2 * sizeof(WCHAR));
+        if (g_WinObj.CurrentObjectPath) {
+            g_WinObj.CurrentObjectPath[0] = L'\\';
+            g_WinObj.CurrentObjectPath[1] = 0;
         }
         return;
     }
 
     list = prevlist;
-    CurrentObjectPath = HeapAlloc(GetProcessHeap(), 0, p * sizeof(WCHAR));
-    if (CurrentObjectPath) {
+    g_WinObj.CurrentObjectPath = supHeapAlloc(p * sizeof(WCHAR));
+    if (g_WinObj.CurrentObjectPath) {
         p = 0;
         // building the final string
         while (list != NULL) {
@@ -418,13 +417,13 @@ VOID MainWindowTreeViewSelChanged(
             sitem.cchTextMax = MAX_PATH;
             TreeView_GetItem(trhdr->hdr.hwndFrom, &sitem);
 
-            CurrentObjectPath[p] = L'\\';
+            g_WinObj.CurrentObjectPath[p] = L'\\';
             p++;
-            _strcpy(CurrentObjectPath + p, text);
+            _strcpy(g_WinObj.CurrentObjectPath + p, text);
             p += _strlen(text);
 
             prevlist = list->Prev;
-            HeapFree(GetProcessHeap(), 0, list);
+            supHeapFree(list);
             list = prevlist;
         }
     }
@@ -462,19 +461,18 @@ LRESULT MainWindowHandleWMNotify(
 
     if (hdr) {
 
-        if (hdr->hwndFrom == ObjectTree) {
+        if (hdr->hwndFrom == g_hwndObjectTree) {
             switch (hdr->code) {
             case TVN_ITEMEXPANDED:
             case TVN_SELCHANGED:
-                SetFocus(ObjectTree);
+                SetFocus(g_hwndObjectTree);
                 supSetWaitCursor(TRUE);
                 MainWindowTreeViewSelChanged((LPNMTREEVIEWW)lParam);
-                SendMessageW(StatusBar, WM_SETTEXT, 0, (LPARAM)CurrentObjectPath);
+                SendMessage(hwndStatusBar, WM_SETTEXT, 0, (LPARAM)g_WinObj.CurrentObjectPath);
 
-                g_enumParams.lpSubDirName = CurrentObjectPath;
-                ListObjectsInDirectory(&g_enumParams);
+                ListObjectsInDirectory(g_WinObj.CurrentObjectPath);
 
-                ListView_SortItemsEx(ObjectList, &MainWindowObjectListCompareFunc, SortColumn);
+                ListView_SortItemsEx(g_hwndObjectList, &MainWindowObjectListCompareFunc, SortColumn);
 
                 supSetWaitCursor(FALSE);
 
@@ -491,36 +489,36 @@ LRESULT MainWindowHandleWMNotify(
                 if (TreeView_HitTest(hdr->hwndFrom, &hti) &&
                     (hti.flags & (TVHT_ONITEM | TVHT_ONITEMRIGHT))) {
                     SelectedTreeItem = hti.hItem;
-                    TreeView_SelectItem(ObjectTree, SelectedTreeItem);
-                    SendMessageW(StatusBar, WM_SETTEXT, 0, (LPARAM)CurrentObjectPath);
+                    TreeView_SelectItem(g_hwndObjectTree, SelectedTreeItem);
+                    SendMessage(hwndStatusBar, WM_SETTEXT, 0, (LPARAM)g_WinObj.CurrentObjectPath);
                     supHandleTreePopupMenu(hwnd, &pt);
                 }
                 break;
             }
         }
 
-        if (hdr->hwndFrom == ObjectList) {
+        if (hdr->hwndFrom == g_hwndObjectList) {
             switch (hdr->code) {
             case NM_SETFOCUS:
-                if (ListView_GetSelectionMark(ObjectList) == -1) {
+                if (ListView_GetSelectionMark(g_hwndObjectList) == -1) {
                     lvitem.mask = LVIF_STATE;
                     lvitem.iItem = 0;
                     lvitem.state = LVIS_SELECTED | LVIS_FOCUSED;
                     lvitem.stateMask = LVIS_SELECTED | LVIS_FOCUSED;
-                    ListView_SetItem(ObjectList, &lvitem);
+                    ListView_SetItem(g_hwndObjectList, &lvitem);
                 }
 
                 break;
             case LVN_ITEMCHANGED:
                 lvn = (LPNMLISTVIEW)lParam;
                 RtlSecureZeroMemory(&item_string, sizeof(item_string));
-                ListView_GetItemText(ObjectList, lvn->iItem, 0, item_string, MAX_PATH);
-                lcp = _strlen(CurrentObjectPath);
+                ListView_GetItemText(g_hwndObjectList, lvn->iItem, 0, item_string, MAX_PATH);
+                lcp = _strlen(g_WinObj.CurrentObjectPath);
                 if (lcp) {
-                    str = HeapAlloc(GetProcessHeap(), 0, (lcp + sizeof(item_string) + 4) * sizeof(WCHAR));
+                    str = supHeapAlloc((lcp + sizeof(item_string) + 4) * sizeof(WCHAR));
                     if (str == NULL)
                         break;
-                    _strcpy(str, CurrentObjectPath);
+                    _strcpy(str, g_WinObj.CurrentObjectPath);
 
                     if ((str[0] == '\\') && (str[1] == 0)) {
                         _strcpy(str + lcp, item_string);
@@ -529,37 +527,32 @@ LRESULT MainWindowHandleWMNotify(
                         str[lcp] = '\\';
                         _strcpy(str + lcp + 1, item_string);
                     }
-                    SendMessageW(StatusBar, WM_SETTEXT, 0, (LPARAM)str);
-                    HeapFree(GetProcessHeap(), 0, str);
+                    SendMessage(hwndStatusBar, WM_SETTEXT, 0, (LPARAM)str);
+                    supHeapFree(str);
                 }
                 break;
 
                 //handle sort by column
             case LVN_COLUMNCLICK:
-                bSortInverse = !bSortInverse;
+                bMainWndSortInverse = !bMainWndSortInverse;
                 SortColumn = ((NMLISTVIEW *)lParam)->iSubItem;
-                ListView_SortItemsEx(ObjectList, &MainWindowObjectListCompareFunc, SortColumn);
+                ListView_SortItemsEx(g_hwndObjectList, &MainWindowObjectListCompareFunc, SortColumn);
 
                 RtlSecureZeroMemory(&col, sizeof(col));
                 col.mask = LVCF_IMAGE;
                 col.iImage = -1;
 
                 for (c = 0; c < 3; c++)
-                    ListView_SetColumn(ObjectList, c, &col);
+                    ListView_SetColumn(g_hwndObjectList, c, &col);
 
-                k = ImageList_GetImageCount(ListViewImages);
-                if (bSortInverse)
+                k = ImageList_GetImageCount(g_ListViewImages);
+                if (bMainWndSortInverse)
                     col.iImage = k - 2;
                 else
                     col.iImage = k - 1;
 
-                ListView_SetColumn(ObjectList, ((NMLISTVIEW *)lParam)->iSubItem, &col);
+                ListView_SetColumn(g_hwndObjectList, ((NMLISTVIEW *)lParam)->iSubItem, &col);
 
-                break;
-            case NM_CLICK:
-                c = ((LPNMITEMACTIVATE)lParam)->iItem;
-                EnableMenuItem(GetSubMenu(GetMenu(hwnd), 2), ID_OBJECT_GOTOLINKTARGET,
-                    (supIsSymlink(c)) ? MF_BYCOMMAND : MF_BYCOMMAND | MF_GRAYED);
                 break;
 
             case NM_DBLCLK:
@@ -580,7 +573,7 @@ LRESULT MainWindowHandleWMNotify(
             case ID_OBJECT_PROPERTIES:
             case ID_VIEW_REFRESH:
             case ID_FIND_FINDOBJECT:
-                lpttt->hinst = g_hInstance;
+                lpttt->hinst = g_WinObj.hInstance;
                 lpttt->lpszText = MAKEINTRESOURCE(lpttt->hdr.idFrom);
                 lpttt->uFlags |= TTF_DI_SETITEM;
                 break;
@@ -609,13 +602,13 @@ VOID MainWindowResizeHandler(
     RECT ToolBarRect, StatusBarRect;
     LONG posY, sizeY, sizeX;
 
-    if (ToolBar1 != NULL) {
-        SendMessage(ToolBar1, WM_SIZE, 0, 0);
-        SendMessage(StatusBar, WM_SIZE, 0, 0);
+    if (hwndToolBar != NULL) {
+        SendMessage(hwndToolBar, WM_SIZE, 0, 0);
+        SendMessage(hwndStatusBar, WM_SIZE, 0, 0);
         RtlSecureZeroMemory(&ToolBarRect, sizeof(ToolBarRect));
         RtlSecureZeroMemory(&StatusBarRect, sizeof(StatusBarRect));
-        GetWindowRect(ToolBar1, &ToolBarRect);
-        GetWindowRect(StatusBar, &StatusBarRect);
+        GetWindowRect(hwndToolBar, &ToolBarRect);
+        GetWindowRect(hwndStatusBar, &StatusBarRect);
 
         sizeX = ToolBarRect.right - ToolBarRect.left;
         if (sPos > sizeX - SplitterMargin)
@@ -625,9 +618,9 @@ VOID MainWindowResizeHandler(
         posY = ToolBarRect.bottom - ToolBarRect.top;
         sizeX = ToolBarRect.right - ToolBarRect.left - sPos - SplitterSize;
 
-        SetWindowPos(ObjectTree, NULL, 0, posY, sPos, sizeY, 0);
-        SetWindowPos(ObjectList, NULL, sPos + SplitterSize, posY, sizeX, sizeY, 0);
-        SetWindowPos(Splitter, NULL, sPos, posY, SplitterSize, sizeY, 0);
+        SetWindowPos(g_hwndObjectTree, NULL, 0, posY, sPos, sizeY, 0);
+        SetWindowPos(g_hwndObjectList, NULL, sPos + SplitterSize, posY, sizeX, sizeY, 0);
+        SetWindowPos(hwndSplitter, NULL, sPos, posY, SplitterSize, sizeY, 0);
     }
 }
 
@@ -656,25 +649,25 @@ LRESULT CALLBACK MainWindowProc(
 
         RtlSecureZeroMemory(&crc, sizeof(crc));
 
-        if ((HWND)wParam == ObjectTree) {
-            TreeView_GetItemRect(ObjectTree, TreeView_GetSelection(ObjectTree), &crc, TRUE);
+        if ((HWND)wParam == g_hwndObjectTree) {
+            TreeView_GetItemRect(g_hwndObjectTree, TreeView_GetSelection(g_hwndObjectTree), &crc, TRUE);
             crc.top = crc.bottom;
-            ClientToScreen(ObjectTree, (LPPOINT)&crc);
+            ClientToScreen(g_hwndObjectTree, (LPPOINT)&crc);
             supHandleTreePopupMenu(hwnd, (LPPOINT)&crc);
         }
 
-        if ((HWND)wParam == ObjectList) {
-            mark = ListView_GetSelectionMark(ObjectList);
+        if ((HWND)wParam == g_hwndObjectList) {
+            mark = ListView_GetSelectionMark(g_hwndObjectList);
 
             if (lParam == MAKELPARAM(-1, -1)) {
-                ListView_GetItemRect(ObjectList, mark, &crc, TRUE);
+                ListView_GetItemRect(g_hwndObjectList, mark, &crc, TRUE);
                 crc.top = crc.bottom;
-                ClientToScreen(ObjectList, (LPPOINT)&crc);
+                ClientToScreen(g_hwndObjectList, (LPPOINT)&crc);
             }
             else
                 GetCursorPos((LPPOINT)&crc);
 
-            supHandleObjectPopupMenu(hwnd, mark, (LPPOINT)&crc);
+            supHandleObjectPopupMenu(hwnd, g_hwndObjectList, mark, (LPPOINT)&crc);
         }
         break;
 
@@ -754,14 +747,14 @@ LRESULT CALLBACK MainWindowProc(
 *
 */
 BOOL MainDlgMsgHandler(
-    MSG msg
+    _In_ MSG msg
 )
 {
     UINT c;
 
     for (c = 0; c < WOBJ_MAX_DIALOGS; c++) {
-        if ((g_wobjDialogs[c] != NULL)) {
-            if (IsDialogMessage(g_wobjDialogs[c], &msg))
+        if ((g_WinObj.AuxDialogs[c] != NULL)) {
+            if (IsDialogMessage(g_WinObj.AuxDialogs[c], &msg))
                 return TRUE;
         }
     }
@@ -778,6 +771,74 @@ BOOL MainDlgMsgHandler(
 }
 
 /*
+* WinObjInitGlobals
+*
+* Purpose:
+*
+* Initialize global variables.
+*
+*/
+BOOL WinObjInitGlobals()
+{
+    SIZE_T cch;
+    BOOL bResult = FALSE, bCond = FALSE;
+
+    do {
+        RtlSecureZeroMemory(&g_WinObj, sizeof(g_WinObj));
+
+        //
+        // Query version info.
+        //
+        g_WinObj.osver.dwOSVersionInfoSize = sizeof(g_WinObj.osver);
+        RtlGetVersion(&g_WinObj.osver);
+
+        //
+        // Remember hInstance.
+        //
+        g_WinObj.hInstance = GetModuleHandle(NULL);
+
+        //
+        // Create dedicated heap.
+        //
+        g_WinObj.Heap = RtlCreateHeap(HEAP_GROWABLE, NULL, 0, 0, NULL, NULL);
+        if (g_WinObj.Heap == NULL)
+            break;
+
+        RtlSetHeapInformation(g_WinObj.Heap, HeapEnableTerminationOnCorruption, NULL, 0);
+        RtlInitializeCriticalSection(&g_WinObj.Lock);
+
+        //
+        // Remember %TEMP% directory.
+        //
+        cch = ExpandEnvironmentStrings(L"%temp%", g_WinObj.szTempDirectory, MAX_PATH);
+        if ((cch == 0) || (cch > MAX_PATH))
+            break;
+
+        //
+        // Remember Windows directory.
+        //
+        if (!GetWindowsDirectory(g_WinObj.szWindowsDirectory, MAX_PATH))
+            break;
+
+        //
+        // Remember System32 directory.
+        //
+        if (!GetSystemDirectory(g_WinObj.szSystemDirectory, MAX_PATH))
+            break;
+
+        bResult = TRUE;
+
+    } while (bCond);
+
+    if (bResult == FALSE) {
+        if (g_WinObj.Heap)
+            RtlDestroyHeap(g_WinObj.Heap);
+    }
+
+    return bResult;
+}
+
+/*
 * WinObjExMain
 *
 * Purpose:
@@ -791,22 +852,17 @@ void WinObjExMain()
     WNDCLASSEX              wincls;
     BOOL                    IsFullAdmin = FALSE, IsWine = FALSE, rv = TRUE, cond = FALSE;
     ATOM                    class_atom = 0;
-    INITCOMMONCONTROLSEX    icc;
+    INITCOMMONCONTROLSEX    icc;   
     LVCOLUMN                col;
     SHSTOCKICONINFO         sii;
     HMENU                   hMenu;
     HACCEL                  hAccTable = 0;
     WCHAR                   szWindowTitle[100];
     HANDLE                  hIcon;
+    HIMAGELIST              TreeViewImages;
 
-    pHtmlHelpW = NULL;
-    CurrentObjectPath = NULL;
-    bSortInverse = FALSE;
-    g_hInstance = GetModuleHandle(NULL);
-    RtlSecureZeroMemory(szWindowTitle, sizeof(szWindowTitle));
-
-    //clear dialogs array
-    RtlSecureZeroMemory(g_wobjDialogs, sizeof(g_wobjDialogs));
+    if (!WinObjInitGlobals())
+        return;
 
     // do not move anywhere
     IsFullAdmin = supUserIsFullAdmin();
@@ -826,25 +882,28 @@ void WinObjExMain()
     TestStart();
 #endif
 
-    //create main window and it components
-    wincls.cbSize = sizeof(WNDCLASSEX);
-    wincls.style = 0;
-    wincls.lpfnWndProc = &MainWindowProc;
-    wincls.cbClsExtra = 0;
-    wincls.cbWndExtra = 0;
-    wincls.hInstance = g_hInstance;
-    wincls.hIcon = (HICON)LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN), IMAGE_ICON, 0, 0, LR_SHARED);
-    wincls.hCursor = (HCURSOR)LoadImage(NULL, MAKEINTRESOURCE(OCR_SIZEWE), IMAGE_CURSOR, 0, 0, LR_SHARED);
-    wincls.hbrBackground = NULL;
-    wincls.lpszMenuName = MAKEINTRESOURCE(IDR_MENU1);
-    wincls.lpszClassName = MAINWINDOWCLASSNAME;
-    wincls.hIconSm = 0;
-
     do {
+        //
+        // Create main window and it components.
+        //
+        wincls.cbSize = sizeof(WNDCLASSEX);
+        wincls.style = 0;
+        wincls.lpfnWndProc = &MainWindowProc;
+        wincls.cbClsExtra = 0;
+        wincls.cbWndExtra = 0;
+        wincls.hInstance = g_WinObj.hInstance;
+        wincls.hIcon = (HICON)LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN), IMAGE_ICON, 0, 0, LR_SHARED);
+        wincls.hCursor = (HCURSOR)LoadImage(NULL, MAKEINTRESOURCE(OCR_SIZEWE), IMAGE_CURSOR, 0, 0, LR_SHARED);
+        wincls.hbrBackground = NULL;
+        wincls.lpszMenuName = MAKEINTRESOURCE(IDR_MENU1);
+        wincls.lpszClassName = MAINWINDOWCLASSNAME;
+        wincls.hIconSm = 0;
+
         class_atom = RegisterClassEx(&wincls);
         if (class_atom == 0)
             break;
-
+        
+        RtlSecureZeroMemory(szWindowTitle, sizeof(szWindowTitle));
         _strcpy(szWindowTitle, PROGRAM_NAME);
         if (IsFullAdmin != FALSE) {
             _strcat(szWindowTitle, L" (Administrator)");
@@ -855,7 +914,7 @@ void WinObjExMain()
         }
 
         MainWindow = CreateWindowEx(0, MAKEINTATOM(class_atom), szWindowTitle,
-            WS_VISIBLE | WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 800, 600, NULL, NULL, g_hInstance, NULL);
+            WS_VISIBLE | WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 800, 600, NULL, NULL, g_WinObj.hInstance, NULL);
         if (MainWindow == NULL)
             break;
 
@@ -864,43 +923,43 @@ void WinObjExMain()
         if (!InitCommonControlsEx(&icc))
             break;
 
-        StatusBar = CreateWindowEx(0, STATUSCLASSNAME, NULL,
-            WS_VISIBLE | WS_CHILD, 0, 0, 0, 0, MainWindow, NULL, g_hInstance, NULL);
+        hwndStatusBar = CreateWindowEx(0, STATUSCLASSNAME, NULL,
+            WS_VISIBLE | WS_CHILD, 0, 0, 0, 0, MainWindow, NULL, g_WinObj.hInstance, NULL);
 
-        ObjectTree = CreateWindowEx(WS_EX_CLIENTEDGE, WC_TREEVIEW, NULL,
+        g_hwndObjectTree = CreateWindowEx(WS_EX_CLIENTEDGE, WC_TREEVIEW, NULL,
             WS_VISIBLE | WS_CHILD | WS_TABSTOP | TVS_DISABLEDRAGDROP | TVS_HASBUTTONS |
-            TVS_HASLINES | TVS_LINESATROOT, 0, 0, 0, 0, MainWindow, (HMENU)1002, g_hInstance, NULL);
+            TVS_HASLINES | TVS_LINESATROOT, 0, 0, 0, 0, MainWindow, (HMENU)1002, g_WinObj.hInstance, NULL);
 
-        if (ObjectTree == NULL)
+        if (g_hwndObjectTree == NULL)
             break;
 
-        ObjectList = CreateWindowEx(WS_EX_CLIENTEDGE, WC_LISTVIEW, NULL,
+        g_hwndObjectList = CreateWindowEx(WS_EX_CLIENTEDGE, WC_LISTVIEW, NULL,
             WS_VISIBLE | WS_CHILD | WS_TABSTOP | LVS_AUTOARRANGE | LVS_REPORT |
             LVS_SHOWSELALWAYS | LVS_SINGLESEL | LVS_SHAREIMAGELISTS, 0, 0, 0, 0,
-            MainWindow, (HMENU)1003, g_hInstance, NULL);
+            MainWindow, (HMENU)1003, g_WinObj.hInstance, NULL);
 
-        if (ObjectList == NULL)
+        if (g_hwndObjectList == NULL)
             break;
 
-        ToolBar1 = CreateWindowEx(0, TOOLBARCLASSNAME, NULL,
+        hwndToolBar = CreateWindowEx(0, TOOLBARCLASSNAME, NULL,
             WS_VISIBLE | WS_CHILD | CCS_TOP | TBSTYLE_FLAT | TBSTYLE_TRANSPARENT |
-            TBSTYLE_TOOLTIPS, 0, 0, 0, 0, MainWindow, (HMENU)1004, g_hInstance, NULL);
+            TBSTYLE_TOOLTIPS, 0, 0, 0, 0, MainWindow, (HMENU)1004, g_WinObj.hInstance, NULL);
 
-        if (ToolBar1 == NULL)
+        if (hwndToolBar == NULL)
             break;
 
-        Splitter = CreateWindowEx(0, WC_STATIC, NULL,
-            WS_VISIBLE | WS_CHILD, 0, 0, 0, 0, MainWindow, (HMENU)1005, g_hInstance, NULL);
+        hwndSplitter = CreateWindowEx(0, WC_STATIC, NULL,
+            WS_VISIBLE | WS_CHILD, 0, 0, 0, 0, MainWindow, (HMENU)1005, g_WinObj.hInstance, NULL);
 
         // initialization of views
         SendMessage(MainWindow, WM_SIZE, 0, 0);
-        ListView_SetExtendedListViewStyle(ObjectList,
+        ListView_SetExtendedListViewStyle(g_hwndObjectList,
             LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_LABELTIP | LVS_EX_DOUBLEBUFFER);
 
         // set tree imagelist
-        TreeViewImages = supLoadImageList(g_hInstance, IDI_ICON_VIEW_DEFAULT, IDI_ICON_VIEW_SELECTED);
+        TreeViewImages = supLoadImageList(g_WinObj.hInstance, IDI_ICON_VIEW_DEFAULT, IDI_ICON_VIEW_SELECTED);
         if (TreeViewImages) {
-            TreeView_SetImageList(ObjectTree, TreeViewImages, TVSIL_NORMAL);
+            TreeView_SetImageList(g_hwndObjectTree, TreeViewImages, TVSIL_NORMAL);
         }
 
         //not enough user rights, insert run as admin menu entry and hide admin only stuff
@@ -923,7 +982,7 @@ void WinObjExMain()
         }
 
         //unsupported
-        if (g_kdctx.osver.dwBuildNumber > 10240) {
+        if (g_WinObj.osver.dwBuildNumber > 10240) {
             DeleteMenu(GetSubMenu(GetMenu(MainWindow), 4), ID_EXTRAS_PRIVATENAMESPACES, MF_BYCOMMAND);
         }
 
@@ -933,41 +992,41 @@ void WinObjExMain()
         }
 
         //load listview images
-        ListViewImages = supLoadImageList(g_hInstance, IDI_ICON_DEVICE, IDI_ICON_UNKNOWN);
-        if (ListViewImages) {
-            hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+        g_ListViewImages = supLoadImageList(g_WinObj.hInstance, IDI_ICON_DEVICE, IDI_ICON_UNKNOWN);
+        if (g_ListViewImages) {
+            hIcon = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
             if (hIcon) {
-                ImageList_ReplaceIcon(ListViewImages, -1, hIcon);
+                ImageList_ReplaceIcon(g_ListViewImages, -1, hIcon);
                 DestroyIcon(hIcon);
             }
-            hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+            hIcon = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
             if (hIcon) {
-                ImageList_ReplaceIcon(ListViewImages, -1, hIcon);
+                ImageList_ReplaceIcon(g_ListViewImages, -1, hIcon);
                 DestroyIcon(hIcon);
             }
-            ListView_SetImageList(ObjectList, ListViewImages, LVSIL_SMALL);
+            ListView_SetImageList(g_hwndObjectList, g_ListViewImages, LVSIL_SMALL);
         }
 
         //load toolbar images
-        ToolBarMenuImages = ImageList_LoadImage(g_hInstance, MAKEINTRESOURCE(IDB_BITMAP1),
+        g_ToolBarMenuImages = ImageList_LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDB_BITMAP1),
             16, 7, CLR_DEFAULT, IMAGE_BITMAP, LR_CREATEDIBSECTION);
 
-        if (ToolBarMenuImages) {
+        if (g_ToolBarMenuImages) {
 
-            supCreateToolbarButtons(ToolBar1);
+            supCreateToolbarButtons(hwndToolBar);
 
             //set menu icons
             hMenu = GetSubMenu(GetMenu(MainWindow), 1);
             if (hMenu) {
                 supSetMenuIcon(hMenu, ID_VIEW_REFRESH,
-                    (ULONG_PTR)ImageList_ExtractIcon(g_hInstance, ToolBarMenuImages, 1));
+                    (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 1));
             }
             hMenu = GetSubMenu(GetMenu(MainWindow), 2);
-            if (hMenu && ListViewImages) {
+            if (hMenu && g_ListViewImages) {
                 supSetMenuIcon(hMenu, ID_OBJECT_PROPERTIES,
-                    (ULONG_PTR)ImageList_ExtractIcon(g_hInstance, ToolBarMenuImages, 0));
+                    (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 0));
                 supSetMenuIcon(hMenu, ID_OBJECT_GOTOLINKTARGET,
-                    (ULONG_PTR)ImageList_ExtractIcon(g_hInstance, ListViewImages,
+                    (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ListViewImages,
                         ID_FROM_VALUE(IDI_ICON_SYMLINK)));
             }
 
@@ -975,28 +1034,28 @@ void WinObjExMain()
             hMenu = GetSubMenu(GetMenu(MainWindow), 3);
             if (hMenu) {
                 supSetMenuIcon(hMenu, ID_FIND_FINDOBJECT,
-                    (ULONG_PTR)ImageList_ExtractIcon(g_hInstance, ToolBarMenuImages, 2));
+                    (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 2));
             }
 
             //set extras-mailslots/pipes menu image
             hMenu = GetSubMenu(GetMenu(MainWindow), 4);
             if (hMenu) {
                 supSetMenuIcon(hMenu, ID_EXTRAS_MAILSLOTS,
-                    (ULONG_PTR)ImageList_ExtractIcon(g_hInstance, ToolBarMenuImages, 5));
+                    (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 5));
                 supSetMenuIcon(hMenu, ID_EXTRAS_PIPES,
-                    (ULONG_PTR)ImageList_ExtractIcon(g_hInstance, ToolBarMenuImages, 6));
+                    (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 6));
             }
 
             //set help menu image
             hMenu = GetSubMenu(GetMenu(MainWindow), 5);
             if (hMenu) {
                 supSetMenuIcon(hMenu, ID_HELP_HELP,
-                    (ULONG_PTR)ImageList_ExtractIcon(g_hInstance, ToolBarMenuImages, 3));
+                    (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 3));
             }
 
         }
 
-        hAccTable = LoadAccelerators(g_hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
+        hAccTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
 
         //create ObjectList columns
         RtlSecureZeroMemory(&col, sizeof(col));
@@ -1006,30 +1065,30 @@ void WinObjExMain()
         col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
         col.iOrder = 0;
         col.iImage = -1;
-        if (ListViewImages) {
-            col.iImage = ImageList_GetImageCount(ListViewImages) - 1;
+        if (g_ListViewImages) {
+            col.iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
         }
         col.cx = 300;
-        ListView_InsertColumn(ObjectList, 1, &col);
+        ListView_InsertColumn(g_hwndObjectList, 1, &col);
 
         col.iSubItem = 2;
         col.pszText = TEXT("Type");
         col.iOrder = 1;
         col.iImage = -1;
         col.cx = 100;
-        ListView_InsertColumn(ObjectList, 2, &col);
+        ListView_InsertColumn(g_hwndObjectList, 2, &col);
 
         col.iSubItem = 3;
         col.pszText = TEXT("Additional Information");
         col.iOrder = 2;
         col.iImage = -1;
         col.cx = 170;
-        ListView_InsertColumn(ObjectList, 3, &col);
+        ListView_InsertColumn(g_hwndObjectList, 3, &col);
 
         ListObjectDirectoryTree(L"\\", NULL, NULL);
 
-        TreeView_SelectItem(ObjectTree, TreeView_GetRoot(ObjectTree));
-        SetFocus(ObjectTree);
+        TreeView_SelectItem(g_hwndObjectTree, TreeView_GetRoot(g_hwndObjectTree));
+        SetFocus(g_hwndObjectTree);
 
         do {
             rv = GetMessage(&msg1, NULL, 0, 0);
@@ -1052,7 +1111,7 @@ void WinObjExMain()
     } while (cond);
 
     if (class_atom != 0)
-        UnregisterClass(MAKEINTATOM(class_atom), g_hInstance);
+        UnregisterClass(MAKEINTATOM(class_atom), g_WinObj.hInstance);
 
     //do not move anywhere
 

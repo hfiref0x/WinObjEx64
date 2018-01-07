@@ -141,10 +141,10 @@ unsigned int hde64_disasm(const void *code, hde64s *hs)
                 uint8_t *table_end, op = opcode;
                 if (hs->opcode2) {
                     ht = hde64_table + DELTA_OP2_LOCK_OK;
-                    table_end = ht + DELTA_OP_ONLY_MEM - DELTA_OP2_LOCK_OK;
+                    table_end = ht + DELTA_OP_ONLY_MEM - DELTA_OP2_LOCK_OK; //-V594
                 } else {
                     ht = hde64_table + DELTA_OP_LOCK_OK;
-                    table_end = ht + DELTA_OP2_LOCK_OK - DELTA_OP_LOCK_OK;
+                    table_end = ht + DELTA_OP2_LOCK_OK - DELTA_OP_LOCK_OK; //-V594
                     op &= -2;
                 }
                 for (; ht != table_end; ht++)
@@ -194,10 +194,10 @@ unsigned int hde64_disasm(const void *code, hde64s *hs)
             uint8_t *table_end;
             if (hs->opcode2) {
                 ht = hde64_table + DELTA_OP2_ONLY_MEM;
-                table_end = ht + sizeof(hde64_table) - DELTA_OP2_ONLY_MEM;
+                table_end = ht + sizeof(hde64_table) - DELTA_OP2_ONLY_MEM; //-V594
             } else {
                 ht = hde64_table + DELTA_OP_ONLY_MEM;
-                table_end = ht + DELTA_OP2_ONLY_MEM - DELTA_OP_ONLY_MEM;
+                table_end = ht + DELTA_OP2_ONLY_MEM - DELTA_OP_ONLY_MEM; //-V594
             }
             for (; ht != table_end; ht += 2)
                 if (*ht++ == opcode) {

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       PROPPROCESS.C
 *
-*  VERSION:     1.51
+*  VERSION:     1.52
 *
-*  DATE:        02 Dec 2017
+*  DATE:        08 Jan 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -43,31 +43,46 @@ INT CALLBACK ProcessListCompareFunc(
     _In_ LPARAM lParamSort
 )
 {
-    INT       nResult = 0, k;
+    INT       nResult = 0;
     LPWSTR    lpItem1 = NULL, lpItem2 = NULL;
-    SIZE_T    sz1, sz2;
+    SIZE_T    cbItem1 = 0, cbItem2 = 0;
     ULONG_PTR Value1, Value2;
 
-    sz1 = 0;
-    lpItem1 = supGetItemText(g_hwndProcessList, (INT)lParam1, (INT)lParamSort, &sz1);
+    USHORT AddressPrefix;
+
+    lpItem1 = supGetItemText(
+        g_hwndProcessList,
+        (INT)lParam1,
+        (INT)lParamSort,
+        &cbItem1);
+
     if (lpItem1 == NULL) //can't be 0 for this dialog
         goto Done;
 
-    sz2 = 0;
-    lpItem2 = supGetItemText(g_hwndProcessList, (INT)lParam2, (INT)lParamSort, &sz2);
+    lpItem2 = supGetItemText(
+        g_hwndProcessList,
+        (INT)lParam2,
+        (INT)lParamSort,
+        &cbItem2);
+
     if (lpItem2 == NULL) //can't be 0 for this dialog
         goto Done;
 
     switch (lParamSort) {
-    case 0: //name column
-
+    case 0:
+        //
+        // Name column.
+        //
         if (bProcessListSortInverse)
             nResult = _strcmpi(lpItem2, lpItem1);
         else
             nResult = _strcmpi(lpItem1, lpItem2);
 
         break;
-    case 1: // id column
+    case 1:
+        //
+        // Id column.
+        //
         Value1 = strtou64(lpItem1);
         Value2 = strtou64(lpItem2);
         if (bProcessListSortInverse)
@@ -76,33 +91,84 @@ INT CALLBACK ProcessListCompareFunc(
             nResult = Value1 > Value2;
         break;
 
-        //anything else is hex
-    default:
-
-        k = 0;
-        if ((sz1 > 1) && (sz2 > 1)) {
-            if (lpItem1[1] == L'x')
-                k = 2;
+    case 2:
+        //
+        // Handle value colum.
+        //
+        if ((cbItem1 / sizeof(WCHAR) != MAX_ADDRESS_TEXT_LENGTH64) &&
+            (cbItem2 / sizeof(WCHAR) != MAX_ADDRESS_TEXT_LENGTH64))
+        {
+            nResult = 0;
+            break;
         }
 
-        Value1 = hextou64(&lpItem1[k]);
-        Value2 = hextou64(&lpItem2[k]);
+        Value1 = 0;
+        Value2 = 0;
+
+        AddressPrefix = supIsAddressPrefix(lpItem1, cbItem1);
+        if (AddressPrefix == 2)
+            Value1 = hextou64(&lpItem1[AddressPrefix]);
+
+        AddressPrefix = supIsAddressPrefix(lpItem2, cbItem2);
+        if (AddressPrefix == 2)
+            Value2 = hextou64(&lpItem2[AddressPrefix]);
+
         if (bProcessListSortInverse)
             nResult = Value2 > Value1;
         else
             nResult = Value1 > Value2;
+
+        break;
+    case 3:
+        //
+        // GrantedAccess column.
+        //
+        if ((cbItem1 / sizeof(WCHAR) != MAX_ADDRESS_TEXT_LENGTH32) &&
+            (cbItem2 / sizeof(WCHAR) != MAX_ADDRESS_TEXT_LENGTH32))
+        {
+            nResult = 0;
+            break;
+        }
+
+        Value1 = 0;
+        Value2 = 0;
+
+        AddressPrefix = supIsAddressPrefix(lpItem1, cbItem1);
+        if (AddressPrefix == 2)
+            Value1 = hextou64(&lpItem1[AddressPrefix]);
+
+        AddressPrefix = supIsAddressPrefix(lpItem2, cbItem2);
+        if (AddressPrefix == 2)
+            Value2 = hextou64(&lpItem2[AddressPrefix]);
+
+        if (bProcessListSortInverse)
+            nResult = Value2 > Value1;
+        else
+            nResult = Value1 > Value2;
+
+        break;
+
+    default:
         break;
     }
 
 Done:
-    if (lpItem1) HeapFree(GetProcessHeap(), 0, lpItem1);
-    if (lpItem2) HeapFree(GetProcessHeap(), 0, lpItem2);
+    if (lpItem1) supHeapFree(lpItem1);
+    if (lpItem2) supHeapFree(lpItem2);
     return nResult;
 }
 
+/*
+* ProcessShowProperties
+*
+* Purpose:
+*
+* Query full target path and execute Windows shell properties dialog.
+*
+*/
 VOID ProcessShowProperties(
-    HWND hwndDlg,
-    INT iItem
+    _In_ HWND hwndDlg,
+    _In_ INT iItem
 )
 {
     LPWSTR              Buffer;
@@ -119,24 +185,30 @@ VOID ProcessShowProperties(
         Buffer = supGetItemText(g_hwndProcessList, iItem, 1, NULL);
         if (Buffer) {
             dwProcessId = strtoul(Buffer);
-            HeapFree(GetProcessHeap(), 0, Buffer);
+            supHeapFree(Buffer);
 
             //query process win32 image path
             //1. open target process
-            cid.UniqueProcess = (HANDLE)dwProcessId;
+            cid.UniqueProcess = (HANDLE)dwProcessId; //-V204
             cid.UniqueThread = NULL;
             InitializeObjectAttributes(&obja, NULL, 0, NULL, NULL);
             status = NtOpenProcess(&hProcess, PROCESS_QUERY_LIMITED_INFORMATION, &obja, &cid);
             if (NT_SUCCESS(status)) {
-                bytesNeeded = 0;
                 //2. query required buffer size
+                bytesNeeded = 0;
                 NtQueryInformationProcess(hProcess, ProcessImageFileNameWin32, NULL, 0, &bytesNeeded);
                 if (bytesNeeded) {
-                    Buffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytesNeeded);
+
+                    Buffer = supHeapAlloc(bytesNeeded);
                     if (Buffer) {
+
                         //3. query win32 filename
-                        status = NtQueryInformationProcess(hProcess, ProcessImageFileNameWin32, Buffer,
-                            bytesNeeded, &bytesNeeded);
+                        status = NtQueryInformationProcess(hProcess,
+                            ProcessImageFileNameWin32,
+                            Buffer,
+                            bytesNeeded,
+                            &bytesNeeded);
+
                         if (NT_SUCCESS(status)) {
                             dynUstr = (PUNICODE_STRING)Buffer;
                             if (dynUstr->Buffer && dynUstr->Length) {
@@ -144,7 +216,7 @@ VOID ProcessShowProperties(
                                 supShowProperties(hwndDlg, dynUstr->Buffer);
                             }
                         }
-                        HeapFree(GetProcessHeap(), 0, Buffer);
+                        supHeapFree(Buffer);
                     }
                 }
                 NtClose(hProcess);
@@ -165,8 +237,8 @@ VOID ProcessShowProperties(
 *
 */
 VOID ProcessListHandleNotify(
-    HWND hwndDlg,
-    LPARAM lParam
+    _In_ HWND hwndDlg,
+    _In_ LPARAM lParam
 )
 {
     INT        c;
@@ -219,12 +291,12 @@ VOID ProcessListHandleNotify(
 *
 */
 BOOL ProcessQueryInfo(
-    _In_ DWORD ProcessId,
+    _In_ ULONG_PTR ProcessId,
     _Out_ HICON *pProcessIcon,
     _Out_ BOOL *pbIs32
 )
 {
-    BOOL               bResult = FALSE, bIconFound;
+    BOOL               bResult = FALSE, bIconFound = FALSE;
     ULONG              bytesNeeded;
     HANDLE             hProcess;
     NTSTATUS           status;
@@ -233,31 +305,33 @@ BOOL ProcessQueryInfo(
     CLIENT_ID          cid;
     OBJECT_ATTRIBUTES  obja;
 
-    if ((pProcessIcon == NULL) || (pbIs32 == NULL)) {
-        return bResult;
-    }
-
-    *pProcessIcon = NULL;
-    *pbIs32 = FALSE;
-
-    bIconFound = FALSE;
     __try {
+        *pProcessIcon = NULL;
+        *pbIs32 = FALSE;
+
         cid.UniqueProcess = (HANDLE)ProcessId;
         cid.UniqueThread = NULL;
 
         InitializeObjectAttributes(&obja, NULL, 0, NULL, NULL);
         status = NtOpenProcess(&hProcess, PROCESS_QUERY_LIMITED_INFORMATION, &obja, &cid);
-        if (!NT_SUCCESS(status)) {
+        if (!NT_SUCCESS(status))
             return bResult;
-        }
-        //query process icon, first query win32 imagefilename then parse image resources
+
+        //
+        // Query process icon, first query win32 imagefilename then parse image resources.
+        //
         bytesNeeded = 0;
-        NtQueryInformationProcess(hProcess, ProcessImageFileNameWin32, NULL, 0, &bytesNeeded);
-        if (bytesNeeded) {
-            Buffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytesNeeded);
+        status = NtQueryInformationProcess(hProcess, ProcessImageFileNameWin32, NULL, 0, &bytesNeeded);
+        if ((status == STATUS_INFO_LENGTH_MISMATCH) && (bytesNeeded)) {
+            Buffer = supHeapAlloc(bytesNeeded);
             if (Buffer) {
-                status = NtQueryInformationProcess(hProcess, ProcessImageFileNameWin32, Buffer,
-                    bytesNeeded, &bytesNeeded);
+
+                status = NtQueryInformationProcess(hProcess,
+                    ProcessImageFileNameWin32,
+                    Buffer,
+                    bytesNeeded,
+                    &bytesNeeded);
+
                 if (NT_SUCCESS(status)) {
                     dynUstr = (PUNICODE_STRING)Buffer;
                     if (dynUstr->Buffer && dynUstr->Length) {
@@ -265,11 +339,13 @@ BOOL ProcessQueryInfo(
                         bIconFound = TRUE;
                     }
                 }
-                HeapFree(GetProcessHeap(), 0, Buffer);
+                supHeapFree(Buffer);
             }
         }
 
-        //query if this is wow64 process
+        //
+        // Query if this is wow64 process.
+        //
         *pbIs32 = supIsProcess32bit(hProcess);
 
         NtClose(hProcess);
@@ -291,7 +367,7 @@ BOOL ProcessQueryInfo(
 */
 VOID ProcessListAddItem(
     _In_ PVOID	ProcessesList,
-    _In_ PSYSTEM_HANDLE_TABLE_ENTRY_INFO phti
+    _In_ PSYSTEM_HANDLE_TABLE_ENTRY_INFO_EX phti
 )
 {
     BOOL     bIsWow64;
@@ -304,18 +380,26 @@ VOID ProcessListAddItem(
         return;
     }
 
-    //default image index
+    //
+    // Default image index.
+    //
     iImage = 0;
 
-    //set default process name as Unknown
+    //
+    // Set default process name as Unknown.
+    //
     RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
     _strcpy(szBuffer, T_Unknown);
 
     if (supQueryProcessName(phti->UniqueProcessId,
-        ProcessesList, szBuffer, MAX_PATH)) {
-
-        //id exists, extract icon
-        //skip idle, system
+        ProcessesList,
+        szBuffer,
+        MAX_PATH))
+    {
+        //
+        // Id exists, extract icon
+        // Skip idle, system
+        //
         if (phti->UniqueProcessId <= 4) {
             iImage = 0;
         }
@@ -330,11 +414,13 @@ VOID ProcessListAddItem(
                 if (bIsWow64) {
                     _strcat(szBuffer, L"*32");
                 }
-            } //ProcessQueryInfo
-        } //else
+            }
+        }
     }
 
-    //Name
+    //
+    // Process Name.
+    //
     RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
     lvitem.mask = LVIF_TEXT | LVIF_IMAGE;
     lvitem.iImage = iImage;
@@ -343,26 +429,32 @@ VOID ProcessListAddItem(
     lvitem.iItem = MAXINT;
     nIndex = ListView_InsertItem(g_hwndProcessList, &lvitem);
 
-    //ID
+    //
+    // ProcessId.
+    //
     RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-    ultostr(phti->UniqueProcessId, szBuffer);
+    u64tostr(phti->UniqueProcessId, szBuffer);
     lvitem.mask = LVIF_TEXT;
     lvitem.iSubItem = 1;
     lvitem.pszText = szBuffer;
     lvitem.iItem = nIndex;
     ListView_SetItem(g_hwndProcessList, &lvitem);
 
-    //Value
+    //
+    // Handle Value.
+    //
     RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
     _strcpy(szBuffer, L"0x");
-    ultohex(phti->HandleValue, _strend(szBuffer));
+    u64tohex(phti->HandleValue, _strend(szBuffer));
     lvitem.mask = LVIF_TEXT;
     lvitem.iSubItem = 2;
     lvitem.pszText = szBuffer;
     lvitem.iItem = nIndex;
     ListView_SetItem(g_hwndProcessList, &lvitem);
 
-    //GrantedAccess
+    //
+    // Handle GrantedAccess.
+    //
     RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
     _strcpy(szBuffer, L"0x");
     ultohex(phti->GrantedAccess, _strend(szBuffer));
@@ -383,19 +475,19 @@ VOID ProcessListAddItem(
 *
 */
 VOID ProcessListSetInfo(
-    PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO *Context,
     _In_ HWND hwndDlg
 )
 {
-    BOOL                         cond = FALSE;
-    UCHAR                        ObjectTypeIndex;
-    ULONG                        i;
-    DWORD                        CurrentProcessId = GetCurrentProcessId();
-    ULONG_PTR                    ObjectAddress;
-    ACCESS_MASK                  DesiredAccess;
-    PVOID                        ProcessesList;
-    HANDLE                       hObject, hIcon;
-    PSYSTEM_HANDLE_INFORMATION   pHandles;
+    BOOL                            cond = FALSE;
+    USHORT                          ObjectTypeIndex;
+    ULONG                           i;
+    DWORD                           CurrentProcessId = GetCurrentProcessId();
+    ULONG_PTR                       ObjectAddress;
+    ACCESS_MASK                     DesiredAccess;
+    PVOID                           ProcessesList;
+    HANDLE                          hObject, hIcon;
+    PSYSTEM_HANDLE_INFORMATION_EX   pHandles;
 
     if (Context == NULL) {
         return;
@@ -420,12 +512,12 @@ VOID ProcessListSetInfo(
         DestroyIcon(hIcon);
     }
     //sort images
-    hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+    hIcon = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
     if (hIcon) {
         ImageList_ReplaceIcon(ProcessImageList, -1, hIcon);
         DestroyIcon(hIcon);
     }
-    hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+    hIcon = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
     if (hIcon) {
         ImageList_ReplaceIcon(ProcessImageList, -1, hIcon);
         DestroyIcon(hIcon);
@@ -484,22 +576,20 @@ VOID ProcessListSetInfo(
             }
         }
 
-        pHandles = (PSYSTEM_HANDLE_INFORMATION)supGetSystemInfo(SystemHandleInformation);
-        if (pHandles == NULL) {
+        pHandles = (PSYSTEM_HANDLE_INFORMATION_EX)supGetSystemInfo(SystemExtendedHandleInformation);
+        if (pHandles == NULL)
             break;
-        }
 
         ProcessesList = supGetSystemInfo(SystemProcessInformation);
-        if (ProcessesList == NULL) {
+        if (ProcessesList == NULL)
             break;
-        }
 
         //no additional info available which mean we must query object address by yourself
         if (ObjectAddress == 0) {
             //find our handle object by handle value
             for (i = 0; i < pHandles->NumberOfHandles; i++)
                 if (pHandles->Handles[i].UniqueProcessId == CurrentProcessId)
-                    if (pHandles->Handles[i].HandleValue == (USHORT)(ULONG_PTR)hObject) {
+                    if (pHandles->Handles[i].HandleValue == (ULONG_PTR)hObject) {
                         ObjectAddress = (ULONG_PTR)pHandles->Handles[i].Object;
                         ObjectTypeIndex = pHandles->Handles[i].ObjectTypeIndex;
                         break;
@@ -518,11 +608,10 @@ VOID ProcessListSetInfo(
         }
 
         //retake snapshot
-        HeapFree(GetProcessHeap(), 0, pHandles);
-        pHandles = (PSYSTEM_HANDLE_INFORMATION)supGetSystemInfo(SystemHandleInformation);
-        if (pHandles == NULL) {
+        supHeapFree(pHandles);
+        pHandles = (PSYSTEM_HANDLE_INFORMATION_EX)supGetSystemInfo(SystemExtendedHandleInformation);
+        if (pHandles == NULL)
             break;
-        }
 
         //find any handles with the same object address and object type
         for (i = 0; i < pHandles->NumberOfHandles; i++)
@@ -537,12 +626,12 @@ VOID ProcessListSetInfo(
 
     //cleanup
     if (pHandles) {
-        HeapFree(GetProcessHeap(), 0, pHandles);
+        supHeapFree(pHandles);
     }
     if (ProcessesList) {
-        HeapFree(GetProcessHeap(), 0, ProcessesList);
+        supHeapFree(ProcessesList);
     }
-    if (Context->TypeIndex == TYPE_WINSTATION && hObject) {
+    if ((Context->TypeIndex == TYPE_WINSTATION) && (hObject != NULL)) {
         CloseWindowStation(hObject);
         hObject = NULL;
     }
@@ -598,12 +687,13 @@ VOID ProcessListCreate(
     col.iSubItem++;
     col.pszText = TEXT("Handle");
     col.iOrder++;
-    col.cx = 80;
+    col.cx = 130;
     ListView_InsertColumn(g_hwndProcessList, col.iSubItem, &col);
 
     col.iSubItem++;
     col.pszText = TEXT("Access");
     col.iOrder++;
+    col.cx = 80;
     ListView_InsertColumn(g_hwndProcessList, col.iSubItem, &col);
 }
 
@@ -652,7 +742,6 @@ VOID ProcessCopyText(
     LPWSTR  lpText, lpItemText[4];
     HWND    hwndList;
 
-
     hwndList = GetDlgItem(hwndDlg, ID_PROCESSLIST);
     if (hwndList == NULL) {
         return;
@@ -676,7 +765,7 @@ VOID ProcessCopyText(
         }
 
         cbText += (PROCESSLIST_COLUMN_COUNT * sizeof(WCHAR)) + sizeof(UNICODE_NULL);
-        lpText = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, cbText);
+        lpText = supHeapAlloc(cbText);
         if (lpText) {
 
             for (i = 0; i < PROCESSLIST_COLUMN_COUNT; i++) {
@@ -688,11 +777,11 @@ VOID ProcessCopyText(
                 }
             }
             supClipboardCopy(lpText, cbText);
-            HeapFree(GetProcessHeap(), 0, lpText);
+            supHeapFree(lpText);
         }
         for (i = 0; i < PROCESSLIST_COLUMN_COUNT; i++) {
             if (lpItemText[i] != NULL) {
-                HeapFree(GetProcessHeap(), 0, lpItemText[i]);
+                supHeapFree(lpItemText[i]);
             }
         }
     }

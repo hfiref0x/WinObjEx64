@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2016
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       SUPCONSTS.H
 *
-*  VERSION:     1.44
+*  VERSION:     1.52
 *
-*  DATE:        17 July 2016
+*  DATE:        08 Jan 2018
 *
 *  Consts header file for support unit.
 *
@@ -18,9 +18,11 @@
 *******************************************************************************/
 #pragma once
 
+#define T_SECUREBOOTSTATEKEY        L"System\\CurrentControlSet\\Control\\SecureBoot\\State"
+#define T_SECUREBOOTSTATEVALUE      L"UEFISecureBootEnabled"
+
 #define VERSION_TRANSLATION         L"\\VarFileInfo\\Translation"
 #define VERSION_DESCRIPTION         L"\\StringFileInfo\\%04x%04x\\FileDescription"
-#define REGISTRYSERVICESKEY         L"System\\CurrentControlSet\\Services\\%ws"
 #define HHCTRLOCXKEY                L"CLSID\\{ADB880A6-D8FF-11CF-9377-00AA003B7A11}\\InprocServer32"
 #define T_OBJECTTYPES               L"\\ObjectTypes"
 
@@ -30,3 +32,6 @@
 #define FORMATTED_ATTRIBUTE         L"           0x"
 
 #define HHCTRLOCX                   L"hhctrl.ocx"
+
+#define supServicesRegPath          L"System\\CurrentControlSet\\Services\\"
+#define supServicesRegPathSize      sizeof(supServicesRegPath) - sizeof(WCHAR)

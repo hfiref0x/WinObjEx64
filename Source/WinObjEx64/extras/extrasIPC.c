@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017
+*  (C) COPYRIGHT AUTHORS, 2017 - 2018
 *
 *  TITLE:       EXTRASIPC.C
 *
-*  VERSION:     1.46
+*  VERSION:     1.52
 *
-*  DATE:        10 Mar 2017
+*  DATE:        08 Jan 2018
 *
 *  IPC supported: Pipes, Mailslots
 *
@@ -30,9 +30,7 @@
 #define DEVICE_NAMED_PIPE        L"\\Device\\NamedPipe\\"
 #define DEVICE_NAMED_PIPE_LENGTH sizeof(DEVICE_NAMED_PIPE) - sizeof(WCHAR)
 
-EXTRASCONTEXT DlgContext;
-
-IPC_DIALOG_MODE CurrentDialogMode;
+EXTRASCONTEXT IpcDlgContext[IpcMaxMode];
 
 //maximum number of possible pages
 #define EXTRAS_IPC_MAX_PAGE 2
@@ -47,7 +45,8 @@ HPROPSHEETPAGE IpcPages[EXTRAS_IPC_MAX_PAGE];//object, security
 *
 */
 VOID IpcDisplayError(
-    _In_ HWND hwndDlg
+    _In_ HWND hwndDlg,
+    _In_ IPC_DIALOG_MODE DialogMode
 )
 {
     DWORD dwLastError;
@@ -58,7 +57,7 @@ VOID IpcDisplayError(
 
     RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
 
-    switch (CurrentDialogMode) {
+    switch (DialogMode) {
     case IpcModeMailshots:
         _strcpy(szBuffer, TEXT("Cannot open mailslot because: "));
         break;
@@ -79,7 +78,7 @@ VOID IpcDisplayError(
 * Purpose:
 *
 * Create complete object name including directory.
-* Caller responsible for cleanup with HeapFree after use.
+* Caller responsible for cleanup with supHeapFree after use.
 *
 */
 LPWSTR IpcCreateObjectPathWithName(
@@ -109,7 +108,7 @@ LPWSTR IpcCreateObjectPathWithName(
         break;
     }
     if (lpRootDirectory) {
-        lpFullName = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sz);
+        lpFullName = supHeapAlloc(sz);
         if (lpFullName == NULL) {
             return NULL;
         }
@@ -188,7 +187,7 @@ VOID IpcMailslotQueryInfo(
     //validate context
     if (Context == NULL) {
         SetLastError(ERROR_NOT_ENOUGH_MEMORY);
-        IpcDisplayError(hwndDlg);
+        IpcDisplayError(hwndDlg, IpcModeMailshots);
         return;
     }
     if (
@@ -197,14 +196,14 @@ VOID IpcMailslotQueryInfo(
         )
     {
         SetLastError(ERROR_OBJECT_NOT_FOUND);
-        IpcDisplayError(hwndDlg);
+        IpcDisplayError(hwndDlg, IpcModeMailshots);
         return;
     }
 
     hMailslot = NULL;
     if (!IpcOpenObjectMethod(Context, &hMailslot, GENERIC_READ)) {
         //on error display last win32 error
-        IpcDisplayError(hwndDlg);
+        IpcDisplayError(hwndDlg, IpcModeMailshots);
         return;
     }
 
@@ -264,7 +263,7 @@ VOID IpcPipeQueryInfo(
     //validate context
     if (Context == NULL) {
         SetLastError(ERROR_NOT_ENOUGH_MEMORY);
-        IpcDisplayError(hwndDlg);
+        IpcDisplayError(hwndDlg, IpcModeNamedPipes);
         return;
     }
     if (
@@ -273,7 +272,7 @@ VOID IpcPipeQueryInfo(
         )
     {
         SetLastError(ERROR_OBJECT_NOT_FOUND);
-        IpcDisplayError(hwndDlg);
+        IpcDisplayError(hwndDlg, IpcModeNamedPipes);
         return;
     }
 
@@ -282,7 +281,7 @@ VOID IpcPipeQueryInfo(
     //open pipe
     hPipe = NULL;
     if (!IpcOpenObjectMethod(Context, &hPipe, GENERIC_READ)) {
-        IpcDisplayError(hwndDlg);
+        IpcDisplayError(hwndDlg, IpcModeNamedPipes);
         return;
     }
 
@@ -350,7 +349,7 @@ VOID IpcPipeQueryInfo(
     else {
         //show detail on query error
         SetLastError(RtlNtStatusToDosError(status));
-        IpcDisplayError(hwndDlg);
+        IpcDisplayError(hwndDlg, IpcModeNamedPipes);
     }
     NtClose(hPipe);
 }
@@ -375,6 +374,8 @@ INT_PTR CALLBACK IpcTypeDialogProc(
     PROPSHEETPAGE    *pSheet = NULL;
     PROP_OBJECT_INFO *Context = NULL;
 
+    EXTRASCONTEXT *pDlgContext;
+
     switch (uMsg) {
 
     case WM_INITDIALOG:
@@ -389,15 +390,18 @@ INT_PTR CALLBACK IpcTypeDialogProc(
         if (wParam) {
             Context = GetProp(hwndDlg, T_PROPCONTEXT);
             if (Context) {
-                switch (CurrentDialogMode) {
-                case IpcModeMailshots:
-                    IpcMailslotQueryInfo(Context, hwndDlg);
-                    break;
-                case IpcModeNamedPipes:
-                    IpcPipeQueryInfo(Context, hwndDlg);
-                    break;
-                default:
-                    break;
+                pDlgContext = (EXTRASCONTEXT*)Context->Tag;
+                if (pDlgContext) {
+                    switch (pDlgContext->DialogMode) {
+                    case IpcModeMailshots:
+                        IpcMailslotQueryInfo(Context, hwndDlg);
+                        break;
+                    case IpcModeNamedPipes:
+                        IpcPipeQueryInfo(Context, hwndDlg);
+                        break;
+                    default:
+                        break;
+                    }
                 }
             }
         }
@@ -405,12 +409,18 @@ INT_PTR CALLBACK IpcTypeDialogProc(
         break;
 
     case WM_PAINT:
-        hDc = BeginPaint(hwndDlg, &Paint);
-        if (hDc) {
-            ImageList_Draw(DlgContext.ImageList, 0, hDc, 24, 34, ILD_NORMAL | ILD_TRANSPARENT);
-            EndPaint(hwndDlg, &Paint);
+        Context = GetProp(hwndDlg, T_PROPCONTEXT);
+        if (Context) {
+            pDlgContext = (EXTRASCONTEXT*)Context->Tag;
+            if (pDlgContext) {
+                hDc = BeginPaint(hwndDlg, &Paint);
+                if (hDc) {
+                    ImageList_Draw(pDlgContext->ImageList, 0, hDc, 24, 34, ILD_NORMAL | ILD_TRANSPARENT);
+                    EndPaint(hwndDlg, &Paint);
+                }
+                return 1;
+            }
         }
-        return 1;
         break;
 
     case WM_DESTROY:
@@ -432,7 +442,7 @@ INT_PTR CALLBACK IpcTypeDialogProc(
 */
 VOID IpcDlgShowProperties(
     _In_ INT iItem,
-    _In_ IPC_DIALOG_MODE Mode
+    _In_ EXTRASCONTEXT *pDlgContext
 )
 {
     INT                 nPages = 0;
@@ -446,9 +456,11 @@ VOID IpcDlgShowProperties(
     if (Context == NULL) {
         return;
     }
-    
-    Context->lpObjectName = supGetItemText(DlgContext.ListView, iItem, 0, NULL);
-    Context->lpCurrentObjectPath = IpcCreateObjectPathWithName(Context->lpObjectName, Mode);
+
+    Context->lpObjectName = supGetItemText(pDlgContext->ListView, iItem, 0, NULL);
+    Context->lpCurrentObjectPath = IpcCreateObjectPathWithName(Context->lpObjectName, 
+        (IPC_DIALOG_MODE)pDlgContext->DialogMode);
+    Context->Tag = (ULONG_PTR)pDlgContext;
 
     RtlSecureZeroMemory(&IpcPages, sizeof(IpcPages));
     //
@@ -457,18 +469,18 @@ VOID IpcDlgShowProperties(
     RtlSecureZeroMemory(&Page, sizeof(Page));
     Page.dwSize = sizeof(PROPSHEETPAGE);
     Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
-    Page.hInstance = g_hInstance;
+    Page.hInstance = g_WinObj.hInstance;
     Page.pfnDlgProc = IpcTypeDialogProc;
 
-    switch (Mode) {
+    switch (pDlgContext->DialogMode) {
     case IpcModeMailshots:
         Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_MAILSLOT);
-        Page.pszTitle = L"Mailslot";
+        Page.pszTitle = TEXT("Mailslot");
         break;
     case IpcModeNamedPipes:
     default:
         Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_PIPE);
-        Page.pszTitle = L"Pipe";
+        Page.pszTitle = TEXT("Pipe");
         break;
     }
     Page.lParam = (LPARAM)Context;
@@ -477,7 +489,7 @@ VOID IpcDlgShowProperties(
     //
     // Disconnected clients cannot query security (see msfs!MsCommonQuerySecurityInfo).
     //
-    if (Mode != IpcModeMailshots) {
+    if (pDlgContext->DialogMode != IpcModeMailshots) {
 
         //
         //Create Security Dialog if available
@@ -491,7 +503,7 @@ VOID IpcDlgShowProperties(
             SI_PAGE_TITLE
         );
         if (SecurityPage != NULL) {
-            IpcPages[nPages++] = SecurityPage;  
+            IpcPages[nPages++] = SecurityPage;
         }
     }
 
@@ -505,8 +517,8 @@ VOID IpcDlgShowProperties(
     PropHeader.nPages = nPages;
     PropHeader.dwFlags = PSH_DEFAULT | PSH_NOCONTEXTHELP;
     PropHeader.nStartPage = 0;
-    PropHeader.hwndParent = DlgContext.hwndDlg;
-    PropHeader.hInstance = g_hInstance;
+    PropHeader.hwndParent = pDlgContext->hwndDlg;
+    PropHeader.hInstance = g_WinObj.hInstance;
     PropHeader.pszCaption = szCaption;
 
     PropertySheet(&PropHeader);
@@ -524,14 +536,22 @@ VOID IpcDlgShowProperties(
 INT CALLBACK IpcDlgCompareFunc(
     _In_ LPARAM lParam1,
     _In_ LPARAM lParam2,
-    _In_ LPARAM lParamSort
+    _In_ LPARAM lParamSort //pointer to EXTRASCALLBACK
 )
 {
     LPWSTR lpItem1, lpItem2;
     INT    nResult = 0;
 
-    lpItem1 = supGetItemText(DlgContext.ListView, (INT)lParam1, (INT)lParamSort, NULL);
-    lpItem2 = supGetItemText(DlgContext.ListView, (INT)lParam2, (INT)lParamSort, NULL);
+    EXTRASCONTEXT *pDlgContext;
+    EXTRASCALLBACK *CallbackParam = (EXTRASCALLBACK*)lParamSort;
+
+    if (CallbackParam == NULL)
+        return 0;
+
+    pDlgContext = &IpcDlgContext[CallbackParam->Value];
+
+    lpItem1 = supGetItemText(pDlgContext->ListView, (INT)lParam1, (INT)CallbackParam->lParam, NULL);
+    lpItem2 = supGetItemText(pDlgContext->ListView, (INT)lParam2, (INT)CallbackParam->lParam, NULL);
 
     if ((lpItem1 == NULL) && (lpItem2 == NULL)) {
         nResult = 0;
@@ -539,25 +559,25 @@ INT CALLBACK IpcDlgCompareFunc(
     }
 
     if ((lpItem1 == NULL) && (lpItem2 != NULL)) {
-        nResult = (DlgContext.bInverseSort) ? 1 : -1;
+        nResult = (pDlgContext->bInverseSort) ? 1 : -1;
         goto Done;
     }
     if ((lpItem2 == NULL) && (lpItem1 != NULL)) {
-        nResult = (DlgContext.bInverseSort) ? -1 : 1;
+        nResult = (pDlgContext->bInverseSort) ? -1 : 1;
         goto Done;
     }
 
-    if (DlgContext.bInverseSort)
+    if (pDlgContext->bInverseSort)
         nResult = _strcmpi(lpItem2, lpItem1);
     else
         nResult = _strcmpi(lpItem1, lpItem2);
 
 Done:
     if (lpItem1) {
-        HeapFree(GetProcessHeap(), 0, lpItem1);
+        supHeapFree(lpItem1);
     }
     if (lpItem2) {
-        HeapFree(GetProcessHeap(), 0, lpItem2);
+        supHeapFree(lpItem2);
     }
     return nResult;
 }
@@ -571,11 +591,13 @@ Done:
 *
 */
 VOID IpcDlgQueryInfo(
-    _In_ LPWSTR lpObjectRoot
+    _In_ LPWSTR lpObjectRoot,
+    _In_ HWND ListView
 )
 {
     BOOL                        cond = TRUE;
     BOOLEAN                     bRestartScan;
+    ULONG                       QuerySize;
     HANDLE                      hObject = NULL;
     FILE_DIRECTORY_INFORMATION *DirectoryInfo = NULL;
     NTSTATUS                    status;
@@ -592,10 +614,11 @@ VOID IpcDlgQueryInfo(
         InitializeObjectAttributes(&obja, &uStr, OBJ_CASE_INSENSITIVE, NULL, NULL);
         status = NtOpenFile(&hObject, FILE_LIST_DIRECTORY, &obja, &iost,
             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, 0);
-        if (!NT_SUCCESS(status))
+        if (!NT_SUCCESS(status) || (hObject == NULL))
             __leave;
 
-        DirectoryInfo = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 0x1000);
+        QuerySize = 0x1000;
+        DirectoryInfo = supHeapAlloc((SIZE_T)QuerySize);
         if (DirectoryInfo == NULL)
             __leave;
 
@@ -606,7 +629,9 @@ VOID IpcDlgQueryInfo(
             RtlSecureZeroMemory(&iost, sizeof(iost));
 
             status = NtQueryDirectoryFile(hObject, NULL, NULL, NULL, &iost,
-                DirectoryInfo, 0x1000, FileDirectoryInformation,
+                DirectoryInfo,
+                QuerySize,
+                FileDirectoryInformation,
                 TRUE, //ReturnSingleEntry
                 NULL,
                 bRestartScan //RestartScan
@@ -626,12 +651,12 @@ VOID IpcDlgQueryInfo(
             lvitem.mask = LVIF_TEXT | LVIF_IMAGE;
             lvitem.pszText = DirectoryInfo->FileName;
             lvitem.iItem = MAXINT;
-            ListView_InsertItem(DlgContext.ListView, &lvitem);
+            ListView_InsertItem(ListView, &lvitem);
             bRestartScan = FALSE;
-            RtlSecureZeroMemory(DirectoryInfo, 0x1000);
+            RtlSecureZeroMemory(DirectoryInfo, QuerySize);
 
             c++;
-            if (c > 0x1000) {//its a trap
+            if (c > 1000) {//its a trap
                 break;
             }
         }
@@ -639,7 +664,7 @@ VOID IpcDlgQueryInfo(
     __finally {
 
         if (DirectoryInfo != NULL) {
-            HeapFree(GetProcessHeap(), 0, DirectoryInfo);
+            supHeapFree(DirectoryInfo);
         }
 
         if (hObject) {
@@ -657,12 +682,15 @@ VOID IpcDlgQueryInfo(
 *
 */
 VOID IpcDlgHandleNotify(
-    _In_ LPARAM lParam
+    _In_ LPARAM lParam,
+    _In_ EXTRASCONTEXT *pDlgContext
 )
 {
     LVCOLUMN col;
     LPNMHDR  nhdr = (LPNMHDR)lParam;
     INT      item;
+
+    EXTRASCALLBACK CallbackParam;
 
     if (nhdr == NULL)
         return;
@@ -673,27 +701,30 @@ VOID IpcDlgHandleNotify(
     switch (nhdr->code) {
 
     case LVN_COLUMNCLICK:
-        DlgContext.bInverseSort = !DlgContext.bInverseSort;
-        ListView_SortItemsEx(DlgContext.ListView, &IpcDlgCompareFunc, 0);
+        pDlgContext->bInverseSort = !pDlgContext->bInverseSort;
+
+        CallbackParam.lParam = 0;
+        CallbackParam.Value = pDlgContext->DialogMode;
+        ListView_SortItemsEx(pDlgContext->ListView, &IpcDlgCompareFunc, (LPARAM)&CallbackParam);
 
         RtlSecureZeroMemory(&col, sizeof(col));
         col.mask = LVCF_IMAGE;
         col.iImage = -1;
 
-        ListView_SetColumn(DlgContext.ListView, 0, &col);
+        ListView_SetColumn(pDlgContext->ListView, 0, &col);
 
-        if (DlgContext.bInverseSort)
+        if (pDlgContext->bInverseSort)
             col.iImage = 1;
         else
             col.iImage = 2;
 
-        ListView_SetColumn(DlgContext.ListView, 0, &col);
+        ListView_SetColumn(pDlgContext->ListView, 0, &col);
         break;
 
     case NM_DBLCLK:
         item = ((LPNMITEMACTIVATE)lParam)->iItem;
         if (item >= 0) {
-            IpcDlgShowProperties(item, CurrentDialogMode);
+            IpcDlgShowProperties(item, pDlgContext);
         }
         break;
 
@@ -717,19 +748,45 @@ INT_PTR CALLBACK IpcDlgProc(
     _In_  LPARAM lParam
 )
 {
+    INT dlgIndex;
+    EXTRASCONTEXT *pDlgContext;
+
     switch (uMsg) {
     case WM_NOTIFY:
-        IpcDlgHandleNotify(lParam);
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_IPCDLGCONTEXT);
+        if (pDlgContext) {
+            IpcDlgHandleNotify(lParam, pDlgContext);
+        }
         break;
 
     case WM_INITDIALOG:
+        SetProp(hwndDlg, T_IPCDLGCONTEXT, (HANDLE)lParam);
         supCenterWindow(hwndDlg);
         break;
 
+    case WM_DESTROY:
+        RemoveProp(hwndDlg, T_IPCDLGCONTEXT);
+        break;
+
     case WM_CLOSE:
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_IPCDLGCONTEXT);
+        if (pDlgContext) {
+
+            ImageList_Destroy(pDlgContext->ImageList);
+
+            dlgIndex = 0;
+            if (pDlgContext->DialogMode == IpcModeMailshots)
+                dlgIndex = WOBJ_IPCDLG_MSLOT_IDX;
+            else if (pDlgContext->DialogMode == IpcModeNamedPipes)
+                dlgIndex = WOBJ_IPCDLG_PIPES_IDX;
+
+            if ((dlgIndex == WOBJ_IPCDLG_MSLOT_IDX) || 
+                (dlgIndex == WOBJ_IPCDLG_PIPES_IDX))
+                g_WinObj.AuxDialogs[dlgIndex] = NULL;
+
+            RtlSecureZeroMemory(pDlgContext, sizeof(EXTRASCONTEXT));
+        }
         DestroyWindow(hwndDlg);
-        g_wobjDialogs[WOBJ_IPCDLG_IDX] = NULL;
-        ImageList_Destroy(DlgContext.ImageList);
         return TRUE;
 
     case WM_COMMAND:
@@ -755,106 +812,124 @@ VOID extrasCreateIpcDialog(
     _In_ IPC_DIALOG_MODE Mode
 )
 {
-    INT      ResourceId;
+    INT      ResourceId = 0, dlgIndex;
+    HWND     hwndDlg;
     HICON    hIcon;
     SIZE_T   sz = 0;
     LPWSTR   lpObjectsRoot = NULL, lpObjectRelativePath = NULL;
     LVCOLUMN col;
 
-    //allow only one dialog
-    if (g_wobjDialogs[WOBJ_IPCDLG_IDX]) {
-        SendMessage(g_wobjDialogs[WOBJ_IPCDLG_IDX], WM_CLOSE, 0, 0);
-    }
+    EXTRASCONTEXT *pDlgContext;
 
-    RtlSecureZeroMemory(&DlgContext, sizeof(DlgContext));
-    DlgContext.hwndDlg = CreateDialogParam(g_hInstance, MAKEINTRESOURCE(IDD_DIALOG_IPCOBJECTS),
-        hwndParent, &IpcDlgProc, 0);
+    EXTRASCALLBACK CallbackParam;
 
-    if (DlgContext.hwndDlg == NULL) {
+    if (Mode >= IpcMaxMode)
         return;
+
+    dlgIndex = 0;
+    if (Mode == IpcModeMailshots)
+        dlgIndex = WOBJ_IPCDLG_MSLOT_IDX;
+    else if (Mode == IpcModeNamedPipes)
+        dlgIndex = WOBJ_IPCDLG_PIPES_IDX;
+
+    if ((dlgIndex != WOBJ_IPCDLG_MSLOT_IDX) &&
+        (dlgIndex != WOBJ_IPCDLG_PIPES_IDX)) return;
+
+    //
+    // Allow only one dialog.
+    //
+    if (g_WinObj.AuxDialogs[dlgIndex]) {
+        SendMessage(g_WinObj.AuxDialogs[dlgIndex], WM_CLOSE, 0, 0);
     }
-    g_wobjDialogs[WOBJ_IPCDLG_IDX] = DlgContext.hwndDlg;
-    CurrentDialogMode = Mode;
 
-    __try {
+    RtlSecureZeroMemory(&IpcDlgContext[Mode], sizeof(EXTRASCONTEXT));
+    pDlgContext = &IpcDlgContext[Mode];
+    pDlgContext->DialogMode = Mode;
 
-        switch (Mode) {
-        case IpcModeMailshots:
-            ResourceId = IDI_ICON_MAILSLOT;
-            sz = DEVICE_MAILSLOT_LENGTH;
-            lpObjectsRoot = DEVICE_MAILSLOT;
-            SetWindowText(DlgContext.hwndDlg, L"Mailslots");
-            break;
-        case IpcModeNamedPipes:
-            ResourceId = IDI_ICON_PIPE;
-            sz = DEVICE_NAMED_PIPE_LENGTH;
-            lpObjectsRoot = DEVICE_NAMED_PIPE;
-            SetWindowText(DlgContext.hwndDlg, L"Pipes");
-            break;
-        default:
-            ResourceId = IDI_ICON_UNKNOWN;
-            sz = 0;
-            break;
-        }
+    hwndDlg = CreateDialogParam(g_WinObj.hInstance, MAKEINTRESOURCE(IDD_DIALOG_IPCOBJECTS),
+        hwndParent, &IpcDlgProc, (LPARAM)pDlgContext);
 
-        if (lpObjectsRoot == NULL)
-            __leave;
+    if (hwndDlg == NULL)
+        return;
 
-        lpObjectRelativePath = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sz + 100);
-        if (lpObjectRelativePath == NULL)
-            __leave;
+    pDlgContext->hwndDlg = hwndDlg;
+    g_WinObj.AuxDialogs[dlgIndex] = hwndDlg;
 
-        _strcpy(lpObjectRelativePath, L"Relative Path ( ");
+    switch (Mode) {
+    case IpcModeMailshots:
+        ResourceId = IDI_ICON_MAILSLOT;
+        sz = DEVICE_MAILSLOT_LENGTH;
+        lpObjectsRoot = DEVICE_MAILSLOT;
+        SetWindowText(hwndDlg, TEXT("Mailslots"));
+        break;
+    case IpcModeNamedPipes:
+        ResourceId = IDI_ICON_PIPE;
+        sz = DEVICE_NAMED_PIPE_LENGTH;
+        lpObjectsRoot = DEVICE_NAMED_PIPE;
+        SetWindowText(hwndDlg, TEXT("Pipes"));
+        break;
+    default:
+        lpObjectsRoot = NULL;
+        break;
+    }
+
+    if (lpObjectsRoot == NULL)
+        return;
+
+    lpObjectRelativePath = supHeapAlloc(sz + 100);
+    if (lpObjectRelativePath) {
+        _strcpy(lpObjectRelativePath, TEXT("Relative Path ( "));
         _strcat(lpObjectRelativePath, lpObjectsRoot);
-        _strcat(lpObjectRelativePath, L" )");
-        SetWindowText(GetDlgItem(DlgContext.hwndDlg, ID_IPCROOT), lpObjectRelativePath);
-        HeapFree(GetProcessHeap(), 0, lpObjectRelativePath);
-        lpObjectRelativePath = NULL;
-
-        //setup dlg listview
-        DlgContext.ListView = GetDlgItem(DlgContext.hwndDlg, ID_IPCOBJECTSLIST);
-        if (DlgContext.ListView) {
-            DlgContext.ImageList = ImageList_Create(16, 16, ILC_COLOR32 | ILC_MASK, 42, 8);
-            if (DlgContext.ImageList) {
-
-                //set object icon
-                hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(ResourceId), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
-                if (hIcon) {
-                    ImageList_ReplaceIcon(DlgContext.ImageList, -1, hIcon);
-                    DestroyIcon(hIcon);
-                }
-                //sort images
-                hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
-                if (hIcon) {
-                    ImageList_ReplaceIcon(DlgContext.ImageList, -1, hIcon);
-                    DestroyIcon(hIcon);
-                }
-                hIcon = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
-                if (hIcon) {
-                    ImageList_ReplaceIcon(DlgContext.ImageList, -1, hIcon);
-                    DestroyIcon(hIcon);
-                }
-                ListView_SetImageList(DlgContext.ListView, DlgContext.ImageList, LVSIL_SMALL);
-            }
-
-            ListView_SetExtendedListViewStyle(DlgContext.ListView,
-                LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
-
-            RtlSecureZeroMemory(&col, sizeof(col));
-            col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
-            col.iSubItem = 1;
-            col.pszText = TEXT("Name");
-            col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
-            col.iOrder = 0;
-            col.iImage = 2;
-            col.cx = 500;
-            ListView_InsertColumn(DlgContext.ListView, 1, &col);
-
-            IpcDlgQueryInfo(lpObjectsRoot);
-            ListView_SortItemsEx(DlgContext.ListView, &IpcDlgCompareFunc, 0);
-        }
+        _strcat(lpObjectRelativePath, TEXT(" )"));
+        SetWindowText(GetDlgItem(hwndDlg, ID_IPCROOT), lpObjectRelativePath);
+        supHeapFree(lpObjectRelativePath);
     }
-    __finally {
-        if (lpObjectRelativePath) HeapFree(GetProcessHeap(), 0, lpObjectRelativePath);
+    else
+        return;
+
+    //setup dlg listview
+    pDlgContext->ListView = GetDlgItem(hwndDlg, ID_IPCOBJECTSLIST);
+    if (pDlgContext->ListView) {
+        pDlgContext->ImageList = ImageList_Create(16, 16, ILC_COLOR32 | ILC_MASK, 42, 8);
+        if (pDlgContext->ImageList) {
+
+            //set object icon
+            hIcon = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(ResourceId), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+            if (hIcon) {
+                ImageList_ReplaceIcon(pDlgContext->ImageList, -1, hIcon);
+                DestroyIcon(hIcon);
+            }
+            //sort images
+            hIcon = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+            if (hIcon) {
+                ImageList_ReplaceIcon(pDlgContext->ImageList, -1, hIcon);
+                DestroyIcon(hIcon);
+            }
+            hIcon = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+            if (hIcon) {
+                ImageList_ReplaceIcon(pDlgContext->ImageList, -1, hIcon);
+                DestroyIcon(hIcon);
+            }
+            ListView_SetImageList(pDlgContext->ListView, pDlgContext->ImageList, LVSIL_SMALL);
+        }
+
+        ListView_SetExtendedListViewStyle(pDlgContext->ListView,
+            LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
+
+        RtlSecureZeroMemory(&col, sizeof(col));
+        col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
+        col.iSubItem = 1;
+        col.pszText = TEXT("Name");
+        col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
+        col.iOrder = 0;
+        col.iImage = 2;
+        col.cx = 500;
+        ListView_InsertColumn(pDlgContext->ListView, 1, &col);
+
+        IpcDlgQueryInfo(lpObjectsRoot, pDlgContext->ListView);
+
+        CallbackParam.lParam = 0;
+        CallbackParam.Value = Mode;
+        ListView_SortItemsEx(pDlgContext->ListView, &IpcDlgCompareFunc, (LPARAM)&CallbackParam);
     }
 }

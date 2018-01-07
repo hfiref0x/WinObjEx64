@@ -11,7 +11,7 @@ WinObjEx64 is an advanced utility that lets you explore the Windows Object Manag
 WinObjEx64 does not require administrative privileges. However administrative privilege is required to view much of the namespace and to edit object-related security information.
 
 
-WinObjEx64 works only on the following x64 Windows: Windows 7, Windows 8, Windows 8.1 and Windows 10 (TH1/TH2/RS1/RS2/RS3), including Server variants.
+WinObjEx64 works only on the following x64 Windows: Windows 7, Windows 8, Windows 8.1 and Windows 10 (TH1/TH2/RS1/RS2/RS3/RS4), including Server variants.
 
 
 WinObjEx64 does not work on Windows XP, Windows Vista is partially supported. We have no plans of their full support.
@@ -31,6 +31,6 @@ For a changelog see program help file -> History or changelog.txt in Source dire
 # Authors
 
 
-(c) 2015 - 2017 WinObjEx64 Project
+(c) 2015 - 2018 WinObjEx64 Project
 
 Original WinObjEx (c) 2003 - 2005 Four-F

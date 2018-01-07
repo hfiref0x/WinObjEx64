@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       PROPDLG.C
 *
-*  VERSION:     1.50
+*  VERSION:     1.52
 *
-*  DATE:        03 Aug 2017
+*  DATE:        08 Jan 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -47,9 +47,9 @@ HWND g_SubPropWindow = NULL;
 *
 */
 BOOL propOpenCurrentObject(
-    _In_	PROP_OBJECT_INFO *Context,
-    _Inout_ PHANDLE	phObject,
-    _In_	ACCESS_MASK	DesiredAccess
+    _In_ PROP_OBJECT_INFO *Context,
+    _Out_ PHANDLE phObject,
+    _In_ ACCESS_MASK DesiredAccess
 )
 {
     BOOL                bResult;
@@ -60,26 +60,14 @@ BOOL propOpenCurrentObject(
     IO_STATUS_BLOCK     iost;
 
     bResult = FALSE;
-    if (Context == NULL) {
-        return bResult;
-    }
 
-    //we don't know who is it
-    if (Context->TypeIndex == TYPE_UNKNOWN) {
-        SetLastError(ERROR_UNSUPPORTED_TYPE);
-        return bResult;
-    }
-    if ((phObject == NULL) ||
-        (Context->lpObjectName == NULL) ||
-        (Context->lpCurrentObjectPath == NULL)
-        )    
-    {
-        SetLastError(ERROR_OBJECT_NOT_FOUND);
-        return bResult;
-    }
+    *phObject = NULL;
 
-    //ports not supported 
+    //
+    // Filter unsupported types.
+    //
     if (
+        (Context->TypeIndex == TYPE_UNKNOWN) ||
         (Context->TypeIndex == TYPE_PORT) ||
         (Context->TypeIndex == TYPE_FLTCOMM_PORT) ||
         (Context->TypeIndex == TYPE_FLTCONN_PORT) ||
@@ -90,18 +78,32 @@ BOOL propOpenCurrentObject(
         return bResult;
     }
 
+    if ((Context->lpObjectName == NULL) ||
+        (Context->lpCurrentObjectPath == NULL)
+        )    
+    {
+        SetLastError(ERROR_OBJECT_NOT_FOUND);
+        return bResult;
+    }
+
     hDirectory = NULL;
 
     if (DesiredAccess == 0) {
         DesiredAccess = 1;
     }
 
-    //handle directory type
+    //
+    // Handle directory type.
+    //
     if (Context->TypeIndex == TYPE_DIRECTORY) {
 
-        //if this is root, then root hDirectory = NULL
+        //
+        // If this is root, then root hDirectory = NULL.
+        //
         if (_strcmpi(Context->lpObjectName, L"\\") != 0) {
-            //else open directory that holds this object
+            //
+            // Otherwise open directory that keep this object.
+            //
             hDirectory = supOpenDirectoryForObject(Context->lpObjectName, Context->lpCurrentObjectPath);
             if (hDirectory == NULL) {
                 SetLastError(ERROR_OBJECT_NOT_FOUND);
@@ -109,7 +111,9 @@ BOOL propOpenCurrentObject(
             }
         }
 
-        //open object in directory
+        //
+        // Open object in directory.
+        //
         RtlSecureZeroMemory(&ustr, sizeof(ustr));
         RtlInitUnicodeString(&ustr, Context->lpObjectName);
         InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, hDirectory, NULL);
@@ -130,7 +134,9 @@ BOOL propOpenCurrentObject(
         return bResult;
     }
 
-    //handle window station type
+    //
+    // Handle window station type.
+    //
     if (Context->TypeIndex == TYPE_WINSTATION) {
         hObject = OpenWindowStation(Context->lpObjectName, FALSE, DesiredAccess); //WINSTA_READATTRIBUTES for query
         bResult = (hObject != NULL);
@@ -140,7 +146,9 @@ BOOL propOpenCurrentObject(
         return bResult;
     }
 
-    //handle desktop type
+    //
+    // Handle desktop type.
+    //
     if (Context->TypeIndex == TYPE_DESKTOP) {
         hObject = OpenDesktop(Context->lpObjectName, 0, FALSE, DesiredAccess); //DESKTOP_READOBJECTS for query
         bResult = (hObject != NULL);
@@ -150,7 +158,9 @@ BOOL propOpenCurrentObject(
         return bResult;
     }
 
-    //open directory which current object belongs
+    //
+    // Open directory which current object belongs.
+    //
     hDirectory = supOpenDirectoryForObject(Context->lpObjectName, Context->lpCurrentObjectPath);
     if (hDirectory == NULL) {
         SetLastError(ERROR_OBJECT_NOT_FOUND);
@@ -164,7 +174,9 @@ BOOL propOpenCurrentObject(
     status = STATUS_UNSUCCESSFUL;
     hObject = NULL;
 
-    //handle supported objects
+    //
+    // Handle supported objects.
+    //
     switch (Context->TypeIndex) {
 
     case TYPE_DEVICE: //FILE_OBJECT
@@ -249,72 +261,74 @@ PPROP_OBJECT_INFO propContextCreate(
     PROP_OBJECT_INFO *Context;
 
     __try {
-        //allocate context structure
-        Context = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(PROP_OBJECT_INFO));
-        if (Context == NULL) {
-            return Context;
-        }
+        //
+        // Allocate context structure.
+        //
+        Context = supHeapAlloc(sizeof(PROP_OBJECT_INFO));
+        if (Context == NULL)
+            return NULL;
 
-        //copy object name if given
+        //
+        // Copy object name if given.
+        //
         if (lpObjectName) {
-            Context->lpObjectName = HeapAlloc(GetProcessHeap(),
-                HEAP_ZERO_MEMORY,
-                (1 + _strlen(lpObjectName)) * sizeof(WCHAR) //lpObjectName + '\0'
-            );
+
+            Context->lpObjectName = supHeapAlloc((1 + _strlen(lpObjectName)) * sizeof(WCHAR));
             if (Context->lpObjectName) {
                 _strcpy(Context->lpObjectName, lpObjectName);
-                bSelectedObject = (_strcmpi(Context->lpObjectName, L"ObjectTypes") == 0);
+                bSelectedObject = (_strcmpi(Context->lpObjectName, TEXT("ObjectTypes")) == 0);
             }
         }
 
-        //copy object type if given
+        //
+        // Copy object type if given.
+        //
         if (lpObjectType) {
-            Context->lpObjectType = HeapAlloc(GetProcessHeap(),
-                HEAP_ZERO_MEMORY,
-                (1 + _strlen(lpObjectType)) * sizeof(WCHAR) //lpObjectType + '\0'
-            );
+            Context->lpObjectType = supHeapAlloc((1 + _strlen(lpObjectType)) * sizeof(WCHAR));
             if (Context->lpObjectType) {
                 _strcpy(Context->lpObjectType, lpObjectType);
             }
             Context->TypeIndex = supGetObjectIndexByTypeName(lpObjectType);
         }
 
-        //copy CurrentObjectPath if given, as it can change because dialog is modeless
+        //
+        // Copy CurrentObjectPath if given, as it can change because dialog is modeless.
+        //
         if (lpCurrentObjectPath) {
-            Context->lpCurrentObjectPath = HeapAlloc(GetProcessHeap(),
-                HEAP_ZERO_MEMORY,
-                (1 + _strlen(lpCurrentObjectPath)) * sizeof(WCHAR) //lpCurrentObjectPath + '\0'
-            );
+            Context->lpCurrentObjectPath = supHeapAlloc((1 + _strlen(lpCurrentObjectPath)) * sizeof(WCHAR));
             if (Context->lpCurrentObjectPath) {
                 _strcpy(Context->lpCurrentObjectPath, lpCurrentObjectPath);
                 bSelectedDirectory = (_strcmpi(Context->lpCurrentObjectPath, T_OBJECTTYPES) == 0);
             }
         }
-
-        //copy object description, could be NULL
+        
+        //
+        // Copy object description, could be NULL.
+        //
         if (lpDescription) {
-            Context->lpDescription = HeapAlloc(GetProcessHeap(),
-                HEAP_ZERO_MEMORY,
-                (1 + _strlen(lpDescription)) * sizeof(WCHAR) //lpDescription + '\0'
-            );
+            Context->lpDescription = supHeapAlloc((1 + _strlen(lpDescription)) * sizeof(WCHAR));
             if (Context->lpDescription) {
                 _strcpy(Context->lpDescription, lpDescription);
             }
         }
 
-        //Check if object is Type object.
-        //Type objects handled differently.
+        //
+        // Check if object is Type object.
+        // Type objects handled differently.
+        //
         if ((bSelectedObject == FALSE) && (bSelectedDirectory != FALSE)) {
             Context->IsType = TRUE;
             //
-            // Query actual type index for case when user will browse Type object info
+            // Query actual type index for case when user will browse Type object info.
             //
             if (Context->lpObjectName) {
                 Context->RealTypeIndex = supGetObjectIndexByTypeName(Context->lpObjectName);
             }
         }
         else {
-            //use the same type index for everything else
+            //
+            // Use the same type index for everything else.
+            //
             Context->RealTypeIndex = Context->TypeIndex;
         }
 
@@ -338,28 +352,25 @@ VOID propContextDestroy(
 )
 {
     __try {
-        if (Context == NULL) {
-            return;
-        }
         //free name
         if (Context->lpObjectName) {
-            HeapFree(GetProcessHeap(), 0, Context->lpObjectName);
+            supHeapFree(Context->lpObjectName);
         }
         //free type
         if (Context->lpObjectType) {
-            HeapFree(GetProcessHeap(), 0, Context->lpObjectType);
+            supHeapFree(Context->lpObjectType);
         }
         //free currentobjectpath
         if (Context->lpCurrentObjectPath) {
-            HeapFree(GetProcessHeap(), 0, Context->lpCurrentObjectPath);
+            supHeapFree(Context->lpCurrentObjectPath);
         }
         //free description
         if (Context->lpDescription) {
-            HeapFree(GetProcessHeap(), 0, Context->lpDescription);
+            supHeapFree(Context->lpDescription);
         }
 
         //free context itself
-        HeapFree(GetProcessHeap(), 0, Context);
+        supHeapFree(Context);
     }
     __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
         return;
@@ -377,10 +388,10 @@ VOID propContextDestroy(
 *
 */
 LRESULT WINAPI PropSheetCustomWndProc(
-    HWND hwnd,
-    UINT Msg,
-    WPARAM wParam,
-    LPARAM lParam
+    _In_ HWND hwnd,
+    _In_ UINT Msg,
+    _In_ WPARAM wParam,
+    _In_ LPARAM lParam
 )
 {
     PROP_OBJECT_INFO *Context = NULL;
@@ -401,9 +412,7 @@ LRESULT WINAPI PropSheetCustomWndProc(
 
     case WM_CLOSE:
         DestroyWindow(hwnd);
-        //
-        //!Consider rewrite
-        //
+
         if (hwnd == g_SubPropWindow) {
             g_SubPropWindow = NULL;
         }
@@ -421,7 +430,7 @@ LRESULT WINAPI PropSheetCustomWndProc(
         break;
 
     case WM_COMMAND:
-        if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL) {
+        if ((LOWORD(wParam) == IDOK) || (LOWORD(wParam) == IDCANCEL)) {
             SendMessage(hwnd, WM_CLOSE, 0, 0);
             return TRUE;
         }
@@ -457,22 +466,20 @@ VOID propCreateDialog(
     PROPSHEETHEADER     PropHeader;
     WCHAR               szCaption[MAX_PATH * 2];
 
-    if ((hwndParent == NULL) ||
-        (lpObjectName == NULL) ||
-        (lpObjectType == NULL))
-    {
+    //
+    // Allocate context variable, copy name, type, object path.
+    //
+    propContext = propContextCreate(lpObjectName, 
+        lpObjectType, 
+        g_WinObj.CurrentObjectPath, 
+        lpDescription);
+
+    if (propContext == NULL)
         return;
-    }
 
     //
-    //allocate context variable, copy name, type, object path
+    // If worker available - wait on it.
     //
-    propContext = propContextCreate(lpObjectName, lpObjectType, CurrentObjectPath, lpDescription);
-    if (propContext == NULL) {
-        return;
-    }
-
-    //if worker available - wait on it
     if (g_kdctx.hDevice) {
         if (g_kdctx.hThreadWorker) {
             WaitForSingleObject(g_kdctx.hThreadWorker, INFINITE);
@@ -481,29 +488,33 @@ VOID propCreateDialog(
         }
     }
 
-    //remember previously focused window
-    //except special types: desktop
+    //
+    // Remember previously focused window.
+    // Except special types: Desktop.
+    //
     if (propContext->TypeIndex != TYPE_DESKTOP) {
         hPrevFocus = GetFocus();
     }
 
-    //zero pages arrays
     nPages = 0;
     RtlSecureZeroMemory(psp, sizeof(psp));
+
     //
     // Properties: 
     // Basic->[Object]->[Process]->[Desktops]->[Registry]->Type->[Security]
     //
 
     //
-    //Basic Info Page
+    // Basic Info Page.
     //
     RtlSecureZeroMemory(&Page, sizeof(Page));
     Page.dwSize = sizeof(PROPSHEETPAGE);
     Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
-    Page.hInstance = g_hInstance;
+    Page.hInstance = g_WinObj.hInstance;
 
-    //select dialog for basic info
+    //
+    // Select dialog for basic info.
+    //
     switch (propContext->TypeIndex) {
     case TYPE_TIMER:
         Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_TIMER);
@@ -548,12 +559,12 @@ VOID propCreateDialog(
         break;
     }
     Page.pfnDlgProc = BasicPropDialogProc;
-    Page.pszTitle = L"Basic";
+    Page.pszTitle = TEXT("Basic");
     Page.lParam = (LPARAM)propContext;
     psp[nPages++] = CreatePropertySheetPage(&Page);
 
     //
-    //Create Objects page for supported types
+    // Create Objects page for supported types.
     //
     if (g_kdctx.hDevice != NULL) {
         switch (propContext->TypeIndex) {
@@ -570,10 +581,10 @@ VOID propCreateDialog(
             RtlSecureZeroMemory(&Page, sizeof(Page));
             Page.dwSize = sizeof(PROPSHEETPAGE);
             Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
-            Page.hInstance = g_hInstance;
+            Page.hInstance = g_WinObj.hInstance;
             Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_OBJECTDUMP);
             Page.pfnDlgProc = ObjectDumpDialogProc;
-            Page.pszTitle = L"Object";
+            Page.pszTitle = TEXT("Object");
             Page.lParam = (LPARAM)propContext;
             psp[nPages++] = CreatePropertySheetPage(&Page);
             break;
@@ -581,7 +592,7 @@ VOID propCreateDialog(
     }
 
     //
-    //Create additional page(s), depending on object type
+    // Create additional page(s), depending on object type.
     //
     switch (propContext->TypeIndex) {
     case TYPE_DIRECTORY:
@@ -601,24 +612,24 @@ VOID propCreateDialog(
         RtlSecureZeroMemory(&Page, sizeof(Page));
         Page.dwSize = sizeof(PROPSHEETPAGE);
         Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
-        Page.hInstance = g_hInstance;
+        Page.hInstance = g_WinObj.hInstance;
         Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_PROCESSLIST);
         Page.pfnDlgProc = ProcessListDialogProc;
-        Page.pszTitle = L"Process";
+        Page.pszTitle = TEXT("Process");
         Page.lParam = (LPARAM)propContext;
         psp[nPages++] = CreatePropertySheetPage(&Page);
 
         //
-        //Add desktop list for selected desktop, located here because of sheets order
+        // Add desktop list for selected desktop, located here because of sheets order.
         //
         if (propContext->TypeIndex == TYPE_WINSTATION) {
             RtlSecureZeroMemory(&Page, sizeof(Page));
             Page.dwSize = sizeof(PROPSHEETPAGE);
             Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
-            Page.hInstance = g_hInstance;
+            Page.hInstance = g_WinObj.hInstance;
             Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_DESKTOPS);
             Page.pfnDlgProc = DesktopListDialogProc;
-            Page.pszTitle = L"Desktops";
+            Page.pszTitle = TEXT("Desktops");
             Page.lParam = (LPARAM)propContext;
             psp[nPages++] = CreatePropertySheetPage(&Page);
         }
@@ -626,35 +637,35 @@ VOID propCreateDialog(
         break;
     case TYPE_DRIVER:
         //
-        //Add registry page
+        // Add registry page.
         //
         RtlSecureZeroMemory(&Page, sizeof(Page));
         Page.dwSize = sizeof(PROPSHEETPAGE);
         Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
-        Page.hInstance = g_hInstance;
+        Page.hInstance = g_WinObj.hInstance;
         Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_SERVICE);
         Page.pfnDlgProc = DriverRegistryDialogProc;
-        Page.pszTitle = L"Registry";
+        Page.pszTitle = TEXT("Registry");
         Page.lParam = (LPARAM)propContext;
         psp[nPages++] = CreatePropertySheetPage(&Page);
         break;
     }
 
     //
-    //Type Info Page
+    // Type Info Page.
     //
     RtlSecureZeroMemory(&Page, sizeof(Page));
     Page.dwSize = sizeof(PROPSHEETPAGE);
     Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
-    Page.hInstance = g_hInstance;
+    Page.hInstance = g_WinObj.hInstance;
     Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_TYPE);
     Page.pfnDlgProc = TypePropDialogProc;
-    Page.pszTitle = L"Type";
+    Page.pszTitle = TEXT("Type");
     Page.lParam = (LPARAM)propContext;
     psp[nPages++] = CreatePropertySheetPage(&Page);
 
     //
-    //Create Security Dialog if available
+    // Create Security Dialog if available.
     //
     SecurityPage = propSecurityCreatePage(
         propContext, //Context
@@ -669,7 +680,7 @@ VOID propCreateDialog(
     }
 
     //
-    //Finally create property sheet
+    // Finally create property sheet.
     //
     if (propContext->IsType) {
         _strncpy(szCaption, MAX_PATH, lpObjectName, _strlen(lpObjectName));
@@ -678,7 +689,7 @@ VOID propCreateDialog(
         _strncpy(szCaption, MAX_PATH, lpObjectType, _strlen(lpObjectType));
     }
 
-    _strcat(szCaption, L" Properties");
+    _strcat(szCaption, TEXT(" Properties"));
     RtlSecureZeroMemory(&PropHeader, sizeof(PropHeader));
     PropHeader.dwSize = sizeof(PropHeader);
     PropHeader.phpage = psp;
@@ -686,7 +697,7 @@ VOID propCreateDialog(
     PropHeader.dwFlags = PSH_DEFAULT | PSH_NOCONTEXTHELP | PSH_MODELESS;
     PropHeader.nStartPage = 0;
     PropHeader.hwndParent = hwndParent;
-    PropHeader.hInstance = g_hInstance;
+    PropHeader.hInstance = g_WinObj.hInstance;
     PropHeader.pszCaption = szCaption;
 
     hwndDlg = (HWND)PropertySheet(&PropHeader);

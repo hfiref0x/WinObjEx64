@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       EXTRASPN.C
 *
-*  VERSION:     1.50
+*  VERSION:     1.52
 *
-*  DATE:        10 Aug 2017
+*  DATE:        08 Jan 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -20,9 +20,11 @@
 
 EXTRASCONTEXT DlgContext;
 
-#define T_NAMESPACEID          TEXT("Ns%I64x")
-#define T_NAMESPACEOBJECTCNT   TEXT("Total Object(s): %ld")
+#ifdef _USE_OWN_DRIVER
+#define T_NAMESPACEQUERYFAILED TEXT("Unable to list namespaces! Make sure you run this program as Admin.")
+#else
 #define T_NAMESPACEQUERYFAILED TEXT("Unable to list namespaces! Make sure you run this program as Admin and Windows is in a DEBUG mode.")
+#endif
 
 /*
 * PNListCompareFunc
@@ -63,8 +65,8 @@ INT CALLBACK PNListCompareFunc(
         nResult = _strcmpi(lpItem1, lpItem2);
 
 Done:
-    if (lpItem1) HeapFree(GetProcessHeap(), 0, lpItem1);
-    if (lpItem2) HeapFree(GetProcessHeap(), 0, lpItem2);
+    if (lpItem1) supHeapFree(lpItem1);
+    if (lpItem2) supHeapFree(lpItem2);
 
     return nResult;
 }
@@ -128,7 +130,9 @@ BOOL PNDlgQueryInfo(
         lvitem.iSubItem = 2;
         lvitem.iItem = index;
         RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-        wsprintf(szBuffer, T_NAMESPACEID, ObjectInfo->NamespaceId);
+
+        _strcpy(szBuffer, TEXT("Ns"));
+        u64tostr(ObjectInfo->NamespaceId, _strend(szBuffer));
         lvitem.pszText = szBuffer;
         ListView_SetItem(DlgContext.ListView, &lvitem);
 
@@ -174,7 +178,7 @@ VOID PNDlgHandleNotify(
         for (c = 0; c < DlgContext.lvColumnCount; c++)
             ListView_SetColumn(DlgContext.ListView, c, &col);
 
-        k = ImageList_GetImageCount(ListViewImages);
+        k = ImageList_GetImageCount(g_ListViewImages);
         if (DlgContext.bInverseSort)
             col.iImage = k - 2;
         else
@@ -216,7 +220,7 @@ INT_PTR CALLBACK PNDialogProc(
 
     case WM_CLOSE:
         DestroyWindow(hwndDlg);
-        g_wobjDialogs[WOBJ_PNDLG_IDX] = NULL;
+        g_WinObj.AuxDialogs[WOBJ_PNDLG_IDX] = NULL;
         return TRUE;
 
     case WM_COMMAND:
@@ -245,24 +249,24 @@ VOID extrasCreatePNDialog(
     WCHAR    szBuffer[MAX_PATH];
 
     //allow only one dialog
-    if (g_wobjDialogs[WOBJ_PNDLG_IDX]) {
-        SetActiveWindow(g_wobjDialogs[WOBJ_PNDLG_IDX]);
+    if (g_WinObj.AuxDialogs[WOBJ_PNDLG_IDX]) {
+        SetActiveWindow(g_WinObj.AuxDialogs[WOBJ_PNDLG_IDX]);
         return;
     }
 
     RtlSecureZeroMemory(&DlgContext, sizeof(DlgContext));
-    DlgContext.hwndDlg = CreateDialogParam(g_hInstance, MAKEINTRESOURCE(IDD_DIALOG_PNAMESPACE),
+    DlgContext.hwndDlg = CreateDialogParam(g_WinObj.hInstance, MAKEINTRESOURCE(IDD_DIALOG_PNAMESPACE),
         hwndParent, &PNDialogProc, 0);
 
     if (DlgContext.hwndDlg == NULL) {
         return;
     }
 
-    g_wobjDialogs[WOBJ_PNDLG_IDX] = DlgContext.hwndDlg;
+    g_WinObj.AuxDialogs[WOBJ_PNDLG_IDX] = DlgContext.hwndDlg;
 
     DlgContext.ListView = GetDlgItem(DlgContext.hwndDlg, ID_NAMESPACELIST);
     if (DlgContext.ListView) {
-        ListView_SetImageList(DlgContext.ListView, ListViewImages, LVSIL_SMALL);
+        ListView_SetImageList(DlgContext.ListView, g_ListViewImages, LVSIL_SMALL);
         ListView_SetExtendedListViewStyle(DlgContext.ListView,
             LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
 
@@ -272,7 +276,7 @@ VOID extrasCreatePNDialog(
         col.iSubItem++;
         col.pszText = TEXT("Name");
         col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
-        col.iImage = ImageList_GetImageCount(ListViewImages) - 1;
+        col.iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
         col.cx = 400;
         ListView_InsertColumn(DlgContext.ListView, col.iSubItem, &col);
 
@@ -296,7 +300,8 @@ VOID extrasCreatePNDialog(
         if (PNDlgQueryInfo()) {
             ListView_SortItemsEx(DlgContext.ListView, &PNListCompareFunc, 0);
             RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-            wsprintf(szBuffer, T_NAMESPACEOBJECTCNT, ListView_GetItemCount(DlgContext.ListView));
+            _strcpy(szBuffer, TEXT("Total Object(s): "));
+            ultostr((ULONG)ListView_GetItemCount(DlgContext.ListView), _strend(szBuffer));
             SetDlgItemText(DlgContext.hwndDlg, ID_PNAMESPACESINFO, szBuffer);
         }
         else {

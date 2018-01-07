@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       PROPTYPE.C
 *
-*  VERSION:     1.51
+*  VERSION:     1.52
 *
-*  DATE:        02 Dec 2017
+*  DATE:        08 Jan 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -546,10 +546,12 @@ BOOL propQueryTypeInfo(
             pObject = (POBJECT_TYPE_INFORMATION)&pObjectTypes->TypeInformation;
             for (i = 0; i < pObjectTypes->NumberOfTypes; i++) {
                 sz = (pObject->TypeName.MaximumLength) + sizeof(UNICODE_NULL);
-                lpType = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sz);
+                lpType = supHeapAlloc(sz);
                 if (lpType) {
 
-                    _strncpy(lpType, sz / sizeof(WCHAR), pObject->TypeName.Buffer,
+                    _strncpy(lpType, 
+                        sz / sizeof(WCHAR), 
+                        pObject->TypeName.Buffer,
                         pObject->TypeName.Length / sizeof(WCHAR));
 
                     if (_strcmpi(lpType, lpObjectType) == 0) {
@@ -571,7 +573,7 @@ BOOL propQueryTypeInfo(
                         }
                         bResult = TRUE;
                     }
-                    HeapFree(GetProcessHeap(), 0, lpType);
+                    supHeapFree(lpType);
                     if (bResult) {
                         break;
                     }
@@ -582,7 +584,7 @@ BOOL propQueryTypeInfo(
         } while (cond);
 
         if (pObjectTypes) {
-            HeapFree(GetProcessHeap(), 0, pObjectTypes);
+            supHeapFree(pObjectTypes);
         }
     }
     __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
@@ -628,7 +630,7 @@ VOID propSetTypeInfo(
     }
     else {
         RtlSecureZeroMemory(&szType, sizeof(szType));
-        if (LoadString(g_hInstance, TYPE_DESCRIPTION_START_INDEX + nIndex, szType,
+        if (LoadString(g_WinObj.hInstance, TYPE_DESCRIPTION_START_INDEX + nIndex, szType,
             (MAX_PATH * sizeof(WCHAR)) - sizeof(UNICODE_NULL)))
         {
             lpTypeDescription = szType;
@@ -665,9 +667,10 @@ VOID propSetTypeInfo(
         else {
             //set description
             RtlSecureZeroMemory(&szType, sizeof(szType));
-            if (LoadString(g_hInstance, TYPE_DESCRIPTION_START_INDEX + Context->RealTypeIndex, szType,
-                (MAX_PATH * 2) - sizeof(UNICODE_NULL)
-            ))
+            if (LoadString(g_WinObj.hInstance, 
+                TYPE_DESCRIPTION_START_INDEX + Context->RealTypeIndex, 
+                szType,
+                (MAX_PATH * 2) - sizeof(UNICODE_NULL)))
             {
                 lpTypeDescription = szType;
             }
@@ -677,22 +680,30 @@ VOID propSetTypeInfo(
         }
     }
     else {
-        //query object type object
+        //
+        // Query object type object.
+        //
         pObject = ObQueryObject(T_OBJECTTYPES, Context->lpObjectType);
 
-        //cannot query, no driver or other error, try second method
+        //
+        // If we cannot query because of no driver or other error, try second method.
+        //
         if (pObject == NULL) {
             bOkay = propQueryTypeInfo(Context->lpObjectType, &ObjectTypeDump);
         }
     }
 
-    //set description label
+    //
+    // Set description label.
+    //
     SetDlgItemText(hwndDlg, ID_TYPE_DESCRIPTION, lpTypeDescription);
 
-    //driver info available, dump type
+    //
+    // Driver info available, dump type.
+    //
     if (pObject != NULL) {
         bOkay = ObDumpTypeInfo(pObject->ObjectAddress, &ObjectTypeDump);
-        HeapFree(GetProcessHeap(), 0, pObject);
+        supHeapFree(pObject);
     }
 
     if (bOkay) {
@@ -808,7 +819,7 @@ INT_PTR CALLBACK TypePropDialogProc(
         if (Context) {
             hDc = BeginPaint(hwndDlg, &Paint);
             if (hDc) {
-                ImageList_Draw(ListViewImages, Context->RealTypeIndex, hDc, 24, 34,
+                ImageList_Draw(g_ListViewImages, Context->RealTypeIndex, hDc, 24, 34,
                     ILD_NORMAL | ILD_TRANSPARENT);
                 EndPaint(hwndDlg, &Paint);
             }

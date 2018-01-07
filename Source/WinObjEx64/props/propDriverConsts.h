@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       PROPDRIVERCONSTS.H
 *
-*  VERSION:     1.46
+*  VERSION:     1.52
 *
-*  DATE:        07 Mar 2017
+*  DATE:        08 Jan 2018
 *
 *  Common header file for Driver property sheet.
 *
@@ -19,5 +19,11 @@
 #pragma once
 
 #define REGEDITWNDCLASS           L"RegEdit_RegEdit"
-#define PROPDRVREGSERVICESKEY     L"\\HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\%ws"
-#define PROPDRVREGSERVICESKEYLEN  sizeof(REGISTRYSERVICESKEY) - sizeof(WCHAR)
+#define REGEDIT_EXE               L"regedit.exe"
+#define SHELL_OPEN_VERB           L"open"
+
+//
+// Path to navigate in the regedit window treeview.
+//
+#define PROPDRVREGSERVICESKEY     L"\\HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\"
+#define PROPDRVREGSERVICESKEYLEN  sizeof(PROPDRVREGSERVICESKEY) - sizeof(WCHAR)

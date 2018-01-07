@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     1.47
+*  VERSION:     1.52
 *
-*  DATE:        18 Mar 2017
+*  DATE:        08 Jan 2018
 *
 *  Test code used while debug.
 *
@@ -24,11 +24,29 @@
 HANDLE g_TestIoCompletion = NULL, g_TestTransaction = NULL;
 HANDLE g_TestNamespace = NULL, g_TestMutex = NULL;
 HANDLE g_TestMailslot = NULL;
+HANDLE g_DebugObject = NULL;
 
 VOID TestApiPort(
     VOID
 )
 {
+}
+
+VOID TestDebugObject(
+    VOID
+)
+{
+    NTSTATUS status;
+    OBJECT_ATTRIBUTES obja;
+    UNICODE_STRING    ustr;
+
+    ustr.Buffer = NULL;
+    RtlInitUnicodeString(&ustr, L"\\BaseNamedObjects\\TestDebugObject");
+    InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
+    status = NtCreateDebugObject(&g_DebugObject, DEBUG_ALL_ACCESS, &obja, 0);
+    if (NT_SUCCESS(status)) {
+        Beep(0, 0);
+    }
 }
 
 VOID TestMailslot(
@@ -96,8 +114,6 @@ VOID TestMailslot(
         readTimeout.LowPart = 0xFFFFFFFF;
 
         ustr.Buffer = NULL;
-        ustr.Length = 0;
-        ustr.MaximumLength = 0;
         RtlInitUnicodeString(&ustr, L"\\Device\\Mailslot\\TestMailslot");
 
         InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, pSD);
@@ -127,8 +143,6 @@ VOID TestPartition(
 
     if (g_ExtApiSet.NtOpenPartition != NULL) {
         ustr.Buffer = NULL;
-        ustr.Length = 0;
-        ustr.MaximumLength = 0;
         RtlInitUnicodeString(&ustr, L"\\KernelObjects\\MemoryPartition0");
         InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
         status = g_ExtApiSet.NtOpenPartition(&TargetHandle, MEMORY_PARTITION_QUERY_ACCESS, &obja);
@@ -148,9 +162,7 @@ VOID TestIoCompletion(
 
     //IoCompletion
     ustr.Buffer = NULL;
-    ustr.Length = 0;
-    ustr.MaximumLength = 0;
-    RtlInitUnicodeString(&ustr, L"\\BaseNamedObjects\\TestCompletion");
+    RtlInitUnicodeString(&ustr, L"\\BaseNamedObjects\\TestIoCompletion");
     InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
     NtCreateIoCompletion(&g_TestIoCompletion, IO_COMPLETION_ALL_ACCESS, &obja, 100);
 }
@@ -180,8 +192,6 @@ VOID TestTransaction(
 
     //TmTx
     ustr.Buffer = NULL;
-    ustr.Length = 0;
-    ustr.MaximumLength = 0;
     RtlInitUnicodeString(&ustr, L"\\BaseNamedObjects\\TestTransaction");
     InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
     NtCreateTransaction(&g_TestTransaction, TRANSACTION_ALL_ACCESS, &obja, NULL, NULL, 0, 0, 0, NULL, NULL);
@@ -235,11 +245,25 @@ VOID TestPrivateNamespace(
     } while (cond);
 }
 
+VOID TestException(
+    VOID
+)
+{
+    __try {
+        *(PBYTE)(NULL) = 0;
+    }
+    __except (exceptFilter(GetExceptionCode(), GetExceptionInformation()))
+    {
+        __nop();
+    }
+}
+
 VOID TestStart(
     VOID
 )
 {
     TestApiPort();
+    TestDebugObject();
     TestMailslot();
     TestPartition();
     TestPrivateNamespace();
@@ -252,6 +276,7 @@ VOID TestStop(
     VOID
 )
 {
+    if (g_DebugObject) NtClose(g_DebugObject);
     if (g_TestIoCompletion) NtClose(g_TestIoCompletion);
     if (g_TestTransaction) NtClose(g_TestTransaction);
 

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       PROPDESKTOP.C
 *
-*  VERSION:     1.46
+*  VERSION:     1.52
 *
-*  DATE:        05 Mar 2017
+*  DATE:        08 Jan 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -36,8 +36,8 @@ BOOL bDesktopListSortInverse = FALSE;
 *
 */
 BOOL CALLBACK DesktopListEnumProc(
-    _In_  LPWSTR lpszDesktop,
-    _In_  LPARAM lParam
+    _In_ LPWSTR lpszDesktop,
+    _In_ LPARAM lParam
 )
 {
     BOOL              bSucc;
@@ -56,18 +56,14 @@ BOOL CALLBACK DesktopListEnumProc(
         return FALSE;
     }
 
-    sz = (_strlen(lpszDesktop) * sizeof(WCHAR)) +
-        (_strlen(Context->lpObjectName) * sizeof(WCHAR)) +
-        (2 * sizeof(WCHAR)) + sizeof(UNICODE_NULL);
-
-    lpName = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sz);
-    //not enough memory? cancel enum
-    if (lpName == NULL) {
+    // Desktop\\Object+0
+    sz = (3 + _strlen(lpszDesktop) + _strlen(Context->lpObjectName)) * sizeof(WCHAR);
+    lpName = supHeapAlloc(sz);
+    if (lpName == NULL)
         return 0;
-    }
 
     _strcpy(lpName, Context->lpObjectName);
-    _strcat(lpName, L"\\");
+    _strcat(lpName, TEXT("\\"));
     _strcat(lpName, lpszDesktop);
 
     //Name
@@ -79,32 +75,43 @@ BOOL CALLBACK DesktopListEnumProc(
     lvitem.iItem = MAXINT;
     nIndex = ListView_InsertItem(DesktopList, &lvitem);
 
-    HeapFree(GetProcessHeap(), 0, lpName);
+    supHeapFree(lpName);
 
-    //Query desktop objects information
+    //
+    // Query desktop objects information.
+    //
     bSucc = FALSE;
     StringSid = NULL;
     hDesktop = OpenDesktop(lpszDesktop, 0, FALSE, DESKTOP_READOBJECTS);
     if (hDesktop) {
 
-        //Query SID
+        //
+        // Query SID.
+        //
         bytesNeeded = 0;
         GetUserObjectInformation(hDesktop, UOI_USER_SID, NULL, 0, &bytesNeeded);
-        //user associated with desktop present, query sid
+        
+        //
+        // User associated with desktop present, query sid.
+        //
         if (bytesNeeded) {
-            //allocate memory for sid
-            pSID = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytesNeeded);
+            //
+            // Allocate memory for sid.
+            //
+            pSID = supHeapAlloc(bytesNeeded);
             if (pSID) {
                 if (GetUserObjectInformation(hDesktop,
                     UOI_USER_SID, pSID, bytesNeeded, &bytesNeeded))
                 {
                     bSucc = ConvertSidToStringSid(pSID, &StringSid);
                 }
-                HeapFree(GetProcessHeap(), 0, pSID);
+                supHeapFree(pSID);
             }
         }
 
-        //Add SID string to the list
+        //
+        // Add SID string to the list.
+        //
         if (bSucc && StringSid) {
             lvitem.mask = LVIF_TEXT;
             lvitem.iSubItem = 1;
@@ -114,14 +121,19 @@ BOOL CALLBACK DesktopListEnumProc(
             LocalFree(StringSid);
         }
 
-        //Add Desktop Heap Size, returned in KBytes
+        //
+        // Add Desktop Heap Size, returned in KBytes.
+        //
         dwDesktopHeapSize = 0;
-        if (GetUserObjectInformation(hDesktop, UOI_HEAPSIZE,
-            &dwDesktopHeapSize, sizeof(dwDesktopHeapSize), &bytesNeeded)) {
-
+        if (GetUserObjectInformation(hDesktop, 
+            UOI_HEAPSIZE,
+            &dwDesktopHeapSize, 
+            sizeof(dwDesktopHeapSize), 
+            &bytesNeeded)) 
+        {
             RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
             ultostr(dwDesktopHeapSize / 1024, szBuffer);
-            _strcat(szBuffer, L" Mb");
+            _strcat(szBuffer, TEXT(" Mb"));
 
             lvitem.mask = LVIF_TEXT;
             lvitem.iSubItem = 2;
@@ -190,19 +202,19 @@ VOID DesktopListCreate(
     if (DesktopImageList) {
 
         //desktop image
-        hImage = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_DESKTOP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+        hImage = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_DESKTOP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
         if (hImage) {
             ImageList_ReplaceIcon(DesktopImageList, -1, hImage);
             DestroyIcon(hImage);
         }
 
         //sort images
-        hImage = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+        hImage = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
         if (hImage) {
             ImageList_ReplaceIcon(DesktopImageList, -1, hImage);
             DestroyIcon(hImage);
         }
-        hImage = LoadImage(g_hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+        hImage = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
         if (hImage) {
             ImageList_ReplaceIcon(DesktopImageList, -1, hImage);
             DestroyIcon(hImage);
@@ -278,8 +290,8 @@ INT CALLBACK DesktopListCompareFunc(
         nResult = _strcmpi(lpItem1, lpItem2);
 
 Done:
-    if (lpItem1) HeapFree(GetProcessHeap(), 0, lpItem1);
-    if (lpItem2) HeapFree(GetProcessHeap(), 0, lpItem2);
+    if (lpItem1) supHeapFree(lpItem1);
+    if (lpItem2) supHeapFree(lpItem2);
     return nResult;
 }
 
@@ -292,8 +304,8 @@ Done:
 *
 */
 VOID DesktopListHandleNotify(
-    HWND			hwndDlg,
-    LPNMLISTVIEW	nhdr
+    _In_ HWND           hwndDlg,
+    _In_ LPNMLISTVIEW   nhdr
 )
 {
     INT      c;
@@ -347,7 +359,7 @@ VOID DesktopListHandleNotify(
             lpName = &lpItemText[l];
             //hwndDlg set to mainwindow on purpose
             propCreateDialog(hwndDlg, lpName, g_lpObjectNames[TYPE_DESKTOP], NULL);
-            HeapFree(GetProcessHeap(), 0, lpItemText);
+            supHeapFree(lpItemText);
         }
         break;
 
@@ -370,10 +382,10 @@ VOID DesktopListHandleNotify(
 *
 */
 INT_PTR CALLBACK DesktopListDialogProc(
-    _In_  HWND hwndDlg,
-    _In_  UINT uMsg,
-    _In_  WPARAM wParam,
-    _In_  LPARAM lParam
+    _In_ HWND hwndDlg,
+    _In_ UINT uMsg,
+    _In_ WPARAM wParam,
+    _In_ LPARAM lParam
 )
 {
     LPNMLISTVIEW      nhdr = NULL;

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       PROPTYPE.H
 *
-*  VERSION:     1.46
+*  VERSION:     1.52
 *
-*  DATE:        05 Mar 2017
+*  DATE:        08 Jan 2018
 *
 *  Common header file for Basic property sheet.
 *
@@ -19,8 +19,7 @@
 #pragma once
 
 INT_PTR CALLBACK BasicPropDialogProc(
-    _In_  HWND hwndDlg,
-    _In_  UINT uMsg,
-    _In_  WPARAM wParam,
-    _In_  LPARAM lParam
-);
+    _In_ HWND hwndDlg,
+    _In_ UINT uMsg,
+    _In_ WPARAM wParam,
+    _In_ LPARAM lParam);

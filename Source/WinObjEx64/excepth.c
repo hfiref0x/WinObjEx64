@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       EXCEPTH.C
 *
-*  VERSION:     1.46
+*  VERSION:     1.52
 *
-*  DATE:        04 Mar 2017
+*  DATE:        08 Jan 2018
 *
 *  Exception handler routines.
 *
@@ -20,13 +20,13 @@
 #include "DbgHelp.h"
 
 typedef BOOL(WINAPI *pfnMiniDumpWriteDump)(
-    _In_  HANDLE hProcess,
-    _In_  DWORD ProcessId,
-    _In_  HANDLE hFile,
-    _In_  MINIDUMP_TYPE DumpType,
-    _In_opt_  PMINIDUMP_EXCEPTION_INFORMATION ExceptionParam,
-    _In_opt_  PMINIDUMP_USER_STREAM_INFORMATION UserStreamParam,
-    _In_opt_  PMINIDUMP_CALLBACK_INFORMATION CallbackParam
+    _In_ HANDLE hProcess,
+    _In_ DWORD ProcessId,
+    _In_ HANDLE hFile,
+    _In_ MINIDUMP_TYPE DumpType,
+    _In_opt_ PMINIDUMP_EXCEPTION_INFORMATION ExceptionParam,
+    _In_opt_ PMINIDUMP_USER_STREAM_INFORMATION UserStreamParam,
+    _In_opt_ PMINIDUMP_CALLBACK_INFORMATION CallbackParam
     );
 
 pfnMiniDumpWriteDump pMiniDumpWriteDump;
@@ -46,7 +46,6 @@ BOOL exceptWriteDump(
 {
     BOOL   bResult;
     HANDLE hDbgHelp, hFile;
-    DWORD  dwRetVal;
     WCHAR  szFileName[MAX_PATH * 2];
 
     MINIDUMP_EXCEPTION_INFORMATION mdei;
@@ -55,28 +54,21 @@ BOOL exceptWriteDump(
     hDbgHelp = GetModuleHandle(TEXT("dbghelp.dll"));
     if (hDbgHelp == NULL) {
         RtlSecureZeroMemory(szFileName, sizeof(szFileName));
-        if (!GetSystemDirectory(szFileName, MAX_PATH)) {
-            return bResult;
-        }
+        _strcpy(szFileName, g_WinObj.szSystemDirectory);
         _strcat(szFileName, TEXT("\\dbghelp.dll"));
 
         hDbgHelp = LoadLibraryEx(szFileName, 0, 0);
-        if (hDbgHelp == NULL) {
+        if (hDbgHelp == NULL)
             return bResult;
-        }
     }
 
     pMiniDumpWriteDump = (pfnMiniDumpWriteDump)GetProcAddress(hDbgHelp, "MiniDumpWriteDump");
-    if (pMiniDumpWriteDump == NULL) {
+    if (pMiniDumpWriteDump == NULL)
         return bResult;
-    }
 
     RtlSecureZeroMemory(szFileName, sizeof(szFileName));
-    dwRetVal = GetTempPath(MAX_PATH, szFileName);
-    if (dwRetVal > MAX_PATH || (dwRetVal == 0)) {
-        return bResult;
-    }
-    _strcat(szFileName, TEXT("wobjex"));
+    _strcpy(szFileName, g_WinObj.szTempDirectory);
+    _strcat(szFileName, TEXT("\\wobjex"));
     u64tostr(IdFile, _strend(szFileName));
     _strcat(szFileName, TEXT(".dmp"));
 

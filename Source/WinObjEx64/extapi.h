@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       EXTAPI.H
 *
-*  VERSION:     1.46
+*  VERSION:     1.52
 *
-*  DATE:        04 Mar 2017
+*  DATE:        08 Jan 2018
 *
 *  Header file for Windows 10 new API which we cannot statically link.
 *

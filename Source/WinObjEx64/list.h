@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2016
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       LIST.H
 *
-*  VERSION:     1.44
+*  VERSION:     1.52
 *
-*  DATE:        17 July 2016
+*  DATE:        08 Jan 2018
 *
 *  Common header file main program logic.
 *
@@ -37,8 +37,7 @@ VOID ListObjectDirectoryTree(
 
 VOID AddListViewItem(
     _In_ HANDLE hObjectRootDirectory,
-    _In_ POBJECT_DIRECTORY_INFORMATION objinf,
-    _In_ PENUM_PARAMS lpEnumParams
+    _In_ POBJECT_DIRECTORY_INFORMATION objinf
 );
 
 VOID FindObject(
@@ -49,7 +48,7 @@ VOID FindObject(
 );
 
 VOID ListObjectsInDirectory(
-    _In_ PENUM_PARAMS lpEnumParams
+    _In_ LPWSTR lpObjectDirectory
 );
 
 VOID FORCEINLINE InitializeListHead(
@@ -77,7 +76,7 @@ BOOLEAN FORCEINLINE RemoveEntryList(
 }
 
 PLIST_ENTRY FORCEINLINE RemoveHeadList(
-    _In_ PLIST_ENTRY ListHead
+    _Inout_ PLIST_ENTRY ListHead
 )
 {
     PLIST_ENTRY Flink;
@@ -91,8 +90,8 @@ PLIST_ENTRY FORCEINLINE RemoveHeadList(
 }
 
 VOID FORCEINLINE InsertHeadList(
-    _In_ PLIST_ENTRY ListHead,
-    _In_ PLIST_ENTRY Entry
+    _Inout_ PLIST_ENTRY ListHead,
+    _Inout_ PLIST_ENTRY Entry
 )
 {
     PLIST_ENTRY Flink;

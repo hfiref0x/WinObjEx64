@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.50
+*  VERSION:     1.52
 *
-*  DATE:        17 June 2017
+*  DATE:        08 Jan 2018
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -30,7 +30,6 @@
 
 #define RegControlKey           L"System\\CurrentControlSet\\Control"
 #define RegStartOptionsValue    L"SystemStartOptions"
-#define NTOSFOLDERSYSTEM32      L"\\\\?\\globalroot\\systemroot\\system32" //no slash at end
 
 #define OBJECT_SHIFT 8
 
@@ -60,7 +59,7 @@ typedef struct _KLDBGCONTEXT {
     UCHAR ObHeaderCookie;
 
     //index of directory type and root address
-    UCHAR DirectoryTypeIndex;
+    USHORT DirectoryTypeIndex;
     ULONG_PTR DirectoryRootAddress;
 
     //kldbgdrv device handle
@@ -93,9 +92,6 @@ typedef struct _KLDBGCONTEXT {
 
     //object list lock
     CRITICAL_SECTION ListLock;
-
-    //osversion 
-    RTL_OSVERSIONINFOW osver;
 
 } KLDBGCONTEXT, *PKLDBGCONTEXT;
 

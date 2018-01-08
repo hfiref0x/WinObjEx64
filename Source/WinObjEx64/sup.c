@@ -1065,14 +1065,15 @@ VOID supHandleTreePopupMenu(
     HMENU hMenu;
 
     hMenu = CreatePopupMenu();
-    if (hMenu == NULL) return;
-    InsertMenu(hMenu, 0, MF_BYCOMMAND, ID_OBJECT_PROPERTIES, T_PROPERTIES);
+    if (hMenu) {
+        InsertMenu(hMenu, 0, MF_BYCOMMAND, ID_OBJECT_PROPERTIES, T_PROPERTIES);
 
-    supSetMenuIcon(hMenu, ID_OBJECT_PROPERTIES,
-        (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 0));
+        supSetMenuIcon(hMenu, ID_OBJECT_PROPERTIES,
+            (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 0));
 
-    TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, point->x, point->y, 0, hwnd, NULL);
-    DestroyMenu(hMenu);
+        TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, point->x, point->y, 0, hwnd, NULL);
+        DestroyMenu(hMenu);
+    }
 }
 
 /*

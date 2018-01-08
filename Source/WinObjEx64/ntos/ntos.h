@@ -4,7 +4,7 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.80
+*  VERSION:     1.81
 *
 *  DATE:        08 Jan 2018
 *
@@ -6395,7 +6395,7 @@ NTSTATUS NTAPI NtUnloadDriver(
     _In_ PUNICODE_STRING DriverServiceName);
 
 NTSTATUS NTAPI NtLoadHotPatch(
-    _In_ PUNICODE_STRING HotPathName,
+    _In_ PUNICODE_STRING HotPatchName,
     _Reserved_ ULONG LoadFlag);
 
 /************************************************************************************

@@ -152,7 +152,7 @@ VOID SdtHandlePopupMenu(
         return;
 
     hMenu = CreatePopupMenu();
-    if (hMenu == NULL) {
+    if (hMenu) {
         InsertMenu(hMenu, 0, MF_BYCOMMAND, ID_OBJECT_COPY, T_SAVETOFILE);
         TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, hwndDlg, NULL);
         DestroyMenu(hMenu);

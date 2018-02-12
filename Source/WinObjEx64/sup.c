@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.52
 *
-*  DATE:        08 Jan 2018
+*  DATE:        10 Feb 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -294,7 +294,6 @@ BOOL supQueryObjectFromHandle(
     ULONG  i;
     DWORD  CurrentProcessId = GetCurrentProcessId();
 
-    //PSYSTEM_HANDLE_INFORMATION pHandles;
     PSYSTEM_HANDLE_INFORMATION_EX pHandles;
 
     if (Address == NULL) {
@@ -816,11 +815,11 @@ UINT supGetObjectNameIndexByTypeIndex(
     POBJECT_TYPE_INFORMATION   pObject;
     POBJECT_TYPE_INFORMATION_8 pObject8;
 
-    __try {
+    if (Object == NULL) {
+        return TYPE_UNKNOWN;
+    }
 
-        if (Object == NULL) {
-            return TYPE_UNKNOWN;
-        }
+    __try {
 
         Index = ObDecodeTypeIndex(Object, TypeIndex);
 
@@ -848,7 +847,7 @@ UINT supGetObjectNameIndexByTypeIndex(
         }
 
     }
-    __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
+    __except (EXCEPTION_EXECUTE_HANDLER) {
         return TYPE_UNKNOWN;
     }
     return TYPE_UNKNOWN;
@@ -1316,7 +1315,8 @@ VOID supxMapNtdllCopy(
 *
 */
 VOID supInit(
-    _In_ BOOL IsFullAdmin
+    _In_ BOOL IsFullAdmin,
+    _In_ BOOL IsWine
 )
 {
     supQueryKnownDlls();
@@ -1329,7 +1329,19 @@ VOID supInit(
 
     sapiCreateSetupDBSnapshot();
     
-    g_pObjectTypesInfo = supGetObjectTypesInfo();
+    //
+    // Quick Wine Staging fix. 
+    // Under usual Wine NtQueryObject(ObjectTypesInformation) is not implemented.
+    // We are okay with that.
+    // But under Wine Staging this piece of code is implemented and it is broken.
+    // So generally ban this call from Wine.
+    //
+    if (IsWine) {
+        g_pObjectTypesInfo = NULL;
+    }
+    else {
+        g_pObjectTypesInfo = supGetObjectTypesInfo();
+    }
 
     ExApiSetInit();
 }
@@ -2044,33 +2056,40 @@ BOOL supQueryTypeInfo(
         return bResult;
     }
 
-    pObject = (POBJECT_TYPE_INFORMATION)&g_pObjectTypesInfo->TypeInformation;
-    for (i = 0; i < g_pObjectTypesInfo->NumberOfTypes; i++) {
+    __try {
 
-        if (_strncmpi(pObject->TypeName.Buffer, 
-            lpTypeName, 
-            pObject->TypeName.Length / sizeof(WCHAR)) == 0)
-        {
-            for (nPool = 0; nPool < MAX_KNOWN_POOL_TYPES; nPool++) {
-                if ((POOL_TYPE)pObject->PoolType == (POOL_TYPE)a_PoolTypes[nPool].dwValue) {
+        pObject = (POBJECT_TYPE_INFORMATION)&g_pObjectTypesInfo->TypeInformation;
+        for (i = 0; i < g_pObjectTypesInfo->NumberOfTypes; i++) {
 
-                    _strncpy(
-                        Buffer, ccBuffer,
-                        a_PoolTypes[nPool].lpDescription,
-                        _strlen(a_PoolTypes[nPool].lpDescription)
-                    );
+            if (_strncmpi(pObject->TypeName.Buffer,
+                lpTypeName,
+                pObject->TypeName.Length / sizeof(WCHAR)) == 0)
+            {
+                for (nPool = 0; nPool < MAX_KNOWN_POOL_TYPES; nPool++) {
+                    if ((POOL_TYPE)pObject->PoolType == (POOL_TYPE)a_PoolTypes[nPool].dwValue) {
 
-                    break;
+                        _strncpy(
+                            Buffer, ccBuffer,
+                            a_PoolTypes[nPool].lpDescription,
+                            _strlen(a_PoolTypes[nPool].lpDescription)
+                        );
+
+                        break;
+                    }
                 }
+                bResult = TRUE;
             }
-            bResult = TRUE;
+            if (bResult) {
+                break;
+            }
+            //next entry located after the aligned type name buffer
+            pObject = (POBJECT_TYPE_INFORMATION)((PCHAR)(pObject + 1) +
+                ALIGN_UP(pObject->TypeName.MaximumLength, sizeof(ULONG_PTR)));
         }
-        if (bResult) {
-            break;
-        }
-        //next entry located after the aligned type name buffer
-        pObject = (POBJECT_TYPE_INFORMATION)((PCHAR)(pObject + 1) +
-            ALIGN_UP(pObject->TypeName.MaximumLength, sizeof(ULONG_PTR)));
+
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return FALSE;
     }
     return bResult;
 }

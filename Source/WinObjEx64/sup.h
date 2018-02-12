@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.52
 *
-*  DATE:        08 Jan 2018
+*  DATE:        10 Feb 2018
 *
 *  Common header file for the program support routines.
 *
@@ -158,7 +158,8 @@ VOID supCreateToolbarButtons(
     _In_ HWND hWndToolbar);
 
 VOID supInit(
-    _In_ BOOL IsFullAdmin);
+    _In_ BOOL IsFullAdmin,
+    _In_ BOOL IsWine);
 
 VOID supShutdown(
     VOID);

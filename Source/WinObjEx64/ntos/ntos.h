@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.81
+*  VERSION:     1.83
 *
-*  DATE:        08 Jan 2018
+*  DATE:        16 Jan 2018
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -23,7 +23,8 @@
 #pragma warning(disable: 4214) // nonstandard extension used : bit field types other than int
 
 #ifndef IN_REGION
-#define IN_REGION(x, Base, Size) (((ULONG_PTR)x >= (ULONG_PTR)Base) && ((ULONG_PTR)x <= (ULONG_PTR)Base + (ULONG_PTR)Size))
+#define IN_REGION(x, Base, Size) (((ULONG_PTR)(x) >= (ULONG_PTR)(Base)) && \
+            ((ULONG_PTR)(x) <= (ULONG_PTR)(Base) + (ULONG_PTR)(Size)))
 #endif
 
 #ifndef ALIGN_DOWN
@@ -70,7 +71,6 @@ typedef SIZE_T SYSINF_PAGE_COUNT;
 #define OBJ_KERNEL_HANDLE       0x00000200L
 #define OBJ_FORCE_ACCESS_CHECK  0x00000400L
 #define OBJ_VALID_ATTRIBUTES    0x000007F2L
-
 
 //
 // Callback Object Rights
@@ -219,7 +219,6 @@ typedef SIZE_T SYSINF_PAGE_COUNT;
                                      MEMORY_PARTITION_QUERY_ACCESS |    \
                                      MEMORY_PARTITION_MODIFY_ACCESS)
 
-
 //
 // NtCreateProcessEx specific flags.
 //
@@ -235,14 +234,12 @@ typedef SIZE_T SYSINF_PAGE_COUNT;
 //
 // Define special ByteOffset parameters for read and write operations
 //
-
 #define FILE_WRITE_TO_END_OF_FILE       0xffffffff
 #define FILE_USE_FILE_POINTER_POSITION  0xfffffffe
 
 //
 // This is the maximum MaximumLength for a UNICODE_STRING.
 //
-
 #define MAXUSHORT   0xffff     
 #define MAX_USTRING ( sizeof(WCHAR) * (MAXUSHORT/sizeof(WCHAR)) )
 
@@ -2313,11 +2310,11 @@ typedef struct _SYSTEM_HANDLE_INFORMATION_EX {
 // InfoMask values
 //
 
-#define OB_INFOMASK_PROCESS_INFO	0x10
-#define OB_INFOMASK_QUOTA			0x08
-#define OB_INFOMASK_HANDLE			0x04
-#define OB_INFOMASK_NAME			0x02
-#define OB_INFOMASK_CREATOR_INFO	0x01
+#define OB_INFOMASK_PROCESS_INFO    0x10
+#define OB_INFOMASK_QUOTA           0x08
+#define OB_INFOMASK_HANDLE          0x04
+#define OB_INFOMASK_NAME            0x02
+#define OB_INFOMASK_CREATOR_INFO    0x01
 
 typedef struct _OBJECT_DIRECTORY_ENTRY {
     PVOID ChainLink;
@@ -3328,7 +3325,41 @@ typedef struct _LDR_DATA_TABLE_ENTRY_COMPATIBLE {
     ULONG SizeOfImage;
     UNICODE_STRING FullDllName;
     UNICODE_STRING BaseDllName;
-    ULONG Flags;
+    union
+    {
+        ULONG Flags;
+        struct
+        {
+            ULONG PackagedBinary : 1; // Size=4 Offset=104 BitOffset=0 BitCount=1
+            ULONG MarkedForRemoval : 1; // Size=4 Offset=104 BitOffset=1 BitCount=1
+            ULONG ImageDll : 1; // Size=4 Offset=104 BitOffset=2 BitCount=1
+            ULONG LoadNotificationsSent : 1; // Size=4 Offset=104 BitOffset=3 BitCount=1
+            ULONG TelemetryEntryProcessed : 1; // Size=4 Offset=104 BitOffset=4 BitCount=1
+            ULONG ProcessStaticImport : 1; // Size=4 Offset=104 BitOffset=5 BitCount=1
+            ULONG InLegacyLists : 1; // Size=4 Offset=104 BitOffset=6 BitCount=1
+            ULONG InIndexes : 1; // Size=4 Offset=104 BitOffset=7 BitCount=1
+            ULONG ShimDll : 1; // Size=4 Offset=104 BitOffset=8 BitCount=1
+            ULONG InExceptionTable : 1; // Size=4 Offset=104 BitOffset=9 BitCount=1
+            ULONG ReservedFlags1 : 2; // Size=4 Offset=104 BitOffset=10 BitCount=2
+            ULONG LoadInProgress : 1; // Size=4 Offset=104 BitOffset=12 BitCount=1
+            ULONG LoadConfigProcessed : 1; // Size=4 Offset=104 BitOffset=13 BitCount=1
+            ULONG EntryProcessed : 1; // Size=4 Offset=104 BitOffset=14 BitCount=1
+            ULONG ProtectDelayLoad : 1; // Size=4 Offset=104 BitOffset=15 BitCount=1
+            ULONG ReservedFlags3 : 2; // Size=4 Offset=104 BitOffset=16 BitCount=2
+            ULONG DontCallForThreads : 1; // Size=4 Offset=104 BitOffset=18 BitCount=1
+            ULONG ProcessAttachCalled : 1; // Size=4 Offset=104 BitOffset=19 BitCount=1
+            ULONG ProcessAttachFailed : 1; // Size=4 Offset=104 BitOffset=20 BitCount=1
+            ULONG CorDeferredValidate : 1; // Size=4 Offset=104 BitOffset=21 BitCount=1
+            ULONG CorImage : 1; // Size=4 Offset=104 BitOffset=22 BitCount=1
+            ULONG DontRelocate : 1; // Size=4 Offset=104 BitOffset=23 BitCount=1
+            ULONG CorILOnly : 1; // Size=4 Offset=104 BitOffset=24 BitCount=1
+            ULONG ChpeImage : 1; // Size=4 Offset=104 BitOffset=25 BitCount=1
+            ULONG ReservedFlags5 : 2; // Size=4 Offset=104 BitOffset=26 BitCount=2
+            ULONG Redirected : 1; // Size=4 Offset=104 BitOffset=28 BitCount=1
+            ULONG ReservedFlags6 : 2; // Size=4 Offset=104 BitOffset=29 BitCount=2
+            ULONG CompatDatabaseProcessed : 1; // Size=4 Offset=104 BitOffset=31 BitCount=1
+        };
+    } ENTRYFLAGSUNION;
     WORD ObsoleteLoadCount;
     WORD TlsIndex;
     union
@@ -3670,7 +3701,9 @@ typedef struct _PEB32 {
             ULONG ProcessUsingVEH : 1;
             ULONG ProcessUsingVCH : 1;
             ULONG ProcessUsingFTH : 1;
-            ULONG ReservedBits0 : 27;
+            ULONG ProcessPreviouslyThrottled : 1;
+            ULONG ProcessCurrentlyThrottled : 1;
+            ULONG ReservedBits0 : 25;
         };
         ULONG EnvironmentUpdateCount;
     };
@@ -3960,7 +3993,9 @@ typedef struct _PEB {
             ULONG ProcessUsingVEH : 1;
             ULONG ProcessUsingVCH : 1;
             ULONG ProcessUsingFTH : 1;
-            ULONG ReservedBits0 : 27;
+            ULONG ProcessPreviouslyThrottled : 1;
+            ULONG ProcessCurrentlyThrottled : 1;
+            ULONG ReservedBits0 : 25;
         };
         ULONG EnvironmentUpdateCount;
     };
@@ -4695,6 +4730,13 @@ NTSTATUS NTAPI CsrClientConnectToServer(
 *
 ************************************************************************************/
 
+#ifndef RtlInitEmptyUnicodeString
+#define RtlInitEmptyUnicodeString(_ucStr,_buf,_bufSize) \
+    ((_ucStr)->Buffer = (_buf), \
+     (_ucStr)->Length = 0, \
+     (_ucStr)->MaximumLength = (USHORT)(_bufSize))
+#endif
+
 BOOLEAN NTAPI RtlCreateUnicodeString(
     _Out_ PUNICODE_STRING DestinationString,
     _In_ PCWSTR SourceString);
@@ -4828,6 +4870,27 @@ NTSTATUS NTAPI RtlHashUnicodeString(
     _In_ BOOLEAN CaseInSensitive,
     _In_ ULONG HashAlgorithm,
     _Out_ PULONG HashValue);
+
+NTSTATUS NTAPI RtlAppendUnicodeStringToString(
+    _In_ PUNICODE_STRING Destination,
+    _In_ PUNICODE_STRING Source);
+
+NTSTATUS NTAPI RtlAppendUnicodeToString(
+    _In_ PUNICODE_STRING Destination,
+    _In_opt_ PWSTR Source);
+
+NTSTATUS NTAPI RtlUpcaseUnicodeString(
+    _Inout_ PUNICODE_STRING DestinationString,
+    _In_ PUNICODE_STRING SourceString,
+    _In_ BOOLEAN AllocateDestinationString);
+
+NTSTATUS NTAPI RtlDowncaseUnicodeString(
+    _Inout_ PUNICODE_STRING DestinationString,
+    _In_ PUNICODE_STRING SourceString,
+    _In_ BOOLEAN AllocateDestinationString);
+
+VOID NTAPI RtlEraseUnicodeString(
+    _Inout_ PUNICODE_STRING String);
 
 /************************************************************************************
 *
@@ -5249,6 +5312,19 @@ BOOLEAN NTAPI RtlFreeHeap(
     _In_ ULONG Flags,
     _In_ PVOID BaseAddress);
 
+NTSTATUS NTAPI RtlZeroHeap(
+    _In_ PVOID HeapHandle,
+    _In_ ULONG Flags);
+
+SIZE_T NTAPI RtlSizeHeap(
+    _In_ PVOID HeapHandle,
+    _In_ ULONG Flags,
+    _In_ PVOID BaseAddress);
+
+VOID NTAPI RtlProtectHeap(
+    _In_ PVOID HeapHandle,
+    _In_ BOOLEAN MakeReadOnly);
+
 /************************************************************************************
 *
 * RTL Compression API.
@@ -5588,6 +5664,14 @@ VOID NTAPI RtlUpdateClonedSRWLock(
 NTSTATUS NTAPI RtlQueryElevationFlags(
     _Inout_ ULONG *ElevationFlags);
 
+/************************************************************************************
+*
+* RTL Misc Support API.
+*
+************************************************************************************/
+
+BOOLEAN NTAPI RtlDoesFileExists_U(
+    _In_ PCWSTR FileName);
 
 /************************************************************************************
 *
@@ -7617,5 +7701,105 @@ NTSTATUS NTAPI NtSystemDebugControl(
     _Out_writes_bytes_opt_(OutputBufferLength) PVOID OutputBuffer,
     _In_ ULONG OutputBufferLength,
     _Out_opt_ PULONG ReturnLength);
+
+/************************************************************************************
+*
+* Application Verifier API and definitions.
+*
+************************************************************************************/
+
+#ifndef DLL_PROCESS_VERIFIER
+#define DLL_PROCESS_VERIFIER 4
+#endif
+
+typedef VOID(NTAPI *RTL_VERIFIER_DLL_LOAD_CALLBACK)(
+    PWSTR DllName,
+    PVOID DllBase,
+    SIZE_T DllSize,
+    PVOID Reserved);
+
+typedef VOID(NTAPI *RTL_VERIFIER_DLL_UNLOAD_CALLBACK)(
+    PWSTR DllName,
+    PVOID DllBase,
+    SIZE_T DllSize,
+    PVOID Reserved);
+
+typedef VOID(NTAPI *RTL_VERIFIER_NTDLLHEAPFREE_CALLBACK)(
+    PVOID AllocationBase,
+    SIZE_T AllocationSize);
+
+typedef struct _RTL_VERIFIER_THUNK_DESCRIPTOR {
+    PCHAR ThunkName;
+    PVOID ThunkOldAddress;
+    PVOID ThunkNewAddress;
+} RTL_VERIFIER_THUNK_DESCRIPTOR, *PRTL_VERIFIER_THUNK_DESCRIPTOR;
+
+typedef struct _RTL_VERIFIER_DLL_DESCRIPTOR {
+    PWCHAR DllName;
+    DWORD DllFlags;
+    PVOID DllAddress;
+    PRTL_VERIFIER_THUNK_DESCRIPTOR DllThunks;
+} RTL_VERIFIER_DLL_DESCRIPTOR, *PRTL_VERIFIER_DLL_DESCRIPTOR;
+
+typedef struct _RTL_VERIFIER_PROVIDER_DESCRIPTOR {
+    DWORD Length;
+    PRTL_VERIFIER_DLL_DESCRIPTOR ProviderDlls;
+    RTL_VERIFIER_DLL_LOAD_CALLBACK ProviderDllLoadCallback;
+    RTL_VERIFIER_DLL_UNLOAD_CALLBACK ProviderDllUnloadCallback;
+    PWSTR VerifierImage;
+    DWORD VerifierFlags;
+    DWORD VerifierDebug;
+    PVOID RtlpGetStackTraceAddress;
+    PVOID RtlpDebugPageHeapCreate;
+    PVOID RtlpDebugPageHeapDestroy;
+    RTL_VERIFIER_NTDLLHEAPFREE_CALLBACK ProviderNtdllHeapFreeCallback;
+} RTL_VERIFIER_PROVIDER_DESCRIPTOR, *PRTL_VERIFIER_PROVIDER_DESCRIPTOR;
+
+//
+// Application verifier standard flags.
+//
+#define RTL_VRF_FLG_FULL_PAGE_HEAP                   0x00000001
+#define RTL_VRF_FLG_RESERVED_DONOTUSE                0x00000002
+#define RTL_VRF_FLG_HANDLE_CHECKS                    0x00000004
+#define RTL_VRF_FLG_STACK_CHECKS                     0x00000008
+#define RTL_VRF_FLG_APPCOMPAT_CHECKS                 0x00000010
+#define RTL_VRF_FLG_TLS_CHECKS                       0x00000020
+#define RTL_VRF_FLG_DIRTY_STACKS                     0x00000040
+#define RTL_VRF_FLG_RPC_CHECKS                       0x00000080
+#define RTL_VRF_FLG_COM_CHECKS                       0x00000100
+#define RTL_VRF_FLG_DANGEROUS_APIS                   0x00000200
+#define RTL_VRF_FLG_RACE_CHECKS                      0x00000400
+#define RTL_VRF_FLG_DEADLOCK_CHECKS                  0x00000800
+#define RTL_VRF_FLG_FIRST_CHANCE_EXCEPTION_CHECKS    0x00001000
+#define RTL_VRF_FLG_VIRTUAL_MEM_CHECKS               0x00002000
+#define RTL_VRF_FLG_ENABLE_LOGGING                   0x00004000
+#define RTL_VRF_FLG_FAST_FILL_HEAP                   0x00008000
+#define RTL_VRF_FLG_VIRTUAL_SPACE_TRACKING           0x00010000
+#define RTL_VRF_FLG_ENABLED_SYSTEM_WIDE              0x00020000
+#define RTL_VRF_FLG_MISCELLANEOUS_CHECKS             0x00020000
+#define RTL_VRF_FLG_LOCK_CHECKS                      0x00040000
+
+VOID NTAPI RtlApplicationVerifierStop(
+    _In_ ULONG_PTR Code,
+    _In_ PSTR Message,
+    _In_ ULONG_PTR Param1,
+    _In_ PSTR Description1,
+    _In_ ULONG_PTR Param2,
+    _In_ PSTR Description2,
+    _In_ ULONG_PTR Param3,
+    _In_ PSTR Description3,
+    _In_ ULONG_PTR Param4,
+    _In_ PSTR Description4);
+
+#ifndef VERIFIER_STOP
+#define VERIFIER_STOP(Code, Msg, P1, S1, P2, S2, P3, S3, P4, S4) {  \
+        RtlApplicationVerifierStop ((Code),                         \
+                                    (Msg),                          \
+                                    (ULONG_PTR)(P1),(S1),           \
+                                    (ULONG_PTR)(P2),(S2),           \
+                                    (ULONG_PTR)(P3),(S3),           \
+                                    (ULONG_PTR)(P4),(S4));          \
+  }
+#endif
 
 #pragma warning(pop)

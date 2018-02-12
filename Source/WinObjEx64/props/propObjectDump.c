@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.52
 *
-*  DATE:        08 Jan 2018
+*  DATE:        13 Jan 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -825,7 +825,7 @@ VOID ObDumpDriverObject(
             ObDumpUnicodeString(h_tviRootItem, L"BaseDllName", &ldrEntry.BaseDllName, FALSE);
 
             //Flags
-            ObDumpUlong(g_TreeList, h_tviRootItem, T_FLAGS, NULL, ldrEntry.Flags, TRUE, FALSE, 0, 0);
+            ObDumpUlong(g_TreeList, h_tviRootItem, T_FLAGS, NULL, ldrEntry.ENTRYFLAGSUNION.Flags, TRUE, FALSE, 0, 0);
 
             //LoadCount
             lpType = L"ObsoleteLoadCount";

@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.52
 *
-*  DATE:        08 Jan 2018
+*  DATE:        10 Feb 2018
 *
 *  Program entry point and main window handler.
 *
@@ -872,11 +872,14 @@ void WinObjExMain()
     if (IsWine != FALSE) {
         IsFullAdmin = FALSE;
     }
-    supInit(IsFullAdmin);
+
+    supInit(IsFullAdmin, IsWine);
 
     // do not move anywhere
-    g_kdctx.IsFullAdmin = IsFullAdmin;
+    // g_kdctx variable initialized BEFORE this.
+    // if you move these lines anywhere above they will be zeroed during kdInit
     g_kdctx.IsWine = IsWine;
+    g_kdctx.IsFullAdmin = IsFullAdmin;
 
 #ifdef _DEBUG
     TestStart();

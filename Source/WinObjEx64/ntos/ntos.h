@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.83
+*  VERSION:     1.86
 *
-*  DATE:        16 Jan 2018
+*  DATE:        07 Mar 2018
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -21,6 +21,14 @@
 
 #pragma warning(push)
 #pragma warning(disable: 4214) // nonstandard extension used : bit field types other than int
+
+#ifndef PAGE_SIZE
+#define PAGE_SIZE 0x1000ull
+#endif
+
+typedef CCHAR KPROCESSOR_MODE;
+typedef UCHAR KIRQL;
+typedef KIRQL *PKIRQL;
 
 #ifndef IN_REGION
 #define IN_REGION(x, Base, Size) (((ULONG_PTR)(x) >= (ULONG_PTR)(Base)) && \
@@ -45,6 +53,13 @@
 #ifndef LOGICAL
 #define LOGICAL ULONG
 #endif
+
+#ifndef RTL_CONSTANT_STRING
+#define RTL_CONSTANT_STRING(s) { sizeof( s ) - sizeof( (s)[0] ), sizeof( s ), s }
+#endif
+
+#define RtlOffsetToPointer(B,O)  ((PCHAR)( ((PCHAR)(B)) + ((ULONG_PTR)(O))  ))
+#define RtlPointerToOffset(B,P)  ((ULONG)( ((PCHAR)(P)) - ((PCHAR)(B))  ))
 
 typedef ULONG CLONG;
 typedef LONG KPRIORITY;
@@ -258,6 +273,11 @@ typedef struct _UNICODE_STRING {
 } UNICODE_STRING;
 typedef UNICODE_STRING *PUNICODE_STRING;
 typedef const UNICODE_STRING *PCUNICODE_STRING;
+
+#ifndef STATIC_UNICODE_STRING
+#define STATIC_UNICODE_STRING(string, value) \
+  static UNICODE_STRING string = { sizeof(value) - sizeof(WCHAR), sizeof(value), value };
+#endif
 
 typedef struct _STRING {
     USHORT Length;
@@ -557,12 +577,12 @@ typedef struct _SYSTEM_PROCESS_INFORMATION_EXTENSION {
     ULONG JobObjectId;
     ULONG SpareUlong;
     ULONGLONG ProcessSequenceNumber;
-} SYSTEM_PROCESS_INFORMATION_EXTENSION, *PSYSTEM_PROCESS_INFORMATION_EXTENSION;
-
+} SYSTEM_PROCESS_INFORMATION_EXTENSION, *PSYSTEM_PROCESS_INFORMATION_EXTENSION; 
+                                                              
 typedef struct _SYSTEM_PROCESSES_FULL_INFORMATION {
     SYSTEM_PROCESSES_INFORMATION ProcessAndThreads;
     SYSTEM_PROCESS_INFORMATION_EXTENSION ExtendedInfo;
-} SYSTEM_PROCESSES_FULL_INFORMATION, *PSYSTEM_PROCESSES_FULL_INFORMATION;*/
+} SYSTEM_PROCESSES_FULL_INFORMATION, *PSYSTEM_PROCESSES_FULL_INFORMATION;  */
 
 typedef struct _SYSTEM_SECUREBOOT_INFORMATION {
     BOOLEAN SecureBootEnabled;
@@ -945,6 +965,8 @@ typedef enum _PS_PROTECTED_SIGNER {
     PsProtectedSignerLsa,
     PsProtectedSignerWindows,
     PsProtectedSignerWinTcb,
+    PsProtectedSignerWinSystem,
+    PsProtectedSignerApp,
     PsProtectedSignerMax
 } PS_PROTECTED_SIGNER;
 
@@ -1245,8 +1267,59 @@ typedef enum _SYSTEM_INFORMATION_CLASS {
     SystemProcessorIdleMaskInformation = 193,
     SystemSecureDumpEncryptionInformation = 194,
     SystemWriteConstraintInformation = 195,
-    MaxSystemInfoClass = 196
+    SystemKernelVaShadowInformation = 196,
+    ReservedRS4_1 = 197,
+    ReservedRS4_2 = 198,
+    ReservedRS4_3 = 199,
+    ReservedRS4_4 = 200,
+    SystemSpeculationControlInformation = 201,
+    MaxSystemInfoClass
 } SYSTEM_INFORMATION_CLASS, *PSYSTEM_INFORMATION_CLASS;
+
+//msdn.microsoft.com/en-us/library/windows/desktop/ms724509(v=vs.85).aspx
+typedef struct _SYSTEM_SPECULATION_CONTROL_INFORMATION {
+    struct {
+        ULONG BpbEnabled : 1;
+        ULONG BpbDisabledSystemPolicy : 1;
+        ULONG BpbDisabledNoHardwareSupport : 1;
+        ULONG SpecCtrlEnumerated : 1;
+        ULONG SpecCmdEnumerated : 1;
+        ULONG IbrsPresent : 1;
+        ULONG StibpPresent : 1;
+        ULONG SmepPresent : 1;
+        ULONG Reserved : 24;
+    } SpeculationControlFlags;
+} SYSTEM_SPECULATION_CONTROL_INFORMATION, *PSYSTEM_SPECULATION_CONTROL_INFORMATION;
+
+typedef struct _SYSTEM_KERNEL_VA_SHADOW_INFORMATION {
+    struct {
+        ULONG KvaShadowEnabled : 1;
+        ULONG KvaShadowUserGlobal : 1;
+        ULONG KvaShadowPcid : 1;
+        ULONG KvaShadowInvpcid : 1;
+        ULONG Reserved : 28;
+    } KvaShadowFlags;
+} SYSTEM_KERNEL_VA_SHADOW_INFORMATION, *PSYSTEM_KERNEL_VA_SHADOW_INFORMATION;
+
+typedef struct _SYSTEM_CODEINTEGRITY_INFORMATION {
+    ULONG  Length;
+    ULONG  CodeIntegrityOptions;
+} SYSTEM_CODEINTEGRITY_INFORMATION, *PSYSTEM_CODEINTEGRITY_INFORMATION;
+
+#define CODEINTEGRITY_OPTION_ENABLED                      0x01
+#define CODEINTEGRITY_OPTION_TESTSIGN                     0x02
+#define CODEINTEGRITY_OPTION_UMCI_ENABLED                 0x04
+#define CODEINTEGRITY_OPTION_UMCI_AUDITMODE_ENABLED       0x08
+#define CODEINTEGRITY_OPTION_UMCI_EXCLUSIONPATHS_ENABLED  0x10
+#define CODEINTEGRITY_OPTION_TEST_BUILD                   0x20
+#define CODEINTEGRITY_OPTION_PREPRODUCTION_BUILD          0x40
+#define CODEINTEGRITY_OPTION_DEBUGMODE_ENABLED            0x80
+#define CODEINTEGRITY_OPTION_FLIGHT_BUILD                 0x100
+#define CODEINTEGRITY_OPTION_FLIGHTING_ENABLED            0x200
+#define CODEINTEGRITY_OPTION_HVCI_KMCI_ENABLED            0x400
+#define CODEINTEGRITY_OPTION_HVCI_KMCI_AUDITMODE_ENABLED  0x800
+#define CODEINTEGRITY_OPTION_HVCI_KMCI_STRICTMODE_ENABLED 0x1000
+#define CODEINTEGRITY_OPTION_HVCI_IUM_ENABLED             0x2000
 
 typedef VOID(NTAPI *PIO_APC_ROUTINE)(
     _In_ PVOID ApcContext,
@@ -5238,6 +5311,18 @@ ULONG NTAPI RtlNtStatusToDosError(
 
 VOID NTAPI RtlSetLastWin32Error(
     _In_ LONG Win32Error);
+
+NTSTATUS NTAPI RtlGetLastNtStatus(
+    VOID);
+
+LONG NTAPI RtlGetLastWin32Error(
+    VOID);
+
+ULONG RtlNtStatusToDosErrorNoTeb(
+    _In_ NTSTATUS Status);
+
+VOID NTAPI RtlSetLastWin32ErrorAndNtStatusFromNtStatus(
+    _In_ NTSTATUS Status);
 
 /************************************************************************************
 *

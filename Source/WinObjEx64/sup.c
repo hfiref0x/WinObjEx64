@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.52
+*  VERSION:     1.53
 *
-*  DATE:        10 Feb 2018
+*  DATE:        07 Mar 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -3067,3 +3067,62 @@ BOOL supQuerySecureBootState(
 
     return bResult;
 }
+
+/*
+* supxGetWindowStationName
+*
+* Purpose:
+*
+* Build current windows station object path based on SessionId value from PEB.
+*
+*/
+BOOLEAN supxGetWindowStationName(
+    _Out_ UNICODE_STRING *pusWinstaName
+)
+{
+    LPWSTR WindowStationsDir = L"\\Windows\\WindowStations";
+    LPWSTR SourceString;
+    ULONG SessionId = NtCurrentPeb()->SessionId;
+
+    WCHAR szWinsta[MAX_PATH];
+
+    if (SessionId) {
+        _strcpy(szWinsta, L"\\Sessions\\");
+        ultostr(SessionId, _strend(szWinsta));
+        _strcat(szWinsta, WindowStationsDir);
+        SourceString = szWinsta;
+    }
+    else {
+        SourceString = WindowStationsDir;
+    }
+    return RtlCreateUnicodeString(pusWinstaName, SourceString);
+}
+
+/*
+* supOpenWindowStationFromContext
+*
+* Purpose:
+*
+* Open Window station with hardcoded object path check.
+*
+*/
+HWINSTA supOpenWindowStationFromContext(
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ BOOL fInherit,
+    _In_ ACCESS_MASK dwDesiredAccess)
+{
+    HWINSTA hObject = NULL;
+    UNICODE_STRING CurrentWinstaDir;
+    UNICODE_STRING WinstaDir;
+
+    if (supxGetWindowStationName(&CurrentWinstaDir)) {
+        RtlInitUnicodeString(&WinstaDir, Context->lpCurrentObjectPath);
+        if (RtlEqualUnicodeString(&WinstaDir, &CurrentWinstaDir, TRUE)) {
+            hObject = OpenWindowStation(Context->lpObjectName, fInherit, dwDesiredAccess);
+        }
+        RtlFreeUnicodeString(&CurrentWinstaDir);
+    }
+
+    return hObject;
+}
+

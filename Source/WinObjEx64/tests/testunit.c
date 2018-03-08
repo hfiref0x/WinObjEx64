@@ -258,6 +258,30 @@ VOID TestException(
     }
 }
 
+#include "ui.h"
+
+VOID TestWinsta(
+    VOID
+)
+{
+    NTSTATUS Status;
+    HWINSTA hWinsta;
+    PROP_OBJECT_INFO Context;
+
+    Context.lpCurrentObjectPath = L"\\Windows\\WindowStations";
+    //Context.lpCurrentObjectPath = L"\\Sessions\\1\\Windows\\WindowStations";
+    Context.lpObjectName = L"Winsta0";
+
+    hWinsta = supOpenWindowStationFromContext(&Context, FALSE, READ_CONTROL);
+    if (hWinsta) {
+
+        CloseWindowStation(hWinsta);
+        Status = RtlGetLastNtStatus();
+        if (NT_SUCCESS(Status))
+            Beep(0, 0);
+    }
+}
+
 VOID TestStart(
     VOID
 )
@@ -270,6 +294,7 @@ VOID TestStart(
     TestIoCompletion();
     TestTimer();
     TestTransaction();
+    TestWinsta();
 }
 
 VOID TestStop(

@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDESKTOP.C
 *
-*  VERSION:     1.52
+*  VERSION:     1.53
 *
-*  DATE:        08 Jan 2018
+*  DATE:        07 Mar 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -169,7 +169,7 @@ VOID DesktopListSetInfo(
 
     ListView_DeleteAllItems(DesktopList);
 
-    hObject = OpenWindowStation(Context->lpObjectName, FALSE, WINSTA_ENUMDESKTOPS);
+    hObject = supOpenWindowStationFromContext(Context, FALSE, WINSTA_ENUMDESKTOPS);
     if (hObject) {
         EnumDesktops(hObject, DesktopListEnumProc, (LPARAM)Context);
         CloseWindowStation(hObject);

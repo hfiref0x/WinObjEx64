@@ -1,3 +1,4 @@
+CoverageSampler - new RS4 object, ETW
 DmaAdapter
 DmaDomain
 IoCompletionReserve - same as IoCompletion except using reserve process allocated memory
@@ -14,3 +15,8 @@ RegistryTransaction - new RS1 object
 CoreMessagining - new RS1 object
 ActivityReference - new RS2 object
 EtwSessionDemuxEntry - new Win10 object
+DxgkCompositionObject
+DxgkDisplayManagerObject
+DxgkSharedBundleObject
+DxgkSharedKeyedMutextObject
+DxgkSharedProtectedSessionObject

@@ -4,9 +4,9 @@
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.52
+*  VERSION:     1.53
 *
-*  DATE:        08 Jan 2018
+*  DATE:        07 Mar 2018
 *
 *  Common header file for the user interface.
 *
@@ -33,7 +33,7 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
     _In_ DWORD_PTR dwData
     );
 
-#define PROGRAM_VERSION         L"1.5.2"
+#define PROGRAM_VERSION         L"1.5.3"
 #define PROGRAM_NAME            L"Windows Object Explorer 64-bit"
 #define PROFRAM_NAME_AND_TITLE  L"Object Explorer for Windows 7/8/8.1/10"
 #define MAINWINDOWCLASSNAME     L"WinObjEx64Class"

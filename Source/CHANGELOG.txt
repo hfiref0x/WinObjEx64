@@ -1,3 +1,6 @@
+v1.5.3
+OpenWindowStation fix
+
 v1.5.2
 internal rearrange
 
@@ -5,7 +8,7 @@ v1.5.1
 bugfixes
 
 v1.5.0
-added Partition, DxghCurrentDxgProcessObject objects description
+added Partition, DxgkCurrentDxgProcessObject objects description
 added mailslots viewer dialog
 added file properties for drivers (menu -> extras -> Drivers)
 added FltConnectionPort object dump
@@ -35,3 +38,6 @@ added descriptions for more object types
 added named pipes dialog (menu -> extras) 
 added information for IoCompletion object type, including structured object body dump2 
 some code revision and corrections 
+
+v 1.0.0 (Feb 23, 2015)
+initial release

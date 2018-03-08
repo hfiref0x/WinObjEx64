@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017
+*  (C) COPYRIGHT AUTHORS, 2017 - 2018
 *
 *  TITLE:       EXTAPI.C
 *
-*  VERSION:     1.46
+*  VERSION:     1.53
 *
-*  DATE:        03 Mar 2017
+*  DATE:        07 Mar 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -32,13 +32,21 @@ NTSTATUS ExApiSetInit(
     VOID
     )
 {
+    NTSTATUS Status = STATUS_SOME_NOT_MAPPED;
     HANDLE hNtdll = NULL;
 
+    //
+    // New Partition API introduced in Windows 10.
+    //
     hNtdll = GetModuleHandle(TEXT("ntdll.dll"));
-    if (hNtdll == NULL)
-        return STATUS_UNSUCCESSFUL;
+    if (hNtdll) {
+        g_ExtApiSet.NtOpenPartition = (pfnNtOpenPartition)GetProcAddress(hNtdll, "NtOpenPartition");
+        g_ExtApiSet.NtManagePartition = (pfnNtManagePartition)GetProcAddress(hNtdll, "NtManagePartition");
 
-    g_ExtApiSet.NtOpenPartition = (pfnNtOpenPartition)GetProcAddress(hNtdll, "NtOpenPartition");      
-    g_ExtApiSet.NtManagePartition = (pfnNtManagePartition)GetProcAddress(hNtdll, "NtManagePartition");
-    return STATUS_SUCCESS;
+        if ((g_ExtApiSet.NtOpenPartition) &&
+            (g_ExtApiSet.NtManagePartition))
+            Status = STATUS_SUCCESS;
+    }
+
+    return Status;
 }

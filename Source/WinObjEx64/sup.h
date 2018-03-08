@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.52
+*  VERSION:     1.53
 *
-*  DATE:        10 Feb 2018
+*  DATE:        07 Mar 2018
 *
 *  Common header file for the program support routines.
 *
@@ -310,5 +310,10 @@ USHORT supIsAddressPrefix(
 
 BOOL supQuerySecureBootState(
     _In_ PBOOLEAN pbSecureBoot);
+
+HWINSTA supOpenWindowStationFromContext(
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ BOOL fInherit,
+    _In_ ACCESS_MASK dwDesiredAccess);
 
 #define PathFileExists(lpszPath) (GetFileAttributes(lpszPath) != (DWORD)-1)

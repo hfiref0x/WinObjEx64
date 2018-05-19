@@ -268,13 +268,15 @@ VOID TestWinsta(
     HWINSTA hWinsta;
     PROP_OBJECT_INFO Context;
 
-    Context.lpCurrentObjectPath = L"\\Windows\\WindowStations";
-    //Context.lpCurrentObjectPath = L"\\Sessions\\1\\Windows\\WindowStations";
+    //Context.lpCurrentObjectPath = L"\\Windows\\WindowStations";
+    Context.lpCurrentObjectPath = L"\\Sessions\\1\\Windows\\WindowStations";
     Context.lpObjectName = L"Winsta0";
 
-    hWinsta = supOpenWindowStationFromContext(&Context, FALSE, READ_CONTROL);
-    if (hWinsta) {
+    hWinsta = OpenWindowStation(L"WinSta0", FALSE, WINSTA_ALL_ACCESS);
 
+    //hWinsta = supOpenWindowStationFromContext(&Context, FALSE, READ_CONTROL);
+    if (hWinsta) {
+        CloseHandle(hWinsta);
         CloseWindowStation(hWinsta);
         Status = RtlGetLastNtStatus();
         if (NT_SUCCESS(Status))

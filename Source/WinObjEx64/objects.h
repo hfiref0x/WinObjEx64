@@ -4,9 +4,9 @@
 *
 *  TITLE:       OBJECTS.H
 *
-*  VERSION:     1.52
+*  VERSION:     1.53
 *
-*  DATE:        08 Jan 2018
+*  DATE:        08 May 2018
 *
 *  Header file for internal Windows objects handling.
 *
@@ -50,7 +50,7 @@
 #define TYPE_TIMER                      16
 #define TYPE_SESSION                    17
 #define TYPE_CONTROLLER                 18
-#define TYPE_PROFILE				    19
+#define TYPE_PROFILE                    19
 #define TYPE_EVENTPAIR                  20
 #define TYPE_DESKTOP                    21
 #define TYPE_FILE                       22

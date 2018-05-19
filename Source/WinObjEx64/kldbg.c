@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.52
+*  VERSION:     1.53
 *
-*  DATE:        08 Jan 2018
+*  DATE:        01 Apr 2018
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -963,7 +963,7 @@ BOOL ObWalkPrivateNamespaceTable(
     _In_ ULONG_PTR TableAddress
 )
 {
-    BOOL          EntryFound;
+    BOOL          EntryFound, bCond = FALSE;
     INT           c, d;
     SIZE_T        retSize = 0;
     ULONG_PTR     ObjectHeaderAddress, item0, item1, InfoHeaderAddress, NameSpaceIdMax = 0L;
@@ -998,6 +998,9 @@ BOOL ObWalkPrivateNamespaceTable(
 
         Head = LookupTable.HashBuckets[c].Blink;
         Current = LookupTable.HashBuckets[c].Flink;
+
+        if ((Head == NULL) || (Current == NULL))
+            continue;
 
         do {
             RtlSecureZeroMemory(&LookupEntry, sizeof(OBJECT_NAMESPACE_ENTRY));
@@ -1093,7 +1096,7 @@ BOOL ObWalkPrivateNamespaceTable(
                     } while (item1 != 0);
                 }
             }
-        } while ((Current != NULL) && (Current != Head));
+        } while (bCond);
     }
 
     return (!IsListEmpty(ListHead));

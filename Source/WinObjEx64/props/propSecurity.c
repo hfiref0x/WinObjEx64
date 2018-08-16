@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPSECURITY.C
 *
-*  VERSION:     1.52
+*  VERSION:     1.54
 *
-*  DATE:        08 Jan 2018
+*  DATE:        16 Aug 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -31,8 +31,7 @@ BOOL propSecurityObjectSupported(
     _In_ INT nTypeIndex
 )
 {
-    if (
-        (nTypeIndex != TYPE_FILE) &&
+    if ((nTypeIndex != TYPE_FILE) &&
         (nTypeIndex != TYPE_DIRECTORY) &&
         (nTypeIndex != TYPE_DEVICE) &&
         (nTypeIndex != TYPE_SECTION) &&
@@ -46,8 +45,7 @@ BOOL propSecurityObjectSupported(
         (nTypeIndex != TYPE_WINSTATION) &&
         (nTypeIndex != TYPE_IOCOMPLETION) &&
         (nTypeIndex != TYPE_JOB) &&
-        (nTypeIndex != TYPE_MEMORYPARTITION)
-        )
+        (nTypeIndex != TYPE_MEMORYPARTITION))
     {
         return FALSE;
     }
@@ -161,11 +159,8 @@ ACCESS_MASK propGetObjectAccessMask(
     ACCESS_MASK AccessMask = 0;
 
     if (fSet) {
-        if (
-            (SecurityInformation & OWNER_SECURITY_INFORMATION) ||
-            (SecurityInformation & GROUP_SECURITY_INFORMATION)
-            )
-        {
+        if ((SecurityInformation & OWNER_SECURITY_INFORMATION) ||
+            (SecurityInformation & GROUP_SECURITY_INFORMATION)) {
             AccessMask |= WRITE_OWNER;
         }
 
@@ -179,12 +174,9 @@ ACCESS_MASK propGetObjectAccessMask(
     }
     else {
         //get
-        if (
-            (SecurityInformation & OWNER_SECURITY_INFORMATION) ||
+        if ((SecurityInformation & OWNER_SECURITY_INFORMATION) ||
             (SecurityInformation & GROUP_SECURITY_INFORMATION) ||
-            (SecurityInformation & DACL_SECURITY_INFORMATION)
-            )
-        {
+            (SecurityInformation & DACL_SECURITY_INFORMATION)) {
             AccessMask |= READ_CONTROL;
         }
 

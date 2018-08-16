@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.53
+*  VERSION:     1.54
 *
-*  DATE:        07 Mar 2018
+*  DATE:        16 Aug 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -3126,3 +3126,105 @@ HWINSTA supOpenWindowStationFromContext(
     return hObject;
 }
 
+/*
+* supQueryObjectTrustLabel
+*
+* Purpose:
+*
+* Query object trust label protection origin and level.
+*
+* Note: hObject must be opened with READ_CONTROL.
+*
+*/
+BOOL supQueryObjectTrustLabel(
+    _In_ HANDLE hObject,
+    _Out_ PULONG ProtectionType,
+    _Out_ PULONG ProtectionLevel)
+{
+    BOOL                            bCond = FALSE, bResult = FALSE;   
+    BOOLEAN                         saclPresent = FALSE, saclDefaulted = FALSE;
+    ULONG                           i, Length = 0, returnLength = 0;
+
+    NTSTATUS                        Status;
+
+    PSID                            aceSID;
+    PACL                            sacl = NULL;
+    PACE_HEADER                     aceHeader;
+    PSYSTEM_PROCESS_TRUST_LABEL_ACE ace;
+
+    ACL_SIZE_INFORMATION            aclSize;
+    PSECURITY_DESCRIPTOR            pSD = NULL;
+
+    *ProtectionType = 0;
+    *ProtectionLevel = 0;
+
+    do {
+
+        //
+        // Query Security Descriptor for given object.
+        //
+        Length = PAGE_SIZE;
+        pSD = (PSECURITY_DESCRIPTOR)supHeapAlloc((SIZE_T)Length);
+        if (pSD == NULL)
+            break;
+
+        Status = NtQuerySecurityObject(hObject,
+            PROCESS_TRUST_LABEL_SECURITY_INFORMATION,
+            pSD, Length, &returnLength);
+
+        if (Status == STATUS_BUFFER_TOO_SMALL) {
+            supHeapFree(pSD);
+
+            pSD = (PSECURITY_DESCRIPTOR)supHeapAlloc((SIZE_T)returnLength);
+            if (pSD == NULL)
+                break;
+
+            Status = NtQuerySecurityObject(hObject,
+                PROCESS_TRUST_LABEL_SECURITY_INFORMATION,
+                pSD, Length, &returnLength);
+        }
+
+        if (!NT_SUCCESS(Status))
+            break;
+
+        //
+        // Query SACL from SD.
+        //
+        if (!NT_SUCCESS(RtlGetSaclSecurityDescriptor(pSD, 
+            &saclPresent, 
+            &sacl, 
+            &saclDefaulted))) break;
+
+        if (!sacl)
+            break;
+
+        //
+        // Query SACL size.
+        //
+        if (!NT_SUCCESS(RtlQueryInformationAcl(sacl, 
+            &aclSize, 
+            sizeof(aclSize), 
+            AclSizeInformation))) break;
+
+        //
+        // Locate trust label ace.
+        //
+        for (i = 0; i < aclSize.AceCount; i++) {
+            if (NT_SUCCESS(RtlGetAce(sacl, i, (LPVOID)&aceHeader))) {
+                if (aceHeader->AceType == SYSTEM_PROCESS_TRUST_LABEL_ACE_TYPE) {
+                    ace = (SYSTEM_PROCESS_TRUST_LABEL_ACE*)aceHeader;
+                    aceSID = (PSID)(&ace->SidStart);
+                    *ProtectionType = *RtlSubAuthoritySid(aceSID, 0);
+                    *ProtectionLevel = *RtlSubAuthoritySid(aceSID, 1);
+                    bResult = TRUE;
+                    break;
+                }
+            }
+        }
+
+    } while (bCond);
+
+    if (pSD) supHeapFree(pSD);
+
+    return bResult;
+}

@@ -1,3 +1,6 @@
+v1.5.4
+added display of Process Trust Label for Directory object type
+
 v1.5.3
 OpenWindowStation fix
 

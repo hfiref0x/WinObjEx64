@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASIPC.C
 *
-*  VERSION:     1.52
+*  VERSION:     1.53
 *
-*  DATE:        08 Jan 2018
+*  DATE:        15 June 2018
 *
 *  IPC supported: Pipes, Mailslots
 *
@@ -823,17 +823,16 @@ VOID extrasCreateIpcDialog(
 
     EXTRASCALLBACK CallbackParam;
 
-    if (Mode >= IpcMaxMode)
-        return;
-
-    dlgIndex = 0;
-    if (Mode == IpcModeMailshots)
+    switch (Mode) {
+    case IpcModeMailshots:
         dlgIndex = WOBJ_IPCDLG_MSLOT_IDX;
-    else if (Mode == IpcModeNamedPipes)
+        break;
+    case IpcModeNamedPipes:
         dlgIndex = WOBJ_IPCDLG_PIPES_IDX;
-
-    if ((dlgIndex != WOBJ_IPCDLG_MSLOT_IDX) &&
-        (dlgIndex != WOBJ_IPCDLG_PIPES_IDX)) return;
+        break;
+    default:
+        return;
+    }
 
     //
     // Allow only one dialog.

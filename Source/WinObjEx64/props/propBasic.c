@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     1.52
+*  VERSION:     1.54
 *
-*  DATE:        08 Jan 2018
+*  DATE:        16 Aug 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,6 +17,72 @@
 #include "global.h"
 #include "propDlg.h"
 #include "propBasicConsts.h"
+
+/*
+* propSetProcessTrustLabelInfo
+*
+* Purpose:
+*
+* Set Process Trust Label if it specified for this object.
+*
+*/
+VOID propSetProcessTrustLabelInfo(
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ HWND hwndDlg
+)
+{
+    BOOL bFail = TRUE;
+    HANDLE hObject = NULL;
+
+    ULONG ProtectionType = 0, ProtectionLevel = 0, i;
+
+    LPWSTR lpType = L"", lpLevel = L"";
+
+    WCHAR szBuffer[0x100];
+
+    //
+    // Re-open current object as we need READ_CONTROL.
+    //
+    if (!propOpenCurrentObject(Context, &hObject, READ_CONTROL)) {
+        SetDlgItemText(hwndDlg, ID_OBJECT_TRUSTLABEL, L"");
+        return;
+    }
+
+    if (supQueryObjectTrustLabel(hObject, 
+        &ProtectionType, 
+        &ProtectionLevel)) 
+    {
+        szBuffer[0] = 0;
+
+        for (i = 0; i < MAX_KNOWN_TRUSTLABEL_PROTECTIONTYPE; i++) 
+            if (TrustLabelProtectionType[i].dwValue == ProtectionType) 
+            {
+                lpType = TrustLabelProtectionType[i].lpDescription;
+                break;
+            }
+
+        for (i = 0; i < MAX_KNOWN_TRUSTLABEL_PROTECTIONLEVEL; i++)
+            if (TrustLabelProtectionLevel[i].dwValue == ProtectionLevel)
+            {
+                lpLevel = TrustLabelProtectionLevel[i].lpDescription;
+                break;
+            }
+
+        if ((lpType) && (lpLevel)) {
+            _strcpy(szBuffer, lpType);
+            _strcat(szBuffer, L"-");
+            _strcat(szBuffer, lpLevel);
+
+            SetDlgItemText(hwndDlg, ID_OBJECT_TRUSTLABEL, szBuffer);
+            bFail = FALSE;
+        }
+    }
+
+    propCloseCurrentObject(Context, hObject);
+
+    if (bFail) 
+        SetDlgItemText(hwndDlg, ID_OBJECT_TRUSTLABEL, L"");
+}
 
 /*
 * propSetDefaultInfo
@@ -158,6 +224,8 @@ VOID propBasicQueryDirectory(
     }
 
     propSetDefaultInfo(Context, hwndDlg, hObject);
+    propSetProcessTrustLabelInfo(Context, hwndDlg);
+
     NtClose(hObject);
 }
 
@@ -517,6 +585,7 @@ VOID propBasicQuerySymlink(
     if (ExtendedInfoAvailable == FALSE) {
         propSetDefaultInfo(Context, hwndDlg, hObject);
     }
+
     NtClose(hObject);
 }
 
@@ -605,6 +674,7 @@ VOID propBasicQueryKey(
     if (ExtendedInfoAvailable == FALSE) {
         propSetDefaultInfo(Context, hwndDlg, hObject);
     }
+
     NtClose(hObject);
 }
 
@@ -916,6 +986,7 @@ VOID propBasicQueryWindowStation(
     if (ExtendedInfoAvailable == FALSE) {
         propSetDefaultInfo(Context, hwndDlg, hObject);
     }
+
     CloseWindowStation(hObject);
 }
 

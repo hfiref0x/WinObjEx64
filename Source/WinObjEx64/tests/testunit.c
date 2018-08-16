@@ -4,9 +4,9 @@
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     1.52
+*  VERSION:     1.54
 *
-*  DATE:        08 Jan 2018
+*  DATE:        16 Aug 2018
 *
 *  Test code used while debug.
 *
@@ -38,10 +38,8 @@ VOID TestDebugObject(
 {
     NTSTATUS status;
     OBJECT_ATTRIBUTES obja;
-    UNICODE_STRING    ustr;
+    UNICODE_STRING    ustr = RTL_CONSTANT_STRING(L"\\BaseNamedObjects\\TestDebugObject");
 
-    ustr.Buffer = NULL;
-    RtlInitUnicodeString(&ustr, L"\\BaseNamedObjects\\TestDebugObject");
     InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
     status = NtCreateDebugObject(&g_DebugObject, DEBUG_ALL_ACCESS, &obja, 0);
     if (NT_SUCCESS(status)) {
@@ -56,7 +54,7 @@ VOID TestMailslot(
     BOOL bCond = FALSE;
     NTSTATUS status;
     OBJECT_ATTRIBUTES obja;
-    UNICODE_STRING    ustr;
+    UNICODE_STRING    ustr = RTL_CONSTANT_STRING(L"\\Device\\Mailslot\\TestMailslot");
     IO_STATUS_BLOCK iost;
     LARGE_INTEGER readTimeout;
     PSID pEveryoneSID = NULL, pAdminSID = NULL;
@@ -113,9 +111,6 @@ VOID TestMailslot(
         readTimeout.HighPart = 0x7FFFFFFF;
         readTimeout.LowPart = 0xFFFFFFFF;
 
-        ustr.Buffer = NULL;
-        RtlInitUnicodeString(&ustr, L"\\Device\\Mailslot\\TestMailslot");
-
         InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, pSD);
         status = NtCreateMailslotFile(&g_TestMailslot,
             GENERIC_READ | SYNCHRONIZE | WRITE_DAC,
@@ -139,11 +134,10 @@ VOID TestPartition(
     NTSTATUS status;
     HANDLE TargetHandle = NULL;
     OBJECT_ATTRIBUTES obja;
-    UNICODE_STRING    ustr;
+    UNICODE_STRING    ustr = RTL_CONSTANT_STRING(L"\\KernelObjects\\MemoryPartition0");
 
     if (g_ExtApiSet.NtOpenPartition != NULL) {
-        ustr.Buffer = NULL;
-        RtlInitUnicodeString(&ustr, L"\\KernelObjects\\MemoryPartition0");
+
         InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
         status = g_ExtApiSet.NtOpenPartition(&TargetHandle, MEMORY_PARTITION_QUERY_ACCESS, &obja);
         if (NT_SUCCESS(status)) {
@@ -158,11 +152,9 @@ VOID TestIoCompletion(
 )
 {
     OBJECT_ATTRIBUTES obja;
-    UNICODE_STRING    ustr;
+    UNICODE_STRING    ustr = RTL_CONSTANT_STRING(L"\\BaseNamedObjects\\TestIoCompletion");
 
     //IoCompletion
-    ustr.Buffer = NULL;
-    RtlInitUnicodeString(&ustr, L"\\BaseNamedObjects\\TestIoCompletion");
     InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
     NtCreateIoCompletion(&g_TestIoCompletion, IO_COMPLETION_ALL_ACCESS, &obja, 100);
 }
@@ -188,11 +180,9 @@ VOID TestTransaction(
 )
 {
     OBJECT_ATTRIBUTES obja;
-    UNICODE_STRING    ustr;
+    UNICODE_STRING    ustr = RTL_CONSTANT_STRING(L"\\BaseNamedObjects\\TestTransaction");
 
     //TmTx
-    ustr.Buffer = NULL;
-    RtlInitUnicodeString(&ustr, L"\\BaseNamedObjects\\TestTransaction");
     InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
     NtCreateTransaction(&g_TestTransaction, TRANSACTION_ALL_ACCESS, &obja, NULL, NULL, 0, 0, 0, NULL, NULL);
 }

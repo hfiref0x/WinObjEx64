@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDLG.C
 *
-*  VERSION:     1.53
+*  VERSION:     1.54
 *
-*  DATE:        07 Mar 2018
+*  DATE:        16 Aug 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -37,6 +37,36 @@ WNDPROC PropSheetOriginalWndProc = NULL;
 //handle to the PropertySheet window
 HWND g_PropWindow = NULL;
 HWND g_SubPropWindow = NULL;
+
+/*
+* propCloseCurrentObject
+*
+* Purpose:
+*
+* Close currently viewed object handle depending on type
+*
+*/
+BOOL propCloseCurrentObject(
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ HANDLE hObject
+)
+{
+    BOOL bResult = FALSE;
+
+    switch (Context->TypeIndex) {
+    case TYPE_WINSTATION:
+        bResult = CloseWindowStation(hObject);
+        break;
+    case TYPE_DESKTOP:
+        bResult = CloseDesktop(hObject);
+        break;
+    default:
+        bResult = NT_SUCCESS(NtClose(hObject));
+        break;
+    }
+
+    return bResult;
+}
 
 /*
 * propOpenCurrentObject

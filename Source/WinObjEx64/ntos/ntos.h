@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.86
+*  VERSION:     1.89
 *
-*  DATE:        07 Mar 2018
+*  DATE:        10 Aug 2018
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -54,9 +54,29 @@ typedef KIRQL *PKIRQL;
 #define LOGICAL ULONG
 #endif
 
+//
+// ntdef.h begin
+//
 #ifndef RTL_CONSTANT_STRING
-#define RTL_CONSTANT_STRING(s) { sizeof( s ) - sizeof( (s)[0] ), sizeof( s ), s }
+char _RTL_CONSTANT_STRING_type_check(const void *s);
+#define _RTL_CONSTANT_STRING_remove_const_macro(s) (s)
+#define RTL_CONSTANT_STRING(s) \
+{ \
+    sizeof( s ) - sizeof( (s)[0] ), \
+    sizeof( s ) / sizeof(_RTL_CONSTANT_STRING_type_check(s)), \
+    _RTL_CONSTANT_STRING_remove_const_macro(s) \
+}
 #endif
+
+#define RTL_CONSTANT_OBJECT_ATTRIBUTES(n, a) \
+    { sizeof(OBJECT_ATTRIBUTES), NULL, RTL_CONST_CAST(PUNICODE_STRING)(n), a, NULL, NULL }
+
+// This synonym is more appropriate for initializing what isn't actually const.
+#define RTL_INIT_OBJECT_ATTRIBUTES(n, a) RTL_CONSTANT_OBJECT_ATTRIBUTES(n, a)
+
+//
+// ntdef.h end
+//
 
 #define RtlOffsetToPointer(B,O)  ((PCHAR)( ((PCHAR)(B)) + ((ULONG_PTR)(O))  ))
 #define RtlPointerToOffset(B,P)  ((ULONG)( ((PCHAR)(P)) - ((PCHAR)(B))  ))
@@ -502,15 +522,17 @@ typedef struct _SYSTEM_PROCESSES_INFORMATION {
     IO_COUNTERS IoCounters;
     SYSTEM_THREAD_INFORMATION Threads[1];
 } SYSTEM_PROCESSES_INFORMATION, *PSYSTEM_PROCESSES_INFORMATION;
-/*
+
 typedef enum _SYSTEM_PROCESS_CLASSIFICATION {
     SystemProcessClassificationNormal,
     SystemProcessClassificationSystem,
     SystemProcessClassificationSecureSystem,
     SystemProcessClassificationMemCompression,
+    SystemProcessClassificationRegistry,
     SystemProcessClassificationMaximum
 } SYSTEM_PROCESS_CLASSIFICATION;
 
+/*
 typedef struct _PROCESS_DISK_COUNTERS {
     ULONGLONG BytesRead;
     ULONGLONG BytesWritten;
@@ -712,7 +734,10 @@ typedef enum _PROCESSINFOCLASS {
     ProcessEnableReadWriteVmLogging = 87,
     ProcessUptimeInformation = 88,
     ProcessImageSection = 89,
-    MaxProcessInfoClass = 90
+    ProcessDebugAuthInformation = 90,
+    ProcessSystemResourceManagement = 91,
+    ProcessSequenceNumber = 92,
+    MaxProcessInfoClass
 } PROCESSINFOCLASS;
 
 typedef enum _THREADINFOCLASS {
@@ -851,7 +876,8 @@ typedef enum _PS_MITIGATION_OPTION {
     PS_MITIGATION_OPTION_EXPORT_ADDRESS_FILTER_PLUS,
     PS_MITIGATION_OPTION_RESTRICT_CHILD_PROCESS_CREATION,
     PS_MITIGATION_OPTION_IMPORT_ADDRESS_FILTER,
-    PS_MITIGATION_OPTION_MODULE_TAMPERING_PROTECTION
+    PS_MITIGATION_OPTION_MODULE_TAMPERING_PROTECTION,
+    PS_MITIGATION_OPTION_RESTRICT_INDIRECT_BRANCH_PREDICTION
 } PS_MITIGATION_OPTION;
 
 typedef enum _PS_CREATE_STATE {
@@ -1268,11 +1294,13 @@ typedef enum _SYSTEM_INFORMATION_CLASS {
     SystemSecureDumpEncryptionInformation = 194,
     SystemWriteConstraintInformation = 195,
     SystemKernelVaShadowInformation = 196,
-    ReservedRS4_1 = 197,
-    ReservedRS4_2 = 198,
-    ReservedRS4_3 = 199,
-    ReservedRS4_4 = 200,
+    SystemHypervisorSharedPageInformation = 197,
+    SystemFirmwareBootPerformanceInformation = 198,
+    SystemCodeIntegrityVerificationInformation = 199,
+    SystemFirmwarePartitionInformation = 200,
     SystemSpeculationControlInformation = 201,
+    SystemDmaGuardPolicyInformation = 202,
+    SystemEnclaveLaunchControlInformation,
     MaxSystemInfoClass
 } SYSTEM_INFORMATION_CLASS, *PSYSTEM_INFORMATION_CLASS;
 
@@ -1297,7 +1325,9 @@ typedef struct _SYSTEM_KERNEL_VA_SHADOW_INFORMATION {
         ULONG KvaShadowUserGlobal : 1;
         ULONG KvaShadowPcid : 1;
         ULONG KvaShadowInvpcid : 1;
-        ULONG Reserved : 28;
+        ULONG KvaShadowRequired : 1;
+        ULONG KvaShadowRequiredAvailable : 1;
+        ULONG Reserved : 26;
     } KvaShadowFlags;
 } SYSTEM_KERNEL_VA_SHADOW_INFORMATION, *PSYSTEM_KERNEL_VA_SHADOW_INFORMATION;
 
@@ -5172,6 +5202,141 @@ NTSTATUS NTAPI RtlGetSaclSecurityDescriptor(
     _Out_ PACL *Sacl,
     _Out_ PBOOLEAN SaclDefaulted);
 
+NTSTATUS NTAPI RtlCreateAcl(
+    _Out_writes_bytes_(AclLength) PACL Acl,
+    _In_ ULONG AclLength,
+    _In_ ULONG AclRevision);
+
+BOOLEAN NTAPI RtlValidAcl(
+    _In_ PACL Acl);
+
+NTSTATUS NTAPI RtlQueryInformationAcl(
+    _In_ PACL Acl,
+    _Out_writes_bytes_(AclInformationLength) PVOID AclInformation,
+    _In_ ULONG AclInformationLength,
+    _In_ ACL_INFORMATION_CLASS AclInformationClass);
+
+NTSTATUS NTAPI RtlSetInformationAcl(
+    _Inout_ PACL Acl,
+    _In_reads_bytes_(AclInformationLength) PVOID AclInformation,
+    _In_ ULONG AclInformationLength,
+    _In_ ACL_INFORMATION_CLASS AclInformationClass);
+
+NTSTATUS NTAPI RtlAddAce(
+    _Inout_ PACL Acl,
+    _In_ ULONG AceRevision,
+    _In_ ULONG StartingAceIndex,
+    _In_reads_bytes_(AceListLength) PVOID AceList,
+    _In_ ULONG AceListLength);
+
+NTSTATUS NTAPI RtlDeleteAce(
+    _Inout_ PACL Acl,
+    _In_ ULONG AceIndex);
+
+NTSTATUS NTAPI RtlGetAce(
+    _In_ PACL Acl,
+    _In_ ULONG AceIndex,
+    _Outptr_ PVOID *Ace);
+
+BOOLEAN NTAPI RtlFirstFreeAce(
+    _In_ PACL Acl,
+    _Out_ PVOID *FirstFree);
+
+BOOLEAN NTAPI RtlOwnerAcesPresent(
+    _In_ PACL pAcl);
+
+NTSTATUS NTAPI RtlAddAccessAllowedAce(
+    _Inout_ PACL Acl,
+    _In_ ULONG AceRevision,
+    _In_ ACCESS_MASK AccessMask,
+    _In_ PSID Sid);
+
+NTSTATUS NTAPI RtlAddAccessAllowedAceEx(
+    _Inout_ PACL Acl,
+    _In_ ULONG AceRevision,
+    _In_ ULONG AceFlags,
+    _In_ ACCESS_MASK AccessMask,
+    _In_ PSID Sid);
+
+NTSTATUS NTAPI RtlAddAccessDeniedAce(
+    _Inout_ PACL Acl,
+    _In_ ULONG AceRevision,
+    _In_ ACCESS_MASK AccessMask,
+    _In_ PSID Sid);
+
+NTSTATUS NTAPI RtlAddAccessDeniedAceEx(
+    _Inout_ PACL Acl,
+    _In_ ULONG AceRevision,
+    _In_ ULONG AceFlags,
+    _In_ ACCESS_MASK AccessMask,
+    _In_ PSID Sid);
+
+NTSTATUS NTAPI RtlAddAuditAccessAce(
+    _Inout_ PACL Acl,
+    _In_ ULONG AceRevision,
+    _In_ ACCESS_MASK AccessMask,
+    _In_ PSID Sid,
+    _In_ BOOLEAN AuditSuccess,
+    _In_ BOOLEAN AuditFailure);
+
+NTSTATUS NTAPI RtlAddAuditAccessAceEx(
+    _Inout_ PACL Acl,
+    _In_ ULONG AceRevision,
+    _In_ ULONG AceFlags,
+    _In_ ACCESS_MASK AccessMask,
+    _In_ PSID Sid,
+    _In_ BOOLEAN AuditSuccess,
+    _In_ BOOLEAN AuditFailure);
+
+NTSTATUS NTAPI RtlAddAccessAllowedObjectAce(
+    _Inout_ PACL Acl,
+    _In_ ULONG AceRevision,
+    _In_ ULONG AceFlags,
+    _In_ ACCESS_MASK AccessMask,
+    _In_opt_ GUID *ObjectTypeGuid,
+    _In_opt_ GUID *InheritedObjectTypeGuid,
+    _In_ PSID Sid);
+
+NTSTATUS NTAPI
+RtlAddAccessDeniedObjectAce(
+    _Inout_ PACL Acl,
+    _In_ ULONG AceRevision,
+    _In_ ULONG AceFlags,
+    _In_ ACCESS_MASK AccessMask,
+    _In_opt_ GUID *ObjectTypeGuid,
+    _In_opt_ GUID *InheritedObjectTypeGuid,
+    _In_ PSID Sid);
+
+NTSTATUS NTAPI RtlAddAuditAccessObjectAce(
+    _Inout_ PACL Acl,
+    _In_ ULONG AceRevision,
+    _In_ ULONG AceFlags,
+    _In_ ACCESS_MASK AccessMask,
+    _In_opt_ GUID *ObjectTypeGuid,
+    _In_opt_ GUID *InheritedObjectTypeGuid,
+    _In_ PSID Sid,
+    _In_ BOOLEAN AuditSuccess,
+    _In_ BOOLEAN AuditFailure);
+
+NTSTATUS NTAPI RtlAddCompoundAce(
+    _Inout_ PACL Acl,
+    _In_ ULONG AceRevision,
+    _In_ UCHAR AceType,
+    _In_ ACCESS_MASK AccessMask,
+    _In_ PSID ServerSid,
+    _In_ PSID ClientSid);
+
+NTSTATUS NTAPI RtlAddMandatoryAce(
+    _Inout_ PACL Acl,
+    _In_ ULONG AceRevision,
+    _In_ ULONG AceFlags,
+    _In_ PSID Sid,
+    _In_ UCHAR AceType,
+    _In_ ACCESS_MASK AccessMask);
+
+NTSTATUS NTAPIRtlDefaultNpAcl(
+    _Out_ PACL *Acl);
+
 ULONG NTAPI RtlLengthSecurityDescriptor(
     _In_ PSECURITY_DESCRIPTOR SecurityDescriptor);
 
@@ -5258,6 +5423,10 @@ NTSTATUS NTAPI RtlSetOwnerSecurityDescriptor(
     _In_ PSECURITY_DESCRIPTOR SecurityDescriptor,
     _In_ PSID Owner,
     _In_ BOOLEAN OwnerDefaulted);
+
+NTSTATUS NTAPI RtlCopySecurityDescriptor(
+    _In_ PSECURITY_DESCRIPTOR InputSecurityDescriptor,
+    _Out_ PSECURITY_DESCRIPTOR *OutputSecurityDescriptor);
 
 FORCEINLINE LUID NTAPI RtlConvertLongToLuid(
     _In_ LONG Long
@@ -5982,7 +6151,7 @@ NTSTATUS NTAPI NtCreateTimer(
     _In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
     _In_ TIMER_TYPE TimerType);
 
-NTSTATUS NtSetTimer(
+NTSTATUS NTAPI NtSetTimer(
     _In_ HANDLE TimerHandle,
     _In_ PLARGE_INTEGER DueTime,
     _In_opt_ PTIMER_APC_ROUTINE TimerApcRoutine,
@@ -6579,7 +6748,8 @@ typedef enum _MEMORY_PARTITION_INFORMATION_CLASS {
     SystemMemoryPartitionAddPagefile,
     SystemMemoryPartitionCombineMemory,
     SystemMemoryPartitionInitialAddMemory,
-    SystemMemoryPartitionGetMemoryEvents
+    SystemMemoryPartitionGetMemoryEvents,
+    SystemMemoryPartitionMax
 } MEMORY_PARTITION_INFORMATION_CLASS;
 
 typedef struct _MEMORY_PARTITION_PAGE_RANGE {
@@ -6638,7 +6808,7 @@ NTSTATUS NTAPI NtCreateSection(
     _In_ ULONG AllocationAttributes,
     _In_opt_ HANDLE FileHandle);
 
-NTSTATUS NtOpenSection(
+NTSTATUS NTAPI NtOpenSection(
     _Out_ PHANDLE SectionHandle,
     _In_ ACCESS_MASK DesiredAccess,
     _In_ POBJECT_ATTRIBUTES ObjectAttributes);
@@ -7058,7 +7228,7 @@ typedef struct _IO_COMPLETION_BASIC_INFORMATION {
     LONG Depth;
 } IO_COMPLETION_BASIC_INFORMATION, *PIO_COMPLETION_BASIC_INFORMATION;
 
-NTSTATUS NtCreateIoCompletion(
+NTSTATUS NTAPI NtCreateIoCompletion(
     _Out_ PHANDLE IoCompletionHandle,
     _In_ ACCESS_MASK DesiredAccess,
     _In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,

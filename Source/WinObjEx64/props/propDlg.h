@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDLG.H
 *
-*  VERSION:     1.52
+*  VERSION:     1.54
 *
-*  DATE:        08 Jan 2018
+*  DATE:        16 Aug 2018
 *
 *  Common header file for properties dialog.
 *
@@ -30,6 +30,10 @@ BOOL propOpenCurrentObject(
     _In_ PROP_OBJECT_INFO *Context,
     _Out_ PHANDLE phObject,
     _In_ ACCESS_MASK DesiredAccess);
+
+BOOL propCloseCurrentObject(
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ HANDLE hObject);
 
 VOID propCreateDialog(
     _In_ HWND hwndParent,

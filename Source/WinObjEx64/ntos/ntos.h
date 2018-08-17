@@ -5297,8 +5297,7 @@ NTSTATUS NTAPI RtlAddAccessAllowedObjectAce(
     _In_opt_ GUID *InheritedObjectTypeGuid,
     _In_ PSID Sid);
 
-NTSTATUS NTAPI
-RtlAddAccessDeniedObjectAce(
+NTSTATUS NTAPI RtlAddAccessDeniedObjectAce(
     _Inout_ PACL Acl,
     _In_ ULONG AceRevision,
     _In_ ULONG AceFlags,
@@ -5334,7 +5333,7 @@ NTSTATUS NTAPI RtlAddMandatoryAce(
     _In_ UCHAR AceType,
     _In_ ACCESS_MASK AccessMask);
 
-NTSTATUS NTAPIRtlDefaultNpAcl(
+NTSTATUS NTAPI RtlDefaultNpAcl(
     _Out_ PACL *Acl);
 
 ULONG NTAPI RtlLengthSecurityDescriptor(

@@ -4,9 +4,9 @@
 *
 *  TITLE:       LIST.C
 *
-*  VERSION:     1.52
+*  VERSION:     1.55
 *
-*  DATE:        08 Jan 2018
+*  DATE:        31 Aug 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -189,7 +189,6 @@ VOID ListObjectDirectoryTree(
     POBJECT_DIRECTORY_INFORMATION  objinf;
 
     ViewRootHandle = AddTreeViewItem(SubDirName, ViewRootHandle);
-    RtlSecureZeroMemory(&objname, sizeof(objname));
     RtlInitUnicodeString(&objname, SubDirName);
     InitializeObjectAttributes(&objattr, &objname, OBJ_CASE_INSENSITIVE, RootHandle, NULL);
     status = NtOpenDirectoryObject(&hDirectory, DIRECTORY_QUERY, &objattr);
@@ -375,7 +374,6 @@ VOID ListObjectsInDirectory(
     POBJECT_DIRECTORY_INFORMATION   objinf;
 
     ListView_DeleteAllItems(g_hwndObjectList);
-    objname.Buffer = NULL;
     RtlInitUnicodeString(&objname, lpObjectDirectory);
     InitializeObjectAttributes(&objattr, &objname, OBJ_CASE_INSENSITIVE, NULL, NULL);
     status = NtOpenDirectoryObject(&hDirectory, DIRECTORY_QUERY, &objattr);
@@ -445,7 +443,6 @@ VOID FindObject(
 
     POBJECT_DIRECTORY_INFORMATION	objinf;
 
-    RtlSecureZeroMemory(&objname, sizeof(objname));
     RtlInitUnicodeString(&objname, DirName);
     sdlen = _strlen(DirName);
     InitializeObjectAttributes(&objattr, &objname, OBJ_CASE_INSENSITIVE, NULL, NULL);

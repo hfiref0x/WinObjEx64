@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     1.54
+*  VERSION:     1.55
 *
-*  DATE:        16 Aug 2018
+*  DATE:        30 Aug 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -73,6 +73,7 @@ VOID propSetProcessTrustLabelInfo(
             _strcat(szBuffer, L"-");
             _strcat(szBuffer, lpLevel);
 
+            ShowWindow(GetDlgItem(hwndDlg, ID_PTL_CAPTION), SW_SHOW);
             SetDlgItemText(hwndDlg, ID_OBJECT_TRUSTLABEL, szBuffer);
             bFail = FALSE;
         }
@@ -80,8 +81,10 @@ VOID propSetProcessTrustLabelInfo(
 
     propCloseCurrentObject(Context, hObject);
 
-    if (bFail) 
+    if (bFail) {
+        ShowWindow(GetDlgItem(hwndDlg, ID_PTL_CAPTION), SW_HIDE);
         SetDlgItemText(hwndDlg, ID_OBJECT_TRUSTLABEL, L"");
+    }
 }
 
 /*
@@ -224,7 +227,6 @@ VOID propBasicQueryDirectory(
     }
 
     propSetDefaultInfo(Context, hwndDlg, hObject);
-    propSetProcessTrustLabelInfo(Context, hwndDlg);
 
     NtClose(hObject);
 }
@@ -1492,6 +1494,12 @@ VOID propSetBasicInfo(
         if (ExtendedInfoAvailable == FALSE) {
             propBasicQueryDirectory(Context, hwndDlg);
         }
+
+        //
+        // Set process trust label information.
+        //
+        propSetProcessTrustLabelInfo(Context, hwndDlg);
+
         break;
     case TYPE_DRIVER:
         propBasicQueryDriver(Context, hwndDlg);

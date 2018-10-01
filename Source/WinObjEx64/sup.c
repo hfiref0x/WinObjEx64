@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.54
+*  VERSION:     1.55
 *
-*  DATE:        16 Aug 2018
+*  DATE:        07 Sep 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -54,7 +54,7 @@ ULONG g_cHeapAlloc = 0;
 *
 */
 #ifndef _DEBUG
-PVOID FORCEINLINE supHeapAlloc(
+FORCEINLINE PVOID supHeapAlloc(
     _In_ SIZE_T Size)
 {
     return RtlAllocateHeap(g_WinObj.Heap, HEAP_ZERO_MEMORY, Size);
@@ -100,7 +100,7 @@ PVOID supHeapAlloc(
 *
 */
 #ifndef _DEBUG
-BOOL FORCEINLINE supHeapFree(
+FORCEINLINE BOOL supHeapFree(
     _In_ PVOID Memory)
 {
     return RtlFreeHeap(g_WinObj.Heap, 0, Memory);
@@ -1267,8 +1267,6 @@ VOID supxMapNtdllCopy(
 
     WCHAR  szDllPath[MAX_PATH * 2];
 
-    usFileName.Buffer = NULL;
-
     RtlSecureZeroMemory(szDllPath, sizeof(szDllPath));
     _strcpy(szDllPath, TEXT("\\??\\"));
     _strcat(szDllPath, g_WinObj.szSystemDirectory);
@@ -1391,7 +1389,6 @@ VOID supQueryKnownDlls(
     g_lpKnownDlls32 = NULL;
     g_lpKnownDlls64 = NULL;
 
-    RtlSecureZeroMemory(&KnownDlls, sizeof(KnownDlls));
     RtlInitUnicodeString(&KnownDlls, L"\\KnownDlls32\\KnownDllPath");
     supxQueryKnownDllsLink(&KnownDlls, &g_lpKnownDlls32);
     RtlInitUnicodeString(&KnownDlls, L"\\KnownDlls\\KnownDllPath");
@@ -2474,19 +2471,20 @@ HANDLE supOpenDirectory(
     _In_ LPWSTR lpDirectory
 )
 {
-    HANDLE            hDirectory;
+    HANDLE            hDirectory = NULL;
     UNICODE_STRING    ustr;
     OBJECT_ATTRIBUTES obja;
 
-    if (lpDirectory == NULL) {
-        return NULL;
-    }
-    RtlSecureZeroMemory(&ustr, sizeof(ustr));
     RtlInitUnicodeString(&ustr, lpDirectory);
     InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
-
-    hDirectory = NULL;
-    NtOpenDirectoryObject(&hDirectory, DIRECTORY_QUERY, &obja);
+   
+    if (!NT_SUCCESS(NtOpenDirectoryObject(
+        &hDirectory,
+        DIRECTORY_QUERY,
+        &obja)))
+    {
+        return NULL;
+    }
 
     return hDirectory;
 }
@@ -2879,7 +2877,6 @@ BOOL supGetWin32FileName(
 
     do {
 
-        RtlSecureZeroMemory(&NtFileName, sizeof(NtFileName));
         RtlInitUnicodeString(&NtFileName, FileName);
         InitializeObjectAttributes(&obja, &NtFileName, OBJ_CASE_INSENSITIVE, 0, NULL);
 

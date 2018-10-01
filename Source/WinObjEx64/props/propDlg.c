@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDLG.C
 *
-*  VERSION:     1.54
+*  VERSION:     1.55
 *
-*  DATE:        16 Aug 2018
+*  DATE:        31 Aug 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -144,7 +144,6 @@ BOOL propOpenCurrentObject(
         //
         // Open object in directory.
         //
-        RtlSecureZeroMemory(&ustr, sizeof(ustr));
         RtlInitUnicodeString(&ustr, Context->lpObjectName);
         InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, hDirectory, NULL);
         hObject = NULL;
@@ -197,7 +196,6 @@ BOOL propOpenCurrentObject(
         return bResult;
     }
 
-    RtlSecureZeroMemory(&ustr, sizeof(ustr));
     RtlInitUnicodeString(&ustr, Context->lpObjectName);
     InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, hDirectory, NULL);
 

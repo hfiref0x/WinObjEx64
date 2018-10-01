@@ -9,6 +9,7 @@ Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
 		Release|x64 = Release|x64
+		ReleaseNotSignedWithDriver|x64 = ReleaseNotSignedWithDriver|x64
 		ReleaseSigned|x64 = ReleaseSigned|x64
 		ReleaseSignedWithDriver|x64 = ReleaseSignedWithDriver|x64
 	EndGlobalSection
@@ -17,6 +18,8 @@ Global
 		{A68B0947-9415-4ACA-BC0A-8558A4F4FBE3}.Debug|x64.Build.0 = Debug|x64
 		{A68B0947-9415-4ACA-BC0A-8558A4F4FBE3}.Release|x64.ActiveCfg = Release|x64
 		{A68B0947-9415-4ACA-BC0A-8558A4F4FBE3}.Release|x64.Build.0 = Release|x64
+		{A68B0947-9415-4ACA-BC0A-8558A4F4FBE3}.ReleaseNotSignedWithDriver|x64.ActiveCfg = ReleaseNotSignedWithDriver|x64
+		{A68B0947-9415-4ACA-BC0A-8558A4F4FBE3}.ReleaseNotSignedWithDriver|x64.Build.0 = ReleaseNotSignedWithDriver|x64
 		{A68B0947-9415-4ACA-BC0A-8558A4F4FBE3}.ReleaseSigned|x64.ActiveCfg = ReleaseSigned|x64
 		{A68B0947-9415-4ACA-BC0A-8558A4F4FBE3}.ReleaseSigned|x64.Build.0 = ReleaseSigned|x64
 		{A68B0947-9415-4ACA-BC0A-8558A4F4FBE3}.ReleaseSignedWithDriver|x64.ActiveCfg = ReleaseSignedWithDriver|x64

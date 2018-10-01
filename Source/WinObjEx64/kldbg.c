@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.53
+*  VERSION:     1.55
 *
-*  DATE:        01 Apr 2018
+*  DATE:        07 Sep 2018
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -487,7 +487,7 @@ BOOL ObGetDirectoryObjectAddress(
     else {
         lpTarget = lpDirectory;
     }
-    RtlSecureZeroMemory(&objname, sizeof(objname));
+
     RtlInitUnicodeString(&objname, lpTarget);
     InitializeObjectAttributes(&objattr, &objname, OBJ_CASE_INSENSITIVE, NULL, NULL);
     status = NtOpenDirectoryObject(&hDirectory, DIRECTORY_QUERY, &objattr);
@@ -1662,10 +1662,11 @@ VOID kdShutdown(
 
     if (g_kdctx.hThreadWorker) {
         //give it a last chance to complete, elsewhere we don't care.
-        WaitForSingleObject(g_kdctx.hThreadWorker, 1000);
+        if (WaitForSingleObject(g_kdctx.hThreadWorker, 1000) == WAIT_TIMEOUT)
+            TerminateThread(g_kdctx.hThreadWorker, 0);
         CloseHandle(g_kdctx.hThreadWorker);
         g_kdctx.hThreadWorker = NULL;
-    }
+    }              
 
     CloseHandle(g_kdctx.hDevice);
     g_kdctx.hDevice = NULL;

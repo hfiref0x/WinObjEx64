@@ -37,6 +37,9 @@
     <Filter Include="ntos">
       <UniqueIdentifier>{621f3500-b7f1-418f-8901-7eff2d8c3a2d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resource Files\graphics">
+      <UniqueIdentifier>{87a2b20f-17e9-4ce8-abbd-11f4b06fde61}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="aboutDlg.c">
@@ -318,170 +321,170 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <Image Include="rsrc\pipe.ico">
+      <Filter>Resource Files\graphics</Filter>
+    </Image>
     <Image Include="rsrc\100.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\101.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\102.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\103.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\104.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\105.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\106.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\107.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\108.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\109.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\110.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\111.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\112.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\113.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\114.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\115.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\116.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\117.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\118.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\119.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\120.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\121.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\122.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\123.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\124.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\125.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\126.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\127.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\128.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\129.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\130.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\131.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\132.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\133.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\134.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="rsrc\6001.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="rsrc\6002.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\135.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\136.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\137.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\138.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\139.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="rsrc\pipe.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\140.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\141.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\142.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\143.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\144.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\145.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\146.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\147.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="rsrc\Bitmap_125.bmp">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="rsrc\icon1.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\148.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
+    </Image>
+    <Image Include="rsrc\6001.ico">
+      <Filter>Resource Files\graphics</Filter>
+    </Image>
+    <Image Include="rsrc\6002.ico">
+      <Filter>Resource Files\graphics</Filter>
+    </Image>
+    <Image Include="rsrc\Bitmap_125.bmp">
+      <Filter>Resource Files\graphics</Filter>
+    </Image>
+    <Image Include="rsrc\icon1.ico">
+      <Filter>Resource Files\graphics</Filter>
     </Image>
     <Image Include="rsrc\mailslot.ico">
-      <Filter>Resource Files</Filter>
+      <Filter>Resource Files\graphics</Filter>
     </Image>
   </ItemGroup>
 </Project>

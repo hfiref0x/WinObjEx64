@@ -1219,7 +1219,7 @@ VOID propBasicQueryJob(
                 bytesNeeded,
                 &bytesNeeded);
 
-            if (status == STATUS_BUFFER_TOO_SMALL) {
+            if (status == STATUS_BUFFER_OVERFLOW) {
 
                 supVirtualFree(pJobProcList);
                 pJobProcList = supVirtualAlloc(bytesNeeded);

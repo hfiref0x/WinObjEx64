@@ -4,9 +4,9 @@
 *
 *  TITLE:       FINDDLG.C
 *
-*  VERSION:     1.52
+*  VERSION:     1.60
 *
-*  DATE:        08 Jan 2018
+*  DATE:        24 Oct 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -88,7 +88,7 @@ VOID FindDlgAddListItem(
     lvitem.iSubItem = 0;
     lvitem.pszText = ObjectName;
     lvitem.iItem = 0;
-    lvitem.iImage = supGetObjectIndexByTypeName(TypeName);
+    lvitem.iImage = ObManagerGetImageIndexByTypeName(TypeName);
     index = ListView_InsertItem(hList, &lvitem);
 
     lvitem.mask = LVIF_TEXT;
@@ -219,9 +219,8 @@ VOID FindDlgHandleNotify(
     _In_ LPNMLISTVIEW nhdr
 )
 {
-    INT      c, k;
+    INT      nImageIndex;
     LPWSTR   lpItemText;
-    LVCOLUMN col;
 
     if (nhdr->hdr.idFrom != ID_SEARCH_LIST)
         return;
@@ -244,20 +243,18 @@ VOID FindDlgHandleNotify(
         FindDlgSortColumn = ((NMLISTVIEW *)nhdr)->iSubItem;
         ListView_SortItemsEx(FindDlgList, &FindDlgCompareFunc, FindDlgSortColumn);
 
-        RtlSecureZeroMemory(&col, sizeof(col));
-        col.mask = LVCF_IMAGE;
-        col.iImage = -1;
-
-        for (c = 0; c < 2; c++)
-            ListView_SetColumn(FindDlgList, c, &col);
-
-        k = ImageList_GetImageCount(g_ListViewImages);
+        nImageIndex = ImageList_GetImageCount(g_ListViewImages);
         if (bFindDlgSortInverse)
-            col.iImage = k - 2;
+            nImageIndex -= 2;
         else
-            col.iImage = k - 1;
+            nImageIndex -= 1;
 
-        ListView_SetColumn(FindDlgList, ((NMLISTVIEW *)nhdr)->iSubItem, &col);
+        supUpdateLvColumnHeaderImage(
+            FindDlgList,
+            2,
+            FindDlgSortColumn,
+            nImageIndex);
+
         break;
 
     default:
@@ -396,7 +393,13 @@ VOID FindDlgAddTypes(
 
     __try {
         //type collection available, list it
-        pObject = (POBJECT_TYPE_INFORMATION)&g_pObjectTypesInfo->TypeInformation;
+        if (g_kdctx.IsWine) {
+            pObject = OBJECT_TYPES_FIRST_ENTRY_WINE(g_pObjectTypesInfo);
+        }
+        else {
+            pObject = OBJECT_TYPES_FIRST_ENTRY(g_pObjectTypesInfo);
+        }
+
         for (i = 0; i < g_pObjectTypesInfo->NumberOfTypes; i++) {
             sz = pObject->TypeName.MaximumLength + sizeof(UNICODE_NULL);
             lpType = supHeapAlloc(sz);
@@ -410,8 +413,7 @@ VOID FindDlgAddTypes(
                 SendMessage(hComboBox, CB_ADDSTRING, (WPARAM)0, (LPARAM)lpType);
                 supHeapFree(lpType);
             }
-            pObject = (POBJECT_TYPE_INFORMATION)((PCHAR)(pObject + 1) +
-                ALIGN_UP(pObject->TypeName.MaximumLength, sizeof(ULONG_PTR)));
+            pObject = OBJECT_TYPES_NEXT_ENTRY(pObject);
         }
         SendMessage(hComboBox, CB_ADDSTRING, (WPARAM)0, (LPARAM)L"*");
         SendMessage(hComboBox, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
@@ -462,7 +464,12 @@ VOID FindDlgCreate(
     if (FindDlgList) {
         bFindDlgSortInverse = FALSE;
         ListView_SetImageList(FindDlgList, g_ListViewImages, LVSIL_SMALL);
-        ListView_SetExtendedListViewStyle(FindDlgList, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
+
+        ListView_SetExtendedListViewStyle(
+            FindDlgList,
+            LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
+
+        SetWindowTheme(FindDlgList, TEXT("Explorer"), NULL);
 
         RtlSecureZeroMemory(&col, sizeof(col));
         col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
@@ -474,10 +481,11 @@ VOID FindDlgCreate(
         col.cx = 300;
         ListView_InsertColumn(FindDlgList, 1, &col);
 
+        col.iImage = I_IMAGENONE;
+
         col.iSubItem = 2;
         col.pszText = TEXT("Type");
         col.iOrder = 1;
-        col.iImage = -1;
         col.cx = 100;
         ListView_InsertColumn(FindDlgList, 2, &col);
     }

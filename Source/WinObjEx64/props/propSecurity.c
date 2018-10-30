@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPSECURITY.C
 *
-*  VERSION:     1.54
+*  VERSION:     1.60
 *
-*  DATE:        16 Aug 2018
+*  DATE:        24 Oct 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -31,21 +31,21 @@ BOOL propSecurityObjectSupported(
     _In_ INT nTypeIndex
 )
 {
-    if ((nTypeIndex != TYPE_FILE) &&
-        (nTypeIndex != TYPE_DIRECTORY) &&
-        (nTypeIndex != TYPE_DEVICE) &&
-        (nTypeIndex != TYPE_SECTION) &&
-        (nTypeIndex != TYPE_EVENT) &&
-        (nTypeIndex != TYPE_MUTANT) &&
-        (nTypeIndex != TYPE_DESKTOP) &&
-        (nTypeIndex != TYPE_KEY) &&
-        (nTypeIndex != TYPE_SEMAPHORE) &&
-        (nTypeIndex != TYPE_SYMLINK) &&
-        (nTypeIndex != TYPE_TIMER) &&
-        (nTypeIndex != TYPE_WINSTATION) &&
-        (nTypeIndex != TYPE_IOCOMPLETION) &&
-        (nTypeIndex != TYPE_JOB) &&
-        (nTypeIndex != TYPE_MEMORYPARTITION))
+    if ((nTypeIndex != ObjectTypeFile) &&
+        (nTypeIndex != ObjectTypeDirectory) &&
+        (nTypeIndex != ObjectTypeDevice) &&
+        (nTypeIndex != ObjectTypeSection) &&
+        (nTypeIndex != ObjectTypeEvent) &&
+        (nTypeIndex != ObjectTypeMutant) &&
+        (nTypeIndex != ObjectTypeDesktop) &&
+        (nTypeIndex != ObjectTypeKey) &&
+        (nTypeIndex != ObjectTypeSemaphore) &&
+        (nTypeIndex != ObjectTypeSymbolicLink) &&
+        (nTypeIndex != ObjectTypeTimer) &&
+        (nTypeIndex != ObjectTypeWinstation) &&
+        (nTypeIndex != ObjectTypeIoCompletion) &&
+        (nTypeIndex != ObjectTypeJob) &&
+        (nTypeIndex != ObjectTypeMemoryPartition))
     {
         return FALSE;
     }
@@ -68,73 +68,73 @@ PSI_ACCESS propGetAccessTable(
 
     switch (This->ObjectContext->TypeIndex) {
 
-    case TYPE_DIRECTORY:
+    case ObjectTypeDirectory:
         This->dwAccessMax = MAX_KNOWN_DIRECTORY_ACCESS_VALUE;
         AccessTable = (PSI_ACCESS)&DirectoryAccessValues;
         break;
 
-    case TYPE_FILE:
-    case TYPE_DEVICE:
+    case ObjectTypeFile:
+    case ObjectTypeDevice:
         This->dwAccessMax = MAX_KNOWN_FILE_ACCESS_VALUE;
         AccessTable = (PSI_ACCESS)&FileAccessValues;
         break;
 
-    case TYPE_SECTION:
+    case ObjectTypeSection:
         This->dwAccessMax = MAX_KNOWN_SECTION_ACCESS_VALUE;
         AccessTable = (PSI_ACCESS)&SectionAccessValues;
         break;
 
-    case TYPE_EVENT:
+    case ObjectTypeEvent:
         This->dwAccessMax = MAX_KNOWN_EVENT_ACCESS_VALUE;
         AccessTable = (PSI_ACCESS)&EventAccessValues;
         break;
 
-    case TYPE_MUTANT:
+    case ObjectTypeMutant:
         This->dwAccessMax = MAX_KNOWN_MUTANT_ACCESS_VALUE;
         AccessTable = (PSI_ACCESS)&MutantAccessValues;
         break;
 
-    case TYPE_DESKTOP:
+    case ObjectTypeDesktop:
         This->dwAccessMax = MAX_KNOWN_DESKTOP_ACCESS_VALUE;
         AccessTable = (PSI_ACCESS)&DesktopAccessValues;
         break;
 
-    case TYPE_WINSTATION:
+    case ObjectTypeWinstation:
         This->dwAccessMax = MAX_KNOWN_WINSTATION_ACCESS_VALUE;
         AccessTable = (PSI_ACCESS)&WinStationAccessValues;
         break;
 
-    case TYPE_KEY:
+    case ObjectTypeKey:
         This->dwAccessMax = MAX_KNOWN_KEY_ACCESS_VALUE;
         AccessTable = (PSI_ACCESS)&KeyAccessValues;
         break;
 
-    case TYPE_SEMAPHORE:
+    case ObjectTypeSemaphore:
         This->dwAccessMax = MAX_KNOWN_SEMAPHORE_ACCESS_VALUE;
         AccessTable = (PSI_ACCESS)&SemaphoreAccessValues;
         break;
 
-    case TYPE_SYMLINK:
+    case ObjectTypeSymbolicLink:
         This->dwAccessMax = MAX_KNOWN_SYMLINK_ACCESS_VALUE;
         AccessTable = (PSI_ACCESS)&SymlinkAccessValues;
         break;
 
-    case TYPE_TIMER:
+    case ObjectTypeTimer:
         This->dwAccessMax = MAX_KNOWN_TIMER_ACCESS_VALUE;
         AccessTable = (PSI_ACCESS)&TimerAccessValues;
         break;
 
-    case TYPE_JOB:
+    case ObjectTypeJob:
         This->dwAccessMax = MAX_KNOWN_JOB_ACCESS_VALUE;
         AccessTable = (PSI_ACCESS)&JobAccessValues;
         break;
 
-    case TYPE_IOCOMPLETION:
+    case ObjectTypeIoCompletion:
         This->dwAccessMax = MAX_KNOWN_IOCOMPLETION_ACCESS_VALUE;
         AccessTable = (PSI_ACCESS)&IoCompletionAccessValues;
         break;
 
-    case TYPE_MEMORYPARTITION:
+    case ObjectTypeMemoryPartition:
         This->dwAccessMax = MAX_KNOWN_MEMORYPARTITION_ACCESS_VALUE;
         AccessTable = (PSI_ACCESS)&MemoryPartitionAccessValues;
         break;
@@ -203,10 +203,10 @@ VOID propDefaultCloseObject(
 {
     if ((hObject != NULL) && (This->ObjectContext)) {
         switch (This->ObjectContext->TypeIndex) {
-        case TYPE_WINSTATION:
+        case ObjectTypeWinstation:
             CloseWindowStation(hObject);
             break;
-        case TYPE_DESKTOP:
+        case ObjectTypeDesktop:
             CloseDesktop(hObject);
             break;
         default:
@@ -505,7 +505,7 @@ HRESULT propSecurityConstructor(
         TypeAccessTable = propGetAccessTable(This);
 
         //allocate access table
-        Size = (MAX_KNOWN_GENERAL_ACCESS_VALUE + This->dwAccessMax) * sizeof(SI_ACCESS);
+        Size = (MAX_KNOWN_GENERAL_ACCESS_VALUE + (SIZE_T)This->dwAccessMax) * sizeof(SI_ACCESS);
         This->AccessTable = supHeapAlloc(Size);
         if (This->AccessTable == NULL) {
             hResult = HRESULT_FROM_WIN32(GetLastError());
@@ -517,8 +517,7 @@ HRESULT propSecurityConstructor(
             supCopyMemory(This->AccessTable,
                 Size,
                 TypeAccessTable,
-                (This->dwAccessMax * sizeof(SI_ACCESS))
-            );
+                (This->dwAccessMax * sizeof(SI_ACCESS)));
         }
 
         if (This->ValidAccessMask & DELETE) {
@@ -596,11 +595,12 @@ HPROPSHEETPAGE propSecurityCreatePage(
     if (psi == NULL)
         return NULL;
 
-    if (propSecurityConstructor(psi, 
+    if (S_OK != propSecurityConstructor(
+        psi, 
         Context,
         OpenObjectMethod, 
         CloseObjectMethod,
-        psiFlags) != S_OK)
+        psiFlags))
     {
         supHeapFree(psi);
         return NULL;

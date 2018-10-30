@@ -4,9 +4,9 @@
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.55
+*  VERSION:     1.60
 *
-*  DATE:        07 Sep 2018
+*  DATE:        24 Oct 2018
 *
 *  Common header file for the user interface.
 *
@@ -33,8 +33,12 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
     _In_ DWORD_PTR dwData
     );
 
-#define PROGRAM_VERSION         L"1.5.5"
+#define PROGRAM_VERSION         L"1.6.0"
+#ifdef _USE_OWN_DRIVER
+#define PROGRAM_NAME            L"Windows Object Explorer 64-bit (Non-public version)"
+#else 
 #define PROGRAM_NAME            L"Windows Object Explorer 64-bit"
+#endif
 #define PROFRAM_NAME_AND_TITLE  L"Object Explorer for Windows 7/8/8.1/10"
 #define MAINWINDOWCLASSNAME     L"WinObjEx64Class"
 
@@ -42,8 +46,10 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 #define T_PROPERTIES            L"Properties...\tEnter"
 #define T_GOTOLINKTARGET        L"Go To Link Target\tCtrl+->"
 #define T_RUNASADMIN            L"R&un as Administrator"
+#define T_RUNASSYSTEM           L"R&un as LocalSystem"
 #define T_COPYTEXTROW           L"Copy Row Selection"
 #define T_COPYVALUE             L"Copy Value Field Text"
+#define T_COPYADDINFO           L"Copy Additional Info Field Text"
 #define T_SAVETOFILE            L"Save list to File"
 #define T_DUMPDRIVER            L"Dump Driver"
 
@@ -57,8 +63,7 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 #define WOBJ_SSDTDLG_IDX        5
 #define WOBJ_DRVDLG_IDX         6
 
-#define MAX_ADDRESS_TEXT_LENGTH64 18 // 16 + 0x
-#define MAX_ADDRESS_TEXT_LENGTH32 10 // 8 + 0x
+#define MAX_TEXT_CONVERSION_ULONG64 32
 
 //
 // Global UI variables
@@ -71,6 +76,9 @@ HIMAGELIST g_ToolBarMenuImages;
 //
 // Treelist
 //
+
+HWND g_TreeList;
+ATOM g_TreeListAtom;
 
 typedef struct _TL_SUBITEMS_FIXED {
     ULONG       ColorFlags;
@@ -85,7 +93,16 @@ typedef struct _TL_SUBITEMS_FIXED {
 //
 
 //Variable typedefs
+
+typedef struct _PROP_NAMESPACE_INFO {
+    ULONG Reserved;
+    ULONG SizeOfBoundaryDescriptor;
+    OBJECT_BOUNDARY_DESCRIPTOR *BoundaryDescriptor;
+    ULONG_PTR ObjectAddress;
+} PROP_NAMESPACE_INFO, *PPROP_NAMESPACE_INFO;
+
 typedef struct _PROP_OBJECT_INFO {
+    BOOL IsPrivateNamespaceObject;
     BOOL IsType; //TRUE if selected object is object type
     INT TypeIndex;
     INT RealTypeIndex;//save index for type
@@ -93,9 +110,10 @@ typedef struct _PROP_OBJECT_INFO {
     LPWSTR lpObjectName;
     LPWSTR lpObjectType;
     LPWSTR lpCurrentObjectPath;
-    ULONG_PTR Tag;
     LPWSTR lpDescription; //description from main list (3rd column)
+    ULONG_PTR Tag;
     OBJINFO ObjectInfo; //object dump related structures
+    PROP_NAMESPACE_INFO NamespaceInfo;
 } PROP_OBJECT_INFO, *PPROP_OBJECT_INFO;
 
 typedef struct _VALUE_DESC {

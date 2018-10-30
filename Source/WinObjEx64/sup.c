@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.55
+*  VERSION:     1.60
 *
-*  DATE:        07 Sep 2018
+*  DATE:        29 Oct 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -15,7 +15,7 @@
 *
 *******************************************************************************/
 #include "global.h"
-#include "treelist.h"
+#include "treelist\treelist.h"
 #include "extras\extrasSSDT.h"
 #include <cfgmgr32.h>
 #include <setupapi.h>
@@ -81,12 +81,12 @@ PVOID supHeapAlloc(
         _strcat(szBuffer, L"\r\n");
         OutputDebugString(szBuffer);
     }
-    else {     
+    else {
         _strcpy(szBuffer, L"Allocate buffer with size=");
         u64tostr((ULONG_PTR)Size, _strend(szBuffer));
         _strcat(szBuffer, L"FAILED \r\n");
-        OutputDebugString(szBuffer);       
-    } 
+        OutputDebugString(szBuffer);
+    }
     return Buffer;
 }
 #endif
@@ -284,14 +284,15 @@ VOID supClipboardCopy(
 * Return object kernel address from handle in current process handle table.
 *
 */
+_Success_(return != FALSE)
 BOOL supQueryObjectFromHandle(
     _In_ HANDLE hOject,
     _Out_ ULONG_PTR *Address,
-    _Inout_opt_ USHORT *TypeIndex
+    _Out_opt_ USHORT *TypeIndex
 )
 {
     BOOL   bFound = FALSE;
-    ULONG  i;
+    ULONG_PTR i;
     DWORD  CurrentProcessId = GetCurrentProcessId();
 
     PSYSTEM_HANDLE_INFORMATION_EX pHandles;
@@ -300,25 +301,16 @@ BOOL supQueryObjectFromHandle(
         return bFound;
     }
 
-    *Address = 0;
-
     pHandles = (PSYSTEM_HANDLE_INFORMATION_EX)supGetSystemInfo(SystemExtendedHandleInformation);
     if (pHandles) {
         for (i = 0; i < pHandles->NumberOfHandles; i++) {
-            if (pHandles->Handles[i].UniqueProcessId == CurrentProcessId) {
-                if (pHandles->Handles[i].HandleValue == (USHORT)(ULONG_PTR)hOject) {
-                    if ((ULONG_PTR)pHandles->Handles[i].Object < g_kdctx.SystemRangeStart) {
-                        if (TypeIndex) {
-                            *TypeIndex = 0;
-                        }
+            if (pHandles->Handles[i].UniqueProcessId == (ULONG_PTR)CurrentProcessId) {
+                if (pHandles->Handles[i].HandleValue == (ULONG_PTR)hOject) {
+                    *Address = (ULONG_PTR)pHandles->Handles[i].Object;
+                    if (TypeIndex) {
+                        *TypeIndex = pHandles->Handles[i].ObjectTypeIndex;
                     }
-                    else {
-                        *Address = (ULONG_PTR)pHandles->Handles[i].Object;
-                        if (TypeIndex) {
-                            *TypeIndex = pHandles->Handles[i].ObjectTypeIndex;
-                        }
-                        bFound = TRUE;
-                    }
+                    bFound = TRUE;
                     break;
                 }
             }
@@ -390,7 +382,7 @@ BOOL supDumpSyscallTableConverted(
             if (ConvertedTable) {
                 *Table = ConvertedTable;
                 for (ServiceId = 0; ServiceId < Context->KiServiceLimit; ServiceId++) {
-                    ConvertedTable[ServiceId] = supxSyscallTableEntryToAddress(KiServiceTableDumped, 
+                    ConvertedTable[ServiceId] = supxSyscallTableEntryToAddress(KiServiceTableDumped,
                         ServiceId,
                         Context->KiServiceTableAddress);
                 }
@@ -415,17 +407,42 @@ BOOL supDumpSyscallTableConverted(
 *
 */
 VOID supShowHelp(
-    VOID
+    _In_ HWND ParentWindow
 )
 {
     DWORD   dwSize, dwType = 0;
     HKEY    hKey;
     LRESULT lRet;
     HANDLE  hHtmlOcx;
+    LPWSTR  s;
     WCHAR   szOcxPath[MAX_PATH + 1];
     WCHAR   szBuffer[MAX_PATH * 2];
+    WCHAR   szHelpFile[MAX_PATH * 2];
 
-    RtlSecureZeroMemory(&szOcxPath, sizeof(szOcxPath));
+    //
+    //  Check if CHM file exist and remember filename.
+    //
+    RtlSecureZeroMemory(szHelpFile, sizeof(szHelpFile));
+    if (!GetCurrentDirectory(MAX_PATH, szHelpFile)) {
+        return;
+    }
+    _strcat(szHelpFile, L"\\winobjex64.chm");
+
+    if (!PathFileExists(szHelpFile)) {
+        s = supHeapAlloc((MAX_PATH * 2) + (_strlen(szHelpFile) * sizeof(WCHAR)));
+        if (s) {
+            _strcpy(s, TEXT("Help file could not be found - "));
+            _strcat(s, szHelpFile);
+            MessageBox(ParentWindow, s, NULL, MB_ICONINFORMATION);
+            supHeapFree(s);
+        }
+        return;
+    }
+
+    //
+    // Query OCX path from registry.
+    //
+    RtlSecureZeroMemory(szOcxPath, sizeof(szOcxPath));
     RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
     lRet = RegOpenKeyEx(HKEY_CLASSES_ROOT, HHCTRLOCXKEY, 0, KEY_QUERY_VALUE, &hKey);
     if (lRet == ERROR_SUCCESS) {
@@ -447,12 +464,9 @@ VOID supShowHelp(
         _strcpy(szOcxPath, HHCTRLOCX);
     }
 
-    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-    if (!GetCurrentDirectory(MAX_PATH, szBuffer)) {
-        return;
-    }
-    _strcat(szBuffer, L"\\winobjex64.chm");
-
+    //
+    // Load OCX and call help.
+    //
     hHtmlOcx = GetModuleHandle(HHCTRLOCX);
     if (hHtmlOcx == NULL) {
         hHtmlOcx = LoadLibrary(szOcxPath);
@@ -466,7 +480,7 @@ VOID supShowHelp(
             return;
         }
     }
-    g_WinObj.HtmlHelpW(GetDesktopWindow(), szBuffer, 0, 0);
+    g_WinObj.HtmlHelpW(GetDesktopWindow(), szHelpFile, 0, 0);
 }
 
 /*
@@ -677,7 +691,7 @@ PVOID supGetObjectTypesInfo(
 {
     INT         c = 0;
     PVOID       Buffer = NULL;
-    ULONG       Size = 0x1000;
+    ULONG       Size = 0x2000;
     NTSTATUS    status;
     ULONG       memIO;
 
@@ -763,6 +777,35 @@ LPWSTR supGetItemText(
 }
 
 /*
+* supGetItemText2
+*
+* Purpose:
+*
+* Returns text from the given listview item.
+*
+*/
+LPWSTR supGetItemText2(
+    _In_ HWND ListView,
+    _In_ INT nItem,
+    _In_ INT nSubItem,
+    _In_ LPWSTR pszText,
+    _In_ UINT cbText
+)
+{
+    LV_ITEM item;
+
+    RtlSecureZeroMemory(&item, sizeof(item));
+
+    item.iItem = nItem;
+    item.iSubItem = nSubItem;
+    item.pszText = pszText;
+    item.cchTextMax = (SIZE_T)cbText;
+    SendMessage(ListView, LVM_GETITEMTEXT, (WPARAM)item.iItem, (LPARAM)&item);
+
+    return item.pszText;
+}
+
+/*
 * supLoadImageList
 *
 * Purpose:
@@ -780,7 +823,7 @@ HIMAGELIST supLoadImageList(
     HIMAGELIST list;
     HICON      hIcon;
 
-    list = ImageList_Create(16, 16, ILC_COLOR32 | ILC_MASK, TYPE_UNKNOWN, 8);
+    list = ImageList_Create(16, 16, ILC_COLOR32 | ILC_MASK, TYPE_LAST, 8);
     if (list) {
         for (i = FirstId; i <= LastId; i++) {
             hIcon = LoadImage(hInst, MAKEINTRESOURCE(i), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR);
@@ -810,93 +853,57 @@ UINT supGetObjectNameIndexByTypeIndex(
 {
     UINT   Index;
     ULONG  i;
-    BOOL   bFound = FALSE;
 
-    POBJECT_TYPE_INFORMATION   pObject;
-    POBJECT_TYPE_INFORMATION_8 pObject8;
+    POBJECT_TYPE_INFORMATION pObject;
+
+    union {
+        union {
+            POBJECT_TYPE_INFORMATION Object;
+            POBJECT_TYPE_INFORMATION_V2 ObjectV2;
+        } u1;
+        PBYTE Ref;
+    } ObjectTypeEntry;
 
     if (Object == NULL) {
-        return TYPE_UNKNOWN;
+        return ObjectTypeUnknown;
     }
 
     __try {
 
         Index = ObDecodeTypeIndex(Object, TypeIndex);
 
-        pObject = (POBJECT_TYPE_INFORMATION)&g_pObjectTypesInfo->TypeInformation;
-        for (i = 0; i < g_pObjectTypesInfo->NumberOfTypes; i++) {
+        if (g_kdctx.IsWine) {
+            pObject = OBJECT_TYPES_FIRST_ENTRY_WINE(g_pObjectTypesInfo);
+        }
+        else {
+            pObject = OBJECT_TYPES_FIRST_ENTRY(g_pObjectTypesInfo);
+        }
 
-            if (g_WinObj.osver.dwBuildNumber >= 9200) {
-                pObject8 = (POBJECT_TYPE_INFORMATION_8)pObject;
-                if (pObject8->TypeIndex == Index) {
-                    bFound = TRUE;
+        for (i = 0; i < g_pObjectTypesInfo->NumberOfTypes; i++) {
+            if (g_NtBuildNumber >= 9200) {
+                ObjectTypeEntry.Ref = (PBYTE)pObject;
+                if (ObjectTypeEntry.u1.ObjectV2->TypeIndex == Index) {
+                    
+                    return ObManagerGetIndexByTypeName(
+                        pObject->TypeName.Buffer);
+                
                 }
             }
             else {
                 if (i + 2 == Index) {
-                    bFound = TRUE;
+                    
+                    return ObManagerGetIndexByTypeName(
+                        pObject->TypeName.Buffer);
+
                 }
             }
-
-            if (bFound) {
-                return supGetObjectIndexByTypeName(pObject->TypeName.Buffer);
-            }
-
-            pObject = (POBJECT_TYPE_INFORMATION)((PCHAR)(pObject + 1) +
-                ALIGN_UP(pObject->TypeName.MaximumLength, sizeof(ULONG_PTR)));
+            pObject = OBJECT_TYPES_NEXT_ENTRY(pObject);
         }
-
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {
-        return TYPE_UNKNOWN;
+        return ObjectTypeUnknown;
     }
-    return TYPE_UNKNOWN;
-}
-
-/*
-* supGetObjectIndexByTypeName
-*
-* Purpose:
-*
-* Returns object index of known type.
-*
-* Known type names listed in objects.c, objects.h
-*
-*/
-UINT supGetObjectIndexByTypeName(
-    _In_ LPCWSTR lpTypeName
-)
-{
-    UINT nIndex;
-
-    if (lpTypeName == NULL) {
-        return TYPE_UNKNOWN;
-    }
-
-    for (nIndex = TYPE_DEVICE; nIndex < TYPE_UNKNOWN; nIndex++) {
-        if (_strcmpi(lpTypeName, g_lpObjectNames[nIndex]) == 0)
-            return nIndex;
-    }
-
-    //
-    // In Win8 the following Win32k object was named 
-    // CompositionSurface, in Win8.1 MS renamed it to
-    // Composition, handle this.
-    //
-    if (_strcmpi(lpTypeName, L"CompositionSurface") == 0) {
-        return TYPE_COMPOSITION;
-    }
-
-    //
-    // In Win10 TH1 the following ntos object was named 
-    // NetworkNamespace, later in Win10 updates MS renamed it to
-    // NdisCmState, handle this.
-    //
-/*    if (_strcmpi(lpTypeName, L"NetworkNamespace") == 0) {
-        return TYPE_NDISCMSTATE;
-    }*/
-
-    return TYPE_UNKNOWN;
+    return ObjectTypeUnknown;
 }
 
 /*
@@ -954,7 +961,6 @@ VOID supShowProperties(
     shinfo.nShow = SW_SHOWNORMAL;
     ShellExecuteEx(&shinfo);
 }
-
 
 /*
 * supUserIsFullAdmin
@@ -1045,7 +1051,7 @@ BOOL supxIsSymlink(
     WCHAR ItemText[MAX_PATH + 1];
     RtlSecureZeroMemory(ItemText, sizeof(ItemText));
     ListView_GetItemText(hwndList, iItem, 1, ItemText, MAX_PATH);
-    return (_strcmpi(ItemText, g_lpObjectNames[TYPE_SYMLINK]) == 0);
+    return (_strcmpi(ItemText, g_ObjectTypes[ObjectTypeSymbolicLink].Name) == 0);
 }
 
 /*
@@ -1246,63 +1252,6 @@ BOOL supxQueryKnownDllsLink(
 }
 
 /*
-* supxMapNtdllCopy
-*
-* Purpose:
-*
-* Load copy of ntdll from disk as image.
-*
-*/
-VOID supxMapNtdllCopy(
-    VOID
-)
-{
-    HANDLE              hFile = NULL, hSection = NULL;
-    PVOID               DllBase;
-    SIZE_T              DllVirtualSize;
-    NTSTATUS            status;
-    OBJECT_ATTRIBUTES   attr;
-    UNICODE_STRING      usFileName;
-    IO_STATUS_BLOCK     iosb;
-
-    WCHAR  szDllPath[MAX_PATH * 2];
-
-    RtlSecureZeroMemory(szDllPath, sizeof(szDllPath));
-    _strcpy(szDllPath, TEXT("\\??\\"));
-    _strcat(szDllPath, g_WinObj.szSystemDirectory);
-    _strcat(szDllPath, TEXT("\\ntdll.dll"));
-
-    RtlInitUnicodeString(&usFileName, szDllPath);
-
-    InitializeObjectAttributes(&attr, &usFileName,
-        OBJ_CASE_INSENSITIVE, NULL, NULL);
-
-    status = NtCreateFile(&hFile, SYNCHRONIZE | FILE_READ_DATA,
-        &attr, &iosb, NULL, 0, FILE_SHARE_READ, FILE_OPEN,
-        FILE_SYNCHRONOUS_IO_NONALERT, NULL, 0);
-
-    if (NT_SUCCESS(status)) {
-
-        status = NtCreateSection(&hSection, SECTION_ALL_ACCESS, NULL,
-            NULL, PAGE_READONLY, SEC_IMAGE, hFile);
-
-        if (NT_SUCCESS(status)) {
-
-            DllBase = NULL;
-            DllVirtualSize = 0;
-            status = NtMapViewOfSection(hSection, NtCurrentProcess(), &DllBase,
-                0, 0, NULL, &DllVirtualSize, ViewUnmap, 0, PAGE_READONLY);
-            
-            if (NT_SUCCESS(status)) {
-                g_WinObj.hNtdllModule = DllBase;
-            }
-            NtClose(hSection);
-        }
-        NtClose(hFile);
-    }
-}
-
-/*
 * supInit
 *
 * Purpose:
@@ -1313,8 +1262,7 @@ VOID supxMapNtdllCopy(
 *
 */
 VOID supInit(
-    _In_ BOOL IsFullAdmin,
-    _In_ BOOL IsWine
+    _In_ BOOL IsFullAdmin
 )
 {
     supQueryKnownDlls();
@@ -1322,24 +1270,10 @@ VOID supInit(
 
     if (IsFullAdmin) {
         supCreateSCMSnapshot();
-        supxMapNtdllCopy();
     }
 
     sapiCreateSetupDBSnapshot();
-    
-    //
-    // Quick Wine Staging fix. 
-    // Under usual Wine NtQueryObject(ObjectTypesInformation) is not implemented.
-    // We are okay with that.
-    // But under Wine Staging this piece of code is implemented and it is broken.
-    // So generally ban this call from Wine.
-    //
-    if (IsWine) {
-        g_pObjectTypesInfo = NULL;
-    }
-    else {
-        g_pObjectTypesInfo = supGetObjectTypesInfo();
-    }
+    g_pObjectTypesInfo = supGetObjectTypesInfo();
 
     ExApiSetInit();
 }
@@ -1367,9 +1301,6 @@ VOID supShutdown(
     if (g_lpKnownDlls32) supHeapFree(g_lpKnownDlls32);
     if (g_lpKnownDlls64) supHeapFree(g_lpKnownDlls64);
     if (g_SdtTable) supHeapFree(g_SdtTable);
-    if (g_WinObj.hNtdllModule) {
-        NtUnmapViewOfSection(NtCurrentProcess(), g_WinObj.hNtdllModule);
-    }
 }
 
 /*
@@ -1505,21 +1436,114 @@ BOOL supQueryProcessName(
     _In_ DWORD ccBuffer //size of buffer in chars
 )
 {
-    PSYSTEM_PROCESSES_INFORMATION pList = ProcessList;
+    ULONG NextEntryDelta = 0;
+    union {
+        PSYSTEM_PROCESSES_INFORMATION Processes;
+        PBYTE ListRef;
+    } List;
 
-    if ((ProcessList == NULL) || (Buffer == NULL) || (ccBuffer == 0))
-        return FALSE;
+    List.ListRef = ProcessList;
 
-    for (;;) {
-        if ((ULONG_PTR)pList->UniqueProcessId == dwProcessId) {
-            _strncpy(Buffer, ccBuffer, pList->ImageName.Buffer, pList->ImageName.Length / sizeof(WCHAR));
+    do {
+
+        List.ListRef += NextEntryDelta;
+
+        if ((ULONG_PTR)List.Processes->UniqueProcessId == dwProcessId) {
+
+            _strncpy(
+                Buffer,
+                ccBuffer,
+                List.Processes->ImageName.Buffer,
+                List.Processes->ImageName.Length / sizeof(WCHAR));
+
             return TRUE;
         }
-        if (pList->NextEntryDelta == 0)
-            break;
-        pList = (PSYSTEM_PROCESSES_INFORMATION)(((LPBYTE)pList) + pList->NextEntryDelta);
-    }
+
+        NextEntryDelta = List.Processes->NextEntryDelta;
+
+    } while (NextEntryDelta);
+
     return FALSE;
+}
+
+/*
+* supQueryProcessNameByEPROCESS
+*
+* Purpose:
+*
+* Lookups process name by given process object address.
+*
+* If nothing found return FALSE.
+*
+*/
+BOOL supQueryProcessNameByEPROCESS(
+    _In_ ULONG_PTR ValueOfEPROCESS,
+    _In_ PVOID ProcessList,
+    _Inout_ LPWSTR Buffer,
+    _In_ DWORD ccBuffer //size of buffer in chars
+)
+{
+    BOOL bFound = FALSE;
+    ULONG NextEntryDelta = 0;
+    ULONG_PTR ObjectAddress = 0;
+    HANDLE hProcess = NULL;
+    union {
+        PSYSTEM_PROCESSES_INFORMATION Processes;
+        PBYTE ListRef;
+    } List;
+
+    OBJECT_ATTRIBUTES obja = RTL_INIT_OBJECT_ATTRIBUTES(NULL, 0);
+
+    List.ListRef = ProcessList;
+
+
+    do {
+        List.ListRef += NextEntryDelta;
+
+        if (List.Processes->ThreadCount) {
+
+            //
+            // Bruteforce process list (could be slow).
+            //
+            //  1. Open each process.
+            //  2. Find exact handle object value for process.
+            //  3. Compare with object value we are looking for.
+            //
+            if (NT_SUCCESS(NtOpenProcess(
+                &hProcess,
+                PROCESS_QUERY_LIMITED_INFORMATION,
+                &obja,
+                &List.Processes->Threads[0].ClientId)))
+            {
+
+                if (supQueryObjectFromHandle(
+                    hProcess,
+                    &ObjectAddress,
+                    NULL))
+                {
+                    if (ObjectAddress == ValueOfEPROCESS) {
+                        _strncpy(
+                            Buffer,
+                            ccBuffer,
+                            List.Processes->ImageName.Buffer,
+                            List.Processes->ImageName.Length / sizeof(WCHAR));
+
+                        bFound = TRUE;
+                    }
+                }
+
+                NtClose(hProcess);
+            }
+        }
+
+        if (bFound)
+            break;
+
+        NextEntryDelta = List.Processes->NextEntryDelta;
+
+    } while (NextEntryDelta);
+
+    return bFound;
 }
 
 /*
@@ -1556,15 +1580,16 @@ BOOL supCreateSCMSnapshot(
         if (Services == NULL)
             break;
 
-        bResult = EnumServicesStatusEx(schSCManager, 
-            SC_ENUM_PROCESS_INFO, 
+        bResult = EnumServicesStatusEx(
+            schSCManager,
+            SC_ENUM_PROCESS_INFO,
             SERVICE_DRIVER,
-            SERVICE_STATE_ALL, 
-            Services, 
-            dwSize, 
-            &dwBytesNeeded, 
-            &dwServicesReturned, 
-            NULL, 
+            SERVICE_STATE_ALL,
+            Services,
+            dwSize,
+            &dwBytesNeeded,
+            &dwServicesReturned,
+            NULL,
             NULL);
 
         if (bResult == FALSE) {
@@ -1581,18 +1606,19 @@ BOOL supCreateSCMSnapshot(
                 if (Services == NULL)
                     break;
 
-                bResult = EnumServicesStatusEx(schSCManager, 
-                    SC_ENUM_PROCESS_INFO, 
+                bResult = EnumServicesStatusEx(
+                    schSCManager,
+                    SC_ENUM_PROCESS_INFO,
                     SERVICE_DRIVER,
-                    SERVICE_STATE_ALL, 
-                    Services, 
-                    dwSize, 
-                    &dwBytesNeeded, 
-                    &dwServicesReturned, 
-                    NULL, 
+                    SERVICE_STATE_ALL,
+                    Services,
+                    dwSize,
+                    &dwBytesNeeded,
+                    &dwServicesReturned,
+                    NULL,
                     NULL);
 
-                if (!bResult){
+                if (!bResult) {
                     supVirtualFree(Services);
                     Services = NULL;
                     dwServicesReturned = 0;
@@ -2055,9 +2081,14 @@ BOOL supQueryTypeInfo(
 
     __try {
 
-        pObject = (POBJECT_TYPE_INFORMATION)&g_pObjectTypesInfo->TypeInformation;
-        for (i = 0; i < g_pObjectTypesInfo->NumberOfTypes; i++) {
+        if (g_kdctx.IsWine) {
+            pObject = OBJECT_TYPES_FIRST_ENTRY_WINE(g_pObjectTypesInfo);
+        }
+        else {
+            pObject = OBJECT_TYPES_FIRST_ENTRY(g_pObjectTypesInfo);
+        }
 
+        for (i = 0; i < g_pObjectTypesInfo->NumberOfTypes; i++) {
             if (_strncmpi(pObject->TypeName.Buffer,
                 lpTypeName,
                 pObject->TypeName.Length / sizeof(WCHAR)) == 0)
@@ -2075,13 +2106,10 @@ BOOL supQueryTypeInfo(
                     }
                 }
                 bResult = TRUE;
-            }
-            if (bResult) {
                 break;
             }
-            //next entry located after the aligned type name buffer
-            pObject = (POBJECT_TYPE_INFORMATION)((PCHAR)(pObject + 1) +
-                ALIGN_UP(pObject->TypeName.MaximumLength, sizeof(ULONG_PTR)));
+
+            pObject = OBJECT_TYPES_NEXT_ENTRY(pObject);
         }
 
     }
@@ -2118,7 +2146,7 @@ BOOL supQueryDeviceDescription(
     if ((ccBuffer < MAX_PATH) || (Buffer == NULL)) {
         SetLastError(ERROR_INSUFFICIENT_BUFFER);
         return bResult;
-    }  
+    }
 
     //
     // Build full device path.
@@ -2147,12 +2175,12 @@ BOOL supQueryDeviceDescription(
             if (Item->lpDeviceName != NULL) {
                 if (_strcmpi(lpFullDeviceName, Item->lpDeviceName) == 0) {
                     if (Item->lpDeviceDesc != NULL) {
-                        
-                        _strncpy(Buffer, 
-                            ccBuffer, 
-                            Item->lpDeviceDesc, 
-                            _strlen(Item->lpDeviceDesc)
-                        );
+
+                        _strncpy(
+                            Buffer,
+                            ccBuffer,
+                            Item->lpDeviceDesc,
+                            _strlen(Item->lpDeviceDesc));
 
                     }
                     bResult = TRUE;
@@ -2477,7 +2505,7 @@ HANDLE supOpenDirectory(
 
     RtlInitUnicodeString(&ustr, lpDirectory);
     InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
-   
+
     if (!NT_SUCCESS(NtOpenDirectoryObject(
         &hDirectory,
         DIRECTORY_QUERY,
@@ -2752,11 +2780,12 @@ BOOL supIsProcess32bit(
 
     RtlSecureZeroMemory(&pebi, sizeof(pebi));
     pebi.Size = sizeof(PROCESS_EXTENDED_BASIC_INFORMATION);
-    
-    status = NtQueryInformationProcess(hProcess, 
+
+    status = NtQueryInformationProcess(
+        hProcess,
         ProcessBasicInformation,
-        &pebi, 
-        sizeof(pebi), 
+        &pebi,
+        sizeof(pebi),
         &returnLength);
 
     if (NT_SUCCESS(status)) {
@@ -2781,9 +2810,10 @@ ULONG_PTR supQuerySystemRangeStart(
     ULONG_PTR SystemRangeStart = 0;
     ULONG     memIO = 0;
 
-    status = NtQuerySystemInformation(SystemRangeStartInformation, 
-        (PVOID)&SystemRangeStart, 
-        sizeof(ULONG_PTR), 
+    status = NtQuerySystemInformation(
+        SystemRangeStartInformation,
+        (PVOID)&SystemRangeStart,
+        sizeof(ULONG_PTR),
         &memIO);
 
     if (!NT_SUCCESS(status)) {
@@ -2942,51 +2972,6 @@ BOOL supIsWine(
     return FALSE;
 }
 
-typedef union {
-    WCHAR Name[sizeof(DWORD) / sizeof(WCHAR)];
-    DWORD Alignment;
-} DWORDALIGNEDNAME;
-
-const DWORDALIGNEDNAME AddressNamePrefixLowCase = { L'0', L'x' };
-const DWORDALIGNEDNAME AddressNamePrefixUpCase = { L'0', L'X' };
-const UNICODE_STRING AddressNameLowCase = {
-    sizeof(AddressNamePrefixLowCase),
-    sizeof(AddressNamePrefixLowCase),
-    (PWSTR)&AddressNamePrefixLowCase
-};
-const UNICODE_STRING AddressNameUpCase = {
-    sizeof(AddressNamePrefixUpCase),
-    sizeof(AddressNamePrefixUpCase),
-    (PWSTR)&AddressNamePrefixUpCase
-};
-
-/*
-* supIsAddressPrefix
-*
-* Purpose:
-*
-* Return offset to Address name in case if given lpName is in Address Prefix Format.
-*
-*/
-USHORT supIsAddressPrefix(
-    _In_ LPWSTR lpName,
-    _In_ SIZE_T cbName
-)
-{
-    if ((cbName >= AddressNameLowCase.Length) &&
-        (*(PDWORD)(lpName) == AddressNamePrefixLowCase.Alignment))
-    {
-        return AddressNameLowCase.Length / sizeof(WCHAR);
-    }
-    if ((cbName >= AddressNameUpCase.Length) &&
-        (*(PDWORD)(lpName) == AddressNamePrefixUpCase.Alignment))
-    {
-        return AddressNameUpCase.Length / sizeof(WCHAR);
-    }
-
-    return 0;
-}
-
 /*
 * supQuerySecureBootState
 *
@@ -3012,7 +2997,8 @@ BOOL supQuerySecureBootState(
 
         bSecureBoot = FALSE;
 
-        returnLength = GetFirmwareEnvironmentVariable(L"SecureBoot",
+        returnLength = GetFirmwareEnvironmentVariable(
+            L"SecureBoot",
             L"{8be4df61-93ca-11d2-aa0d-00e098032b8c}",
             &bSecureBoot,
             sizeof(BOOLEAN));
@@ -3138,7 +3124,7 @@ BOOL supQueryObjectTrustLabel(
     _Out_ PULONG ProtectionType,
     _Out_ PULONG ProtectionLevel)
 {
-    BOOL                            bCond = FALSE, bResult = FALSE;   
+    BOOL                            bCond = FALSE, bResult = FALSE;
     BOOLEAN                         saclPresent = FALSE, saclDefaulted = FALSE;
     ULONG                           i, Length = 0, returnLength = 0;
 
@@ -3187,9 +3173,9 @@ BOOL supQueryObjectTrustLabel(
         //
         // Query SACL from SD.
         //
-        if (!NT_SUCCESS(RtlGetSaclSecurityDescriptor(pSD, 
-            &saclPresent, 
-            &sacl, 
+        if (!NT_SUCCESS(RtlGetSaclSecurityDescriptor(pSD,
+            &saclPresent,
+            &sacl,
             &saclDefaulted))) break;
 
         if (!sacl)
@@ -3198,9 +3184,9 @@ BOOL supQueryObjectTrustLabel(
         //
         // Query SACL size.
         //
-        if (!NT_SUCCESS(RtlQueryInformationAcl(sacl, 
-            &aclSize, 
-            sizeof(aclSize), 
+        if (!NT_SUCCESS(RtlQueryInformationAcl(sacl,
+            &aclSize,
+            sizeof(aclSize),
             AclSizeInformation))) break;
 
         //
@@ -3224,4 +3210,662 @@ BOOL supQueryObjectTrustLabel(
     if (pSD) supHeapFree(pSD);
 
     return bResult;
+}
+
+/*
+* supIsLocalSystem
+*
+* Purpose:
+*
+* pbResult will be set to TRUE if current account is run by system user, FALSE otherwise.
+*
+* Function return operation status code.
+*
+*/
+NTSTATUS supIsLocalSystem(
+    _In_ HANDLE hToken,
+    _Out_ PBOOL pbResult)
+{
+    BOOL                            bResult = FALSE;
+
+    NTSTATUS                        status = STATUS_UNSUCCESSFUL;
+    HANDLE                          ProcessHeap = NtCurrentPeb()->ProcessHeap;
+
+    ULONG                           LengthNeeded = 0;
+
+    PSID                            SystemSid = NULL;
+    PTOKEN_USER                     ptu = NULL;
+    SID_IDENTIFIER_AUTHORITY        NtAuth = SECURITY_NT_AUTHORITY;
+
+    status = NtQueryInformationToken(
+        hToken,
+        TokenUser,
+        NULL,
+        0,
+        &LengthNeeded);
+
+    if (status == STATUS_BUFFER_TOO_SMALL) {
+
+        ptu = (PTOKEN_USER)RtlAllocateHeap(
+            ProcessHeap,
+            HEAP_ZERO_MEMORY,
+            LengthNeeded);
+
+        if (ptu) {
+
+            status = NtQueryInformationToken(
+                hToken,
+                TokenUser,
+                ptu,
+                LengthNeeded,
+                &LengthNeeded);
+
+            if (NT_SUCCESS(status)) {
+
+                status = RtlAllocateAndInitializeSid(
+                    &NtAuth,
+                    1,
+                    SECURITY_LOCAL_SYSTEM_RID,
+                    0, 0, 0, 0, 0, 0, 0,
+                    &SystemSid);
+
+                if (NT_SUCCESS(status)) {
+                    bResult = RtlEqualSid(ptu->User.Sid, SystemSid);
+                    RtlFreeSid(SystemSid);
+                }
+
+            }
+            RtlFreeHeap(ProcessHeap, 0, ptu);
+        }
+        else {
+            status = STATUS_INSUFFICIENT_RESOURCES;
+        }
+    } //STATUS_BUFFER_TOO_SMALL
+
+    if (pbResult)
+        *pbResult = bResult;
+
+    return status;
+}
+
+/*
+* supxGetSystemToken
+*
+* Purpose:
+*
+* Find NT AUTHORITY\System process and duplicate it token.
+*
+*/
+HANDLE supxGetSystemToken(
+    PVOID ProcessList)
+{
+    BOOL bSystemToken = FALSE;
+    ULONG NextEntryDelta = 0;
+    HANDLE hObject = NULL;
+    HANDLE hToken = NULL;
+
+    OBJECT_ATTRIBUTES obja;
+
+    union {
+        PSYSTEM_PROCESSES_INFORMATION Processes;
+        PBYTE ListRef;
+    } List;
+
+    List.ListRef = ProcessList;
+
+    InitializeObjectAttributes(&obja, NULL, 0, NULL, NULL);
+
+    do {
+
+        List.ListRef += NextEntryDelta;
+
+        if (List.Processes->ThreadCount &&
+            List.Processes->InheritedFromUniqueProcessId)
+        {
+            if (NT_SUCCESS(NtOpenProcess(
+                &hObject,
+                PROCESS_QUERY_INFORMATION,
+                &obja,
+                &List.Processes->Threads[0].ClientId)))
+            {
+
+                if (NT_SUCCESS(NtOpenProcessToken(
+                    hObject,
+                    TOKEN_DUPLICATE | TOKEN_ASSIGN_PRIMARY | TOKEN_IMPERSONATE | TOKEN_QUERY,
+                    &hToken)))
+                {
+                    if (NT_SUCCESS(supIsLocalSystem(hToken, &bSystemToken))) {
+                        if (bSystemToken) {
+                            NtClose(hObject);
+                            return hToken;
+                        }
+                    }
+                    NtClose(hToken);
+                }
+
+                NtClose(hObject);
+            }
+        }
+
+        NextEntryDelta = List.Processes->NextEntryDelta;
+
+    } while (NextEntryDelta);
+
+
+    return NULL;
+}
+
+/*
+* supRunAsLocalSystem
+*
+* Purpose:
+*
+* Restart WinObjEx64 in local system account.
+*
+* Note: Elevated instance required.
+*
+*/
+BOOL supRunAsLocalSystem(
+    _In_ HWND hwndParent)
+{
+    BOOL bCond = FALSE, bSuccess = FALSE;
+    PVOID ProcessList;
+    ULONG SessionId = NtCurrentPeb()->SessionId;
+
+    HANDLE hSystemToken, hPrimaryToken = NULL, hImpersonationToken = NULL;
+
+    BOOLEAN bThreadImpersonated = FALSE;
+
+    PROCESS_INFORMATION pi;
+    STARTUPINFO si;
+
+    SECURITY_QUALITY_OF_SERVICE sqos;
+    OBJECT_ATTRIBUTES obja;
+    TOKEN_PRIVILEGES *TokenPrivileges;
+
+    WCHAR szApplication[MAX_PATH * 2];
+
+    //
+    // Remember our application name.
+    //
+    RtlSecureZeroMemory(szApplication, sizeof(szApplication));
+    GetModuleFileName(NULL, szApplication, MAX_PATH);
+
+    sqos.Length = sizeof(sqos);
+    sqos.ImpersonationLevel = SecurityImpersonation;
+    sqos.ContextTrackingMode = SECURITY_DYNAMIC_TRACKING;
+    sqos.EffectiveOnly = FALSE;
+    InitializeObjectAttributes(&obja, NULL, 0, NULL, NULL);
+    obja.SecurityQualityOfService = &sqos;
+
+    ProcessList = supGetSystemInfo(SystemProcessInformation);
+    if (ProcessList == NULL)
+        return FALSE;
+
+    supEnablePrivilege(SE_DEBUG_PRIVILEGE, TRUE);
+
+    //
+    // Get LocalSystem token.
+    //
+    hSystemToken = supxGetSystemToken(ProcessList);
+
+    supHeapFree(ProcessList);
+
+    do {
+
+        if (hSystemToken == NULL) {
+            
+            MessageBox(
+                hwndParent, 
+                TEXT("No suitable system token found. Make sure you are running as administrator"),
+                PROGRAM_NAME, 
+                MB_ICONINFORMATION);
+            
+            break;
+        }
+
+        //
+        // Duplicate as impersonation token.
+        //
+        if (!NT_SUCCESS(NtDuplicateToken(
+            hSystemToken,
+            TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_QUERY |
+            TOKEN_ASSIGN_PRIMARY | TOKEN_ADJUST_PRIVILEGES,
+            &obja,
+            FALSE,
+            TokenImpersonation,
+            &hImpersonationToken)))
+        {
+            break;
+        }
+
+        //
+        // Duplicate as primary token.
+        //
+        if (!NT_SUCCESS(NtDuplicateToken(
+            hSystemToken,
+            TOKEN_ALL_ACCESS,
+            &obja,
+            FALSE,
+            TokenPrimary,
+            &hPrimaryToken)))
+        {
+            break;
+        }
+
+        //
+        // Impersonate system token.
+        //
+        if (!NT_SUCCESS(NtSetInformationThread(
+            NtCurrentThread(),
+            ThreadImpersonationToken,
+            &hImpersonationToken,
+            sizeof(HANDLE))))
+        {
+            break;
+        }
+
+        bThreadImpersonated = TRUE;
+
+        //
+        // Turn on AssignPrimaryToken privilege in impersonated token.
+        //
+        TokenPrivileges = _alloca(sizeof(TOKEN_PRIVILEGES) + (1 * sizeof(LUID_AND_ATTRIBUTES)));
+
+        TokenPrivileges->PrivilegeCount = 1;
+        TokenPrivileges->Privileges[0].Luid.LowPart = SE_ASSIGNPRIMARYTOKEN_PRIVILEGE;
+        TokenPrivileges->Privileges[0].Luid.HighPart = 0;
+        TokenPrivileges->Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+        if (!NT_SUCCESS(NtAdjustPrivilegesToken(
+            hImpersonationToken,
+            FALSE,
+            TokenPrivileges,
+            0,
+            NULL,
+            NULL)))
+        {
+            break;
+        }
+
+        //
+        // Set session id to primary token.
+        //
+        if (!NT_SUCCESS(NtSetInformationToken(
+            hPrimaryToken,
+            TokenSessionId,
+            &SessionId,
+            sizeof(ULONG))))
+        {
+            break;
+        }
+
+        si.cb = sizeof(si);
+        GetStartupInfo(&si);
+
+        si.dwFlags = STARTF_USESHOWWINDOW;
+        si.wShowWindow = SW_SHOWNORMAL;
+
+        //
+        // Run new instance with prepared primary token.
+        //
+        bSuccess = CreateProcessAsUser(
+            hPrimaryToken,
+            szApplication,
+            NULL,
+            NULL,
+            NULL,
+            FALSE,
+            CREATE_DEFAULT_ERROR_MODE,
+            NULL,
+            NULL,
+            &si,
+            &pi);
+
+        if (bSuccess) {
+            CloseHandle(pi.hProcess);
+            CloseHandle(pi.hThread);
+        }
+
+    } while (bCond);
+
+    if (hImpersonationToken) {
+        NtClose(hImpersonationToken);
+    }
+
+    //
+    // Revert To Self.
+    //
+    if (bThreadImpersonated) {
+        hImpersonationToken = NULL;
+        NtSetInformationThread(
+            NtCurrentThread(),
+            ThreadImpersonationToken,
+            (PVOID)&hImpersonationToken,
+            sizeof(HANDLE));
+    }
+
+    if (hPrimaryToken) NtClose(hPrimaryToken);
+    if (hSystemToken) NtClose(hSystemToken);
+
+    //
+    // Quit.
+    //
+    if (bSuccess)
+        PostQuitMessage(0);
+
+    return bSuccess;
+}
+
+/*
+* supGetCurrentProcessToken
+*
+* Purpose:
+*
+* Restart WinObjEx64 in local system account.
+*
+*/
+HANDLE supGetCurrentProcessToken(
+    VOID)
+{
+    HANDLE hToken = NULL;
+
+    if (NT_SUCCESS(NtOpenProcessToken(
+        NtCurrentProcess(),
+        TOKEN_QUERY,
+        &hToken)))
+    {
+        return hToken;
+    }
+    return NULL;
+}
+
+/*
+* supLookupImageSectionByName
+*
+* Purpose:
+*
+* Lookup section pointer and size for section name.
+*
+*/
+PVOID supLookupImageSectionByName(
+    _In_ CHAR* SectionName,
+    _In_ ULONG SectionNameLength,
+    _In_ PVOID DllBase,
+    _Out_ PULONG SectionSize
+)
+{
+    BOOLEAN bFound = FALSE;
+    ULONG i;
+    PVOID Section;
+    IMAGE_NT_HEADERS *NtHeaders = RtlImageNtHeader(DllBase);
+    IMAGE_SECTION_HEADER *SectionTableEntry;
+
+    if (SectionSize)
+        *SectionSize = 0;
+
+    SectionTableEntry = (PIMAGE_SECTION_HEADER)((PCHAR)NtHeaders +
+        sizeof(ULONG) +
+        sizeof(IMAGE_FILE_HEADER) +
+        NtHeaders->FileHeader.SizeOfOptionalHeader);
+
+    //
+    // Locate section.
+    //
+    i = NtHeaders->FileHeader.NumberOfSections;
+    while (i > 0) {
+        
+        if (_strncmp_a(
+            (CHAR*)SectionTableEntry->Name, 
+            SectionName, 
+            SectionNameLength) == 0)
+        {
+            bFound = TRUE;
+            break;
+        }
+
+        i -= 1;
+        SectionTableEntry += 1;
+    }
+
+    //
+    // Section not found, abort scan.
+    //
+    if (!bFound)
+        return NULL;
+
+    Section = (PVOID)((ULONG_PTR)DllBase + SectionTableEntry->VirtualAddress);
+    if (SectionSize)
+        *SectionSize = SectionTableEntry->Misc.VirtualSize;
+
+    return Section;
+}
+
+/*
+* supFindPattern
+*
+* Purpose:
+*
+* Lookup pattern in buffer.
+*
+*/
+PVOID supFindPattern(
+    _In_ CONST PBYTE Buffer,
+    _In_ SIZE_T BufferSize,
+    _In_ CONST PBYTE Pattern,
+    _In_ SIZE_T PatternSize
+)
+{
+    PBYTE	p = Buffer;
+
+    if (PatternSize == 0)
+        return NULL;
+    if (BufferSize < PatternSize)
+        return NULL;
+    BufferSize -= PatternSize;
+
+    do {
+        p = memchr(p, Pattern[0], BufferSize - (p - Buffer));
+        if (p == NULL)
+            break;
+
+        if (memcmp(p, Pattern, PatternSize) == 0)
+            return p;
+
+        p++;
+    } while (BufferSize - (p - Buffer) > 0); //-V555
+
+    return NULL;
+}
+
+/*
+* supUpdateLvColumnHeaderImage
+*
+* Purpose:
+*
+* Set new image for selected column and reset for all the rest.
+*
+*/
+VOID supUpdateLvColumnHeaderImage(
+    _In_ HWND ListView,
+    _In_ INT NumberOfColumns,
+    _In_ INT UpdateColumn,
+    _In_ INT ImageIndex
+)
+{
+    INT i;
+    LVCOLUMN col;
+
+    RtlSecureZeroMemory(&col, sizeof(col));
+    col.mask = LVCF_IMAGE;
+
+    for (i = 0; i < NumberOfColumns; i++) {
+        if (i == UpdateColumn) {
+            col.iImage = ImageIndex;
+        }
+        else {
+            col.iImage = I_IMAGENONE;
+        }
+        ListView_SetColumn(ListView, i, &col);
+    }
+}
+
+/*
+* supGetMaxOfTwoU64FromHex
+*
+* Purpose:
+*
+* Returned value used in listview comparer functions.
+*
+*/
+INT supGetMaxOfTwoU64FromHex(
+    _In_ HWND ListView,
+    _In_ LPARAM lParam1,
+    _In_ LPARAM lParam2,
+    _In_ LPARAM lParamSort,
+    _In_ BOOL Inverse
+)
+{
+    INT       nResult;
+    LPWSTR    lpItem1 = NULL, lpItem2 = NULL;
+    ULONG_PTR ad1, ad2;
+    WCHAR     szText[MAX_TEXT_CONVERSION_ULONG64 + 1];
+
+    RtlSecureZeroMemory(&szText, sizeof(szText));
+
+    lpItem1 = supGetItemText2(
+        ListView,
+        (INT)lParam1,
+        (INT)lParamSort,
+        szText,
+        MAX_TEXT_CONVERSION_ULONG64);
+
+    ad1 = hextou64(&lpItem1[2]);
+
+    RtlSecureZeroMemory(&szText, sizeof(szText));
+
+    lpItem2 = supGetItemText2(
+        ListView,
+        (INT)lParam2,
+        (INT)lParamSort,
+        szText,
+        MAX_TEXT_CONVERSION_ULONG64);
+
+    ad2 = hextou64(&lpItem2[2]);
+
+    if (Inverse)
+        nResult = ad1 < ad2;
+    else
+        nResult = ad1 > ad2;
+
+    return nResult;
+}
+
+/*
+* supOpenNamedObjectFromContext
+*
+* Purpose:
+*
+* Return handle (query rights) for the given named object.
+*
+*/
+HANDLE supOpenNamedObjectFromContext(
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ OBJECT_ATTRIBUTES *ObjectAttributes,
+    _In_ ACCESS_MASK DesiredAccess,
+    _Out_ NTSTATUS *Status
+)
+{
+    HANDLE hObject = NULL, hPrivateNamespace = NULL;
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    IO_STATUS_BLOCK iost;
+    OBJECT_ATTRIBUTES objaNamespace;
+
+    if (Context->IsPrivateNamespaceObject) {
+
+        //
+        // Open private namespace.
+        //
+        InitializeObjectAttributes(&objaNamespace, NULL, OBJ_CASE_INSENSITIVE, NULL, NULL);
+
+        status = NtOpenPrivateNamespace(
+            &hPrivateNamespace,
+            MAXIMUM_ALLOWED,
+            &objaNamespace,
+            Context->NamespaceInfo.BoundaryDescriptor);
+           
+        if (!NT_SUCCESS(status)) {
+            *Status = status;
+            return NULL;
+        }
+
+        //
+        // Modify OBJECT_ATTRIBUTES RootDirectory.
+        //
+        ObjectAttributes->RootDirectory = hPrivateNamespace;
+    }
+
+    switch (Context->TypeIndex) {
+    case ObjectTypeDevice: //FILE_OBJECT
+        status = NtCreateFile(&hObject, DesiredAccess, ObjectAttributes, &iost, NULL, 0,
+            FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE, FILE_OPEN, 0, NULL, 0);//generic access rights
+        break;
+
+    case ObjectTypeMutant:
+        status = NtOpenMutant(&hObject, DesiredAccess, ObjectAttributes); //MUTANT_QUERY_STATE for query
+        break;
+
+    case ObjectTypeKey:
+        status = NtOpenKey(&hObject, DesiredAccess, ObjectAttributes); //KEY_QUERY_VALUE for query
+        break;
+
+    case ObjectTypeSemaphore:
+        status = NtOpenSemaphore(&hObject, DesiredAccess, ObjectAttributes); //SEMAPHORE_QUERY_STATE for query
+        break;
+
+    case ObjectTypeTimer:
+        status = NtOpenTimer(&hObject, DesiredAccess, ObjectAttributes); //TIMER_QUERY_STATE for query
+        break;
+
+    case ObjectTypeEvent:
+        status = NtOpenEvent(&hObject, DesiredAccess, ObjectAttributes); //EVENT_QUERY_STATE for query
+        break;
+
+    case ObjectTypeEventPair:
+        status = NtOpenEventPair(&hObject, DesiredAccess, ObjectAttributes); //generic access
+        break;
+
+    case ObjectTypeSymbolicLink:
+        status = NtOpenSymbolicLinkObject(&hObject, DesiredAccess, ObjectAttributes); //SYMBOLIC_LINK_QUERY for query
+        break;
+
+    case ObjectTypeIoCompletion:
+        status = NtOpenIoCompletion(&hObject, DesiredAccess, ObjectAttributes); //IO_COMPLETION_QUERY_STATE for query
+        break;
+
+    case ObjectTypeSection:
+        status = NtOpenSection(&hObject, DesiredAccess, ObjectAttributes); //SECTION_QUERY for query
+        break;
+
+    case ObjectTypeJob:
+        status = NtOpenJobObject(&hObject, DesiredAccess, ObjectAttributes); //JOB_OBJECT_QUERY for query
+        break;
+
+    case ObjectTypeMemoryPartition:
+        if (g_ExtApiSet.NtOpenPartition) {
+            status = g_ExtApiSet.NtOpenPartition(&hObject, DesiredAccess, ObjectAttributes); //MEMORY_PARTITION_QUERY_ACCESS for query 
+        }
+        else
+            status = STATUS_PROCEDURE_NOT_FOUND;
+        break;
+    default:
+        status = STATUS_OBJECTID_NOT_FOUND;
+        break;
+    }
+
+    *Status = status;
+
+    if (hPrivateNamespace) NtClose(hPrivateNamespace);
+
+    return hObject;
 }

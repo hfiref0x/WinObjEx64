@@ -4,9 +4,9 @@
 *
 *  TITLE:       LIST.C
 *
-*  VERSION:     1.55
+*  VERSION:     1.60
 *
-*  DATE:        31 Aug 2018
+*  DATE:        24 Oct 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -15,6 +15,38 @@
 *
 *******************************************************************************/
 #include "global.h"
+#include "treelist\treelist.h"
+
+/*
+* TreeListAddItem
+*
+* Purpose:
+*
+* Insert new treelist item.
+*
+*/
+HTREEITEM TreeListAddItem(
+    _In_ HWND TreeList,
+    _In_opt_ HTREEITEM hParent,
+    _In_ UINT mask,
+    _In_ UINT state,
+    _In_ UINT stateMask,
+    _In_opt_ LPWSTR pszText,
+    _In_opt_ PVOID subitems
+)
+{
+    TVINSERTSTRUCT  tvitem;
+    PTL_SUBITEMS    si = (PTL_SUBITEMS)subitems;
+
+    RtlSecureZeroMemory(&tvitem, sizeof(tvitem));
+    tvitem.hParent = hParent;
+    tvitem.item.mask = mask;
+    tvitem.item.state = state;
+    tvitem.item.stateMask = stateMask;
+    tvitem.item.pszText = pszText;
+    tvitem.hInsertAfter = TVI_LAST;
+    return TreeList_InsertTreeItem(TreeList, &tvitem, si);
+}
 
 /*
 * GetNextSub
@@ -217,16 +249,29 @@ VOID ListObjectDirectoryTree(
         if (objinf == NULL)
             break;
 
-        status = NtQueryDirectoryObject(hDirectory, objinf, rlen, TRUE, FALSE, &ctx, &rlen);
+        status = NtQueryDirectoryObject(
+            hDirectory, 
+            objinf, 
+            rlen, 
+            TRUE, 
+            FALSE, 
+            &ctx, 
+            &rlen);
+
         if (!NT_SUCCESS(status)) {
             supHeapFree(objinf);
             break;
         }
 
-        if (_strncmpi(objinf->TypeName.Buffer, g_lpObjectNames[TYPE_DIRECTORY],
-            objinf->TypeName.Length / sizeof(WCHAR)) == 0)
+        if (0 == _strncmpi(
+            objinf->TypeName.Buffer, 
+            g_ObjectTypes[ObjectTypeDirectory].Name,
+            objinf->TypeName.Length / sizeof(WCHAR)))
         {
-            ListObjectDirectoryTree(objinf->Name.Buffer, hDirectory, ViewRootHandle);
+            ListObjectDirectoryTree(
+                objinf->Name.Buffer, 
+                hDirectory, 
+                ViewRootHandle);
         }
 
         supHeapFree(objinf);
@@ -262,7 +307,7 @@ VOID AddListViewItem(
     lvitem.iSubItem = 0;
     lvitem.pszText = objinf->Name.Buffer;
     lvitem.iItem = MAXINT;
-    lvitem.iImage = supGetObjectIndexByTypeName(objinf->TypeName.Buffer);
+    lvitem.iImage = ObManagerGetImageIndexByTypeName(objinf->TypeName.Buffer);
     index = ListView_InsertItem(g_hwndObjectList, &lvitem);
 
     lvitem.mask = LVIF_TEXT;
@@ -275,7 +320,7 @@ VOID AddListViewItem(
     RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
 
     //check SymbolicLink
-    if (_strncmpi(objinf->TypeName.Buffer, g_lpObjectNames[TYPE_SYMLINK], cch) == 0) {
+    if (_strncmpi(objinf->TypeName.Buffer, g_ObjectTypes[ObjectTypeSymbolicLink].Name, cch) == 0) {
        
         bFound = supQueryLinkTarget(hObjectRootDirectory,
             &objinf->Name, 
@@ -286,7 +331,7 @@ VOID AddListViewItem(
     }
 
     //check Section
-    if (_strncmpi(objinf->TypeName.Buffer, g_lpObjectNames[TYPE_SECTION], cch) == 0) {
+    if (_strncmpi(objinf->TypeName.Buffer, g_ObjectTypes[ObjectTypeSection].Name, cch) == 0) {
         
         bFound = supQuerySectionFileInfo(hObjectRootDirectory,
             &objinf->Name, 
@@ -297,7 +342,7 @@ VOID AddListViewItem(
     }
 
     //check Driver
-    if (_strncmpi(objinf->TypeName.Buffer, g_lpObjectNames[TYPE_DRIVER], cch) == 0) {
+    if (_strncmpi(objinf->TypeName.Buffer, g_ObjectTypes[ObjectTypeDriver].Name, cch) == 0) {
         
         bFound = supQueryDriverDescription(
             objinf->Name.Buffer,
@@ -308,7 +353,7 @@ VOID AddListViewItem(
     }
 
     //check Device
-    if (_strncmpi(objinf->TypeName.Buffer, g_lpObjectNames[TYPE_DEVICE], cch) == 0) {
+    if (_strncmpi(objinf->TypeName.Buffer, g_ObjectTypes[ObjectTypeDevice].Name, cch) == 0) {
         
         bFound = supQueryDeviceDescription(
             objinf->Name.Buffer,
@@ -319,7 +364,7 @@ VOID AddListViewItem(
     }
 
     //check WindowStation
-    if (_strncmpi(objinf->TypeName.Buffer, g_lpObjectNames[TYPE_WINSTATION], cch) == 0) {
+    if (_strncmpi(objinf->TypeName.Buffer, g_ObjectTypes[ObjectTypeWinstation].Name, cch) == 0) {
         
         bFound = supQueryWinstationDescription(
             objinf->Name.Buffer,
@@ -330,7 +375,7 @@ VOID AddListViewItem(
     }
 
     //check Type
-    if (_strncmpi(objinf->TypeName.Buffer, g_lpObjectNames[TYPE_TYPE], cch) == 0) {
+    if (_strncmpi(objinf->TypeName.Buffer, g_ObjectTypes[ObjectTypeType].Name, cch) == 0) {
 
         bFound = supQueryTypeInfo(
             objinf->Name.Buffer,
@@ -506,7 +551,7 @@ VOID FindObject(
                 *List = tmp;
             };
 
-        if (_strcmpi(objinf->TypeName.Buffer, g_lpObjectNames[TYPE_DIRECTORY]) == 0) {
+        if (_strcmpi(objinf->TypeName.Buffer, g_ObjectTypes[ObjectTypeDirectory].Name) == 0) {
 
             newdir = supHeapAlloc((sdlen + 4) * sizeof(WCHAR) + objinf->Name.Length);
             if (newdir != NULL) {

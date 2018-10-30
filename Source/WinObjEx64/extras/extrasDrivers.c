@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
-*  VERSION:     1.52
+*  VERSION:     1.60
 *
-*  DATE:        08 Jan 2018
+*  DATE:        24 Oct 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -60,14 +60,13 @@ VOID DrvDumpDriver(
 )
 {
     BOOL      bCond = FALSE, bSuccess = FALSE;
-    USHORT    AddressPrefix;
     INT       iPos;
     ULONG     ImageSize;
-    SIZE_T    sz, cbItem;
-    LPWSTR    lpDriverName = NULL, lpszValue = NULL;
+    SIZE_T    sz;
+    LPWSTR    lpDriverName = NULL;
     PVOID     DumpedDrv = NULL;
     ULONG_PTR ImageBase = 0;
-    WCHAR     szBuffer[MAX_PATH * 2];
+    WCHAR     szBuffer[MAX_PATH * 2], szDriverDumpInfo[MAX_TEXT_CONVERSION_ULONG64 + 1];
 
     do {
         //
@@ -97,38 +96,32 @@ VOID DrvDumpDriver(
         //
         // Query driver address from listview.
         //
-        cbItem = 0;
-        lpszValue = supGetItemText(DlgContext.ListView, iPos, 2, &cbItem);
-        if (lpszValue == NULL)
-            break;
+        RtlSecureZeroMemory(szDriverDumpInfo, sizeof(szDriverDumpInfo));
+        supGetItemText2(
+            DlgContext.ListView,
+            iPos,
+            2,
+            szDriverDumpInfo,
+            MAX_TEXT_CONVERSION_ULONG64);
 
-        if ((cbItem / sizeof(WCHAR)) != MAX_ADDRESS_TEXT_LENGTH64)
+        ImageBase = hextou64(&szDriverDumpInfo[2]);
+        if (ImageBase < g_kdctx.SystemRangeStart)
             break;
-
-        AddressPrefix = supIsAddressPrefix(lpszValue, cbItem);
-        if (AddressPrefix == 2) {
-            ImageBase = hextou64(&lpszValue[AddressPrefix]);
-            if (ImageBase < g_kdctx.SystemRangeStart)
-                break;
-        }
-        else
-            break;
-
-        supHeapFree(lpszValue);
 
         //
         // Query driver size from listview.
         //
-        lpszValue = supGetItemText(DlgContext.ListView, iPos, 3, NULL);
-        if (lpszValue == NULL)
-            break;
+        RtlSecureZeroMemory(szDriverDumpInfo, sizeof(szDriverDumpInfo));
+        supGetItemText2(
+            DlgContext.ListView,
+            iPos,
+            3,
+            szDriverDumpInfo,
+            MAX_TEXT_CONVERSION_ULONG64);
 
-        ImageSize = strtoul(lpszValue);
+        ImageSize = strtoul(szDriverDumpInfo);
         if (ImageSize == 0)
             break;
-
-        supHeapFree(lpszValue);
-        lpszValue = NULL;
 
         //
         // Allocate buffer for dump and read kernel memory.
@@ -166,7 +159,6 @@ VOID DrvDumpDriver(
     } while (bCond);
 
     if (lpDriverName) supHeapFree(lpDriverName);
-    if (lpszValue) supHeapFree(lpszValue);
 }
 
 /*
@@ -207,7 +199,7 @@ VOID DrvListDrivers(
             //LoadOrder
             lvitem.mask = LVIF_TEXT | LVIF_IMAGE;
             lvitem.iItem = MAXINT;
-            lvitem.iImage = TYPE_DRIVER; //imagelist id
+            lvitem.iImage = ObjectTypeDriver; //imagelist id
             RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
             ultostr(pModule->LoadOrderIndex, szBuffer);
             lvitem.pszText = szBuffer;
@@ -215,9 +207,13 @@ VOID DrvListDrivers(
 
             //Name
             RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-            MultiByteToWideChar(CP_ACP, 0,
+            
+            MultiByteToWideChar(
+                CP_ACP, 0,
                 (LPCSTR)&pModule->FullPathName[pModule->OffsetToFileName],
-                -1, szBuffer, MAX_PATH);
+                -1, 
+                szBuffer, 
+                MAX_PATH);
 
             lvitem.mask = LVIF_TEXT;
             lvitem.iSubItem++;
@@ -241,9 +237,15 @@ VOID DrvListDrivers(
 
             //FullName
             RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-            MultiByteToWideChar(CP_ACP, 0,
+            
+            MultiByteToWideChar(
+                CP_ACP, 
+                0,
                 (LPCSTR)&pModule->FullPathName,
-                -1, szBuffer, MAX_PATH);
+                -1, 
+                szBuffer, 
+                MAX_PATH);
+            
             lvitem.iSubItem++;
             ListView_SetItem(DlgContext.ListView, &lvitem);
         }
@@ -270,23 +272,30 @@ INT CALLBACK DrvDlgCompareFunc(
     LPWSTR    lpItem1 = NULL, lpItem2 = NULL;
     INT       nResult = 0;
     ULONG     id1, id2;
-    ULONG_PTR ad1, ad2;
 
-    SIZE_T cbItem1 = 0, cbItem2 = 0;
-
-    USHORT AddressPrefix;
+    //
+    // Sort addresses.
+    //
+    if (lParamSort == 2) {
+        return supGetMaxOfTwoU64FromHex(
+            DlgContext.ListView,
+            lParam1,
+            lParam2,
+            lParamSort,
+            DlgContext.bInverseSort);
+    }
 
     lpItem1 = supGetItemText(
         DlgContext.ListView, 
         (INT)lParam1, 
         (INT)lParamSort, 
-        &cbItem1);
+        NULL);
 
     lpItem2 = supGetItemText(
         DlgContext.ListView, 
         (INT)lParam2, 
         (INT)lParamSort, 
-        &cbItem2);
+        NULL);
 
     if ((lpItem1 == NULL) && 
         (lpItem2 == NULL))
@@ -317,37 +326,6 @@ INT CALLBACK DrvDlgCompareFunc(
 
         break;
    
-    case 2:  //sort Address
-
-        if ((cbItem1 / sizeof(WCHAR) != MAX_ADDRESS_TEXT_LENGTH64) &&
-            (cbItem2 / sizeof(WCHAR) != MAX_ADDRESS_TEXT_LENGTH64))
-        {
-            nResult = 0;
-            break;
-        }
-
-        ad1 = 0;
-        ad2 = 0;
-
-        if (lpItem1) {
-            AddressPrefix = supIsAddressPrefix(lpItem1, cbItem1);
-            if (AddressPrefix == 2)
-                ad1 = hextou64(&lpItem1[AddressPrefix]);
-        }
-
-        if (lpItem2) {
-            AddressPrefix = supIsAddressPrefix(lpItem2, cbItem2);
-            if (AddressPrefix == 2)
-                ad2 = hextou64(&lpItem2[AddressPrefix]);
-        }
-
-        if (DlgContext.bInverseSort)
-            nResult = ad1 < ad2;
-        else
-            nResult = ad1 > ad2;
-
-        break;
-
     case 1:  //sort Name
     case 4:  //sort Module
     default:
@@ -510,9 +488,14 @@ VOID extrasCreateDriversDialog(
     DlgContext.ListView = GetDlgItem(DlgContext.hwndDlg, ID_EXTRASLIST);
     if (DlgContext.ListView) {
 
+        //
+        // Set listview imagelist, style flags and theme.
+        //
         ListView_SetImageList(DlgContext.ListView, g_ListViewImages, LVSIL_SMALL);
         ListView_SetExtendedListViewStyle(DlgContext.ListView,
             LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
+
+        SetWindowTheme(DlgContext.ListView, TEXT("Explorer"), NULL);
 
         RtlSecureZeroMemory(&col, sizeof(col));
         col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
@@ -523,9 +506,10 @@ VOID extrasCreateDriversDialog(
         col.cx = 60;
         ListView_InsertColumn(DlgContext.ListView, col.iSubItem, &col);
 
+        col.iImage = I_IMAGENONE;
+
         col.iSubItem++;
         col.pszText = TEXT("Name");
-        col.iImage = -1;
         col.iOrder++;
         col.cx = 160;
         ListView_InsertColumn(DlgContext.ListView, col.iSubItem, &col);

@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMPCONSTS.H
 *
-*  VERSION:     1.52
+*  VERSION:     1.60
 *
-*  DATE:        08 Jan 2018
+*  DATE:        24 Oct 2018
 *
 *  Consts header file for Object Dump module.
 *
@@ -32,7 +32,9 @@
 #define T_PLIST_ENTRY               L"PLIST_ENTRY"
 #define T_EX_PUSH_LOCK              L"EX_PUSH_LOCK"
 #define T_PDEVICE_MAP               L"PDEVICE_MAP"
+#define T_OBJ_INVALID_SESSION_ID    L"OBJ_INVALID_SESSION_ID"
 #define T_POBJECT_DIRECTORY_ENTRY   L"POBJECT_DIRECTORY_ENTRY"
+#define T_POBJECT_DIRECTORY         L"POBJECT_DIRECTORY"
 #define T_OBJECT_DIRECTORY          L"OBJECT_DIRECTORY"
 #define T_OBJECT_TYPE               L"OBJECT_TYPE"
 #define T_OBJECT_TYPE_INITIALIZER   L"OBJECT_TYPE_INITIALIZER"
@@ -51,6 +53,10 @@
 #define T_PFLT_FILTER               L"PFLT_FILTER"
 #define T_FLT_OBJECT                L"FLT_OBJECT"
 #define T_FLT_FILTER_FLAGS          L"FLT_FILTER_FLAGS"
+
+#define T_ALPC_PORT_OBJECT          L"ALPC_PORT"
+#define T_PALPC_PORT_OBJECT         L"PALPC_PORT"
+#define T_ALPC_HANDLE_TABLE         L"ALPC_HANDLE_TABLE"
 
 #define T_EVENT_NOTIFICATION        L"NotificationEvent"
 #define T_EVENT_SYNC                L"SynchronizationEvent"
@@ -178,6 +184,25 @@ static LPWSTR T_FAST_IO_DISPATCH[] = {
     L"ReleaseForModWrite",
     L"AcquireForCcFlush",
     L"ReleaseForCcFlush"
+};
+
+static LPWSTR T_ALPC_PORT_STATE[] = {
+    L"Initialized",
+    L"Type",
+    L"ConnectionPending",
+    L"ConnectionRefused",
+    L"Disconnected",
+    L"Closed",
+    L"NoFlushOnClose",
+    L"ReturnExtendedInfo",
+    L"Waitable",
+    L"DynamicSecurity",
+    L"Wow64CompletionList",
+    L"Lpc",
+    L"LpcToLpc",
+    L"HasCompletionList",
+    L"HadCompletionList",
+    L"EnableCompletionList"
 };
 
 #define MAX_DEVOBJ_CHARS 76

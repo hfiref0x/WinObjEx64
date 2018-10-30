@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASUSD.C
 *
-*  VERSION:     1.52
+*  VERSION:     1.60
 *
-*  DATE:        08 Jan 2018
+*  DATE:        24 Oct 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -33,7 +33,7 @@ VOID UsdDumpSharedRegion(
     _In_ HWND hwndParent
 )
 {
-    BOOL                  bCond = FALSE;
+    BOOL                  bCond = FALSE, bAny = FALSE;
     INT                   i;
     DWORD                 mask;
     HWND                  UsdTreeList;
@@ -63,7 +63,8 @@ VOID UsdDumpSharedRegion(
         //KUSER_SHARED_DATA
         //
 
-        h_tviRootItem = TreeListAddItem(UsdTreeList,
+        h_tviRootItem = TreeListAddItem(
+            UsdTreeList,
             (HTREEITEM)NULL,
             TVIF_TEXT | TVIF_STATE,
             TVIS_EXPANDED,
@@ -80,7 +81,8 @@ VOID UsdDumpSharedRegion(
         subitems.Text[0] = pUserSharedData->NtSystemRoot;
         subitems.Count = 1;
 
-        TreeListAddItem(UsdTreeList,
+        TreeListAddItem(
+            UsdTreeList,
             h_tviRootItem,
             TVIF_TEXT | TVIF_STATE,
             (UINT)0,
@@ -104,7 +106,8 @@ VOID UsdDumpSharedRegion(
             break;
         }
 
-        ObDumpUlong(UsdTreeList,
+        ObDumpUlong(
+            UsdTreeList,
             h_tviRootItem,
             TEXT("NtProductType"),
             lpType,
@@ -114,7 +117,8 @@ VOID UsdDumpSharedRegion(
             (COLORREF)0,
             (COLORREF)0);
 
-        ObDumpByte(UsdTreeList,
+        ObDumpByte(
+            UsdTreeList,
             h_tviRootItem,
             TEXT("ProductTypeIsValid"),
             (LPWSTR)NULL,
@@ -124,7 +128,8 @@ VOID UsdDumpSharedRegion(
             TRUE);
 
         //Version
-        ObDumpUlong(UsdTreeList,
+        ObDumpUlong(
+            UsdTreeList,
             h_tviRootItem,
             TEXT("NtMajorVersion"),
             (LPWSTR)NULL,
@@ -134,7 +139,8 @@ VOID UsdDumpSharedRegion(
             (COLORREF)0,
             (COLORREF)0);
 
-        ObDumpUlong(UsdTreeList,
+        ObDumpUlong(
+            UsdTreeList,
             h_tviRootItem,
             TEXT("NtMinorVersion"),
             (LPWSTR)NULL,
@@ -144,8 +150,25 @@ VOID UsdDumpSharedRegion(
             (COLORREF)0,
             (COLORREF)0);
 
+        //
+        // Prior to Windows 10 this field declared as reserved.
+        //
+        if (g_WinObj.osver.dwMajorVersion >= 10) {
+            ObDumpUlong(
+                UsdTreeList,
+                h_tviRootItem,
+                TEXT("NtBuildNumber"),
+                (LPWSTR)NULL,
+                pUserSharedData->NtBuildNumber,
+                FALSE,
+                FALSE,
+                (COLORREF)0,
+                (COLORREF)0);
+        }
+
         //ProcessorFeatures
-        h_tviSubItem = TreeListAddItem(UsdTreeList,
+        h_tviSubItem = TreeListAddItem(
+            UsdTreeList,
             h_tviRootItem,
             TVIF_TEXT | TVIF_STATE,
             (UINT)0,
@@ -156,6 +179,7 @@ VOID UsdDumpSharedRegion(
         if (h_tviSubItem) {
             for (i = 0; i < PROCESSOR_FEATURE_MAX; i++) {
                 if (pUserSharedData->ProcessorFeatures[i]) {
+                    bAny = TRUE;
                     if (i > 32) {
                         lpType = T_Unknown;
                     }
@@ -168,7 +192,8 @@ VOID UsdDumpSharedRegion(
                     subitems.Text[0] = szValue;
                     subitems.Text[1] = lpType;
                     subitems.Count = 2;
-                    TreeListAddItem(UsdTreeList,
+                    TreeListAddItem(
+                        UsdTreeList,
                         h_tviSubItem,
                         TVIF_TEXT | TVIF_STATE,
                         (UINT)0,
@@ -176,6 +201,24 @@ VOID UsdDumpSharedRegion(
                         (LPWSTR)NULL,
                         &subitems);
                 }
+            }
+
+            if (bAny == FALSE) {
+                RtlSecureZeroMemory(&subitems, sizeof(subitems));
+                RtlSecureZeroMemory(&szValue, sizeof(szValue));
+                lpType = L"-";
+                _strcpy(szValue, L"0");
+                subitems.Text[0] = szValue;
+                subitems.Text[1] = lpType;
+                subitems.Count = 2;
+                TreeListAddItem(
+                    UsdTreeList,
+                    h_tviSubItem,
+                    TVIF_TEXT | TVIF_STATE,
+                    (UINT)0,
+                    (UINT)0,
+                    (LPWSTR)NULL,
+                    &subitems);
             }
         }
 
@@ -192,7 +235,8 @@ VOID UsdDumpSharedRegion(
             break;
         }
 
-        ObDumpUlong(UsdTreeList,
+        ObDumpUlong(
+            UsdTreeList,
             h_tviRootItem,
             TEXT("AlternativeArchitecture"),
             lpType,
@@ -211,7 +255,8 @@ VOID UsdDumpSharedRegion(
         subitems.Text[0] = szValue;
         subitems.Count = 1;
 
-        h_tviSubItem = TreeListAddItem(UsdTreeList,
+        h_tviSubItem = TreeListAddItem(
+            UsdTreeList,
             h_tviRootItem,
             TVIF_TEXT | TVIF_STATE,
             (UINT)0,
@@ -233,7 +278,8 @@ VOID UsdDumpSharedRegion(
                     subitems.Text[1] = SuiteMasks[i].lpDescription;
                     subitems.Count = 2;
 
-                    TreeListAddItem(UsdTreeList,
+                    TreeListAddItem(
+                        UsdTreeList,
                         h_tviSubItem,
                         TVIF_TEXT | TVIF_STATE,
                         (UINT)0,
@@ -247,7 +293,8 @@ VOID UsdDumpSharedRegion(
         }
 
         //KdDebuggerEnabled
-        ObDumpByte(UsdTreeList,
+        ObDumpByte(
+            UsdTreeList,
             h_tviRootItem,
             TEXT("KdDebuggerEnabled"),
             (LPWSTR)NULL,
@@ -257,17 +304,81 @@ VOID UsdDumpSharedRegion(
             TRUE);
 
         //MitigationPolicies
-        ObDumpByte(UsdTreeList,
-            h_tviRootItem,
-            TEXT("MitigationPolicies"),
-            (LPWSTR)NULL,
-            pUserSharedData->MitigationPolicies,
-            (COLORREF)0,
-            (COLORREF)0,
-            FALSE);
+
+        if (g_NtBuildNumber < 9200) {
+
+            ObDumpByte(
+                UsdTreeList,
+                h_tviRootItem,
+                TEXT("NXSupportPolicy"),
+                (LPWSTR)NULL,
+                pUserSharedData->NXSupportPolicy,
+                (COLORREF)0,
+                (COLORREF)0,
+                FALSE);
+
+        }
+        else {
+
+            //
+            // Expanded to more values starting from Windows 8+.
+            //
+
+            RtlSecureZeroMemory(&subitems, sizeof(subitems));
+            RtlSecureZeroMemory(&szValue, sizeof(szValue));
+
+            wsprintf(szValue, L"0x%02x", pUserSharedData->MitigationPolicies);
+
+            subitems.Text[0] = szValue;
+            subitems.Count = 1;
+
+            h_tviSubItem = TreeListAddItem(
+                UsdTreeList,
+                h_tviRootItem,
+                TVIF_TEXT | TVIF_STATE,
+                (UINT)0,
+                (UINT)0,
+                TEXT("MitigationPolicies"),
+                &subitems);
+
+            if (h_tviSubItem) {
+
+                ObDumpByte(
+                    UsdTreeList,
+                    h_tviSubItem,
+                    TEXT("NXSupportPolicy"),
+                    (LPWSTR)NULL,
+                    pUserSharedData->NXSupportPolicy,
+                    (COLORREF)0,
+                    (COLORREF)0,
+                    FALSE);
+
+                ObDumpByte(
+                    UsdTreeList,
+                    h_tviSubItem,
+                    TEXT("SEHValidationPolicy"),
+                    (LPWSTR)NULL,
+                    pUserSharedData->SEHValidationPolicy,
+                    (COLORREF)0,
+                    (COLORREF)0,
+                    FALSE);
+
+
+                ObDumpByte(
+                    UsdTreeList,
+                    h_tviSubItem,
+                    TEXT("CurDirDevicesSkippedForDlls"),
+                    (LPWSTR)NULL,
+                    pUserSharedData->CurDirDevicesSkippedForDlls,
+                    (COLORREF)0,
+                    (COLORREF)0,
+                    FALSE);
+            }
+        }
 
         //SafeBootMode
-        ObDumpByte(UsdTreeList,
+        ObDumpByte(
+            UsdTreeList,
             h_tviRootItem,
             TEXT("SafeBootMode"),
             (LPWSTR)NULL,
@@ -285,7 +396,8 @@ VOID UsdDumpSharedRegion(
         subitems.Text[0] = szValue;
         subitems.Count = 1;
 
-        h_tviSubItem = TreeListAddItem(UsdTreeList,
+        h_tviSubItem = TreeListAddItem(
+            UsdTreeList,
             h_tviRootItem,
             TVIF_TEXT | TVIF_STATE,
             (UINT)0,
@@ -303,7 +415,8 @@ VOID UsdDumpSharedRegion(
                     subitems.Text[0] = szValue;
                     subitems.Text[1] = (LPTSTR)T_SharedDataFlags[i];
                     subitems.Count = 2;
-                    TreeListAddItem(UsdTreeList,
+                    TreeListAddItem(
+                        UsdTreeList,
                         h_tviSubItem,
                         TVIF_TEXT | TVIF_STATE,
                         (UINT)0,

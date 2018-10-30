@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPPROCESS.C
 *
-*  VERSION:     1.52
+*  VERSION:     1.60
 *
-*  DATE:        08 Jan 2018
+*  DATE:        24 Oct 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -16,18 +16,10 @@
 *******************************************************************************/
 #include "global.h"
 #include "propDlg.h"
+#include "extras.h"
 
 //number of columns, revise this unit code after any change to this number
 #define PROCESSLIST_COLUMN_COUNT 4
-
-//page imagelist
-HIMAGELIST ProcessImageList = NULL;
-//page listview
-HWND g_hwndProcessList = NULL;
-//column to sort
-static LONG	ProcessListSortColumn = 0;
-//sort direction
-BOOL bProcessListSortInverse = FALSE;
 
 /*
 * ProcessListCompareFunc
@@ -40,40 +32,60 @@ BOOL bProcessListSortInverse = FALSE;
 INT CALLBACK ProcessListCompareFunc(
     _In_ LPARAM lParam1,
     _In_ LPARAM lParam2,
-    _In_ LPARAM lParamSort
+    _In_ LPARAM lpContextParam
 )
 {
     INT       nResult = 0;
     LPWSTR    lpItem1 = NULL, lpItem2 = NULL;
-    SIZE_T    cbItem1 = 0, cbItem2 = 0;
     ULONG_PTR Value1, Value2;
 
-    USHORT AddressPrefix;
+    LPARAM lvColumnToSort;
+
+    EXTRASCONTEXT *pDlgContext;
+
+    pDlgContext = (EXTRASCONTEXT*)lpContextParam;
+    if (pDlgContext == NULL)
+        return 0;
+
+    lvColumnToSort = (LPARAM)pDlgContext->lvColumnToSort;
+
+    //
+    // Sort Handle/GrantedAccess value column.
+    //
+    if ((lvColumnToSort == 2) || (lvColumnToSort == 3)) {
+        return supGetMaxOfTwoU64FromHex(
+            pDlgContext->ListView,
+            lParam1,
+            lParam2,
+            lvColumnToSort,
+            pDlgContext->bInverseSort);
+    }
+
 
     lpItem1 = supGetItemText(
-        g_hwndProcessList,
+        pDlgContext->ListView,
         (INT)lParam1,
-        (INT)lParamSort,
-        &cbItem1);
+        (INT)lvColumnToSort,
+        NULL);
 
     if (lpItem1 == NULL) //can't be 0 for this dialog
         goto Done;
 
     lpItem2 = supGetItemText(
-        g_hwndProcessList,
+        pDlgContext->ListView,
         (INT)lParam2,
-        (INT)lParamSort,
-        &cbItem2);
+        (INT)lvColumnToSort,
+        NULL);
 
     if (lpItem2 == NULL) //can't be 0 for this dialog
         goto Done;
 
-    switch (lParamSort) {
+    switch (lvColumnToSort) {
     case 0:
         //
         // Name column.
         //
-        if (bProcessListSortInverse)
+        if (pDlgContext->bInverseSort)
             nResult = _strcmpi(lpItem2, lpItem1);
         else
             nResult = _strcmpi(lpItem1, lpItem2);
@@ -85,67 +97,10 @@ INT CALLBACK ProcessListCompareFunc(
         //
         Value1 = strtou64(lpItem1);
         Value2 = strtou64(lpItem2);
-        if (bProcessListSortInverse)
+        if (pDlgContext->bInverseSort)
             nResult = Value2 > Value1;
         else
             nResult = Value1 > Value2;
-        break;
-
-    case 2:
-        //
-        // Handle value colum.
-        //
-        if ((cbItem1 / sizeof(WCHAR) != MAX_ADDRESS_TEXT_LENGTH64) &&
-            (cbItem2 / sizeof(WCHAR) != MAX_ADDRESS_TEXT_LENGTH64))
-        {
-            nResult = 0;
-            break;
-        }
-
-        Value1 = 0;
-        Value2 = 0;
-
-        AddressPrefix = supIsAddressPrefix(lpItem1, cbItem1);
-        if (AddressPrefix == 2)
-            Value1 = hextou64(&lpItem1[AddressPrefix]);
-
-        AddressPrefix = supIsAddressPrefix(lpItem2, cbItem2);
-        if (AddressPrefix == 2)
-            Value2 = hextou64(&lpItem2[AddressPrefix]);
-
-        if (bProcessListSortInverse)
-            nResult = Value2 > Value1;
-        else
-            nResult = Value1 > Value2;
-
-        break;
-    case 3:
-        //
-        // GrantedAccess column.
-        //
-        if ((cbItem1 / sizeof(WCHAR) != MAX_ADDRESS_TEXT_LENGTH32) &&
-            (cbItem2 / sizeof(WCHAR) != MAX_ADDRESS_TEXT_LENGTH32))
-        {
-            nResult = 0;
-            break;
-        }
-
-        Value1 = 0;
-        Value2 = 0;
-
-        AddressPrefix = supIsAddressPrefix(lpItem1, cbItem1);
-        if (AddressPrefix == 2)
-            Value1 = hextou64(&lpItem1[AddressPrefix]);
-
-        AddressPrefix = supIsAddressPrefix(lpItem2, cbItem2);
-        if (AddressPrefix == 2)
-            Value2 = hextou64(&lpItem2[AddressPrefix]);
-
-        if (bProcessListSortInverse)
-            nResult = Value2 > Value1;
-        else
-            nResult = Value1 > Value2;
-
         break;
 
     default:
@@ -168,6 +123,7 @@ Done:
 */
 VOID ProcessShowProperties(
     _In_ HWND hwndDlg,
+    _In_ HWND hwndListView,
     _In_ INT iItem
 )
 {
@@ -182,14 +138,14 @@ VOID ProcessShowProperties(
 
     __try {
         //query process id
-        Buffer = supGetItemText(g_hwndProcessList, iItem, 1, NULL);
+        Buffer = supGetItemText(hwndListView, iItem, 1, NULL);
         if (Buffer) {
             dwProcessId = strtoul(Buffer);
             supHeapFree(Buffer);
 
             //query process win32 image path
             //1. open target process
-            cid.UniqueProcess = (HANDLE)dwProcessId; //-V204
+            cid.UniqueProcess = ULongToHandle(dwProcessId);
             cid.UniqueThread = NULL;
             InitializeObjectAttributes(&obja, NULL, 0, NULL, NULL);
             status = NtOpenProcess(&hProcess, PROCESS_QUERY_LIMITED_INFORMATION, &obja, &cid);
@@ -199,7 +155,7 @@ VOID ProcessShowProperties(
                 NtQueryInformationProcess(hProcess, ProcessImageFileNameWin32, NULL, 0, &bytesNeeded);
                 if (bytesNeeded) {
 
-                    Buffer = supHeapAlloc(bytesNeeded);
+                    Buffer = supHeapAlloc((SIZE_T)bytesNeeded);
                     if (Buffer) {
 
                         //3. query win32 filename
@@ -241,9 +197,10 @@ VOID ProcessListHandleNotify(
     _In_ LPARAM lParam
 )
 {
-    INT        c;
-    LVCOLUMN   col;
-    LPNMHDR    nhdr = (LPNMHDR)lParam;
+    INT     nImageIndex;
+    LPNMHDR nhdr = (LPNMHDR)lParam;
+
+    EXTRASCONTEXT *pDlgContext;
 
     if (nhdr == NULL)
         return;
@@ -254,27 +211,38 @@ VOID ProcessListHandleNotify(
     switch (nhdr->code) {
 
     case LVN_COLUMNCLICK:
-        bProcessListSortInverse = !bProcessListSortInverse;
-        ProcessListSortColumn = ((NMLISTVIEW *)nhdr)->iSubItem;
-        ListView_SortItemsEx(g_hwndProcessList, &ProcessListCompareFunc, ProcessListSortColumn);
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+            pDlgContext->bInverseSort = !pDlgContext->bInverseSort;
+            pDlgContext->lvColumnToSort = ((NMLISTVIEW *)nhdr)->iSubItem;
 
-        RtlSecureZeroMemory(&col, sizeof(col));
-        col.mask = LVCF_IMAGE;
-        col.iImage = -1;
+            ListView_SortItemsEx(
+                pDlgContext->ListView,
+                &ProcessListCompareFunc,
+                pDlgContext);
 
-        for (c = 0; c < PROCESSLIST_COLUMN_COUNT; c++)
-            ListView_SetColumn(g_hwndProcessList, c, &col);
+            if (pDlgContext->bInverseSort)
+                nImageIndex = 1;
+            else
+                nImageIndex = 2;
 
-        if (bProcessListSortInverse)
-            col.iImage = 1;
-        else
-            col.iImage = 2;
-
-        ListView_SetColumn(g_hwndProcessList, ((NMLISTVIEW *)nhdr)->iSubItem, &col);
+            supUpdateLvColumnHeaderImage(
+                pDlgContext->ListView,
+                pDlgContext->lvColumnCount,
+                pDlgContext->lvColumnToSort,
+                nImageIndex);
+        }
         break;
 
     case NM_DBLCLK:
-        ProcessShowProperties(hwndDlg, ((LPNMITEMACTIVATE)lParam)->iItem);
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+
+            ProcessShowProperties(
+                hwndDlg,
+                pDlgContext->ListView,
+                ((LPNMITEMACTIVATE)lParam)->iItem);
+        }
         break;
 
     default:
@@ -323,10 +291,11 @@ BOOL ProcessQueryInfo(
         bytesNeeded = 0;
         status = NtQueryInformationProcess(hProcess, ProcessImageFileNameWin32, NULL, 0, &bytesNeeded);
         if ((status == STATUS_INFO_LENGTH_MISMATCH) && (bytesNeeded)) {
-            Buffer = supHeapAlloc(bytesNeeded);
+            Buffer = supHeapAlloc((SIZE_T)bytesNeeded);
             if (Buffer) {
 
-                status = NtQueryInformationProcess(hProcess,
+                status = NtQueryInformationProcess(
+                    hProcess,
                     ProcessImageFileNameWin32,
                     Buffer,
                     bytesNeeded,
@@ -366,7 +335,9 @@ BOOL ProcessQueryInfo(
 *
 */
 VOID ProcessListAddItem(
-    _In_ PVOID	ProcessesList,
+    _In_ HWND hwndListView,
+    _In_ HIMAGELIST ImageList,
+    _In_ PVOID ProcessesList,
     _In_ PSYSTEM_HANDLE_TABLE_ENTRY_INFO_EX phti
 )
 {
@@ -391,7 +362,8 @@ VOID ProcessListAddItem(
     RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
     _strcpy(szBuffer, T_Unknown);
 
-    if (supQueryProcessName(phti->UniqueProcessId,
+    if (supQueryProcessName(
+        phti->UniqueProcessId,
         ProcessesList,
         szBuffer,
         MAX_PATH))
@@ -408,7 +380,7 @@ VOID ProcessListAddItem(
             bIsWow64 = FALSE;
             if (ProcessQueryInfo(phti->UniqueProcessId, &hIcon, &bIsWow64)) {
                 if (hIcon) {
-                    iImage = ImageList_ReplaceIcon(ProcessImageList, -1, hIcon);
+                    iImage = ImageList_ReplaceIcon(ImageList, -1, hIcon);
                     DestroyIcon(hIcon);
                 }
                 if (bIsWow64) {
@@ -427,7 +399,7 @@ VOID ProcessListAddItem(
     lvitem.iSubItem = 0;
     lvitem.pszText = szBuffer;
     lvitem.iItem = MAXINT;
-    nIndex = ListView_InsertItem(g_hwndProcessList, &lvitem);
+    nIndex = ListView_InsertItem(hwndListView, &lvitem);
 
     //
     // ProcessId.
@@ -438,7 +410,7 @@ VOID ProcessListAddItem(
     lvitem.iSubItem = 1;
     lvitem.pszText = szBuffer;
     lvitem.iItem = nIndex;
-    ListView_SetItem(g_hwndProcessList, &lvitem);
+    ListView_SetItem(hwndListView, &lvitem);
 
     //
     // Handle Value.
@@ -450,7 +422,7 @@ VOID ProcessListAddItem(
     lvitem.iSubItem = 2;
     lvitem.pszText = szBuffer;
     lvitem.iItem = nIndex;
-    ListView_SetItem(g_hwndProcessList, &lvitem);
+    ListView_SetItem(hwndListView, &lvitem);
 
     //
     // Handle GrantedAccess.
@@ -462,7 +434,7 @@ VOID ProcessListAddItem(
     lvitem.iSubItem = 3;
     lvitem.pszText = szBuffer;
     lvitem.iItem = nIndex;
-    ListView_SetItem(g_hwndProcessList, &lvitem);
+    ListView_SetItem(hwndListView, &lvitem);
 }
 
 /*
@@ -475,8 +447,9 @@ VOID ProcessListAddItem(
 *
 */
 VOID ProcessListSetInfo(
+    _In_ HWND hwndDlg,
     _In_ PROP_OBJECT_INFO *Context,
-    _In_ HWND hwndDlg
+    _In_ EXTRASCONTEXT *pDlgContext
 )
 {
     BOOL                            cond = FALSE;
@@ -500,7 +473,7 @@ VOID ProcessListSetInfo(
     ObjectTypeIndex = 0;
 
     //empty process list images
-    ImageList_RemoveAll(ProcessImageList);
+    ImageList_RemoveAll(pDlgContext->ImageList);
 
     //empty process list
     ListView_DeleteAllItems(GetDlgItem(hwndDlg, ID_PROCESSLIST));
@@ -508,18 +481,18 @@ VOID ProcessListSetInfo(
     //set default app icon
     hIcon = LoadIcon(NULL, IDI_APPLICATION);
     if (hIcon) {
-        ImageList_ReplaceIcon(ProcessImageList, -1, hIcon);
+        ImageList_ReplaceIcon(pDlgContext->ImageList, -1, hIcon);
         DestroyIcon(hIcon);
     }
     //sort images
     hIcon = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
     if (hIcon) {
-        ImageList_ReplaceIcon(ProcessImageList, -1, hIcon);
+        ImageList_ReplaceIcon(pDlgContext->ImageList, -1, hIcon);
         DestroyIcon(hIcon);
     }
     hIcon = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
     if (hIcon) {
-        ImageList_ReplaceIcon(ProcessImageList, -1, hIcon);
+        ImageList_ReplaceIcon(pDlgContext->ImageList, -1, hIcon);
         DestroyIcon(hIcon);
     }
 
@@ -533,37 +506,37 @@ VOID ProcessListSetInfo(
         //object info not present
         if (ObjectAddress == 0) {
             switch (Context->TypeIndex) {
-            case TYPE_DIRECTORY:
+            case ObjectTypeDirectory:
                 DesiredAccess = DIRECTORY_QUERY;
                 break;
-            case TYPE_EVENT:
+            case ObjectTypeEvent:
                 DesiredAccess = EVENT_QUERY_STATE;
                 break;
-            case TYPE_MUTANT:
+            case ObjectTypeMutant:
                 DesiredAccess = MUTANT_QUERY_STATE;
                 break;
-            case TYPE_SEMAPHORE:
+            case ObjectTypeSemaphore:
                 DesiredAccess = SEMAPHORE_QUERY_STATE;
                 break;
-            case TYPE_SECTION:
+            case ObjectTypeSection:
                 DesiredAccess = SECTION_QUERY;
                 break;
-            case TYPE_SYMLINK:
+            case ObjectTypeSymbolicLink:
                 DesiredAccess = SYMBOLIC_LINK_QUERY;
                 break;
-            case TYPE_TIMER:
+            case ObjectTypeTimer:
                 DesiredAccess = TIMER_QUERY_STATE;
                 break;
-            case TYPE_JOB:
+            case ObjectTypeJob:
                 DesiredAccess = JOB_OBJECT_QUERY;
                 break;
-            case TYPE_WINSTATION:
+            case ObjectTypeWinstation:
                 DesiredAccess = WINSTA_READATTRIBUTES;
                 break;
-            case TYPE_IOCOMPLETION:
+            case ObjectTypeIoCompletion:
                 DesiredAccess = IO_COMPLETION_QUERY_STATE;
                 break;
-            case TYPE_MEMORYPARTITION:
+            case ObjectTypeMemoryPartition:
                 DesiredAccess = MEMORY_PARTITION_QUERY_ACCESS;
                 break;
             default:
@@ -617,8 +590,15 @@ VOID ProcessListSetInfo(
         for (i = 0; i < pHandles->NumberOfHandles; i++)
             if (pHandles->Handles[i].ObjectTypeIndex == ObjectTypeIndex) {
                 if ((ULONG_PTR)pHandles->Handles[i].Object == ObjectAddress) {
-                    //decode and add information to the list
-                    ProcessListAddItem(ProcessesList, &pHandles->Handles[i]);
+
+                    //
+                    // Decode and add information to the list.
+                    //
+                    ProcessListAddItem(
+                        pDlgContext->ListView,
+                        pDlgContext->ImageList,
+                        ProcessesList,
+                        &pHandles->Handles[i]);
                 }
             }
 
@@ -631,13 +611,15 @@ VOID ProcessListSetInfo(
     if (ProcessesList) {
         supHeapFree(ProcessesList);
     }
-    if ((Context->TypeIndex == TYPE_WINSTATION) && (hObject != NULL)) {
-        CloseWindowStation(hObject);
-        hObject = NULL;
-    }
+
     if (hObject) {
-        NtClose(hObject);
+
+        if (Context->TypeIndex == ObjectTypeWinstation)
+            CloseWindowStation(hObject);
+        else
+            NtClose(hObject);
     }
+
     //show/hide notification text
     ShowWindow(GetDlgItem(hwndDlg, ID_PROCESSLISTNOALL), (ObjectAddress == 0) ? SW_SHOW : SW_HIDE);
 }
@@ -652,21 +634,26 @@ VOID ProcessListSetInfo(
 *
 */
 VOID ProcessListCreate(
-    _In_ HWND hwndDlg
+    _In_ HWND hwndDlg,
+    _In_ EXTRASCONTEXT* pDlgContext
 )
 {
     LVCOLUMN col;
 
-    g_hwndProcessList = GetDlgItem(hwndDlg, ID_PROCESSLIST);
-    if (g_hwndProcessList == NULL)
+    pDlgContext->ListView = GetDlgItem(hwndDlg, ID_PROCESSLIST);
+    if (pDlgContext->ListView == NULL)
         return;
 
-    ProcessImageList = ImageList_Create(16, 16, ILC_COLOR32 | ILC_MASK, 32, 8);
-    if (ProcessImageList) {
-        ListView_SetImageList(g_hwndProcessList, ProcessImageList, LVSIL_SMALL);
+    pDlgContext->ImageList = ImageList_Create(16, 16, ILC_COLOR32 | ILC_MASK, 32, 8);
+    if (pDlgContext->ImageList) {
+        ListView_SetImageList(pDlgContext->ListView, pDlgContext->ImageList, LVSIL_SMALL);
     }
 
-    ListView_SetExtendedListViewStyle(g_hwndProcessList, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
+    ListView_SetExtendedListViewStyle(
+        pDlgContext->ListView,
+        LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
+
+    SetWindowTheme(pDlgContext->ListView, TEXT("Explorer"), NULL);
 
     RtlSecureZeroMemory(&col, sizeof(col));
     col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
@@ -675,26 +662,29 @@ VOID ProcessListCreate(
     col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
     col.iImage = 2;
     col.cx = 160;
-    ListView_InsertColumn(g_hwndProcessList, col.iSubItem, &col);
+    ListView_InsertColumn(pDlgContext->ListView, col.iSubItem, &col);
+
+    col.iImage = I_IMAGENONE;
 
     col.iSubItem++;
     col.pszText = TEXT("ID");
     col.iOrder++;
-    col.iImage = -1;
     col.cx = 60;
-    ListView_InsertColumn(g_hwndProcessList, col.iSubItem, &col);
+    ListView_InsertColumn(pDlgContext->ListView, col.iSubItem, &col);
 
     col.iSubItem++;
     col.pszText = TEXT("Handle");
     col.iOrder++;
     col.cx = 130;
-    ListView_InsertColumn(g_hwndProcessList, col.iSubItem, &col);
+    ListView_InsertColumn(pDlgContext->ListView, col.iSubItem, &col);
 
     col.iSubItem++;
     col.pszText = TEXT("Access");
     col.iOrder++;
     col.cx = 80;
-    ListView_InsertColumn(g_hwndProcessList, col.iSubItem, &col);
+    ListView_InsertColumn(pDlgContext->ListView, col.iSubItem, &col);
+
+    pDlgContext->lvColumnCount = PROCESSLIST_COLUMN_COUNT;
 }
 
 /*
@@ -732,18 +722,13 @@ VOID ProcessHandlePopupMenu(
 *
 */
 VOID ProcessCopyText(
-    _In_ HWND hwndDlg
+    _In_ HWND hwndList,
+    _In_ INT lvComlumnCount
 )
 {
     INT     nSelection, i;
     SIZE_T  cbText, sz;
     LPWSTR  lpText, lpItemText[4];
-    HWND    hwndList;
-
-    hwndList = GetDlgItem(hwndDlg, ID_PROCESSLIST);
-    if (hwndList == NULL) {
-        return;
-    }
 
     if (ListView_GetSelectedCount(hwndList) == 0) {
         return;
@@ -756,17 +741,17 @@ VOID ProcessCopyText(
 
     __try {
         cbText = 0;
-        for (i = 0; i < PROCESSLIST_COLUMN_COUNT; i++) {
+        for (i = 0; i < lvComlumnCount; i++) {
             sz = 0;
             lpItemText[i] = supGetItemText(hwndList, nSelection, i, &sz);
             cbText += sz;
         }
 
-        cbText += (PROCESSLIST_COLUMN_COUNT * sizeof(WCHAR)) + sizeof(UNICODE_NULL);
+        cbText += (lvComlumnCount * sizeof(WCHAR)) + sizeof(UNICODE_NULL);
         lpText = supHeapAlloc(cbText);
         if (lpText) {
 
-            for (i = 0; i < PROCESSLIST_COLUMN_COUNT; i++) {
+            for (i = 0; i < lvComlumnCount; i++) {
                 if (lpItemText[i]) {
                     _strcat(lpText, lpItemText[i]);
                     if (i != 3) {
@@ -777,7 +762,7 @@ VOID ProcessCopyText(
             supClipboardCopy(lpText, cbText);
             supHeapFree(lpText);
         }
-        for (i = 0; i < PROCESSLIST_COLUMN_COUNT; i++) {
+        for (i = 0; i < lvComlumnCount; i++) {
             if (lpItemText[i] != NULL) {
                 supHeapFree(lpItemText[i]);
             }
@@ -814,6 +799,7 @@ INT_PTR CALLBACK ProcessListDialogProc(
 {
     PROPSHEETPAGE    *pSheet = NULL;
     PROP_OBJECT_INFO *Context = NULL;
+    EXTRASCONTEXT    *pDlgContext = NULL;
 
     switch (uMsg) {
 
@@ -824,7 +810,10 @@ INT_PTR CALLBACK ProcessListDialogProc(
     case WM_COMMAND:
 
         if (LOWORD(wParam) == ID_OBJECT_COPY) {
-            ProcessCopyText(hwndDlg);
+            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+            if (pDlgContext) {
+                ProcessCopyText(pDlgContext->ListView, pDlgContext->lvColumnCount);
+            }
         }
         break;
 
@@ -834,10 +823,15 @@ INT_PTR CALLBACK ProcessListDialogProc(
         break;
 
     case WM_DESTROY:
-        if (ProcessImageList) {
-            ImageList_Destroy(ProcessImageList);
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+            if (pDlgContext->ImageList) {
+                ImageList_Destroy(pDlgContext->ImageList);
+            }
+            supHeapFree(pDlgContext);
         }
         RemoveProp(hwndDlg, T_PROPCONTEXT);
+        RemoveProp(hwndDlg, T_DLGCONTEXT);
         break;
 
     case WM_INITDIALOG:
@@ -847,12 +841,21 @@ INT_PTR CALLBACK ProcessListDialogProc(
             Context = (PROP_OBJECT_INFO *)pSheet->lParam;
             SetProp(hwndDlg, T_PROPCONTEXT, (HANDLE)Context);
 
-            ProcessListCreate(hwndDlg);
-            if (g_hwndProcessList) {
-                ProcessListSetInfo(Context, hwndDlg);
-                ListView_SortItemsEx(g_hwndProcessList, &ProcessListCompareFunc, ProcessListSortColumn);
-            }
+            pDlgContext = supHeapAlloc(sizeof(EXTRASCONTEXT));
+            if (pDlgContext) {
+                SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)pDlgContext);
 
+                ProcessListCreate(hwndDlg, pDlgContext);
+                if (pDlgContext->ListView) {
+
+                    ProcessListSetInfo(hwndDlg, Context, pDlgContext);
+
+                    ListView_SortItemsEx(
+                        pDlgContext->ListView,
+                        &ProcessListCompareFunc,
+                        pDlgContext);
+                }
+            }
         }
         return 1;
         break;

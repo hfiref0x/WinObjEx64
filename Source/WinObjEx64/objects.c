@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017
+*  (C) COPYRIGHT AUTHORS, 2017 - 2018
 *
 *  TITLE:       OBJECTS.C
 *
-*  VERSION:     1.50
+*  VERSION:     1.60
 *
-*  DATE:        20 June 2017
+*  DATE:        24 Oct 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,64 +17,187 @@
 
 #include "global.h"
 
-//Known object type names
+/*
+* ObManagerGetNameByIndex
+*
+* Purpose:
+*
+* Returns object name by index of known type.
+*
+*
+*/
+LPWSTR ObManagerGetNameByIndex(
+    _In_ ULONG TypeIndex
+)
+{
+    if (TypeIndex >= ObjectTypeMax)
+        return g_ObjectTypes[ObjectTypeUnknown].Name;
 
-LPCWSTR g_lpObjectNames[TYPE_MAX] = {
-    L"Device",                              //0
-    L"Driver",                              //1
-    L"Section",                             //2
-    L"ALPC Port",                           //3
-    L"SymbolicLink",                        //4
-    L"Key",                                 //5
-    L"Event",                               //6
-    L"Job",                                 //7
-    L"Mutant",                              //8
-    L"KeyedEvent",                          //9
-    L"Type",                                //10
-    L"Directory",                           //11
-    L"WindowStation",                       //12
-    L"Callback",                            //13
-    L"Semaphore",                           //14
-    L"WaitablePort",                        //15
-    L"Timer",                               //16
-    L"Session",                             //17
-    L"Controller",                          //18
-    L"Profile",                             //19
-    L"EventPair",                           //20
-    L"Desktop",                             //21
-    L"File",                                //22
-    L"WMIGuid",                             //23
-    L"DebugObject",                         //24
-    L"IoCompletion",                        //25
-    L"Process",                             //26
-    L"Adapter",                             //27
-    L"Token",                               //28
-    L"EtwRegistration",                     //29
-    L"Thread",                              //30
-    L"TmTx",                                //31
-    L"TmTm",                                //32
-    L"TmRm",                                //33
-    L"TmEn",                                //34
-    L"PcwObject",                           //35
-    L"FilterConnectionPort",                //36
-    L"FilterCommunicationPort",             //37
-    L"PowerRequest",                        //38
-    L"EtwConsumer",                         //39
-    L"TpWorkerFactory",                     //40
-    L"Composition",                         //41
-    L"IRTimer",                             //42
-    L"DxgkSharedResource",                  //43
-    L"DxgkSharedSwapChainObject",           //44
-    L"DxgkSharedSyncObject",                //45
-    L"DxgkCurrentDxgProcessObject",         //46
-    L"Partition",                           //47
-    L""                                     //48 final index must be always TYPE_UNKNOWN
-};
+    return g_ObjectTypes[TypeIndex].Name;
+}
+
+/*
+* ObManagerGetImageIndexByTypeIndex
+*
+* Purpose:
+*
+* Returns object image index by index of known type.
+*
+*
+*/
+UINT ObManagerGetImageIndexByTypeIndex(
+    _In_ ULONG TypeIndex
+)
+{
+    if (TypeIndex >= ObjectTypeMax)
+        return ObjectTypeUnknown;
+
+    return g_ObjectTypes[TypeIndex].ImageIndex;
+}
+
+/*
+* ObManagerGetIndexByTypeName
+*
+* Purpose:
+*
+* Returns object index of known type.
+*
+*/
+UINT ObManagerGetIndexByTypeName(
+    _In_ LPCWSTR lpTypeName
+)
+{
+    UINT nIndex;
+
+    if (lpTypeName == NULL) {
+        return ObjectTypeUnknown;
+    }
+
+    for (nIndex = TYPE_FIRST; nIndex < TYPE_LAST; nIndex++) {
+        if (_strcmpi(lpTypeName, g_ObjectTypes[nIndex].Name) == 0)
+            return nIndex;
+    }
+
+    //
+    // In Win8 the following Win32k object was named 
+    // CompositionSurface, in Win8.1 MS renamed it to
+    // Composition, handle this.
+    //
+    if (_strcmpi(lpTypeName, L"CompositionSurface") == 0) {
+        return ObjectTypeComposition;
+    }
+
+    //
+    // In Win10 TH1 the following ntos object was named 
+    // NetworkNamespace, later in Win10 updates MS renamed it to
+    // NdisCmState, handle this.
+    //
+   /*
+    if (_strcmpi(lpTypeName, L"NetworkNamespace") == 0) {
+        return ObjectTypeNdisCmState;
+    }
+    */
+
+    return ObjectTypeUnknown;
+}
+
+/*
+* ObManagerGetImageIndexByTypeName
+*
+* Purpose:
+*
+* Returns object image index of known type.
+*
+*/
+UINT ObManagerGetImageIndexByTypeName(
+    _In_ LPCWSTR lpTypeName
+)
+{
+    UINT nIndex;
+
+    if (lpTypeName == NULL) {
+        return ObjectTypeUnknown;
+    }
+
+    for (nIndex = TYPE_FIRST; nIndex < TYPE_LAST; nIndex++) {
+        if (_strcmpi(lpTypeName, g_ObjectTypes[nIndex].Name) == 0)
+            return g_ObjectTypes[nIndex].ImageIndex;
+    }
+
+    //
+    // In Win8 the following Win32k object was named 
+    // CompositionSurface, in Win8.1 MS renamed it to
+    // Composition, handle this.
+    //
+    if (_strcmpi(lpTypeName, L"CompositionSurface") == 0) {
+        return g_ObjectTypes[ObjectTypeComposition].ImageIndex;
+    }
+
+    //
+    // In Win10 TH1 the following ntos object was named 
+    // NetworkNamespace, later in Win10 updates MS renamed it to
+    // NdisCmState, handle this.
+    //
+    /*    
+    if (_strcmpi(lpTypeName, L"NetworkNamespace") == 0) {
+        return g_ObjectTypes[ObjectTypeComposition].ImageIndex;
+    }
+    */
+
+    return ObjectTypeUnknown;
+}
+
+/*
+* ObManagerLoadImageList
+*
+* Purpose:
+*
+* Create and load image list from icon resource type.
+*
+*/
+HIMAGELIST ObManagerLoadImageList(
+    VOID
+)
+{
+    UINT       i, imageIndex;
+    HIMAGELIST list;
+    HICON      hIcon;
+
+    list = ImageList_Create(
+        16, 
+        16, 
+        ILC_COLOR32 | ILC_MASK,
+        TYPE_LAST, 
+        8);
+
+    if (list) {
+        for (i = TYPE_FIRST; i <= TYPE_LAST; i++) {
+            
+            imageIndex = TYPE_RESOURCE_IMAGE_INDEX_START + g_ObjectTypes[i].ImageIndex;
+            
+            hIcon = LoadImage(
+                g_WinObj.hInstance, 
+                MAKEINTRESOURCE(imageIndex), 
+                IMAGE_ICON, 
+                16, 
+                16, 
+                LR_DEFAULTCOLOR);
+
+            if (hIcon) {
+                ImageList_ReplaceIcon(list, -1, hIcon);
+                DestroyIcon(hIcon);
+            }
+        }
+    }
+    return list;
+}
 
 //
 // Future use
 //
 /*
+
+Usually none of these object types identities present in object directory.
 
 ActivityReference
 CoreMessagining

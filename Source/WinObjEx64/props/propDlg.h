@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDLG.H
 *
-*  VERSION:     1.54
+*  VERSION:     1.60
 *
-*  DATE:        16 Aug 2018
+*  DATE:        25 Oct 2018
 *
 *  Common header file for properties dialog.
 *
@@ -18,13 +18,16 @@
 *******************************************************************************/
 #pragma once
 
-//externs for global properties variables
+//
+// Externs for global properties variables.
+//
 extern HWND g_PropWindow;
 extern HWND g_SubPropWindow;
+extern HWND g_NamespacePropWindow;
 
-/*
-** Prototypes
-*/
+//
+// Prototypes
+//
 
 BOOL propOpenCurrentObject(
     _In_ PROP_OBJECT_INFO *Context,
@@ -39,7 +42,8 @@ VOID propCreateDialog(
     _In_ HWND hwndParent,
     _In_ LPWSTR lpObjectName,
     _In_ LPCWSTR lpObjectType,
-    _In_opt_ LPWSTR lpDescription);
+    _In_opt_ LPWSTR lpDescription,
+    _In_opt_ PROP_NAMESPACE_INFO *NamespaceObject);
 
 PPROP_OBJECT_INFO propContextCreate(
     _In_opt_ LPWSTR lpObjectName,

@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.52
+*  VERSION:     1.60
 *
-*  DATE:        10 Feb 2018
+*  DATE:        24 Oct 2018
 *
 *  Program entry point and main window handler.
 *
@@ -106,7 +106,13 @@ VOID MainWindowHandleObjectTreeProp(
     tvi.mask = TVIF_TEXT;
     tvi.hItem = SelectedTreeItem;
     if (TreeView_GetItem(g_hwndObjectTree, &tvi)) {
-        propCreateDialog(hwnd, szBuffer, g_lpObjectNames[TYPE_DIRECTORY], NULL);
+        
+        propCreateDialog(
+            hwnd, 
+            szBuffer, 
+            g_ObjectTypes[ObjectTypeDirectory].Name, 
+            NULL,
+            NULL);
     }
 }
 
@@ -146,7 +152,12 @@ VOID MainWindowHandleObjectListProp(
             //lpDesc is not important, we can work if it NULL
             lpDesc = supGetItemText(g_hwndObjectList, nSelected, 2, NULL);
 
-            propCreateDialog(hwnd, lpItemText, lpType, lpDesc);
+            propCreateDialog(
+                hwnd, 
+                lpItemText, 
+                lpType, 
+                lpDesc,
+                NULL);
 
             if (lpDesc) {
                 supHeapFree(lpDesc);
@@ -177,17 +188,13 @@ VOID MainWindowOnRefresh(
     supSetWaitCursor(TRUE);
 
     if (g_kdctx.hDevice != NULL) {
-        ObListDestroy(&g_kdctx.ObjectList);
+        ObCollectionDestroy(&g_kdctx.ObCollection);
         if (g_kdctx.hThreadWorker) {
-            WaitForSingleObject(g_kdctx.hThreadWorker, INFINITE);
+            if (WaitForSingleObject(g_kdctx.hThreadWorker, 5000) == WAIT_TIMEOUT)
+                TerminateThread(g_kdctx.hThreadWorker, 0);
             CloseHandle(g_kdctx.hThreadWorker);
             g_kdctx.hThreadWorker = NULL;
         }
-
-        //query object list info
-        g_kdctx.hThreadWorker = CreateThread(NULL, 0,
-            kdQueryProc,
-            &g_kdctx, 0, NULL);
     }
 
     supFreeSCMSnapshot();
@@ -235,7 +242,12 @@ LRESULT MainWindowHandleWMCommand(
     switch (LOWORD(wParam)) {
 
     case ID_FILE_RUNASADMIN:
-        supRunAsAdmin();
+        if (g_kdctx.IsFullAdmin) {
+            supRunAsLocalSystem(hwnd);
+        }
+        else {
+            supRunAsAdmin();
+        }
         break;
 
     case ID_FILE_EXIT:
@@ -301,12 +313,9 @@ LRESULT MainWindowHandleWMCommand(
 
         //Extras -> Private Namespaces
     case ID_EXTRAS_PRIVATENAMESPACES:
-        if (g_WinObj.osver.dwBuildNumber <= 10240) {
-
-            //feature require driver usage
-            if (g_kdctx.hDevice != NULL) {
-                extrasShowPrivateNamespacesDialog(hwnd);
-            }
+        //feature require driver usage
+        if (g_kdctx.hDevice != NULL) {
+            extrasShowPrivateNamespacesDialog(hwnd);
         }
         break;
 
@@ -334,7 +343,7 @@ LRESULT MainWindowHandleWMCommand(
         break;
 
     case ID_HELP_HELP:
-        supShowHelp();
+        supShowHelp(hwnd);
         break;
 
     default:
@@ -444,7 +453,7 @@ LRESULT MainWindowHandleWMNotify(
     _In_ LPARAM lParam
 )
 {
-    INT             c, k;
+    INT             nImageIndex;
     LPNMHDR         hdr = (LPNMHDR)lParam;
     LPTOOLTIPTEXT   lpttt;
     LPNMLISTVIEW    lvn;
@@ -452,7 +461,6 @@ LRESULT MainWindowHandleWMNotify(
     LPWSTR          str;
     SIZE_T          lcp;
     LVITEM          lvitem;
-    LVCOLUMN        col;
     TVHITTESTINFO   hti;
     POINT           pt;
     WCHAR           item_string[MAX_PATH + 1];
@@ -538,20 +546,17 @@ LRESULT MainWindowHandleWMNotify(
                 SortColumn = ((NMLISTVIEW *)lParam)->iSubItem;
                 ListView_SortItemsEx(g_hwndObjectList, &MainWindowObjectListCompareFunc, SortColumn);
 
-                RtlSecureZeroMemory(&col, sizeof(col));
-                col.mask = LVCF_IMAGE;
-                col.iImage = -1;
-
-                for (c = 0; c < 3; c++)
-                    ListView_SetColumn(g_hwndObjectList, c, &col);
-
-                k = ImageList_GetImageCount(g_ListViewImages);
+                nImageIndex = ImageList_GetImageCount(g_ListViewImages);
                 if (bMainWndSortInverse)
-                    col.iImage = k - 2;
+                    nImageIndex -= 2; //sort down/up images are always at the end of g_ListViewImages
                 else
-                    col.iImage = k - 1;
+                    nImageIndex -= 1;
 
-                ListView_SetColumn(g_hwndObjectList, ((NMLISTVIEW *)lParam)->iSubItem, &col);
+                supUpdateLvColumnHeaderImage(
+                    g_hwndObjectList,
+                    3,
+                    SortColumn,
+                    nImageIndex);
 
                 break;
 
@@ -792,6 +797,8 @@ BOOL WinObjInitGlobals()
         g_WinObj.osver.dwOSVersionInfoSize = sizeof(g_WinObj.osver);
         RtlGetVersion(&g_WinObj.osver);
 
+        g_NtBuildNumber = g_WinObj.osver.dwBuildNumber;
+
         //
         // Remember hInstance.
         //
@@ -846,23 +853,23 @@ BOOL WinObjInitGlobals()
 * Actual program entry point.
 *
 */
-void WinObjExMain()
+UINT WinObjExMain()
 {
     MSG                     msg1;
     WNDCLASSEX              wincls;
-    BOOL                    IsFullAdmin = FALSE, IsWine = FALSE, rv = TRUE, cond = FALSE;
+    BOOL                    IsFullAdmin = FALSE, IsWine = FALSE, rv = TRUE, cond = FALSE, bLocalSystem = FALSE;
     ATOM                    class_atom = 0;
-    INITCOMMONCONTROLSEX    icc;   
+    INITCOMMONCONTROLSEX    icc;
     LVCOLUMN                col;
     SHSTOCKICONINFO         sii;
     HMENU                   hMenu;
     HACCEL                  hAccTable = 0;
     WCHAR                   szWindowTitle[100];
-    HANDLE                  hIcon;
+    HANDLE                  hIcon, hToken;
     HIMAGELIST              TreeViewImages;
 
     if (!WinObjInitGlobals())
-        return;
+        return ERROR_APP_INIT_FAILURE;
 
     // do not move anywhere
     IsFullAdmin = supUserIsFullAdmin();
@@ -873,7 +880,7 @@ void WinObjExMain()
         IsFullAdmin = FALSE;
     }
 
-    supInit(IsFullAdmin, IsWine);
+    supInit(IsFullAdmin);
 
     // do not move anywhere
     // g_kdctx variable initialized BEFORE this.
@@ -895,9 +902,24 @@ void WinObjExMain()
         wincls.cbClsExtra = 0;
         wincls.cbWndExtra = 0;
         wincls.hInstance = g_WinObj.hInstance;
-        wincls.hIcon = (HICON)LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN), IMAGE_ICON, 0, 0, LR_SHARED);
-        wincls.hCursor = (HCURSOR)LoadImage(NULL, MAKEINTRESOURCE(OCR_SIZEWE), IMAGE_CURSOR, 0, 0, LR_SHARED);
-        wincls.hbrBackground = NULL;
+
+        wincls.hIcon = (HICON)LoadImage(
+            g_WinObj.hInstance,
+            MAKEINTRESOURCE(IDI_ICON_MAIN),
+            IMAGE_ICON,
+            0,
+            0,
+            LR_SHARED);
+
+        wincls.hCursor = (HCURSOR)LoadImage(
+            NULL,
+            MAKEINTRESOURCE(OCR_SIZEWE),
+            IMAGE_CURSOR,
+            0,
+            0,
+            LR_SHARED);
+
+        wincls.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
         wincls.lpszMenuName = MAKEINTRESOURCE(IDR_MENU1);
         wincls.lpszClassName = MAINWINDOWCLASSNAME;
         wincls.hIconSm = 0;
@@ -905,7 +927,7 @@ void WinObjExMain()
         class_atom = RegisterClassEx(&wincls);
         if (class_atom == 0)
             break;
-        
+
         RtlSecureZeroMemory(szWindowTitle, sizeof(szWindowTitle));
         _strcpy(szWindowTitle, PROGRAM_NAME);
         if (IsFullAdmin != FALSE) {
@@ -916,8 +938,23 @@ void WinObjExMain()
             _strcat(szWindowTitle, L" (Wine emulation)");
         }
 
-        MainWindow = CreateWindowEx(0, MAKEINTATOM(class_atom), szWindowTitle,
-            WS_VISIBLE | WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 800, 600, NULL, NULL, g_WinObj.hInstance, NULL);
+        //
+        // Main App window.
+        //
+        MainWindow = CreateWindowEx(
+            0,
+            MAKEINTATOM(class_atom),
+            szWindowTitle,
+            WS_VISIBLE | WS_OVERLAPPEDWINDOW,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            800,
+            600,
+            NULL,
+            NULL,
+            g_WinObj.hInstance,
+            NULL);
+
         if (MainWindow == NULL)
             break;
 
@@ -926,38 +963,115 @@ void WinObjExMain()
         if (!InitCommonControlsEx(&icc))
             break;
 
-        hwndStatusBar = CreateWindowEx(0, STATUSCLASSNAME, NULL,
-            WS_VISIBLE | WS_CHILD, 0, 0, 0, 0, MainWindow, NULL, g_WinObj.hInstance, NULL);
+        //
+        // Status Bar window.
+        //
+        hwndStatusBar = CreateWindowEx(
+            0,
+            STATUSCLASSNAME,
+            NULL,
+            WS_VISIBLE | WS_CHILD,
+            0,
+            0,
+            0,
+            0,
+            MainWindow,
+            NULL,
+            g_WinObj.hInstance,
+            NULL);
 
-        g_hwndObjectTree = CreateWindowEx(WS_EX_CLIENTEDGE, WC_TREEVIEW, NULL,
-            WS_VISIBLE | WS_CHILD | WS_TABSTOP | TVS_DISABLEDRAGDROP | TVS_HASBUTTONS |
-            TVS_HASLINES | TVS_LINESATROOT, 0, 0, 0, 0, MainWindow, (HMENU)1002, g_WinObj.hInstance, NULL);
+        //
+        // TreeView window.
+        //
+        g_hwndObjectTree = CreateWindowEx(
+            WS_EX_CLIENTEDGE,
+            WC_TREEVIEW,
+            NULL,
+            WS_VISIBLE | WS_CHILD | WS_TABSTOP |
+            TVS_DISABLEDRAGDROP | TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT,
+            0,
+            0,
+            0,
+            0,
+            MainWindow,
+            (HMENU)1002,
+            g_WinObj.hInstance,
+            NULL);
 
         if (g_hwndObjectTree == NULL)
             break;
 
-        g_hwndObjectList = CreateWindowEx(WS_EX_CLIENTEDGE, WC_LISTVIEW, NULL,
-            WS_VISIBLE | WS_CHILD | WS_TABSTOP | LVS_AUTOARRANGE | LVS_REPORT |
-            LVS_SHOWSELALWAYS | LVS_SINGLESEL | LVS_SHAREIMAGELISTS, 0, 0, 0, 0,
-            MainWindow, (HMENU)1003, g_WinObj.hInstance, NULL);
+        //
+        // ListView window.
+        //
+        g_hwndObjectList = CreateWindowEx(
+            WS_EX_CLIENTEDGE,
+            WC_LISTVIEW,
+            NULL,
+            WS_VISIBLE | WS_CHILD | WS_TABSTOP |
+            LVS_AUTOARRANGE | LVS_REPORT | LVS_SHOWSELALWAYS | LVS_SINGLESEL | LVS_SHAREIMAGELISTS,
+            0,
+            0,
+            0,
+            0,
+            MainWindow,
+            (HMENU)1003,
+            g_WinObj.hInstance,
+            NULL);
 
         if (g_hwndObjectList == NULL)
             break;
 
-        hwndToolBar = CreateWindowEx(0, TOOLBARCLASSNAME, NULL,
-            WS_VISIBLE | WS_CHILD | CCS_TOP | TBSTYLE_FLAT | TBSTYLE_TRANSPARENT |
-            TBSTYLE_TOOLTIPS, 0, 0, 0, 0, MainWindow, (HMENU)1004, g_WinObj.hInstance, NULL);
+        //
+        // Toolbar window.
+        //
+        hwndToolBar = CreateWindowEx(
+            0,
+            TOOLBARCLASSNAME,
+            NULL,
+            WS_VISIBLE | WS_CHILD | CCS_TOP |
+            TBSTYLE_FLAT | TBSTYLE_TRANSPARENT | TBSTYLE_TOOLTIPS,
+            0,
+            0,
+            0,
+            0,
+            MainWindow,
+            (HMENU)1004,
+            g_WinObj.hInstance,
+            NULL);
 
         if (hwndToolBar == NULL)
             break;
 
-        hwndSplitter = CreateWindowEx(0, WC_STATIC, NULL,
-            WS_VISIBLE | WS_CHILD, 0, 0, 0, 0, MainWindow, (HMENU)1005, g_WinObj.hInstance, NULL);
+        //
+        // Spliter window.
+        //
+        hwndSplitter = CreateWindowEx(
+            0,
+            WC_STATIC,
+            NULL,
+            WS_VISIBLE | WS_CHILD,
+            0,
+            0,
+            0,
+            0,
+            MainWindow,
+            (HMENU)1005,
+            g_WinObj.hInstance,
+            NULL);
 
-        // initialization of views
+        //
+        // Initialization of views.
+        //
         SendMessage(MainWindow, WM_SIZE, 0, 0);
         ListView_SetExtendedListViewStyle(g_hwndObjectList,
             LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_LABELTIP | LVS_EX_DOUBLEBUFFER);
+
+        //
+        // Apply Window theme.
+        //
+        SetWindowTheme(g_hwndObjectList, TEXT("Explorer"), NULL);
+        SetWindowTheme(g_hwndObjectTree, TEXT("Explorer"), NULL);
 
         // set tree imagelist
         TreeViewImages = supLoadImageList(g_WinObj.hInstance, IDI_ICON_VIEW_DEFAULT, IDI_ICON_VIEW_SELECTED);
@@ -965,7 +1079,7 @@ void WinObjExMain()
             TreeView_SetImageList(g_hwndObjectTree, TreeViewImages, TVSIL_NORMAL);
         }
 
-        //not enough user rights, insert run as admin menu entry and hide admin only stuff
+        //not enough user rights, insert run as admin menu entry
         if ((IsFullAdmin == FALSE) && (g_kdctx.IsWine == FALSE)) {
             hMenu = GetSubMenu(GetMenu(MainWindow), 0);
             InsertMenu(hMenu, 0, MF_BYPOSITION, ID_FILE_RUNASADMIN, T_RUNASADMIN);
@@ -977,6 +1091,35 @@ void WinObjExMain()
                 supSetMenuIcon(hMenu, ID_FILE_RUNASADMIN, (ULONG_PTR)sii.hIcon);
             }
         }
+        else {
+            //insert run as localsystem menu entry if possible
+            hToken = supGetCurrentProcessToken();
+            if (hToken) {
+                if (NT_SUCCESS(supIsLocalSystem(hToken, &bLocalSystem))) {
+                    if (bLocalSystem == FALSE) {
+                        hMenu = GetSubMenu(GetMenu(MainWindow), 0);
+                        InsertMenu(hMenu, 0, MF_BYPOSITION, ID_FILE_RUNASADMIN, T_RUNASSYSTEM);
+                        InsertMenu(hMenu, 1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+                        RtlSecureZeroMemory(&sii, sizeof(sii));
+                        sii.cbSize = sizeof(sii);
+                        if (SHGetStockIconInfo(SIID_DESKTOPPC, SHGSI_ICON | SHGFI_SMALLICON, &sii) == S_OK) {
+                            supSetMenuIcon(hMenu, ID_FILE_RUNASADMIN, (ULONG_PTR)sii.hIcon);
+                        }
+                    }
+                    else {
+                        RtlSecureZeroMemory(szWindowTitle, sizeof(szWindowTitle));
+                        _strcpy(szWindowTitle, PROGRAM_NAME);
+                        _strcat(szWindowTitle, TEXT(" (LocalSystem)"));
+                        SetWindowText(MainWindow, szWindowTitle);
+                    }
+                }
+                NtClose(hToken);
+            }
+        }
+
+        //
+        // Hide admin only stuff.
+        //
 
         if (g_kdctx.hDevice == NULL) {
             //require driver usage, remove
@@ -984,18 +1127,24 @@ void WinObjExMain()
             DeleteMenu(GetSubMenu(GetMenu(MainWindow), 4), ID_EXTRAS_PRIVATENAMESPACES, MF_BYCOMMAND);
         }
 
-        //unsupported
-        if (g_WinObj.osver.dwBuildNumber > 10240) {
+        //
+        // This feature is not supported in Windows 10 10586.
+        //
+        if (g_NtBuildNumber == 10586) {
             DeleteMenu(GetSubMenu(GetMenu(MainWindow), 4), ID_EXTRAS_PRIVATENAMESPACES, MF_BYCOMMAND);
         }
 
-        //wine unsupported
+        //
+        // This feature is not unsupported in Wine.
+        //
         if (g_kdctx.IsWine != FALSE) {
             DeleteMenu(GetSubMenu(GetMenu(MainWindow), 4), ID_EXTRAS_DRIVERS, MF_BYCOMMAND);
         }
 
-        //load listview images
-        g_ListViewImages = supLoadImageList(g_WinObj.hInstance, IDI_ICON_DEVICE, IDI_ICON_UNKNOWN);
+        //
+        // Load listview images for object types.
+        //
+        g_ListViewImages = ObManagerLoadImageList();
         if (g_ListViewImages) {
             hIcon = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
             if (hIcon) {
@@ -1010,9 +1159,17 @@ void WinObjExMain()
             ListView_SetImageList(g_hwndObjectList, g_ListViewImages, LVSIL_SMALL);
         }
 
-        //load toolbar images
-        g_ToolBarMenuImages = ImageList_LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDB_BITMAP1),
-            16, 7, CLR_DEFAULT, IMAGE_BITMAP, LR_CREATEDIBSECTION);
+        //
+        // Load toolbar images.
+        //
+        g_ToolBarMenuImages = ImageList_LoadImage(
+            g_WinObj.hInstance,
+            MAKEINTRESOURCE(IDB_BITMAP1),
+            16,
+            7,
+            CLR_DEFAULT,
+            IMAGE_BITMAP,
+            LR_CREATEDIBSECTION);
 
         if (g_ToolBarMenuImages) {
 
@@ -1067,24 +1224,26 @@ void WinObjExMain()
         col.pszText = TEXT("Name");
         col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
         col.iOrder = 0;
-        col.iImage = -1;
         if (g_ListViewImages) {
             col.iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
+        }
+        else {
+            col.iImage = I_IMAGENONE;
         }
         col.cx = 300;
         ListView_InsertColumn(g_hwndObjectList, 1, &col);
 
+        col.iImage = I_IMAGENONE;
+
         col.iSubItem = 2;
         col.pszText = TEXT("Type");
-        col.iOrder = 1;
-        col.iImage = -1;
+        col.iOrder = 1;       
         col.cx = 100;
         ListView_InsertColumn(g_hwndObjectList, 2, &col);
 
         col.iSubItem = 3;
         col.pszText = TEXT("Additional Information");
         col.iOrder = 2;
-        col.iImage = -1;
         col.cx = 170;
         ListView_InsertColumn(g_hwndObjectList, 3, &col);
 
@@ -1124,6 +1283,7 @@ void WinObjExMain()
     TestStop();
 #endif
 
+    return ERROR_SUCCESS;
 }
 
 /*
@@ -1137,6 +1297,5 @@ void WinObjExMain()
 void main()
 {
     __security_init_cookie();
-    WinObjExMain();
-    ExitProcess(0);
+    ExitProcess(WinObjExMain());
 }

@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     1.52
+*  VERSION:     1.60
 *
-*  DATE:        08 Jan 2018
+*  DATE:        24 Oct 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -39,23 +39,30 @@ INT CALLBACK SdtDlgCompareFunc(
     INT       nResult = 0;
     LPWSTR    lpItem1 = NULL, lpItem2 = NULL;
     ULONG     id1, id2;
-    ULONG_PTR ad1, ad2;
 
-    SIZE_T cbItem1 = 0, cbItem2 = 0;
-
-    USHORT AddressPrefix;
+    //
+    // Sort addresses.
+    //
+    if (lParamSort == 2) {
+        return supGetMaxOfTwoU64FromHex(
+            DlgContext.ListView,
+            lParam1,
+            lParam2,
+            lParamSort,
+            DlgContext.bInverseSort);
+    }
 
     lpItem1 = supGetItemText(
-        DlgContext.ListView, 
-        (INT)lParam1, 
-        (INT)lParamSort, 
-        &cbItem1);
+        DlgContext.ListView,
+        (INT)lParam1,
+        (INT)lParamSort,
+        NULL);
 
     lpItem2 = supGetItemText(
-        DlgContext.ListView, 
-        (INT)lParam2, 
-        (INT)lParamSort, 
-        &cbItem2);
+        DlgContext.ListView,
+        (INT)lParam2,
+        (INT)lParamSort,
+        NULL);
 
     if ((lpItem1 == NULL) &&
         (lpItem2 == NULL))
@@ -82,37 +89,6 @@ INT CALLBACK SdtDlgCompareFunc(
             nResult = id1 < id2;
         else
             nResult = id1 > id2;
-
-        break;
-
-    case 2: //sort Address
-
-        if ((cbItem1 / sizeof(WCHAR) != MAX_ADDRESS_TEXT_LENGTH64) &&
-            (cbItem2 / sizeof(WCHAR) != MAX_ADDRESS_TEXT_LENGTH64))
-        {
-            nResult = 0;
-            break;
-        }
-
-        ad1 = 0;
-        ad2 = 0;
-
-        if (lpItem1) {
-            AddressPrefix = supIsAddressPrefix(lpItem1, cbItem1);
-            if (AddressPrefix == 2)
-                ad1 = hextou64(&lpItem1[AddressPrefix]);
-        }
-
-        if (lpItem2) {
-            AddressPrefix = supIsAddressPrefix(lpItem2, cbItem2);
-            if (AddressPrefix == 2)
-                ad2 = hextou64(&lpItem2[AddressPrefix]);
-        }
-
-        if (DlgContext.bInverseSort)
-            nResult = ad1 < ad2;
-        else
-            nResult = ad1 > ad2;
 
         break;
 
@@ -216,7 +192,7 @@ VOID SdtSaveListToFile(
             }
             _strcat(output, L"\r\n");
             BufferSize = (INT)_strlen(output);
-            supWriteBufferToFile(szTempBuffer, output, BufferSize * sizeof(WCHAR), FALSE, TRUE);
+            supWriteBufferToFile(szTempBuffer, output, (SIZE_T)(BufferSize * sizeof(WCHAR)), FALSE, TRUE);
         }
 
         SetCursor(hSaveCursor);
@@ -300,12 +276,12 @@ VOID SdtListTable(
 )
 {
     BOOL                    cond = FALSE;
+    ULONG                   EntrySize = 0;
     PUTable                 TableDump = NULL;
     PRTL_PROCESS_MODULES    pModules = NULL;
-    PVOID                   Module = NULL;
-    PIMAGE_EXPORT_DIRECTORY pexp = NULL;
+    PBYTE                   Module = NULL;
+    PIMAGE_EXPORT_DIRECTORY ExportDirectory = NULL;
     PIMAGE_NT_HEADERS       NtHeaders = NULL;
-    DWORD                   ETableVA;
     PDWORD                  names, functions;
     PWORD                   ordinals;
     LVITEM                  lvitem;
@@ -326,17 +302,12 @@ VOID SdtListTable(
             //if table empty, dump and prepare table
             if (g_SdtTable == NULL) {
 
-                if (g_WinObj.hNtdllModule == NULL) {
-                    Module = GetModuleHandle(TEXT("ntdll.dll"));
-                }
-                else {
-                    Module = g_WinObj.hNtdllModule;
-                }
+                Module = (PBYTE)GetModuleHandle(TEXT("ntdll.dll"));
 
                 if (Module == NULL)
                     break;
 
-                g_SdtTable = (PSERVICETABLEENTRY)supHeapAlloc(sizeof(SERVICETABLEENTRY) * g_kdctx.KiServiceLimit);
+                g_SdtTable = (PSERVICETABLEENTRY)supHeapAlloc((SIZE_T)(sizeof(SERVICETABLEENTRY) * g_kdctx.KiServiceLimit));
                 if (g_SdtTable == NULL)
                     break;
 
@@ -347,15 +318,22 @@ VOID SdtListTable(
                 if (NtHeaders == NULL)
                     break;
 
-                ETableVA = NtHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
-                pexp = (PIMAGE_EXPORT_DIRECTORY)((PBYTE)Module + ETableVA);
-                names = (PDWORD)((PBYTE)Module + pexp->AddressOfNames),
-                    functions = (PDWORD)((PBYTE)Module + pexp->AddressOfFunctions);
-                ordinals = (PWORD)((PBYTE)Module + pexp->AddressOfNameOrdinals);
+                ExportDirectory = RtlImageDirectoryEntryToData(
+                    Module,
+                    TRUE,
+                    IMAGE_DIRECTORY_ENTRY_EXPORT,
+                    &EntrySize);
+
+                if (ExportDirectory == NULL)
+                    break;
+
+                names = (PDWORD)((PBYTE)Module + ExportDirectory->AddressOfNames);
+                functions = (PDWORD)((PBYTE)Module + ExportDirectory->AddressOfFunctions);
+                ordinals = (PWORD)((PBYTE)Module + ExportDirectory->AddressOfNameOrdinals);
 
                 //walk for Nt stubs
                 g_cSdtTable = 0;
-                for (i = 0; i < pexp->NumberOfNames; i++) {
+                for (i = 0; i < ExportDirectory->NumberOfNames; i++) {
 
                     name = ((CHAR *)Module + names[i]);
                     addr = (PVOID *)((CHAR *)Module + functions[ordinals[i]]);
@@ -392,7 +370,7 @@ VOID SdtListTable(
                         break;
                     }
                 }
-                
+
                 supHeapFree(TableDump);
                 TableDump = NULL;
             }
@@ -405,7 +383,7 @@ VOID SdtListTable(
                 lvitem.mask = LVIF_TEXT | LVIF_IMAGE;
                 lvitem.iSubItem = 0;
                 lvitem.iItem = MAXINT;
-                lvitem.iImage = TYPE_DEVICE; //imagelist id
+                lvitem.iImage = ObjectTypeDevice; //imagelist id
                 RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
                 ultostr(g_SdtTable[i].ServiceId, szBuffer);
                 lvitem.pszText = szBuffer;
@@ -438,7 +416,9 @@ VOID SdtListTable(
                 }
                 else {
 
-                    MultiByteToWideChar(CP_ACP, 0,
+                    MultiByteToWideChar(
+                        CP_ACP,
+                        0,
                         (LPCSTR)&pModules->Modules[number].FullPathName,
                         (INT)_strlen_a((char*)pModules->Modules[number].FullPathName),
                         szBuffer,
@@ -507,24 +487,30 @@ VOID extrasCreateSSDTDialog(
     DlgContext.ListView = GetDlgItem(DlgContext.hwndDlg, ID_EXTRASLIST);
     if (DlgContext.ListView) {
 
+        //
+        // Set listview imagelist, style flags and theme.
+        //
         ListView_SetImageList(DlgContext.ListView, g_ListViewImages, LVSIL_SMALL);
         ListView_SetExtendedListViewStyle(DlgContext.ListView,
             LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
+
+        SetWindowTheme(DlgContext.ListView, TEXT("Explorer"), NULL);
 
         //columns
         RtlSecureZeroMemory(&col, sizeof(col));
         col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
         col.iSubItem++;
         col.pszText = TEXT("Id");
+        col.cx = 80;
         col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
         col.iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
-        col.cx = 80;
         ListView_InsertColumn(DlgContext.ListView, col.iSubItem, &col);
+
+        col.iImage = I_IMAGENONE;
 
         col.iSubItem++;
         col.pszText = TEXT("Service Name");
         col.iOrder++;
-        col.iImage = -1;
         col.cx = 200;
         ListView_InsertColumn(DlgContext.ListView, col.iSubItem, &col);
 

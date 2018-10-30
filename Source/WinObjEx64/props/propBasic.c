@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     1.55
+*  VERSION:     1.60
 *
-*  DATE:        30 Aug 2018
+*  DATE:        24 Oct 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1069,8 +1069,6 @@ VOID propBasicQueryDevice(
 *
 * Set information values for Partition object type
 *
-* If ExtendedInfoAvailable is FALSE then it calls propSetDefaultInfo to set Basic page properties
-*
 */
 VOID propBasicQueryMemoryPartition(
     _In_ PROP_OBJECT_INFO *Context,
@@ -1090,15 +1088,90 @@ VOID propBasicQueryMemoryPartition(
     if (!propOpenCurrentObject(Context, &hObject, MEMORY_PARTITION_QUERY_ACCESS))
         return;
 
-    //TODO more info here
-    //FIXME FIXME
-
-
     //
     // Query object basic and type info if needed.
     //
     propSetDefaultInfo(Context, hwndDlg, hObject);
     NtClose(hObject);
+}
+
+/*
+* propBasicQueryAlpcPort
+*
+* Purpose:
+*
+* Set information values for AlpcPort object type
+*
+*/
+VOID propBasicQueryAlpcPort(
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ HWND hwndDlg
+)
+{
+    ULONG_PTR OwnerProcess;
+    ULONG ObjectSize = 0, ObjectVersion = 0;
+    PVOID ProcessList;
+
+    WCHAR szBuffer[MAX_PATH * 2];
+
+    union {
+        union {
+            ALPC_PORT_7600 *Port7600;
+            ALPC_PORT_9200 *Port9200;
+            ALPC_PORT_9600 *Port9600;
+            ALPC_PORT_10240 *Port10240;
+        } u1;
+        PBYTE Ref;
+    } AlpcPort;
+
+    if (Context == NULL) {
+        return;
+    }
+
+    AlpcPort.Ref = ObDumpAlpcPortObjectVersionAware(
+        Context->ObjectInfo.ObjectAddress,
+        &ObjectSize,
+        &ObjectVersion);
+
+    if (AlpcPort.Ref == NULL)
+        return;
+
+    //
+    // Determine owner process.
+    //
+    OwnerProcess = (ULONG_PTR)AlpcPort.u1.Port7600->OwnerProcess;
+    if (OwnerProcess) {
+        szBuffer[0] = L'0';
+        szBuffer[1] = L'x';
+        szBuffer[2] = 0;
+        u64tohex(OwnerProcess, &szBuffer[2]);
+
+        _strcat(szBuffer, TEXT(" ("));
+
+        ProcessList = supGetSystemInfo(SystemProcessInformation);
+        if (ProcessList) {
+
+            if (!supQueryProcessNameByEPROCESS(
+                OwnerProcess,
+                ProcessList,
+                _strend(szBuffer),
+                MAX_PATH))
+            {
+                _strcat(szBuffer, T_CannotQuery);
+            }
+            supHeapFree(ProcessList);
+        }
+        else {
+            _strcat(szBuffer, T_CannotQuery);
+        }
+        _strcat(szBuffer, TEXT(")"));
+    }
+    else {
+        _strcpy(szBuffer, T_CannotQuery);
+    }
+    SetDlgItemText(hwndDlg, ID_ALPC_OWNERPROCESS, szBuffer);
+
+    supVirtualFree(AlpcPort.Ref);
 }
 
 /*
@@ -1207,7 +1280,7 @@ VOID propBasicQueryJob(
                 break;
 
             //allocate default size
-            bytesNeeded = sizeof(JOBOBJECT_BASIC_PROCESS_ID_LIST);
+            bytesNeeded = PAGE_SIZE;
             pJobProcList = supVirtualAlloc(bytesNeeded);
             if (pJobProcList == NULL)
                 break;
@@ -1251,7 +1324,12 @@ VOID propBasicQueryJob(
                         //
                         // Query process name.
                         //
-                        if (!supQueryProcessName(ProcessId, ProcessList, szProcessName, MAX_PATH)) {
+                        if (!supQueryProcessName(
+                            ProcessId, 
+                            ProcessList, 
+                            szProcessName, 
+                            MAX_PATH)) 
+                        {
                             _strcpy(szProcessName, TEXT("UnknownProcess"));
                         }
 
@@ -1462,11 +1540,24 @@ VOID propSetBasicInfo(
     SetDlgItemText(hwndDlg, ID_OBJECT_NAME, Context->lpObjectName);
     SetDlgItemText(hwndDlg, ID_OBJECT_TYPE, Context->lpObjectType);
 
-    //desktops should be parsed differently
-    if (Context->TypeIndex != TYPE_DESKTOP) {
+    //
+    // Desktops should be parsed differently.
+    //
+    if (Context->TypeIndex != ObjectTypeDesktop) {
 
-        //try to dump object info
-        InfoObject = ObQueryObject(Context->lpCurrentObjectPath, Context->lpObjectName);
+        //
+        // If object is in private namespace then dump it information by object address.
+        // Otherwise query object as usual.
+        //
+        if (Context->IsPrivateNamespaceObject) {
+            InfoObject = ObQueryObjectByAddress(Context->NamespaceInfo.ObjectAddress);
+        }
+        else {
+            //
+            // Try to dump object info.
+            //
+            InfoObject = ObQueryObject(Context->lpCurrentObjectPath, Context->lpObjectName);
+        }
         ExtendedInfoAvailable = (InfoObject != NULL);
         if (InfoObject == NULL) {
             SetDlgItemText(hwndDlg, ID_OBJECT_ADDR, L"");
@@ -1480,6 +1571,15 @@ VOID propSetBasicInfo(
             // Set Object Address, Header Address, NP/PP Charge, RefCount, HandleCount, Attributes.
             //
             propSetBasicInfoEx(hwndDlg, InfoObject);
+
+            //
+            // Special case for AlpcPort object type.
+            // The only infor we can get is from driver here as we cannot open port directly.
+            // 
+            if (Context->TypeIndex == ObjectTypePort) {
+                propBasicQueryAlpcPort(Context, hwndDlg);
+            }
+
             supHeapFree(InfoObject);
         }
     }
@@ -1489,7 +1589,7 @@ VOID propSetBasicInfo(
     // If extended info not available each routine should query basic info itself.
     //
     switch (Context->TypeIndex) {
-    case TYPE_DIRECTORY:
+    case ObjectTypeDirectory:
         //if TRUE skip this because directory is basic dialog and basic info already set
         if (ExtendedInfoAvailable == FALSE) {
             propBasicQueryDirectory(Context, hwndDlg);
@@ -1501,46 +1601,46 @@ VOID propSetBasicInfo(
         propSetProcessTrustLabelInfo(Context, hwndDlg);
 
         break;
-    case TYPE_DRIVER:
+    case ObjectTypeDriver:
         propBasicQueryDriver(Context, hwndDlg);
         break;
-    case TYPE_DEVICE:
+    case ObjectTypeDevice:
         propBasicQueryDevice(Context, hwndDlg);
         break;
-    case TYPE_SYMLINK:
+    case ObjectTypeSymbolicLink:
         propBasicQuerySymlink(Context, hwndDlg, ExtendedInfoAvailable);
         break;
-    case TYPE_KEY:
+    case ObjectTypeKey:
         propBasicQueryKey(Context, hwndDlg, ExtendedInfoAvailable);
         break;
-    case TYPE_MUTANT:
+    case ObjectTypeMutant:
         propBasicQueryMutant(Context, hwndDlg, ExtendedInfoAvailable);
         break;
-    case TYPE_EVENT:
+    case ObjectTypeEvent:
         propBasicQueryEvent(Context, hwndDlg, ExtendedInfoAvailable);
         break;
-    case TYPE_TIMER:
+    case ObjectTypeTimer:
         propBasicQueryTimer(Context, hwndDlg, ExtendedInfoAvailable);
         break;
-    case TYPE_SEMAPHORE:
+    case ObjectTypeSemaphore:
         propBasicQuerySemaphore(Context, hwndDlg, ExtendedInfoAvailable);
         break;
-    case TYPE_SECTION:
+    case ObjectTypeSection:
         propBasicQuerySection(Context, hwndDlg, ExtendedInfoAvailable);
         break;
-    case TYPE_WINSTATION:
+    case ObjectTypeWinstation:
         propBasicQueryWindowStation(Context, hwndDlg, ExtendedInfoAvailable);
         break;
-    case TYPE_JOB:
+    case ObjectTypeJob:
         propBasicQueryJob(Context, hwndDlg, ExtendedInfoAvailable);
         break;
-    case TYPE_DESKTOP:
+    case ObjectTypeDesktop:
         propBasicQueryDesktop(Context, hwndDlg);
         break;
-    case TYPE_IOCOMPLETION:
+    case ObjectTypeIoCompletion:
         propBasicQueryIoCompletion(Context, hwndDlg, ExtendedInfoAvailable);
         break;
-    case TYPE_MEMORYPARTITION:
+    case ObjectTypeMemoryPartition:
         propBasicQueryMemoryPartition(Context, hwndDlg);
         break;
     }

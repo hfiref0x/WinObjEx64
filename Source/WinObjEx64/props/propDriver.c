@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDRIVER.C
 *
-*  VERSION:     1.52
+*  VERSION:     1.60
 *
-*  DATE:        08 Jan 2018
+*  DATE:        24 Oct 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -66,17 +66,29 @@ VOID DriverSetInfo(
         ShowWindow(GetDlgItem(hwndDlg, IDC_QUERYFAIL), FALSE);
 
         do {
-            SchSCManager = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT | SC_MANAGER_ENUMERATE_SERVICE);
+            SchSCManager = OpenSCManager(
+                NULL,
+                NULL,
+                SC_MANAGER_CONNECT | SC_MANAGER_ENUMERATE_SERVICE);
+
             if (SchSCManager == NULL)
                 break;
 
-            schService = OpenService(SchSCManager, Context->lpObjectName,
+            schService = OpenService(
+                SchSCManager,
+                Context->lpObjectName,
                 SERVICE_QUERY_CONFIG | SERVICE_QUERY_STATUS | SERVICE_ENUMERATE_DEPENDENTS);
+
             if (schService == NULL)
                 break;
 
             bytesNeeded = 0;
-            bResult = QueryServiceConfig(schService, NULL, 0, &bytesNeeded);
+            bResult = QueryServiceConfig(
+                schService,
+                NULL,
+                0,
+                &bytesNeeded);
+
             if ((bResult == FALSE) && (bytesNeeded == 0))
                 break;
 
@@ -104,29 +116,29 @@ VOID DriverSetInfo(
                 lpType = T_UnknownType;
                 switch (psci->dwServiceType) {
                 case SERVICE_KERNEL_DRIVER:
-                    lpType = L"Kernel-Mode Driver";
+                    lpType = TEXT("Kernel-Mode Driver");
                     break;
                 case SERVICE_FILE_SYSTEM_DRIVER:
-                    lpType = L"File System Driver";
+                    lpType = TEXT("File System Driver");
                     break;
                 case SERVICE_ADAPTER:
-                    lpType = L"Adapter";
+                    lpType = TEXT("Adapter");
                     break;
                 case SERVICE_RECOGNIZER_DRIVER:
-                    lpType = L"File System Recognizer";
+                    lpType = TEXT("File System Recognizer");
                     break;
                 case SERVICE_WIN32_OWN_PROCESS:
-                    lpType = L"Own Process";
+                    lpType = TEXT("Own Process");
                     break;
                 case SERVICE_WIN32_SHARE_PROCESS:
-                    lpType = L"Share Process";
+                    lpType = TEXT("Share Process");
                     break;
                 case (SERVICE_WIN32_OWN_PROCESS | SERVICE_INTERACTIVE_PROCESS):
-                    lpType = L"Own Process (Interactive)";
+                    lpType = TEXT("Own Process (Interactive)");
                     SetDlgItemText(hwndDlg, ID_SERVICE_NAME, psci->lpServiceStartName);
                     break;
                 case (SERVICE_WIN32_SHARE_PROCESS | SERVICE_INTERACTIVE_PROCESS):
-                    lpType = L"Share Process (Interactive)";
+                    lpType = TEXT("Share Process (Interactive)");
                     SetDlgItemText(hwndDlg, ID_SERVICE_NAME, psci->lpServiceStartName);
                     break;
                 }
@@ -136,19 +148,19 @@ VOID DriverSetInfo(
                 lpType = T_UnknownType;
                 switch (psci->dwStartType) {
                 case SERVICE_AUTO_START:
-                    lpType = L"Auto";
+                    lpType = TEXT("Auto");
                     break;
                 case SERVICE_BOOT_START:
-                    lpType = L"Boot";
+                    lpType = TEXT("Boot");
                     break;
                 case SERVICE_DEMAND_START:
-                    lpType = L"On Demand";
+                    lpType = TEXT("On Demand");
                     break;
                 case SERVICE_DISABLED:
-                    lpType = L"Disabled";
+                    lpType = TEXT("Disabled");
                     break;
                 case SERVICE_SYSTEM_START:
-                    lpType = L"System";
+                    lpType = TEXT("System");
                     break;
                 }
                 SetDlgItemText(hwndDlg, ID_SERVICE_START, lpType);
@@ -157,16 +169,16 @@ VOID DriverSetInfo(
                 lpType = T_Unknown;
                 switch (psci->dwErrorControl) {
                 case SERVICE_ERROR_CRITICAL:
-                    lpType = L"Critical";
+                    lpType = TEXT("Critical");
                     break;
                 case SERVICE_ERROR_IGNORE:
-                    lpType = L"Ignore";
+                    lpType = TEXT("Ignore");
                     break;
                 case SERVICE_ERROR_NORMAL:
-                    lpType = L"Normal";
+                    lpType = TEXT("Normal");
                     break;
                 case SERVICE_ERROR_SEVERE:
-                    lpType = L"Severe";
+                    lpType = TEXT("Severe");
                     break;
                 }
                 SetDlgItemText(hwndDlg, ID_SERVICE_ERROR, lpType);
@@ -190,25 +202,25 @@ VOID DriverSetInfo(
                     lpType = T_Unknown;
                     switch (ssp.dwCurrentState) {
                     case SERVICE_STOPPED:
-                        lpType = L"Stopped";
+                        lpType = TEXT("Stopped");
                         break;
                     case SERVICE_START_PENDING:
-                        lpType = L"Start Pending";
+                        lpType = TEXT("Start Pending");
                         break;
                     case SERVICE_STOP_PENDING:
-                        lpType = L"Stop Pending";
+                        lpType = TEXT("Stop Pending");
                         break;
                     case SERVICE_RUNNING:
-                        lpType = L"Running";
+                        lpType = TEXT("Running");
                         break;
                     case SERVICE_CONTINUE_PENDING:
-                        lpType = L"Continue Pending";
+                        lpType = TEXT("Continue Pending");
                         break;
                     case SERVICE_PAUSE_PENDING:
-                        lpType = L"Pause Pending";
+                        lpType = TEXT("Pause Pending");
                         break;
                     case SERVICE_PAUSED:
-                        lpType = L"Paused";
+                        lpType = TEXT("Paused");
                         break;
                     }
                     SetDlgItemText(hwndDlg, ID_SERVICE_CURRENT, lpType);
@@ -224,8 +236,12 @@ VOID DriverSetInfo(
                 psd = supHeapAlloc(bytesNeeded);
                 if (psd) {
 
-                    bRet = QueryServiceConfig2(schService, SERVICE_CONFIG_DESCRIPTION,
-                        (LPBYTE)psd, bytesNeeded, &bytesNeeded);
+                    bRet = QueryServiceConfig2(
+                        schService,
+                        SERVICE_CONFIG_DESCRIPTION,
+                        (LPBYTE)psd,
+                        bytesNeeded,
+                        &bytesNeeded);
 
                     if ((bRet == FALSE) && (bytesNeeded != 0)) {
                         supHeapFree(psd);
@@ -233,8 +249,12 @@ VOID DriverSetInfo(
                     }
                     if (psd) {
                         //set description or hide window
-                        bRet = QueryServiceConfig2(schService, SERVICE_CONFIG_DESCRIPTION,
-                            (LPBYTE)psd, bytesNeeded, &bytesNeeded);
+                        bRet = QueryServiceConfig2(
+                            schService,
+                            SERVICE_CONFIG_DESCRIPTION,
+                            (LPBYTE)psd,
+                            bytesNeeded,
+                            &bytesNeeded);
 
                         if (bRet) {
                             SetDlgItemText(hwndDlg, IDC_SERVICE_DESCRIPTION, psd->lpDescription);
@@ -270,7 +290,7 @@ VOID DriverSetInfo(
 
                         //iterate through MULTI_SZ string
                         do {
-                            while (psci->lpDependencies[nEnd] != L'\0') {
+                            while (psci->lpDependencies[nEnd] != TEXT('\0')) {
                                 nEnd++;
                             }
 
@@ -320,17 +340,23 @@ VOID DriverSetInfo(
                     lpDependencies = supHeapAlloc(bytesNeeded);
                     if (lpDependencies) {
 
-                        bRet = EnumDependentServices(schService, SERVICE_STATE_ALL, lpDependencies,
-                            bytesNeeded, &bytesNeeded, &dwServices);
+                        bRet = EnumDependentServices(
+                            schService,
+                            SERVICE_STATE_ALL,
+                            lpDependencies,
+                            bytesNeeded,
+                            &bytesNeeded,
+                            &dwServices);
 
                         if (bRet && (GetLastError() == ERROR_MORE_DATA)) {
                             //more memory needed for enum
                             supHeapFree(lpDependencies);
                             dwServices = 0;
-                            lpDependencies = supHeapAlloc(bytesNeeded);
+                            lpDependencies = supHeapAlloc((SIZE_T)bytesNeeded);
                             if (lpDependencies) {
 
-                                bRet = EnumDependentServices(schService,
+                                bRet = EnumDependentServices(
+                                    schService,
                                     SERVICE_STATE_ALL,
                                     lpDependencies,
                                     bytesNeeded,
@@ -345,13 +371,23 @@ VOID DriverSetInfo(
                             if (bRet && dwServices) {
                                 for (i = 0; i < dwServices; i++) {
                                     ess = *(lpDependencies + i);
-                                    SendDlgItemMessage(hwndDlg, IDC_SERVICE_DEPENDENTSERVICES, CB_ADDSTRING,
-                                        (WPARAM)0, (LPARAM)ess.lpServiceName);
+
+                                    SendDlgItemMessage(
+                                        hwndDlg,
+                                        IDC_SERVICE_DEPENDENTSERVICES,
+                                        CB_ADDSTRING,
+                                        (WPARAM)0,
+                                        (LPARAM)ess.lpServiceName);
                                 }
                                 //enable combobox and set current selection to the first item
                                 EnableWindow(GetDlgItem(hwndDlg, IDC_SERVICE_DEPENDENTSERVICES), TRUE);
-                                SendDlgItemMessage(hwndDlg, IDC_SERVICE_DEPENDENTSERVICES, CB_SETCURSEL,
-                                    (WPARAM)0, (LPARAM)0);
+
+                                SendDlgItemMessage(
+                                    hwndDlg,
+                                    IDC_SERVICE_DEPENDENTSERVICES,
+                                    CB_SETCURSEL,
+                                    (WPARAM)0,
+                                    (LPARAM)0);
                             }
                             supHeapFree(lpDependencies);
                         }
@@ -585,7 +621,6 @@ INT_PTR CALLBACK DriverRegistryDialogProc(
     case WM_DESTROY:
         RemoveProp(hwndDlg, T_PROPCONTEXT);
         break;
-
     }
     return 0;
 }

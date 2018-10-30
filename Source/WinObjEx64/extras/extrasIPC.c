@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASIPC.C
 *
-*  VERSION:     1.55
+*  VERSION:     1.60
 *
-*  DATE:        31 Aug 2018
+*  DATE:        24 Oct 2018
 *
 *  IPC supported: Pipes, Mailslots
 *
@@ -707,9 +707,6 @@ VOID IpcDlgHandleNotify(
 
         RtlSecureZeroMemory(&col, sizeof(col));
         col.mask = LVCF_IMAGE;
-        col.iImage = -1;
-
-        ListView_SetColumn(pDlgContext->ListView, 0, &col);
 
         if (pDlgContext->bInverseSort)
             col.iImage = 1;
@@ -912,6 +909,8 @@ VOID extrasCreateIpcDialog(
 
         ListView_SetExtendedListViewStyle(pDlgContext->ListView,
             LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
+
+        SetWindowTheme(pDlgContext->ListView, TEXT("Explorer"), NULL);
 
         RtlSecureZeroMemory(&col, sizeof(col));
         col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;

@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDESKTOP.C
 *
-*  VERSION:     1.53
+*  VERSION:     1.60
 *
-*  DATE:        07 Mar 2018
+*  DATE:        24 Oct 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,15 +17,15 @@
 
 #include "global.h"
 #include "propDlg.h"
+#include "extras.h"
 
-//page imagelist
-HIMAGELIST DesktopImageList = NULL;
-//page listview
-HWND DesktopList = NULL;
-//column to sort
-static LONG	DesktopListSortColumn = 0;
-//sort direction
-BOOL bDesktopListSortInverse = FALSE;
+//number of columns, revise this unit code after any change to this number
+#define DESKTOPLIST_COLUMN_COUNT 3
+
+typedef struct _DLG_ENUM_CALLBACK_CONTEXT {
+    PROP_OBJECT_INFO *ObjectContext;
+    EXTRASCONTEXT *DialogContext;
+} DLG_ENUM_CALLBACK_CONTEXT, *PDLG_ENUM_CALLBACK_CONTEXT;
 
 /*
 * DesktopListEnumProc
@@ -47,22 +47,21 @@ BOOL CALLBACK DesktopListEnumProc(
     PSID              pSID;
     SIZE_T            sz;
     HDESK             hDesktop;
-    PROP_OBJECT_INFO *Context;
     LVITEM            lvitem;
     WCHAR             szBuffer[MAX_PATH];
 
-    Context = (PROP_OBJECT_INFO*)lParam;
-    if (Context == NULL) {
+    DLG_ENUM_CALLBACK_CONTEXT *enumParam = (DLG_ENUM_CALLBACK_CONTEXT*)lParam;
+    if (enumParam == NULL) {
         return FALSE;
     }
 
     // Desktop\\Object+0
-    sz = (3 + _strlen(lpszDesktop) + _strlen(Context->lpObjectName)) * sizeof(WCHAR);
+    sz = (3 + _strlen(lpszDesktop) + _strlen(enumParam->ObjectContext->lpObjectName)) * sizeof(WCHAR);
     lpName = supHeapAlloc(sz);
     if (lpName == NULL)
         return 0;
 
-    _strcpy(lpName, Context->lpObjectName);
+    _strcpy(lpName, enumParam->ObjectContext->lpObjectName);
     _strcat(lpName, TEXT("\\"));
     _strcat(lpName, lpszDesktop);
 
@@ -73,7 +72,7 @@ BOOL CALLBACK DesktopListEnumProc(
     lvitem.iSubItem = 0;
     lvitem.pszText = lpName;
     lvitem.iItem = MAXINT;
-    nIndex = ListView_InsertItem(DesktopList, &lvitem);
+    nIndex = ListView_InsertItem(enumParam->DialogContext->ListView, &lvitem);
 
     supHeapFree(lpName);
 
@@ -90,7 +89,7 @@ BOOL CALLBACK DesktopListEnumProc(
         //
         bytesNeeded = 0;
         GetUserObjectInformation(hDesktop, UOI_USER_SID, NULL, 0, &bytesNeeded);
-        
+
         //
         // User associated with desktop present, query sid.
         //
@@ -117,7 +116,7 @@ BOOL CALLBACK DesktopListEnumProc(
             lvitem.iSubItem = 1;
             lvitem.pszText = StringSid;
             lvitem.iItem = nIndex;
-            ListView_SetItem(DesktopList, &lvitem);
+            ListView_SetItem(enumParam->DialogContext->ListView, &lvitem);
             LocalFree(StringSid);
         }
 
@@ -125,11 +124,11 @@ BOOL CALLBACK DesktopListEnumProc(
         // Add Desktop Heap Size, returned in KBytes.
         //
         dwDesktopHeapSize = 0;
-        if (GetUserObjectInformation(hDesktop, 
+        if (GetUserObjectInformation(hDesktop,
             UOI_HEAPSIZE,
-            &dwDesktopHeapSize, 
-            sizeof(dwDesktopHeapSize), 
-            &bytesNeeded)) 
+            &dwDesktopHeapSize,
+            sizeof(dwDesktopHeapSize),
+            &bytesNeeded))
         {
             RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
             ultostr(dwDesktopHeapSize / 1024, szBuffer);
@@ -139,7 +138,7 @@ BOOL CALLBACK DesktopListEnumProc(
             lvitem.iSubItem = 2;
             lvitem.pszText = szBuffer;
             lvitem.iItem = nIndex;
-            ListView_SetItem(DesktopList, &lvitem);
+            ListView_SetItem(enumParam->DialogContext->ListView, &lvitem);
         }
         CloseDesktop(hDesktop);
     }
@@ -156,22 +155,25 @@ BOOL CALLBACK DesktopListEnumProc(
 *
 */
 VOID DesktopListSetInfo(
+    _In_ HWND hwndDlg,
     _In_ PROP_OBJECT_INFO *Context,
-    _In_ HWND hwndDlg
+    _In_ EXTRASCONTEXT *pDlgContext
 )
 {
     BOOL    bResult = FALSE;
     HWINSTA hObject;
 
-    if (Context == NULL) {
-        return;
-    }
+    DLG_ENUM_CALLBACK_CONTEXT enumParam;
 
-    ListView_DeleteAllItems(DesktopList);
+    ListView_DeleteAllItems(pDlgContext->ListView);
 
     hObject = supOpenWindowStationFromContext(Context, FALSE, WINSTA_ENUMDESKTOPS);
     if (hObject) {
-        EnumDesktops(hObject, DesktopListEnumProc, (LPARAM)Context);
+
+        enumParam.ObjectContext = Context;
+        enumParam.DialogContext = pDlgContext;
+
+        EnumDesktops(hObject, DesktopListEnumProc, (LPARAM)&enumParam);
         CloseWindowStation(hObject);
         bResult = TRUE;
     }
@@ -188,43 +190,47 @@ VOID DesktopListSetInfo(
 *
 */
 VOID DesktopListCreate(
-    _In_ HWND hwndDlg
+    _In_ HWND hwndDlg,
+    _In_ EXTRASCONTEXT *pDlgContext
 )
 {
     LVCOLUMN col;
     HANDLE   hImage;
 
-    DesktopList = GetDlgItem(hwndDlg, ID_DESKTOPSLIST);
-    if (DesktopList == NULL)
+    pDlgContext->ListView = GetDlgItem(hwndDlg, ID_DESKTOPSLIST);
+    if (pDlgContext->ListView == NULL)
         return;
 
-    DesktopImageList = ImageList_Create(16, 16, ILC_COLOR32 | ILC_MASK, 8, 8);
-    if (DesktopImageList) {
+    pDlgContext->ImageList = ImageList_Create(16, 16, ILC_COLOR32 | ILC_MASK, 8, 8);
+    if (pDlgContext->ImageList) {
 
         //desktop image
         hImage = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_DESKTOP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
         if (hImage) {
-            ImageList_ReplaceIcon(DesktopImageList, -1, hImage);
+            ImageList_ReplaceIcon(pDlgContext->ImageList, -1, hImage);
             DestroyIcon(hImage);
         }
 
         //sort images
         hImage = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
         if (hImage) {
-            ImageList_ReplaceIcon(DesktopImageList, -1, hImage);
+            ImageList_ReplaceIcon(pDlgContext->ImageList, -1, hImage);
             DestroyIcon(hImage);
         }
         hImage = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
         if (hImage) {
-            ImageList_ReplaceIcon(DesktopImageList, -1, hImage);
+            ImageList_ReplaceIcon(pDlgContext->ImageList, -1, hImage);
             DestroyIcon(hImage);
         }
 
-        ListView_SetImageList(DesktopList, DesktopImageList, LVSIL_SMALL);
+        ListView_SetImageList(pDlgContext->ListView, pDlgContext->ImageList, LVSIL_SMALL);
     }
 
-    ListView_SetExtendedListViewStyle(DesktopList,
+    ListView_SetExtendedListViewStyle(
+        pDlgContext->ListView,
         LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
+
+    SetWindowTheme(pDlgContext->ListView, TEXT("Explorer"), NULL);
 
     RtlSecureZeroMemory(&col, sizeof(col));
     col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
@@ -234,21 +240,23 @@ VOID DesktopListCreate(
     col.iOrder = 0;
     col.iImage = 2;
     col.cx = 200;
-    ListView_InsertColumn(DesktopList, col.iSubItem, &col);
+    ListView_InsertColumn(pDlgContext->ListView, col.iSubItem, &col);
+
+    col.iImage = I_IMAGENONE;
 
     col.iSubItem = 2;
     col.pszText = TEXT("SID");
     col.iOrder = 1;
-    col.iImage = -1;
     col.cx = 100;
-    ListView_InsertColumn(DesktopList, col.iSubItem, &col);
+    ListView_InsertColumn(pDlgContext->ListView, col.iSubItem, &col);
 
     col.iSubItem = 3;
     col.pszText = TEXT("Heap Size");
     col.iOrder = 2;
-    col.iImage = -1;
     col.cx = 100;
-    ListView_InsertColumn(DesktopList, col.iSubItem, &col);
+    ListView_InsertColumn(pDlgContext->ListView, col.iSubItem, &col);
+
+    pDlgContext->lvColumnCount = DESKTOPLIST_COLUMN_COUNT;
 }
 
 /*
@@ -262,29 +270,39 @@ VOID DesktopListCreate(
 INT CALLBACK DesktopListCompareFunc(
     _In_ LPARAM lParam1,
     _In_ LPARAM lParam2,
-    _In_ LPARAM lParamSort
+    _In_ LPARAM lpContextParam
 )
 {
     INT    nResult = 0;
     LPWSTR lpItem1 = NULL, lpItem2 = NULL;
 
-    lpItem1 = supGetItemText(DesktopList, (INT)lParam1, (INT)lParamSort, NULL);
-    lpItem2 = supGetItemText(DesktopList, (INT)lParam2, (INT)lParamSort, NULL);
+    LPARAM lvColumnToSort;
+
+    EXTRASCONTEXT *pDlgContext;
+
+    pDlgContext = (EXTRASCONTEXT*)lpContextParam;
+    if (pDlgContext == NULL)
+        return 0;
+
+    lvColumnToSort = (LPARAM)pDlgContext->lvColumnToSort;
+
+    lpItem1 = supGetItemText(pDlgContext->ListView, (INT)lParam1, (INT)lvColumnToSort, NULL);
+    lpItem2 = supGetItemText(pDlgContext->ListView, (INT)lParam2, (INT)lvColumnToSort, NULL);
 
     if ((lpItem1 == NULL) && (lpItem2 == NULL)) {
         nResult = 0;
         goto Done;
     }
     if ((lpItem1 == NULL) && (lpItem2 != NULL)) {
-        nResult = (bDesktopListSortInverse) ? 1 : -1;
+        nResult = (pDlgContext->bInverseSort) ? 1 : -1;
         goto Done;
     }
     if ((lpItem2 == NULL) && (lpItem1 != NULL)) {
-        nResult = (bDesktopListSortInverse) ? -1 : 1;
+        nResult = (pDlgContext->bInverseSort) ? -1 : 1;
         goto Done;
     }
 
-    if (bDesktopListSortInverse)
+    if (pDlgContext->bInverseSort)
         nResult = _strcmpi(lpItem2, lpItem1);
     else
         nResult = _strcmpi(lpItem1, lpItem2);
@@ -308,10 +326,11 @@ VOID DesktopListHandleNotify(
     _In_ LPNMLISTVIEW   nhdr
 )
 {
-    INT      c;
+    INT      nImageIndex;
     SIZE_T   sz, i, l;
     LPWSTR   lpItemText, lpName;
-    LVCOLUMN col;
+
+    EXTRASCONTEXT *pDlgContext;
 
     if (nhdr == NULL) {
         return;
@@ -324,42 +343,60 @@ VOID DesktopListHandleNotify(
     switch (nhdr->hdr.code) {
 
     case LVN_COLUMNCLICK:
-        bDesktopListSortInverse = !bDesktopListSortInverse;
-        DesktopListSortColumn = ((NMLISTVIEW *)nhdr)->iSubItem;
-        ListView_SortItemsEx(DesktopList, &DesktopListCompareFunc, DesktopListSortColumn);
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+            pDlgContext->bInverseSort = !pDlgContext->bInverseSort;
+            pDlgContext->lvColumnToSort = ((NMLISTVIEW *)nhdr)->iSubItem;
 
-        RtlSecureZeroMemory(&col, sizeof(col));
-        col.mask = LVCF_IMAGE;
-        col.iImage = -1;
+            ListView_SortItemsEx(
+                pDlgContext->ListView,
+                &DesktopListCompareFunc,
+                pDlgContext);
 
-        for (c = 0; c < 3; c++) {
-            ListView_SetColumn(DesktopList, c, &col);
+            if (pDlgContext->bInverseSort)
+                nImageIndex = 1;
+            else
+                nImageIndex = 2;
+
+            supUpdateLvColumnHeaderImage(
+                pDlgContext->ListView,
+                pDlgContext->lvColumnCount,
+                pDlgContext->lvColumnToSort,
+                nImageIndex);
         }
-
-        if (bDesktopListSortInverse)
-            col.iImage = 1;
-        else
-            col.iImage = 2;
-
-        ListView_SetColumn(DesktopList, ((NMLISTVIEW *)nhdr)->iSubItem, &col);
         break;
 
     case NM_DBLCLK:
-        /*
-        * A very basic support for this type
-        * desktop described by win32k PDESKTOP structure which is totally undocumented
-        */
-        sz = 0;
-        lpItemText = supGetItemText(DesktopList, ListView_GetSelectionMark(DesktopList), 0, &sz);
-        if (lpItemText) {
-            l = 0;
-            for (i = 0; i < sz; i++)
-                if (lpItemText[i] == L'\\')
-                    l = i + 1;
-            lpName = &lpItemText[l];
-            //hwndDlg set to mainwindow on purpose
-            propCreateDialog(hwndDlg, lpName, g_lpObjectNames[TYPE_DESKTOP], NULL);
-            supHeapFree(lpItemText);
+        //
+        // A very basic support for this type.
+        // Desktop described by win32k PDESKTOP structure which is totally undocumented.
+        //
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+
+            sz = 0;
+            lpItemText = supGetItemText(
+                pDlgContext->ListView,
+                ListView_GetSelectionMark(pDlgContext->ListView),
+                0,
+                &sz);
+
+            if (lpItemText) {
+                l = 0;
+                for (i = 0; i < sz; i++)
+                    if (lpItemText[i] == L'\\')
+                        l = i + 1;
+                lpName = &lpItemText[l];
+
+                propCreateDialog(
+                    hwndDlg,
+                    lpName,
+                    g_ObjectTypes[ObjectTypeDesktop].Name,
+                    NULL,
+                    NULL);
+
+                supHeapFree(lpItemText);
+            }
         }
         break;
 
@@ -391,18 +428,26 @@ INT_PTR CALLBACK DesktopListDialogProc(
     LPNMLISTVIEW      nhdr = NULL;
     PROPSHEETPAGE    *pSheet;
     PROP_OBJECT_INFO *Context = NULL;
+    EXTRASCONTEXT    *pDlgContext = NULL;
 
     switch (uMsg) {
 
     case WM_SHOWWINDOW:
         if (wParam) {
             Context = GetProp(hwndDlg, T_PROPCONTEXT);
-            DesktopListSetInfo(Context, hwndDlg);
-            if (DesktopList) {
-                ListView_SortItemsEx(DesktopList,
-                    &DesktopListCompareFunc, DesktopListSortColumn);
+            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+            if ((Context) && (pDlgContext)) {
+
+                DesktopListSetInfo(hwndDlg, Context, pDlgContext);
+                if (pDlgContext->ListView) {
+
+                    ListView_SortItemsEx(
+                        pDlgContext->ListView,
+                        &DesktopListCompareFunc,
+                        pDlgContext);
+                }
+                return 1;
             }
-            return 1;
         }
         break;
 
@@ -413,9 +458,14 @@ INT_PTR CALLBACK DesktopListDialogProc(
         break;
 
     case WM_DESTROY:
-        if (DesktopImageList) {
-            ImageList_Destroy(DesktopImageList);
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+            if (pDlgContext->ImageList) {
+                ImageList_Destroy(pDlgContext->ImageList);
+            }
+            supHeapFree(pDlgContext);
         }
+        RemoveProp(hwndDlg, T_DLGCONTEXT);
         RemoveProp(hwndDlg, T_PROPCONTEXT);
         break;
 
@@ -423,8 +473,12 @@ INT_PTR CALLBACK DesktopListDialogProc(
         pSheet = (PROPSHEETPAGE*)lParam;
         if (pSheet) {
             SetProp(hwndDlg, T_PROPCONTEXT, (HANDLE)pSheet->lParam);
+            pDlgContext = supHeapAlloc(sizeof(EXTRASCONTEXT));
+            if (pDlgContext) {
+                SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)pDlgContext);
+                DesktopListCreate(hwndDlg, pDlgContext);
+            }
         }
-        DesktopListCreate(hwndDlg);
         return 1;
         break;
 

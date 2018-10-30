@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.55
+*  VERSION:     1.60
 *
-*  DATE:        07 Sep 2018
+*  DATE:        24 Oct 2018
 *
 *  Common header file for the program support routines.
 *
@@ -71,6 +71,8 @@ extern SAPIDB g_sapiDB;
 extern SCMDB g_scmDB;
 extern POBJECT_TYPES_INFORMATION g_pObjectTypesInfo;
 
+#define PathFileExists(lpszPath) (GetFileAttributes(lpszPath) != (DWORD)-1)
+
 #ifndef _DEBUG
 FORCEINLINE PVOID supHeapAlloc(
     _In_ SIZE_T Size);
@@ -97,12 +99,12 @@ BOOL supInitTreeListForDump(
     _Out_ HWND *pTreeListHwnd);
 
 VOID supShowHelp(
-    VOID);
+    _In_ HWND ParentWindow);
 
 BOOL supQueryObjectFromHandle(
     _In_ HANDLE hOject,
     _Out_ ULONG_PTR *Address,
-    _Inout_opt_ USHORT *TypeIndex);
+    _Out_opt_ USHORT *TypeIndex);
 
 HICON supGetMainIcon(
     _In_ LPWSTR lpFileName,
@@ -128,9 +130,6 @@ HIMAGELIST supLoadImageList(
     _In_ HINSTANCE hInst,
     _In_ UINT FirstId,
     _In_ UINT LastId);
-
-UINT supGetObjectIndexByTypeName(
-    _In_ LPCWSTR lpTypeName);
 
 UINT supGetObjectNameIndexByTypeIndex(
     _In_ PVOID Object,
@@ -158,8 +157,7 @@ VOID supCreateToolbarButtons(
     _In_ HWND hWndToolbar);
 
 VOID supInit(
-    _In_ BOOL IsFullAdmin,
-    _In_ BOOL IsWine);
+    _In_ BOOL IsFullAdmin);
 
 VOID supShutdown(
     VOID);
@@ -192,6 +190,13 @@ LPWSTR supGetItemText(
     _In_ INT nItem,
     _In_ INT nSubItem,
     _Out_opt_ PSIZE_T lpSize);
+
+LPWSTR supGetItemText2(
+    _In_ HWND ListView,
+    _In_ INT nItem,
+    _In_ INT nSubItem,
+    _In_ LPWSTR pszText,
+    _In_ UINT cbText);
 
 BOOL supQueryLinkTarget(
     _In_opt_ HANDLE hRootDirectory,
@@ -229,6 +234,12 @@ BOOL supQueryProcessName(
     _In_ ULONG_PTR dwProcessId,
     _In_ PVOID ProcessList,
     _Inout_	LPWSTR Buffer,
+    _In_ DWORD ccBuffer);
+
+BOOL supQueryProcessNameByEPROCESS(
+    _In_ ULONG_PTR ValueOfEPROCESS,
+    _In_ PVOID ProcessList,
+    _Inout_ LPWSTR Buffer,
     _In_ DWORD ccBuffer);
 
 BOOL supFindModuleNameByAddress(
@@ -301,12 +312,7 @@ BOOL supGetWin32FileName(
     _In_ SIZE_T ccWin32FileName);
 
 BOOL supIsWine(
-    VOID
-);
-
-USHORT supIsAddressPrefix(
-    _In_ LPWSTR lpName,
-    _In_ SIZE_T cbName);
+    VOID);
 
 BOOL supQuerySecureBootState(
     _In_ PBOOLEAN pbSecureBoot);
@@ -321,4 +327,43 @@ BOOL supQueryObjectTrustLabel(
     _Out_ PULONG ProtectionType,
     _Out_ PULONG ProtectionLevel);
 
-#define PathFileExists(lpszPath) (GetFileAttributes(lpszPath) != (DWORD)-1)
+NTSTATUS supIsLocalSystem(
+    _In_ HANDLE hToken,
+    _Out_ PBOOL pbResult);
+
+BOOL supRunAsLocalSystem(
+    _In_ HWND hwndParent);
+
+HANDLE supGetCurrentProcessToken(
+    VOID);
+
+PVOID supLookupImageSectionByName(
+    _In_ CHAR* SectionName,
+    _In_ ULONG SectionNameLength,
+    _In_ PVOID DllBase,
+    _Out_ PULONG SectionSize);
+
+PVOID supFindPattern(
+    _In_ CONST PBYTE Buffer,
+    _In_ SIZE_T BufferSize,
+    _In_ CONST PBYTE Pattern,
+    _In_ SIZE_T PatternSize);
+
+VOID supUpdateLvColumnHeaderImage(
+    _In_ HWND ListView,
+    _In_ INT NumberOfColumns,
+    _In_ INT UpdateColumn,
+    _In_ INT ImageIndex);
+
+INT supGetMaxOfTwoU64FromHex(
+    _In_ HWND ListView,
+    _In_ LPARAM lParam1,
+    _In_ LPARAM lParam2,
+    _In_ LPARAM lParamSort,
+    _In_ BOOL Inverse);
+
+HANDLE supOpenNamedObjectFromContext(
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ OBJECT_ATTRIBUTES *ObjectAttributes,
+    _In_ ACCESS_MASK DesiredAccess,
+    _Out_ NTSTATUS *Status);

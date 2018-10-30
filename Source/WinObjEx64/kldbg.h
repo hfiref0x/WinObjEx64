@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.52
+*  VERSION:     1.60
 *
-*  DATE:        08 Jan 2018
+*  DATE:        24 Oct 2018
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -28,9 +28,6 @@
 #define KLDBGDRVSYS             L"\\drivers\\kldbgdrv.sys"
 #endif
 
-#define RegControlKey           L"System\\CurrentControlSet\\Control"
-#define RegStartOptionsValue    L"SystemStartOptions"
-
 #define OBJECT_SHIFT 8
 
 typedef ULONG_PTR *PUTable;
@@ -43,6 +40,11 @@ typedef enum _OBJ_HEADER_INFO_FLAG {
     HeaderQuotaInfoFlag = 0x8,
     HeaderProcessInfoFlag = 0x10
 } OBJ_HEADER_INFO_FLAG;
+
+typedef struct _OBJECT_COLLECTION {
+    LIST_ENTRY ListHead;
+    HANDLE Heap;
+} OBJECT_COLLECTION, *POBJECT_COLLECTION;
 
 typedef struct _KLDBGCONTEXT {
 
@@ -87,8 +89,8 @@ typedef struct _KLDBGCONTEXT {
     //system range start
     ULONG_PTR SystemRangeStart;
 
-    //object list head
-    LIST_ENTRY ObjectList;
+    //objects collection
+    OBJECT_COLLECTION ObCollection;
 
     //object list lock
     CRITICAL_SECTION ListLock;
@@ -97,6 +99,9 @@ typedef struct _KLDBGCONTEXT {
 
 //global context
 KLDBGCONTEXT g_kdctx;
+
+//global build number
+ULONG g_NtBuildNumber;
 
 typedef struct _KLDBG {
     SYSDBG_COMMAND SysDbgRequest;
@@ -113,26 +118,63 @@ typedef struct _OBJINFO {
     OBJECT_HEADER ObjectHeader;
 } OBJINFO, *POBJINFO;
 
+typedef struct _OBJREFPNS {
+    ULONG SizeOfBoundaryInformation;
+    ULONG_PTR NamespaceDirectoryAddress; //point to OBJECT_DIRECTORY
+    ULONG_PTR NamespaceLookupEntry; //point to OBJECT_NAMESPACE_ENTRY
+} OBJREFPNS, *POBJREFPNS;
+
 typedef struct _OBJREF {
     LIST_ENTRY ListEntry;
     LPWSTR ObjectName;
     ULONG_PTR HeaderAddress;
     ULONG_PTR ObjectAddress;
-    ULONG_PTR NamespaceDirectoryAddress; //point to OBJECT_DIRECTORY
-    ULONG_PTR NamespaceId;
     UCHAR TypeIndex;
+    OBJREFPNS PrivateNamespace;
 } OBJREF, *POBJREF;
 
-DWORD WINAPI kdQueryProc(
-    _In_  LPVOID lpParameter);
+// return true to stop enumeration
+typedef BOOL(CALLBACK *PENUMERATE_COLLECTION_CALLBACK)(
+    _In_ POBJREF CollectionEntry,
+    _In_ PVOID Context
+    );
+
+// return true to stop enumeration
+typedef BOOL(CALLBACK *PENUMERATE_BOUNDARY_DESCRIPTOR_CALLBACK)(
+    _In_ OBJECT_BOUNDARY_ENTRY *Entry,
+    _In_ PVOID Context
+    );
+
+NTSTATUS ObCopyBoundaryDescriptor(
+    _In_ OBJECT_NAMESPACE_ENTRY *NamespaceLookupEntry,
+    _Out_ POBJECT_BOUNDARY_DESCRIPTOR *BoundaryDescriptor,
+    _Out_opt_ PULONG BoundaryDescriptorSize);
+
+NTSTATUS ObEnumerateBoundaryDescriptorEntries(
+    _In_ OBJECT_BOUNDARY_DESCRIPTOR *BoundaryDescriptor,
+    _In_opt_ PENUMERATE_BOUNDARY_DESCRIPTOR_CALLBACK Callback,
+    _In_opt_ PVOID Context);
 
 UCHAR ObDecodeTypeIndex(
     _In_ PVOID Object,
     _In_ UCHAR EncodedTypeIndex);
 
+PVOID ObDumpAlpcPortObjectVersionAware(
+    _In_ ULONG_PTR ObjectAddress,
+    _Out_ PULONG Size,
+    _Out_ PULONG Version);
+
+PVOID ObDumpDirectoryObjectVersionAware(
+    _In_ ULONG_PTR ObjectAddress,
+    _Out_ PULONG Size,
+    _Out_ PULONG Version);
+
 POBJINFO ObQueryObject(
     _In_ LPWSTR lpDirectory,
     _In_ LPWSTR lpObjectName);
+
+POBJINFO ObQueryObjectByAddress(
+    _In_ ULONG_PTR ObjectAddress);
 
 BOOL ObDumpTypeInfo(
     _In_    ULONG_PTR ObjectAddress,
@@ -148,16 +190,32 @@ BOOL ObHeaderToNameInfoAddress(
     _Inout_ PULONG_PTR HeaderAddress,
     _In_    OBJ_HEADER_INFO_FLAG InfoFlag);
 
-BOOL ObListCreate(
-    _Inout_ PLIST_ENTRY ListHead,
-    _In_    BOOL fNamespace);
+BOOL ObHeaderToNameInfoAddressEx(
+    _In_ UCHAR ObjectInfoMask,
+    _In_ ULONG_PTR ObjectAddress,
+    _Inout_ PULONG_PTR HeaderAddress,
+    _In_ BYTE DesiredHeaderBit);
 
-VOID ObListDestroy(
-    _In_ PLIST_ENTRY ListHead);
+BOOL ObCollectionCreate(
+    _In_ POBJECT_COLLECTION Collection,
+    _In_ BOOL fNamespace,
+    _In_ BOOL Locked);
 
-POBJREF ObListFindByAddress(
-    _In_ PLIST_ENTRY ListHead,
-    _In_ ULONG_PTR	 ObjectAddress);
+VOID ObCollectionDestroy(
+    _In_ POBJECT_COLLECTION Collection);
+
+BOOL ObCollectionEnumerate(
+    _In_ POBJECT_COLLECTION Collection,
+    _In_ PENUMERATE_COLLECTION_CALLBACK Callback,
+    _In_ PVOID Context);
+
+POBJREF ObCollectionFindByAddress(
+    _In_ POBJECT_COLLECTION Collection,
+    _In_ ULONG_PTR ObjectAddress,
+    _In_ BOOLEAN fNamespace);
+
+PVOID kdQueryIopInvalidDeviceRequest(
+    VOID);
 
 BOOL kdReadSystemMemory(
     _In_    ULONG_PTR Address,
@@ -171,11 +229,14 @@ BOOL kdReadSystemMemoryEx(
     _In_ ULONG BufferSize,
     _Out_opt_ PULONG NumberOfBytesRead);
 
-BOOL kdAddressInNtOsImage(
+BOOL __forceinline kdAddressInNtOsImage(
     _In_ PVOID Address);
 
 VOID kdInit(
-    BOOL IsFullAdmin);
+    _In_ BOOL IsFullAdmin);
+
+BOOL kdIsDebugBoot(
+    VOID);
 
 VOID kdShutdown(
     VOID);

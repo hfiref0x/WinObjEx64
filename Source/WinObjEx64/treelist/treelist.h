@@ -1,12 +1,21 @@
-/*
-
-Tree-List custom control header file
-
-Version 1.1
-
-Feb/22/2016
-
-*/
+/*******************************************************************************
+*
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*
+*  TITLE:       TREELIST.H
+*
+*  VERSION:     1.2
+*
+*  DATE:        25 Oct 2018
+*
+*  Tree-List custom control header file.
+*
+* THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
+* ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
+* TO THE IMPLIED WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A
+* PARTICULAR PURPOSE.
+*
+*******************************************************************************/
 
 #define WC_TREELISTA            "CustomTreeList"
 #define WC_TREELISTW            L"CustomTreeList"
@@ -23,6 +32,7 @@ Feb/22/2016
 #define TL_HEAP_SLOT			sizeof(HANDLE)*3
 #define TL_TOOLTIPS_SLOT		sizeof(HANDLE)*4
 #define TL_TOOLTIPSBUFFER_SLOT	sizeof(HANDLE)*5
+#define TL_HEADERWNDPROC_SLOT	sizeof(HANDLE)*6
 
 #define TL_SIZEOF_PRIVATEBUFFER	(sizeof(TCHAR) * (MAX_PATH + 1))
 
@@ -52,6 +62,9 @@ ATOM InitializeTreeListControl();
 
 #define TreeList_ClearTree(hwnd) \
     (BOOL)SNDMSG((hwnd), TVM_DELETEITEM, 0, (LPARAM)TVI_ROOT)
+
+#define TreeList_Expand(hwnd, hitem, code) \
+    (BOOL)SNDMSG((hwnd), TVM_EXPAND, (WPARAM)(code), (LPARAM)(HTREEITEM)(hitem))
 
 #define TreeList_GetSelection(hwnd) \
     (HTREEITEM)SNDMSG((hwnd), TVM_GETNEXTITEM, TVGN_CARET, 0)

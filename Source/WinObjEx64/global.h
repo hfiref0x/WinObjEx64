@@ -4,9 +4,9 @@
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.52
+*  VERSION:     1.60
 *
-*  DATE:        08 Jan 2018
+*  DATE:        24 Oct 2018
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -46,7 +46,17 @@
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "Setupapi.lib")
 #pragma comment(lib, "Version.lib")
-#if (_MSC_VER >= 1900)
+
+#if defined (_MSC_VER)
+#if ((_MSC_VER >= 1910) && (_MSC_VER <= 1915)) //Visual Studio 2017
+#ifdef _DEBUG
+#pragma comment(lib, "vcruntimed.lib")
+#pragma comment(lib, "ucrtd.lib")
+#else
+#pragma comment(lib, "libucrt.lib")
+#pragma comment(lib, "libvcruntime.lib")
+#endif
+#elif (_MSC_VER == 1900) //Visual Studio 2015
 #ifdef _DEBUG
 #pragma comment(lib, "vcruntimed.lib")
 #pragma comment(lib, "ucrtd.lib")
@@ -54,10 +64,13 @@
 #pragma comment(lib, "libvcruntime.lib")
 #endif
 #endif
+#endif
 
 #include <Windows.h>
 #include <commctrl.h>
+#include <Uxtheme.h>
 #include <ntstatus.h>
+#include "wine.h"
 #include <sddl.h>
 #include "minirtl\minirtl.h"
 #include "minirtl\rtltypes.h"
@@ -78,7 +91,6 @@
 typedef struct _WINOBJ_GLOBALS {
     HINSTANCE hInstance;
     HANDLE Heap;
-    HANDLE hNtdllModule;
     LPWSTR CurrentObjectPath;
     pfnHtmlHelpW HtmlHelpW;
     HWND AuxDialogs[WOBJ_MAX_DIALOGS];

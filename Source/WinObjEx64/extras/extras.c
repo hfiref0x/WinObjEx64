@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRAS.C
 *
-*  VERSION:     1.52
+*  VERSION:     1.60
 *
-*  DATE:        08 Jan 2018
+*  DATE:        24 Oct 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -72,8 +72,7 @@ VOID extrasDlgHandleNotify(
     _In_opt_ PVOID CustomParameter
 )
 {
-    INT      c, k;
-    LVCOLUMN col;
+    INT nImageIndex;
 
     if ((nhdr == NULL) || (Context == NULL) || (CompareFunc == NULL))
         return;
@@ -89,20 +88,18 @@ VOID extrasDlgHandleNotify(
         Context->lvColumnToSort = ((NMLISTVIEW *)nhdr)->iSubItem;
         ListView_SortItemsEx(Context->ListView, CompareFunc, Context->lvColumnToSort);
 
-        RtlSecureZeroMemory(&col, sizeof(col));
-        col.mask = LVCF_IMAGE;
-        col.iImage = -1;
-
-        for (c = 0; c < Context->lvColumnCount; c++)
-            ListView_SetColumn(Context->ListView, c, &col);
-
-        k = ImageList_GetImageCount(g_ListViewImages);
+        nImageIndex = ImageList_GetImageCount(g_ListViewImages);
         if (Context->bInverseSort)
-            col.iImage = k - 2;
+            nImageIndex -= 2; //sort down/up images are always at the end of g_ListViewImages
         else
-            col.iImage = k - 1;
+            nImageIndex -= 1;
 
-        ListView_SetColumn(Context->ListView, ((NMLISTVIEW *)nhdr)->iSubItem, &col);
+        supUpdateLvColumnHeaderImage(
+            Context->ListView,
+            Context->lvColumnCount,
+            Context->lvColumnToSort,
+            nImageIndex);
+
         break;
 
     default:

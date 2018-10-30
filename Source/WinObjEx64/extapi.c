@@ -16,7 +16,7 @@
 *******************************************************************************/
 #include "global.h"
 
-EXTENDED_API_SET g_ExtApiSet = { NULL, NULL };
+EXTENDED_API_SET g_ExtApiSet;
 
 /*
 * ExApiSetInit
@@ -35,17 +35,19 @@ NTSTATUS ExApiSetInit(
     NTSTATUS Status = STATUS_SOME_NOT_MAPPED;
     HANDLE hNtdll = NULL;
 
+    RtlSecureZeroMemory(&g_ExtApiSet, sizeof(g_ExtApiSet));
+
     //
     // New Partition API introduced in Windows 10.
     //
     hNtdll = GetModuleHandle(TEXT("ntdll.dll"));
     if (hNtdll) {
         g_ExtApiSet.NtOpenPartition = (pfnNtOpenPartition)GetProcAddress(hNtdll, "NtOpenPartition");
-        g_ExtApiSet.NtManagePartition = (pfnNtManagePartition)GetProcAddress(hNtdll, "NtManagePartition");
 
-        if ((g_ExtApiSet.NtOpenPartition) &&
-            (g_ExtApiSet.NtManagePartition))
+        if (g_ExtApiSet.NtOpenPartition) {
+            g_ExtApiSet.NumberOfAPI++;
             Status = STATUS_SUCCESS;
+        }
     }
 
     return Status;

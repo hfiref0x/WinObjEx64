@@ -1,3 +1,16 @@
+v1.6.0
+ported to msvc 2017 (with backward compatibility to 2015)
+reimplemented private namespaces lookup
+object directory dump reflect Win10 changes
+added alpc port dump and additional dialog
+treelist control updated
+private namespaces dialog updated
+usershareddata dialog updated
+internal rearrange
+merge pull request #7, fix Job object process list display
+multiple Wine Staging fixes
+rtls updated 
+
 v1.5.5
 tweaked PTL display
 

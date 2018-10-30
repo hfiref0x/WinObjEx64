@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMP.H
 *
-*  VERSION:     1.52
+*  VERSION:     1.60
 *
-*  DATE:        08 Jan 2018
+*  DATE:        24 Oct 2018
 *
 *  Common header file for the object dump support.
 *
@@ -57,6 +57,15 @@ VOID ObDumpByte(
     _In_opt_ COLORREF FontColor,
     _In_ BOOL IsBool);
 
+VOID ObDumpSetString(
+    _In_ HWND TreeList,
+    _In_ HTREEITEM hParent,
+    _In_ LPWSTR lpszName,
+    _In_opt_ LPWSTR lpszDesc,
+    _In_ LPWSTR lpszValue,
+    _In_opt_ COLORREF BgColor,
+    _In_opt_ COLORREF FontColor);
+
 VOID ObDumpAddress(
     _In_ HWND TreeList,
     _In_ HTREEITEM hParent,
@@ -77,12 +86,3 @@ VOID ObDumpListEntry(
     _In_ HTREEITEM hParent,
     _In_ LPWSTR ListEntryName,
     _In_opt_ PLIST_ENTRY ListEntry);
-
-HTREEITEM TreeListAddItem(
-    _In_ HWND TreeList,
-    _In_opt_ HTREEITEM hParent,
-    _In_ UINT mask,
-    _In_ UINT state,
-    _In_ UINT stateMask,
-    _In_opt_ LPWSTR pszText,
-    _In_opt_ PVOID subitems);

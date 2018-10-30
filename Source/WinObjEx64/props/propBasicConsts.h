@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPBASICCONSTS.H
 *
-*  VERSION:     1.54
+*  VERSION:     1.60
 *
-*  DATE:        16 Aug 2018
+*  DATE:        25 Oct 2018
 *
 *  Consts header file for Basic property sheet.
 *

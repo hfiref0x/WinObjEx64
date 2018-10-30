@@ -40,6 +40,9 @@
     <Filter Include="Resource Files\graphics">
       <UniqueIdentifier>{87a2b20f-17e9-4ce8-abbd-11f4b06fde61}</UniqueIdentifier>
     </Filter>
+    <Filter Include="treelist">
+      <UniqueIdentifier>{34095c79-e50f-47a4-9daa-c1f74616bcfe}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="aboutDlg.c">
@@ -64,9 +67,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="sup.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="treelist.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="minirtl\_strcat.c">
@@ -191,6 +191,9 @@
     </ClCompile>
     <ClCompile Include="extras\extrasIPC.c">
       <Filter>Source Files\extras</Filter>
+    </ClCompile>
+    <ClCompile Include="treelist\treelist.c">
+      <Filter>treelist</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -318,6 +321,15 @@
     </ClInclude>
     <ClInclude Include="ntos\ntalpc.h">
       <Filter>ntos</Filter>
+    </ClInclude>
+    <ClInclude Include="treelist\treelist.h">
+      <Filter>treelist</Filter>
+    </ClInclude>
+    <ClInclude Include="msvcver.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="wine.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

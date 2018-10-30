@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDLG.C
 *
-*  VERSION:     1.55
+*  VERSION:     1.60
 *
-*  DATE:        31 Aug 2018
+*  DATE:        27 Oct 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -37,6 +37,7 @@ WNDPROC PropSheetOriginalWndProc = NULL;
 //handle to the PropertySheet window
 HWND g_PropWindow = NULL;
 HWND g_SubPropWindow = NULL;
+HWND g_NamespacePropWindow = NULL;
 
 /*
 * propCloseCurrentObject
@@ -54,10 +55,10 @@ BOOL propCloseCurrentObject(
     BOOL bResult = FALSE;
 
     switch (Context->TypeIndex) {
-    case TYPE_WINSTATION:
+    case ObjectTypeWinstation:
         bResult = CloseWindowStation(hObject);
         break;
-    case TYPE_DESKTOP:
+    case ObjectTypeDesktop:
         bResult = CloseDesktop(hObject);
         break;
     default:
@@ -87,7 +88,6 @@ BOOL propOpenCurrentObject(
     NTSTATUS            status;
     UNICODE_STRING      ustr;
     OBJECT_ATTRIBUTES   obja;
-    IO_STATUS_BLOCK     iost;
 
     bResult = FALSE;
 
@@ -97,22 +97,75 @@ BOOL propOpenCurrentObject(
     // Filter unsupported types.
     //
     if (
-        (Context->TypeIndex == TYPE_UNKNOWN) ||
-        (Context->TypeIndex == TYPE_PORT) ||
-        (Context->TypeIndex == TYPE_FLTCOMM_PORT) ||
-        (Context->TypeIndex == TYPE_FLTCONN_PORT) ||
-        (Context->TypeIndex == TYPE_WAITABLEPORT)
+        (Context->TypeIndex == ObjectTypeUnknown) ||
+        (Context->TypeIndex == ObjectTypePort) ||
+        (Context->TypeIndex == ObjectTypeFltConnPort) ||
+        (Context->TypeIndex == ObjectTypeFltComnPort) ||
+        (Context->TypeIndex == ObjectTypeWaitablePort)
         )
     {
         SetLastError(ERROR_UNSUPPORTED_TYPE);
         return bResult;
     }
 
+    //
+    // Handle window station type.
+    //
+    if (Context->TypeIndex == ObjectTypeWinstation) {
+        hObject = supOpenWindowStationFromContext(Context, FALSE, DesiredAccess); //WINSTA_READATTRIBUTES for query
+        bResult = (hObject != NULL);
+        if (bResult) {
+            *phObject = hObject;
+        }
+        return bResult;
+    }
+
+    //
+    // Handle desktop type.
+    //
+    if (Context->TypeIndex == ObjectTypeDesktop) {
+        if (Context->lpObjectName == NULL) {
+            SetLastError(ERROR_INVALID_PARAMETER);
+            return bResult;
+        }
+        hObject = OpenDesktop(Context->lpObjectName, 0, FALSE, DesiredAccess); //DESKTOP_READOBJECTS for query
+        bResult = (hObject != NULL);
+        if (bResult) {
+            *phObject = hObject;
+        }
+        return bResult;
+    }
+
+    //
+    // Namespace objects must be handled in a special way.
+    //
+    if (Context->IsPrivateNamespaceObject) {
+        if (Context->lpObjectName == NULL) {
+            SetLastError(ERROR_INVALID_PARAMETER);
+            return bResult;
+        }
+
+        RtlInitUnicodeString(&ustr, Context->lpObjectName);
+        InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
+        hObject = supOpenNamedObjectFromContext(
+            Context,
+            &obja,
+            DesiredAccess,
+            &status);
+
+        SetLastError(RtlNtStatusToDosError(status));
+        bResult = ((NT_SUCCESS(status)) && (hObject != NULL));
+        if (bResult) {
+            *phObject = hObject;
+        }
+        return bResult;
+    }
+
     if ((Context->lpObjectName == NULL) ||
         (Context->lpCurrentObjectPath == NULL)
-        )    
+        )
     {
-        SetLastError(ERROR_OBJECT_NOT_FOUND);
+        SetLastError(ERROR_INVALID_PARAMETER);
         return bResult;
     }
 
@@ -125,7 +178,7 @@ BOOL propOpenCurrentObject(
     //
     // Handle directory type.
     //
-    if (Context->TypeIndex == TYPE_DIRECTORY) {
+    if (Context->TypeIndex == ObjectTypeDirectory) {
 
         //
         // If this is root, then root hDirectory = NULL.
@@ -164,30 +217,6 @@ BOOL propOpenCurrentObject(
     }
 
     //
-    // Handle window station type.
-    //
-    if (Context->TypeIndex == TYPE_WINSTATION) {
-        hObject = supOpenWindowStationFromContext(Context, FALSE, DesiredAccess); //WINSTA_READATTRIBUTES for query
-        bResult = (hObject != NULL);
-        if (bResult) {
-            *phObject = hObject;
-        }
-        return bResult;
-    }
-
-    //
-    // Handle desktop type.
-    //
-    if (Context->TypeIndex == TYPE_DESKTOP) {
-        hObject = OpenDesktop(Context->lpObjectName, 0, FALSE, DesiredAccess); //DESKTOP_READOBJECTS for query
-        bResult = (hObject != NULL);
-        if (bResult) {
-            *phObject = hObject;
-        }
-        return bResult;
-    }
-
-    //
     // Open directory which current object belongs.
     //
     hDirectory = supOpenDirectoryForObject(Context->lpObjectName, Context->lpCurrentObjectPath);
@@ -205,61 +234,12 @@ BOOL propOpenCurrentObject(
     //
     // Handle supported objects.
     //
-    switch (Context->TypeIndex) {
+    hObject = supOpenNamedObjectFromContext(
+        Context,
+        &obja,
+        DesiredAccess,
+        &status);
 
-    case TYPE_DEVICE: //FILE_OBJECT
-        status = NtCreateFile(&hObject, DesiredAccess, &obja, &iost, NULL, 0,
-            FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE, FILE_OPEN, 0, NULL, 0);//generic access rights
-        break;
-
-    case TYPE_MUTANT:
-        status = NtOpenMutant(&hObject, DesiredAccess, &obja); //MUTANT_QUERY_STATE for query
-        break;
-
-    case TYPE_KEY:
-        status = NtOpenKey(&hObject, DesiredAccess, &obja); //KEY_QUERY_VALUE for query
-        break;
-
-    case TYPE_SEMAPHORE:
-        status = NtOpenSemaphore(&hObject, DesiredAccess, &obja); //SEMAPHORE_QUERY_STATE for query
-        break;
-
-    case TYPE_TIMER:
-        status = NtOpenTimer(&hObject, DesiredAccess, &obja); //TIMER_QUERY_STATE for query
-        break;
-
-    case TYPE_EVENT:
-        status = NtOpenEvent(&hObject, DesiredAccess, &obja); //EVENT_QUERY_STATE for query
-        break;
-
-    case TYPE_EVENTPAIR:
-        status = NtOpenEventPair(&hObject, DesiredAccess, &obja); //generic access
-        break;
-
-    case TYPE_SYMLINK:
-        status = NtOpenSymbolicLinkObject(&hObject, DesiredAccess, &obja); //SYMBOLIC_LINK_QUERY for query
-        break;
-
-    case TYPE_IOCOMPLETION:
-        status = NtOpenIoCompletion(&hObject, DesiredAccess, &obja); //IO_COMPLETION_QUERY_STATE for query
-        break;
-
-    case TYPE_SECTION:
-        status = NtOpenSection(&hObject, DesiredAccess, &obja); //SECTION_QUERY for query
-        break;
-
-    case TYPE_JOB:
-        status = NtOpenJobObject(&hObject, DesiredAccess, &obja); //JOB_OBJECT_QUERY for query
-        break;
-
-    case TYPE_MEMORYPARTITION:
-        if (g_ExtApiSet.NtOpenPartition) {
-            status = g_ExtApiSet.NtOpenPartition(&hObject, DesiredAccess, &obja); //MEMORY_PARTITION_QUERY_ACCESS for query 
-        }
-        else
-            status = STATUS_PROCEDURE_NOT_FOUND;
-        break;
-    }
     SetLastError(RtlNtStatusToDosError(status));
     NtClose(hDirectory);
 
@@ -316,7 +296,7 @@ PPROP_OBJECT_INFO propContextCreate(
             if (Context->lpObjectType) {
                 _strcpy(Context->lpObjectType, lpObjectType);
             }
-            Context->TypeIndex = supGetObjectIndexByTypeName(lpObjectType);
+            Context->TypeIndex = ObManagerGetIndexByTypeName(lpObjectType);
         }
 
         //
@@ -329,7 +309,7 @@ PPROP_OBJECT_INFO propContextCreate(
                 bSelectedDirectory = (_strcmpi(Context->lpCurrentObjectPath, T_OBJECTTYPES) == 0);
             }
         }
-        
+
         //
         // Copy object description, could be NULL.
         //
@@ -350,7 +330,7 @@ PPROP_OBJECT_INFO propContextCreate(
             // Query actual type index for case when user will browse Type object info.
             //
             if (Context->lpObjectName) {
-                Context->RealTypeIndex = supGetObjectIndexByTypeName(Context->lpObjectName);
+                Context->RealTypeIndex = ObManagerGetIndexByTypeName(Context->lpObjectName);
             }
         }
         else {
@@ -397,6 +377,10 @@ VOID propContextDestroy(
             supHeapFree(Context->lpDescription);
         }
 
+        if (Context->NamespaceInfo.BoundaryDescriptor) {
+            supHeapFree(Context->NamespaceInfo.BoundaryDescriptor);
+        }
+
         //free context itself
         supHeapFree(Context);
     }
@@ -441,7 +425,10 @@ LRESULT WINAPI PropSheetCustomWndProc(
     case WM_CLOSE:
         DestroyWindow(hwnd);
 
-        if (hwnd == g_SubPropWindow) {
+        if (hwnd == g_NamespacePropWindow) {
+            g_NamespacePropWindow = NULL;
+        }
+        else if (hwnd == g_SubPropWindow) {
             g_SubPropWindow = NULL;
         }
         if (hwnd == g_PropWindow) {
@@ -474,18 +461,20 @@ LRESULT WINAPI PropSheetCustomWndProc(
 *
 * Purpose:
 *
-* Initialize and create PropertySheet Window
+* Initialize and create PropertySheet Window for selected object properties.
 *
-* Sets custom Window Procedure for PropertySheet
+* Sets custom Window Procedure for PropertySheet.
 *
 */
 VOID propCreateDialog(
     _In_ HWND hwndParent,
     _In_ LPWSTR lpObjectName,
     _In_ LPCWSTR lpObjectType,
-    _In_opt_ LPWSTR lpDescription
+    _In_opt_ LPWSTR lpDescription,
+    _In_opt_ PROP_NAMESPACE_INFO *NamespaceObject
 )
 {
+    BOOL                IsPrivateNamespaceObject = FALSE;
     INT                 nPages;
     HWND                hwndDlg;
     PROP_OBJECT_INFO   *propContext = NULL;
@@ -497,11 +486,28 @@ VOID propCreateDialog(
     //
     // Allocate context variable, copy name, type, object path.
     //
-    propContext = propContextCreate(lpObjectName, 
-        lpObjectType, 
-        g_WinObj.CurrentObjectPath, 
-        lpDescription);
-
+    if (NamespaceObject) {
+        propContext = propContextCreate(
+            lpObjectName,
+            lpObjectType,
+            NULL,
+            NULL);
+        if (propContext) {
+            propContext->IsPrivateNamespaceObject = TRUE;
+            IsPrivateNamespaceObject = TRUE;
+            RtlCopyMemory(
+                &propContext->NamespaceInfo,
+                NamespaceObject,
+                sizeof(PROP_NAMESPACE_INFO));
+        }
+    }
+    else {
+        propContext = propContextCreate(
+            lpObjectName,
+            lpObjectType,
+            g_WinObj.CurrentObjectPath,
+            lpDescription);
+    }
     if (propContext == NULL)
         return;
 
@@ -520,7 +526,7 @@ VOID propCreateDialog(
     // Remember previously focused window.
     // Except special types: Desktop.
     //
-    if (propContext->TypeIndex != TYPE_DESKTOP) {
+    if (propContext->TypeIndex != ObjectTypeDesktop) {
         hPrevFocus = GetFocus();
     }
 
@@ -544,44 +550,46 @@ VOID propCreateDialog(
     // Select dialog for basic info.
     //
     switch (propContext->TypeIndex) {
-    case TYPE_TIMER:
+    case ObjectTypeTimer:
         Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_TIMER);
         break;
-    case TYPE_MUTANT:
+    case ObjectTypeMutant:
         Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_MUTANT);
         break;
-    case TYPE_SEMAPHORE:
+    case ObjectTypeSemaphore:
         Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_SEMAPHORE);
         break;
-    case TYPE_JOB:
+    case ObjectTypeJob:
         Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_JOB);
         break;
-    case TYPE_WINSTATION:
+    case ObjectTypeWinstation:
         Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_WINSTATION);
         break;
-    case TYPE_EVENT:
+    case ObjectTypeEvent:
         Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_EVENT);
         break;
-    case TYPE_SYMLINK:
+    case ObjectTypeSymbolicLink:
         Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_SYMLINK);
         break;
-    case TYPE_KEY:
+    case ObjectTypeKey:
         Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_KEY);
         break;
-    case TYPE_SECTION:
+    case ObjectTypeSection:
         Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_SECTION);
         break;
-    case TYPE_DRIVER:
+    case ObjectTypeDriver:
         Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_DRIVER);
         break;
-    case TYPE_DEVICE:
+    case ObjectTypeDevice:
         Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_DEVICE);
         break;
-    case TYPE_IOCOMPLETION:
+    case ObjectTypeIoCompletion:
         Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_IOCOMPLETION);
         break;
-
-    case TYPE_TYPE:
+    case ObjectTypePort:
+        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_ALPCPORT);
+        break;
+    case ObjectTypeType:
     default:
         Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_BASIC);
         break;
@@ -596,16 +604,17 @@ VOID propCreateDialog(
     //
     if (g_kdctx.hDevice != NULL) {
         switch (propContext->TypeIndex) {
-        case TYPE_DIRECTORY:
-        case TYPE_DRIVER:
-        case TYPE_DEVICE:
-        case TYPE_EVENT:
-        case TYPE_MUTANT:
-        case TYPE_SEMAPHORE:
-        case TYPE_TIMER:
-        case TYPE_IOCOMPLETION:
-        case TYPE_FLTCONN_PORT:
-        case TYPE_TYPE:
+        case ObjectTypeDirectory:
+        case ObjectTypeDriver:
+        case ObjectTypeDevice:
+        case ObjectTypeEvent:
+        case ObjectTypeMutant:
+        case ObjectTypePort:
+        case ObjectTypeSemaphore:
+        case ObjectTypeTimer:
+        case ObjectTypeIoCompletion:
+        case ObjectTypeFltConnPort:
+        case ObjectTypeType:
             RtlSecureZeroMemory(&Page, sizeof(Page));
             Page.dwSize = sizeof(PROPSHEETPAGE);
             Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
@@ -623,20 +632,20 @@ VOID propCreateDialog(
     // Create additional page(s), depending on object type.
     //
     switch (propContext->TypeIndex) {
-    case TYPE_DIRECTORY:
-    case TYPE_PORT:
-    case TYPE_FLTCOMM_PORT:
-    case TYPE_FLTCONN_PORT:
-    case TYPE_EVENT:
-    case TYPE_MUTANT:
-    case TYPE_SEMAPHORE:
-    case TYPE_SECTION:
-    case TYPE_SYMLINK:
-    case TYPE_TIMER:
-    case TYPE_JOB:
-    case TYPE_WINSTATION:
-    case TYPE_IOCOMPLETION:
-    case TYPE_MEMORYPARTITION:
+    case ObjectTypeDirectory:
+    case ObjectTypePort:
+    case ObjectTypeFltComnPort:
+    case ObjectTypeFltConnPort:
+    case ObjectTypeEvent:
+    case ObjectTypeMutant:
+    case ObjectTypeSemaphore:
+    case ObjectTypeSection:
+    case ObjectTypeSymbolicLink:
+    case ObjectTypeTimer:
+    case ObjectTypeJob:
+    case ObjectTypeWinstation:
+    case ObjectTypeIoCompletion:
+    case ObjectTypeMemoryPartition:
         RtlSecureZeroMemory(&Page, sizeof(Page));
         Page.dwSize = sizeof(PROPSHEETPAGE);
         Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
@@ -650,7 +659,7 @@ VOID propCreateDialog(
         //
         // Add desktop list for selected desktop, located here because of sheets order.
         //
-        if (propContext->TypeIndex == TYPE_WINSTATION) {
+        if (propContext->TypeIndex == ObjectTypeWinstation) {
             RtlSecureZeroMemory(&Page, sizeof(Page));
             Page.dwSize = sizeof(PROPSHEETPAGE);
             Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
@@ -663,7 +672,7 @@ VOID propCreateDialog(
         }
 
         break;
-    case TYPE_DRIVER:
+    case ObjectTypeDriver:
         //
         // Add registry page.
         //
@@ -733,7 +742,10 @@ VOID propCreateDialog(
     //remove class icon if any
     SetClassLongPtr(hwndDlg, GCLP_HICON, (LONG_PTR)NULL);
 
-    if (propContext->TypeIndex == TYPE_DESKTOP) {
+    if (IsPrivateNamespaceObject) {
+        g_NamespacePropWindow = hwndDlg;
+    }
+    if (propContext->TypeIndex == ObjectTypeDesktop) {
         g_SubPropWindow = hwndDlg;
     }
     else {

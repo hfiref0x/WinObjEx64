@@ -1,14 +1,14 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2018
 *
-*  TITLE:       TESTUNIT.H
+*  TITLE:       EXTRASCALLBACKS.H
 *
 *  VERSION:     1.70
 *
 *  DATE:        30 Nov 2018
 *
-*  Common header file for test code.
+*  Common header file for Callbacks dialog.
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -16,9 +16,8 @@
 * PARTICULAR PURPOSE.
 *
 *******************************************************************************/
+
 #pragma once
 
-extern HANDLE g_TestMailslot;
-
-VOID TestStart();
-VOID TestStop();
+VOID extrasCreateCallbacksDialog(
+    _In_ HWND hwndParent);

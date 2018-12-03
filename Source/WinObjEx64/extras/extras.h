@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRAS.H
 *
-*  VERSION:     1.52
+*  VERSION:     1.70
 *
-*  DATE:        08 Jan 2018
+*  DATE:        30 Nov 2018
 *
 *  Common header file for Extras dialogs.
 *
@@ -20,7 +20,10 @@
 
 typedef struct _EXTRASCONTEXT {
     HWND hwndDlg;
-    HWND ListView;
+    union {
+        HWND ListView;
+        HWND TreeList;
+    };
     HWND SizeGrip;
     HIMAGELIST ImageList;
     LONG lvColumnToSort;
@@ -63,11 +66,9 @@ VOID extrasSimpleListResize(
 VOID extrasSetDlgIcon(
     _In_ HWND hwndDlg);
 
-VOID extrasShowPipeDialog(
-    _In_ HWND hwndParent);
-
-VOID extrasShowMailslotsDialog(
-    _In_ HWND hwndParent);
+VOID extrasShowIPCDialog(
+    _In_ HWND hwndParent,
+    _In_ ULONG CallerId);
 
 VOID extrasShowUserSharedDataDialog(
     _In_ HWND hwndParent);
@@ -76,7 +77,14 @@ VOID extrasShowPrivateNamespacesDialog(
     _In_ HWND hwndParent);
 
 VOID extrasShowSSDTDialog(
-    _In_ HWND hwndParent);
+    _In_ HWND hwndParent,
+    _In_ ULONG CallerId);
 
 VOID extrasShowDriversDialog(
+    _In_ HWND hwndParent);
+
+VOID extrasShowPsListDialog(
+    _In_ HWND hwndParent);
+
+VOID extrasShowCallbacksDialog(
     _In_ HWND hwndParent);

@@ -69,7 +69,9 @@
     <SpectreMitigation>Spectre</SpectreMitigation>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
-  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.props" />
+  </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -97,7 +99,8 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>.\output\$(Platform)\$(Configuration)\bin\</OutDir>
     <IntDir>.\output\$(Platform)\$(Configuration)\</IntDir>
-    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet>..\..\..\Program Files (x86)\Microsoft Visual Studio\2017\Professional\Team Tools\Static Analysis Tools\Rule Sets\SecurityRules.ruleset</CodeAnalysisRuleSet>
+    <RunCodeAnalysis>true</RunCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseSigned|x64'">
     <OutDir>.\output\$(Platform)\$(Configuration)\bin\</OutDir>
@@ -113,9 +116,10 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseNotSignedWithDriver|x64'">
     <OutDir>.\output\$(Platform)\$(Configuration)\bin\</OutDir>
     <IntDir>.\output\$(Platform)\$(Configuration)\</IntDir>
-    <CodeAnalysisRuleSet>SecurityRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet>..\..\..\Program Files (x86)\Microsoft Visual Studio\2017\Professional\Team Tools\Static Analysis Tools\Rule Sets\SecurityRules.ruleset</CodeAnalysisRuleSet>
     <PostBuildEventUseInBuild>
     </PostBuildEventUseInBuild>
+    <RunCodeAnalysis>true</RunCodeAnalysis>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -128,7 +132,7 @@
       <ExpandAttributedSource>true</ExpandAttributedSource>
       <AssemblerOutput>All</AssemblerOutput>
       <BrowseInformation>true</BrowseInformation>
-      <CompileAs>CompileAsC</CompileAs>
+      <CompileAs>CompileAsCpp</CompileAs>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
       <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\treelist;$(ProjectDir)\props;$(ProjectDir)\extras;$(ProjectDir)\ntos</AdditionalIncludeDirectories>
     </ClCompile>
@@ -139,7 +143,8 @@
       <SuppressStartupBanner>false</SuppressStartupBanner>
       <GenerateMapFile>true</GenerateMapFile>
       <MapExports>true</MapExports>
-      <EntryPointSymbol>main</EntryPointSymbol>
+      <EntryPointSymbol>
+      </EntryPointSymbol>
     </Link>
     <Manifest>
       <SuppressStartupBanner>false</SuppressStartupBanner>
@@ -165,10 +170,9 @@
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <ControlFlowGuard>Guard</ControlFlowGuard>
-      <ExpandAttributedSource>true</ExpandAttributedSource>
-      <AssemblerOutput>All</AssemblerOutput>
-      <CompileAs>CompileAsC</CompileAs>
       <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\treelist;$(ProjectDir)\props;$(ProjectDir)\extras;$(ProjectDir)\ntos</AdditionalIncludeDirectories>
+      <CompileAs>CompileAsC</CompileAs>
+      <EnablePREfast>true</EnablePREfast>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -176,10 +180,11 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>No</GenerateDebugInformation>
       <Version>6.0</Version>
-      <SuppressStartupBanner>false</SuppressStartupBanner>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
       <GenerateMapFile>true</GenerateMapFile>
       <MapExports>true</MapExports>
-      <EntryPointSymbol>main</EntryPointSymbol>
+      <EntryPointSymbol>
+      </EntryPointSymbol>
       <SetChecksum>true</SetChecksum>
     </Link>
     <Manifest>
@@ -225,10 +230,11 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>No</GenerateDebugInformation>
       <Version>6.0</Version>
-      <SuppressStartupBanner>false</SuppressStartupBanner>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
       <GenerateMapFile>true</GenerateMapFile>
       <MapExports>true</MapExports>
-      <EntryPointSymbol>main</EntryPointSymbol>
+      <EntryPointSymbol>
+      </EntryPointSymbol>
       <SetChecksum>true</SetChecksum>
       <AdditionalOptions>/INTEGRITYCHECK %(AdditionalOptions)</AdditionalOptions>
     </Link>
@@ -274,10 +280,11 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>No</GenerateDebugInformation>
       <Version>6.0</Version>
-      <SuppressStartupBanner>false</SuppressStartupBanner>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
       <GenerateMapFile>true</GenerateMapFile>
       <MapExports>true</MapExports>
-      <EntryPointSymbol>main</EntryPointSymbol>
+      <EntryPointSymbol>
+      </EntryPointSymbol>
       <SetChecksum>true</SetChecksum>
       <AdditionalOptions>/INTEGRITYCHECK %(AdditionalOptions)</AdditionalOptions>
     </Link>
@@ -298,7 +305,6 @@
     </PostBuildEvent>
     <ResourceCompile>
       <PreprocessorDefinitions>_UseOwnDriver;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ShowProgress>true</ShowProgress>
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseNotSignedWithDriver|x64'">
@@ -316,10 +322,9 @@
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <ControlFlowGuard>Guard</ControlFlowGuard>
-      <ExpandAttributedSource>true</ExpandAttributedSource>
-      <AssemblerOutput>All</AssemblerOutput>
       <CompileAs>CompileAsC</CompileAs>
       <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\treelist;$(ProjectDir)\props;$(ProjectDir)\extras;$(ProjectDir)\ntos</AdditionalIncludeDirectories>
+      <EnablePREfast>true</EnablePREfast>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -327,10 +332,11 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>No</GenerateDebugInformation>
       <Version>6.0</Version>
-      <SuppressStartupBanner>false</SuppressStartupBanner>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
       <GenerateMapFile>true</GenerateMapFile>
       <MapExports>true</MapExports>
-      <EntryPointSymbol>main</EntryPointSymbol>
+      <EntryPointSymbol>
+      </EntryPointSymbol>
       <SetChecksum>true</SetChecksum>
     </Link>
     <Manifest>
@@ -351,7 +357,6 @@
     </PostBuildEvent>
     <ResourceCompile>
       <PreprocessorDefinitions>_UseOwnDriver;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ShowProgress>true</ShowProgress>
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -359,9 +364,11 @@
     <ClCompile Include="excepth.c" />
     <ClCompile Include="extapi.c" />
     <ClCompile Include="extras\extras.c" />
+    <ClCompile Include="extras\extrasCallbacks.c" />
     <ClCompile Include="extras\extrasDrivers.c" />
     <ClCompile Include="extras\extrasIPC.c" />
     <ClCompile Include="extras\extrasPN.c" />
+    <ClCompile Include="extras\extrasPSList.c" />
     <ClCompile Include="extras\extrasSSDT.c" />
     <ClCompile Include="extras\extrasUSD.c" />
     <ClCompile Include="findDlg.c" />
@@ -383,6 +390,7 @@
     <ClCompile Include="minirtl\ultohex.c" />
     <ClCompile Include="minirtl\ultostr.c" />
     <ClCompile Include="minirtl\_strcat.c" />
+    <ClCompile Include="minirtl\_strchr.c" />
     <ClCompile Include="minirtl\_strcmp.c" />
     <ClCompile Include="minirtl\_strcmpi.c" />
     <ClCompile Include="minirtl\_strcpy.c" />
@@ -414,9 +422,11 @@
     <ClInclude Include="excepth.h" />
     <ClInclude Include="extapi.h" />
     <ClInclude Include="extras\extras.h" />
+    <ClInclude Include="extras\extrasCallbacks.h" />
     <ClInclude Include="extras\extrasDrivers.h" />
     <ClInclude Include="extras\extrasIPC.h" />
     <ClInclude Include="extras\extrasPN.h" />
+    <ClInclude Include="extras\extrasPSList.h" />
     <ClInclude Include="extras\extrasSSDT.h" />
     <ClInclude Include="extras\extrasUSD.h" />
     <ClInclude Include="findDlg.h" />
@@ -511,6 +521,23 @@
     <Image Include="rsrc\mailslot.ico" />
     <Image Include="rsrc\pipe.ico" />
   </ItemGroup>
+  <ItemGroup>
+    <MASM Include="ntuser\StubNtUserOpenWindowStation.asm">
+      <FileType>Document</FileType>
+      <TreatWarningsAsErrors Condition="'$(Configuration)|$(Platform)'=='ReleaseSignedWithDriver|x64'">true</TreatWarningsAsErrors>
+      <TreatWarningsAsErrors Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</TreatWarningsAsErrors>
+      <TreatWarningsAsErrors Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</TreatWarningsAsErrors>
+      <TreatWarningsAsErrors Condition="'$(Configuration)|$(Platform)'=='ReleaseNotSignedWithDriver|x64'">true</TreatWarningsAsErrors>
+      <TreatWarningsAsErrors Condition="'$(Configuration)|$(Platform)'=='ReleaseSigned|x64'">true</TreatWarningsAsErrors>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='ReleaseNotSignedWithDriver|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='ReleaseSigned|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='ReleaseSignedWithDriver|x64'">false</ExcludedFromBuild>
+    </MASM>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <ImportGroup Label="ExtensionTargets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
+  </ImportGroup>
 </Project>

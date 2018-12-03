@@ -4,11 +4,11 @@
 *
 *  TITLE:       EXTRASSSDT.H
 *
-*  VERSION:     1.52
+*  VERSION:     1.70
 *
-*  DATE:        08 Jan 2018
+*  DATE:        30 Nov 2018
 *
-*  Common header file for KiServiceTable dialog.
+*  Common header file for Service Table dialog.
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -24,7 +24,15 @@ typedef struct _SERVICETABLEENTRY {
     WCHAR Name[MAX_PATH + 1];
 } SERVICETABLEENTRY, *PSERVICETABLEENTRY;
 
-extern PSERVICETABLEENTRY g_SdtTable;
+extern PSERVICETABLEENTRY g_pSDT;
+extern PSERVICETABLEENTRY g_pSDTShadow;
+
+typedef enum _SSDT_DLG_MODE {
+    SST_Ntos = 0,
+    SST_Win32k = 1,
+    SST_Max
+} SSDT_DLG_MODE;
 
 VOID extrasCreateSSDTDialog(
-    _In_ HWND hwndParent);
+    _In_ HWND hwndParent,
+    _In_ SSDT_DLG_MODE Mode);

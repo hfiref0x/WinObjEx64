@@ -9,6 +9,9 @@ excepth.h
 extras.c - extras menu handler
 extras.h
 
+extrasCallbacks.c - Callbacks list
+extrasCallbacks.h
+
 extrasDrivers.c - Drivers list
 extrasDrivers.h
 
@@ -20,6 +23,9 @@ extrasIPC.h
 
 extrasPN.c - private namespaces
 extrasPN.h
+
+extrasPSList.c - process list
+extrasPSList.h
 
 extrasUSD.c - UserSharedData dialog
 extrasUSD.h
@@ -41,8 +47,10 @@ main.c - program entry point and initialization routines, main window dialog pro
 minirtl.c - set of reimplemented rtl routines
 minirtl.h
 
-objects.c - known objects names array
-objects.h - known objects indexes
+msvcver.h - MS VisualC compiler versions header file
+
+objects.c - known objects support functions
+objects.h
 
 propBasic.c - property sheet "Basic" handlers, including window procedures
 propBasic.h
@@ -83,7 +91,10 @@ testunit.h
 treelist.c - systreeview32 combined with sysheader32 control
 treelist.h
 
+wine.h - wine support header file
+
 global.h - global include file
 ntos.h - os internals related definitions and prototypes
+ntalpc.h - alpc port dedicated header file
 resource.h - studio generated resource header
 ui.h - user interface global constant

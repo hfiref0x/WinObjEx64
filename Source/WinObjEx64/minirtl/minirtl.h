@@ -6,7 +6,7 @@ Description:
 	header for string handling and conversion routines
 
 Date:
-	1 Mar 2015
+	1 Dec 2018
 */
 
 #ifndef _MINIRTL_
@@ -25,6 +25,9 @@ wchar_t *_strcat_w(wchar_t *dest, const wchar_t *src);
 
 char *_strncpy_a(char *dest, size_t ccdest, const char *src, size_t ccsrc);
 wchar_t *_strncpy_w(wchar_t *dest, size_t ccdest, const wchar_t *src, size_t ccsrc);
+
+char *_strcpyn_a(char* dest, const char* src, size_t n);
+wchar_t *_strcpyn_w(wchar_t* dest, const wchar_t* src, size_t n);
 
 size_t _strlen_a(const char *s);
 size_t _strlen_w(const wchar_t *s);
@@ -48,6 +51,10 @@ wchar_t *_strstr_w(const wchar_t *s, const wchar_t *sub_s);
 
 char *_strstri_a(const char *s, const char *sub_s);
 wchar_t *_strstri_w(const wchar_t *s, const wchar_t *sub_s);
+
+char *_strchr_a(const char *s, const char ch);
+wchar_t *_strchr_w(const wchar_t *s, const wchar_t ch);
+
 
 // conversion of integer types to string, returning string length
 
@@ -98,6 +105,7 @@ unsigned long long hextou64_w(wchar_t *s);
 #define _strcat _strcat_w
 #define _strlen _strlen_w
 #define _strncpy _strncpy_w
+#define _strcpyn _strcpyn_w
 
 #define _strcmp _strcmp_w
 #define _strncmp _strncmp_w
@@ -105,6 +113,7 @@ unsigned long long hextou64_w(wchar_t *s);
 #define _strncmpi _strncmpi_w
 #define _strstr _strstr_w
 #define _strstri _strstri_w
+#define _strchr _strchr_w
 
 #define ultostr ultostr_w
 #define ultohex ultohex_w
@@ -127,7 +136,7 @@ unsigned long long hextou64_w(wchar_t *s);
 #define _strcat _strcat_a
 #define _strlen _strlen_a
 #define _strncpy _strncpy_a
-#define _strcmp _strcmp_a
+#define _strcpyn _strcpyn_a
 
 #define _strcmp _strcmp_a
 #define _strncmp _strncmp_a
@@ -135,6 +144,7 @@ unsigned long long hextou64_w(wchar_t *s);
 #define _strncmpi _strncmpi_a
 #define _strstr _strstr_a
 #define _strstri _strstri_a
+#define _strchr _strchr_a
 
 #define ultostr ultostr_a
 #define ultohex ultohex_a

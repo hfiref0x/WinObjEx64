@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTALPC.H
 *
-*  VERSION:     1.86
+*  VERSION:     1.88
 *
-*  DATE:        25 Oct 2018
+*  DATE:        30 Nov 2018
 *
 *  Common header file for the ntos ALPC/CSR related functions and definitions.
 *
@@ -17,6 +17,17 @@
 *
 ************************************************************************************/
 #pragma once
+
+#ifndef NTALPC_RTL
+#define NTALPC_RTL
+
+//
+// NTALPC_RTL HEADER BEGIN
+//
+
+#if defined(__cplusplus)
+extern "C" {
+#endif
 
 #pragma warning(push)
 #pragma warning(disable: 4214) // nonstandard extension used : bit field types other than int
@@ -346,7 +357,7 @@ typedef struct _ALPC_PORT_9600 {
 } ALPC_PORT_9600, *PALPC_PORT_9600; /* size: 0x01c0 */
 
 //
-// Windows 10 (10240 - 18252) ALPC port object.
+// Windows 10 (10240 - 18290) ALPC port object.
 //
 typedef struct _ALPC_PORT_10240 {
     /* 0x0000 */ struct _LIST_ENTRY PortListEntry;
@@ -416,20 +427,41 @@ typedef struct _ALPC_PORT_10240 {
     /* 0x01d4 */ unsigned long WaitQueueLength;
 } ALPC_PORT_10240, *PALPC_PORT_10240; /* size: 0x01d8 */
 
-NTSTATUS NTAPI NtAlpcCreatePort(
+NTSYSAPI
+NTSTATUS 
+NTAPI 
+NtAlpcCreatePort(
     _Out_ PHANDLE PortHandle,
     _In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
     _In_opt_ PALPC_PORT_ATTRIBUTES PortAttributes);
 
-NTSTATUS NTAPI NtAlpcDisconnectPort(
+NTSYSAPI
+NTSTATUS 
+NTAPI 
+NtAlpcDisconnectPort(
     _In_ HANDLE PortHandle,
     _In_ ULONG Flags);
 
-NTSTATUS NTAPI NtAlpcQueryInformation(
+NTSYSAPI
+NTSTATUS 
+NTAPI 
+NtAlpcQueryInformation(
     _In_ HANDLE PortHandle,
     _In_ ALPC_PORT_INFORMATION_CLASS PortInformationClass,
     _Inout_updates_bytes_to_(Length, *ReturnLength) PVOID PortInformation,
     _In_ ULONG Length,
     _Out_opt_ PULONG ReturnLength);
 
+
+//
+// NTALPC_RTL HEADER END
+//
+
 #pragma warning(pop)
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif NTALPC_RTL

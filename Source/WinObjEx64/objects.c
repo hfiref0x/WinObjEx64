@@ -4,9 +4,9 @@
 *
 *  TITLE:       OBJECTS.C
 *
-*  VERSION:     1.60
+*  VERSION:     1.70
 *
-*  DATE:        24 Oct 2018
+*  DATE:        30 Nov 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -175,8 +175,7 @@ HIMAGELIST ObManagerLoadImageList(
             
             imageIndex = TYPE_RESOURCE_IMAGE_INDEX_START + g_ObjectTypes[i].ImageIndex;
             
-            hIcon = LoadImage(
-                g_WinObj.hInstance, 
+            hIcon = (HICON)LoadImage(g_WinObj.hInstance, 
                 MAKEINTRESOURCE(imageIndex), 
                 IMAGE_ICON, 
                 16, 
@@ -199,6 +198,7 @@ HIMAGELIST ObManagerLoadImageList(
 
 Usually none of these object types identities present in object directory.
 
+ActivationObject
 ActivityReference
 CoreMessagining
 DmaAdapter

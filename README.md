@@ -35,9 +35,9 @@ In order to build from source you need Microsoft Visual Studio 2013 U4 or Visual
   * If v140 then select 8.1 (Note that Windows 8.1 SDK must be installed);
   * If v141 then select 10.0.17134.0 (Note that Windows 10.0.17134 SDK must be installed). 
  
-# Changelog
+# What is new
 
-For a changelog see program help file -> History or changelog.txt in Source directory.
+[Whats New in 1.7](https://github.com/hfiref0x/WinObjEx64/blob/master/bin/WHATSNEW.md)
 
 
 # Authors

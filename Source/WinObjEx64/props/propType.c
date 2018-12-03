@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPTYPE.C
 *
-*  VERSION:     1.60
+*  VERSION:     1.70
 *
-*  DATE:        24 Oct 2018
+*  DATE:        30 Nov 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -517,6 +517,7 @@ VOID propSetTypeListView(
 * Used if object dumped info not available (restricted user, no driver etc).
 *
 */
+_Success_(return == TRUE)
 BOOL propQueryTypeInfo(
     _In_ LPWSTR lpObjectType,
     _Out_ POBJECT_TYPE_COMPATIBLE pObjectTypeDump
@@ -541,7 +542,7 @@ BOOL propQueryTypeInfo(
     __try {
 
         do {
-            pObjectTypes = supGetObjectTypesInfo();
+            pObjectTypes = (POBJECT_TYPES_INFORMATION)supGetObjectTypesInfo();
             if (pObjectTypes == NULL) {
                 break;
             }
@@ -556,7 +557,7 @@ BOOL propQueryTypeInfo(
             for (i = 0; i < pObjectTypes->NumberOfTypes; i++) {
 
                 sz = (pObject->TypeName.MaximumLength) + sizeof(UNICODE_NULL);
-                lpType = supHeapAlloc(sz);
+                lpType = (LPWSTR)supHeapAlloc(sz);
                 if (lpType) {
                     _strncpy(lpType,
                         sz / sizeof(WCHAR),
@@ -573,7 +574,7 @@ BOOL propQueryTypeInfo(
                         pObjectTypeDump->TypeInfo.DefaultPagedPoolCharge = pObject->DefaultPagedPoolCharge;
                         pObjectTypeDump->HighWaterNumberOfHandles = pObject->HighWaterNumberOfHandles;
                         pObjectTypeDump->HighWaterNumberOfObjects = pObject->HighWaterNumberOfObjects;
-                        pObjectTypeDump->TypeInfo.PoolType = pObject->PoolType;
+                        pObjectTypeDump->TypeInfo.PoolType = (POOL_TYPE)pObject->PoolType;
                         if (pObject->SecurityRequired) {
                             SET_BIT(pObjectTypeDump->TypeInfo.ObjectTypeFlags, 3);
                         }
@@ -797,7 +798,7 @@ INT_PTR CALLBACK TypePropDialogProc(
 
     switch (uMsg) {
     case WM_SHOWWINDOW:
-        Context = GetProp(hwndDlg, T_PROPCONTEXT);
+        Context = (PROP_OBJECT_INFO*)GetProp(hwndDlg, T_PROPCONTEXT);
         if (Context) {
             //show window
             if (wParam) {
@@ -823,7 +824,7 @@ INT_PTR CALLBACK TypePropDialogProc(
     case WM_COMMAND:
         if (LOWORD(wParam) == ID_TYPE_ATTRLIST) {
             if (HIWORD(wParam) == LBN_SELCHANGE) {
-                Context = GetProp(hwndDlg, T_PROPCONTEXT);
+                Context = (PROP_OBJECT_INFO*)GetProp(hwndDlg, T_PROPCONTEXT);
                 propSetTypeDecodedAttributes(Context, hwndDlg);
             }
         }
@@ -831,7 +832,7 @@ INT_PTR CALLBACK TypePropDialogProc(
         break;
 
     case WM_PAINT:
-        Context = GetProp(hwndDlg, T_PROPCONTEXT);
+        Context = (PROP_OBJECT_INFO*)GetProp(hwndDlg, T_PROPCONTEXT);
         if (Context) {
             hDc = BeginPaint(hwndDlg, &Paint);
             if (hDc) {

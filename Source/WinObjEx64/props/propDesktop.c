@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDESKTOP.C
 *
-*  VERSION:     1.60
+*  VERSION:     1.70
 *
-*  DATE:        24 Oct 2018
+*  DATE:        30 Nov 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -57,7 +57,7 @@ BOOL CALLBACK DesktopListEnumProc(
 
     // Desktop\\Object+0
     sz = (3 + _strlen(lpszDesktop) + _strlen(enumParam->ObjectContext->lpObjectName)) * sizeof(WCHAR);
-    lpName = supHeapAlloc(sz);
+    lpName = (LPWSTR)supHeapAlloc(sz);
     if (lpName == NULL)
         return 0;
 
@@ -167,14 +167,24 @@ VOID DesktopListSetInfo(
 
     ListView_DeleteAllItems(pDlgContext->ListView);
 
-    hObject = supOpenWindowStationFromContext(Context, FALSE, WINSTA_ENUMDESKTOPS);
+    if (g_WinObj.EnableExperimentalFeatures)
+        hObject = supOpenWindowStationFromContextEx(Context, FALSE, WINSTA_ENUMDESKTOPS);
+    else
+        hObject = supOpenWindowStationFromContext(Context, FALSE, WINSTA_ENUMDESKTOPS);
+    
     if (hObject) {
 
         enumParam.ObjectContext = Context;
         enumParam.DialogContext = pDlgContext;
 
         EnumDesktops(hObject, DesktopListEnumProc, (LPARAM)&enumParam);
-        CloseWindowStation(hObject);
+
+        if (g_WinObj.EnableExperimentalFeatures) {
+            NtClose((HANDLE)hObject);
+        }
+        else {
+            CloseWindowStation(hObject);
+        }
         bResult = TRUE;
     }
     ShowWindow(GetDlgItem(hwndDlg, ID_DESKTOPSNOTALL), (bResult == FALSE) ? SW_SHOW : SW_HIDE);
@@ -195,7 +205,7 @@ VOID DesktopListCreate(
 )
 {
     LVCOLUMN col;
-    HANDLE   hImage;
+    HICON    hImage;
 
     pDlgContext->ListView = GetDlgItem(hwndDlg, ID_DESKTOPSLIST);
     if (pDlgContext->ListView == NULL)
@@ -205,19 +215,25 @@ VOID DesktopListCreate(
     if (pDlgContext->ImageList) {
 
         //desktop image
-        hImage = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_DESKTOP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+        hImage = (HICON)LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_DESKTOP), 
+            IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+
         if (hImage) {
             ImageList_ReplaceIcon(pDlgContext->ImageList, -1, hImage);
             DestroyIcon(hImage);
         }
 
         //sort images
-        hImage = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+        hImage = (HICON)LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), 
+            IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+
         if (hImage) {
             ImageList_ReplaceIcon(pDlgContext->ImageList, -1, hImage);
             DestroyIcon(hImage);
         }
-        hImage = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+        hImage = (HICON)LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), 
+            IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+
         if (hImage) {
             ImageList_ReplaceIcon(pDlgContext->ImageList, -1, hImage);
             DestroyIcon(hImage);
@@ -434,7 +450,7 @@ INT_PTR CALLBACK DesktopListDialogProc(
 
     case WM_SHOWWINDOW:
         if (wParam) {
-            Context = GetProp(hwndDlg, T_PROPCONTEXT);
+            Context = (PROP_OBJECT_INFO*)GetProp(hwndDlg, T_PROPCONTEXT);
             pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
             if ((Context) && (pDlgContext)) {
 
@@ -473,7 +489,7 @@ INT_PTR CALLBACK DesktopListDialogProc(
         pSheet = (PROPSHEETPAGE*)lParam;
         if (pSheet) {
             SetProp(hwndDlg, T_PROPCONTEXT, (HANDLE)pSheet->lParam);
-            pDlgContext = supHeapAlloc(sizeof(EXTRASCONTEXT));
+            pDlgContext = (EXTRASCONTEXT*)supHeapAlloc(sizeof(EXTRASCONTEXT));
             if (pDlgContext) {
                 SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)pDlgContext);
                 DesktopListCreate(hwndDlg, pDlgContext);

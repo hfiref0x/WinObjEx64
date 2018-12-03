@@ -48,7 +48,7 @@ List of system wide driver callbacks and notify routines registered with the fol
 
 <img src="https://raw.githubusercontent.com/hfiref0x/WinObjEx64/master/Screenshots/CallbackObjectView.png" width="600" />
 
-Viewer of register callbacks for Callback object type. Drivers can create callbacks with ExCreateCallback API and register them with ExRegisterCallback.
+Viewer of registered callbacks for Callback object type. Drivers can create callbacks with ExCreateCallback API and register them with ExRegisterCallback.
 
 
  - **Improved OBJECT_TYPE view**

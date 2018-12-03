@@ -1,4 +1,4 @@
-v1.6.1
+v1.7.0
 code can now be compiled as C++
 added W32pServiceTable view
 added process list dialog (extras)

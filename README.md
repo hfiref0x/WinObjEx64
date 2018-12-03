@@ -16,8 +16,6 @@ WinObjEx64 works only on the following x64 Windows: Windows 7, Windows 8, Window
 WinObjEx64 also supports running on Wine, including Wine Staging.
 
 
-WinObjEx64 does not work on Windows XP, Windows Vista is partially supported. We have no plans of their full support.
-
 In order to use all program features Windows must be booted in the DEBUG mode.
 
 # Build 

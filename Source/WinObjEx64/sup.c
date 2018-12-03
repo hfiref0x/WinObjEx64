@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.60
 *
-*  DATE:        30 Nov 2018
+*  DATE:        29 Oct 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -53,7 +53,7 @@ ULONG g_cHeapAlloc = 0;
 * Wrapper for RtlAllocateHeap with WinObjEx heap.
 *
 */
-#ifndef _PROFILE_MEMORY_USAGE_
+#ifndef _DEBUG
 FORCEINLINE PVOID supHeapAlloc(
     _In_ SIZE_T Size)
 {
@@ -64,13 +64,10 @@ PVOID supHeapAlloc(
     _In_ SIZE_T Size)
 {
     LONG x;
-    DWORD LastError;
     PVOID Buffer = NULL;
     WCHAR szBuffer[100];
 
     Buffer = RtlAllocateHeap(g_WinObj.Heap, HEAP_ZERO_MEMORY, Size);
-    LastError = GetLastError();
-
     if (Buffer) {
         x = InterlockedIncrement((PLONG)&g_cHeapAlloc);
 
@@ -90,8 +87,6 @@ PVOID supHeapAlloc(
         _strcat(szBuffer, L"FAILED \r\n");
         OutputDebugString(szBuffer);
     }
-
-    SetLastError(LastError);
     return Buffer;
 }
 #endif
@@ -104,7 +99,7 @@ PVOID supHeapAlloc(
 * Wrapper for RtlFreeHeap with WinObjEx heap.
 *
 */
-#ifndef _PROFILE_MEMORY_USAGE_
+#ifndef _DEBUG
 FORCEINLINE BOOL supHeapFree(
     _In_ PVOID Memory)
 {
@@ -115,14 +110,9 @@ BOOL supHeapFree(
     _In_ PVOID Memory)
 {
     LONG x;
-    BOOL bSuccess;
-    DWORD LastError;
     WCHAR szBuffer[100];
 
-    bSuccess = RtlFreeHeap(g_WinObj.Heap, 0, Memory);
-    LastError = GetLastError();
-
-    if (bSuccess) {
+    if (RtlFreeHeap(g_WinObj.Heap, 0, Memory)) {
         x = InterlockedDecrement((PLONG)&g_cHeapAlloc);
         _strcpy(szBuffer, L"Free buffer=0x");
         u64tohex((ULONG_PTR)Memory, _strend(szBuffer));
@@ -133,16 +123,15 @@ BOOL supHeapFree(
         ultostr(x, _strend(szBuffer));
         _strcat(szBuffer, L"\r\n");
         OutputDebugString(szBuffer);
+        return TRUE;
     }
     else {
         _strcpy(szBuffer, L"Free buffer=0x");
         u64tohex((ULONG_PTR)Memory, _strend(szBuffer));
         _strcat(szBuffer, L" FAILED \r\n");
         OutputDebugString(szBuffer);
+        return FALSE;
     }
-
-    SetLastError(LastError);
-    return bSuccess;
 }
 #endif
 
@@ -162,8 +151,7 @@ PVOID supVirtualAlloc(
     SIZE_T size;
 
     size = Size;
-    Status = NtAllocateVirtualMemory(
-        NtCurrentProcess(),
+    Status = NtAllocateVirtualMemory(NtCurrentProcess(),
         &Buffer,
         0,
         &size,
@@ -174,8 +162,6 @@ PVOID supVirtualAlloc(
         RtlSecureZeroMemory(Buffer, size);
         return Buffer;
     }
-
-    SetLastError(RtlNtStatusToDosError(Status));
     return NULL;
 }
 
@@ -194,14 +180,11 @@ BOOL supVirtualFree(
     SIZE_T size = 0;
 
     if (Memory) {
-        Status = NtFreeVirtualMemory(
-            NtCurrentProcess(),
+        Status = NtFreeVirtualMemory(NtCurrentProcess(),
             &Memory,
             &size,
             MEM_RELEASE);
     }
-
-    SetLastError(RtlNtStatusToDosError(Status));
     return NT_SUCCESS(Status);
 }
 
@@ -282,13 +265,12 @@ VOID supClipboardCopy(
         dwSize = cbText + sizeof(UNICODE_NULL);
         hglbCopy = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, dwSize);
         if (hglbCopy != NULL) {
-            lptstrCopy = (LPWSTR)GlobalLock(hglbCopy);
+            lptstrCopy = GlobalLock(hglbCopy);
             if (lptstrCopy) {
                 supCopyMemory(lptstrCopy, dwSize, lpText, cbText);
             }
             GlobalUnlock(hglbCopy);
-            if (!SetClipboardData(CF_UNICODETEXT, hglbCopy))
-                GlobalFree(hglbCopy);
+            SetClipboardData(CF_UNICODETEXT, hglbCopy);
         }
         CloseClipboard();
     }
@@ -339,52 +321,79 @@ BOOL supQueryObjectFromHandle(
 }
 
 /*
+* supxSyscallTableEntryToAddress
+*
+* Purpose:
+*
+* Translate KiServiceTable entry to the real function address.
+*
+*/
+ULONG_PTR supxSyscallTableEntryToAddress(
+    _In_ PULONG KiServiceTable,
+    _In_ ULONG ServiceId,
+    _In_ ULONG_PTR KiServiceTablePtr
+)
+{
+    LONG32 Offset;
+
+    Offset = ((LONG32)KiServiceTable[ServiceId] >> 4);
+    return KiServiceTablePtr + Offset;
+}
+
+/*
 * supDumpSyscallTableConverted
 *
 * Purpose:
 *
-* Read service table and convert it.
+* Read KiServiceTable and convert it.
 *
 */
 BOOL supDumpSyscallTableConverted(
-    _In_ ULONG_PTR ServiceTableAddress,
-    _In_ ULONG ServiceLimit,
-    _Out_ PUTable *Table
+    _In_ PKLDBGCONTEXT Context,
+    _Inout_ PUTable *Table
 )
 {
     ULONG   ServiceId, memIO, bytesRead;
     BOOL    bResult = FALSE;
-    PULONG  ServiceTableDumped = NULL;
+    PULONG  KiServiceTableDumped = NULL;
     PUTable ConvertedTable;
 
-    LONG32 Offset;
+    __try {
 
-    *Table = NULL;
+        if ((Context->KiServiceTableAddress == 0) || (Context->KiServiceLimit == 0))
+            __leave;
 
-    memIO = ServiceLimit * sizeof(ULONG);
+        memIO = (ULONG)(Context->KiServiceLimit * sizeof(ULONG_PTR));
+        KiServiceTableDumped = (PULONG)supHeapAlloc(memIO);
+        if (KiServiceTableDumped == NULL)
+            __leave;
 
-    ServiceTableDumped = (PULONG)supHeapAlloc(memIO);
-    if (ServiceTableDumped) {
         bytesRead = 0;
-        if (kdReadSystemMemoryEx(
-            ServiceTableAddress,
-            (PVOID)ServiceTableDumped,
+        if (!kdReadSystemMemoryEx(Context->KiServiceTableAddress,
+            (PVOID)KiServiceTableDumped,
             memIO,
             &bytesRead))
         {
-            ConvertedTable = (PULONG_PTR)supHeapAlloc(ServiceLimit * sizeof(ULONG_PTR));
+            __leave;
+        }
 
+        if (bytesRead > 16) {
+            ConvertedTable = (PULONG_PTR)supHeapAlloc(bytesRead);
             if (ConvertedTable) {
-
                 *Table = ConvertedTable;
-                for (ServiceId = 0; ServiceId < ServiceLimit; ServiceId++) {
-                    Offset = ((LONG32)ServiceTableDumped[ServiceId] >> 4);
-                    ConvertedTable[ServiceId] = ServiceTableAddress + Offset;
+                for (ServiceId = 0; ServiceId < Context->KiServiceLimit; ServiceId++) {
+                    ConvertedTable[ServiceId] = supxSyscallTableEntryToAddress(KiServiceTableDumped,
+                        ServiceId,
+                        Context->KiServiceTableAddress);
                 }
                 bResult = TRUE;
             }
         }
-        supHeapFree(ServiceTableDumped);
+    }
+    __finally {
+        if (KiServiceTableDumped != NULL) {
+            supHeapFree(KiServiceTableDumped);
+        }
     }
     return bResult;
 }
@@ -404,7 +413,7 @@ VOID supShowHelp(
     DWORD   dwSize, dwType = 0;
     HKEY    hKey;
     LRESULT lRet;
-    HMODULE hHtmlOcx;
+    HANDLE  hHtmlOcx;
     LPWSTR  s;
     WCHAR   szOcxPath[MAX_PATH + 1];
     WCHAR   szBuffer[MAX_PATH * 2];
@@ -420,7 +429,7 @@ VOID supShowHelp(
     _strcat(szHelpFile, L"\\winobjex64.chm");
 
     if (!PathFileExists(szHelpFile)) {
-        s = (LPWSTR)supHeapAlloc((MAX_PATH * 2) + (_strlen(szHelpFile) * sizeof(WCHAR)));
+        s = supHeapAlloc((MAX_PATH * 2) + (_strlen(szHelpFile) * sizeof(WCHAR)));
         if (s) {
             _strcpy(s, TEXT("Help file could not be found - "));
             _strcat(s, szHelpFile);
@@ -580,64 +589,6 @@ VOID supSetWaitCursor(
 {
     ShowCursor(fSet);
     SetCursor(LoadCursor(NULL, fSet ? IDC_WAIT : IDC_ARROW));
-}
-
-/*
-* supxLoadBannerDialog
-*
-* Purpose:
-*
-* Wait window banner dialog procedure.
-*
-*/
-INT_PTR CALLBACK supxLoadBannerDialog(
-    _In_ HWND   hwndDlg,
-    _In_ UINT   uMsg,
-    _In_ WPARAM wParam,
-    _In_ LPARAM lParam
-)
-{
-    UNREFERENCED_PARAMETER(wParam);
-
-    switch (uMsg) {
-
-    case WM_INITDIALOG:
-        supCenterWindow(hwndDlg);
-
-        if (lParam) {
-            SetDlgItemText(hwndDlg, IDC_LOADING_MSG, (LPWSTR)lParam);
-        }
-        break;
-
-    case WM_CLOSE:
-        DestroyWindow(hwndDlg);
-        break;
-
-    default:
-        break;
-    }
-    return 0;
-}
-
-/*
-* supDisplayLoadBanner
-*
-* Purpose:
-*
-* Display borderless banner window to inform user about operation that need some wait.
-*
-*/
-HWND supDisplayLoadBanner(
-    _In_ HWND hwndParent,
-    _In_ LPWSTR lpMessage
-)
-{
-    return CreateDialogParam(
-        g_WinObj.hInstance,
-        MAKEINTRESOURCE(IDD_DIALOG_LOAD),
-        hwndParent,
-        supxLoadBannerDialog,
-        (LPARAM)lpMessage);
 }
 
 /*
@@ -807,9 +758,9 @@ LPWSTR supGetItemText(
             supHeapFree(item.pszText);
             item.pszText = NULL;
         }
-        item.pszText = (LPWSTR)supHeapAlloc(len * sizeof(WCHAR));
+        item.pszText = supHeapAlloc(len * sizeof(WCHAR));
         sz = SendMessage(ListView, LVM_GETITEMTEXT, (WPARAM)item.iItem, (LPARAM)&item);
-    } while (sz == (LPARAM)len - 1);
+    } while (sz == len - 1);
 
     //empty string
     if (sz == 0) {
@@ -875,7 +826,7 @@ HIMAGELIST supLoadImageList(
     list = ImageList_Create(16, 16, ILC_COLOR32 | ILC_MASK, TYPE_LAST, 8);
     if (list) {
         for (i = FirstId; i <= LastId; i++) {
-            hIcon = (HICON)LoadImage(hInst, MAKEINTRESOURCE(i), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR);
+            hIcon = LoadImage(hInst, MAKEINTRESOURCE(i), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR);
             if (hIcon) {
                 ImageList_ReplaceIcon(list, -1, hIcon);
                 DestroyIcon(hIcon);
@@ -932,15 +883,15 @@ UINT supGetObjectNameIndexByTypeIndex(
             if (g_NtBuildNumber >= 9200) {
                 ObjectTypeEntry.Ref = (PBYTE)pObject;
                 if (ObjectTypeEntry.u1.ObjectV2->TypeIndex == Index) {
-
+                    
                     return ObManagerGetIndexByTypeName(
                         pObject->TypeName.Buffer);
-
+                
                 }
             }
             else {
                 if (i + 2 == Index) {
-
+                    
                     return ObManagerGetIndexByTypeName(
                         pObject->TypeName.Buffer);
 
@@ -976,8 +927,6 @@ VOID supRunAsAdmin(
         shinfo.lpVerb = TEXT("runas");
         shinfo.lpFile = szPath;
         shinfo.nShow = SW_SHOW;
-        if (g_WinObj.EnableExperimentalFeatures)
-            shinfo.lpParameters = TEXT("-exp");
         if (ShellExecuteEx(&shinfo)) {
             PostQuitMessage(0);
         }
@@ -1036,27 +985,25 @@ BOOL supUserIsFullAdmin(
     SID_IDENTIFIER_AUTHORITY NtAuthority = SECURITY_NT_AUTHORITY;
     PSID AdministratorsGroup = NULL;
 
-    hToken = supGetCurrentProcessToken();
-    if (hToken == NULL)
-        return FALSE;
+    status = NtOpenProcessToken(NtCurrentProcess(), TOKEN_QUERY, &hToken);
+    if (!NT_SUCCESS(status))
+        return bResult;
 
     do {
-        if (!NT_SUCCESS(RtlAllocateAndInitializeSid(
+        if (!AllocateAndInitializeSid(
             &NtAuthority,
             2,
             SECURITY_BUILTIN_DOMAIN_RID,
             DOMAIN_ALIAS_RID_ADMINS,
             0, 0, 0, 0, 0, 0,
-            &AdministratorsGroup)))
-        {
+            &AdministratorsGroup))
             break;
-        }
 
         status = NtQueryInformationToken(hToken, TokenGroups, NULL, 0, &ReturnLength);
         if (status != STATUS_BUFFER_TOO_SMALL)
             break;
 
-        pTkGroups = (PTOKEN_GROUPS)supHeapAlloc((SIZE_T)ReturnLength);
+        pTkGroups = supHeapAlloc((SIZE_T)ReturnLength);
         if (pTkGroups == NULL)
             break;
 
@@ -1065,7 +1012,7 @@ BOOL supUserIsFullAdmin(
             if (pTkGroups->GroupCount > 0)
                 for (i = 0; i < pTkGroups->GroupCount; i++) {
                     Attributes = pTkGroups->Groups[i].Attributes;
-                    if (RtlEqualSid(AdministratorsGroup, pTkGroups->Groups[i].Sid))
+                    if (EqualSid(AdministratorsGroup, pTkGroups->Groups[i].Sid))
                         if (
                             (Attributes & SE_GROUP_ENABLED) &&
                             (!(Attributes & SE_GROUP_USE_FOR_DENY_ONLY))
@@ -1081,7 +1028,7 @@ BOOL supUserIsFullAdmin(
     } while (cond);
 
     if (AdministratorsGroup != NULL) {
-        RtlFreeSid(AdministratorsGroup);
+        FreeSid(AdministratorsGroup);
     }
 
     NtClose(hToken);
@@ -1288,7 +1235,7 @@ BOOL supxQueryKnownDllsLink(
         }
 
         memIO = bytesNeeded + sizeof(UNICODE_NULL);
-        lpDataBuffer = (LPWSTR)supHeapAlloc(memIO);
+        lpDataBuffer = supHeapAlloc(memIO);
         if (lpKnownDllsBuffer) {
             KnownDlls.Buffer = lpDataBuffer;
             KnownDlls.Length = (USHORT)bytesNeeded;
@@ -1322,11 +1269,11 @@ VOID supInit(
     kdInit(IsFullAdmin);
 
     if (IsFullAdmin) {
-        supCreateSCMSnapshot(SERVICE_DRIVER, NULL);
+        supCreateSCMSnapshot();
     }
 
     sapiCreateSetupDBSnapshot();
-    g_pObjectTypesInfo = (POBJECT_TYPES_INFORMATION)supGetObjectTypesInfo();
+    g_pObjectTypesInfo = supGetObjectTypesInfo();
 
     ExApiSetInit();
 }
@@ -1347,14 +1294,13 @@ VOID supShutdown(
 {
     kdShutdown();
 
-    supFreeSCMSnapshot(NULL);
+    supFreeSCMSnapshot();
     sapiFreeSnapshot();
 
     if (g_pObjectTypesInfo) supHeapFree(g_pObjectTypesInfo);
     if (g_lpKnownDlls32) supHeapFree(g_lpKnownDlls32);
     if (g_lpKnownDlls64) supHeapFree(g_lpKnownDlls64);
-    if (g_pSDT) supHeapFree(g_pSDT);
-    if (g_pSDTShadow) supHeapFree(g_pSDTShadow);
+    if (g_SdtTable) supHeapFree(g_SdtTable);
 }
 
 /*
@@ -1375,9 +1321,9 @@ VOID supQueryKnownDlls(
     g_lpKnownDlls64 = NULL;
 
     RtlInitUnicodeString(&KnownDlls, L"\\KnownDlls32\\KnownDllPath");
-    supxQueryKnownDllsLink(&KnownDlls, (PVOID*)&g_lpKnownDlls32);
+    supxQueryKnownDllsLink(&KnownDlls, &g_lpKnownDlls32);
     RtlInitUnicodeString(&KnownDlls, L"\\KnownDlls\\KnownDllPath");
-    supxQueryKnownDllsLink(&KnownDlls, (PVOID*)&g_lpKnownDlls64);
+    supxQueryKnownDllsLink(&KnownDlls, &g_lpKnownDlls64);
 }
 
 /*
@@ -1397,7 +1343,6 @@ BOOL supEnablePrivilege(
 {
     BOOL             bResult = FALSE;
     NTSTATUS         status;
-    ULONG            dummy;
     HANDLE           hToken;
     TOKEN_PRIVILEGES TokenPrivileges;
 
@@ -1415,7 +1360,7 @@ BOOL supEnablePrivilege(
     TokenPrivileges.Privileges[0].Luid.HighPart = 0;
     TokenPrivileges.Privileges[0].Attributes = (fEnable) ? SE_PRIVILEGE_ENABLED : 0;
     status = NtAdjustPrivilegesToken(hToken, FALSE, &TokenPrivileges,
-        sizeof(TOKEN_PRIVILEGES), (PTOKEN_PRIVILEGES)NULL, (PULONG)&dummy);
+        sizeof(TOKEN_PRIVILEGES), (PTOKEN_PRIVILEGES)NULL, NULL);
     if (status == STATUS_NOT_ALL_ASSIGNED) {
         status = STATUS_PRIVILEGE_NOT_HELD;
     }
@@ -1497,7 +1442,7 @@ BOOL supQueryProcessName(
         PBYTE ListRef;
     } List;
 
-    List.ListRef = (PBYTE)ProcessList;
+    List.ListRef = ProcessList;
 
     do {
 
@@ -1539,101 +1484,64 @@ BOOL supQueryProcessNameByEPROCESS(
 )
 {
     BOOL bFound = FALSE;
-    DWORD  CurrentProcessId = GetCurrentProcessId();
-    ULONG NextEntryDelta = 0, NumberOfProcesses = 0, i, j, ProcessListCount = 0;
+    ULONG NextEntryDelta = 0;
+    ULONG_PTR ObjectAddress = 0;
     HANDLE hProcess = NULL;
-    OBEX_PROCESS_LOOKUP_ENTRY *SavedProcessList;
-    PSYSTEM_HANDLE_INFORMATION_EX pHandles;
-
     union {
         PSYSTEM_PROCESSES_INFORMATION Processes;
         PBYTE ListRef;
     } List;
 
-    OBJECT_ATTRIBUTES obja = RTL_INIT_OBJECT_ATTRIBUTES((PUNICODE_STRING)NULL, 0);
+    OBJECT_ATTRIBUTES obja = RTL_INIT_OBJECT_ATTRIBUTES(NULL, 0);
 
-    List.ListRef = (PBYTE)ProcessList;
+    List.ListRef = ProcessList;
 
-    //
-    // Calculate process handle list size.
-    //
+
     do {
-
         List.ListRef += NextEntryDelta;
 
-        if (List.Processes->ThreadCount)
-            NumberOfProcesses += 1;
+        if (List.Processes->ThreadCount) {
+
+            //
+            // Bruteforce process list (could be slow).
+            //
+            //  1. Open each process.
+            //  2. Find exact handle object value for process.
+            //  3. Compare with object value we are looking for.
+            //
+            if (NT_SUCCESS(NtOpenProcess(
+                &hProcess,
+                PROCESS_QUERY_LIMITED_INFORMATION,
+                &obja,
+                &List.Processes->Threads[0].ClientId)))
+            {
+
+                if (supQueryObjectFromHandle(
+                    hProcess,
+                    &ObjectAddress,
+                    NULL))
+                {
+                    if (ObjectAddress == ValueOfEPROCESS) {
+                        _strncpy(
+                            Buffer,
+                            ccBuffer,
+                            List.Processes->ImageName.Buffer,
+                            List.Processes->ImageName.Length / sizeof(WCHAR));
+
+                        bFound = TRUE;
+                    }
+                }
+
+                NtClose(hProcess);
+            }
+        }
+
+        if (bFound)
+            break;
 
         NextEntryDelta = List.Processes->NextEntryDelta;
 
     } while (NextEntryDelta);
-
-    List.ListRef = (PBYTE)ProcessList;
-
-    ProcessListCount = 0;
-    NextEntryDelta = 0;
-
-    //
-    // Build process handle list.
-    //
-    SavedProcessList = (OBEX_PROCESS_LOOKUP_ENTRY*)supHeapAlloc(NumberOfProcesses * sizeof(OBEX_PROCESS_LOOKUP_ENTRY));
-    if (SavedProcessList) {
-
-        do {
-            List.ListRef += NextEntryDelta;
-
-            if (List.Processes->ThreadCount) {
-
-                if (NT_SUCCESS(NtOpenProcess(
-                    &hProcess,
-                    PROCESS_QUERY_LIMITED_INFORMATION,
-                    &obja,
-                    &List.Processes->Threads[0].ClientId)))
-                {
-                    SavedProcessList[ProcessListCount].hProcess = hProcess;
-                    SavedProcessList[ProcessListCount].EntryPtr = List.ListRef;
-                    ProcessListCount += 1;
-                }
-            }
-            NextEntryDelta = List.Processes->NextEntryDelta;
-        } while (NextEntryDelta);
-
-        //
-        // Lookup this handles in system handle list.
-        //
-        pHandles = (PSYSTEM_HANDLE_INFORMATION_EX)supGetSystemInfo(SystemExtendedHandleInformation);
-        if (pHandles) {
-            for (i = 0; i < pHandles->NumberOfHandles; i++)
-                if (pHandles->Handles[i].UniqueProcessId == (ULONG_PTR)CurrentProcessId) //current process id
-                    for (j = 0; j < ProcessListCount; j++)
-                        if (pHandles->Handles[i].HandleValue == (ULONG_PTR)SavedProcessList[j].hProcess) //same handle value
-                            if ((ULONG_PTR)pHandles->Handles[i].Object == ValueOfEPROCESS) { //save object value
-
-                                List.ListRef = SavedProcessList[j].EntryPtr;
-
-                                _strncpy(
-                                    Buffer,
-                                    ccBuffer,
-                                    List.Processes->ImageName.Buffer,
-                                    List.Processes->ImageName.Length / sizeof(WCHAR));
-
-                                bFound = TRUE;
-                                break;
-                            }
-
-            supHeapFree(pHandles);
-        }
-
-        //
-        // Destroy process handle list.
-        //
-        for (i = 0; i < ProcessListCount; i++) {
-            if (SavedProcessList[i].hProcess)
-                NtClose(SavedProcessList[i].hProcess);
-        }
-
-        supHeapFree(SavedProcessList);
-    }
 
     return bFound;
 }
@@ -1645,17 +1553,14 @@ BOOL supQueryProcessNameByEPROCESS(
 *
 * Collects SCM information for drivers description.
 *
-* Use supFreeSCMSnapshot to free returned buffer.
-*
 */
 BOOL supCreateSCMSnapshot(
-    _In_ ULONG ServiceType,
-    _Out_opt_ SCMDB *Snapshot
+    VOID
 )
 {
     BOOL      cond = FALSE, bResult = FALSE;
     SC_HANDLE schSCManager;
-    DWORD     dwBytesNeeded = 0, dwServicesReturned = 0, dwSize;
+    DWORD     dwBytesNeeded = 0, dwServicesReturned = 0, dwSize, dwSlack;
     PVOID     Services = NULL;
 
     do {
@@ -1670,7 +1575,7 @@ BOOL supCreateSCMSnapshot(
         //
         // Query required memory size for snapshot.
         //
-        dwSize = PAGE_SIZE;
+        dwSize = 0x1000;
         Services = supVirtualAlloc(dwSize);
         if (Services == NULL)
             break;
@@ -1678,9 +1583,9 @@ BOOL supCreateSCMSnapshot(
         bResult = EnumServicesStatusEx(
             schSCManager,
             SC_ENUM_PROCESS_INFO,
-            ServiceType,
+            SERVICE_DRIVER,
             SERVICE_STATE_ALL,
-            (LPBYTE)Services,
+            Services,
             dwSize,
             &dwBytesNeeded,
             &dwServicesReturned,
@@ -1693,7 +1598,10 @@ BOOL supCreateSCMSnapshot(
                 // Allocate required buffer.
                 //
                 supVirtualFree(Services);
-                dwSize = (DWORD)ALIGN_UP_BY(dwBytesNeeded + sizeof(ENUM_SERVICE_STATUS_PROCESS), PAGE_SIZE);
+                dwSize = (DWORD)(dwBytesNeeded + sizeof(ENUM_SERVICE_STATUS_PROCESS));
+                dwSlack = dwSize % 0x1000;
+                if (dwSlack > 0) dwSize = dwSize + 0x1000 - dwSlack;
+
                 Services = supVirtualAlloc(dwSize);
                 if (Services == NULL)
                     break;
@@ -1701,9 +1609,9 @@ BOOL supCreateSCMSnapshot(
                 bResult = EnumServicesStatusEx(
                     schSCManager,
                     SC_ENUM_PROCESS_INFO,
-                    ServiceType,
+                    SERVICE_DRIVER,
                     SERVICE_STATE_ALL,
-                    (LPBYTE)Services,
+                    Services,
                     dwSize,
                     &dwBytesNeeded,
                     &dwServicesReturned,
@@ -1723,16 +1631,10 @@ BOOL supCreateSCMSnapshot(
 
     } while (cond);
 
-    if (Snapshot) {
-        Snapshot->Entries = Services;
-        Snapshot->NumberOfEntries = dwServicesReturned;
-    }
-    else {
-        RtlEnterCriticalSection(&g_WinObj.Lock);
-        g_scmDB.Entries = Services;
-        g_scmDB.NumberOfEntries = dwServicesReturned;
-        RtlLeaveCriticalSection(&g_WinObj.Lock);
-    }
+    RtlEnterCriticalSection(&g_WinObj.Lock);
+    g_scmDB.Entries = Services;
+    g_scmDB.NumberOfEntries = dwServicesReturned;
+    RtlLeaveCriticalSection(&g_WinObj.Lock);
 
     return bResult;
 }
@@ -1746,21 +1648,13 @@ BOOL supCreateSCMSnapshot(
 *
 */
 VOID supFreeSCMSnapshot(
-    _In_opt_ SCMDB *Snapshot)
+    VOID)
 {
-    if (Snapshot) {
-        if ((Snapshot->Entries) && (Snapshot->NumberOfEntries))
-            supVirtualFree(Snapshot->Entries);
-        Snapshot->NumberOfEntries = 0;
-        Snapshot->Entries = NULL;
-    }
-    else {
-        RtlEnterCriticalSection(&g_WinObj.Lock);
-        supVirtualFree(g_scmDB.Entries);
-        g_scmDB.Entries = NULL;
-        g_scmDB.NumberOfEntries = 0;
-        RtlLeaveCriticalSection(&g_WinObj.Lock);
-    }
+    RtlEnterCriticalSection(&g_WinObj.Lock);
+    supVirtualFree(g_scmDB.Entries);
+    g_scmDB.Entries = NULL;
+    g_scmDB.NumberOfEntries = 0;
+    RtlLeaveCriticalSection(&g_WinObj.Lock);
 }
 
 /*
@@ -1790,7 +1684,7 @@ BOOL sapiQueryDeviceProperty(
         *PropertyBufferSize = 0;
 
     dataSize = (1 + MAX_PATH) * sizeof(WCHAR);
-    lpProperty = (LPWSTR)RtlAllocateHeap(SnapshotHeap, HEAP_ZERO_MEMORY, dataSize);
+    lpProperty = RtlAllocateHeap(SnapshotHeap, HEAP_ZERO_MEMORY, dataSize);
     if (lpProperty == NULL)
         return FALSE;
 
@@ -1806,7 +1700,7 @@ BOOL sapiQueryDeviceProperty(
 
         RtlFreeHeap(SnapshotHeap, 0, lpProperty);
         dataSize = returnLength;
-        lpProperty = (LPWSTR)RtlAllocateHeap(SnapshotHeap, HEAP_ZERO_MEMORY, dataSize);
+        lpProperty = RtlAllocateHeap(SnapshotHeap, HEAP_ZERO_MEMORY, dataSize);
         if (lpProperty) {
 
             result = SetupDiGetDeviceRegistryProperty(hDevInfo,
@@ -1872,7 +1766,7 @@ BOOL sapiCreateSetupDBSnapshot(
 
         for (i = 0; SetupDiEnumDeviceInfo(hDevInfo, i, &DeviceInfoData); i++) {
 
-            Entry = (PSAPIDBENTRY)RtlAllocateHeap(Heap, HEAP_ZERO_MEMORY, sizeof(SAPIDBENTRY));
+            Entry = RtlAllocateHeap(Heap, HEAP_ZERO_MEMORY, sizeof(SAPIDBENTRY));
             if (Entry == NULL) {
                 bFailed = TRUE;
                 break;
@@ -2055,45 +1949,11 @@ BOOL supQueryWinstationDescription(
 }
 
 /*
-* supFindModuleEntryByName
-*
-* Purpose:
-*
-* Find Module entry for given name.
-*
-*/
-PVOID supFindModuleEntryByName(
-    _In_ PRTL_PROCESS_MODULES pModulesList,
-    _In_ LPCSTR ModuleName
-)
-{
-    ULONG i, c, off;
-    LPSTR pModuleName;
-
-    c = pModulesList->NumberOfModules;
-    if (c == 0) {
-        return NULL;
-    }
-
-    for (i = 0; i < c; i++) {
-        off = pModulesList->Modules[i].OffsetToFileName;
-        pModuleName = (LPSTR)&pModulesList->Modules[i].FullPathName[off];
-        if (pModuleName) {
-
-            if (_strcmpi_a(pModuleName, ModuleName) == 0)
-                return &pModulesList->Modules[i];
-
-        }
-    }
-    return NULL;
-}
-
-/*
 * supFindModuleEntryByAddress
 *
 * Purpose:
 *
-* Find Module Entry for given Address.
+* Find Module Name for given Address.
 *
 */
 ULONG supFindModuleEntryByAddress(
@@ -2120,6 +1980,7 @@ ULONG supFindModuleEntryByAddress(
     }
     return (ULONG)-1;
 }
+
 
 /*
 * supFindModuleNameByAddress
@@ -2291,7 +2152,7 @@ BOOL supQueryDeviceDescription(
     // Build full device path.
     //
     Length = (4 + _strlen(lpDeviceName) + _strlen(g_WinObj.CurrentObjectPath)) * sizeof(WCHAR);
-    lpFullDeviceName = (LPWSTR)supHeapAlloc(Length);
+    lpFullDeviceName = supHeapAlloc(Length);
     if (lpFullDeviceName != NULL) {
 
         // create full path device name for comparison
@@ -2423,7 +2284,7 @@ BOOL supQueryDriverDescription(
             sz += supServicesRegPathSize;
             sz = (1 + sz) * sizeof(WCHAR);
 
-            lpRegKey = (LPWSTR)supHeapAlloc(sz);
+            lpRegKey = supHeapAlloc(sz);
             if (lpRegKey == NULL)
                 break;
 
@@ -2458,7 +2319,7 @@ BOOL supQueryDriverDescription(
 
                 // query codepage and language id info
                 dwSize = 0;
-                if (!VerQueryValue(vinfo, VERSION_TRANSLATION, (LPVOID*)&lpTranslate, (PUINT)&dwSize))
+                if (!VerQueryValue(vinfo, VERSION_TRANSLATION, &lpTranslate, (PUINT)&dwSize))
                     break;
 
                 if (dwSize == 0)
@@ -2472,7 +2333,7 @@ BOOL supQueryDriverDescription(
                 // finally query pointer to version_info filedescription block data
                 lpDisplayName = NULL;
                 dwSize = 0;
-                bResult = VerQueryValue(vinfo, szBuffer, (LPVOID*)&lpDisplayName, (PUINT)&dwSize);
+                bResult = VerQueryValue(vinfo, szBuffer, &lpDisplayName, (PUINT)&dwSize);
                 if (bResult) {
                     _strncpy(Buffer, ccBuffer, lpDisplayName, dwSize);
                 }
@@ -2576,7 +2437,7 @@ BOOL supQuerySectionFileInfo(
         // allocate memory buffer to store full filename
         // KnownDlls + \\ + Object->Name + \0 
         cLength = (2 + _strlen(lpszKnownDlls) + _strlen(ObjectName->Buffer)) * sizeof(WCHAR);
-        lpszFileName = (LPWSTR)supHeapAlloc(cLength);
+        lpszFileName = supHeapAlloc(cLength);
         if (lpszFileName == NULL)
             break;
 
@@ -2600,7 +2461,7 @@ BOOL supQuerySectionFileInfo(
             break;
 
         // query codepage and language id info
-        if (!VerQueryValue(vinfo, VERSION_TRANSLATION, (LPVOID*)&lpTranslate, (PUINT)&dwInfoSize))
+        if (!VerQueryValue(vinfo, VERSION_TRANSLATION, &lpTranslate, (PUINT)&dwInfoSize))
             break;
         if (dwInfoSize == 0)
             break;
@@ -2613,7 +2474,7 @@ BOOL supQuerySectionFileInfo(
         // finally query pointer to version_info filedescription block data
         pcValue = NULL;
         dwInfoSize = 0;
-        bResult = VerQueryValue(vinfo, szQueryBlock, (LPVOID*)&pcValue, (PUINT)&dwInfoSize);
+        bResult = VerQueryValue(vinfo, szQueryBlock, &pcValue, (PUINT)&dwInfoSize);
         if (bResult) {
             _strncpy(Buffer, ccBuffer, pcValue, dwInfoSize);
         }
@@ -2702,7 +2563,7 @@ HANDLE supOpenDirectoryForObject(
         //  e.g. lpDirectory = \ObjectTypes, lpObjectName = ObjectTypes then lpDirectory = \ 
         //
         ldirSz = rdirLen * sizeof(WCHAR) + sizeof(UNICODE_NULL);
-        LookupDirName = (LPWSTR)supHeapAlloc(ldirSz);
+        LookupDirName = supHeapAlloc(ldirSz);
         if (LookupDirName == NULL)
             return NULL;
 
@@ -2962,14 +2823,14 @@ ULONG_PTR supQuerySystemRangeStart(
 }
 
 /*
-* supxConvertFileName
+* supConvertFileName
 *
 * Purpose:
 *
 * Translate Nt path name to Dos path name.
 *
 */
-BOOL supxConvertFileName(
+BOOL supConvertFileName(
     _In_ LPWSTR NtFileName,
     _In_ LPWSTR DosFileName,
     _In_ SIZE_T ccDosFileName
@@ -3061,7 +2922,7 @@ BOOL supGetWin32FileName(
         if (status != STATUS_INFO_LENGTH_MISMATCH)
             break;
 
-        Buffer = (BYTE*)supHeapAlloc(memIO);
+        Buffer = supHeapAlloc(memIO);
         if (Buffer == NULL)
             break;
 
@@ -3069,7 +2930,7 @@ BOOL supGetWin32FileName(
         if (!NT_SUCCESS(status))
             break;
 
-        if (!supxConvertFileName(((PUNICODE_STRING)Buffer)->Buffer, Win32FileName, ccWin32FileName))
+        if (!supConvertFileName(((PUNICODE_STRING)Buffer)->Buffer, Win32FileName, ccWin32FileName))
             break;
 
         bResult = TRUE;
@@ -3097,7 +2958,7 @@ BOOL supIsWine(
     VOID
 )
 {
-    HMODULE hNtdll;
+    HANDLE hNtdll;
     FARPROC  WineVersion = NULL;
 
     hNtdll = GetModuleHandle(TEXT("ntdll.dll"));
@@ -3237,79 +3098,14 @@ HWINSTA supOpenWindowStationFromContext(
     UNICODE_STRING CurrentWinstaDir;
     UNICODE_STRING WinstaDir;
 
-    DWORD LastError = ERROR_SUCCESS;
-
     if (supxGetWindowStationName(&CurrentWinstaDir)) {
         RtlInitUnicodeString(&WinstaDir, Context->lpCurrentObjectPath);
         if (RtlEqualUnicodeString(&WinstaDir, &CurrentWinstaDir, TRUE)) {
             hObject = OpenWindowStation(Context->lpObjectName, fInherit, dwDesiredAccess);
-            LastError = GetLastError();
         }
         RtlFreeUnicodeString(&CurrentWinstaDir);
     }
 
-    SetLastError(LastError);
-    return hObject;
-}
-
-/*
-* supOpenWindowStationFromContextEx
-*
-* Purpose:
-*
-* Open Window station bypass session check.
-*
-*/
-HWINSTA supOpenWindowStationFromContextEx(
-    _In_ PROP_OBJECT_INFO *Context,
-    _In_ BOOL fInherit,
-    _In_ ACCESS_MASK dwDesiredAccess)
-{
-    NTSTATUS Status = STATUS_UNSUCCESSFUL;
-    HWINSTA hObject = NULL;
-    HANDLE hRootDirectory = NULL;
-    UNICODE_STRING CurrentWinstaDir;
-    UNICODE_STRING WinstaDir;
-    UNICODE_STRING WinstaName;
-    OBJECT_ATTRIBUTES obja;
-
-    if (supxGetWindowStationName(&CurrentWinstaDir)) {
-        
-        //
-        // Same session, open as usual.
-        //
-        RtlInitUnicodeString(&WinstaDir, Context->lpCurrentObjectPath);
-        if (RtlEqualUnicodeString(&WinstaDir, &CurrentWinstaDir, TRUE)) {
-            hObject = OpenWindowStation(Context->lpObjectName, fInherit, dwDesiredAccess);
-            if (hObject)
-                Status = STATUS_SUCCESS;
-        }
-        else {
-            
-            //
-            // Different session, use NtUserOpenWindowStation (doesn't work in Windows 10).
-            //
-            InitializeObjectAttributes(&obja, &WinstaDir, OBJ_CASE_INSENSITIVE, NULL, NULL);
-            Status = NtOpenDirectoryObject(&hRootDirectory,
-                DIRECTORY_TRAVERSE,
-                &obja);
-            
-            if (NT_SUCCESS(Status)) {
-                
-                RtlInitUnicodeString(&WinstaName, Context->lpObjectName);
-                InitializeObjectAttributes(&obja, &WinstaName, OBJ_CASE_INSENSITIVE, hRootDirectory, NULL);
-                
-                if (fInherit)
-                    obja.Attributes |= OBJ_INHERIT;
-                
-                hObject = g_ExtApiSet.NtUserOpenWindowStation(&obja, dwDesiredAccess);
-                Status = RtlGetLastNtStatus();
-                NtClose(hRootDirectory);
-            }
-        }
-        RtlFreeUnicodeString(&CurrentWinstaDir);
-    }
-    SetLastError(RtlNtStatusToDosErrorNoTeb(Status));
     return hObject;
 }
 
@@ -3397,7 +3193,7 @@ BOOL supQueryObjectTrustLabel(
         // Locate trust label ace.
         //
         for (i = 0; i < aclSize.AceCount; i++) {
-            if (NT_SUCCESS(RtlGetAce(sacl, i, (PVOID*)&aceHeader))) {
+            if (NT_SUCCESS(RtlGetAce(sacl, i, (LPVOID)&aceHeader))) {
                 if (aceHeader->AceType == SYSTEM_PROCESS_TRUST_LABEL_ACE_TYPE) {
                     ace = (SYSTEM_PROCESS_TRUST_LABEL_ACE*)aceHeader;
                     aceSID = (PSID)(&ace->SidStart);
@@ -3417,80 +3213,6 @@ BOOL supQueryObjectTrustLabel(
 }
 
 /*
-* supQueryTokenUserSid
-*
-* Purpose:
-*
-* Return SID of given token.
-*
-* Use supHeapFree to free memory allocated for result.
-*
-*/
-PSID supQueryTokenUserSid(
-    _In_ HANDLE hProcessToken
-)
-{
-    PSID result = NULL;
-    PTOKEN_USER ptu;
-    NTSTATUS status;
-    ULONG LengthNeeded = 0;
-
-    status = NtQueryInformationToken(hProcessToken, TokenUser,
-        NULL, 0, &LengthNeeded);
-
-    if (status == STATUS_BUFFER_TOO_SMALL) {
-
-        ptu = (PTOKEN_USER)supHeapAlloc(LengthNeeded);
-
-        if (ptu) {
-
-            status = NtQueryInformationToken(hProcessToken, TokenUser,
-                ptu, LengthNeeded, &LengthNeeded);
-
-            if (NT_SUCCESS(status)) {
-                LengthNeeded = SECURITY_MAX_SID_SIZE;
-                result = supHeapAlloc(LengthNeeded);
-                if (result) {
-                    status = RtlCopySid(LengthNeeded, result, ptu->User.Sid);
-                }
-            }
-
-            supHeapFree(ptu);
-        }
-    }
-
-    return (NT_SUCCESS(status)) ? result : NULL;
-}
-
-/*
-* supQueryProcessSid
-*
-* Purpose:
-*
-* Return SID for the given process.
-*
-* Use supHeapFree to free memory allocated for result.
-*
-*/
-PSID supQueryProcessSid(
-    _In_ HANDLE hProcess
-)
-{
-    HANDLE hProcessToken = NULL;
-    PSID result = NULL;
-
-
-    if (NT_SUCCESS(NtOpenProcessToken(hProcess, TOKEN_QUERY, &hProcessToken))) {
-
-        result = supQueryTokenUserSid(hProcessToken);
-
-        NtClose(hProcessToken);
-    }
-
-    return result;
-}
-
-/*
 * supIsLocalSystem
 *
 * Purpose:
@@ -3504,28 +3226,61 @@ NTSTATUS supIsLocalSystem(
     _In_ HANDLE hToken,
     _Out_ PBOOL pbResult)
 {
-    BOOL                     bResult = FALSE;
-    NTSTATUS                 status = STATUS_UNSUCCESSFUL;
-    PSID                     SystemSid = NULL, TokenSid = NULL;
-    SID_IDENTIFIER_AUTHORITY NtAuth = SECURITY_NT_AUTHORITY;
+    BOOL                            bResult = FALSE;
 
-    TokenSid = supQueryTokenUserSid(hToken);
-    if (TokenSid == NULL)
-        return status;
+    NTSTATUS                        status = STATUS_UNSUCCESSFUL;
+    HANDLE                          ProcessHeap = NtCurrentPeb()->ProcessHeap;
 
-    status = RtlAllocateAndInitializeSid(
-        &NtAuth,
-        1,
-        SECURITY_LOCAL_SYSTEM_RID,
-        0, 0, 0, 0, 0, 0, 0,
-        &SystemSid);
+    ULONG                           LengthNeeded = 0;
 
-    if (NT_SUCCESS(status)) {
-        bResult = RtlEqualSid(TokenSid, SystemSid);
-        RtlFreeSid(SystemSid);
-    }
+    PSID                            SystemSid = NULL;
+    PTOKEN_USER                     ptu = NULL;
+    SID_IDENTIFIER_AUTHORITY        NtAuth = SECURITY_NT_AUTHORITY;
 
-    supHeapFree(TokenSid);
+    status = NtQueryInformationToken(
+        hToken,
+        TokenUser,
+        NULL,
+        0,
+        &LengthNeeded);
+
+    if (status == STATUS_BUFFER_TOO_SMALL) {
+
+        ptu = (PTOKEN_USER)RtlAllocateHeap(
+            ProcessHeap,
+            HEAP_ZERO_MEMORY,
+            LengthNeeded);
+
+        if (ptu) {
+
+            status = NtQueryInformationToken(
+                hToken,
+                TokenUser,
+                ptu,
+                LengthNeeded,
+                &LengthNeeded);
+
+            if (NT_SUCCESS(status)) {
+
+                status = RtlAllocateAndInitializeSid(
+                    &NtAuth,
+                    1,
+                    SECURITY_LOCAL_SYSTEM_RID,
+                    0, 0, 0, 0, 0, 0, 0,
+                    &SystemSid);
+
+                if (NT_SUCCESS(status)) {
+                    bResult = RtlEqualSid(ptu->User.Sid, SystemSid);
+                    RtlFreeSid(SystemSid);
+                }
+
+            }
+            RtlFreeHeap(ProcessHeap, 0, ptu);
+        }
+        else {
+            status = STATUS_INSUFFICIENT_RESOURCES;
+        }
+    } //STATUS_BUFFER_TOO_SMALL
 
     if (pbResult)
         *pbResult = bResult;
@@ -3549,14 +3304,16 @@ HANDLE supxGetSystemToken(
     HANDLE hObject = NULL;
     HANDLE hToken = NULL;
 
-    OBJECT_ATTRIBUTES obja = RTL_INIT_OBJECT_ATTRIBUTES((PUNICODE_STRING)NULL, 0);
+    OBJECT_ATTRIBUTES obja;
 
     union {
         PSYSTEM_PROCESSES_INFORMATION Processes;
         PBYTE ListRef;
     } List;
 
-    List.ListRef = (PBYTE)ProcessList;
+    List.ListRef = ProcessList;
+
+    InitializeObjectAttributes(&obja, NULL, 0, NULL, NULL);
 
     do {
 
@@ -3613,7 +3370,7 @@ BOOL supRunAsLocalSystem(
 {
     BOOL bCond = FALSE, bSuccess = FALSE;
     PVOID ProcessList;
-    ULONG SessionId = NtCurrentPeb()->SessionId, dummy;
+    ULONG SessionId = NtCurrentPeb()->SessionId;
 
     HANDLE hSystemToken, hPrimaryToken = NULL, hImpersonationToken = NULL;
 
@@ -3657,13 +3414,13 @@ BOOL supRunAsLocalSystem(
     do {
 
         if (hSystemToken == NULL) {
-
+            
             MessageBox(
-                hwndParent,
+                hwndParent, 
                 TEXT("No suitable system token found. Make sure you are running as administrator"),
-                PROGRAM_NAME,
+                PROGRAM_NAME, 
                 MB_ICONINFORMATION);
-
+            
             break;
         }
 
@@ -3713,8 +3470,7 @@ BOOL supRunAsLocalSystem(
         //
         // Turn on AssignPrimaryToken privilege in impersonated token.
         //
-        TokenPrivileges = (TOKEN_PRIVILEGES*)_alloca(sizeof(TOKEN_PRIVILEGES) +
-            (1 * sizeof(LUID_AND_ATTRIBUTES)));
+        TokenPrivileges = _alloca(sizeof(TOKEN_PRIVILEGES) + (1 * sizeof(LUID_AND_ATTRIBUTES)));
 
         TokenPrivileges->PrivilegeCount = 1;
         TokenPrivileges->Privileges[0].Luid.LowPart = SE_ASSIGNPRIMARYTOKEN_PRIVILEGE;
@@ -3727,7 +3483,7 @@ BOOL supRunAsLocalSystem(
             TokenPrivileges,
             0,
             NULL,
-            (PULONG)&dummy)))
+            NULL)))
         {
             break;
         }
@@ -3756,7 +3512,7 @@ BOOL supRunAsLocalSystem(
         bSuccess = CreateProcessAsUser(
             hPrimaryToken,
             szApplication,
-            g_WinObj.EnableExperimentalFeatures ? GetCommandLine() : NULL,
+            NULL,
             NULL,
             NULL,
             FALSE,
@@ -3806,7 +3562,7 @@ BOOL supRunAsLocalSystem(
 *
 * Purpose:
 *
-* Return current process token value with TOKEN_QUERY access right.
+* Restart WinObjEx64 in local system account.
 *
 */
 HANDLE supGetCurrentProcessToken(
@@ -3858,10 +3614,10 @@ PVOID supLookupImageSectionByName(
     //
     i = NtHeaders->FileHeader.NumberOfSections;
     while (i > 0) {
-
+        
         if (_strncmp_a(
-            (CHAR*)SectionTableEntry->Name,
-            SectionName,
+            (CHAR*)SectionTableEntry->Name, 
+            SectionName, 
             SectionNameLength) == 0)
         {
             bFound = TRUE;
@@ -3909,7 +3665,7 @@ PVOID supFindPattern(
     BufferSize -= PatternSize;
 
     do {
-        p = (PBYTE)memchr(p, Pattern[0], BufferSize - (p - Buffer));
+        p = memchr(p, Pattern[0], BufferSize - (p - Buffer));
         if (p == NULL)
             break;
 
@@ -4006,154 +3762,6 @@ INT supGetMaxOfTwoU64FromHex(
 }
 
 /*
-* supGetMaxOfTwoLongFromString
-*
-* Purpose:
-*
-* Returned value used in listview comparer functions.
-*
-*/
-INT supGetMaxOfTwoLongFromString(
-    _In_ HWND ListView,
-    _In_ LPARAM lParam1,
-    _In_ LPARAM lParam2,
-    _In_ LPARAM lParamSort,
-    _In_ BOOL Inverse
-)
-{
-    INT       nResult;
-    LPWSTR    lpItem1 = NULL, lpItem2 = NULL;
-    LONG_PTR  value1, value2;
-    WCHAR     szText[MAX_TEXT_CONVERSION_ULONG64 + 1];
-
-    RtlSecureZeroMemory(&szText, sizeof(szText));
-
-    lpItem1 = supGetItemText2(
-        ListView,
-        (INT)lParam1,
-        (INT)lParamSort,
-        szText,
-        MAX_TEXT_CONVERSION_ULONG64);
-
-    value1 = strtoi64(lpItem1);
-
-    RtlSecureZeroMemory(&szText, sizeof(szText));
-
-    lpItem2 = supGetItemText2(
-        ListView,
-        (INT)lParam2,
-        (INT)lParamSort,
-        szText,
-        MAX_TEXT_CONVERSION_ULONG64);
-
-    value2 = strtoi64(lpItem2);
-
-    if (Inverse)
-        nResult = value1 < value2;
-    else
-        nResult = value1 > value2;
-
-    return nResult;
-}
-
-/*
-* supGetMaxOfTwoULongFromString
-*
-* Purpose:
-*
-* Returned value used in listview comparer functions.
-*
-*/
-INT supGetMaxOfTwoULongFromString(
-    _In_ HWND ListView,
-    _In_ LPARAM lParam1,
-    _In_ LPARAM lParam2,
-    _In_ LPARAM lParamSort,
-    _In_ BOOL Inverse
-)
-{
-    INT       nResult;
-    LPWSTR    lpItem1 = NULL, lpItem2 = NULL;
-    ULONG_PTR value1, value2;
-    WCHAR     szText[MAX_TEXT_CONVERSION_ULONG64 + 1];
-
-    RtlSecureZeroMemory(&szText, sizeof(szText));
-
-    lpItem1 = supGetItemText2(
-        ListView,
-        (INT)lParam1,
-        (INT)lParamSort,
-        szText,
-        MAX_TEXT_CONVERSION_ULONG64);
-
-    value1 = strtou64(lpItem1);
-
-    RtlSecureZeroMemory(&szText, sizeof(szText));
-
-    lpItem2 = supGetItemText2(
-        ListView,
-        (INT)lParam2,
-        (INT)lParamSort,
-        szText,
-        MAX_TEXT_CONVERSION_ULONG64);
-
-    value2 = strtou64(lpItem2);
-
-    if (Inverse)
-        nResult = value1 < value2;
-    else
-        nResult = value1 > value2;
-
-    return nResult;
-}
-
-/*
-* supGetMaxCompareTwoFixedStrings
-*
-* Purpose:
-*
-* Returned value used in listview comparer functions.
-*
-*/
-INT supGetMaxCompareTwoFixedStrings(
-    _In_ HWND ListView,
-    _In_ LPARAM lParam1,
-    _In_ LPARAM lParam2,
-    _In_ LPARAM lParamSort,
-    _In_ BOOL Inverse
-)
-{
-    INT       nResult;
-    LPWSTR    lpItem1 = NULL, lpItem2 = NULL;
-    WCHAR     szString1[MAX_PATH + 1], szString2[MAX_PATH + 1];
-
-    szString1[0] = 0;
-
-    lpItem1 = supGetItemText2(
-        ListView,
-        (INT)lParam1,
-        (INT)lParamSort,
-        szString1,
-        MAX_PATH);
-
-    szString2[0] = 0;
-
-    lpItem2 = supGetItemText2(
-        ListView,
-        (INT)lParam2,
-        (INT)lParamSort,
-        szString2,
-        MAX_PATH);
-
-    if (Inverse)
-        nResult = _strcmpi(lpItem2, lpItem1);
-    else
-        nResult = _strcmpi(lpItem1, lpItem2);
-
-    return nResult;
-}
-
-/*
 * supOpenNamedObjectFromContext
 *
 * Purpose:
@@ -4185,7 +3793,7 @@ HANDLE supOpenNamedObjectFromContext(
             MAXIMUM_ALLOWED,
             &objaNamespace,
             Context->NamespaceInfo.BoundaryDescriptor);
-
+           
         if (!NT_SUCCESS(status)) {
             *Status = status;
             return NULL;
@@ -4260,77 +3868,4 @@ HANDLE supOpenNamedObjectFromContext(
     if (hPrivateNamespace) NtClose(hPrivateNamespace);
 
     return hObject;
-}
-
-/*
-* supShowError
-*
-* Purpose:
-*
-* Display detailed last error to user.
-*
-*/
-VOID supShowLastError(
-    _In_ HWND hWnd,
-    _In_ LPWSTR Source,
-    _In_ DWORD LastError
-)
-{
-    LPWSTR lpMsgBuf = NULL;
-
-    if (FormatMessage(
-        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
-        NULL, LastError,
-        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-        (LPWSTR)&lpMsgBuf, 0, NULL))
-    {
-        MessageBox(hWnd, lpMsgBuf, Source, MB_TOPMOST | MB_ICONERROR);
-        LocalFree(lpMsgBuf);
-    }
-}
-
-/*
-* supCopyTreeListSubItemValue
-*
-* Purpose:
-*
-* Copy treelist value to the clipboard.
-*
-*/
-VOID supCopyTreeListSubItemValue(
-    _In_ HWND TreeList,
-    _In_ UINT ValueIndex
-)
-{
-    SIZE_T             cbText;
-    LPWSTR             lpText;
-    TL_SUBITEMS_FIXED *subitems;
-    TVITEMEX           itemex;
-    WCHAR              textbuf[MAX_PATH + 1];
-
-    __try {
-
-        RtlSecureZeroMemory(&itemex, sizeof(itemex));
-        RtlSecureZeroMemory(textbuf, sizeof(textbuf));
-        subitems = NULL;
-        itemex.mask = TVIF_TEXT;
-        itemex.hItem = TreeList_GetSelection(TreeList);
-        itemex.pszText = textbuf;
-        itemex.cchTextMax = MAX_PATH;
-
-        TreeList_GetTreeItem(TreeList, &itemex, &subitems);
-
-        if (subitems) {
-            if (ValueIndex < subitems->Count) {
-                lpText = subitems->Text[ValueIndex];
-                if (lpText) {
-                    cbText = _strlen(lpText) * sizeof(WCHAR);
-                    supClipboardCopy(lpText, cbText);
-                }
-            }
-        }
-    }
-    __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
-        return;
-    }
 }

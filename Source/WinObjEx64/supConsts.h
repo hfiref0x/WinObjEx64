@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUPCONSTS.H
 *
-*  VERSION:     1.70
+*  VERSION:     1.60
 *
-*  DATE:        30 Nov 2018
+*  DATE:        25 Oct 2018
 *
 *  Consts header file for support unit.
 *
@@ -25,6 +25,7 @@
 #define VERSION_DESCRIPTION         L"\\StringFileInfo\\%04x%04x\\FileDescription"
 #define HHCTRLOCXKEY                L"CLSID\\{ADB880A6-D8FF-11CF-9377-00AA003B7A11}\\InprocServer32"
 #define T_OBJECTTYPES               L"\\ObjectTypes"
+#define T_NAMESPACE_ALIAS_PREFIX    L"ArisuTsuberuku"
 
 
 #define FORMATTED_TIME_DATE_VALUE   L"%02hd:%02hd:%02hd, %02hd %ws %04hd"

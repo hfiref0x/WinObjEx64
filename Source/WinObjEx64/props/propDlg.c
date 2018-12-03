@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDLG.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.60
 *
-*  DATE:        30 Nov 2018
+*  DATE:        27 Oct 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -44,7 +44,7 @@ HWND g_NamespacePropWindow = NULL;
 *
 * Purpose:
 *
-* Close handle opened with propOpenCurrentObject.
+* Close currently viewed object handle depending on type
 *
 */
 BOOL propCloseCurrentObject(
@@ -54,30 +54,16 @@ BOOL propCloseCurrentObject(
 {
     BOOL bResult = FALSE;
 
-    if (Context == NULL) {
-        if (hObject != NULL)
-            bResult = NT_SUCCESS(NtClose(hObject));
-        return bResult;
-    }
-
-    else {
-
-        switch (Context->TypeIndex) {
-        case ObjectTypeWinstation:
-            if (g_WinObj.EnableExperimentalFeatures) {
-                bResult = NT_SUCCESS(NtClose(hObject));
-            }
-            else {
-                bResult = CloseWindowStation((HWINSTA)hObject);
-            }
-            break;
-        case ObjectTypeDesktop:
-            bResult = CloseDesktop((HDESK)hObject);
-            break;
-        default:
-            bResult = NT_SUCCESS(NtClose(hObject));
-            break;
-        }
+    switch (Context->TypeIndex) {
+    case ObjectTypeWinstation:
+        bResult = CloseWindowStation(hObject);
+        break;
+    case ObjectTypeDesktop:
+        bResult = CloseDesktop(hObject);
+        break;
+    default:
+        bResult = NT_SUCCESS(NtClose(hObject));
+        break;
     }
 
     return bResult;
@@ -126,12 +112,7 @@ BOOL propOpenCurrentObject(
     // Handle window station type.
     //
     if (Context->TypeIndex == ObjectTypeWinstation) {
-        if (g_WinObj.EnableExperimentalFeatures) {
-            hObject = supOpenWindowStationFromContextEx(Context, FALSE, DesiredAccess); //WINSTA_READATTRIBUTES for query
-        }
-        else {
-            hObject = supOpenWindowStationFromContext(Context, FALSE, DesiredAccess); //WINSTA_READATTRIBUTES for query
-        }
+        hObject = supOpenWindowStationFromContext(Context, FALSE, DesiredAccess); //WINSTA_READATTRIBUTES for query
         bResult = (hObject != NULL);
         if (bResult) {
             *phObject = hObject;
@@ -291,7 +272,7 @@ PPROP_OBJECT_INFO propContextCreate(
         //
         // Allocate context structure.
         //
-        Context = (PROP_OBJECT_INFO*)supHeapAlloc(sizeof(PROP_OBJECT_INFO));
+        Context = supHeapAlloc(sizeof(PROP_OBJECT_INFO));
         if (Context == NULL)
             return NULL;
 
@@ -300,7 +281,7 @@ PPROP_OBJECT_INFO propContextCreate(
         //
         if (lpObjectName) {
 
-            Context->lpObjectName = (LPWSTR)supHeapAlloc((1 + _strlen(lpObjectName)) * sizeof(WCHAR));
+            Context->lpObjectName = supHeapAlloc((1 + _strlen(lpObjectName)) * sizeof(WCHAR));
             if (Context->lpObjectName) {
                 _strcpy(Context->lpObjectName, lpObjectName);
                 bSelectedObject = (_strcmpi(Context->lpObjectName, TEXT("ObjectTypes")) == 0);
@@ -311,7 +292,7 @@ PPROP_OBJECT_INFO propContextCreate(
         // Copy object type if given.
         //
         if (lpObjectType) {
-            Context->lpObjectType = (LPWSTR)supHeapAlloc((1 + _strlen(lpObjectType)) * sizeof(WCHAR));
+            Context->lpObjectType = supHeapAlloc((1 + _strlen(lpObjectType)) * sizeof(WCHAR));
             if (Context->lpObjectType) {
                 _strcpy(Context->lpObjectType, lpObjectType);
             }
@@ -322,7 +303,7 @@ PPROP_OBJECT_INFO propContextCreate(
         // Copy CurrentObjectPath if given, as it can change because dialog is modeless.
         //
         if (lpCurrentObjectPath) {
-            Context->lpCurrentObjectPath = (LPWSTR)supHeapAlloc((1 + _strlen(lpCurrentObjectPath)) * sizeof(WCHAR));
+            Context->lpCurrentObjectPath = supHeapAlloc((1 + _strlen(lpCurrentObjectPath)) * sizeof(WCHAR));
             if (Context->lpCurrentObjectPath) {
                 _strcpy(Context->lpCurrentObjectPath, lpCurrentObjectPath);
                 bSelectedDirectory = (_strcmpi(Context->lpCurrentObjectPath, T_OBJECTTYPES) == 0);
@@ -333,7 +314,7 @@ PPROP_OBJECT_INFO propContextCreate(
         // Copy object description, could be NULL.
         //
         if (lpDescription) {
-            Context->lpDescription = (LPWSTR)supHeapAlloc((1 + _strlen(lpDescription)) * sizeof(WCHAR));
+            Context->lpDescription = supHeapAlloc((1 + _strlen(lpDescription)) * sizeof(WCHAR));
             if (Context->lpDescription) {
                 _strcpy(Context->lpDescription, lpDescription);
             }
@@ -436,10 +417,8 @@ LRESULT WINAPI PropSheetCustomWndProc(
         break;
 
     case WM_DESTROY:
-        Context = (PROP_OBJECT_INFO*)GetProp(hwnd, T_PROPCONTEXT);
-        if (Context) {
-            propContextDestroy(Context);
-        }
+        Context = GetProp(hwnd, T_PROPCONTEXT);
+        propContextDestroy(Context);
         RemoveProp(hwnd, T_PROPCONTEXT);
         break;
 
@@ -531,6 +510,17 @@ VOID propCreateDialog(
     }
     if (propContext == NULL)
         return;
+
+    //
+    // If worker available - wait on it.
+    //
+    if (g_kdctx.hDevice) {
+        if (g_kdctx.hThreadWorker) {
+            WaitForSingleObject(g_kdctx.hThreadWorker, INFINITE);
+            CloseHandle(g_kdctx.hThreadWorker);
+            g_kdctx.hThreadWorker = NULL;
+        }
+    }
 
     //
     // Remember previously focused window.
@@ -625,7 +615,6 @@ VOID propCreateDialog(
         case ObjectTypeIoCompletion:
         case ObjectTypeFltConnPort:
         case ObjectTypeType:
-        case ObjectTypeCallback:
             RtlSecureZeroMemory(&Page, sizeof(Page));
             Page.dwSize = sizeof(PROPSHEETPAGE);
             Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
@@ -718,7 +707,7 @@ VOID propCreateDialog(
     SecurityPage = propSecurityCreatePage(
         propContext, //Context
         (POPENOBJECTMETHOD)&propOpenCurrentObject, //OpenObjectMethod
-        (PCLOSEOBJECTMETHOD)&propCloseCurrentObject,//CloseObjectMethod
+        NULL, //CloseObjectMethod, use default
         SI_EDIT_AUDITS | SI_EDIT_OWNER | SI_EDIT_PERMS | //psiFlags
         SI_ADVANCED | SI_NO_ACL_PROTECT | SI_NO_TREE_APPLY |
         SI_PAGE_TITLE

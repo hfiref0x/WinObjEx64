@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRAS.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.60
 *
-*  DATE:        30 Nov 2018
+*  DATE:        24 Oct 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -21,8 +21,6 @@
 #include "extrasSSDT.h"
 #include "extrasDrivers.h"
 #include "extrasIPC.h"
-#include "extrasPSList.h"
-#include "extrasCallbacks.h"
 
 /*
 * extrasSimpleListResize
@@ -130,27 +128,38 @@ VOID extrasSetDlgIcon(
     hIcon = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN), IMAGE_ICON, 0, 0, LR_SHARED);
     if (hIcon) {
         SetClassLongPtr(hwndDlg, GCLP_HICON, (LONG_PTR)hIcon);
-        DestroyIcon((HICON)hIcon);
+        DestroyIcon(hIcon);
     }
 }
 
 /*
-* extrasShowIPCDialog
+* extrasShowPipeDialog
 *
 * Purpose:
 *
-* Display Pipe/Mailslots Properties Dialog.
+* Display Pipe Properties Dialog.
 *
 */
-VOID extrasShowIPCDialog(
-    _In_ HWND hwndParent,
-    _In_ ULONG CallerId
+VOID extrasShowPipeDialog(
+    _In_ HWND hwndParent
 )
 {
-    if (CallerId == ID_EXTRAS_MAILSLOTS) 
-        extrasCreateIpcDialog(hwndParent, IpcModeMailSlots);
-    else if (CallerId == ID_EXTRAS_PIPES)
-        extrasCreateIpcDialog(hwndParent, IpcModeNamedPipes);
+    extrasCreateIpcDialog(hwndParent, IpcModeNamedPipes);
+}
+
+/*
+* extrasShowMailslotsDialog
+*
+* Purpose:
+*
+* Display Mailslots Properties Dialog.
+*
+*/
+VOID extrasShowMailslotsDialog(
+    _In_ HWND hwndParent
+)
+{
+    extrasCreateIpcDialog(hwndParent, IpcModeMailshots);
 }
 
 /*
@@ -192,14 +201,10 @@ VOID extrasShowPrivateNamespacesDialog(
 *
 */
 VOID extrasShowSSDTDialog(
-    _In_ HWND hwndParent,
-    _In_ ULONG CallerId
+    _In_ HWND hwndParent
 )
 {
-    if (CallerId == ID_EXTRAS_SSDT)
-        extrasCreateSSDTDialog(hwndParent, SST_Ntos);
-    else if (CallerId == ID_EXTRAS_W32PSERVICETABLE)
-        extrasCreateSSDTDialog(hwndParent, SST_Win32k);
+    extrasCreateSSDTDialog(hwndParent);
 }
 
 /*
@@ -215,34 +220,4 @@ VOID extrasShowDriversDialog(
 )
 {
     extrasCreateDriversDialog(hwndParent);
-}
-
-/*
-* extrasShowPsListDialog
-*
-* Purpose:
-*
-* Display Process list dialog.
-*
-*/
-VOID extrasShowPsListDialog(
-    _In_ HWND hwndParent
-)
-{
-    extrasCreatePsListDialog(hwndParent);
-}
-
-/*
-* extrasShowCallbacksDialog
-*
-* Purpose:
-*
-* Display Callbacks dialog.
-*
-*/
-VOID extrasShowCallbacksDialog(
-    _In_ HWND hwndParent
-)
-{
-    extrasCreateCallbacksDialog(hwndParent);
 }

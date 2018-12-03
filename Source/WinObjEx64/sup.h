@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.70
+*  VERSION:     1.60
 *
-*  DATE:        30 Nov 2018
+*  DATE:        24 Oct 2018
 *
 *  Common header file for the program support routines.
 *
@@ -35,14 +35,6 @@ typedef struct _ENUMICONINFO {
     HICON hIcon;
     INT cx, cy;
 } ENUMICONINFO, *PENUMICONINFO;
-
-typedef struct _OBEX_PROCESS_LOOKUP_ENTRY {
-    HANDLE hProcess;
-    union {
-        PUCHAR EntryPtr;
-        PSYSTEM_PROCESSES_INFORMATION ProcessInformation;
-    };
-} OBEX_PROCESS_LOOKUP_ENTRY, *POBEX_PROCESS_LOOKUP_ENTRY;
 
 //
 // Gripper window size
@@ -109,7 +101,6 @@ BOOL supInitTreeListForDump(
 VOID supShowHelp(
     _In_ HWND ParentWindow);
 
-_Success_(return != FALSE)
 BOOL supQueryObjectFromHandle(
     _In_ HANDLE hOject,
     _Out_ ULONG_PTR *Address,
@@ -134,10 +125,6 @@ VOID supCenterWindow(
 
 VOID supSetWaitCursor(
     _In_ BOOL fSet);
-
-HWND supDisplayLoadBanner(
-    _In_ HWND hwndParent,
-    _In_ LPWSTR lpMessage);
 
 HIMAGELIST supLoadImageList(
     _In_ HINSTANCE hInst,
@@ -255,10 +242,6 @@ BOOL supQueryProcessNameByEPROCESS(
     _Inout_ LPWSTR Buffer,
     _In_ DWORD ccBuffer);
 
-PVOID supFindModuleEntryByName(
-    _In_ PRTL_PROCESS_MODULES pModulesList,
-    _In_ LPCSTR ModuleName);
-
 BOOL supFindModuleNameByAddress(
     _In_ PRTL_PROCESS_MODULES pModulesList,
     _In_ PVOID Address,
@@ -280,16 +263,14 @@ HANDLE supOpenDirectoryForObject(
     _In_ LPWSTR lpDirectory);
 
 BOOL supDumpSyscallTableConverted(
-    _In_ ULONG_PTR ServiceTableAddress,
-    _In_ ULONG ServiceLimit,
-    _Out_ PUTable *Table);
+    _In_ PKLDBGCONTEXT Context,
+    _Inout_ PUTable *Table);
 
 BOOL supCreateSCMSnapshot(
-    _In_ ULONG ServiceType,
-    _Out_opt_ SCMDB *Snapshot);
+    VOID);
 
 VOID supFreeSCMSnapshot(
-    _In_opt_ SCMDB *Snapshot);
+    VOID);
 
 BOOL sapiCreateSetupDBSnapshot(
     VOID);
@@ -341,11 +322,6 @@ HWINSTA supOpenWindowStationFromContext(
     _In_ BOOL fInherit,
     _In_ ACCESS_MASK dwDesiredAccess);
 
-HWINSTA supOpenWindowStationFromContextEx(
-    _In_ PROP_OBJECT_INFO *Context,
-    _In_ BOOL fInherit,
-    _In_ ACCESS_MASK dwDesiredAccess);
-
 BOOL supQueryObjectTrustLabel(
     _In_ HANDLE hObject,
     _Out_ PULONG ProtectionType,
@@ -386,44 +362,8 @@ INT supGetMaxOfTwoU64FromHex(
     _In_ LPARAM lParamSort,
     _In_ BOOL Inverse);
 
-INT supGetMaxOfTwoLongFromString(
-    _In_ HWND ListView,
-    _In_ LPARAM lParam1,
-    _In_ LPARAM lParam2,
-    _In_ LPARAM lParamSort,
-    _In_ BOOL Inverse);
-
-INT supGetMaxOfTwoULongFromString(
-    _In_ HWND ListView,
-    _In_ LPARAM lParam1,
-    _In_ LPARAM lParam2,
-    _In_ LPARAM lParamSort,
-    _In_ BOOL Inverse);
-
-INT supGetMaxCompareTwoFixedStrings(
-    _In_ HWND ListView,
-    _In_ LPARAM lParam1,
-    _In_ LPARAM lParam2,
-    _In_ LPARAM lParamSort,
-    _In_ BOOL Inverse);
-
 HANDLE supOpenNamedObjectFromContext(
     _In_ PROP_OBJECT_INFO *Context,
     _In_ OBJECT_ATTRIBUTES *ObjectAttributes,
     _In_ ACCESS_MASK DesiredAccess,
     _Out_ NTSTATUS *Status);
-
-VOID supShowLastError(
-    _In_ HWND hWnd,
-    _In_ LPWSTR Source,
-    _In_ DWORD LastError);
-
-PSID supQueryTokenUserSid(
-    _In_ HANDLE hProcessToken);
-
-PSID supQueryProcessSid(
-    _In_ HANDLE hProcess);
-
-VOID supCopyTreeListSubItemValue(
-    _In_ HWND TreeList,
-    _In_ UINT ValueIndex);

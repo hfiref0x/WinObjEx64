@@ -2,7 +2,7 @@
 # WinObjEx64
 ## Windows Object Explorer 64-bit
 
-<img src="https://raw.githubusercontent.com/hfiref0x/WinObjEx64/master/screenshots/MainWindow.png" width="600" />
+<img src="https://raw.githubusercontent.com/hfiref0x/WinObjEx64/master/Screenshots/MainWindow.png" width="600" />
 
 WinObjEx64 is an advanced utility that lets you explore the Windows Object Manager namespace. For certain object types, you can double-click on it or use the "Properties..." toolbar button to get more information, such as description, attributes, resource usage etc. WinObjEx64 let you view and edit object-related security information if you have required access rights.
 
@@ -35,9 +35,9 @@ In order to build from source you need Microsoft Visual Studio 2013 U4 or Visual
   * If v140 then select 8.1 (Note that Windows 8.1 SDK must be installed);
   * If v141 then select 10.0.17134.0 (Note that Windows 10.0.17134 SDK must be installed). 
  
-# What is new
+# Changelog
 
-[Whats New in 1.7](https://github.com/hfiref0x/WinObjEx64/blob/master/bin/WHATSNEW.md)
+For a changelog see program help file -> History or changelog.txt in Source directory.
 
 
 # Authors

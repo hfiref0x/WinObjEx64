@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPSECURITY.H
 *
-*  VERSION:     1.70
+*  VERSION:     1.52
 *
-*  DATE:        30 Nov 2018
+*  DATE:        08 Jan 2018
 *
 *  Common header file for Security property sheet.
 *
@@ -23,16 +23,16 @@
 
 typedef struct _ObjectSecurityVtbl ObjectSecurityVtbl, *PObjectSecurityVtbl;
 
-//open object method (propOpenCurrentObject)
+//custom open object method
 typedef BOOL(CALLBACK *POPENOBJECTMETHOD)(
     _In_ PROP_OBJECT_INFO *Context,
     _Inout_ PHANDLE	phObject,
     _In_ ACCESS_MASK DesiredAccess
     );
 
-//close object method (propCloseCurrentObject)
+//future use, currently the same as propDefaultCloseObject
 typedef VOID(CALLBACK *PCLOSEOBJECTMETHOD)(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PVOID SelfPtrReserved,//do not use
     _In_ HANDLE hObject
     );
 
@@ -122,5 +122,5 @@ typedef struct _ObjectSecurityVtbl {
 HPROPSHEETPAGE propSecurityCreatePage(
     _In_ PROP_OBJECT_INFO *Context,
     _In_ POPENOBJECTMETHOD OpenObjectMethod,
-    _In_ PCLOSEOBJECTMETHOD CloseObjectMethod,
+    _In_opt_ PCLOSEOBJECTMETHOD CloseObjectMethod,
     _In_ ULONG psiFlags);

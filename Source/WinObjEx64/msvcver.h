@@ -4,9 +4,9 @@
 *
 *  TITLE:       MSVCVER.H
 *
-*  VERSION:     1.70
+*  VERSION:     1.60
 *
-*  DATE:        30 Nov 2018
+*  DATE:        24 Oct 2018
 *
 *  Visual Studio compiler version determination.
 *
@@ -22,7 +22,7 @@
 #define _MSC_FULL_VER 180040629*/
 
 #if defined _MSC_VER && _MSC_FULL_VER 
-    #if (_MSC_VER >= 1910) //2017 all variants (too many to list)
+    #if ((_MSC_VER >= 1910) && (_MSC_VER <= 1915)) //2017 all variants (too many to list)
         #define VC_VER L"MSVC 2017"
     #elif (_MSC_VER == 1900) //2015
         #if (_MSC_FULL_VER == 190023026) //2015 RTM

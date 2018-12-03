@@ -4,9 +4,9 @@
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.60
 *
-*  DATE:        30 Nov 2018
+*  DATE:        24 Oct 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -19,7 +19,6 @@
 #include "msvcver.h"
 
 HWND g_hwndGlobals;
-HFONT _hFontGlobalsDlg;
 WNDPROC g_GlobalsEditOriginalWndProc;
 
 /*
@@ -50,7 +49,7 @@ VOID AboutDialogInit(
     hImage = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN), IMAGE_ICON, 48, 48, LR_SHARED);
     if (hImage) {
         SendMessage(GetDlgItem(hwndDlg, ID_ABOUT_ICON), STM_SETIMAGE, IMAGE_ICON, (LPARAM)hImage);
-        DestroyIcon((HICON)hImage);
+        DestroyIcon(hImage);
     }
 
     //remove class icon if any
@@ -59,15 +58,10 @@ VOID AboutDialogInit(
     RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
     _strcpy(szBuffer, VC_VER);
     if (szBuffer[0] == 0) {
-        _strcpy(szBuffer, TEXT("MSVC ("));
+        _strcpy(szBuffer, L"MSVC (");
         ultostr(_MSC_FULL_VER, _strend(szBuffer));
-        _strcat(szBuffer, TEXT(")"));
+        _strcat(szBuffer, L")");
     }
-#if defined(__cplusplus)
-    _strcat(szBuffer, TEXT(" compiled as C++"));
-#else
-    _strcat(szBuffer, TEXT(" compiled as C"));
-#endif
 
     SetDlgItemText(hwndDlg, ID_ABOUT_COMPILERINFO, szBuffer);
 
@@ -100,7 +94,7 @@ VOID AboutDialogInit(
     }
 
     // query vhd boot state if possible
-    psvbi = (SYSTEM_VHD_BOOT_INFORMATION*)supHeapAlloc(PAGE_SIZE);
+    psvbi = supHeapAlloc(PAGE_SIZE);
     if (psvbi) {
         status = NtQuerySystemInformation(SystemVhdBootInformation, psvbi, PAGE_SIZE, &returnLength);
         if (NT_SUCCESS(status)) {
@@ -144,11 +138,7 @@ VOID AboutDialogInit(
 VOID AboutDialogCollectGlobals(
     _In_ LPWSTR lpDestBuffer)
 {
-    _strcpy(lpDestBuffer, TEXT("EnableExperimentalFeatures: "));
-    ultostr(g_WinObj.EnableExperimentalFeatures, _strend(lpDestBuffer));
-    _strcat(lpDestBuffer, TEXT("\r\n"));
-
-    _strcat(lpDestBuffer, TEXT("IsFullAdmin: "));
+    _strcpy(lpDestBuffer, TEXT("IsFullAdmin: "));
     ultostr(g_kdctx.IsFullAdmin, _strend(lpDestBuffer));
     _strcat(lpDestBuffer, TEXT("\r\n"));
 
@@ -196,8 +186,8 @@ VOID AboutDialogCollectGlobals(
     ultohex((ULONG)g_kdctx.ObHeaderCookie, _strend(lpDestBuffer));
     _strcat(lpDestBuffer, TEXT("\r\n"));
 
-    _strcat(lpDestBuffer, TEXT("PrivateNamespaceLookupTable: 0x"));
-    u64tohex((ULONG_PTR)g_kdctx.PrivateNamespaceLookupTable, _strend(lpDestBuffer));
+    _strcat(lpDestBuffer, TEXT("ObpPrivateNamespaceLookupTable: 0x"));
+    u64tohex((ULONG_PTR)g_kdctx.ObpPrivateNamespaceLookupTable, _strend(lpDestBuffer));
     _strcat(lpDestBuffer, TEXT("\r\n"));
 
     _strcat(lpDestBuffer, TEXT("SystemRangeStart: 0x"));
@@ -221,11 +211,6 @@ LRESULT CALLBACK GlobalsCustomWindowProc(
 )
 {
     switch (uMsg) {
-    case WM_DESTROY:
-        if (_hFontGlobalsDlg) {
-            DeleteObject(_hFontGlobalsDlg);
-        }
-        break;
     case WM_CLOSE:
         g_hwndGlobals = NULL;
         break;
@@ -248,61 +233,43 @@ INT_PTR AboutDialogShowGlobals(
 {
     HWND hwnd;
     LPWSTR lpGlobalInfo;
-    NONCLIENTMETRICS ncm;
 
     if (g_hwndGlobals == NULL) {
 
-        ncm.cbSize = sizeof(NONCLIENTMETRICS);
-        if (SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(ncm), &ncm, 0)) {
-            ncm.lfCaptionFont.lfHeight += ncm.lfSmCaptionFont.lfHeight / 4;
-            ncm.lfCaptionFont.lfWeight = FW_NORMAL;
-            ncm.lfCaptionFont.lfQuality = CLEARTYPE_QUALITY;
-            ncm.lfCaptionFont.lfPitchAndFamily = FIXED_PITCH | FF_MODERN;
-            _strcpy(ncm.lfCaptionFont.lfFaceName, TEXT("Courier New"));
-
-            _hFontGlobalsDlg = CreateFontIndirect(&ncm.lfCaptionFont);
-        }
-
         hwnd = CreateWindowEx(
-            0,
-            WC_EDIT,
-            TEXT("WinObjEx64 Globals"),
-            WS_OVERLAPPEDWINDOW | WS_VSCROLL | ES_MULTILINE,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
-            640,
-            480,
-            hwndParent,
-            0,
-            g_WinObj.hInstance,
-            NULL);
+                0,
+                WC_EDIT,
+                TEXT("WinObjEx64 Globals"),
+                WS_OVERLAPPEDWINDOW | WS_VSCROLL | ES_MULTILINE,
+                CW_USEDEFAULT,
+                CW_USEDEFAULT,
+                640,
+                480,
+                hwndParent,
+                0,
+                g_WinObj.hInstance,
+                NULL);
 
-        if (hwnd) {
-            SendMessage(hwnd, WM_SETFONT, (WPARAM)_hFontGlobalsDlg, 0);
-            g_GlobalsEditOriginalWndProc = (WNDPROC)GetWindowLongPtr(hwnd, GWLP_WNDPROC);
-            if (g_GlobalsEditOriginalWndProc) {
-                SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)&GlobalsCustomWindowProc);
+            if (hwnd) {
+                g_GlobalsEditOriginalWndProc = (WNDPROC)GetWindowLongPtr(hwnd, GWLP_WNDPROC);
+                if (g_GlobalsEditOriginalWndProc) {
+                    SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)&GlobalsCustomWindowProc);
+                }
             }
-        }
-        g_hwndGlobals = hwnd;
+            g_hwndGlobals = hwnd;
     }
     else {
         SetActiveWindow(g_hwndGlobals);
     }
 
-    //
-    // Set text to window.
-    //
-    if (g_hwndGlobals) {
-        lpGlobalInfo = (LPWSTR)supVirtualAlloc(PAGE_SIZE);
-        if (lpGlobalInfo) {
-            AboutDialogCollectGlobals(lpGlobalInfo);
-            SetWindowText(g_hwndGlobals, lpGlobalInfo);
-            SendMessage(g_hwndGlobals, EM_SETREADONLY, (WPARAM)1, 0);
-            supVirtualFree(lpGlobalInfo);
-        }
-        ShowWindow(g_hwndGlobals, SW_SHOWNORMAL);
+    lpGlobalInfo = supVirtualAlloc(PAGE_SIZE);
+    if (lpGlobalInfo) {
+        AboutDialogCollectGlobals(lpGlobalInfo);
+        SetWindowText(g_hwndGlobals, lpGlobalInfo);
+        SendMessage(g_hwndGlobals, EM_SETREADONLY, (WPARAM)1, 0);
+        supVirtualFree(lpGlobalInfo);
     }
+    ShowWindow(g_hwndGlobals, SW_SHOWNORMAL);
 
     return 1;
 }

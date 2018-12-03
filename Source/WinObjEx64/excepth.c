@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXCEPTH.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.52
 *
-*  DATE:        30 Nov 2018
+*  DATE:        08 Jan 2018
 *
 *  Exception handler routines.
 *
@@ -44,10 +44,9 @@ BOOL exceptWriteDump(
     _In_ ULONGLONG IdFile
 )
 {
-    BOOL    bResult;
-    HMODULE hDbgHelp;
-    HANDLE  hFile;
-    WCHAR   szFileName[MAX_PATH * 2];
+    BOOL   bResult;
+    HANDLE hDbgHelp, hFile;
+    WCHAR  szFileName[MAX_PATH * 2];
 
     MINIDUMP_EXCEPTION_INFORMATION mdei;
 

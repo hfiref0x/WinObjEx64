@@ -15,9 +15,8 @@ RegistryTransaction - new RS1 object
 CoreMessagining - new RS1 object
 ActivityReference - new RS2 object
 EtwSessionDemuxEntry - new Win10 object
-DxgkCompositionObject - Dxgk
-DxgkDisplayManagerObject - Dxgk
-DxgkSharedBundleObject - Dxgk
-DxgkSharedKeyedMutextObject - Dxgk
-DxgkSharedProtectedSessionObject - Dxgk
-ActivationObject - 19H1, win32k managed object
+DxgkCompositionObject
+DxgkDisplayManagerObject
+DxgkSharedBundleObject
+DxgkSharedKeyedMutextObject
+DxgkSharedProtectedSessionObject

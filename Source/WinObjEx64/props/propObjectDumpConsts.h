@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMPCONSTS.H
 *
-*  VERSION:     1.70
+*  VERSION:     1.60
 *
-*  DATE:        30 Nov 2018
+*  DATE:        24 Oct 2018
 *
 *  Consts header file for Object Dump module.
 *
@@ -62,8 +62,7 @@
 #define T_EVENT_SYNC                L"SynchronizationEvent"
 #define T_SIGNALED                  L"Signaled"
 #define T_NONSIGNALED               L"Nonsignaled"
-#define T_OBJECT_TYPE_FLAGS         L"ObjectTypeFlags"
-#define T_OBJECT_TYPE_FLAGS2        L"ObjectTypeFlags2"
+#define T_OBJECTYPEFLAGS            L"ObjectTypeFlags"
 
 #define T_TIMER_NOTIFICATION        L"NotificationTimer"
 #define T_TIMER_SYNC                L"SynchronizationTimer"

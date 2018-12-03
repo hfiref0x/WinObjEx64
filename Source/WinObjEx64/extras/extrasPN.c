@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPN.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.60
 *
-*  DATE:        30 Nov 2018
+*  DATE:        24 Oct 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -19,7 +19,7 @@
 #include "extrasPN.h"
 #include "propDlg.h"
 
-EXTRASCONTEXT PnDlgContext;
+EXTRASCONTEXT DlgContext;
 OBJECT_COLLECTION PNSCollection;
 ULONG PNSNumberOfObjects = 0;
 
@@ -55,11 +55,11 @@ VOID PNDlgShowObjectProperties(
     if (g_NamespacePropWindow != NULL)
         return;
 
-    if (ListView_GetSelectedCount(PnDlgContext.ListView) == 0) {
+    if (ListView_GetSelectedCount(DlgContext.ListView) == 0) {
         return;
     }
 
-    nSelected = ListView_GetSelectionMark(PnDlgContext.ListView);
+    nSelected = ListView_GetSelectionMark(DlgContext.ListView);
     if (nSelected == -1) {
         return;
     }
@@ -71,7 +71,7 @@ VOID PNDlgShowObjectProperties(
     lvitem.mask = LVIF_PARAM;
     lvitem.iItem = nSelected;
 
-    ListView_GetItem(PnDlgContext.ListView, &lvitem);
+    ListView_GetItem(DlgContext.ListView, &lvitem);
 
     objRef = (OBJREF*)lvitem.lParam;
     if (objRef == NULL)
@@ -93,9 +93,9 @@ VOID PNDlgShowObjectProperties(
         return;
     }
 
-    lpName = supGetItemText(PnDlgContext.ListView, nSelected, 0, NULL);
+    lpName = supGetItemText(DlgContext.ListView, nSelected, 0, NULL);
     if (lpName) {
-        lpType = supGetItemText(PnDlgContext.ListView, nSelected, 1, NULL);
+        lpType = supGetItemText(DlgContext.ListView, nSelected, 1, NULL);
         if (lpType) {
 
             propCreateDialog(
@@ -136,30 +136,30 @@ INT CALLBACK PNListCompareFunc(
     //
     if (lParamSort == 2) {
         return supGetMaxOfTwoU64FromHex(
-            PnDlgContext.ListView,
+            DlgContext.ListView,
             lParam1,
             lParam2,
             lParamSort,
-            PnDlgContext.bInverseSort);
+            DlgContext.bInverseSort);
     }
 
-    lpItem1 = supGetItemText(PnDlgContext.ListView, (INT)lParam1, (INT)lParamSort, NULL);
-    lpItem2 = supGetItemText(PnDlgContext.ListView, (INT)lParam2, (INT)lParamSort, NULL);
+    lpItem1 = supGetItemText(DlgContext.ListView, (INT)lParam1, (INT)lParamSort, NULL);
+    lpItem2 = supGetItemText(DlgContext.ListView, (INT)lParam2, (INT)lParamSort, NULL);
 
     if ((lpItem1 == NULL) && (lpItem2 == NULL)) {
         nResult = 0;
         goto Done;
     }
     if ((lpItem1 == NULL) && (lpItem2 != NULL)) {
-        nResult = (PnDlgContext.bInverseSort) ? 1 : -1;
+        nResult = (DlgContext.bInverseSort) ? 1 : -1;
         goto Done;
     }
     if ((lpItem2 == NULL) && (lpItem1 != NULL)) {
-        nResult = (PnDlgContext.bInverseSort) ? -1 : 1;
+        nResult = (DlgContext.bInverseSort) ? -1 : 1;
         goto Done;
     }
 
-    if (PnDlgContext.bInverseSort)
+    if (DlgContext.bInverseSort)
         nResult = _strcmpi(lpItem2, lpItem1);
     else
         nResult = _strcmpi(lpItem1, lpItem2);
@@ -181,7 +181,7 @@ Done:
 */
 BOOL CALLBACK PNDlgEnumerateCallback(
     _In_ POBJREF Entry,
-    _In_opt_ PVOID Context
+    _In_ PVOID Context
 )
 {
     INT     index;
@@ -207,14 +207,14 @@ BOOL CALLBACK PNDlgEnumerateCallback(
     lvitem.iImage = ConvertedTypeIndex;
     lvitem.pszText = Entry->ObjectName;
     lvitem.lParam = (LPARAM)Entry;
-    index = ListView_InsertItem(PnDlgContext.ListView, &lvitem);
+    index = ListView_InsertItem(DlgContext.ListView, &lvitem);
 
     //Type
     lvitem.mask = LVIF_TEXT;
     lvitem.iSubItem = 1;
     lvitem.pszText = (LPWSTR)TypeName;
     lvitem.iItem = index;
-    ListView_SetItem(PnDlgContext.ListView, &lvitem);
+    ListView_SetItem(DlgContext.ListView, &lvitem);
 
     //RootDirectory address
     lvitem.mask = LVIF_TEXT;
@@ -223,7 +223,7 @@ BOOL CALLBACK PNDlgEnumerateCallback(
     u64tohex(Entry->PrivateNamespace.NamespaceDirectoryAddress, _strend(szBuffer));
     lvitem.pszText = szBuffer;
     lvitem.iItem = index;
-    ListView_SetItem(PnDlgContext.ListView, &lvitem);
+    ListView_SetItem(DlgContext.ListView, &lvitem);
 
     PNSNumberOfObjects++;
 
@@ -239,34 +239,22 @@ BOOL CALLBACK PNDlgEnumerateCallback(
 *
 */
 BOOL PNDlgQueryInfo(
-    _In_ HWND hwndDlg
+    VOID
 )
 {
-    HWND hwndBanner;
     BOOL bResult = FALSE;
 
     PNSNumberOfObjects = 0;
 
-    hwndBanner = supDisplayLoadBanner(
-        hwndDlg,
-        TEXT("Loading private namespaces information, please wait"));
+    bResult = ObCollectionCreate(&PNSCollection, TRUE, FALSE);
+    if (bResult) {
 
-    __try {
+        bResult = ObCollectionEnumerate(
+            &PNSCollection,
+            PNDlgEnumerateCallback,
+            NULL);
 
-        bResult = ObCollectionCreate(&PNSCollection, TRUE, FALSE);
-        if (bResult) {
-
-            bResult = ObCollectionEnumerate(
-                &PNSCollection,
-                PNDlgEnumerateCallback,
-                NULL);
-
-        }
     }
-    __finally {
-        SendMessage(hwndBanner, WM_CLOSE, 0, 0);
-    }
-
     return bResult;
 }
 
@@ -332,7 +320,7 @@ VOID PNDlgOutputSelectedSidInformation(
     PSID pSid;
     PWSTR stype;
 
-    DWORD cAccountName = 0, cReferencedDomainName = 0;
+    DWORD cAccountName, cReferencedDomainName;
 
     WCHAR szName[256];
     WCHAR szDomain[256];
@@ -427,7 +415,7 @@ VOID PNDlgOutputSelectedSidInformation(
         _strcat(szAccountInfo, stype);
     }
     else {
-        _strcpy(szAccountInfo, T_CannotQuery);
+        _strcpy(szAccountInfo, TEXT("-"));
     }
     SetDlgItemText(hwndDlg, ID_BDESCRIPTOR_SID_ACCOUNT, szAccountInfo);
 
@@ -450,7 +438,7 @@ BOOL CALLBACK PNDlgBoundaryDescriptorCallback(
 {
     PWSTR p, lpName;
     PSID Sid;
-    HWND hwndDlg = (HWND)Context;
+    HANDLE hwndDlg = (HWND)Context;
     DWORD dwIL;
 
     WCHAR szBuffer[MAX_PATH];
@@ -460,7 +448,7 @@ BOOL CALLBACK PNDlgBoundaryDescriptorCallback(
     case OBNS_Name:
 
         p = (PWSTR)RtlOffsetToPointer(Entry, sizeof(OBJECT_BOUNDARY_ENTRY));
-        lpName = (PWSTR)supHeapAlloc(Entry->EntrySize);
+        lpName = supHeapAlloc(Entry->EntrySize);
         if (lpName) {
             RtlCopyMemory(lpName, p, Entry->EntrySize - sizeof(OBJECT_BOUNDARY_ENTRY));
             SetDlgItemText(hwndDlg, ID_BDESCRIPTOR_NAME, lpName);
@@ -525,11 +513,11 @@ VOID PNDlgShowNamespaceInfo(
 
     WCHAR szBuffer[64];
 
-    if (ListView_GetSelectedCount(PnDlgContext.ListView) == 0) {
+    if (ListView_GetSelectedCount(DlgContext.ListView) == 0) {
         return;
     }
 
-    nSelected = ListView_GetSelectionMark(PnDlgContext.ListView);
+    nSelected = ListView_GetSelectionMark(DlgContext.ListView);
     if (nSelected == -1) {
         return;
     }
@@ -538,7 +526,7 @@ VOID PNDlgShowNamespaceInfo(
     lvitem.mask = LVIF_PARAM;
     lvitem.iItem = nSelected;
 
-    ListView_GetItem(PnDlgContext.ListView, &lvitem);
+    ListView_GetItem(DlgContext.ListView, &lvitem);
 
     objRef = (OBJREF*)lvitem.lParam;
     if (objRef == NULL)
@@ -589,9 +577,9 @@ VOID PNDlgShowNamespaceInfo(
     //
     // Reset output related controls.
     //
-    SetDlgItemText(hwndDlg, ID_BDESCRIPTOR_NAME, TEXT(""));
-    SetDlgItemText(hwndDlg, ID_BDESCRIPTOR_SID_ACCOUNT, T_CannotQuery);
-    SetDlgItemText(hwndDlg, ID_INTEGRITYLABEL, T_CannotQuery);
+    SetDlgItemText(hwndDlg, ID_BDESCRIPTOR_NAME, NULL);
+    SetDlgItemText(hwndDlg, ID_BDESCRIPTOR_SID_ACCOUNT, TEXT("-"));
+    SetDlgItemText(hwndDlg, ID_INTEGRITYLABEL, TEXT("-"));
     SetDlgItemText(hwndDlg, ID_BDESCRIPTOR_ENTRIES, TEXT("0"));
     SendMessage(GetDlgItem(hwndDlg, ID_BDESCRIPTOR_SID), CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
     EnableWindow(GetDlgItem(hwndDlg, ID_BDESCRIPTOR_SID_COPY), FALSE);
@@ -654,20 +642,20 @@ VOID PNDlgHandleNotify(
 
         case LVN_COLUMNCLICK:
 
-            PnDlgContext.bInverseSort = !PnDlgContext.bInverseSort;
-            PnDlgContext.lvColumnToSort = ((NMLISTVIEW *)nhdr)->iSubItem;
-            ListView_SortItemsEx(PnDlgContext.ListView, &PNListCompareFunc, PnDlgContext.lvColumnToSort);
+            DlgContext.bInverseSort = !DlgContext.bInverseSort;
+            DlgContext.lvColumnToSort = ((NMLISTVIEW *)nhdr)->iSubItem;
+            ListView_SortItemsEx(DlgContext.ListView, &PNListCompareFunc, DlgContext.lvColumnToSort);
 
             nImageIndex = ImageList_GetImageCount(g_ListViewImages);
-            if (PnDlgContext.bInverseSort)
+            if (DlgContext.bInverseSort)
                 nImageIndex -= 2;
             else
                 nImageIndex -= 1;
 
             supUpdateLvColumnHeaderImage(
-                PnDlgContext.ListView,
-                PnDlgContext.lvColumnCount,
-                PnDlgContext.lvColumnToSort,
+                DlgContext.ListView,
+                DlgContext.lvColumnCount,
+                DlgContext.lvColumnToSort,
                 nImageIndex);
 
             break;
@@ -707,7 +695,7 @@ VOID PNDlgCopySelectedSid(
     if (nSelected >= 0) {
         TextLength = SendMessage(hComboBox, CB_GETLBTEXTLEN, (WPARAM)nSelected, 0);
         if (TextLength) {
-            lpStringSid = (PWCHAR)supHeapAlloc((1 + TextLength) * sizeof(WCHAR));
+            lpStringSid = supHeapAlloc((1 + TextLength) * sizeof(WCHAR));
             if (lpStringSid) {
                 SendMessage(hComboBox, CB_GETLBTEXT, nSelected, (LPARAM)lpStringSid);
 
@@ -748,7 +736,7 @@ INT_PTR CALLBACK PNDialogProc(
     case WM_CLOSE:
         DestroyWindow(hwndDlg);
         ObCollectionDestroy(&PNSCollection);
-        g_WinObj.AuxDialogs[wobjPNSDlgId] = NULL;
+        g_WinObj.AuxDialogs[WOBJ_PNDLG_IDX] = NULL;
         return TRUE;
 
     case WM_COMMAND:
@@ -795,35 +783,35 @@ VOID extrasCreatePNDialog(
     LVCOLUMN col;
 
     //allow only one dialog
-    if (g_WinObj.AuxDialogs[wobjPNSDlgId]) {
-        SetActiveWindow(g_WinObj.AuxDialogs[wobjPNSDlgId]);
+    if (g_WinObj.AuxDialogs[WOBJ_PNDLG_IDX]) {
+        SetActiveWindow(g_WinObj.AuxDialogs[WOBJ_PNDLG_IDX]);
         return;
     }
 
-    RtlSecureZeroMemory(&PnDlgContext, sizeof(PnDlgContext));
-    PnDlgContext.hwndDlg = CreateDialogParam(g_WinObj.hInstance, MAKEINTRESOURCE(IDD_DIALOG_PNAMESPACE),
+    RtlSecureZeroMemory(&DlgContext, sizeof(DlgContext));
+    DlgContext.hwndDlg = CreateDialogParam(g_WinObj.hInstance, MAKEINTRESOURCE(IDD_DIALOG_PNAMESPACE),
         hwndParent, &PNDialogProc, 0);
 
-    if (PnDlgContext.hwndDlg == NULL) {
+    if (DlgContext.hwndDlg == NULL) {
         return;
     }
 
     RtlSecureZeroMemory(&PNSCollection, sizeof(OBJECT_COLLECTION));
 
-    g_WinObj.AuxDialogs[wobjPNSDlgId] = PnDlgContext.hwndDlg;
+    g_WinObj.AuxDialogs[WOBJ_PNDLG_IDX] = DlgContext.hwndDlg;
 
-    PnDlgContext.ListView = GetDlgItem(PnDlgContext.hwndDlg, ID_NAMESPACELIST);
-    if (PnDlgContext.ListView) {
+    DlgContext.ListView = GetDlgItem(DlgContext.hwndDlg, ID_NAMESPACELIST);
+    if (DlgContext.ListView) {
 
         //
         // Set listview imagelist, style flags and theme.
         //
-        ListView_SetImageList(PnDlgContext.ListView, g_ListViewImages, LVSIL_SMALL);
+        ListView_SetImageList(DlgContext.ListView, g_ListViewImages, LVSIL_SMALL);
         ListView_SetExtendedListViewStyle(
-            PnDlgContext.ListView,
+            DlgContext.ListView,
             LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
 
-        SetWindowTheme(PnDlgContext.ListView, TEXT("Explorer"), NULL);
+        SetWindowTheme(DlgContext.ListView, TEXT("Explorer"), NULL);
 
         //
         // Create ListView columns.
@@ -835,7 +823,7 @@ VOID extrasCreatePNDialog(
         col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
         col.iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
         col.cx = 280;
-        ListView_InsertColumn(PnDlgContext.ListView, col.iSubItem, &col);
+        ListView_InsertColumn(DlgContext.ListView, col.iSubItem, &col);
 
         col.iImage = I_IMAGENONE;
 
@@ -843,31 +831,31 @@ VOID extrasCreatePNDialog(
         col.pszText = TEXT("Type");
         col.iOrder = 1;
         col.cx = 100;
-        ListView_InsertColumn(PnDlgContext.ListView, col.iSubItem, &col);
+        ListView_InsertColumn(DlgContext.ListView, col.iSubItem, &col);
 
         col.iSubItem++;
         col.pszText = TEXT("RootDirectory");
         col.iOrder = 2;
         col.cx = 140;
-        ListView_InsertColumn(PnDlgContext.ListView, col.iSubItem, &col);
+        ListView_InsertColumn(DlgContext.ListView, col.iSubItem, &col);
 
         //remember columns count
-        PnDlgContext.lvColumnCount = col.iSubItem;
+        DlgContext.lvColumnCount = col.iSubItem;
 
-        if (PNDlgQueryInfo(PnDlgContext.hwndDlg)) {
-            ListView_SortItemsEx(PnDlgContext.ListView, &PNListCompareFunc, 0);
+        if (PNDlgQueryInfo()) {
+            ListView_SortItemsEx(DlgContext.ListView, &PNListCompareFunc, 0);
         }
         else {
-            if (GetWindowRect(PnDlgContext.hwndDlg, &rGB)) {
-                EnumChildWindows(PnDlgContext.hwndDlg, supEnumHideChildWindows, (LPARAM)&rGB);
+            if (GetWindowRect(DlgContext.hwndDlg, &rGB)) {
+                EnumChildWindows(DlgContext.hwndDlg, supEnumHideChildWindows, (LPARAM)&rGB);
             }
-            ShowWindow(GetDlgItem(PnDlgContext.hwndDlg, ID_PNAMESPACESINFO), SW_SHOW);
+            ShowWindow(GetDlgItem(DlgContext.hwndDlg, ID_PNAMESPACESINFO), SW_SHOW);
 
             if (PNSNumberOfObjects == 0) {
-                SetDlgItemText(PnDlgContext.hwndDlg, ID_PNAMESPACESINFO, T_NAMESPACENOTHING);
+                SetDlgItemText(DlgContext.hwndDlg, ID_PNAMESPACESINFO, T_NAMESPACENOTHING);
             }
             else {
-                SetDlgItemText(PnDlgContext.hwndDlg, ID_PNAMESPACESINFO, T_NAMESPACEQUERYFAILED);
+                SetDlgItemText(DlgContext.hwndDlg, ID_PNAMESPACESINFO, T_NAMESPACEQUERYFAILED);
             }
         }
     }

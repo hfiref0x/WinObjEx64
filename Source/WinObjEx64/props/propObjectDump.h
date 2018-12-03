@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMP.H
 *
-*  VERSION:     1.60
+*  VERSION:     1.70
 *
-*  DATE:        24 Oct 2018
+*  DATE:        30 Nov 2018
 *
 *  Common header file for the object dump support.
 *

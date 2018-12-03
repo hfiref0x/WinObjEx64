@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     1.60
+*  VERSION:     1.70
 *
-*  DATE:        29 Oct 2018
+*  DATE:        30 Nov 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -19,6 +19,12 @@
 #include "propDlg.h"
 #include "propObjectDumpConsts.h"
 #include "propTypeConsts.h"
+
+//
+// Global variables for treelist.
+//
+HWND g_TreeList;
+ATOM g_TreeListAtom;
 
 /*
 * ObDumpShowError
@@ -37,6 +43,28 @@ VOID ObDumpShowError(
     if (GetWindowRect(hwndDlg, &rGB)) {
         EnumChildWindows(hwndDlg, supEnumHideChildWindows, (LPARAM)&rGB);
     }
+    ShowWindow(GetDlgItem(hwndDlg, ID_OBJECTDUMPERROR), SW_SHOW);
+}
+
+/*
+* ObDumpShowMessage
+*
+* Purpose:
+*
+* Hide all windows for given hwnd and display message text.
+*
+*/
+VOID ObDumpShowMessage(
+    _In_ HWND hwndDlg,
+    _In_ LPWSTR lpMessageText
+)
+{
+    RECT rGB;
+
+    if (GetWindowRect(hwndDlg, &rGB)) {
+        EnumChildWindows(hwndDlg, supEnumHideChildWindows, (LPARAM)&rGB);
+    }
+    SetWindowText(GetDlgItem(hwndDlg, ID_OBJECTDUMPERROR), lpMessageText);
     ShowWindow(GetDlgItem(hwndDlg, ID_OBJECTDUMPERROR), SW_SHOW);
 }
 
@@ -108,7 +136,7 @@ VOID ObDumpAddressWithModule(
     _In_ HTREEITEM hParent,
     _In_ LPWSTR lpszName,
     _In_opt_ PVOID Address,
-    _In_ PVOID pModules,
+    _In_ PRTL_PROCESS_MODULES pModules,
     _In_opt_ PVOID SelfDriverBase,
     _In_opt_ ULONG SelfDriverSize
 )
@@ -712,7 +740,7 @@ VOID ObDumpUnicodeString(
         subitems.Text[0] = szValue;
 
         //dump unicode string buffer
-        lpObjectName = supHeapAlloc(uStr.Length + sizeof(UNICODE_NULL));
+        lpObjectName = (LPWSTR)supHeapAlloc(uStr.Length + sizeof(UNICODE_NULL));
         if (lpObjectName) {
 
             kdReadSystemMemoryEx(
@@ -896,7 +924,8 @@ VOID ObDumpDriverObject(
     BOOL                    cond, bOkay;
     INT                     i, j;
     HTREEITEM               h_tviRootItem, h_tviSubItem;
-    PVOID                   pModules, pObj;
+    PRTL_PROCESS_MODULES    pModules;
+    PVOID                   pObj;
     POBJREF                 LookupObject;
     LPWSTR                  lpType;
     DRIVER_OBJECT           drvObject;
@@ -1103,7 +1132,7 @@ VOID ObDumpDriverObject(
             &subitems);
 
         RtlSecureZeroMemory(&ntosEntry, sizeof(ntosEntry));
-        pModules = supGetSystemInfo(SystemModuleInformation);
+        pModules = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation);
 
         if (g_kdctx.IopInvalidDeviceRequest == NULL)
             g_kdctx.IopInvalidDeviceRequest = kdQueryIopInvalidDeviceRequest();
@@ -2355,73 +2384,151 @@ VOID ObDumpSyncObject(
     }
 }
 
+/*
+* ObDumpObjectTypeFlags
+*
+* Purpose:
+*
+* Dump ObjectTypeFlags/ObjectTypeFlags2 bits to the treelist.
+*
+*/
+VOID ObDumpObjectTypeFlags(
+    _In_ LPWSTR EntryName,
+    _In_ UCHAR ObjectTypeFlags,
+    _In_ HTREEITEM h_tviSubItem,
+    _In_ LPWSTR *ObjectTypeFlagsText,
+    _In_ BOOLEAN SetEntry
+)
+{
+    ULONG i, j;
+    LPWSTR lpType;
+    TL_SUBITEMS_FIXED TreeListSubitems;
+
+    WCHAR szValue[100];
+
+    if (ObjectTypeFlags) {
+
+        RtlSecureZeroMemory(&TreeListSubitems, sizeof(TreeListSubitems));
+        TreeListSubitems.Count = 2;
+
+        j = 0;
+        for (i = 0; i < 8; i++) {
+            if (GET_BIT(ObjectTypeFlags, i)) {
+                lpType = (LPWSTR)ObjectTypeFlagsText[i];
+                TreeListSubitems.Text[0] = NULL;
+                if (j == 0) {
+                    wsprintf(szValue, FORMAT_HEXBYTE, ObjectTypeFlags);
+                    TreeListSubitems.Text[0] = szValue;
+                }
+                TreeListSubitems.Text[1] = lpType;
+                TreeListAddItem(g_TreeList, h_tviSubItem, TVIF_TEXT | TVIF_STATE, 0,
+                    0, (j == 0) ? ((SetEntry) ? EntryName : NULL) : NULL, &TreeListSubitems);
+                j++;
+            }
+        }
+    }
+    else {
+        if (SetEntry)
+            ObDumpByte(g_TreeList, h_tviSubItem, EntryName, NULL, ObjectTypeFlags, 0, 0, FALSE);
+    }
+}
+
+/*
+* ObDumpObjectType
+*
+* Purpose:
+*
+* Dump OBJECT_TYPE members to the treelist.
+*
+*/
 VOID ObDumpObjectType(
     _In_ PROP_OBJECT_INFO *Context,
     _In_ HWND hwndDlg
 )
 {
-    BOOL                    cond, bOkay;
-    INT                     i, j;
+    BOOL                    bCond = FALSE, bOkay;
     HTREEITEM               h_tviRootItem, h_tviSubItem, h_tviGenericMapping;
+    UINT                    i;
     LPWSTR                  lpType = NULL;
-    POBJINFO                pObject = NULL;
-    PRTL_PROCESS_MODULES    pModulesList = NULL;
-    OBJECT_TYPE_COMPATIBLE  ObjectTypeDump;
-    TL_SUBITEMS_FIXED       subitems;
-    WCHAR                   szValue[MAX_PATH + 1];
+    POBJINFO                CurrentObject = NULL;
+    PVOID                   ObjectTypeInformation = NULL;
+    PRTL_PROCESS_MODULES    ModulesList = NULL;
+    TL_SUBITEMS_FIXED       TreeListSubitems;
     PVOID                   TypeProcs[MAX_KNOWN_OBJECT_TYPE_PROCEDURES];
     PVOID                   SelfDriverBase;
     ULONG                   SelfDriverSize;
+
+    ULONG ObjectSize = 0;
+    ULONG ObjectVersion = 0;
+
+    BOOLEAN bSetEntry;
+
+    ULONG Key;
+    PVOID LockPtr;
+    PLIST_ENTRY pListEntry;
+    ULONG WaitObjectFlagMask;
+    USHORT WaitObjectFlagOffset;
+    USHORT WaitObjectPointerOffset;
+
+    union {
+        union {
+            OBJECT_TYPE_COMPATIBLE* ObjectTypeCompatible;
+            OBJECT_TYPE_7 *ObjectType_7;
+            OBJECT_TYPE_8 *ObjectType_8;
+            OBJECT_TYPE_RS1 *ObjectType_RS1;
+            OBJECT_TYPE_RS2 *ObjectType_RS2;
+        } Versions;
+        PVOID Ref;
+    } ObjectType;
 
     if (Context == NULL) {
         return;
     }
 
-    __try {
-
-        pModulesList = supGetSystemInfo(SystemModuleInformation);
-        if (pModulesList == NULL)
-            return;
+    do {
 
         bOkay = FALSE;
-        cond = FALSE;
-
-        do {
-            //query current object
-            pObject = ObQueryObject(T_OBJECTTYPES, Context->lpObjectName);
-            if (pObject == NULL)
-                break;
-
-            //dump actual state of current object
-            RtlSecureZeroMemory(&ObjectTypeDump, sizeof(ObjectTypeDump));
-            if (!ObDumpTypeInfo(pObject->ObjectAddress, &ObjectTypeDump))
-                break;
-
-            g_TreeList = 0;
-            g_TreeListAtom = 0;
-            if (!supInitTreeListForDump(hwndDlg, &g_TreeListAtom, &g_TreeList))
-                break;
-
-            bOkay = TRUE;
-
-        } while (cond);
-
-        //we don't need it anymore
-        if (pObject) {
-            supHeapFree(pObject);
-        }
 
         //
-        //pObject is NULL, ObDumpTypeInfo failure, list init failure or pModules
-        //allocation failure - show error and leave
+        // Get loaded modules list.
         //
-        if (bOkay == FALSE) {
-            ObDumpShowError(hwndDlg);
-            return;
-        }
+        ModulesList = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation);
+        if (ModulesList == NULL)
+            break;
 
         //
-        //OBJECT_TYPE
+        // Get the reference to the object.
+        //
+        CurrentObject = ObQueryObject(T_OBJECTTYPES, Context->lpObjectName);
+        if (CurrentObject == NULL)
+            break;
+
+        //
+        // Dump object information version aware.
+        //
+        ObjectTypeInformation = ObDumpObjectTypeVersionAware(
+            CurrentObject->ObjectAddress,
+            &ObjectSize,
+            &ObjectVersion);
+
+        if (ObjectTypeInformation == NULL)
+            break;
+
+        //
+        // For listing common fields.
+        //
+        ObjectType.Ref = ObjectTypeInformation;
+
+        //
+        // Initialize treelist.
+        //
+        g_TreeList = 0;
+        g_TreeListAtom = 0;
+        if (!supInitTreeListForDump(hwndDlg, &g_TreeListAtom, &g_TreeList))
+            break;
+
+        //
+        // Add treelist root item ("OBJECT_TYPE").
         //
         h_tviRootItem = TreeListAddItem(
             g_TreeList,
@@ -2432,111 +2539,226 @@ VOID ObDumpObjectType(
             T_OBJECT_TYPE,
             NULL);
 
-        ObDumpListEntry(g_TreeList, h_tviRootItem, L"TypeList", &ObjectTypeDump.TypeList);
-        ObDumpUnicodeString(h_tviRootItem, L"Name", &ObjectTypeDump.Name, FALSE);
-        ObDumpAddress(g_TreeList, h_tviRootItem, L"DefaultObject", NULL, ObjectTypeDump.DefaultObject, 0, 0);
-        ObDumpByte(g_TreeList, h_tviRootItem, T_TYPEINDEX, NULL, ObjectTypeDump.Index, 0, 0, FALSE);
-        ObDumpUlong(g_TreeList, h_tviRootItem, L"TotalNumberOfObjects", NULL, ObjectTypeDump.TotalNumberOfObjects, TRUE, FALSE, 0, 0);
-        ObDumpUlong(g_TreeList, h_tviRootItem, L"TotalNumberOfHandles", NULL, ObjectTypeDump.TotalNumberOfHandles, TRUE, FALSE, 0, 0);
-        ObDumpUlong(g_TreeList, h_tviRootItem, L"HighWaterNumberOfObjects", NULL, ObjectTypeDump.HighWaterNumberOfObjects, TRUE, FALSE, 0, 0);
-        ObDumpUlong(g_TreeList, h_tviRootItem, L"HighWaterNumberOfHandles", NULL, ObjectTypeDump.HighWaterNumberOfHandles, TRUE, FALSE, 0, 0);
+        //
+        // This fields are structure version unaware.
+        //
+        ObDumpListEntry(g_TreeList, h_tviRootItem, TEXT("TypeList"),
+            &ObjectType.Versions.ObjectTypeCompatible->TypeList);
+
+        ObDumpUnicodeString(h_tviRootItem, TEXT("Name"),
+            &ObjectType.Versions.ObjectTypeCompatible->Name, FALSE);
+
+        ObDumpAddress(g_TreeList, h_tviRootItem, TEXT("DefaultObject"), NULL,
+            ObjectType.Versions.ObjectTypeCompatible->DefaultObject, 0, 0);
+
+        ObDumpByte(g_TreeList, h_tviRootItem, T_TYPEINDEX, NULL,
+            ObjectType.Versions.ObjectTypeCompatible->Index, 0, 0, FALSE);
+
+        ObDumpUlong(g_TreeList, h_tviRootItem, TEXT("TotalNumberOfObjects"), NULL,
+            ObjectType.Versions.ObjectTypeCompatible->TotalNumberOfObjects, TRUE, FALSE, 0, 0);
+
+        ObDumpUlong(g_TreeList, h_tviRootItem, TEXT("TotalNumberOfHandles"), NULL,
+            ObjectType.Versions.ObjectTypeCompatible->TotalNumberOfHandles, TRUE, FALSE, 0, 0);
+
+        ObDumpUlong(g_TreeList, h_tviRootItem, TEXT("HighWaterNumberOfObjects"), NULL,
+            ObjectType.Versions.ObjectTypeCompatible->HighWaterNumberOfObjects, TRUE, FALSE, 0, 0);
+
+        ObDumpUlong(g_TreeList, h_tviRootItem, TEXT("HighWaterNumberOfHandles"), NULL,
+            ObjectType.Versions.ObjectTypeCompatible->HighWaterNumberOfHandles, TRUE, FALSE, 0, 0);
 
         //
-        //OBJECT_TYPE_INITIALIZER
+        // OBJECT_TYPE_INITIALIZER
         //
-        RtlSecureZeroMemory(&subitems, sizeof(subitems));
+        RtlSecureZeroMemory(&TreeListSubitems, sizeof(TreeListSubitems));
 
-        subitems.Count = 2;
-        subitems.Text[1] = T_OBJECT_TYPE_INITIALIZER;
+        TreeListSubitems.Count = 2;
+        TreeListSubitems.Text[1] = T_OBJECT_TYPE_INITIALIZER;
         h_tviSubItem = TreeListAddItem(g_TreeList, h_tviRootItem, TVIF_TEXT | TVIF_STATE, 0,
-            0, L"TypeInfo", &subitems);
+            0, TEXT("TypeInfo"), &TreeListSubitems);
 
-        ObDumpUlong(g_TreeList, h_tviSubItem, T_LENGTH, NULL, ObjectTypeDump.TypeInfo.Length, TRUE, FALSE, 0, 0);
+        ObDumpUlong(g_TreeList, h_tviSubItem, T_LENGTH, NULL,
+            ObjectType.Versions.ObjectTypeCompatible->TypeInfo.Length, TRUE, TRUE, 0, 0);
 
-        RtlSecureZeroMemory(&szValue, sizeof(szValue));
-        RtlSecureZeroMemory(&subitems, sizeof(subitems));
-        subitems.Count = 2;
+        //
+        // Dump Object Type Flags / Extended Object Type Flags
+        //
+        ObDumpObjectTypeFlags(T_OBJECT_TYPE_FLAGS,
+            ObjectType.Versions.ObjectTypeCompatible->TypeInfo.ObjectTypeFlags,
+            h_tviSubItem,
+            (LPWSTR*)T_ObjectTypeFlags,
+            TRUE);
 
-        j = 0;
-        lpType = NULL;
-        if (ObjectTypeDump.TypeInfo.ObjectTypeFlags) {
+        if (ObjectVersion > 2) {
 
-            for (i = 0; i < 8; i++) {
-                if (GET_BIT(ObjectTypeDump.TypeInfo.ObjectTypeFlags, i)) {
-                    lpType = (LPWSTR)T_ObjectTypeFlags[i];
-                    subitems.Text[0] = NULL;
-                    if (j == 0) {
-                        wsprintf(szValue, FORMAT_HEXBYTE, ObjectTypeDump.TypeInfo.ObjectTypeFlags);
-                        subitems.Text[0] = szValue;
-                    }
-                    subitems.Text[1] = lpType;
-                    TreeListAddItem(g_TreeList, h_tviSubItem, TVIF_TEXT | TVIF_STATE, 0,
-                        0, (j == 0) ? T_OBJECTYPEFLAGS : NULL, &subitems);
-                    j++;
-                }
+            if (ObjectVersion == 3) {
+                bSetEntry = TRUE;
+                lpType = T_OBJECT_TYPE_FLAGS2; //fu ms
             }
-        }
-        else {
-            ObDumpByte(g_TreeList, h_tviSubItem, T_OBJECTYPEFLAGS, NULL, ObjectTypeDump.TypeInfo.ObjectTypeFlags, 0, 0, FALSE);
-        }
-        ObDumpUlong(g_TreeList, h_tviSubItem, L"ObjectTypeCode", NULL, ObjectTypeDump.TypeInfo.ObjectTypeCode, TRUE, FALSE, 0, 0);
-        ObDumpUlong(g_TreeList, h_tviSubItem, L"InvalidAttributes", NULL, ObjectTypeDump.TypeInfo.InvalidAttributes, TRUE, FALSE, 0, 0);
+            else {
+                bSetEntry = FALSE;
+                lpType = T_OBJECT_TYPE_FLAGS;
+            }
 
+            ObDumpObjectTypeFlags(lpType,
+                ObjectType.Versions.ObjectType_RS1->TypeInfo.ObjectTypeFlags2,
+                h_tviSubItem,
+                (LPWSTR*)T_ObjectTypeFlags2,
+                bSetEntry);
 
-        RtlSecureZeroMemory(&subitems, sizeof(subitems));
-        subitems.Count = 2;
-        subitems.Text[1] = T_GENERIC_MAPPING;
+        }
+
+        //
+        // Structure version independent fields.
+        //
+        ObDumpUlong(g_TreeList, h_tviSubItem, TEXT("ObjectTypeCode"), NULL,
+            ObjectType.Versions.ObjectTypeCompatible->TypeInfo.ObjectTypeCode, TRUE, FALSE, 0, 0);
+
+        ObDumpUlong(g_TreeList, h_tviSubItem, TEXT("InvalidAttributes"), NULL,
+            ObjectType.Versions.ObjectTypeCompatible->TypeInfo.InvalidAttributes, TRUE, FALSE, 0, 0);
+
+        RtlSecureZeroMemory(&TreeListSubitems, sizeof(TreeListSubitems));
+        TreeListSubitems.Count = 2;
+        TreeListSubitems.Text[1] = T_GENERIC_MAPPING;
         h_tviGenericMapping = TreeListAddItem(g_TreeList, h_tviSubItem, TVIF_TEXT | TVIF_STATE, 0,
-            0, L"GenericMapping", &subitems);
+            0, TEXT("GenericMapping"), &TreeListSubitems);
 
-        ObDumpUlong(g_TreeList, h_tviGenericMapping, L"GenericRead", NULL, ObjectTypeDump.TypeInfo.GenericMapping.GenericRead, TRUE, FALSE, 0, 0);
-        ObDumpUlong(g_TreeList, h_tviGenericMapping, L"GenericWrite", NULL, ObjectTypeDump.TypeInfo.GenericMapping.GenericWrite, TRUE, FALSE, 0, 0);
-        ObDumpUlong(g_TreeList, h_tviGenericMapping, L"GenericExecute", NULL, ObjectTypeDump.TypeInfo.GenericMapping.GenericExecute, TRUE, FALSE, 0, 0);
-        ObDumpUlong(g_TreeList, h_tviGenericMapping, L"GenericAll", NULL, ObjectTypeDump.TypeInfo.GenericMapping.GenericAll, TRUE, FALSE, 0, 0);
+        ObDumpUlong(g_TreeList, h_tviGenericMapping, TEXT("GenericRead"), NULL,
+            ObjectType.Versions.ObjectTypeCompatible->TypeInfo.GenericMapping.GenericRead, TRUE, FALSE, 0, 0);
 
-        ObDumpUlong(g_TreeList, h_tviSubItem, L"ValidAccessMask", NULL, ObjectTypeDump.TypeInfo.ValidAccessMask, TRUE, FALSE, 0, 0);
-        ObDumpUlong(g_TreeList, h_tviSubItem, L"RetainAccess", NULL, ObjectTypeDump.TypeInfo.RetainAccess, TRUE, FALSE, 0, 0);
+        ObDumpUlong(g_TreeList, h_tviGenericMapping, TEXT("GenericWrite"), NULL,
+            ObjectType.Versions.ObjectTypeCompatible->TypeInfo.GenericMapping.GenericWrite, TRUE, FALSE, 0, 0);
+
+        ObDumpUlong(g_TreeList, h_tviGenericMapping, TEXT("GenericExecute"), NULL,
+            ObjectType.Versions.ObjectTypeCompatible->TypeInfo.GenericMapping.GenericExecute, TRUE, FALSE, 0, 0);
+
+        ObDumpUlong(g_TreeList, h_tviGenericMapping, TEXT("GenericAll"), NULL,
+            ObjectType.Versions.ObjectTypeCompatible->TypeInfo.GenericMapping.GenericAll, TRUE, FALSE, 0, 0);
+
+        ObDumpUlong(g_TreeList, h_tviSubItem, TEXT("ValidAccessMask"), NULL,
+            ObjectType.Versions.ObjectTypeCompatible->TypeInfo.ValidAccessMask, TRUE, FALSE, 0, 0);
+        ObDumpUlong(g_TreeList, h_tviSubItem, TEXT("RetainAccess"), NULL,
+            ObjectType.Versions.ObjectTypeCompatible->TypeInfo.RetainAccess, TRUE, FALSE, 0, 0);
 
         //Pool Type
         lpType = T_Unknown;
         for (i = 0; i < MAX_KNOWN_POOL_TYPES; i++) {
-            if (ObjectTypeDump.TypeInfo.PoolType == (POOL_TYPE)a_PoolTypes[i].dwValue) {
+            if (ObjectType.Versions.ObjectTypeCompatible->TypeInfo.PoolType == (POOL_TYPE)a_PoolTypes[i].dwValue) {
                 lpType = a_PoolTypes[i].lpDescription;
                 break;
             }
         }
-        ObDumpUlong(g_TreeList, h_tviSubItem, L"PoolType", lpType, ObjectTypeDump.TypeInfo.PoolType, TRUE, FALSE, 0, 0);
-        ObDumpUlong(g_TreeList, h_tviSubItem, L"DefaultPagedPoolCharge", NULL, ObjectTypeDump.TypeInfo.DefaultPagedPoolCharge, TRUE, FALSE, 0, 0);
-        ObDumpUlong(g_TreeList, h_tviSubItem, L"DefaultNonPagedPoolCharge", NULL, ObjectTypeDump.TypeInfo.DefaultNonPagedPoolCharge, TRUE, FALSE, 0, 0);
 
-        //list callback procedures
+        ObDumpUlong(g_TreeList, h_tviSubItem, TEXT("PoolType"), lpType,
+            ObjectType.Versions.ObjectTypeCompatible->TypeInfo.PoolType, TRUE, FALSE, 0, 0);
 
-        //copy type procedures to temp array, assume DumpProcedure always first
+        ObDumpUlong(g_TreeList, h_tviSubItem, TEXT("DefaultPagedPoolCharge"), NULL,
+            ObjectType.Versions.ObjectTypeCompatible->TypeInfo.DefaultPagedPoolCharge, TRUE, FALSE, 0, 0);
+
+        ObDumpUlong(g_TreeList, h_tviSubItem, TEXT("DefaultNonPagedPoolCharge"), NULL,
+            ObjectType.Versions.ObjectTypeCompatible->TypeInfo.DefaultNonPagedPoolCharge, TRUE, FALSE, 0, 0);
+
+        //
+        // List callback procedures.
+        //
+        // Copy type procedures to temp array, assume DumpProcedure always first.
+        //
         RtlSecureZeroMemory(TypeProcs, sizeof(TypeProcs));
 
         supCopyMemory(
             &TypeProcs,
             sizeof(TypeProcs),
-            &ObjectTypeDump.TypeInfo.DumpProcedure,
+            &ObjectType.Versions.ObjectTypeCompatible->TypeInfo.DumpProcedure,
             sizeof(TypeProcs));
 
         //assume ntoskrnl first in list and list initialized
-        SelfDriverBase = pModulesList->Modules[0].ImageBase;
-        SelfDriverSize = pModulesList->Modules[0].ImageSize;
+        SelfDriverBase = ModulesList->Modules[0].ImageBase;
+        SelfDriverSize = ModulesList->Modules[0].ImageSize;
 
         for (i = 0; i < MAX_KNOWN_OBJECT_TYPE_PROCEDURES; i++) {
             if (TypeProcs[i]) {
                 ObDumpAddressWithModule(h_tviSubItem, T_TYPEPROCEDURES[i], TypeProcs[i],
-                    pModulesList, SelfDriverBase, SelfDriverSize);
+                    ModulesList, SelfDriverBase, SelfDriverSize);
             }
             else {
                 ObDumpAddress(g_TreeList, h_tviSubItem, T_TYPEPROCEDURES[i], NULL, TypeProcs[i], 0, 0);
             }
         }
 
-        supHeapFree(pModulesList);
-    }
-    __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
+        if (ObjectVersion > 1) {
+
+            switch (ObjectVersion) {
+            case 2:
+                WaitObjectFlagMask = ObjectType.Versions.ObjectType_8->TypeInfo.WaitObjectFlagMask;
+                WaitObjectFlagOffset = ObjectType.Versions.ObjectType_8->TypeInfo.WaitObjectFlagOffset;
+                WaitObjectPointerOffset = ObjectType.Versions.ObjectType_8->TypeInfo.WaitObjectPointerOffset;
+                break;
+            case 3:
+                WaitObjectFlagMask = ObjectType.Versions.ObjectType_RS1->TypeInfo.WaitObjectFlagMask;
+                WaitObjectFlagOffset = ObjectType.Versions.ObjectType_RS1->TypeInfo.WaitObjectFlagOffset;
+                WaitObjectPointerOffset = ObjectType.Versions.ObjectType_RS1->TypeInfo.WaitObjectPointerOffset;
+                break;
+            default:
+                WaitObjectFlagMask = ObjectType.Versions.ObjectType_RS2->TypeInfo.WaitObjectFlagMask;
+                WaitObjectFlagOffset = ObjectType.Versions.ObjectType_RS2->TypeInfo.WaitObjectFlagOffset;
+                WaitObjectPointerOffset = ObjectType.Versions.ObjectType_RS2->TypeInfo.WaitObjectPointerOffset;
+                break;
+            }
+
+            ObDumpUlong(g_TreeList, h_tviSubItem, TEXT("WaitObjectFlagMask"), NULL, WaitObjectFlagMask, TRUE, FALSE, 0, 0);
+            ObDumpUlong(g_TreeList, h_tviSubItem, TEXT("WaitObjectFlagOffset"), NULL, WaitObjectFlagOffset, TRUE, TRUE, 0, 0);
+            ObDumpUlong(g_TreeList, h_tviSubItem, TEXT("WaitObjectPointerOffset"), NULL, WaitObjectPointerOffset, TRUE, TRUE, 0, 0);
+
+        }
+
+        //
+        // Rest of OBJECT_TYPE
+        //
+        switch (ObjectVersion) {
+        case 1: //7
+            Key = ObjectType.Versions.ObjectType_7->Key;
+            LockPtr = ObjectType.Versions.ObjectType_7->TypeLock.Ptr;
+            pListEntry = &ObjectType.Versions.ObjectType_7->CallbackList;
+            break;
+
+        case 2: //8+
+            Key = ObjectType.Versions.ObjectType_8->Key;
+            LockPtr = ObjectType.Versions.ObjectType_8->TypeLock.Ptr;
+            pListEntry = &ObjectType.Versions.ObjectType_8->CallbackList;
+            break;
+
+        case 3: //RS1
+            Key = ObjectType.Versions.ObjectType_RS1->Key;
+            LockPtr = ObjectType.Versions.ObjectType_RS1->TypeLock.Ptr;
+            pListEntry = &ObjectType.Versions.ObjectType_RS1->CallbackList;
+            break;
+
+        default: //RS2+
+            Key = ObjectType.Versions.ObjectType_RS2->Key;
+            LockPtr = ObjectType.Versions.ObjectType_RS2->TypeLock.Ptr;
+            pListEntry = &ObjectType.Versions.ObjectType_RS2->CallbackList;
+            break;
+        }
+
+        ObDumpPushLock(g_TreeList, h_tviRootItem, LockPtr, 0, 0);
+        ObDumpUlong(g_TreeList, h_tviRootItem, TEXT("Key"), NULL, Key, TRUE, FALSE, 0, 0);
+        ObDumpListEntry(g_TreeList, h_tviRootItem, TEXT("CallbackList"), pListEntry);
+
+        bOkay = TRUE;
+
+    } while (bCond);
+
+    //
+    // Cleanup.
+    //
+    if (ModulesList) supHeapFree(ModulesList);
+    if (ObjectTypeInformation) supVirtualFree(ObjectTypeInformation);
+    if (CurrentObject) supHeapFree(CurrentObject);
+
+    //
+    // Show error message on failure.
+    //
+    if (bOkay == FALSE) {
+        ObDumpShowError(hwndDlg);
         return;
     }
 }
@@ -2633,7 +2855,7 @@ VOID ObDumpFltServerPort(
 )
 {
     HTREEITEM h_tviRootItem;
-    PVOID pModules = NULL;
+    PRTL_PROCESS_MODULES pModules = NULL;
     FLT_SERVER_PORT_OBJECT FltServerPortObject;
 
     if (Context == NULL) {
@@ -2661,7 +2883,7 @@ VOID ObDumpFltServerPort(
             return;
         }
 
-        pModules = supGetSystemInfo(SystemModuleInformation);
+        pModules = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation);
         if (pModules == NULL) {
             ObDumpShowError(hwndDlg);
             return;
@@ -2736,7 +2958,7 @@ VOID ObDumpAlpcPortCommunicationInfo(
     }
 
     BufferSize = ALIGN_UP_BY(BufferSize, PAGE_SIZE);
-    Buffer = supVirtualAlloc(BufferSize);
+    Buffer = (PBYTE)supVirtualAlloc(BufferSize);
     if (Buffer == NULL)
         return;
 
@@ -2887,7 +3109,7 @@ VOID ObDumpAlpcPort(
         PBYTE Ref;
     } AlpcPort;
 
-    PortDumpBuffer = ObDumpAlpcPortObjectVersionAware(
+    PortDumpBuffer = (PBYTE)ObDumpAlpcPortObjectVersionAware(
         Context->ObjectInfo.ObjectAddress,
         &BufferSize,
         &ObjectVersion);
@@ -3016,10 +3238,12 @@ VOID ObDumpAlpcPort(
     //
     //  Dump AlpcPort->StaticSecurity, same offset for every supported Windows.
     //
-   /* ObDumpSqos(
+    /*
+    ObDumpSqos(
         g_TreeList,
         h_tviRootItem,
-        &AlpcPort.u1.Port7600->StaticSecurity.SecurityQos);*/
+        &AlpcPort.u1.Port7600->StaticSecurity.SecurityQos);
+    */
 
     //
     // Dump AlpcPort->PortAttributes, offset is version aware.
@@ -3199,6 +3423,127 @@ VOID ObDumpAlpcPort(
 }
 
 /*
+* ObDumpCallback
+*
+* Purpose:
+*
+* Dump CALLBACK_OBJECT callback members to the treelist.
+*
+*/
+VOID ObDumpCallback(
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ HWND hwndDlg
+)
+{
+    SIZE_T Count;
+    ULONG_PTR ListHead;
+    HTREEITEM h_tviRootItem;
+
+    LIST_ENTRY ListEntry;
+
+    PRTL_PROCESS_MODULES Modules;
+
+    CALLBACK_OBJECT ObjectDump;
+    CALLBACK_REGISTRATION CallbackRegistration;
+
+    //
+    // Read object body.
+    //
+    if (!kdReadSystemMemoryEx(
+        Context->ObjectInfo.ObjectAddress,
+        (PVOID)&ObjectDump,
+        sizeof(ObjectDump),
+        NULL))
+    {
+        ObDumpShowError(hwndDlg);
+        return;
+    }
+
+    //
+    // Verify object signature.
+    //
+    if (ObjectDump.Signature != EX_CALLBACK_SIGNATURE) {
+        ObDumpShowError(hwndDlg);
+        return;
+    }
+
+    //
+    // Create a snapshot list of loaded modules.
+    //
+    Modules = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation);
+    if (Modules == NULL) {
+        ObDumpShowError(hwndDlg);
+        return;
+    }
+
+    //
+    // Prepare treelist for output.
+    //
+    g_TreeList = 0;
+    g_TreeListAtom = 0;
+    if (!supInitTreeListForDump(hwndDlg, &g_TreeListAtom, &g_TreeList)) {
+        ObDumpShowError(hwndDlg);
+        return;
+    }
+
+    //
+    // Add root item to the treelist in expanded state.
+    //
+    h_tviRootItem = TreeListAddItem(
+        g_TreeList,
+        NULL,
+        TVIF_TEXT | TVIF_STATE,
+        TVIS_EXPANDED,
+        TVIS_EXPANDED,
+        TEXT("Callbacks"),
+        NULL);
+
+    //
+    // Walk RegisteredCallback list entry.
+    //
+    ListHead = Context->ObjectInfo.ObjectAddress + FIELD_OFFSET(CALLBACK_OBJECT, RegisteredCallbacks);
+    ListEntry.Flink = ObjectDump.RegisteredCallbacks.Flink;
+    Count = 0;
+    while ((ULONG_PTR)ListEntry.Flink != ListHead) {
+
+        //
+        // Read callback registration data.
+        //
+        if (!kdReadSystemMemoryEx((ULONG_PTR)ListEntry.Flink,
+            (PVOID)&CallbackRegistration,
+            sizeof(CallbackRegistration),
+            NULL))
+        {
+            //
+            // Abort all output on error.
+            //
+            ObDumpShowError(hwndDlg);
+            break;
+        }
+
+        Count += 1;
+        ListEntry.Flink = CallbackRegistration.Link.Flink;
+
+        ObDumpAddressWithModule(h_tviRootItem,
+            Context->lpObjectName,
+            CallbackRegistration.CallbackFunction,
+            Modules,
+            NULL,
+            0);
+    }
+
+    //
+    // If nothing found (or possible query error) output this message.
+    //
+    if (Count == 0) {
+        ObDumpShowMessage(hwndDlg,
+            TEXT("This object has no registered callbacks or there is an query error."));
+    }
+
+    supHeapFree(Modules);
+}
+
+/*
 * ObjectDumpHandlePopupMenu
 *
 * Purpose:
@@ -3226,48 +3571,80 @@ VOID ObjectDumpHandlePopupMenu(
 }
 
 /*
-* ObjectDumpCopyValue
+* ObjectDumpInitDialog
 *
 * Purpose:
 *
-* Copy selected value to the clipboard.
+* Object window WM_INITDIALOG handler.
+*
+* Show load banner and proceed with actual info dump.
 *
 */
-VOID ObjectDumpCopyValue(
-    _In_ UINT ValueIndex
+INT_PTR ObjectDumpInitDialog(
+    _In_ HWND hwndDlg,
+    _In_ LPARAM lParam
 )
 {
-    SIZE_T             cbText;
-    LPWSTR             lpText;
-    TL_SUBITEMS_FIXED *subitems;
-    TVITEMEX           itemex;
-    WCHAR              textbuf[MAX_PATH + 1];
-
+    PROP_OBJECT_INFO *Context = NULL;
+    PROPSHEETPAGE    *pSheet = (PROPSHEETPAGE *)lParam;
+#ifndef _DEBUG
+    HWND hwndBanner = supDisplayLoadBanner(hwndDlg,
+        TEXT("Processing object dump, please wait"));
+#endif
     __try {
+        Context = (PROP_OBJECT_INFO*)pSheet->lParam;
+        if (Context) {
 
-        RtlSecureZeroMemory(&itemex, sizeof(itemex));
-        RtlSecureZeroMemory(textbuf, sizeof(textbuf));
-        subitems = NULL;
-        itemex.mask = TVIF_TEXT;
-        itemex.hItem = TreeView_GetSelection(g_TreeList);
-        itemex.pszText = textbuf;
-        itemex.cchTextMax = MAX_PATH;
+            switch (Context->TypeIndex) {
 
-        TreeList_GetTreeItem(g_TreeList, &itemex, &subitems);
+            case ObjectTypeDirectory:
+                ObDumpDirectoryObject(Context, hwndDlg);
+                break;
 
-        if (subitems) {
-            if (ValueIndex < subitems->Count) {
-                lpText = subitems->Text[ValueIndex];
-                if (lpText) {
-                    cbText = _strlen(lpText) * sizeof(WCHAR);
-                    supClipboardCopy(lpText, cbText);
-                }
+            case ObjectTypeDriver:
+                ObDumpDriverObject(Context, hwndDlg);
+                break;
+
+            case ObjectTypeDevice:
+                ObDumpDeviceObject(Context, hwndDlg);
+                break;
+
+            case ObjectTypeEvent:
+            case ObjectTypeMutant:
+            case ObjectTypeSemaphore:
+            case ObjectTypeTimer:
+                ObDumpSyncObject(Context, hwndDlg);
+                break;
+
+            case ObjectTypePort:
+                ObDumpAlpcPort(Context, hwndDlg);
+                break;
+
+            case ObjectTypeIoCompletion:
+                ObDumpQueueObject(Context, hwndDlg);
+                break;
+
+            case ObjectTypeFltConnPort:
+                ObDumpFltServerPort(Context, hwndDlg);
+                break;
+
+            case ObjectTypeCallback:
+                ObDumpCallback(Context, hwndDlg);
+                break;
+
+            case ObjectTypeType:
+                ObDumpObjectType(Context, hwndDlg);
+                break;
             }
         }
     }
-    __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
-        return;
+    __finally {
+#ifndef _DEBUG
+        SendMessage(hwndBanner, WM_CLOSE, 0, 0);
+#endif
     }
+
+    return 1;
 }
 
 /*
@@ -3285,11 +3662,6 @@ INT_PTR CALLBACK ObjectDumpDialogProc(
     _In_  LPARAM lParam
 )
 {
-    PROPSHEETPAGE    *pSheet = NULL;
-    PROP_OBJECT_INFO *Context = NULL;
-
-    UNREFERENCED_PARAMETER(wParam);
-
     switch (uMsg) {
 
     case WM_CONTEXTMENU:
@@ -3300,65 +3672,26 @@ INT_PTR CALLBACK ObjectDumpDialogProc(
 
         switch (LOWORD(wParam)) {
         case ID_OBJECT_COPY:
-            ObjectDumpCopyValue(0);
+            supCopyTreeListSubItemValue(g_TreeList, 0);
             break;
         case ID_ADDINFO_COPY:
-            ObjectDumpCopyValue(1);
+            supCopyTreeListSubItemValue(g_TreeList, 1);
             break;
         default:
             break;
         }
         break;
 
-    case WM_INITDIALOG:
-        Context = NULL;
-        pSheet = (PROPSHEETPAGE *)lParam;
-        if (pSheet) {
-
-            Context = (PROP_OBJECT_INFO*)pSheet->lParam;
-            if (Context) {
-
-                switch (Context->TypeIndex) {
-
-                case ObjectTypeDirectory:
-                    ObDumpDirectoryObject(Context, hwndDlg);
-                    break;
-
-                case ObjectTypeDriver:
-                    ObDumpDriverObject(Context, hwndDlg);
-                    break;
-
-                case ObjectTypeDevice:
-                    ObDumpDeviceObject(Context, hwndDlg);
-                    break;
-
-                case ObjectTypeEvent:
-                case ObjectTypeMutant:
-                case ObjectTypeSemaphore:
-                case ObjectTypeTimer:
-                    ObDumpSyncObject(Context, hwndDlg);
-                    break;
-
-                case ObjectTypePort:
-                    ObDumpAlpcPort(Context, hwndDlg);
-                    break;
-
-                case ObjectTypeIoCompletion:
-                    ObDumpQueueObject(Context, hwndDlg);
-                    break;
-
-                case ObjectTypeFltConnPort:
-                    ObDumpFltServerPort(Context, hwndDlg);
-                    break;
-
-                case ObjectTypeType:
-                    ObDumpObjectType(Context, hwndDlg);
-                    break;
-                }
-            }
-        }
-        return 1;
+    case WM_DESTROY:
+        DestroyWindow(g_TreeList);
+        UnregisterClass(MAKEINTATOM(g_TreeListAtom), g_WinObj.hInstance);
         break;
+
+    case WM_INITDIALOG:
+
+        return ObjectDumpInitDialog(
+            hwndDlg,
+            lParam);
 
     }
     return 0;

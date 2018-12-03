@@ -4,9 +4,9 @@
 *
 *  TITLE:       LIST.C
 *
-*  VERSION:     1.60
+*  VERSION:     1.70
 *
-*  DATE:        24 Oct 2018
+*  DATE:        30 Nov 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -218,7 +218,7 @@ VOID ListObjectDirectoryTree(
     OBJECT_ATTRIBUTES   objattr;
     UNICODE_STRING      objname;
 
-    POBJECT_DIRECTORY_INFORMATION  objinf;
+    POBJECT_DIRECTORY_INFORMATION objinf;
 
     ViewRootHandle = AddTreeViewItem(SubDirName, ViewRootHandle);
     RtlInitUnicodeString(&objname, SubDirName);
@@ -245,7 +245,7 @@ VOID ListObjectDirectoryTree(
                 break;
         }
 
-        objinf = supHeapAlloc((SIZE_T)rlen);
+        objinf = (POBJECT_DIRECTORY_INFORMATION)supHeapAlloc((SIZE_T)rlen);
         if (objinf == NULL)
             break;
 
@@ -416,7 +416,7 @@ VOID ListObjectsInDirectory(
     OBJECT_ATTRIBUTES   objattr;
     UNICODE_STRING      objname;
 
-    POBJECT_DIRECTORY_INFORMATION   objinf;
+    POBJECT_DIRECTORY_INFORMATION objinf;
 
     ListView_DeleteAllItems(g_hwndObjectList);
     RtlInitUnicodeString(&objname, lpObjectDirectory);
@@ -442,7 +442,7 @@ VOID ListObjectsInDirectory(
                 break;
         }
 
-        objinf = supHeapAlloc((SIZE_T)rlen);
+        objinf = (POBJECT_DIRECTORY_INFORMATION)supHeapAlloc((SIZE_T)rlen);
         if (objinf == NULL)
             break;
 
@@ -486,7 +486,7 @@ VOID FindObject(
     UNICODE_STRING      objname;
     PFO_LIST_ITEM       tmp;
 
-    POBJECT_DIRECTORY_INFORMATION	objinf;
+    POBJECT_DIRECTORY_INFORMATION objinf;
 
     RtlInitUnicodeString(&objname, DirName);
     sdlen = _strlen(DirName);
@@ -511,7 +511,7 @@ VOID FindObject(
                 break;
         }
 
-        objinf = supHeapAlloc((SIZE_T)rlen);
+        objinf = (POBJECT_DIRECTORY_INFORMATION)supHeapAlloc((SIZE_T)rlen);
         if (objinf == NULL)
             break;
 
@@ -524,7 +524,7 @@ VOID FindObject(
         if ((_strstri(objinf->Name.Buffer, NameSubstring) != 0) || (NameSubstring == NULL))
             if ((_strcmpi(objinf->TypeName.Buffer, TypeName) == 0) || (TypeName == NULL)) {
 
-                tmp = supHeapAlloc(sizeof(FO_LIST_ITEM) +
+                tmp = (PFO_LIST_ITEM)supHeapAlloc(sizeof(FO_LIST_ITEM) +
                     objinf->Name.Length +
                     objinf->TypeName.Length +
                     (sdlen + 4) * sizeof(WCHAR));
@@ -553,7 +553,7 @@ VOID FindObject(
 
         if (_strcmpi(objinf->TypeName.Buffer, g_ObjectTypes[ObjectTypeDirectory].Name) == 0) {
 
-            newdir = supHeapAlloc((sdlen + 4) * sizeof(WCHAR) + objinf->Name.Length);
+            newdir = (LPWSTR)supHeapAlloc((sdlen + 4) * sizeof(WCHAR) + objinf->Name.Length);
             if (newdir != NULL) {
                 _strcpy(newdir, DirName);
                 if ((DirName[0] == '\\') && (DirName[1] == 0)) {

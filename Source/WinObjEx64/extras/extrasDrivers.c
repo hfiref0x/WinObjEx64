@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
-*  VERSION:     1.60
+*  VERSION:     1.70
 *
-*  DATE:        24 Oct 2018
+*  DATE:        30 Nov 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,7 +17,7 @@
 #include "global.h"
 #include "extras.h"
 
-EXTRASCONTEXT DlgContext;
+EXTRASCONTEXT DrvDlgContext;
 
 /*
 * DrvHandlePopupMenu
@@ -72,7 +72,7 @@ VOID DrvDumpDriver(
         //
         // Remember selected index.
         //
-        iPos = ListView_GetNextItem(DlgContext.ListView, -1, LVNI_SELECTED);
+        iPos = ListView_GetNextItem(DrvDlgContext.ListView, -1, LVNI_SELECTED);
         if (iPos < 0)
             break;
 
@@ -80,7 +80,7 @@ VOID DrvDumpDriver(
         // Query selected driver name.
         //
         sz = 0;
-        lpDriverName = supGetItemText(DlgContext.ListView, iPos, 1, &sz);
+        lpDriverName = supGetItemText(DrvDlgContext.ListView, iPos, 1, &sz);
         if (lpDriverName == NULL)
             break;
 
@@ -90,7 +90,7 @@ VOID DrvDumpDriver(
         //
         // Run Save As Dialog.
         //
-        if (!supSaveDialogExecute(DlgContext.hwndDlg, szBuffer, TEXT("All files\0*.*\0\0")))
+        if (!supSaveDialogExecute(DrvDlgContext.hwndDlg, szBuffer, TEXT("All files\0*.*\0\0")))
             break;
 
         //
@@ -98,7 +98,7 @@ VOID DrvDumpDriver(
         //
         RtlSecureZeroMemory(szDriverDumpInfo, sizeof(szDriverDumpInfo));
         supGetItemText2(
-            DlgContext.ListView,
+            DrvDlgContext.ListView,
             iPos,
             2,
             szDriverDumpInfo,
@@ -113,7 +113,7 @@ VOID DrvDumpDriver(
         //
         RtlSecureZeroMemory(szDriverDumpInfo, sizeof(szDriverDumpInfo));
         supGetItemText2(
-            DlgContext.ListView,
+            DrvDlgContext.ListView,
             iPos,
             3,
             szDriverDumpInfo,
@@ -153,7 +153,7 @@ VOID DrvDumpDriver(
             else
                 _strcat(szBuffer, TEXT("partially successful"));
 
-            MessageBox(DlgContext.hwndDlg, szBuffer, PROGRAM_NAME, MB_ICONINFORMATION);
+            MessageBox(DrvDlgContext.hwndDlg, szBuffer, PROGRAM_NAME, MB_ICONINFORMATION);
         }
 
     } while (bCond);
@@ -183,7 +183,7 @@ VOID DrvListDrivers(
     PRTL_PROCESS_MODULE_INFORMATION pModule;
 
     do {
-        pModulesList = supGetSystemInfo(SystemModuleInformation);
+        pModulesList = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation);
         if (pModulesList == NULL)
             break;
 
@@ -203,23 +203,23 @@ VOID DrvListDrivers(
             RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
             ultostr(pModule->LoadOrderIndex, szBuffer);
             lvitem.pszText = szBuffer;
-            index = ListView_InsertItem(DlgContext.ListView, &lvitem);
+            index = ListView_InsertItem(DrvDlgContext.ListView, &lvitem);
 
             //Name
             RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-            
+
             MultiByteToWideChar(
                 CP_ACP, 0,
                 (LPCSTR)&pModule->FullPathName[pModule->OffsetToFileName],
-                -1, 
-                szBuffer, 
+                -1,
+                szBuffer,
                 MAX_PATH);
 
             lvitem.mask = LVIF_TEXT;
             lvitem.iSubItem++;
             lvitem.pszText = szBuffer;
             lvitem.iItem = index;
-            ListView_SetItem(DlgContext.ListView, &lvitem);
+            ListView_SetItem(DrvDlgContext.ListView, &lvitem);
 
             //Address
             RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
@@ -227,27 +227,27 @@ VOID DrvListDrivers(
             szBuffer[1] = L'x';
             u64tohex((ULONG_PTR)pModule->ImageBase, &szBuffer[2]);
             lvitem.iSubItem++;
-            ListView_SetItem(DlgContext.ListView, &lvitem);
+            ListView_SetItem(DrvDlgContext.ListView, &lvitem);
 
             //Size
             RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
             ultostr(pModule->ImageSize, szBuffer);
             lvitem.iSubItem++;
-            ListView_SetItem(DlgContext.ListView, &lvitem);
+            ListView_SetItem(DrvDlgContext.ListView, &lvitem);
 
             //FullName
             RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-            
+
             MultiByteToWideChar(
-                CP_ACP, 
+                CP_ACP,
                 0,
                 (LPCSTR)&pModule->FullPathName,
-                -1, 
-                szBuffer, 
+                -1,
+                szBuffer,
                 MAX_PATH);
-            
+
             lvitem.iSubItem++;
-            ListView_SetItem(DlgContext.ListView, &lvitem);
+            ListView_SetItem(DrvDlgContext.ListView, &lvitem);
         }
 
     } while (bCond);
@@ -269,76 +269,35 @@ INT CALLBACK DrvDlgCompareFunc(
     _In_ LPARAM lParamSort
 )
 {
-    LPWSTR    lpItem1 = NULL, lpItem2 = NULL;
-    INT       nResult = 0;
-    ULONG     id1, id2;
+    INT nResult = 0;
 
-    //
-    // Sort addresses.
-    //
-    if (lParamSort == 2) {
-        return supGetMaxOfTwoU64FromHex(
-            DlgContext.ListView,
+    switch (lParamSort) {
+    case 0: //Load Order
+    case 3: //Size
+        return supGetMaxOfTwoULongFromString(
+            DrvDlgContext.ListView,
             lParam1,
             lParam2,
             lParamSort,
-            DlgContext.bInverseSort);
+            DrvDlgContext.bInverseSort);
+
+    case 2: //Address
+        return supGetMaxOfTwoU64FromHex(
+            DrvDlgContext.ListView,
+            lParam1,
+            lParam2,
+            lParamSort,
+            DrvDlgContext.bInverseSort);
+
+    case 1: //Name
+    case 4: //Module
+        return supGetMaxCompareTwoFixedStrings(
+            DrvDlgContext.ListView,
+            lParam1,
+            lParam2,
+            lParamSort,
+            DrvDlgContext.bInverseSort);
     }
-
-    lpItem1 = supGetItemText(
-        DlgContext.ListView, 
-        (INT)lParam1, 
-        (INT)lParamSort, 
-        NULL);
-
-    lpItem2 = supGetItemText(
-        DlgContext.ListView, 
-        (INT)lParam2, 
-        (INT)lParamSort, 
-        NULL);
-
-    if ((lpItem1 == NULL) && 
-        (lpItem2 == NULL))
-    {
-        return 0;
-    }
-
-    if ((lpItem1 == NULL) && (lpItem2 != NULL)) {
-        nResult = (DlgContext.bInverseSort) ? 1 : -1;
-        goto Done;
-    }
-    if ((lpItem2 == NULL) && (lpItem1 != NULL)) {
-        nResult = (DlgContext.bInverseSort) ? -1 : 1;
-        goto Done;
-    }  
-
-    switch (lParamSort) {
-
-    case 0: //sort Load Order
-    case 3: //sort Size
-        id1 = strtoul(lpItem1);
-        id2 = strtoul(lpItem2);
-
-        if (DlgContext.bInverseSort)
-            nResult = id1 < id2;
-        else
-            nResult = id1 > id2;
-
-        break;
-   
-    case 1:  //sort Name
-    case 4:  //sort Module
-    default:
-        if (DlgContext.bInverseSort)
-            nResult = _strcmpi(lpItem2, lpItem1);
-        else
-            nResult = _strcmpi(lpItem1, lpItem2);
-        break;
-    }
-
-Done:
-    if (lpItem1) supHeapFree(lpItem1);
-    if (lpItem2) supHeapFree(lpItem2);
 
     return nResult;
 }
@@ -414,17 +373,17 @@ INT_PTR CALLBACK DriversDialogProc(
         break;
 
     case WM_NOTIFY:
-        extrasDlgHandleNotify(nhdr, &DlgContext, &DrvDlgCompareFunc, DriversHandleNotify, NULL);
+        extrasDlgHandleNotify(nhdr, &DrvDlgContext, &DrvDlgCompareFunc, DriversHandleNotify, NULL);
         break;
 
     case WM_SIZE:
-        extrasSimpleListResize(hwndDlg, DlgContext.SizeGrip);
+        extrasSimpleListResize(hwndDlg, DrvDlgContext.SizeGrip);
         break;
 
     case WM_CLOSE:
-        if (DlgContext.SizeGrip) DestroyWindow(DlgContext.SizeGrip);
+        if (DrvDlgContext.SizeGrip) DestroyWindow(DrvDlgContext.SizeGrip);
         DestroyWindow(hwndDlg);
-        g_WinObj.AuxDialogs[WOBJ_DRVDLG_IDX] = NULL;
+        g_WinObj.AuxDialogs[wobjDriversDlgId] = NULL;
         return TRUE;
 
     case WM_COMMAND:
@@ -461,41 +420,41 @@ VOID extrasCreateDriversDialog(
     LVCOLUMN col;
 
     //allow only one dialog
-    if (g_WinObj.AuxDialogs[WOBJ_DRVDLG_IDX]) {
-        if (IsIconic(g_WinObj.AuxDialogs[WOBJ_DRVDLG_IDX]))
-            ShowWindow(g_WinObj.AuxDialogs[WOBJ_DRVDLG_IDX], SW_RESTORE);
+    if (g_WinObj.AuxDialogs[wobjDriversDlgId]) {
+        if (IsIconic(g_WinObj.AuxDialogs[wobjDriversDlgId]))
+            ShowWindow(g_WinObj.AuxDialogs[wobjDriversDlgId], SW_RESTORE);
         else
-            SetActiveWindow(g_WinObj.AuxDialogs[WOBJ_DRVDLG_IDX]);
+            SetActiveWindow(g_WinObj.AuxDialogs[wobjDriversDlgId]);
         return;
     }
 
-    RtlSecureZeroMemory(&DlgContext, sizeof(DlgContext));
-    DlgContext.hwndDlg = CreateDialogParam(g_WinObj.hInstance, MAKEINTRESOURCE(IDD_DIALOG_EXTRASLIST),
+    RtlSecureZeroMemory(&DrvDlgContext, sizeof(DrvDlgContext));
+    DrvDlgContext.hwndDlg = CreateDialogParam(g_WinObj.hInstance, MAKEINTRESOURCE(IDD_DIALOG_EXTRASLIST),
         hwndParent, &DriversDialogProc, 0);
 
-    if (DlgContext.hwndDlg == NULL) {
+    if (DrvDlgContext.hwndDlg == NULL) {
         return;
     }
 
-    g_WinObj.AuxDialogs[WOBJ_DRVDLG_IDX] = DlgContext.hwndDlg;
+    g_WinObj.AuxDialogs[wobjDriversDlgId] = DrvDlgContext.hwndDlg;
 
-    SetWindowText(DlgContext.hwndDlg, TEXT("Drivers"));
+    SetWindowText(DrvDlgContext.hwndDlg, TEXT("Drivers"));
 
-    DlgContext.SizeGrip = supCreateSzGripWindow(DlgContext.hwndDlg);
+    DrvDlgContext.SizeGrip = supCreateSzGripWindow(DrvDlgContext.hwndDlg);
 
-    extrasSetDlgIcon(DlgContext.hwndDlg);
+    extrasSetDlgIcon(DrvDlgContext.hwndDlg);
 
-    DlgContext.ListView = GetDlgItem(DlgContext.hwndDlg, ID_EXTRASLIST);
-    if (DlgContext.ListView) {
+    DrvDlgContext.ListView = GetDlgItem(DrvDlgContext.hwndDlg, ID_EXTRASLIST);
+    if (DrvDlgContext.ListView) {
 
         //
         // Set listview imagelist, style flags and theme.
         //
-        ListView_SetImageList(DlgContext.ListView, g_ListViewImages, LVSIL_SMALL);
-        ListView_SetExtendedListViewStyle(DlgContext.ListView,
+        ListView_SetImageList(DrvDlgContext.ListView, g_ListViewImages, LVSIL_SMALL);
+        ListView_SetExtendedListViewStyle(DrvDlgContext.ListView,
             LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
 
-        SetWindowTheme(DlgContext.ListView, TEXT("Explorer"), NULL);
+        SetWindowTheme(DrvDlgContext.ListView, TEXT("Explorer"), NULL);
 
         RtlSecureZeroMemory(&col, sizeof(col));
         col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
@@ -504,7 +463,7 @@ VOID extrasCreateDriversDialog(
         col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
         col.iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
         col.cx = 60;
-        ListView_InsertColumn(DlgContext.ListView, col.iSubItem, &col);
+        ListView_InsertColumn(DrvDlgContext.ListView, col.iSubItem, &col);
 
         col.iImage = I_IMAGENONE;
 
@@ -512,32 +471,32 @@ VOID extrasCreateDriversDialog(
         col.pszText = TEXT("Name");
         col.iOrder++;
         col.cx = 160;
-        ListView_InsertColumn(DlgContext.ListView, col.iSubItem, &col);
+        ListView_InsertColumn(DrvDlgContext.ListView, col.iSubItem, &col);
 
         col.iSubItem++;
         col.pszText = TEXT("Address");
         col.iOrder++;
         col.cx = 130;
-        ListView_InsertColumn(DlgContext.ListView, col.iSubItem, &col);
+        ListView_InsertColumn(DrvDlgContext.ListView, col.iSubItem, &col);
 
         col.iSubItem++;
         col.pszText = TEXT("Size");
         col.iOrder++;
         col.cx = 80;
-        ListView_InsertColumn(DlgContext.ListView, col.iSubItem, &col);
+        ListView_InsertColumn(DrvDlgContext.ListView, col.iSubItem, &col);
 
         col.iSubItem++;
         col.pszText = TEXT("Image Path");
         col.iOrder++;
         col.cx = 280;
-        ListView_InsertColumn(DlgContext.ListView, col.iSubItem, &col);
+        ListView_InsertColumn(DrvDlgContext.ListView, col.iSubItem, &col);
 
         //remember col count
-        DlgContext.lvColumnCount = col.iSubItem;
+        DrvDlgContext.lvColumnCount = col.iSubItem;
 
         DrvListDrivers();
-        SendMessage(DlgContext.hwndDlg, WM_SIZE, 0, 0);
+        SendMessage(DrvDlgContext.hwndDlg, WM_SIZE, 0, 0);
 
-        ListView_SortItemsEx(DlgContext.ListView, &DrvDlgCompareFunc, 0);
+        ListView_SortItemsEx(DrvDlgContext.ListView, &DrvDlgCompareFunc, 0);
     }
 }

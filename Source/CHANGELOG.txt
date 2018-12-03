@@ -1,3 +1,12 @@
+v1.6.1
+code can now be compiled as C++
+added W32pServiceTable view
+added process list dialog (extras)
+added Callback object type callbacks list (Properties->Object)
+added callbacks viewer for certain callback types (registry, ps, ob, kebugcheck, se, dbg, po, io etc)
+reimplemented "type" object type view (added missing fields from w10+)
+reimplemented service tables extraction code
+
 v1.6.0
 ported to msvc 2017 (with backward compatibility to 2015)
 reimplemented private namespaces lookup

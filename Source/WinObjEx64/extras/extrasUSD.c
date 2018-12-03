@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASUSD.C
 *
-*  VERSION:     1.60
+*  VERSION:     1.70
 *
-*  DATE:        24 Oct 2018
+*  DATE:        30 Nov 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -20,6 +20,9 @@
 #include "extrasUSD.h"
 
 EXTRASCONTEXT DlgContext;
+
+HWND UsdTreeList = NULL;
+ATOM UsdTreeListAtom = 0;
 
 /*
 * UsdDumpSharedRegion
@@ -36,8 +39,6 @@ VOID UsdDumpSharedRegion(
     BOOL                  bCond = FALSE, bAny = FALSE;
     INT                   i;
     DWORD                 mask;
-    HWND                  UsdTreeList;
-    ATOM                  UsdTreeListAtom;
 
     HTREEITEM             h_tviRootItem, h_tviSubItem;
     LPWSTR                lpType;
@@ -53,8 +54,6 @@ VOID UsdDumpSharedRegion(
         if (IsBadReadPtr(pUserSharedData, sizeof(KUSER_SHARED_DATA)))
             break;
 
-        UsdTreeList = 0;
-        UsdTreeListAtom = 0;
         if (!supInitTreeListForDump(hwndParent, &UsdTreeListAtom, &UsdTreeList)) {
             break;
         }
@@ -454,8 +453,11 @@ INT_PTR CALLBACK UsdDialogProc(
         break;
 
     case WM_CLOSE:
+        DestroyWindow(UsdTreeList);
+        UnregisterClass(MAKEINTATOM(UsdTreeListAtom), g_WinObj.hInstance);
+
         DestroyWindow(hwndDlg);
-        g_WinObj.AuxDialogs[WOBJ_USDDLG_IDX] = NULL;
+        g_WinObj.AuxDialogs[wobjUSDDlgId] = NULL;
         return TRUE;
 
     case WM_COMMAND:
@@ -481,8 +483,8 @@ VOID extrasCreateUsdDialog(
 )
 {
     //allow only one dialog
-    if (g_WinObj.AuxDialogs[WOBJ_USDDLG_IDX]) {
-        SetActiveWindow(g_WinObj.AuxDialogs[WOBJ_USDDLG_IDX]);
+    if (g_WinObj.AuxDialogs[wobjUSDDlgId]) {
+        SetActiveWindow(g_WinObj.AuxDialogs[wobjUSDDlgId]);
         return;
     }
 
@@ -494,7 +496,7 @@ VOID extrasCreateUsdDialog(
         return;
     }
 
-    g_WinObj.AuxDialogs[WOBJ_USDDLG_IDX] = DlgContext.hwndDlg;
+    g_WinObj.AuxDialogs[wobjUSDDlgId] = DlgContext.hwndDlg;
 
     UsdDumpSharedRegion(DlgContext.hwndDlg);
 }

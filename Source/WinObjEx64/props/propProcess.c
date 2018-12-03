@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPPROCESS.C
 *
-*  VERSION:     1.60
+*  VERSION:     1.70
 *
-*  DATE:        24 Oct 2018
+*  DATE:        30 Nov 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -128,8 +128,8 @@ VOID ProcessShowProperties(
 )
 {
     LPWSTR              Buffer;
-    DWORD               dwProcessId;
     ULONG               bytesNeeded;
+    HANDLE              UniqueProcessId;
     HANDLE              hProcess;
     NTSTATUS            status;
     PUNICODE_STRING     dynUstr;
@@ -140,12 +140,12 @@ VOID ProcessShowProperties(
         //query process id
         Buffer = supGetItemText(hwndListView, iItem, 1, NULL);
         if (Buffer) {
-            dwProcessId = strtoul(Buffer);
+            UniqueProcessId = UlongToHandle(strtoul(Buffer));
             supHeapFree(Buffer);
 
             //query process win32 image path
             //1. open target process
-            cid.UniqueProcess = ULongToHandle(dwProcessId);
+            cid.UniqueProcess = UniqueProcessId;
             cid.UniqueThread = NULL;
             InitializeObjectAttributes(&obja, NULL, 0, NULL, NULL);
             status = NtOpenProcess(&hProcess, PROCESS_QUERY_LIMITED_INFORMATION, &obja, &cid);
@@ -155,7 +155,7 @@ VOID ProcessShowProperties(
                 NtQueryInformationProcess(hProcess, ProcessImageFileNameWin32, NULL, 0, &bytesNeeded);
                 if (bytesNeeded) {
 
-                    Buffer = supHeapAlloc((SIZE_T)bytesNeeded);
+                    Buffer = (LPWSTR)supHeapAlloc((SIZE_T)bytesNeeded);
                     if (Buffer) {
 
                         //3. query win32 filename
@@ -453,24 +453,19 @@ VOID ProcessListSetInfo(
 )
 {
     BOOL                            cond = FALSE;
-    USHORT                          ObjectTypeIndex;
+    USHORT                          ObjectTypeIndex = 0;
     ULONG                           i;
     DWORD                           CurrentProcessId = GetCurrentProcessId();
-    ULONG_PTR                       ObjectAddress;
+    ULONG_PTR                       ObjectAddress = 0;
     ACCESS_MASK                     DesiredAccess;
-    PVOID                           ProcessesList;
-    HANDLE                          hObject, hIcon;
-    PSYSTEM_HANDLE_INFORMATION_EX   pHandles;
+    PVOID                           ProcessesList = NULL;
+    HANDLE                          hObject = NULL;
+    HICON                           hIcon;
+    PSYSTEM_HANDLE_INFORMATION_EX   pHandles = NULL;
 
     if (Context == NULL) {
         return;
     }
-
-    hObject = NULL;
-    pHandles = NULL;
-    ProcessesList = NULL;
-    ObjectAddress = 0;
-    ObjectTypeIndex = 0;
 
     //empty process list images
     ImageList_RemoveAll(pDlgContext->ImageList);
@@ -485,12 +480,12 @@ VOID ProcessListSetInfo(
         DestroyIcon(hIcon);
     }
     //sort images
-    hIcon = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+    hIcon = (HICON)LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
     if (hIcon) {
         ImageList_ReplaceIcon(pDlgContext->ImageList, -1, hIcon);
         DestroyIcon(hIcon);
     }
-    hIcon = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+    hIcon = (HICON)LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
     if (hIcon) {
         ImageList_ReplaceIcon(pDlgContext->ImageList, -1, hIcon);
         DestroyIcon(hIcon);
@@ -615,7 +610,7 @@ VOID ProcessListSetInfo(
     if (hObject) {
 
         if (Context->TypeIndex == ObjectTypeWinstation)
-            CloseWindowStation(hObject);
+            CloseWindowStation((HWINSTA)hObject);
         else
             NtClose(hObject);
     }
@@ -748,7 +743,7 @@ VOID ProcessCopyText(
         }
 
         cbText += (lvComlumnCount * sizeof(WCHAR)) + sizeof(UNICODE_NULL);
-        lpText = supHeapAlloc(cbText);
+        lpText = (LPWSTR)supHeapAlloc(cbText);
         if (lpText) {
 
             for (i = 0; i < lvComlumnCount; i++) {
@@ -841,7 +836,7 @@ INT_PTR CALLBACK ProcessListDialogProc(
             Context = (PROP_OBJECT_INFO *)pSheet->lParam;
             SetProp(hwndDlg, T_PROPCONTEXT, (HANDLE)Context);
 
-            pDlgContext = supHeapAlloc(sizeof(EXTRASCONTEXT));
+            pDlgContext = (EXTRASCONTEXT*)supHeapAlloc(sizeof(EXTRASCONTEXT));
             if (pDlgContext) {
                 SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)pDlgContext);
 

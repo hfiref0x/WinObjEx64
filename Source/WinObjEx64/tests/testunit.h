@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2017
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       TESTUNIT.H
 *
-*  VERSION:     1.46
+*  VERSION:     1.70
 *
-*  DATE:        09 Mar 2017
+*  DATE:        30 Nov 2018
 *
 *  Common header file for test code.
 *
@@ -22,4 +22,3 @@ extern HANDLE g_TestMailslot;
 
 VOID TestStart();
 VOID TestStop();
-

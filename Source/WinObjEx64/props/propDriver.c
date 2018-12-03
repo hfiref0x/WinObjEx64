@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDRIVER.C
 *
-*  VERSION:     1.60
+*  VERSION:     1.70
 *
-*  DATE:        24 Oct 2018
+*  DATE:        30 Nov 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -92,7 +92,7 @@ VOID DriverSetInfo(
             if ((bResult == FALSE) && (bytesNeeded == 0))
                 break;
 
-            psci = supHeapAlloc(bytesNeeded);
+            psci = (LPQUERY_SERVICE_CONFIG)supHeapAlloc(bytesNeeded);
             if (psci == NULL)
                 break;
 
@@ -233,7 +233,7 @@ VOID DriverSetInfo(
                 bRet = FALSE;
                 SetDlgItemText(hwndDlg, ID_SERVICE_DESCRIPTION, L"");
                 bytesNeeded = 0x1000;
-                psd = supHeapAlloc(bytesNeeded);
+                psd = (LPSERVICE_DESCRIPTION)supHeapAlloc(bytesNeeded);
                 if (psd) {
 
                     bRet = QueryServiceConfig2(
@@ -245,7 +245,7 @@ VOID DriverSetInfo(
 
                     if ((bRet == FALSE) && (bytesNeeded != 0)) {
                         supHeapFree(psd);
-                        psd = supHeapAlloc(bytesNeeded);
+                        psd = (LPSERVICE_DESCRIPTION)supHeapAlloc(bytesNeeded);
                     }
                     if (psd) {
                         //set description or hide window
@@ -337,7 +337,7 @@ VOID DriverSetInfo(
                     bRet = FALSE;
 
                     //avoid SCM unexpected behaviour by using preallocated buffer
-                    lpDependencies = supHeapAlloc(bytesNeeded);
+                    lpDependencies = (LPENUM_SERVICE_STATUS)supHeapAlloc(bytesNeeded);
                     if (lpDependencies) {
 
                         bRet = EnumDependentServices(
@@ -352,7 +352,7 @@ VOID DriverSetInfo(
                             //more memory needed for enum
                             supHeapFree(lpDependencies);
                             dwServices = 0;
-                            lpDependencies = supHeapAlloc((SIZE_T)bytesNeeded);
+                            lpDependencies = (LPENUM_SERVICE_STATUS)supHeapAlloc((SIZE_T)bytesNeeded);
                             if (lpDependencies) {
 
                                 bRet = EnumDependentServices(
@@ -458,7 +458,7 @@ VOID DriverJumpToKey(
         //
         sz += PROPDRVREGSERVICESKEYLEN;
         sz = (1 + sz) * sizeof(WCHAR);
-        lpRegPath = supHeapAlloc(sz);
+        lpRegPath = (LPWSTR)supHeapAlloc(sz);
         if (lpRegPath == NULL)
             break;
 
@@ -596,7 +596,7 @@ INT_PTR CALLBACK DriverRegistryDialogProc(
 
     case WM_SHOWWINDOW:
         if (wParam) {
-            Context = GetProp(hwndDlg, T_PROPCONTEXT);
+            Context = (PROP_OBJECT_INFO*)GetProp(hwndDlg, T_PROPCONTEXT);
             DriverSetInfo(Context, hwndDlg);
         }
         return 1;
@@ -612,7 +612,7 @@ INT_PTR CALLBACK DriverRegistryDialogProc(
 
     case WM_COMMAND:
         if (LOWORD(wParam) == ID_SERVICE_JUMPTOKEY) {
-            Context = GetProp(hwndDlg, T_PROPCONTEXT);
+            Context = (PROP_OBJECT_INFO*)GetProp(hwndDlg, T_PROPCONTEXT);
             DriverJumpToKey(Context);
         }
         return 1;

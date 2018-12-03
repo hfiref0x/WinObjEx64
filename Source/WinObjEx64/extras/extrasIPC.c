@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASIPC.C
 *
-*  VERSION:     1.60
+*  VERSION:     1.70
 *
-*  DATE:        24 Oct 2018
+*  DATE:        30 Nov 2018
 *
 *  IPC supported: Pipes, Mailslots
 *
@@ -58,7 +58,7 @@ VOID IpcDisplayError(
     RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
 
     switch (DialogMode) {
-    case IpcModeMailshots:
+    case IpcModeMailSlots:
         _strcpy(szBuffer, TEXT("Cannot open mailslot because: "));
         break;
     case IpcModeNamedPipes:
@@ -100,7 +100,7 @@ LPWSTR IpcCreateObjectPathWithName(
         sz += DEVICE_NAMED_PIPE_LENGTH;
         lpRootDirectory = DEVICE_NAMED_PIPE;
         break;
-    case IpcModeMailshots:
+    case IpcModeMailSlots:
         sz += DEVICE_MAILSLOT_LENGTH;
         lpRootDirectory = DEVICE_MAILSLOT;
         break;
@@ -108,7 +108,7 @@ LPWSTR IpcCreateObjectPathWithName(
         break;
     }
     if (lpRootDirectory) {
-        lpFullName = supHeapAlloc(sz);
+        lpFullName = (LPWSTR)supHeapAlloc(sz);
         if (lpFullName == NULL) {
             return NULL;
         }
@@ -186,7 +186,7 @@ VOID IpcMailslotQueryInfo(
     //validate context
     if (Context == NULL) {
         SetLastError(ERROR_NOT_ENOUGH_MEMORY);
-        IpcDisplayError(hwndDlg, IpcModeMailshots);
+        IpcDisplayError(hwndDlg, IpcModeMailSlots);
         return;
     }
     if (
@@ -195,14 +195,14 @@ VOID IpcMailslotQueryInfo(
         )
     {
         SetLastError(ERROR_OBJECT_NOT_FOUND);
-        IpcDisplayError(hwndDlg, IpcModeMailshots);
+        IpcDisplayError(hwndDlg, IpcModeMailSlots);
         return;
     }
 
     hMailslot = NULL;
     if (!IpcOpenObjectMethod(Context, &hMailslot, GENERIC_READ)) {
         //on error display last win32 error
-        IpcDisplayError(hwndDlg, IpcModeMailshots);
+        IpcDisplayError(hwndDlg, IpcModeMailSlots);
         return;
     }
 
@@ -387,12 +387,12 @@ INT_PTR CALLBACK IpcTypeDialogProc(
 
     case WM_SHOWWINDOW:
         if (wParam) {
-            Context = GetProp(hwndDlg, T_PROPCONTEXT);
+            Context = (PROP_OBJECT_INFO*)GetProp(hwndDlg, T_PROPCONTEXT);
             if (Context) {
                 pDlgContext = (EXTRASCONTEXT*)Context->Tag;
                 if (pDlgContext) {
                     switch (pDlgContext->DialogMode) {
-                    case IpcModeMailshots:
+                    case IpcModeMailSlots:
                         IpcMailslotQueryInfo(Context, hwndDlg);
                         break;
                     case IpcModeNamedPipes:
@@ -408,7 +408,7 @@ INT_PTR CALLBACK IpcTypeDialogProc(
         break;
 
     case WM_PAINT:
-        Context = GetProp(hwndDlg, T_PROPCONTEXT);
+        Context = (PROP_OBJECT_INFO*)GetProp(hwndDlg, T_PROPCONTEXT);
         if (Context) {
             pDlgContext = (EXTRASCONTEXT*)Context->Tag;
             if (pDlgContext) {
@@ -472,7 +472,7 @@ VOID IpcDlgShowProperties(
     Page.pfnDlgProc = IpcTypeDialogProc;
 
     switch (pDlgContext->DialogMode) {
-    case IpcModeMailshots:
+    case IpcModeMailSlots:
         Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_MAILSLOT);
         Page.pszTitle = TEXT("Mailslot");
         break;
@@ -488,7 +488,7 @@ VOID IpcDlgShowProperties(
     //
     // Disconnected clients cannot query security (see msfs!MsCommonQuerySecurityInfo).
     //
-    if (pDlgContext->DialogMode != IpcModeMailshots) {
+    if (pDlgContext->DialogMode != IpcModeMailSlots) {
 
         //
         //Create Security Dialog if available
@@ -616,7 +616,7 @@ VOID IpcDlgQueryInfo(
             __leave;
 
         QuerySize = 0x1000;
-        DirectoryInfo = supHeapAlloc((SIZE_T)QuerySize);
+        DirectoryInfo = (FILE_DIRECTORY_INFORMATION*)supHeapAlloc((SIZE_T)QuerySize);
         if (DirectoryInfo == NULL)
             __leave;
 
@@ -770,19 +770,20 @@ INT_PTR CALLBACK IpcDlgProc(
             ImageList_Destroy(pDlgContext->ImageList);
 
             dlgIndex = 0;
-            if (pDlgContext->DialogMode == IpcModeMailshots)
-                dlgIndex = WOBJ_IPCDLG_MSLOT_IDX;
+            if (pDlgContext->DialogMode == IpcModeMailSlots)
+                dlgIndex = wobjIpcMailSlotsDlgId;
             else if (pDlgContext->DialogMode == IpcModeNamedPipes)
-                dlgIndex = WOBJ_IPCDLG_PIPES_IDX;
+                dlgIndex = wobjIpcPipesDlgId;
 
-            if ((dlgIndex == WOBJ_IPCDLG_MSLOT_IDX) || 
-                (dlgIndex == WOBJ_IPCDLG_PIPES_IDX))
+            if ((dlgIndex == wobjIpcMailSlotsDlgId) ||
+                (dlgIndex == wobjIpcPipesDlgId))
+            {
                 g_WinObj.AuxDialogs[dlgIndex] = NULL;
+            }
 
             RtlSecureZeroMemory(pDlgContext, sizeof(EXTRASCONTEXT));
         }
-        DestroyWindow(hwndDlg);
-        return TRUE;
+        return DestroyWindow(hwndDlg);
 
     case WM_COMMAND:
         if (LOWORD(wParam) == IDCANCEL) {
@@ -819,11 +820,11 @@ VOID extrasCreateIpcDialog(
     EXTRASCALLBACK CallbackParam;
 
     switch (Mode) {
-    case IpcModeMailshots:
-        dlgIndex = WOBJ_IPCDLG_MSLOT_IDX;
+    case IpcModeMailSlots:
+        dlgIndex = wobjIpcMailSlotsDlgId;
         break;
     case IpcModeNamedPipes:
-        dlgIndex = WOBJ_IPCDLG_PIPES_IDX;
+        dlgIndex = wobjIpcPipesDlgId;
         break;
     default:
         return;
@@ -850,7 +851,7 @@ VOID extrasCreateIpcDialog(
     g_WinObj.AuxDialogs[dlgIndex] = hwndDlg;
 
     switch (Mode) {
-    case IpcModeMailshots:
+    case IpcModeMailSlots:
         ResourceId = IDI_ICON_MAILSLOT;
         sz = DEVICE_MAILSLOT_LENGTH;
         lpObjectsRoot = DEVICE_MAILSLOT;
@@ -870,7 +871,7 @@ VOID extrasCreateIpcDialog(
     if (lpObjectsRoot == NULL)
         return;
 
-    lpObjectRelativePath = supHeapAlloc(sz + 100);
+    lpObjectRelativePath = (LPWSTR)supHeapAlloc(sz + 100);
     if (lpObjectRelativePath) {
         _strcpy(lpObjectRelativePath, TEXT("Relative Path ( "));
         _strcat(lpObjectRelativePath, lpObjectsRoot);
@@ -888,18 +889,18 @@ VOID extrasCreateIpcDialog(
         if (pDlgContext->ImageList) {
 
             //set object icon
-            hIcon = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(ResourceId), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+            hIcon = (HICON)LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(ResourceId), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
             if (hIcon) {
                 ImageList_ReplaceIcon(pDlgContext->ImageList, -1, hIcon);
                 DestroyIcon(hIcon);
             }
             //sort images
-            hIcon = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+            hIcon = (HICON)LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
             if (hIcon) {
                 ImageList_ReplaceIcon(pDlgContext->ImageList, -1, hIcon);
                 DestroyIcon(hIcon);
             }
-            hIcon = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+            hIcon = (HICON)LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
             if (hIcon) {
                 ImageList_ReplaceIcon(pDlgContext->ImageList, -1, hIcon);
                 DestroyIcon(hIcon);

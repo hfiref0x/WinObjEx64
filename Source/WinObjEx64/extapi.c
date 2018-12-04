@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.70
 *
-*  DATE:        30 Nov 2018
+*  DATE:        03 Dec 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -23,7 +23,7 @@ extern "C" {
 #endif
 
 HWINSTA StubNtUserOpenWindowStation(
-    _In_ OBJECT_ATTRIBUTES ObjectAttributes,
+    _In_ POBJECT_ATTRIBUTES ObjectAttributes,
     _In_ ACCESS_MASK DesiredAccess);
 
 extern DWORD dwNtUserOpenWindowStation;

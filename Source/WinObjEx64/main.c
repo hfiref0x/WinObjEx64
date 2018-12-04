@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.70
 *
-*  DATE:        02 Dec 2018
+*  DATE:        03 Dec 2018
 *
 *  Program entry point and main window handler.
 *
@@ -1174,41 +1174,57 @@ UINT WinObjExMain()
             TreeView_SetImageList(g_hwndObjectTree, TreeViewImages, TVSIL_NORMAL);
         }
 
-        //not enough user rights, insert run as admin menu entry
-        if ((IsFullAdmin == FALSE) && (g_kdctx.IsWine == FALSE)) {
-            hMenu = GetSubMenu(GetMenu(MainWindow), 0);
-            InsertMenu(hMenu, 0, MF_BYPOSITION, ID_FILE_RUNASADMIN, T_RUNASADMIN);
-            InsertMenu(hMenu, 1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-            //set menu shield icon
-            RtlSecureZeroMemory(&sii, sizeof(sii));
-            sii.cbSize = sizeof(sii);
-            if (SHGetStockIconInfo(SIID_SHIELD, SHGSI_ICON | SHGFI_SMALLICON, &sii) == S_OK) {
-                supSetMenuIcon(hMenu, ID_FILE_RUNASADMIN, (ULONG_PTR)sii.hIcon);
+        //
+        // Insert run as admin/local system menu entry if not under Wine.
+        //
+        if (g_kdctx.IsWine == FALSE) {
+            //
+            // We are running as user, add menu item to request elevation.
+            //
+            if (IsFullAdmin == FALSE) {
+                hMenu = GetSubMenu(GetMenu(MainWindow), 0);
+                InsertMenu(hMenu, 0, MF_BYPOSITION, ID_FILE_RUNASADMIN, T_RUNASADMIN);
+                InsertMenu(hMenu, 1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+                //set menu shield icon
+                RtlSecureZeroMemory(&sii, sizeof(sii));
+                sii.cbSize = sizeof(sii);
+                if (SHGetStockIconInfo(SIID_SHIELD, SHGSI_ICON | SHGFI_SMALLICON, &sii) == S_OK) {
+                    supSetMenuIcon(hMenu, ID_FILE_RUNASADMIN, (ULONG_PTR)sii.hIcon);
+                }
             }
-        }
-        else {
-            //insert run as localsystem menu entry if possible
-            hToken = supGetCurrentProcessToken();
-            if (hToken) {
-                if (NT_SUCCESS(supIsLocalSystem(hToken, &bLocalSystem))) {
-                    if (bLocalSystem == FALSE) {
-                        hMenu = GetSubMenu(GetMenu(MainWindow), 0);
-                        InsertMenu(hMenu, 0, MF_BYPOSITION, ID_FILE_RUNASADMIN, T_RUNASSYSTEM);
-                        InsertMenu(hMenu, 1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-                        RtlSecureZeroMemory(&sii, sizeof(sii));
-                        sii.cbSize = sizeof(sii);
-                        if (SHGetStockIconInfo(SIID_DESKTOPPC, SHGSI_ICON | SHGFI_SMALLICON, &sii) == S_OK) {
-                            supSetMenuIcon(hMenu, ID_FILE_RUNASADMIN, (ULONG_PTR)sii.hIcon);
+            else {
+                //
+                // We are running with admin privileges, determine if we need to 
+                // insert run as LocalSystem menu entry.
+                //
+                hToken = supGetCurrentProcessToken();
+                if (hToken) {
+                    if (NT_SUCCESS(supIsLocalSystem(hToken, &bLocalSystem))) {
+                        if (bLocalSystem == FALSE) {
+                            //
+                            // Not LocalSystem account, insert item.
+                            //
+                            hMenu = GetSubMenu(GetMenu(MainWindow), 0);
+                            InsertMenu(hMenu, 0, MF_BYPOSITION, ID_FILE_RUNASADMIN, T_RUNASSYSTEM);
+                            InsertMenu(hMenu, 1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+                            RtlSecureZeroMemory(&sii, sizeof(sii));
+                            sii.cbSize = sizeof(sii);
+                            if (SHGetStockIconInfo(SIID_DESKTOPPC, SHGSI_ICON | SHGFI_SMALLICON, &sii) == S_OK) {
+                                supSetMenuIcon(hMenu, ID_FILE_RUNASADMIN, (ULONG_PTR)sii.hIcon);
+                            }
+                        }
+                        else {
+                            //
+                            // LocalSystem account, update window title.
+                            //
+                            RtlSecureZeroMemory(szWindowTitle, sizeof(szWindowTitle));
+                            _strcpy(szWindowTitle, PROGRAM_NAME);
+                            _strcat(szWindowTitle, TEXT(" (LocalSystem)"));
+                            SetWindowText(MainWindow, szWindowTitle);
                         }
                     }
-                    else {
-                        RtlSecureZeroMemory(szWindowTitle, sizeof(szWindowTitle));
-                        _strcpy(szWindowTitle, PROGRAM_NAME);
-                        _strcat(szWindowTitle, TEXT(" (LocalSystem)"));
-                        SetWindowText(MainWindow, szWindowTitle);
-                    }
+                    NtClose(hToken);
                 }
-                NtClose(hToken);
             }
         }
 

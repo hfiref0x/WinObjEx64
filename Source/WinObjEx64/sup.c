@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.70
 *
-*  DATE:        30 Nov 2018
+*  DATE:        03 Dec 2018
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -3303,6 +3303,7 @@ HWINSTA supOpenWindowStationFromContextEx(
                     obja.Attributes |= OBJ_INHERIT;
                 
                 hObject = g_ExtApiSet.NtUserOpenWindowStation(&obja, dwDesiredAccess);
+
                 Status = RtlGetLastNtStatus();
                 NtClose(hRootDirectory);
             }

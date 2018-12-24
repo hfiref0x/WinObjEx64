@@ -45,6 +45,7 @@ BOOL propSecurityObjectSupported(
         (nTypeIndex != ObjectTypeWinstation) &&
         (nTypeIndex != ObjectTypeIoCompletion) &&
         (nTypeIndex != ObjectTypeJob) &&
+        (nTypeIndex != ObjectTypeSession) &&
         (nTypeIndex != ObjectTypeMemoryPartition))
     {
         return FALSE;

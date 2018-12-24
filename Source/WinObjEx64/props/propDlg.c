@@ -655,6 +655,7 @@ VOID propCreateDialog(
     case ObjectTypeTimer:
     case ObjectTypeJob:
     case ObjectTypeWinstation:
+    case ObjectTypeSession:
     case ObjectTypeIoCompletion:
     case ObjectTypeMemoryPartition:
         RtlSecureZeroMemory(&Page, sizeof(Page));

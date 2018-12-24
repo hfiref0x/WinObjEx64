@@ -4244,6 +4244,10 @@ HANDLE supOpenNamedObjectFromContext(
         status = NtOpenJobObject(&hObject, DesiredAccess, ObjectAttributes); //JOB_OBJECT_QUERY for query
         break;
 
+    case ObjectTypeSession:
+        status = NtOpenSession(&hObject, DesiredAccess, ObjectAttributes); //generic access
+        break;
+
     case ObjectTypeMemoryPartition:
         if (g_ExtApiSet.NtOpenPartition) {
             status = g_ExtApiSet.NtOpenPartition(&hObject, DesiredAccess, ObjectAttributes); //MEMORY_PARTITION_QUERY_ACCESS for query 

@@ -1357,6 +1357,41 @@ VOID propBasicQueryJob(
 }
 
 /*
+* propBasicQuerySession
+*
+* Purpose:
+*
+* Set information values for Session object type
+*
+*/
+VOID propBasicQuerySession(
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ HWND hwndDlg
+)
+{
+    HANDLE hObject;
+
+    if (Context == NULL) {
+        return;
+    }
+
+    //
+    // Open Session object.
+    //
+    hObject = NULL;
+    if (!propOpenCurrentObject(Context, &hObject, MAXIMUM_ALLOWED)) {
+        return;
+    }
+
+    //
+    // Query object basic and type info if needed.
+    //
+    propSetDefaultInfo(Context, hwndDlg, hObject);
+
+    propCloseCurrentObject(Context, hObject);
+}
+
+/*
 * propSetBasicInfoEx
 *
 * Purpose:
@@ -1633,6 +1668,9 @@ VOID propSetBasicInfo(
         break;
     case ObjectTypeJob:
         propBasicQueryJob(Context, hwndDlg, ExtendedInfoAvailable);
+        break;
+    case ObjectTypeSession:
+        propBasicQuerySession(Context, hwndDlg);
         break;
     case ObjectTypeDesktop:
         propBasicQueryDesktop(Context, hwndDlg);

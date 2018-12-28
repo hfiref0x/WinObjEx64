@@ -130,6 +130,11 @@ PSI_ACCESS propGetAccessTable(
         AccessTable = (PSI_ACCESS)&JobAccessValues;
         break;
 
+    case ObjectTypeSession:
+        This->dwAccessMax = MAX_KNOWN_SESSION_ACCESS_VALUE;
+        AccessTable = (PSI_ACCESS)&SessionAccessValues;
+        break;
+
     case ObjectTypeIoCompletion:
         This->dwAccessMax = MAX_KNOWN_IOCOMPLETION_ACCESS_VALUE;
         AccessTable = (PSI_ACCESS)&IoCompletionAccessValues;

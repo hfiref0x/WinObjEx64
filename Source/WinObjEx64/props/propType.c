@@ -119,6 +119,11 @@ VOID propSetTypeDecodeValue(
         Count = MAX_KNOWN_JOB_ATTRIBUTES;
         break;
 
+    case ObjectTypeSession:
+        Desc = a_SessionProp;
+        Count = MAX_KNOWN_SESSION_ATTRIBUTES;
+        break;
+
     case ObjectTypeDesktop:
         Desc = a_DesktopObjectProp;
         Count = MAX_KNOWN_DESKTOP_ATTRIBUTES;

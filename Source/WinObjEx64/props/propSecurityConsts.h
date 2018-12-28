@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2016
+*  (C) COPYRIGHT AUTHORS, 2015 - 2018
 *
 *  TITLE:       PROPSECURITYCONSTS.H
 *
-*  VERSION:     1.45
+*  VERSION:     1.70
 *
-*  DATE:        07 Aug 2016
+*  DATE:        28 Dec 2018
 *
 *  Consts header file for Security property sheet.
 *
@@ -212,9 +212,8 @@ static SI_ACCESS IoCompletionAccessValues[MAX_KNOWN_IOCOMPLETION_ACCESS_VALUE] =
 //
 //MemoryPartition Access Values
 //
-#define MAX_KNOWN_MEMORYPARTITION_ACCESS_VALUE 3
+#define MAX_KNOWN_MEMORYPARTITION_ACCESS_VALUE 2
 static SI_ACCESS MemoryPartitionAccessValues[MAX_KNOWN_MEMORYPARTITION_ACCESS_VALUE] = {
-    { &GUID_NULL, MEMORY_PARTITION_ALL_ACCESS, L"Full Control", SI_ACCESS_GENERAL | SI_ACCESS_SPECIFIC},
     { &GUID_NULL, MEMORY_PARTITION_QUERY_ACCESS, L"Query", SI_ACCESS_GENERAL | SI_ACCESS_SPECIFIC },
     { &GUID_NULL, MEMORY_PARTITION_MODIFY_ACCESS, L"Modify", SI_ACCESS_GENERAL | SI_ACCESS_SPECIFIC }
 };

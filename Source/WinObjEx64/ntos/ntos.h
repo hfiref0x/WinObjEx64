@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.97
+*  VERSION:     1.98
 *
-*  DATE:        29 Nov 2018
+*  DATE:        28 Dec 2018
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -9747,7 +9747,10 @@ NtTerminateJobObject(
 *
 ************************************************************************************/
 
-NTSTATUS NTAPI NtOpenSession(
+NTSYSAPI
+NTSTATUS 
+NTAPI 
+NtOpenSession(
     _Out_ PHANDLE SessionHandle,
     _In_ ACCESS_MASK DesiredAccess,
     _In_ POBJECT_ATTRIBUTES ObjectAttributes);

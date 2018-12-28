@@ -4,9 +4,9 @@
 *
 *  TITLE:       TREELIST.C
 *
-*  VERSION:     1.22
+*  VERSION:     1.23
 *
-*  DATE:        29 Nov 2018
+*  DATE:        12 Dec 2018
 *
 *  TreeList control.
 *
@@ -140,6 +140,7 @@ LRESULT TreeListCustomDraw(
     PTL_SUBITEMS		subitem;
     HGDIOBJ				prev;
     BOOL				ItemSelected;
+    HIMAGELIST			ImgList;
 
     if ((pdraw->nmcd.dwDrawStage & CDDS_ITEM) == 0)
         return CDRF_NOTIFYITEMDRAW;
@@ -148,7 +149,7 @@ LRESULT TreeListCustomDraw(
 
     RtlSecureZeroMemory(&item, sizeof(item));
     RtlSecureZeroMemory(&textbuf, sizeof(textbuf));
-    item.mask = TVIF_TEXT | TVIF_HANDLE | TVIF_PARAM | TVIF_CHILDREN | TVIF_STATE;
+    item.mask = TVIF_TEXT | TVIF_HANDLE | TVIF_PARAM | TVIF_CHILDREN | TVIF_STATE | TVIF_IMAGE;
     item.hItem = (HTREEITEM)pdraw->nmcd.dwItemSpec;
     item.cchTextMax = (sizeof(textbuf) / sizeof(TCHAR)) - 1;
     item.pszText = textbuf;
@@ -158,7 +159,14 @@ LRESULT TreeListCustomDraw(
     RtlSecureZeroMemory(&hr, sizeof(hr));
     TreeView_GetItemRect(pdraw->nmcd.hdr.hwndFrom, (HTREEITEM)pdraw->nmcd.dwItemSpec, &ir, TRUE);
 
-    if (item.cChildren == 1) {
+    ImgList = TreeView_GetImageList(pdraw->nmcd.hdr.hwndFrom, TVSIL_NORMAL);
+    if (ImgList != NULL)
+    {
+        ImageList_Draw(ImgList, item.iImage, pdraw->nmcd.hdc, ir.left - 18, ir.top, ILD_NORMAL);
+    }
+
+    if (item.cChildren == 1) // msdn: The item has one or more child items.
+    {
         RtlSecureZeroMemory(&tsz, sizeof(tsz));
         if (GetThemePartSize(tl_theme, pdraw->nmcd.hdc, TVP_GLYPH, GLPS_CLOSED, NULL, TS_TRUE, &tsz) != S_OK) {
             tsz.cx = 8;
@@ -168,6 +176,10 @@ LRESULT TreeListCustomDraw(
         subr.top = ir.top + (((ir.bottom - ir.top) - tsz.cy) / 2);
         subr.bottom = subr.top + tsz.cy;
         subr.left = ir.left - tsz.cx - 3;
+
+        if (ImgList != NULL)
+            subr.left -= 38;
+
         subr.right = ir.left - 3;
 
         if ((item.state & TVIS_EXPANDED) == 0)
@@ -633,6 +645,10 @@ LRESULT CALLBACK TreeListWindowProc(
     case TVM_EXPAND:
 
         return SendMessage((HWND)GetWindowLongPtr(hwnd, TL_TREECONTROL_SLOT), TVM_EXPAND, wParam, lParam);
+
+    case TVM_SETIMAGELIST:
+
+        return SendMessage((HWND)GetWindowLongPtr(hwnd, TL_TREECONTROL_SLOT), TVM_SETIMAGELIST, wParam, lParam);
 
     case TVM_DELETEITEM:
 

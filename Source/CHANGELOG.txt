@@ -1,3 +1,7 @@
+v1.7.x (dev)
++ Session object view and access rights, merge pull request #8 #9
++ treelist updated
+
 v1.7.0
 code can now be compiled as C++
 added W32pServiceTable view

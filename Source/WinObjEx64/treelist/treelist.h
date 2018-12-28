@@ -4,9 +4,9 @@
 *
 *  TITLE:       TREELIST.H
 *
-*  VERSION:     1.22
+*  VERSION:     1.23
 *
-*  DATE:        29 Nov 2018
+*  DATE:        12 Dec 2018
 *
 *  Tree-List custom control header file.
 *
@@ -78,6 +78,9 @@ ATOM InitializeTreeListControl();
 
 #define TreeList_GetNextItem(hwnd, hitem, code) \
     (HTREEITEM)SNDMSG((hwnd), TVM_GETNEXTITEM, (WPARAM)(code), (LPARAM)(HTREEITEM)(hitem))
+
+#define TreeList_SetImageList(hwnd, himl, iImage) \
+    (HIMAGELIST)SNDMSG((hwnd), TVM_SETIMAGELIST, iImage, (LPARAM)(HIMAGELIST)(himl))
 
 #define TreeList_GetChild(hwnd, hitem)          TreeList_GetNextItem(hwnd, hitem, TVGN_CHILD)
 #define TreeList_GetNextSibling(hwnd, hitem)    TreeList_GetNextItem(hwnd, hitem, TVGN_NEXT)

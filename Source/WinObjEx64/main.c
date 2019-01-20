@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.71
 *
-*  DATE:        03 Dec 2018
+*  DATE:        19 Jan 2019
 *
 *  Program entry point and main window handler.
 *

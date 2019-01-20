@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.70
+*  VERSION:     1.71
 *
-*  DATE:        30 Nov 2018
+*  DATE:        19 Jan 2019
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -167,9 +167,10 @@ typedef struct _NOTIFICATION_CALLBACKS {
     ULONG_PTR IopCdRomFileSystemQueueHead;
     ULONG_PTR IopTapeFileSystemQueueHead;
     ULONG_PTR IopNetworkFileSystemQueueHead;
+    ULONG_PTR CiCallbacks;
 } NOTIFICATION_CALLBACKS, *PNOTIFICATION_CALLBACKS;
 
-extern NOTIFICATION_CALLBACKS g_NotifyCallbacks;
+extern NOTIFICATION_CALLBACKS g_SystemCallbacks;
 
 // return true to stop enumeration
 typedef BOOL(CALLBACK *PENUMERATE_COLLECTION_CALLBACK)(
@@ -288,6 +289,9 @@ BOOL kdFindKiServiceTables(
     _Out_opt_ ULONG *KiServiceLimit,
     _Out_opt_ ULONG_PTR *W32pServiceTable,
     _Out_opt_ ULONG *W32pServiceLimit);
+
+ULONG_PTR KdFindCiCallbacks(
+    _In_ PKLDBGCONTEXT Context);
 
 BOOL kdReadSystemMemory(
     _In_    ULONG_PTR Address,

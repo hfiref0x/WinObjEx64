@@ -343,6 +343,9 @@
     <ClInclude Include="props\propTypeConsts.h">
       <Filter>Source Files\props</Filter>
     </ClInclude>
+    <ClInclude Include="kldbg_patterns.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="rsrc\pipe.ico">

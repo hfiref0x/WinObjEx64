@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2018
+*  (C) COPYRIGHT AUTHORS, 2018 - 2019
 *
 *  TITLE:       EXTRASCALLBACKS.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.71
 *
-*  DATE:        30 Nov 2018
+*  DATE:        19 Jan 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -21,6 +21,273 @@
 #include "hde/hde64.h"
 
 ATOM g_CbTreeListAtom;
+
+//
+// All available names for CiCallbacks. Unknown is expected to be XBOX callback.
+//
+#define CI_CALLBACK_NAMES_COUNT 27
+static const WCHAR *CiCallbackNames[CI_CALLBACK_NAMES_COUNT] = {
+    L"CiSetFileCache", //0
+    L"CiGetFileCache", //1
+    L"CiQueryInformation", //2
+    L"CiValidateImageHeader", //3
+    L"CiValidateImageData", //4
+    L"CiHashMemory", //5
+    L"KappxIsPackageFile", //6
+    L"CiCompareSigningLevels", //7
+    L"CiValidateFileAsImageType", //8
+    L"CiRegisterSigningInformation", //9
+    L"CiUnregisterSigningInformation",//10
+    L"CiInitializePolicy",//11
+    L"CiReleaseContext",//12
+    L"Unknown",//13 XBOX
+    L"CiGetStrongImageReference", //14
+    L"CiHvciSetImageBaseAddress", //15
+    L"CipQueryPolicyInformation", //16
+    L"CiValidateDynamicCodePages", //17
+    L"CiQuerySecurityPolicy", //18
+    L"CiRevalidateImage", //19
+    L"CiSetInformation",//20
+    L"CiSetInformationProcess", //21
+    L"CiGetBuildExpiryTime", //22
+    L"CiCheckProcessDebugAccessPolicy", //23
+    L"SIPolicyQueryPolicyInformation",//24
+    L"SIPolicyQuerySecurityPolicy",//25
+    L"CiSetUnlockInformation"//26
+};
+
+#define CI_CALLBACKS_NAMES_W7_COUNT 3
+static const BYTE CiCallbackIndexes_Win7[CI_CALLBACKS_NAMES_W7_COUNT] = { //Windows 7
+    3,  //CiValidateImageHeader
+    4,  //CiValidateImageData
+    2   //CiQueryInformation
+};
+
+#define CI_CALLBACK_NAMES_W8_COUNT 7
+static const BYTE CiCallbackIndexes_Win8[CI_CALLBACK_NAMES_W8_COUNT] = { //Windows 8
+    0,  //CiSetFileCache
+    1,  //CiGetFileCache
+    2,  //CiQueryInformation
+    3,  //CiValidateImageHeader
+    4,  //CiValidateImageData
+    5,  //CiHashMemory
+    6,  //KappxIsPackageFile
+};
+
+#define CI_CALLBACK_NAMES_W81_COUNT 12
+static const BYTE CiCallbackIndexes_Win81[CI_CALLBACK_NAMES_W81_COUNT] = { //Windows 8.1
+    0,  //CiSetFileCache
+    1,  //CiGetFileCache
+    2,  //CiQueryInformation
+    3,  //CiValidateImageHeader
+    4,  //CiValidateImageData
+    5,  //CiHashMemory
+    6,  //KappxIsPackageFile
+    7,  //CiCompareSigningLevels
+    8,  //CiValidateFileAsImageType
+    9,  //CiRegisterSigningInformation
+    10, //CiUnregisterSigningInformation
+    11  //CiInitializePolicy
+};
+
+#define CI_CALLBACK_NAMES_W10THRESHOLD_COUNT 18
+static const BYTE CiCallbackIndexes_Win10Threshold[CI_CALLBACK_NAMES_W10THRESHOLD_COUNT] = { //Windows 10 TH1/TH2
+    0,  //CiSetFileCache
+    1,  //CiGetFileCache
+    2,  //CiQueryInformation
+    3,  //CiValidateImageHeader
+    4,  //CiValidateImageData
+    5,  //CiHashMemory
+    6,  //KappxIsPackageFile
+    7,  //CiCompareSigningLevels
+    8,  //CiValidateFileAsImageType
+    9,  //CiRegisterSigningInformation
+    10, //CiUnregisterSigningInformation
+    11, //CiInitializePolicy
+    12, //CiReleaseContext
+    13, //Unknown XBOX
+    14, //CiGetStrongImageReference
+    15, //CiHvciSetImageBaseAddress
+    24, //SIPolicyQueryPolicyInformation
+    17  //CiValidateDynamicCodePages
+};
+
+#define CI_CALLBACK_NAMES_W10RS1_COUNT 20
+static const BYTE CiCallbackIndexes_Win10RS1[CI_CALLBACK_NAMES_W10RS1_COUNT] = { //Windows 10 RS1
+    0,  //CiSetFileCache
+    1,  //CiGetFileCache
+    2,  //CiQueryInformation
+    3,  //CiValidateImageHeader
+    4,  //CiValidateImageData
+    5,  //CiHashMemory
+    6,  //KappxIsPackageFile
+    7,  //CiCompareSigningLevels
+    8,  //CiValidateFileAsImageType
+    9,  //CiRegisterSigningInformation
+    10, //CiUnregisterSigningInformation
+    11, //CiInitializePolicy
+    12, //CiReleaseContext
+    13, //Unknown XBOX
+    14, //CiGetStrongImageReference
+    15, //CiHvciSetImageBaseAddress
+    24, //SIPolicyQueryPolicyInformation
+    17, //CiValidateDynamicCodePages
+    25, //SIPolicyQuerySecurityPolicy
+    19  //CiRevalidateImage
+};
+
+#define CI_CALLBACK_NAMES_W10RS2_COUNT 22
+static const BYTE CiCallbackIndexes_Win10RS2[CI_CALLBACK_NAMES_W10RS2_COUNT] = { //Windows 10 RS2
+    0,  //CiSetFileCache
+    1,  //CiGetFileCache
+    2,  //CiQueryInformation
+    3,  //CiValidateImageHeader
+    4,  //CiValidateImageData
+    5,  //CiHashMemory
+    6,  //KappxIsPackageFile
+    7,  //CiCompareSigningLevels
+    8,  //CiValidateFileAsImageType
+    9,  //CiRegisterSigningInformation
+    10, //CiUnregisterSigningInformation
+    11, //CiInitializePolicy
+    12, //CiReleaseContext
+    13, //Unknown XBOX
+    14, //CiGetStrongImageReference
+    15, //CiHvciSetImageBaseAddress
+    16, //CipQueryPolicyInformation
+    17, //CiValidateDynamicCodePages
+    25, //SIPolicyQuerySecurityPolicy
+    19, //CiRevalidateImage
+    26, //CiSetUnlockInformation
+    22  //CiGetBuildExpiryTime
+};
+
+#define CI_CALLBACK_NAMES_W10RS3_COUNT 22
+static const BYTE CiCallbackIndexes_Win10RS3[CI_CALLBACK_NAMES_W10RS3_COUNT] = { //Windows 10 RS3
+    0,  //CiSetFileCache
+    1,  //CiGetFileCache
+    2,  //CiQueryInformation
+    3,  //CiValidateImageHeader
+    4,  //CiValidateImageData
+    5,  //CiHashMemory
+    6,  //KappxIsPackageFile
+    7,  //CiCompareSigningLevels
+    8,  //CiValidateFileAsImageType
+    9,  //CiRegisterSigningInformation
+    10, //CiUnregisterSigningInformation
+    11, //CiInitializePolicy
+    12, //CiReleaseContext
+    13, //Unknown XBOX
+    14, //CiGetStrongImageReference
+    15, //CiHvciSetImageBaseAddress
+    16, //CipQueryPolicyInformation
+    17, //CiValidateDynamicCodePages
+    18, //CiQuerySecurityPolicy
+    19, //CiRevalidateImage
+    20, //CiSetInformation
+    22  //CiGetBuildExpiryTime
+};
+
+#define CI_CALLBACK_NAMES_W10RS4_RS5_COUNT 24
+static const BYTE CiCallbackIndexes_Win10RS4_RS5[CI_CALLBACK_NAMES_W10RS4_RS5_COUNT] = { //Windows 10 RS4/RS5
+    0,  //CiSetFileCache
+    1,  //CiGetFileCache
+    2,  //CiQueryInformation
+    3,  //CiValidateImageHeader
+    4,  //CiValidateImageData
+    5,  //CiHashMemory
+    6,  //KappxIsPackageFile
+    7,  //CiCompareSigningLevels
+    8,  //CiValidateFileAsImageType
+    9,  //CiRegisterSigningInformation
+    10, //CiUnregisterSigningInformation
+    11, //CiInitializePolicy
+    12, //CiReleaseContext
+    13, //Unknown XBOX
+    14, //CiGetStrongImageReference
+    15, //CiHvciSetImageBaseAddress
+    16, //CipQueryPolicyInformation
+    17, //CiValidateDynamicCodePages
+    18, //CiQuerySecurityPolicy
+    19, //CiRevalidateImage
+    20, //CiSetInformation
+    21, //CiSetInformationProcess
+    22, //CiGetBuildExpiryTime
+    23  //CiCheckProcessDebugAccessPolicy
+};
+
+/*
+* GetCiRoutineNameFromIndex
+*
+* Purpose:
+*
+* Return CiCallback name by index
+*
+*/
+LPWSTR GetCiRoutineNameFromIndex(
+    _In_ ULONG Index)
+{
+    ULONG ArrayCount = 0, index;
+    CONST BYTE *Indexes;
+
+    switch (g_NtBuildNumber) {
+
+    case 7600:
+    case 7601:
+        Indexes = CiCallbackIndexes_Win7;
+        ArrayCount = CI_CALLBACKS_NAMES_W7_COUNT;
+        break;
+
+    case 9200:
+        Indexes = CiCallbackIndexes_Win8;
+        ArrayCount = CI_CALLBACK_NAMES_W8_COUNT;
+        break;
+
+    case 9600:
+        Indexes = CiCallbackIndexes_Win81;
+        ArrayCount = CI_CALLBACK_NAMES_W81_COUNT;
+        break;
+
+    case 10240:
+    case 10586:
+        Indexes = CiCallbackIndexes_Win10Threshold;
+        ArrayCount = CI_CALLBACK_NAMES_W10THRESHOLD_COUNT;
+        break;
+
+    case 14393:
+        Indexes = CiCallbackIndexes_Win10RS1;
+        ArrayCount = CI_CALLBACK_NAMES_W10RS1_COUNT;
+        break;
+
+    case 15063:
+        Indexes = CiCallbackIndexes_Win10RS2;
+        ArrayCount = CI_CALLBACK_NAMES_W10RS2_COUNT;
+        break;
+
+    case 16299:
+        Indexes = CiCallbackIndexes_Win10RS3;
+        ArrayCount = CI_CALLBACK_NAMES_W10RS3_COUNT;
+        break;
+
+    case 17134:
+    case 17763:
+        Indexes = CiCallbackIndexes_Win10RS4_RS5;
+        ArrayCount = CI_CALLBACK_NAMES_W10RS4_RS5_COUNT;
+        break;
+
+    default:
+        return T_Unknown;
+    }
+
+    if (Index >= ArrayCount)
+        return T_Unknown;
+
+    index = Indexes[Index];
+    if (index >= CI_CALLBACK_NAMES_COUNT)
+        return T_Unknown;
+
+    return (LPWSTR)CiCallbackNames[index];
+}
 
 /*
 * FindIopFileSystemQueueHeads
@@ -1167,6 +1434,49 @@ VOID AddEntryToList(
 }
 
 /*
+* AddZeroEntryToList
+*
+* Purpose:
+*
+* Adds emptry callback entry to the treelist.
+*
+*/
+VOID AddZeroEntryToList(
+    _In_ HWND TreeList,
+    _In_ HTREEITEM RootItem,
+    _In_ ULONG_PTR Function,
+    _In_opt_ LPWSTR lpAdditionalInfo
+)
+{
+    TL_SUBITEMS_FIXED TreeListSubItems;
+    WCHAR szAddress[32];
+    WCHAR szBuffer[MAX_PATH + 1];
+
+    RtlSecureZeroMemory(&TreeListSubItems, sizeof(TreeListSubItems));
+    TreeListSubItems.Count = 2;
+
+    szAddress[0] = L'0';
+    szAddress[1] = L'x';
+    szAddress[2] = 0;
+    u64tohex(Function, &szAddress[2]);
+    TreeListSubItems.Text[0] = szAddress;
+
+    _strcpy(szBuffer, TEXT("Nothing"));
+
+    TreeListSubItems.Text[0] = szBuffer;
+    TreeListSubItems.Text[1] = lpAdditionalInfo;
+
+    TreeListAddItem(
+        TreeList,
+        RootItem,
+        TVIF_TEXT | TVIF_STATE,
+        (UINT)0,
+        (UINT)0,
+        szAddress,
+        &TreeListSubItems);
+}
+
+/*
 * DumpPsCallbacks
 *
 * Purpose:
@@ -2225,6 +2535,141 @@ VOID DumpIoFileSystemCallbacks(
 }
 
 /*
+* DumpCiCallbacks
+*
+* Purpose:
+*
+* Read SeCiCallbacks/g_CiCallbacks related callback data from kernel and send it to output window.
+*
+*/
+VOID DumpCiCallbacks(
+    _In_ HWND TreeList,
+    _In_ LPWSTR lpCallbackType,
+    _In_ ULONG_PTR CiCallbacks,
+    _In_ PRTL_PROCESS_MODULES Modules
+)
+{
+    HTREEITEM RootItem;
+
+    ULONG_PTR *CallbacksData;
+
+    LPWSTR CallbackName;
+
+    ULONG_PTR SizeOfCiCallbacks = 0;
+
+    ULONG BytesRead = 0, i, c;
+
+    BOOL bRevisionMarker;
+
+    //
+    // Add callback root entry to the treelist.
+    //
+    RootItem = AddRootEntryToList(TreeList, lpCallbackType);
+    if (RootItem == 0)
+        return;
+
+    if (g_NtBuildNumber <= 7601) {
+        SizeOfCiCallbacks = 3 * sizeof(ULONG_PTR);
+
+        CallbacksData = (PULONG_PTR)supVirtualAlloc((SIZE_T)SizeOfCiCallbacks);
+        if (CallbacksData) {
+
+            if (kdReadSystemMemoryEx(CiCallbacks,
+                CallbacksData,
+                (ULONG)SizeOfCiCallbacks,
+                &BytesRead))
+            {
+                c = (ULONG)(SizeOfCiCallbacks / sizeof(ULONG_PTR));
+                for (i = 0; i < c; i++) {
+
+                    CallbackName = GetCiRoutineNameFromIndex(i);
+
+                    if (CallbacksData[i]) {
+
+                        AddEntryToList(TreeList,
+                            RootItem,
+                            CallbacksData[i],
+                            CallbackName,
+                            Modules);
+
+                    }
+                    else {
+
+                        AddZeroEntryToList(TreeList,
+                            RootItem,
+                            CallbacksData[i],
+                            CallbackName);
+
+                    }
+                }
+            }
+            supVirtualFree(CallbacksData);
+        }
+    }
+    else {
+
+        //
+        // Probe size element.
+        //
+        if (!kdReadSystemMemoryEx(CiCallbacks,
+            &SizeOfCiCallbacks,
+            sizeof(ULONG_PTR),
+            &BytesRead))
+        {
+            return;
+        }
+
+        //
+        // Check size.
+        //
+        if ((SizeOfCiCallbacks == 0) || (SizeOfCiCallbacks > PAGE_SIZE))
+            return;
+
+        CallbacksData = (PULONG_PTR)supVirtualAlloc((SIZE_T)SizeOfCiCallbacks);
+        if (CallbacksData) {
+
+            if (kdReadSystemMemoryEx(CiCallbacks,
+                CallbacksData,
+                (ULONG)SizeOfCiCallbacks,
+                &BytesRead))
+            {
+                SizeOfCiCallbacks -= sizeof(ULONG_PTR); //exclude structure sizeof
+                bRevisionMarker = (g_NtBuildNumber >= 14393); //there is a revision marker at the end of this structure.
+                if (bRevisionMarker) SizeOfCiCallbacks -= sizeof(ULONG_PTR); //exclude marker (windows 10 + revision)
+
+                c = (ULONG)(SizeOfCiCallbacks / sizeof(ULONG_PTR));
+
+                for (i = 1; i <= c; i++) {
+
+                    CallbackName = GetCiRoutineNameFromIndex(i - 1);
+
+                    if (CallbacksData[i]) {
+
+                        AddEntryToList(TreeList,
+                            RootItem,
+                            CallbacksData[i],
+                            CallbackName,
+                            Modules);
+
+                    }
+                    else {
+
+                        AddZeroEntryToList(TreeList,
+                            RootItem,
+                            CallbacksData[i],
+                            CallbackName);
+
+                    }
+
+                }
+            }
+
+            supVirtualFree(CallbacksData);
+        }
+    }
+}
+
+/*
 * CallbacksList
 *
 * Purpose:
@@ -2242,69 +2687,72 @@ VOID CallbacksList(
         //
         // Query all addresses.
         //
-        if (g_NotifyCallbacks.PspCreateProcessNotifyRoutine == 0)
-            g_NotifyCallbacks.PspCreateProcessNotifyRoutine = FindPspCreateProcessNotifyRoutine();
+        if (g_SystemCallbacks.PspCreateProcessNotifyRoutine == 0)
+            g_SystemCallbacks.PspCreateProcessNotifyRoutine = FindPspCreateProcessNotifyRoutine();
 
-        if (g_NotifyCallbacks.PspCreateThreadNotifyRoutine == 0)
-            g_NotifyCallbacks.PspCreateThreadNotifyRoutine = FindPspCreateThreadNotifyRoutine();
+        if (g_SystemCallbacks.PspCreateThreadNotifyRoutine == 0)
+            g_SystemCallbacks.PspCreateThreadNotifyRoutine = FindPspCreateThreadNotifyRoutine();
 
-        if (g_NotifyCallbacks.PspLoadImageNotifyRoutine == 0)
-            g_NotifyCallbacks.PspLoadImageNotifyRoutine = FindPspLoadImageNotifyRoutine();
+        if (g_SystemCallbacks.PspLoadImageNotifyRoutine == 0)
+            g_SystemCallbacks.PspLoadImageNotifyRoutine = FindPspLoadImageNotifyRoutine();
 
-        if (g_NotifyCallbacks.KeBugCheckCallbackHead == 0)
-            g_NotifyCallbacks.KeBugCheckCallbackHead = FindKeBugCheckCallbackHead();
+        if (g_SystemCallbacks.KeBugCheckCallbackHead == 0)
+            g_SystemCallbacks.KeBugCheckCallbackHead = FindKeBugCheckCallbackHead();
 
-        if (g_NotifyCallbacks.KeBugCheckReasonCallbackHead == 0)
-            g_NotifyCallbacks.KeBugCheckReasonCallbackHead = FindKeBugCheckReasonCallbackHead();
+        if (g_SystemCallbacks.KeBugCheckReasonCallbackHead == 0)
+            g_SystemCallbacks.KeBugCheckReasonCallbackHead = FindKeBugCheckReasonCallbackHead();
 
-        if (g_NotifyCallbacks.IopNotifyShutdownQueueHead == 0)
-            g_NotifyCallbacks.IopNotifyShutdownQueueHead = FindIopNotifyShutdownQueueHeadHead(FALSE);
+        if (g_SystemCallbacks.IopNotifyShutdownQueueHead == 0)
+            g_SystemCallbacks.IopNotifyShutdownQueueHead = FindIopNotifyShutdownQueueHeadHead(FALSE);
 
-        if (g_NotifyCallbacks.IopNotifyLastChanceShutdownQueueHead == 0)
-            g_NotifyCallbacks.IopNotifyLastChanceShutdownQueueHead = FindIopNotifyShutdownQueueHeadHead(TRUE);
+        if (g_SystemCallbacks.IopNotifyLastChanceShutdownQueueHead == 0)
+            g_SystemCallbacks.IopNotifyLastChanceShutdownQueueHead = FindIopNotifyShutdownQueueHeadHead(TRUE);
 
-        if (g_NotifyCallbacks.CmCallbackListHead == 0)
-            g_NotifyCallbacks.CmCallbackListHead = FindCmCallbackHead();
+        if (g_SystemCallbacks.CmCallbackListHead == 0)
+            g_SystemCallbacks.CmCallbackListHead = FindCmCallbackHead();
 
-        if (g_NotifyCallbacks.ObProcessCallbackHead == 0)
-            g_NotifyCallbacks.ObProcessCallbackHead = GetObjectTypeCallbackListHeadByType(0);
+        if (g_SystemCallbacks.ObProcessCallbackHead == 0)
+            g_SystemCallbacks.ObProcessCallbackHead = GetObjectTypeCallbackListHeadByType(0);
 
-        if (g_NotifyCallbacks.ObThreadCallbackHead == 0)
-            g_NotifyCallbacks.ObThreadCallbackHead = GetObjectTypeCallbackListHeadByType(1);
+        if (g_SystemCallbacks.ObThreadCallbackHead == 0)
+            g_SystemCallbacks.ObThreadCallbackHead = GetObjectTypeCallbackListHeadByType(1);
 
-        if (g_NotifyCallbacks.ObDesktopCallbackHead == 0)
-            g_NotifyCallbacks.ObDesktopCallbackHead = GetObjectTypeCallbackListHeadByType(2);
+        if (g_SystemCallbacks.ObDesktopCallbackHead == 0)
+            g_SystemCallbacks.ObDesktopCallbackHead = GetObjectTypeCallbackListHeadByType(2);
 
-        if (g_NotifyCallbacks.SeFileSystemNotifyRoutinesHead == 0)
-            g_NotifyCallbacks.SeFileSystemNotifyRoutinesHead = FindSeFileSystemNotifyRoutinesHead(FALSE);
+        if (g_SystemCallbacks.SeFileSystemNotifyRoutinesHead == 0)
+            g_SystemCallbacks.SeFileSystemNotifyRoutinesHead = FindSeFileSystemNotifyRoutinesHead(FALSE);
 
-        if (g_NotifyCallbacks.SeFileSystemNotifyRoutinesExHead == 0)
-            g_NotifyCallbacks.SeFileSystemNotifyRoutinesExHead = FindSeFileSystemNotifyRoutinesHead(TRUE);
+        if (g_SystemCallbacks.SeFileSystemNotifyRoutinesExHead == 0)
+            g_SystemCallbacks.SeFileSystemNotifyRoutinesExHead = FindSeFileSystemNotifyRoutinesHead(TRUE);
 
-        if (g_NotifyCallbacks.PopRegisteredPowerSettingCallbacks == 0)
-            g_NotifyCallbacks.PopRegisteredPowerSettingCallbacks = FindPopRegisteredPowerSettingCallbacks();
+        if (g_SystemCallbacks.PopRegisteredPowerSettingCallbacks == 0)
+            g_SystemCallbacks.PopRegisteredPowerSettingCallbacks = FindPopRegisteredPowerSettingCallbacks();
 
-        if (g_NotifyCallbacks.RtlpDebugPrintCallbackList == 0)
-            g_NotifyCallbacks.RtlpDebugPrintCallbackList = FindRtlpDebugPrintCallbackList();
+        if (g_SystemCallbacks.RtlpDebugPrintCallbackList == 0)
+            g_SystemCallbacks.RtlpDebugPrintCallbackList = FindRtlpDebugPrintCallbackList();
 
-        if (g_NotifyCallbacks.IopFsNotifyChangeQueueHead == 0)
-            g_NotifyCallbacks.IopFsNotifyChangeQueueHead = FindIopFsNotifyChangeQueueHead();
+        if (g_SystemCallbacks.IopFsNotifyChangeQueueHead == 0)
+            g_SystemCallbacks.IopFsNotifyChangeQueueHead = FindIopFsNotifyChangeQueueHead();
 
-        if ((g_NotifyCallbacks.IopCdRomFileSystemQueueHead == 0) ||
-            (g_NotifyCallbacks.IopDiskFileSystemQueueHead == 0) ||
-            (g_NotifyCallbacks.IopTapeFileSystemQueueHead == 0) ||
-            (g_NotifyCallbacks.IopNetworkFileSystemQueueHead == 0))
+        if ((g_SystemCallbacks.IopCdRomFileSystemQueueHead == 0) ||
+            (g_SystemCallbacks.IopDiskFileSystemQueueHead == 0) ||
+            (g_SystemCallbacks.IopTapeFileSystemQueueHead == 0) ||
+            (g_SystemCallbacks.IopNetworkFileSystemQueueHead == 0))
         {
-            if (!FindIopFileSystemQueueHeads(&g_NotifyCallbacks.IopCdRomFileSystemQueueHead,
-                &g_NotifyCallbacks.IopDiskFileSystemQueueHead,
-                &g_NotifyCallbacks.IopTapeFileSystemQueueHead,
-                &g_NotifyCallbacks.IopNetworkFileSystemQueueHead))
+            if (!FindIopFileSystemQueueHeads(&g_SystemCallbacks.IopCdRomFileSystemQueueHead,
+                &g_SystemCallbacks.IopDiskFileSystemQueueHead,
+                &g_SystemCallbacks.IopTapeFileSystemQueueHead,
+                &g_SystemCallbacks.IopNetworkFileSystemQueueHead))
             {
 #ifdef _DEBUG
                 OutputDebugString(TEXT("Could not locate all Iop listheads\r\n"));
 #endif
             }
         }
+
+        if (g_SystemCallbacks.CiCallbacks == 0)
+            g_SystemCallbacks.CiCallbacks = (ULONG_PTR)KdFindCiCallbacks(&g_kdctx);
 
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {
@@ -2323,11 +2771,11 @@ VOID CallbacksList(
         // List process callbacks.
         //
 
-        if (g_NotifyCallbacks.PspCreateProcessNotifyRoutine) {
+        if (g_SystemCallbacks.PspCreateProcessNotifyRoutine) {
 
             DumpPsCallbacks(TreeList,
                 TEXT("CreateProcess"),
-                g_NotifyCallbacks.PspCreateProcessNotifyRoutine,
+                g_SystemCallbacks.PspCreateProcessNotifyRoutine,
                 Modules);
 
         }
@@ -2335,11 +2783,11 @@ VOID CallbacksList(
         //
         // List thread callbacks.
         //
-        if (g_NotifyCallbacks.PspCreateThreadNotifyRoutine) {
+        if (g_SystemCallbacks.PspCreateThreadNotifyRoutine) {
 
             DumpPsCallbacks(TreeList,
                 TEXT("CreateThread"),
-                g_NotifyCallbacks.PspCreateThreadNotifyRoutine,
+                g_SystemCallbacks.PspCreateThreadNotifyRoutine,
                 Modules);
 
         }
@@ -2347,11 +2795,11 @@ VOID CallbacksList(
         //
         // List load image callbacks.
         //
-        if (g_NotifyCallbacks.PspLoadImageNotifyRoutine) {
+        if (g_SystemCallbacks.PspLoadImageNotifyRoutine) {
 
             DumpPsCallbacks(TreeList,
                 TEXT("LoadImage"),
-                g_NotifyCallbacks.PspLoadImageNotifyRoutine,
+                g_SystemCallbacks.PspLoadImageNotifyRoutine,
                 Modules);
 
         }
@@ -2359,20 +2807,20 @@ VOID CallbacksList(
         //
         // List KeBugCheck callbacks.
         //
-        if (g_NotifyCallbacks.KeBugCheckCallbackHead) {
+        if (g_SystemCallbacks.KeBugCheckCallbackHead) {
 
             DumpKeBugCheckCallbacks(TreeList,
                 TEXT("BugCheck"),
-                g_NotifyCallbacks.KeBugCheckCallbackHead,
+                g_SystemCallbacks.KeBugCheckCallbackHead,
                 Modules);
 
         }
 
-        if (g_NotifyCallbacks.KeBugCheckReasonCallbackHead) {
+        if (g_SystemCallbacks.KeBugCheckReasonCallbackHead) {
 
             DumpKeBugCheckReasonCallbacks(TreeList,
                 TEXT("BugCheckReason"),
-                g_NotifyCallbacks.KeBugCheckReasonCallbackHead,
+                g_SystemCallbacks.KeBugCheckReasonCallbackHead,
                 Modules);
 
         }
@@ -2380,11 +2828,11 @@ VOID CallbacksList(
         //
         // List Cm callbacks
         //
-        if (g_NotifyCallbacks.CmCallbackListHead) {
+        if (g_SystemCallbacks.CmCallbackListHead) {
 
             DumpCmCallbacks(TreeList,
                 TEXT("CmRegistry"),
-                g_NotifyCallbacks.CmCallbackListHead,
+                g_SystemCallbacks.CmCallbackListHead,
                 Modules);
 
         }
@@ -2392,19 +2840,19 @@ VOID CallbacksList(
         //
         // List Io Shutdown callbacks.
         //
-        if (g_NotifyCallbacks.IopNotifyShutdownQueueHead) {
+        if (g_SystemCallbacks.IopNotifyShutdownQueueHead) {
 
             DumpIoCallbacks(TreeList,
                 TEXT("Shutdown"),
-                g_NotifyCallbacks.IopNotifyShutdownQueueHead,
+                g_SystemCallbacks.IopNotifyShutdownQueueHead,
                 Modules);
 
         }
-        if (g_NotifyCallbacks.IopNotifyLastChanceShutdownQueueHead) {
+        if (g_SystemCallbacks.IopNotifyLastChanceShutdownQueueHead) {
 
             DumpIoCallbacks(TreeList,
                 TEXT("LastChanceShutdown"),
-                g_NotifyCallbacks.IopNotifyLastChanceShutdownQueueHead,
+                g_SystemCallbacks.IopNotifyLastChanceShutdownQueueHead,
                 Modules);
 
         }
@@ -2412,27 +2860,27 @@ VOID CallbacksList(
         //
         // List Ob callbacks.
         //
-        if (g_NotifyCallbacks.ObProcessCallbackHead) {
+        if (g_SystemCallbacks.ObProcessCallbackHead) {
 
             DumpObCallbacks(TreeList,
                 TEXT("ObProcess"),
-                g_NotifyCallbacks.ObProcessCallbackHead,
+                g_SystemCallbacks.ObProcessCallbackHead,
                 Modules);
 
         }
-        if (g_NotifyCallbacks.ObThreadCallbackHead) {
+        if (g_SystemCallbacks.ObThreadCallbackHead) {
 
             DumpObCallbacks(TreeList,
                 TEXT("ObThread"),
-                g_NotifyCallbacks.ObThreadCallbackHead,
+                g_SystemCallbacks.ObThreadCallbackHead,
                 Modules);
 
         }
-        if (g_NotifyCallbacks.ObDesktopCallbackHead) {
+        if (g_SystemCallbacks.ObDesktopCallbackHead) {
 
             DumpObCallbacks(TreeList,
                 TEXT("ObDesktop"),
-                g_NotifyCallbacks.ObDesktopCallbackHead,
+                g_SystemCallbacks.ObDesktopCallbackHead,
                 Modules);
 
         }
@@ -2440,19 +2888,19 @@ VOID CallbacksList(
         //
         // List Se callbacks.
         //
-        if (g_NotifyCallbacks.SeFileSystemNotifyRoutinesHead) {
+        if (g_SystemCallbacks.SeFileSystemNotifyRoutinesHead) {
 
             DumpSeCallbacks(TreeList,
                 TEXT("SeFileSystem"),
-                g_NotifyCallbacks.SeFileSystemNotifyRoutinesHead,
+                g_SystemCallbacks.SeFileSystemNotifyRoutinesHead,
                 Modules);
 
         }
-        if (g_NotifyCallbacks.SeFileSystemNotifyRoutinesExHead) {
+        if (g_SystemCallbacks.SeFileSystemNotifyRoutinesExHead) {
 
             DumpSeCallbacks(TreeList,
                 TEXT("SeFileSystemEx"),
-                g_NotifyCallbacks.SeFileSystemNotifyRoutinesExHead,
+                g_SystemCallbacks.SeFileSystemNotifyRoutinesExHead,
                 Modules);
 
         }
@@ -2460,11 +2908,11 @@ VOID CallbacksList(
         //
         // List Po callbacks.
         //
-        if (g_NotifyCallbacks.PopRegisteredPowerSettingCallbacks) {
+        if (g_SystemCallbacks.PopRegisteredPowerSettingCallbacks) {
 
             DumpPoCallbacks(TreeList,
                 TEXT("PowerSettings"),
-                g_NotifyCallbacks.PopRegisteredPowerSettingCallbacks,
+                g_SystemCallbacks.PopRegisteredPowerSettingCallbacks,
                 Modules);
 
         }
@@ -2472,11 +2920,11 @@ VOID CallbacksList(
         //
         // List Dbg callbacks
         //
-        if (g_NotifyCallbacks.RtlpDebugPrintCallbackList) {
+        if (g_SystemCallbacks.RtlpDebugPrintCallbackList) {
 
             DumpDbgPrintCallbacks(TreeList,
                 TEXT("DbgPrint"),
-                g_NotifyCallbacks.RtlpDebugPrintCallbackList,
+                g_SystemCallbacks.RtlpDebugPrintCallbackList,
                 Modules);
 
         }
@@ -2484,11 +2932,11 @@ VOID CallbacksList(
         //
         // List IoFsRegistration callbacks
         //
-        if (g_NotifyCallbacks.IopFsNotifyChangeQueueHead) {
+        if (g_SystemCallbacks.IopFsNotifyChangeQueueHead) {
 
             DumpIoFsRegistrationCallbacks(TreeList,
                 TEXT("IoFsRegistration"),
-                g_NotifyCallbacks.IopFsNotifyChangeQueueHead,
+                g_SystemCallbacks.IopFsNotifyChangeQueueHead,
                 Modules);
 
         }
@@ -2496,32 +2944,40 @@ VOID CallbacksList(
         //
         // List Io File System callbacks
         //
-        if (g_NotifyCallbacks.IopDiskFileSystemQueueHead) {
+        if (g_SystemCallbacks.IopDiskFileSystemQueueHead) {
 
             DumpIoFileSystemCallbacks(TreeList,
                 TEXT("IoDiskFs"),
-                g_NotifyCallbacks.IopDiskFileSystemQueueHead,
+                g_SystemCallbacks.IopDiskFileSystemQueueHead,
                 Modules);
         }
-        if (g_NotifyCallbacks.IopCdRomFileSystemQueueHead) {
+        if (g_SystemCallbacks.IopCdRomFileSystemQueueHead) {
 
             DumpIoFileSystemCallbacks(TreeList,
                 TEXT("IoCdRomFs"),
-                g_NotifyCallbacks.IopCdRomFileSystemQueueHead,
+                g_SystemCallbacks.IopCdRomFileSystemQueueHead,
                 Modules);
         }
-        if (g_NotifyCallbacks.IopNetworkFileSystemQueueHead) {
+        if (g_SystemCallbacks.IopNetworkFileSystemQueueHead) {
 
             DumpIoFileSystemCallbacks(TreeList,
                 TEXT("IoNetworkFs"),
-                g_NotifyCallbacks.IopNetworkFileSystemQueueHead,
+                g_SystemCallbacks.IopNetworkFileSystemQueueHead,
                 Modules);
         }
-        if (g_NotifyCallbacks.IopTapeFileSystemQueueHead) {
+        if (g_SystemCallbacks.IopTapeFileSystemQueueHead) {
 
             DumpIoFileSystemCallbacks(TreeList,
                 TEXT("IoTapeFs"),
-                g_NotifyCallbacks.IopTapeFileSystemQueueHead,
+                g_SystemCallbacks.IopTapeFileSystemQueueHead,
+                Modules);
+        }
+
+        if (g_SystemCallbacks.CiCallbacks) {
+
+            DumpCiCallbacks(TreeList,
+                TEXT("CiCallbacks"),
+                g_SystemCallbacks.CiCallbacks,
                 Modules);
         }
 
@@ -2748,7 +3204,7 @@ VOID extrasCreateCallbacksDialog(
     pDlgContext->SizeGrip = supCreateSzGripWindow(hwndDlg);
 
     extrasSetDlgIcon(hwndDlg);
-    SetWindowText(hwndDlg, TEXT("Notification Callbacks"));
+    SetWindowText(hwndDlg, TEXT("System Callbacks"));
 
     GetClientRect(hwndParent, &rc);
     g_CbTreeListAtom = InitializeTreeListControl();

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.70
+*  VERSION:     1.71
 *
-*  DATE:        30 Nov 2018
+*  DATE:        19 Jan 2019
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -18,6 +18,7 @@
 *******************************************************************************/
 #include "global.h"
 #include "hde\hde64.h"
+#include "kldbg_patterns.h"
 
 //
 // Global variables, declared as extern in kldbg.h
@@ -30,62 +31,7 @@ KLDBGCONTEXT g_kdctx;
 ULONG g_NtBuildNumber;
 
 //Callbacks
-NOTIFICATION_CALLBACKS g_NotifyCallbacks;
-
-//
-// ObpLookupNamespaceEntry signatures
-//
-
-// 7600, 7601, 9600, 10240
-BYTE NamespacePattern[] = {
-    0x0F, 0xB6, 0x7A, 0x28, 0x48, 0x8D, 0x05
-};
-
-// 9200 (8 failed even here)
-BYTE NamespacePattern8[] = {
-    0x0F, 0xB6, 0x79, 0x28, 0x48, 0x8D, 0x05
-};
-
-//
-// Host Server Silo signature patterns
-//
-
-//
-// PrivateNamespaces redesigned in Windows 10 starting from 10586.
-//
-
-BYTE PsGetServerSiloGlobalsPattern_14393[] = {
-    0x48, 0x83, 0xEC, 0x28, 0x48, 0x83, 0xF9, 0xFF
-};
-
-BYTE PsGetServerSiloGlobalsPattern_15064_16299[] = {
-    0x48, 0x83, 0xEC, 0x28, 0x48, 0x8B, 0xC1, 0x48, 0x83, 0xF9, 0xFF
-};
-
-//
-// lea rax, ObpPrivateNamespaceLookupTable
-//
-BYTE LeaPattern_PNS[] = {
-    0x48, 0x8d, 0x05
-};
-
-//KiSystemServiceStartPattern(KiSystemServiceRepeat) signature
-
-BYTE  KiSystemServiceStartPattern[] = { 0x8B, 0xF8, 0xC1, 0xEF, 0x07, 0x83, 0xE7, 0x20, 0x25, 0xFF, 0x0F, 0x00, 0x00 };
-
-//
-// lea r10, KeServiceDescriptorTable
-//
-BYTE LeaPattern_KeServiceDescriptorTable[] = {
-    0x4c, 0x8d, 0x15
-};
-
-//
-// lea r11, KeServiceDescriptorTableShadow
-//
-BYTE LeaPattern_KeServiceDescriptorTableShadow[] = {
-    0x4c, 0x8d, 0x1d
-};
+NOTIFICATION_CALLBACKS g_SystemCallbacks;
 
 #define MM_SYSTEM_RANGE_START_7 0xFFFF080000000000
 #define MM_SYSTEM_RANGE_START_8 0xFFFF800000000000
@@ -2820,7 +2766,7 @@ VOID kdInit(
     WCHAR szDrvPath[MAX_PATH * 2];
 
     RtlSecureZeroMemory(&g_kdctx, sizeof(g_kdctx));
-    RtlSecureZeroMemory(&g_NotifyCallbacks, sizeof(g_NotifyCallbacks));
+    RtlSecureZeroMemory(&g_SystemCallbacks, sizeof(g_SystemCallbacks));
 
     g_kdctx.ShowKdError = TRUE;
 
@@ -2920,6 +2866,163 @@ VOID kdInit(
 
         kdQuerySystemInformation(&g_kdctx);
     }
+}
+
+/*
+* KdFindCiCallbacks
+*
+* Purpose:
+*
+* Locate address of ntoskrnl g_CiCallbacks/SeCiCallbacks structure.
+*
+*/
+ULONG_PTR KdFindCiCallbacks(
+    _In_ PKLDBGCONTEXT Context
+)
+{
+    BOOL    bCond = FALSE;
+
+    ULONG_PTR Address = 0, Result = 0;
+
+    PBYTE   Signature = NULL, ptrCode = NULL, MatchingPattern = NULL;
+    ULONG   SignatureSize = 0;
+
+    PVOID   SectionBase;
+    ULONG   SectionSize = 0, Index;
+
+    LONG    Rel = 0;
+    hde64s  hs;
+
+    ULONG_PTR NtOsBase = (ULONG_PTR)Context->NtOsBase;
+    HMODULE hNtOs = (HMODULE)Context->NtOsImageMap;
+
+    do {
+        //
+        // Locate PAGE image section as required variable is always in PAGE.
+        //
+        SectionBase = supLookupImageSectionByName(
+            PAGE_SECTION,
+            PAGE_SECTION_LEGNTH,
+            (PVOID)hNtOs,
+            &SectionSize);
+
+        if ((SectionBase == 0) || (SectionSize == 0))
+            break;
+
+        MatchingPattern = SeCiCallbacksMatchingPattern; //default matching pattern
+
+        switch (g_NtBuildNumber) {
+
+        case 7601:
+            Signature = g_CiCallbacksPattern_7601;
+            SignatureSize = sizeof(g_CiCallbacksPattern_7601);
+            MatchingPattern = g_CiCallbacksMatchingPattern;
+            break;
+
+        case 9200:
+        case 9600:
+            Signature = SeCiCallbacksPattern_9200_9600;
+            SignatureSize = sizeof(SeCiCallbacksPattern_9200_9600);
+            MatchingPattern = SeCiCallbacksMatchingPattern;
+            break;
+
+        case 10240:
+        case 10586:
+            Signature = SeCiCallbacksPattern_10240_10586;
+            SignatureSize = sizeof(SeCiCallbacksPattern_10240_10586);
+            MatchingPattern = SeCiCallbacksMatchingPattern;
+            break;
+
+        case 14393:
+            Signature = SeCiCallbacksPattern_14393;
+            SignatureSize = sizeof(SeCiCallbacksPattern_14393);
+            MatchingPattern = SeCiCallbacksMatchingPattern;
+            break;
+
+        case 15063:
+        case 16299:
+            Signature = SeCiCallbacksPattern_15063_16299;
+            SignatureSize = sizeof(SeCiCallbacksPattern_15063_16299);
+            MatchingPattern = SeCiCallbacksMatchingPattern;
+            break;
+
+        case 17134:
+        case 17763:
+            Signature = SeCiCallbacksPattern_17134_17763;
+            SignatureSize = sizeof(SeCiCallbacksPattern_17134_17763);
+            MatchingPattern = SeCiCallbacksMatchingPattern;
+            break;
+
+        default:
+            break;
+        }
+
+        if ((SignatureSize) && (Signature)) {
+
+            ptrCode = (PBYTE)supFindPattern(
+                (PBYTE)SectionBase,
+                SectionSize,
+                Signature,
+                SignatureSize);
+        }
+
+        if (ptrCode == NULL)
+            break;
+
+        if (g_NtBuildNumber <= 7601) {
+
+            //
+            // Find reference to g_CiCallbacks in code.
+            //
+
+            Index = 0; //pattern search include target instruction, do not skip
+
+        }
+        else {
+
+            //
+            // Find reference to SeCiCallbacks/g_CiCallbacks in code.
+            //
+
+            Index = SignatureSize; //skip signature instructions
+
+        }
+
+        do {
+            hde64_disasm((void*)(ptrCode + Index), &hs);
+            if (hs.flags & F_ERROR)
+                break;
+            //
+            // mov cs:g_CiCallbacks, rax (for Windows 7)
+            // lea rcx, SeCiCallbacks (for everything else)
+            //
+            if (hs.len == 7) {
+                if ((ptrCode[Index] == MatchingPattern[0]) &&
+                    (ptrCode[Index + 1] == MatchingPattern[1]) &&
+                    (ptrCode[Index + 2] == MatchingPattern[2]))
+                {
+                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    break;
+                }
+            }
+            Index += hs.len;
+
+        } while (Index < 64);
+
+        if (Rel == 0)
+            break;
+
+        Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
+        Address = NtOsBase + Address - (ULONG_PTR)hNtOs;
+
+        if (!kdAddressInNtOsImage((PVOID)Address))
+            break;
+
+        Result = Address;
+
+    } while (bCond);
+
+    return Result;
 }
 
 /*

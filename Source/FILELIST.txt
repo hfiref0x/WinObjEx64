@@ -38,6 +38,7 @@ instdrv.h
 
 kldbg.c - Windows Kernel Debugging Driver support routines, object related internal API set
 kldbg.h
+kldbg_pattern.h - patterns used to find undocumented stuff
 
 list.c - treeview and listview handlers for main window
 list.h

@@ -186,6 +186,8 @@
       <EntryPointSymbol>
       </EntryPointSymbol>
       <SetChecksum>true</SetChecksum>
+      <AdditionalOptions>/NOCOFFGRPINFO %(AdditionalOptions)</AdditionalOptions>
+      <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
     <Manifest>
       <SuppressStartupBanner>false</SuppressStartupBanner>
@@ -443,6 +445,7 @@
     <ClInclude Include="ntos\ntalpc.h" />
     <ClInclude Include="ntos\ntos.h" />
     <ClInclude Include="objects.h" />
+    <ClInclude Include="kldbg_patterns.h" />
     <ClInclude Include="props\propBasic.h" />
     <ClInclude Include="props\propBasicConsts.h" />
     <ClInclude Include="props\propDesktop.h" />

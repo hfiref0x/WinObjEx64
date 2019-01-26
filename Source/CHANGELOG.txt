@@ -1,5 +1,5 @@
 v1.7.1
-+ SeCiCallbacks/g_CiCallbacks added to the callbacks viewer
++ SeCiCallbacks/g_CiCallbacks, DbgkLmdCallbacks added to the callbacks viewer
 + Session object view and access rights, merge pull request #8 #9
 + treelist updated
 

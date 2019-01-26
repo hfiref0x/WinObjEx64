@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.71
 *
-*  DATE:        19 Jan 2019
+*  DATE:        26 Jan 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1261,6 +1261,70 @@ ULONG_PTR FindPspCreateThreadNotifyRoutine(
 }
 
 /*
+* FindDbgkLmdCallbacks
+*
+* Purpose:
+*
+* Return array address of callbacks registered with:
+*
+*   DbgkLkmdRegisterCallback
+*
+*/
+ULONG_PTR FindDbgkLmdCallbacks(
+    VOID)
+{
+    ULONG Index;
+    LONG Rel = 0;
+    ULONG_PTR Address = 0;
+    PBYTE ptrCode;
+    hde64s hs;
+
+    ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
+    HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
+
+    ptrCode = (PBYTE)GetProcAddress(hNtOs, "DbgkLkmdUnregisterCallback");
+    if (ptrCode == NULL)
+        return 0;
+
+    Index = 0;
+    Rel = 0;
+
+    //
+    // Find DbgkLmdCallbacks pointer
+    //
+    do {
+        hde64_disasm(ptrCode + Index, &hs);
+        if (hs.flags & F_ERROR)
+            break;
+
+        if (hs.len == 7) { //check if lea
+
+            if (((ptrCode[Index] == 0x4C) || (ptrCode[Index] == 0x48)) &&
+                (ptrCode[Index + 1] == 0x8D))
+            {
+                Rel = *(PLONG)(ptrCode + Index + 3);
+                break;
+            }
+
+        }
+
+        Index += hs.len;
+
+    } while (Index < 64);
+
+    if (Rel == 0)
+        return 0;
+
+    Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
+    Address = NtOsBase + Address - (ULONG_PTR)hNtOs;
+
+    if (!kdAddressInNtOsImage((PVOID)Address))
+        return 0;
+
+    return Address;
+}
+
+/*
 * FindPspCreateProcessNotifyRoutine
 *
 * Purpose:
@@ -1510,6 +1574,59 @@ VOID DumpPsCallbacks(
     {
 
         for (c = 0; c < PspNotifyRoutinesLimit; c++) {
+
+            if (Callbacks[c].Value) {
+
+                Address = (ULONG_PTR)ObGetObjectFastReference(Callbacks[c]);
+                Function = (ULONG_PTR)ObGetCallbackBlockRoutine((PVOID)Address);
+                if (Function < g_kdctx.SystemRangeStart)
+                    continue;
+
+                AddEntryToList(TreeList,
+                    RootItem,
+                    Function,
+                    NULL,
+                    Modules);
+            }
+        }
+    }
+
+}
+
+/*
+* DumpDbgkLCallbacks
+*
+* Purpose:
+*
+* Read DbgkL* callback data from kernel and send it to output window.
+*
+*/
+VOID DumpDbgkLCallbacks(
+    _In_ HWND TreeList,
+    _In_ LPWSTR lpCallbackType,
+    _In_ ULONG_PTR RoutinesArrayAddress,
+    _In_ PRTL_PROCESS_MODULES Modules
+)
+{
+    ULONG c;
+    ULONG_PTR Address, Function;
+    EX_FAST_REF Callbacks[DbgkLmdCount];
+
+    HTREEITEM RootItem;
+
+    //
+    // Add callback root entry to the treelist.
+    //
+    RootItem = AddRootEntryToList(TreeList, lpCallbackType);
+    if (RootItem == 0)
+        return;
+
+    RtlSecureZeroMemory(Callbacks, sizeof(Callbacks));
+    if (kdReadSystemMemory(RoutinesArrayAddress,
+        &Callbacks, sizeof(Callbacks)))
+    {
+
+        for (c = 0; c < DbgkLmdCount; c++) {
 
             if (Callbacks[c].Value) {
 
@@ -2751,6 +2868,9 @@ VOID CallbacksList(
             }
         }
 
+        if (g_SystemCallbacks.DbgkLmdCallbacks == 0)
+            g_SystemCallbacks.DbgkLmdCallbacks = FindDbgkLmdCallbacks();
+
         if (g_SystemCallbacks.CiCallbacks == 0)
             g_SystemCallbacks.CiCallbacks = (ULONG_PTR)KdFindCiCallbacks(&g_kdctx);
 
@@ -2973,6 +3093,17 @@ VOID CallbacksList(
                 Modules);
         }
 
+        if (g_SystemCallbacks.DbgkLmdCallbacks) {
+
+            DumpDbgkLCallbacks(TreeList,
+                TEXT("DbgkLmdCallback"),
+                g_SystemCallbacks.DbgkLmdCallbacks,
+                Modules);
+        }
+
+        //
+        // List CI callbacks
+        //
         if (g_SystemCallbacks.CiCallbacks) {
 
             DumpCiCallbacks(TreeList,

@@ -3190,7 +3190,7 @@ typedef struct _OBJECT_TYPE_RS2 {
 */
 
 typedef struct _OBJECT_HEADER {
-    LONG PointerCount;
+    LONG_PTR PointerCount;
     union
     {
         LONG HandleCount;

@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.99
+*  VERSION:     1.100
 *
-*  DATE:        15 Jan 2019
+*  DATE:        26 Jan 2019
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -3193,7 +3193,7 @@ typedef struct _OBJECT_HEADER {
     LONG_PTR PointerCount;
     union
     {
-        LONG HandleCount;
+        LONG_PTR HandleCount;
         PVOID NextToFree;
     };
     EX_PUSH_LOCK Lock;

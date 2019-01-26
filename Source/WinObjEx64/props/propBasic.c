@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.71
 *
-*  DATE:        25 Dec 2018
+*  DATE:        26 Jan 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1432,7 +1432,7 @@ VOID propSetBasicInfoEx(
 
     //Handle Count
     RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-    ultostr(InfoObject->ObjectHeader.HandleCount, _strend(szBuffer));
+    i64tostr(InfoObject->ObjectHeader.HandleCount, _strend(szBuffer));
     SetDlgItemText(hwndDlg, ID_OBJECT_HANDLES, szBuffer);
 
     //NonPagedPoolCharge

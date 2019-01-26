@@ -1427,7 +1427,7 @@ VOID propSetBasicInfoEx(
 
     //Reference Count
     RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-    ultostr(InfoObject->ObjectHeader.PointerCount, _strend(szBuffer));
+    i64tostr(InfoObject->ObjectHeader.PointerCount, _strend(szBuffer));
     SetDlgItemText(hwndDlg, ID_OBJECT_REFC, szBuffer);
 
     //Handle Count

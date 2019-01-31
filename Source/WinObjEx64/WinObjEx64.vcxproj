@@ -100,18 +100,20 @@
     <OutDir>.\output\$(Platform)\$(Configuration)\bin\</OutDir>
     <IntDir>.\output\$(Platform)\$(Configuration)\</IntDir>
     <CodeAnalysisRuleSet>..\..\..\Program Files (x86)\Microsoft Visual Studio\2017\Professional\Team Tools\Static Analysis Tools\Rule Sets\SecurityRules.ruleset</CodeAnalysisRuleSet>
-    <RunCodeAnalysis>true</RunCodeAnalysis>
+    <RunCodeAnalysis>false</RunCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseSigned|x64'">
     <OutDir>.\output\$(Platform)\$(Configuration)\bin\</OutDir>
     <IntDir>.\output\$(Platform)\$(Configuration)\</IntDir>
     <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
     <PostBuildEventUseInBuild>true</PostBuildEventUseInBuild>
+    <RunCodeAnalysis>true</RunCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseSignedWithDriver|x64'">
     <OutDir>.\output\$(Platform)\$(Configuration)\bin\</OutDir>
     <IntDir>.\output\$(Platform)\$(Configuration)\</IntDir>
     <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <RunCodeAnalysis>true</RunCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseNotSignedWithDriver|x64'">
     <OutDir>.\output\$(Platform)\$(Configuration)\bin\</OutDir>
@@ -172,7 +174,7 @@
       <ControlFlowGuard>Guard</ControlFlowGuard>
       <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\treelist;$(ProjectDir)\props;$(ProjectDir)\extras;$(ProjectDir)\ntos</AdditionalIncludeDirectories>
       <CompileAs>CompileAsC</CompileAs>
-      <EnablePREfast>true</EnablePREfast>
+      <EnablePREfast>false</EnablePREfast>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -225,6 +227,7 @@
       <AssemblerOutput>All</AssemblerOutput>
       <CompileAs>CompileAsC</CompileAs>
       <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\treelist;$(ProjectDir)\props;$(ProjectDir)\extras;$(ProjectDir)\ntos</AdditionalIncludeDirectories>
+      <EnablePREfast>true</EnablePREfast>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -275,6 +278,7 @@
       <AssemblerOutput>All</AssemblerOutput>
       <CompileAs>CompileAsC</CompileAs>
       <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\treelist;$(ProjectDir)\props;$(ProjectDir)\extras;$(ProjectDir)\ntos</AdditionalIncludeDirectories>
+      <EnablePREfast>true</EnablePREfast>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.70
+*  VERSION:     1.71
 *
-*  DATE:        30 Nov 2018
+*  DATE:        31 Jan 2019
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -35,6 +35,7 @@
 #pragma warning(disable: 6255 6263) // alloca
 #pragma warning(disable: 6320) // Exception-filter expression is the constant EXCEPTION_EXECUTE_HANDLER. This might mask exceptions that were not intended to be handled.
 #if (_MSC_VER >= 1900)
+#pragma warning(disable: 4054) // 'type cast': from function pointer %s to data pointer %s
 #pragma warning(disable: 4091) // 'typedef ': ignored on left of '' when no variable is declared
 #pragma warning(disable: 4311) // 'type cast': pointer truncation from %s to %s
 #pragma warning(disable: 4312) // 'type cast': conversion from %s to %s of greater size
@@ -51,7 +52,7 @@
 #pragma comment(lib, "Version.lib")
 
 #if defined (_MSC_VER)
-#if (_MSC_VER >= 1910)
+#if (_MSC_VER >= 1900)
 #ifdef _DEBUG
 #pragma comment(lib, "vcruntimed.lib")
 #pragma comment(lib, "ucrtd.lib")

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2018
+*  (C) COPYRIGHT AUTHORS, 2019
 *
 *  TITLE:       EXTRASPSLIST.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.71
 *
-*  DATE:        30 Nov 2018
+*  DATE:        31 Jan 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -500,6 +500,17 @@ HTREEITEM FindParentItem(
     return FindItemRecursive(TreeList,
         htiRoot, FindItemMatchCallback, (ULONG_PTR)ParentProcessId);
 }
+
+//
+// These constants missing in Windows SDK 8.1
+//
+#ifndef SERVICE_USER_SERVICE
+#define SERVICE_USER_SERVICE           0x00000040
+#endif
+
+#ifndef SERVICE_USERSERVICE_INSTANCE
+#define SERVICE_USERSERVICE_INSTANCE   0x00000080
+#endif
 
 /*
 * CreateProcessTreeList

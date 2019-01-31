@@ -1,3 +1,4 @@
+[![Build status](https://ci.appveyor.com/api/projects/status/dxsbgm90sahgwbo0?svg=true)](https://ci.appveyor.com/project/hfiref0x/winobjex64)
 
 # WinObjEx64
 ## Windows Object Explorer 64-bit

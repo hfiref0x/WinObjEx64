@@ -3093,6 +3093,9 @@ VOID CallbacksList(
                 Modules);
         }
 
+        //
+        // List DbgkLmdCallbacks
+        //
         if (g_SystemCallbacks.DbgkLmdCallbacks) {
 
             DumpDbgkLCallbacks(TreeList,

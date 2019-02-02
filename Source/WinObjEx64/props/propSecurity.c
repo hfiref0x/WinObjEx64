@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       PROPSECURITY.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.71
 *
-*  DATE:        28 Dec 2018
+*  DATE:        01 Feb 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -425,7 +425,7 @@ HRESULT propSecurityConstructor(
     _In_ IObjectSecurity *This,
     _In_ PROP_OBJECT_INFO *Context,
     _In_ POPENOBJECTMETHOD OpenObjectMethod,
-    _In_ PCLOSEOBJECTMETHOD CloseObjectMethod,
+    _In_opt_ PCLOSEOBJECTMETHOD CloseObjectMethod,
     _In_ ULONG psiFlags
 )
 {
@@ -438,10 +438,17 @@ HRESULT propSecurityConstructor(
     SI_ACCESS                  *TypeAccessTable = NULL;
     POBJECT_TYPE_INFORMATION    TypeInfo = NULL;
 
-    do {
-        This->ObjectContext = Context;
-        This->OpenObjectMethod = OpenObjectMethod;
+    This->ObjectContext = Context;
+    This->OpenObjectMethod = OpenObjectMethod;
+
+    if (CloseObjectMethod == NULL) {
+        This->CloseObjectMethod = (PCLOSEOBJECTMETHOD)supCloseObjectFromContext;
+    }
+    else {
         This->CloseObjectMethod = CloseObjectMethod;
+    }
+
+    do {
 
         if (!This->OpenObjectMethod(Context, &hObject, READ_CONTROL)) {
             hResult = E_ACCESSDENIED;
@@ -549,7 +556,7 @@ HRESULT propSecurityConstructor(
 HPROPSHEETPAGE propSecurityCreatePage(
     _In_ PROP_OBJECT_INFO *Context,
     _In_ POPENOBJECTMETHOD OpenObjectMethod,
-    _In_ PCLOSEOBJECTMETHOD CloseObjectMethod,
+    _In_opt_ PCLOSEOBJECTMETHOD CloseObjectMethod,
     _In_ ULONG psiFlags
 )
 {

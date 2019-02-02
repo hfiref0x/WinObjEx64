@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.70
+*  VERSION:     1.71
 *
-*  DATE:        30 Nov 2018
+*  DATE:        01 Feb 2019
 *
 *  Common header file for the program support routines.
 *
@@ -412,6 +412,10 @@ HANDLE supOpenNamedObjectFromContext(
     _In_ OBJECT_ATTRIBUTES *ObjectAttributes,
     _In_ ACCESS_MASK DesiredAccess,
     _Out_ NTSTATUS *Status);
+
+BOOL supCloseObjectFromContext(
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ HANDLE hObject);
 
 VOID supShowLastError(
     _In_ HWND hWnd,

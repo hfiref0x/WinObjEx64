@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.71
 *
-*  DATE:        25 Dec 2018
+*  DATE:        01 Feb 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -4265,6 +4265,51 @@ HANDLE supOpenNamedObjectFromContext(
     if (hPrivateNamespace) NtClose(hPrivateNamespace);
 
     return hObject;
+}
+
+
+/*
+* supCloseObjectFromContext
+*
+* Purpose:
+*
+* Close handle opened with propOpenCurrentObject.
+*
+*/
+BOOL supCloseObjectFromContext(
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ HANDLE hObject
+)
+{
+    BOOL bResult = FALSE;
+
+    if (Context == NULL) {
+        if (hObject != NULL)
+            bResult = NT_SUCCESS(NtClose(hObject));
+        return bResult;
+    }
+
+    else {
+
+        switch (Context->TypeIndex) {
+        case ObjectTypeWinstation:
+            if (g_WinObj.EnableExperimentalFeatures) {
+                bResult = NT_SUCCESS(NtClose(hObject));
+            }
+            else {
+                bResult = CloseWindowStation((HWINSTA)hObject);
+            }
+            break;
+        case ObjectTypeDesktop:
+            bResult = CloseDesktop((HDESK)hObject);
+            break;
+        default:
+            bResult = NT_SUCCESS(NtClose(hObject));
+            break;
+        }
+    }
+
+    return bResult;
 }
 
 /*

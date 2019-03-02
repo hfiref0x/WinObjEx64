@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       PROPTYPE.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.72
 *
-*  DATE:        28 Dec 2018
+*  DATE:        22 Feb 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -466,7 +466,7 @@ VOID propSetTypeDecodedAttributes(
         }
     }
     else {
-        propSetTypeDecodeValue(hListRights, dwFlags, Context->RealTypeIndex);
+        propSetTypeDecodeValue(hListRights, dwFlags, Context->ShadowTypeDescription->Index);
     }
 }
 
@@ -622,7 +622,8 @@ VOID propSetTypeInfo(
 )
 {
     BOOL                       bOkay;
-    INT                        i, nIndex;
+    WOBJ_OBJECT_TYPE           RealTypeIndex;
+    INT                        i;
     POBJINFO                   pObject = NULL;
     LPCWSTR                    lpTypeDescription = NULL;
     OBJECT_TYPE_COMPATIBLE     ObjectTypeDump;
@@ -633,22 +634,21 @@ VOID propSetTypeInfo(
         return;
     }
 
-    nIndex = Context->RealTypeIndex;
-    if ((Context->RealTypeIndex > ObjectTypeUnknown) ||
-        (Context->RealTypeIndex < ObjectTypeDevice))
-    {
-        nIndex = ObjectTypeUnknown;
+    RealTypeIndex = Context->ShadowTypeDescription->Index;
+    if ((RealTypeIndex > ObjectTypeUnknown)) {
+        RealTypeIndex = ObjectTypeUnknown;       
     }
 
     //if type is not known set it description to it type name
-    if (nIndex == ObjectTypeUnknown) {
+    if (RealTypeIndex == ObjectTypeUnknown) {
         lpTypeDescription = Context->lpObjectType;
     }
     else {
+        //set description
         RtlSecureZeroMemory(&szType, sizeof(szType));
         if (LoadString(
             g_WinObj.hInstance,
-            TYPE_DESCRIPTION_START_INDEX + nIndex,
+            Context->TypeDescription->ResourceStringId,
             szType,
             (MAX_PATH * sizeof(WCHAR)) - sizeof(UNICODE_NULL)))
         {
@@ -657,6 +657,7 @@ VOID propSetTypeInfo(
         else {
             lpTypeDescription = Context->lpObjectType;
         }
+
     }
 
     //check if we have object address and dump object
@@ -681,14 +682,14 @@ VOID propSetTypeInfo(
         }
 
         //if type is not known set it description to it type name
-        if (Context->RealTypeIndex == ObjectTypeUnknown)
+        if (RealTypeIndex == ObjectTypeUnknown)
             lpTypeDescription = Context->lpObjectName;
         else {
             //set description
             RtlSecureZeroMemory(&szType, sizeof(szType));
             if (LoadString(
                 g_WinObj.hInstance,
-                TYPE_DESCRIPTION_START_INDEX + Context->RealTypeIndex,
+                Context->ShadowTypeDescription->ResourceStringId,
                 szType,
                 (MAX_PATH * 2) - sizeof(UNICODE_NULL)))
             {
@@ -841,7 +842,7 @@ INT_PTR CALLBACK TypePropDialogProc(
         if (Context) {
             hDc = BeginPaint(hwndDlg, &Paint);
             if (hDc) {
-                ImageList_Draw(g_ListViewImages, Context->RealTypeIndex, hDc, 24, 34,
+                ImageList_Draw(g_ListViewImages, Context->ShadowTypeDescription->ImageIndex, hDc, 24, 34,
                     ILD_NORMAL | ILD_TRANSPARENT);
                 EndPaint(hwndDlg, &Paint);
             }

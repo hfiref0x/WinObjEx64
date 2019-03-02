@@ -4,9 +4,9 @@
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.71
+*  VERSION:     1.72
 *
-*  DATE:        31 Jan 2019
+*  DATE:        06 Feb 2019
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -67,6 +67,7 @@
 #include <commctrl.h>
 #include <Uxtheme.h>
 #include <ntstatus.h>
+#include "resource.h"
 #include "wine.h"
 #include <sddl.h>
 #include "minirtl\minirtl.h"
@@ -88,7 +89,6 @@
 #include "excepth.h"
 #include "extapi.h"
 #include "tests\testunit.h"
-#include "resource.h"
 
 #if defined(__cplusplus)
 #include <malloc.h>

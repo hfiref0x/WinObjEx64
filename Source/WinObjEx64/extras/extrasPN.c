@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       EXTRASPN.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.72
 *
-*  DATE:        30 Nov 2018
+*  DATE:        09 Feb 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -197,14 +197,14 @@ BOOL CALLBACK PNDlgEnumerateCallback(
         (PVOID)Entry->ObjectAddress,
         Entry->TypeIndex);
 
-    TypeName = g_ObjectTypes[ConvertedTypeIndex].Name;
+    TypeName = ObManagerGetNameByIndex(ConvertedTypeIndex);
 
     //Name
     RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
     lvitem.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM;
     lvitem.iSubItem = 0;
     lvitem.iItem = MAXINT;
-    lvitem.iImage = ConvertedTypeIndex;
+    lvitem.iImage = ObManagerGetImageIndexByTypeIndex(ConvertedTypeIndex);
     lvitem.pszText = Entry->ObjectName;
     lvitem.lParam = (LPARAM)Entry;
     index = ListView_InsertItem(PnDlgContext.ListView, &lvitem);

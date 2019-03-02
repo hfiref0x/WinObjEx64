@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.71
+*  VERSION:     1.72
 *
-*  DATE:        26 Jan 2019
+*  DATE:        04 Feb 2019
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -60,6 +60,9 @@ typedef struct _KLDBGCONTEXT {
     //are we under Wine
     BOOL IsWine;
 
+    //secureboot enabled?
+    BOOL IsSecureBoot;
+
     //system object header cookie (win10+)
     UCHAR ObHeaderCookie;
 
@@ -82,6 +85,9 @@ typedef struct _KLDBGCONTEXT {
 
     //ntoskrnl mapped image
     PVOID NtOsImageMap;
+
+    //win32 error value from SCM
+    ULONG drvOpenLoadStatus;
 
     //syscall tables related info
     ULONG KiServiceLimit;
@@ -214,20 +220,17 @@ UCHAR ObDecodeTypeIndex(
     _In_ PVOID Object,
     _In_ UCHAR EncodedTypeIndex);
 
-_Success_(return != NULL)
 PVOID ObDumpObjectTypeVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
     _Out_ PULONG Version);
 
-_Success_(return != NULL)
 PVOID ObDumpAlpcPortObjectVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
     _Out_ PULONG Version);
 
-_Success_(return != NULL)
-PVOID ObDumpDirectoryObjectVersionAware(
+PVOID ObDumpSymbolicLinkObjectVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
     _Out_ PULONG Version);

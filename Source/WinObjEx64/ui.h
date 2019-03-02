@@ -4,9 +4,9 @@
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.71
+*  VERSION:     1.72
 *
-*  DATE:        19 Jan 2019
+*  DATE:        09 Feb 2019
 *
 *  Common header file for the user interface.
 *
@@ -33,7 +33,7 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
     _In_ DWORD_PTR dwData
     );
 
-#define PROGRAM_VERSION         L"1.7.1"
+#define PROGRAM_VERSION         L"1.7.2"
 #ifdef _USE_OWN_DRIVER
 #define PROGRAM_NAME            L"Windows Object Explorer 64-bit (Non-public version)"
 #else 
@@ -53,6 +53,7 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 #define T_COPYADDINFO           L"Copy Additional Info Field Text"
 #define T_SAVETOFILE            L"Save list to File"
 #define T_DUMPDRIVER            L"Dump Driver"
+#define T_VIEW_REFRESH          L"Refresh"
 
 typedef enum _WOBJ_DIALOGS_ID {
     wobjFindDlgId = 0,
@@ -110,13 +111,14 @@ typedef struct _PROP_OBJECT_INFO {
     BOOL IsPrivateNamespaceObject;
     BOOL IsType; //TRUE if selected object is object type
     INT TypeIndex;
-    INT RealTypeIndex;//save index for type
     DWORD ObjectFlags;//object specific flags
     LPWSTR lpObjectName;
     LPWSTR lpObjectType;
     LPWSTR lpCurrentObjectPath;
     LPWSTR lpDescription; //description from main list (3rd column)
     ULONG_PTR Tag;
+    WOBJ_TYPE_DESC *TypeDescription;
+    WOBJ_TYPE_DESC *ShadowTypeDescription; //valid only for types, same as TypeDescription for everything else.
     OBJINFO ObjectInfo; //object dump related structures
     PROP_NAMESPACE_INFO NamespaceInfo;
 } PROP_OBJECT_INFO, *PPROP_OBJECT_INFO;
@@ -150,3 +152,19 @@ typedef struct _PROCEDURE_DESC {
 
 //props used by ipc dialogs
 #define T_IPCDLGCONTEXT TEXT("IpcDlgContext")
+
+//Calendar
+static LPCWSTR g_szMonths[12] = {
+    L"Jan",
+    L"Feb",
+    L"Mar",
+    L"Apr",
+    L"May",
+    L"Jun",
+    L"Jul",
+    L"Aug",
+    L"Sep",
+    L"Oct",
+    L"Nov",
+    L"Dec"
+};

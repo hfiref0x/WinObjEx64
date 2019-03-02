@@ -1,23 +1,16 @@
-CoverageSampler - new RS4 object, ETW
-DmaAdapter
-DmaDomain
-IoCompletionReserve - same as IoCompletion except using reserve process allocated memory
-RawInputManager - DirectX Kernel Subsystem object
-UserApcReserve - same as NtQueueApc except using reserve process allocated memory
-WaitCompletionPacket
-Silo (r3 interface removed in 10240 release, object removed in TH2 builds)
-NetworkNamespace - managed by NDIS.sys (renamed to NdisCmState in RS1)
-VRegConfigurationContext - new RS1 object
-VirtualKey - new RS1 object (not present in RS2)
-PsSiloContextPaged - new RS1 object
-PsSiloContextNonPaged - new RS1 object
-RegistryTransaction - new RS1 object
-CoreMessagining - new RS1 object
-ActivityReference - new RS2 object
-EtwSessionDemuxEntry - new Win10 object
-DxgkCompositionObject - Dxgk
-DxgkDisplayManagerObject - Dxgk
-DxgkSharedBundleObject - Dxgk
-DxgkSharedKeyedMutextObject - Dxgk
-DxgkSharedProtectedSessionObject - Dxgk
 ActivationObject - 19H1, win32k managed object
+ActivityReference - new RS2 object
+CoreMessagining - new RS1 object, win32k managed object
+CoverageSampler - new RS4 object, ETW
+EtwSessionDemuxEntry - new Win10 object
+IoCompletionReserve - same as IoCompletion except using reserve process allocated memory
+NetworkNamespace - managed by NDIS.sys (renamed to NdisCmState in RS1)
+PsSiloContextNonPaged - new RS1 object
+PsSiloContextPaged - new RS1 object
+RawInputManager - win32k managed object
+Silo (r3 interface removed in 10240 release, object removed in TH2 builds)
+UserApcReserve - same as NtQueueApc except using reserve process allocated memory
+VirtualKey - new RS1 object (not present in RS2)
+VRegConfigurationContext - new RS1 object
+WaitCompletionPacket
+

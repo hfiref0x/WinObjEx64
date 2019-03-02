@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       EXTRASUSD.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.72
 *
-*  DATE:        30 Nov 2018
+*  DATE:        04 Feb 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -105,7 +105,7 @@ VOID UsdDumpSharedRegion(
             break;
         }
 
-        ObDumpUlong(
+        propObDumpUlong(
             UsdTreeList,
             h_tviRootItem,
             TEXT("NtProductType"),
@@ -116,7 +116,7 @@ VOID UsdDumpSharedRegion(
             (COLORREF)0,
             (COLORREF)0);
 
-        ObDumpByte(
+        propObDumpByte(
             UsdTreeList,
             h_tviRootItem,
             TEXT("ProductTypeIsValid"),
@@ -127,7 +127,7 @@ VOID UsdDumpSharedRegion(
             TRUE);
 
         //Version
-        ObDumpUlong(
+        propObDumpUlong(
             UsdTreeList,
             h_tviRootItem,
             TEXT("NtMajorVersion"),
@@ -138,7 +138,7 @@ VOID UsdDumpSharedRegion(
             (COLORREF)0,
             (COLORREF)0);
 
-        ObDumpUlong(
+        propObDumpUlong(
             UsdTreeList,
             h_tviRootItem,
             TEXT("NtMinorVersion"),
@@ -153,7 +153,7 @@ VOID UsdDumpSharedRegion(
         // Prior to Windows 10 this field declared as reserved.
         //
         if (g_WinObj.osver.dwMajorVersion >= 10) {
-            ObDumpUlong(
+            propObDumpUlong(
                 UsdTreeList,
                 h_tviRootItem,
                 TEXT("NtBuildNumber"),
@@ -234,7 +234,7 @@ VOID UsdDumpSharedRegion(
             break;
         }
 
-        ObDumpUlong(
+        propObDumpUlong(
             UsdTreeList,
             h_tviRootItem,
             TEXT("AlternativeArchitecture"),
@@ -292,7 +292,7 @@ VOID UsdDumpSharedRegion(
         }
 
         //KdDebuggerEnabled
-        ObDumpByte(
+        propObDumpByte(
             UsdTreeList,
             h_tviRootItem,
             TEXT("KdDebuggerEnabled"),
@@ -306,7 +306,7 @@ VOID UsdDumpSharedRegion(
 
         if (g_NtBuildNumber < 9200) {
 
-            ObDumpByte(
+            propObDumpByte(
                 UsdTreeList,
                 h_tviRootItem,
                 TEXT("NXSupportPolicy"),
@@ -342,7 +342,7 @@ VOID UsdDumpSharedRegion(
 
             if (h_tviSubItem) {
 
-                ObDumpByte(
+                propObDumpByte(
                     UsdTreeList,
                     h_tviSubItem,
                     TEXT("NXSupportPolicy"),
@@ -352,7 +352,7 @@ VOID UsdDumpSharedRegion(
                     (COLORREF)0,
                     FALSE);
 
-                ObDumpByte(
+                propObDumpByte(
                     UsdTreeList,
                     h_tviSubItem,
                     TEXT("SEHValidationPolicy"),
@@ -363,7 +363,7 @@ VOID UsdDumpSharedRegion(
                     FALSE);
 
 
-                ObDumpByte(
+                propObDumpByte(
                     UsdTreeList,
                     h_tviSubItem,
                     TEXT("CurDirDevicesSkippedForDlls"),
@@ -376,7 +376,7 @@ VOID UsdDumpSharedRegion(
         }
 
         //SafeBootMode
-        ObDumpByte(
+        propObDumpByte(
             UsdTreeList,
             h_tviRootItem,
             TEXT("SafeBootMode"),

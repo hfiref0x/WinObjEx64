@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       PROPDESKTOP.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.72
 *
-*  DATE:        30 Nov 2018
+*  DATE:        09 Feb 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -407,7 +407,7 @@ VOID DesktopListHandleNotify(
                 propCreateDialog(
                     hwndDlg,
                     lpName,
-                    g_ObjectTypes[ObjectTypeDesktop].Name,
+                    OBTYPE_NAME_DESKTOP,
                     NULL,
                     NULL);
 

@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     1.71
+*  VERSION:     1.72
 *
-*  DATE:        01 Feb 2019
+*  DATE:        10 Feb 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -333,7 +333,7 @@ VOID SdtOutputTable(
 )
 {
     INT index, number;
-    ULONG i;
+    ULONG i, iImage;
     EXTRASCONTEXT *Context = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
 
     LVITEM lvitem;
@@ -365,6 +365,8 @@ VOID SdtOutputTable(
     }
     SetWindowText(hwndDlg, szBuffer);
 
+    iImage = ObManagerGetImageIndexByTypeIndex(ObjectTypeDevice);
+
     //list table
     for (i = 0; i < Count; i++) {
 
@@ -373,7 +375,7 @@ VOID SdtOutputTable(
         lvitem.mask = LVIF_TEXT | LVIF_IMAGE;
         lvitem.iSubItem = 0;
         lvitem.iItem = MAXINT;
-        lvitem.iImage = ObjectTypeDevice; //imagelist id
+        lvitem.iImage = iImage; //imagelist id
         RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
         ultostr(Table[i].ServiceId, szBuffer);
         lvitem.pszText = szBuffer;

@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.71
+*  VERSION:     1.72
 *
-*  DATE:        19 Jan 2019
+*  DATE:        10 Feb 2019
 *
 *  Program entry point and main window handler.
 *
@@ -173,7 +173,7 @@ VOID MainWindowHandleObjectTreeProp(
         propCreateDialog(
             hwnd,
             szBuffer,
-            g_ObjectTypes[ObjectTypeDirectory].Name,
+            OBTYPE_NAME_DIRECTORY,
             NULL,
             NULL);
     }
@@ -863,7 +863,8 @@ BOOL MainWindowDlgMsgHandler(
 * Initialize global variables.
 *
 */
-BOOL WinObjInitGlobals()
+BOOL WinObjInitGlobals(
+    _In_ BOOL IsWine)
 {
     SIZE_T cch;
     BOOL bResult = FALSE, bCond = FALSE;
@@ -894,7 +895,9 @@ BOOL WinObjInitGlobals()
         if (g_WinObj.Heap == NULL)
             break;
 
-        RtlSetHeapInformation(g_WinObj.Heap, HeapEnableTerminationOnCorruption, NULL, 0);
+        if (IsWine == FALSE) {
+            RtlSetHeapInformation(g_WinObj.Heap, HeapEnableTerminationOnCorruption, NULL, 0);
+        }
         RtlInitializeCriticalSection(&g_WinObj.Lock);
 
         //
@@ -963,14 +966,22 @@ UINT WinObjExMain()
     HANDLE                  hToken;
     HIMAGELIST              TreeViewImages;
 
-    if (!WinObjInitGlobals())
+    IsWine = supIsWine();
+
+    //
+    // wine 1.6 xenial does not suport this routine.
+    //
+    if (IsWine == FALSE) {
+        RtlSetHeapInformation(NULL, HeapEnableTerminationOnCorruption, NULL, 0);
+    }
+
+    if (!WinObjInitGlobals(IsWine))
         return ERROR_APP_INIT_FAILURE;
 
     // do not move anywhere
     IsFullAdmin = supUserIsFullAdmin();
 
     // check compatibility
-    IsWine = supIsWine();
     if (IsWine != FALSE) {
         IsFullAdmin = FALSE;
     }
@@ -1239,6 +1250,9 @@ UINT WinObjExMain()
         //
         g_ListViewImages = ObManagerLoadImageList();
         if (g_ListViewImages) {
+            //
+            // Append two column sorting images to the end of the listview imagelist.
+            //
             hIcon = (HICON)LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
             if (hIcon) {
                 ImageList_ReplaceIcon(g_ListViewImages, -1, hIcon);

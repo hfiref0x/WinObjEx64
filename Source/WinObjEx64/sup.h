@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.71
+*  VERSION:     1.72
 *
-*  DATE:        01 Feb 2019
+*  DATE:        09 Feb 2019
 *
 *  Common header file for the program support routines.
 *
@@ -431,3 +431,13 @@ PSID supQueryProcessSid(
 VOID supCopyTreeListSubItemValue(
     _In_ HWND TreeList,
     _In_ UINT ValueIndex);
+
+PVOID supBSearch(
+    _In_ PCVOID key,
+    _In_ PCVOID base,
+    _In_ SIZE_T num,
+    _In_ SIZE_T size,
+    _In_ int(*cmp)(
+        _In_ PCVOID key,
+        _In_ PCVOID elt
+        ));

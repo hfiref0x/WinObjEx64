@@ -513,6 +513,9 @@
     <Image Include="rsrc\mailslot.ico">
       <Filter>Resource Files\graphics</Filter>
     </Image>
+    <Image Include="rsrc\149.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
     <MASM Include="ntuser\StubNtUserOpenWindowStation.asm">

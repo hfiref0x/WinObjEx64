@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       PROPOBJECTDUMP.H
 *
-*  VERSION:     1.70
+*  VERSION:     1.72
 *
-*  DATE:        30 Nov 2018
+*  DATE:        04 Feb 2019
 *
 *  Common header file for the object dump support.
 *
@@ -18,25 +18,13 @@
 *******************************************************************************/
 #pragma once
 
-VOID ObDumpDriverObject(
-    _In_ PROP_OBJECT_INFO *Context,
-    _In_ HWND hwndDlg);
-
-VOID ObDumpDeviceObject(
-    _In_ PROP_OBJECT_INFO *Context,
-    _In_ HWND hwndDlg);
-
-VOID ObDumpDirectoryObject(
-    _In_ PROP_OBJECT_INFO *Context,
-    _In_ HWND hwndDlg);
-
 INT_PTR CALLBACK ObjectDumpDialogProc(
     _In_  HWND hwndDlg,
     _In_  UINT uMsg,
     _In_  WPARAM wParam,
     _In_  LPARAM lParam);
 
-VOID ObDumpUlong(
+VOID propObDumpUlong(
     _In_ HWND TreeList,
     _In_ HTREEITEM hParent,
     _In_ LPWSTR lpszName,
@@ -47,7 +35,7 @@ VOID ObDumpUlong(
     _In_opt_ COLORREF BgColor,
     _In_opt_ COLORREF FontColor);
 
-VOID ObDumpByte(
+VOID propObDumpByte(
     _In_ HWND TreeList,
     _In_ HTREEITEM hParent,
     _In_ LPWSTR lpszName,
@@ -56,33 +44,3 @@ VOID ObDumpByte(
     _In_opt_ COLORREF BgColor,
     _In_opt_ COLORREF FontColor,
     _In_ BOOL IsBool);
-
-VOID ObDumpSetString(
-    _In_ HWND TreeList,
-    _In_ HTREEITEM hParent,
-    _In_ LPWSTR lpszName,
-    _In_opt_ LPWSTR lpszDesc,
-    _In_ LPWSTR lpszValue,
-    _In_opt_ COLORREF BgColor,
-    _In_opt_ COLORREF FontColor);
-
-VOID ObDumpAddress(
-    _In_ HWND TreeList,
-    _In_ HTREEITEM hParent,
-    _In_ LPWSTR lpszName,
-    _In_opt_ LPWSTR lpszDesc,
-    _In_opt_ PVOID Address,
-    _In_ COLORREF BgColor,
-    _In_ COLORREF FontColor);
-
-VOID ObDumpULargeInteger(
-    _In_ HWND TreeList,
-    _In_ HTREEITEM hParent,
-    _In_ LPWSTR ListEntryName,
-    _In_opt_ PULARGE_INTEGER Value);
-
-VOID ObDumpListEntry(
-    _In_ HWND TreeList,
-    _In_ HTREEITEM hParent,
-    _In_ LPWSTR ListEntryName,
-    _In_opt_ PLIST_ENTRY ListEntry);

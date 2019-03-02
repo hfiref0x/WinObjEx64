@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.71
+*  VERSION:     1.72
 *
-*  DATE:        01 Feb 2019
+*  DATE:        09 Feb 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1104,7 +1104,7 @@ BOOL supxIsSymlink(
     WCHAR ItemText[MAX_PATH + 1];
     RtlSecureZeroMemory(ItemText, sizeof(ItemText));
     ListView_GetItemText(hwndList, iItem, 1, ItemText, MAX_PATH);
-    return (_strcmpi(ItemText, g_ObjectTypes[ObjectTypeSymbolicLink].Name) == 0);
+    return (_strcmpi(ItemText, OBTYPE_NAME_SYMBOLIC_LINK) == 0);
 }
 
 /*
@@ -3480,7 +3480,6 @@ PSID supQueryProcessSid(
     HANDLE hProcessToken = NULL;
     PSID result = NULL;
 
-
     if (NT_SUCCESS(NtOpenProcessToken(hProcess, TOKEN_QUERY, &hProcessToken))) {
 
         result = supQueryTokenUserSid(hProcessToken);
@@ -4383,4 +4382,43 @@ VOID supCopyTreeListSubItemValue(
     __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
         return;
     }
+}
+
+/*
+* supBSearch
+*
+* Purpose:
+*
+* Binary search, https://github.com/torvalds/linux/blob/master/lib/bsearch.c
+*
+*/
+PVOID supBSearch(
+    _In_ PCVOID key,
+    _In_ PCVOID base,
+    _In_ SIZE_T num,
+    _In_ SIZE_T size,
+    _In_ int(*cmp)(
+        _In_ PCVOID key,
+        _In_ PCVOID elt
+        )
+)
+{
+    const char *pivot;
+    int result;
+
+    while (num > 0) {
+        pivot = (char*)base + (num >> 1) * size;
+        result = cmp(key, pivot);
+
+        if (result == 0)
+            return (void *)pivot;
+
+        if (result > 0) {
+            base = pivot + size;
+            num--;
+        }
+        num >>= 1;
+    }
+
+    return NULL;
 }

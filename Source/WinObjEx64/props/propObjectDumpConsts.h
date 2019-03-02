@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       PROPOBJECTDUMPCONSTS.H
 *
-*  VERSION:     1.70
+*  VERSION:     1.72
 *
-*  DATE:        30 Nov 2018
+*  DATE:        04 Feb 2019
 *
 *  Consts header file for Object Dump module.
 *
@@ -53,6 +53,8 @@
 #define T_PFLT_FILTER               L"PFLT_FILTER"
 #define T_FLT_OBJECT                L"FLT_OBJECT"
 #define T_FLT_FILTER_FLAGS          L"FLT_FILTER_FLAGS"
+
+#define T_OBJECT_SYMBOLIC_LINK      L"OBJECT_SYMBOLIC_LINK"
 
 #define T_ALPC_PORT_OBJECT          L"ALPC_PORT"
 #define T_PALPC_PORT_OBJECT         L"PALPC_PORT"

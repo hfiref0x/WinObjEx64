@@ -51,7 +51,7 @@ minirtl.h
 msvcver.h - MS VisualC compiler versions header file
 
 objects.c - known objects support functions
-objects.h
+objects.h - known objects table
 
 propBasic.c - property sheet "Basic" handlers, including window procedures
 propBasic.h

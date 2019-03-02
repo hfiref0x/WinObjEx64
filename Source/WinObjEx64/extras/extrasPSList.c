@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPSLIST.C
 *
-*  VERSION:     1.71
+*  VERSION:     1.72
 *
-*  DATE:        31 Jan 2019
+*  DATE:        04 Feb 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -304,25 +304,29 @@ HTREEITEM AddProcessEntryTreeList(
     //
     // 3. Store processes.
     //
-    if (g_ExtApiSet.IsImmersiveProcess) {
-        if (g_ExtApiSet.IsImmersiveProcess(Entry->hProcess)) {
-            subitems.ColorFlags = TLF_BGCOLOR_SET;
-            subitems.BgColor = 0xeaea00;
-            fState = TVIF_STATE;
+    if (Entry->hProcess) {
+        if (g_ExtApiSet.IsImmersiveProcess) {
+            if (g_ExtApiSet.IsImmersiveProcess(Entry->hProcess)) {
+                subitems.ColorFlags = TLF_BGCOLOR_SET;
+                subitems.BgColor = 0xeaea00;
+                fState = TVIF_STATE;
+            }
         }
     }
 
     //
     // 4. Protected processes.
     //
-    exbi.Size = sizeof(PROCESS_EXTENDED_BASIC_INFORMATION);
-    if (NT_SUCCESS(NtQueryInformationProcess(Entry->hProcess, ProcessBasicInformation,
-        &exbi, sizeof(exbi), &r)))
-    {
-        if (exbi.IsProtectedProcess) {
-            subitems.ColorFlags = TLF_BGCOLOR_SET;
-            subitems.BgColor = 0xe6ffe6;
-            fState = TVIF_STATE;
+    if (Entry->hProcess) {
+        exbi.Size = sizeof(PROCESS_EXTENDED_BASIC_INFORMATION);
+        if (NT_SUCCESS(NtQueryInformationProcess(Entry->hProcess, ProcessBasicInformation,
+            &exbi, sizeof(exbi), &r)))
+        {
+            if (exbi.IsProtectedProcess) {
+                subitems.ColorFlags = TLF_BGCOLOR_SET;
+                subitems.BgColor = 0xe6ffe6;
+                fState = TVIF_STATE;
+            }
         }
     }
 

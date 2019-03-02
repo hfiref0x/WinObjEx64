@@ -190,7 +190,6 @@
       <SetChecksum>true</SetChecksum>
       <AdditionalOptions>/NOCOFFGRPINFO %(AdditionalOptions)</AdditionalOptions>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
-      <ShowProgress>LinkVerboseLib</ShowProgress>
     </Link>
     <Manifest>
       <SuppressStartupBanner>false</SuppressStartupBanner>
@@ -522,6 +521,7 @@
     <Image Include="rsrc\146.ico" />
     <Image Include="rsrc\147.ico" />
     <Image Include="rsrc\148.ico" />
+    <Image Include="rsrc\149.ico" />
     <Image Include="rsrc\6001.ico" />
     <Image Include="rsrc\6002.ico" />
     <Image Include="rsrc\Bitmap_125.bmp" />

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017 - 2018
+*  (C) COPYRIGHT AUTHORS, 2017 - 2019
 *
 *  TITLE:       OBJECTS.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.72
 *
-*  DATE:        30 Nov 2018
+*  DATE:        13 Feb 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -18,22 +18,47 @@
 #include "global.h"
 
 /*
+* ObManagerComparerName
+*
+* Purpose:
+*
+* Support comparer routine to work with objects array.
+*
+*/
+INT ObManagerComparerName(
+    _In_ PCVOID FirstObject,
+    _In_ PCVOID SecondObject
+)
+{
+    WOBJ_TYPE_DESC *firstObject = (WOBJ_TYPE_DESC*)FirstObject;
+    WOBJ_TYPE_DESC *secondObject = (WOBJ_TYPE_DESC*)SecondObject;
+
+    if (firstObject == secondObject)
+        return 0;
+
+    return (_strcmpi(firstObject->Name, secondObject->Name));
+}
+
+/*
 * ObManagerGetNameByIndex
 *
 * Purpose:
 *
 * Returns object name by index of known type.
 *
-*
 */
 LPWSTR ObManagerGetNameByIndex(
     _In_ ULONG TypeIndex
 )
 {
-    if (TypeIndex >= ObjectTypeMax)
-        return g_ObjectTypes[ObjectTypeUnknown].Name;
+    ULONG nIndex;
 
-    return g_ObjectTypes[TypeIndex].Name;
+    for (nIndex = TYPE_FIRST; nIndex < TYPE_LAST; nIndex++) {
+        if (g_ObjectTypes[nIndex].Index == (WOBJ_OBJECT_TYPE)TypeIndex)
+            return g_ObjectTypes[nIndex].Name;
+    }
+
+    return OBTYPE_NAME_UNKNOWN;
 }
 
 /*
@@ -49,10 +74,48 @@ UINT ObManagerGetImageIndexByTypeIndex(
     _In_ ULONG TypeIndex
 )
 {
-    if (TypeIndex >= ObjectTypeMax)
-        return ObjectTypeUnknown;
+    ULONG nIndex;
 
-    return g_ObjectTypes[TypeIndex].ImageIndex;
+    for (nIndex = TYPE_FIRST; nIndex < TYPE_LAST; nIndex++) {
+        if (g_ObjectTypes[nIndex].Index == (WOBJ_OBJECT_TYPE)TypeIndex)
+            return g_ObjectTypes[nIndex].ImageIndex;
+    }
+
+    return ObjectTypeUnknown;
+}
+
+/*
+* ObManagerGetEntryByTypeName
+*
+* Purpose:
+*
+* Returns object description entry by type name.
+*
+*/
+WOBJ_TYPE_DESC *ObManagerGetEntryByTypeName(
+    _In_opt_ LPCWSTR lpTypeName
+)
+{
+    WOBJ_TYPE_DESC SearchItem;
+    WOBJ_TYPE_DESC *Result;
+
+    if (lpTypeName == NULL) {
+        return &g_TypeUnknown;
+    }
+
+    SearchItem.Name = (LPWSTR)lpTypeName;
+
+    Result = (WOBJ_TYPE_DESC*)supBSearch((PCVOID)&SearchItem,
+        (PCVOID)&g_ObjectTypes,
+        RTL_NUMBER_OF(g_ObjectTypes),
+        sizeof(WOBJ_TYPE_DESC),
+        ObManagerComparerName);
+
+    if (Result == NULL) {
+        Result = &g_TypeUnknown;
+    }
+
+    return Result;
 }
 
 /*
@@ -64,41 +127,30 @@ UINT ObManagerGetImageIndexByTypeIndex(
 *
 */
 UINT ObManagerGetIndexByTypeName(
-    _In_ LPCWSTR lpTypeName
+    _In_opt_ LPCWSTR lpTypeName
 )
 {
-    UINT nIndex;
+    WOBJ_TYPE_DESC SearchItem;
+    WOBJ_TYPE_DESC *Result;
 
     if (lpTypeName == NULL) {
         return ObjectTypeUnknown;
     }
 
-    for (nIndex = TYPE_FIRST; nIndex < TYPE_LAST; nIndex++) {
-        if (_strcmpi(lpTypeName, g_ObjectTypes[nIndex].Name) == 0)
-            return nIndex;
-    }
+    SearchItem.Name = (LPWSTR)lpTypeName;
 
-    //
-    // In Win8 the following Win32k object was named 
-    // CompositionSurface, in Win8.1 MS renamed it to
-    // Composition, handle this.
-    //
-    if (_strcmpi(lpTypeName, L"CompositionSurface") == 0) {
-        return ObjectTypeComposition;
-    }
+    Result = (WOBJ_TYPE_DESC*)supBSearch((PCVOID)&SearchItem,
+        (PCVOID)&g_ObjectTypes,
+        RTL_NUMBER_OF(g_ObjectTypes),
+        sizeof(WOBJ_TYPE_DESC),
+        ObManagerComparerName);
 
-    //
-    // In Win10 TH1 the following ntos object was named 
-    // NetworkNamespace, later in Win10 updates MS renamed it to
-    // NdisCmState, handle this.
-    //
-   /*
-    if (_strcmpi(lpTypeName, L"NetworkNamespace") == 0) {
-        return ObjectTypeNdisCmState;
+    if (Result) {
+        return Result->Index;
     }
-    */
-
-    return ObjectTypeUnknown;
+    else {
+        return ObjectTypeUnknown;
+    }
 }
 
 /*
@@ -110,41 +162,61 @@ UINT ObManagerGetIndexByTypeName(
 *
 */
 UINT ObManagerGetImageIndexByTypeName(
-    _In_ LPCWSTR lpTypeName
+    _In_opt_ LPCWSTR lpTypeName
 )
 {
-    UINT nIndex;
+    WOBJ_TYPE_DESC SearchItem;
+    WOBJ_TYPE_DESC *Result;
 
     if (lpTypeName == NULL) {
         return ObjectTypeUnknown;
     }
 
-    for (nIndex = TYPE_FIRST; nIndex < TYPE_LAST; nIndex++) {
-        if (_strcmpi(lpTypeName, g_ObjectTypes[nIndex].Name) == 0)
-            return g_ObjectTypes[nIndex].ImageIndex;
+    SearchItem.Name = (LPWSTR)lpTypeName;
+
+    Result = (WOBJ_TYPE_DESC*)supBSearch((PCVOID)&SearchItem,
+        (PCVOID)&g_ObjectTypes,
+        RTL_NUMBER_OF(g_ObjectTypes),
+        sizeof(WOBJ_TYPE_DESC),
+        ObManagerComparerName);
+
+    if (Result) {
+        return Result->ImageIndex;
+    }
+    else {
+        return ObjectTypeUnknown;
+    }
+}
+
+/*
+* ObManagerLoadImageForType
+*
+* Purpose:
+*
+* Load image of the given id.
+*
+*/
+INT ObManagerLoadImageForType(
+    _In_ HIMAGELIST ImageList,
+    _In_ INT ResourceImageId
+)
+{
+    INT ImageIndex = I_IMAGENONE;
+    HICON hIcon;
+
+    hIcon = (HICON)LoadImage(g_WinObj.hInstance,
+        MAKEINTRESOURCE(ResourceImageId),
+        IMAGE_ICON,
+        16,
+        16,
+        LR_DEFAULTCOLOR);
+
+    if (hIcon) {
+        ImageIndex = ImageList_ReplaceIcon(ImageList, -1, hIcon);
+        DestroyIcon(hIcon);
     }
 
-    //
-    // In Win8 the following Win32k object was named 
-    // CompositionSurface, in Win8.1 MS renamed it to
-    // Composition, handle this.
-    //
-    if (_strcmpi(lpTypeName, L"CompositionSurface") == 0) {
-        return g_ObjectTypes[ObjectTypeComposition].ImageIndex;
-    }
-
-    //
-    // In Win10 TH1 the following ntos object was named 
-    // NetworkNamespace, later in Win10 updates MS renamed it to
-    // NdisCmState, handle this.
-    //
-    /*    
-    if (_strcmpi(lpTypeName, L"NetworkNamespace") == 0) {
-        return g_ObjectTypes[ObjectTypeComposition].ImageIndex;
-    }
-    */
-
-    return ObjectTypeUnknown;
+    return ImageIndex;
 }
 
 /*
@@ -159,64 +231,28 @@ HIMAGELIST ObManagerLoadImageList(
     VOID
 )
 {
-    UINT       i, imageIndex;
-    HIMAGELIST list;
-    HICON      hIcon;
+    UINT       i;
+    HIMAGELIST ImageList;
 
-    list = ImageList_Create(
-        16, 
-        16, 
+    ImageList = ImageList_Create(
+        16,
+        16,
         ILC_COLOR32 | ILC_MASK,
-        TYPE_LAST, 
+        TYPE_LAST,
         8);
 
-    if (list) {
-        for (i = TYPE_FIRST; i <= TYPE_LAST; i++) {
-            
-            imageIndex = TYPE_RESOURCE_IMAGE_INDEX_START + g_ObjectTypes[i].ImageIndex;
-            
-            hIcon = (HICON)LoadImage(g_WinObj.hInstance, 
-                MAKEINTRESOURCE(imageIndex), 
-                IMAGE_ICON, 
-                16, 
-                16, 
-                LR_DEFAULTCOLOR);
+    if (ImageList) {
 
-            if (hIcon) {
-                ImageList_ReplaceIcon(list, -1, hIcon);
-                DestroyIcon(hIcon);
-            }
+        for (i = TYPE_FIRST; i < TYPE_LAST; i++) {
+
+            g_ObjectTypes[i].ImageIndex = ObManagerLoadImageForType(ImageList,
+                g_ObjectTypes[i].ResourceImageId);
+
         }
+
+        g_TypeUnknown.ImageIndex = ObManagerLoadImageForType(ImageList,
+            g_TypeUnknown.ResourceImageId);
+
     }
-    return list;
+    return ImageList;
 }
-
-//
-// Future use
-//
-/*
-
-Usually none of these object types identities present in object directory.
-
-ActivationObject
-ActivityReference
-CoreMessagining
-DmaAdapter
-DmaDomain
-DxgkDisplayManagerObject
-DxgkSharedBundleObject
-DxgkSharedProtectedSessionObject
-EnergyTracker
-EtwSessionDemuxEntry
-IoCompletionReserve
-NdisCmState
-PsSiloContextNonPaged
-PsSiloContextPaged
-RawInputManager
-RegistryTransaction
-UserApcReserve
-VirtualKey
-VRegConfigurationContext
-WaitCompletionPacket
-
-*/

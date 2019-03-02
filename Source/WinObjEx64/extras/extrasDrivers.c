@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2016 - 2018
+*  (C) COPYRIGHT AUTHORS, 2016 - 2019
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.72
 *
-*  DATE:        30 Nov 2018
+*  DATE:        10 Feb 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -174,7 +174,7 @@ VOID DrvListDrivers(
 )
 {
     BOOL   bCond = FALSE;
-    INT    index;
+    INT    index, iImage;
     ULONG i;
     LVITEM lvitem;
     WCHAR  szBuffer[MAX_PATH + 1];
@@ -186,6 +186,8 @@ VOID DrvListDrivers(
         pModulesList = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation);
         if (pModulesList == NULL)
             break;
+
+        iImage = ObManagerGetImageIndexByTypeIndex(ObjectTypeDriver);
 
         for (i = 0; i < pModulesList->NumberOfModules; i++) {
 
@@ -199,7 +201,7 @@ VOID DrvListDrivers(
             //LoadOrder
             lvitem.mask = LVIF_TEXT | LVIF_IMAGE;
             lvitem.iItem = MAXINT;
-            lvitem.iImage = ObjectTypeDriver; //imagelist id
+            lvitem.iImage = iImage;
             RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
             ultostr(pModule->LoadOrderIndex, szBuffer);
             lvitem.pszText = szBuffer;

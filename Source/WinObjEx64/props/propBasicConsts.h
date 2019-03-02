@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       PROPBASICCONSTS.H
 *
-*  VERSION:     1.60
+*  VERSION:     1.72
 *
-*  DATE:        25 Oct 2018
+*  DATE:        04 Feb 2019
 *
 *  Consts header file for Basic property sheet.
 *
@@ -17,22 +17,6 @@
 *
 *******************************************************************************/
 #pragma once
-
-//Calendar
-LPCWSTR Months[12] = {
-    L"Jan",
-    L"Feb",
-    L"Mar",
-    L"Apr",
-    L"May",
-    L"Jun",
-    L"Jul",
-    L"Aug",
-    L"Sep",
-    L"Oct",
-    L"Nov",
-    L"Dec"
-};
 
 //OBJECT_HEADER Flags
 LPCWSTR T_ObjectFlags[8] = {

@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.72
 *
-*  DATE:        10 Feb 2019
+*  DATE:        01 Mar 2019
 *
 *  Program entry point and main window handler.
 *
@@ -562,6 +562,8 @@ LRESULT MainWindowHandleWMNotify(
 
                 ListView_SortItemsEx(g_hwndObjectList, &MainWindowObjectListCompareFunc, SortColumn);
 
+                supSetGotoLinkTargetToolButtonState(hwnd, 0, 0, TRUE, FALSE);
+
                 supSetWaitCursor(FALSE);
 
                 lpnmTreeView = (LPNMTREEVIEW)lParam;
@@ -579,6 +581,7 @@ LRESULT MainWindowHandleWMNotify(
                     SelectedTreeItem = hti.hItem;
                     TreeView_SelectItem(g_hwndObjectTree, SelectedTreeItem);
                     SendMessage(hwndStatusBar, WM_SETTEXT, 0, (LPARAM)g_WinObj.CurrentObjectPath);
+                    supSetGotoLinkTargetToolButtonState(hwnd, 0, 0, TRUE, FALSE);
                     supHandleTreePopupMenu(hwnd, &pt);
                 }
                 break;
@@ -617,6 +620,7 @@ LRESULT MainWindowHandleWMNotify(
                     }
                     SendMessage(hwndStatusBar, WM_SETTEXT, 0, (LPARAM)str);
                     supHeapFree(str);
+                    supSetGotoLinkTargetToolButtonState(hwnd, g_hwndObjectList, lvn->iItem, FALSE, FALSE);
                 }
                 break;
 
@@ -1294,7 +1298,7 @@ UINT WinObjExMain()
                 (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 0));
             supSetMenuIcon(hMenu, ID_OBJECT_GOTOLINKTARGET,
                 (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ListViewImages,
-                    ID_FROM_VALUE(IDI_ICON_SYMLINK)));
+                    ObManagerGetImageIndexByTypeName(OBTYPE_NAME_SYMBOLIC_LINK)));
         }
 
         //set object -> find object menu image

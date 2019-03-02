@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.72
 *
-*  DATE:        13 Feb 2019
+*  DATE:        01 Mar 2019
 *
 *  Header file for internal Windows object types handling.
 *
@@ -169,7 +169,7 @@ static WOBJ_TYPE_DESC g_ObjectTypes[] = {
     { OBTYPE_NAME_SECTION, ObjectTypeSection, IDI_ICON_SECTION, IDS_DESC_SECTION },
     { L"Semaphore", ObjectTypeSemaphore, IDI_ICON_SEMAPHORE, IDS_DESC_SEMAPHORE },
     { L"Session", ObjectTypeSession, IDI_ICON_SESSION, IDS_DESC_SESSION },
-    { L"SymbolicLink", ObjectTypeSymbolicLink, IDI_ICON_SYMLINK, IDS_DESC_SYMLINK },
+    { OBTYPE_NAME_SYMBOLIC_LINK, ObjectTypeSymbolicLink, IDI_ICON_SYMLINK, IDS_DESC_SYMLINK },
     { L"Thread", ObjectTypeThread, IDI_ICON_THREAD, IDS_DESC_THREAD },
     { L"Timer", ObjectTypeTimer, IDI_ICON_TIMER, IDS_DESC_TIMER },
     { L"TmEn", ObjectTypeTmEn, IDI_ICON_TMEN, IDS_DESC_TMEN },

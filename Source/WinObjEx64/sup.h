@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.72
 *
-*  DATE:        09 Feb 2019
+*  DATE:        01 Mar 2019
 *
 *  Common header file for the program support routines.
 *
@@ -48,12 +48,6 @@ typedef struct _OBEX_PROCESS_LOOKUP_ENTRY {
 // Gripper window size
 //
 #define GRIPPER_SIZE 11
-
-//
-// Type icons starts from 300
-//
-#define ID_FROM_VALUE(id) ((id) - 300)
-#define ID_TO_VALUE(id) ((id) + 300)
 
 #define GET_BIT(Integer, Bit) (((Integer) >> (Bit)) & 0x1)
 #define SET_BIT(Integer, Bit) ((Integer) |= 1 << (Bit))
@@ -161,6 +155,13 @@ VOID supHandleObjectPopupMenu(
     _In_ HWND hwndlv,
     _In_ INT iItem,
     _In_ LPPOINT point);
+
+VOID supSetGotoLinkTargetToolButtonState(
+    _In_ HWND hwnd,
+    _In_opt_ HWND hwndlv,
+    _In_opt_ INT iItem,
+    _In_ BOOL bForce,
+    _In_ BOOL bForceEnable);
 
 VOID supHandleTreePopupMenu(
     _In_ HWND hwnd,

@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.72
 *
-*  DATE:        09 Feb 2019
+*  DATE:        01 Mar 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1163,13 +1163,44 @@ VOID supHandleObjectPopupMenu(
     if (supxIsSymlink(hwndlv, iItem)) {
         InsertMenu(hMenu, 1, MF_BYCOMMAND, ID_OBJECT_GOTOLINKTARGET, T_GOTOLINKTARGET);
         supSetMenuIcon(hMenu, ID_OBJECT_GOTOLINKTARGET,
-            (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ListViewImages, ID_FROM_VALUE(IDI_ICON_SYMLINK)));
+            (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ListViewImages, 
+                ObManagerGetImageIndexByTypeName(OBTYPE_NAME_SYMBOLIC_LINK)));
         uEnable &= ~MF_GRAYED;
     }
     EnableMenuItem(GetSubMenu(GetMenu(hwnd), 2), ID_OBJECT_GOTOLINKTARGET, uEnable);
 
     TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, point->x, point->y, 0, hwnd, NULL);
     DestroyMenu(hMenu);
+}
+
+/*
+* supSetGotoLinkTargetToolButtonState
+*
+* Purpose:
+*
+* Enable/Disable Go To Link Target tool button.
+*
+*/
+VOID supSetGotoLinkTargetToolButtonState(
+    _In_ HWND hwnd,
+    _In_opt_ HWND hwndlv,
+    _In_opt_ INT iItem,
+    _In_ BOOL bForce,
+    _In_ BOOL bForceEnable
+)
+{
+    UINT  uEnable = MF_BYCOMMAND | MF_GRAYED;
+
+    if (bForce) {
+        if (bForceEnable) 
+            uEnable &= ~MF_GRAYED;
+    }
+    else {
+        if (supxIsSymlink(hwndlv, iItem)) {
+            uEnable &= ~MF_GRAYED;
+        }
+    }
+    EnableMenuItem(GetSubMenu(GetMenu(hwnd), 2), ID_OBJECT_GOTOLINKTARGET, uEnable);
 }
 
 /*

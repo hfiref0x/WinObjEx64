@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.72
+*  VERSION:     1.73
 *
-*  DATE:        04 Feb 2019
+*  DATE:        30 Mar 2019
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -56,9 +56,6 @@ typedef struct _KLDBGCONTEXT {
 
     //we loaded driver?
     BOOL IsOurLoad;
-
-    //are we under Wine
-    BOOL IsWine;
 
     //secureboot enabled?
     BOOL IsSecureBoot;
@@ -283,6 +280,9 @@ POBJREF ObCollectionFindByAddress(
 PVOID ObGetCallbackBlockRoutine(
     _In_ PVOID CallbackBlock);
 
+BOOLEAN kdConnectDriver(
+    VOID);
+
 PVOID kdQueryIopInvalidDeviceRequest(
     VOID);
 
@@ -295,20 +295,17 @@ BOOL kdFindKiServiceTables(
     _Out_opt_ ULONG_PTR *W32pServiceTable,
     _Out_opt_ ULONG *W32pServiceLimit);
 
-ULONG_PTR KdFindCiCallbacks(
+ULONG_PTR kdFindCiCallbacks(
     _In_ PKLDBGCONTEXT Context);
 
-BOOL kdReadSystemMemory(
-    _In_    ULONG_PTR Address,
-    _Inout_ PVOID Buffer,
-    _In_    ULONG BufferSize);
-
-_Success_(return == TRUE)
 BOOL kdReadSystemMemoryEx(
     _In_ ULONG_PTR Address,
     _Inout_ PVOID Buffer,
     _In_ ULONG BufferSize,
     _Out_opt_ PULONG NumberOfBytesRead);
+
+#define kdReadSystemMemory(Address, Buffer, BufferSize) \
+    kdReadSystemMemoryEx(Address, Buffer, BufferSize, NULL)
 
 BOOL __forceinline kdAddressInNtOsImage(
     _In_ PVOID Address);

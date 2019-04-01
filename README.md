@@ -36,7 +36,7 @@ In order to build from source you need Microsoft Visual Studio 2013 U4 or Visual
  
 # What is new
 
-[Whats New in 1.7](https://github.com/hfiref0x/WinObjEx64/blob/master/Compiled/WHATSNEW_170.md)
+[Whats New in 1.7.3](https://github.com/hfiref0x/WinObjEx64/blob/master/Compiled/WHATSNEW_173.md)
 
 
 # Authors

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.73
 *
-*  DATE:        30 Nov 2018
+*  DATE:        20 Mar 2019
 *
 *  Test code used while debug.
 *
@@ -26,6 +26,9 @@ HANDLE g_TestNamespace = NULL, g_TestMutex = NULL;
 HANDLE g_TestMailslot = NULL;
 HANDLE g_DebugObject = NULL;
 HANDLE g_TestJob = NULL;
+HDESK g_TestDesktop = NULL;
+HANDLE g_TestThread = NULL;
+
 
 VOID TestApiPort(
     VOID
@@ -169,7 +172,6 @@ VOID TestIoCompletion(
     NtCreateIoCompletion(&g_TestIoCompletion, IO_COMPLETION_ALL_ACCESS, &obja, 100);
 }
 
-
 VOID TestTimer(
     VOID
 )
@@ -183,6 +185,7 @@ VOID TestTimer(
     if (hTimer) {
         SetWaitableTimer(hTimer, &liDueTime, 0, NULL, NULL, 0);
     }
+
 }
 
 VOID TestTransaction(
@@ -333,9 +336,6 @@ VOID TestPrivateNamespace(
 
         hMutex = CreateMutex(NULL, FALSE, TEXT("NamespaceAlias\\TestMutex"));
 
-
-
-
         hMutex2 = OpenMutex(MUTEX_ALL_ACCESS, FALSE, L"NamespaceAlias\\TestMutex");
         if (hMutex2) CloseHandle(hMutex2);
 
@@ -424,6 +424,93 @@ VOID TestJob()
     }
 }
 
+VOID TestPsObjectSecurity(
+    _In_ BOOL bThread)
+{
+    DWORD dwErr;
+    PACL EmptyDacl;
+    HANDLE hObject;
+    
+    if (bThread)
+        hObject = GetCurrentThread();
+    else
+        hObject = GetCurrentProcess();
+
+    EmptyDacl = (PACL)supHeapAlloc(sizeof(ACL));
+    if (EmptyDacl) {
+
+        if (!InitializeAcl(
+            EmptyDacl, 
+            sizeof(ACL), 
+            ACL_REVISION)) 
+        {
+            dwErr = GetLastError();
+        }
+        else {
+            
+            dwErr = SetSecurityInfo(hObject,
+                SE_KERNEL_OBJECT,
+                DACL_SECURITY_INFORMATION, 
+                NULL, 
+                NULL, 
+                EmptyDacl, 
+                NULL);
+        }
+
+        if (dwErr != ERROR_SUCCESS)
+            Beep(0, 0);
+
+        supHeapFree(EmptyDacl);
+    }
+}
+
+VOID TestDesktop(
+    VOID
+)
+{
+    DWORD LastError = 0;
+
+    g_TestDesktop = CreateDesktop(TEXT("TestDesktop"), NULL, NULL, 0,
+        DESKTOP_CREATEWINDOW | DESKTOP_SWITCHDESKTOP, NULL);
+
+    if (g_TestDesktop == NULL) {
+        LastError = GetLastError();
+        if (LastError != 0)
+            Beep(0, 0);
+    }
+}
+
+DWORD WINAPI TokenImpersonationThreadProc(PVOID Parameter)
+{
+
+    ULONG i = 0;
+    HANDLE hToken;
+
+    UNREFERENCED_PARAMETER(Parameter);
+
+    if (OpenProcessToken(GetCurrentProcess(), TOKEN_ALL_ACCESS, &hToken)) {
+        if (!ImpersonateLoggedOnUser(hToken))
+            Beep(0, 0);
+        CloseHandle(hToken);
+    }
+
+    do {
+        Sleep(1000);
+        OutputDebugString(TEXT("WinObjEx64 test thread\r\n"));
+        i += 1;
+    } while (i < 100);
+
+    if (!RevertToSelf())
+        Beep(0, 0);
+    ExitThread(0);
+}
+
+VOID TestThread()
+{
+    DWORD tid;
+    g_TestThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)TokenImpersonationThreadProc, NULL, 0, &tid);
+}
+
 VOID TestCall()
 {
 
@@ -433,6 +520,8 @@ VOID TestStart(
     VOID
 )
 {
+    //TestPsObjectSecurity();
+    TestDesktop();
     TestCall();
     TestApiPort();
     TestDebugObject();
@@ -443,6 +532,7 @@ VOID TestStart(
     TestTimer();
     TestTransaction();
     TestWinsta();
+    //TestThread();
     //TestJob();
 }
 
@@ -466,5 +556,12 @@ VOID TestStop(
     if (g_TestJob) {
         TerminateJobObject(g_TestJob, 0);
         NtClose(g_TestJob);
+    }
+    if (g_TestDesktop) {
+        CloseDesktop(g_TestDesktop);
+    }
+    if (g_TestThread) {
+        TerminateThread(g_TestThread, 0);
+        CloseHandle(g_TestThread);
     }
 }

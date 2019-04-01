@@ -1,14 +1,14 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2018
+*  (C) COPYRIGHT AUTHORS, 2018 - 2019
 *
 *  TITLE:       WINE.H
 *
-*  VERSION:     1.60
+*  VERSION:     1.73
 *
-*  DATE:        29 Oct 2018
+*  DATE:        09 Mar 2019
 *
-*  Making Wine Great Again.
+*  Agent Donald code.
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -21,3 +21,8 @@
 
 #define OBJECT_TYPES_FIRST_ENTRY_WINE(ObjectTypes) (POBJECT_TYPE_INFORMATION) \
     RtlOffsetToPointer(ObjectTypes, ALIGN_UP(sizeof(OBJECT_TYPES_INFORMATION), ULONG))
+
+typedef char* (__cdecl *pwine_get_version)(void);
+
+const char *wine_get_version(void);
+int is_wine(void);

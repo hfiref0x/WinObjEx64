@@ -1,14 +1,14 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2019
 *
-*  TITLE:       TESTUNIT.H
+*  TITLE:       PROPTOKEN.H
 *
 *  VERSION:     1.73
 *
-*  DATE:        17 Mar 2019
+*  DATE:        09 Mar 2019
 *
-*  Common header file for test code.
+*  Common header file for Token property sheet.
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -18,6 +18,8 @@
 *******************************************************************************/
 #pragma once
 
-VOID TestStart();
-VOID TestStop();
-VOID TestException(VOID);
+INT_PTR CALLBACK TokenPageDialogProc(
+    _In_  HWND hwndDlg,
+    _In_  UINT uMsg,
+    _In_  WPARAM wParam,
+    _In_  LPARAM lParam);

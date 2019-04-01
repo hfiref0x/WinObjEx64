@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDLG.C
 *
-*  VERSION:     1.72
+*  VERSION:     1.73
 *
-*  DATE:        09 Feb 2019
+*  DATE:        19 Mar 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -19,6 +19,7 @@
 #include "propBasic.h"
 #include "propType.h"
 #include "propDriver.h"
+#include "propToken.h"
 #include "propProcess.h"
 #include "propDesktop.h"
 #include "propSecurity.h"
@@ -36,6 +37,7 @@ WNDPROC PropSheetOriginalWndProc = NULL;
 
 //handle to the PropertySheet window
 HWND g_PropWindow = NULL;
+HWND g_PsPropWindow = NULL;
 HWND g_SubPropWindow = NULL;
 HWND g_NamespacePropWindow = NULL;
 
@@ -128,9 +130,30 @@ BOOL propOpenCurrentObject(
     }
 
     //
+    // Objects without name must be handled in a special way.
+    //
+    if (Context->ContextType == propUnnamed) {
+
+        InitializeObjectAttributes(&obja, NULL, 0, NULL, NULL);
+
+        hObject = supOpenObjectFromContext(
+            Context,
+            &obja,
+            DesiredAccess,
+            &status);
+
+        SetLastError(RtlNtStatusToDosError(status));
+        bResult = ((NT_SUCCESS(status)) && (hObject != NULL));
+        if (bResult) {
+            *phObject = hObject;
+        }
+        return bResult;
+    }
+
+    //
     // Namespace objects must be handled in a special way.
     //
-    if (Context->IsPrivateNamespaceObject) {
+    if (Context->ContextType == propPrivateNamespace) {
         if (Context->lpObjectName == NULL) {
             SetLastError(ERROR_INVALID_PARAMETER);
             return bResult;
@@ -138,7 +161,7 @@ BOOL propOpenCurrentObject(
 
         RtlInitUnicodeString(&ustr, Context->lpObjectName);
         InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
-        hObject = supOpenNamedObjectFromContext(
+        hObject = supOpenObjectFromContext(
             Context,
             &obja,
             DesiredAccess,
@@ -225,7 +248,7 @@ BOOL propOpenCurrentObject(
     //
     // Handle supported objects.
     //
-    hObject = supOpenNamedObjectFromContext(
+    hObject = supOpenObjectFromContext(
         Context,
         &obja,
         DesiredAccess,
@@ -295,6 +318,9 @@ PPROP_OBJECT_INFO propContextCreate(
                 _strcpy(Context->lpObjectType, lpObjectType);
             }
             Context->TypeIndex = ObManagerGetIndexByTypeName(lpObjectType);
+        }
+        else {
+            Context->TypeIndex = ObjectTypeUnknown;
         }
 
         //
@@ -369,13 +395,21 @@ VOID propContextDestroy(
         if (Context->lpDescription) {
             supHeapFree(Context->lpDescription);
         }
-
-        if (Context->NamespaceInfo.BoundaryDescriptor) {
-            supHeapFree(Context->NamespaceInfo.BoundaryDescriptor);
+        //free boundary descriptor
+        if (Context->ContextType == propPrivateNamespace) {
+            if (Context->NamespaceInfo.BoundaryDescriptor) {
+                supHeapFree(Context->NamespaceInfo.BoundaryDescriptor);
+            }
+        }
+        //free unnamed object info
+        if (Context->ContextType == propUnnamed) {
+            if (Context->UnnamedObjectInfo.ImageName.Buffer)
+                supHeapFree(Context->UnnamedObjectInfo.ImageName.Buffer);
         }
 
         //free context itself
         supHeapFree(Context);
+
     }
     __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
         return;
@@ -418,9 +452,10 @@ LRESULT WINAPI PropSheetCustomWndProc(
         break;
 
     case WM_CLOSE:
-        DestroyWindow(hwnd);
-
-        if (hwnd == g_NamespacePropWindow) {
+        if (hwnd == g_PsPropWindow) {
+            g_PsPropWindow = NULL;
+        }
+        else if (hwnd == g_NamespacePropWindow) {
             g_NamespacePropWindow = NULL;
         }
         else if (hwnd == g_SubPropWindow) {
@@ -436,7 +471,8 @@ LRESULT WINAPI PropSheetCustomWndProc(
             }
             g_PropWindow = NULL;
         }
-        return TRUE;
+        
+        return DestroyWindow(hwnd);
         break;
 
     case WM_COMMAND:
@@ -452,6 +488,79 @@ LRESULT WINAPI PropSheetCustomWndProc(
 }
 
 /*
+* propCopyNamespaceObject
+*
+* Purpose:
+*
+* Copy namespace object to the properties context.
+*
+*/
+VOID propCopyNamespaceObject(
+    _In_ PROP_OBJECT_INFO *DestinationContext,
+    _In_ PROP_NAMESPACE_INFO *NamespaceObject
+)
+{
+    DestinationContext->ContextType = propPrivateNamespace;
+
+    RtlCopyMemory(
+        &DestinationContext->NamespaceInfo,
+        NamespaceObject,
+        sizeof(PROP_NAMESPACE_INFO));
+}
+
+/*
+* propCopyUnnamedObject
+*
+* Purpose:
+*
+* Copy unnamed object to the properties context.
+*
+*/
+VOID propCopyUnnamedObject(
+    _In_ PROP_OBJECT_INFO *DestinationContext,
+    _In_ PROP_UNNAMED_OBJECT_INFO *SourceObject
+)
+{
+    PVOID CopyBuffer;
+    SIZE_T CopySize;
+
+    DestinationContext->ContextType = propUnnamed;
+
+    //
+    // Copy generic data.
+    //
+    DestinationContext->UnnamedObjectInfo.ObjectAddress = SourceObject->ObjectAddress;
+
+    RtlCopyMemory(&DestinationContext->UnnamedObjectInfo.ClientId,
+        &SourceObject->ClientId,
+        sizeof(CLIENT_ID));
+
+    if (DestinationContext->TypeIndex == ObjectTypeThread) {
+
+        RtlCopyMemory(&DestinationContext->UnnamedObjectInfo.ThreadInformation,
+            &SourceObject->ThreadInformation,
+            sizeof(SYSTEM_THREAD_INFORMATION));
+    }
+
+    //
+    // Copy image name if present.
+    //
+    CopySize = SourceObject->ImageName.MaximumLength;
+    if (CopySize) {
+        CopyBuffer = supHeapAlloc(CopySize);
+        if (CopyBuffer) {
+
+            DestinationContext->UnnamedObjectInfo.ImageName.MaximumLength = (USHORT)CopySize;
+            DestinationContext->UnnamedObjectInfo.ImageName.Buffer = (PWSTR)CopyBuffer;
+
+            RtlCopyUnicodeString(&DestinationContext->UnnamedObjectInfo.ImageName,
+                &SourceObject->ImageName);
+
+        }
+    }
+}
+
+/*
 * propCreateDialog
 *
 * Purpose:
@@ -462,14 +571,15 @@ LRESULT WINAPI PropSheetCustomWndProc(
 *
 */
 VOID propCreateDialog(
-    _In_ HWND hwndParent,
+    _In_opt_ HWND hwndParent,
     _In_ LPWSTR lpObjectName,
     _In_ LPCWSTR lpObjectType,
     _In_opt_ LPWSTR lpDescription,
-    _In_opt_ PROP_NAMESPACE_INFO *NamespaceObject
+    _In_opt_ PROP_NAMESPACE_INFO *NamespaceObject,
+    _In_opt_ PROP_UNNAMED_OBJECT_INFO *UnnamedObject
 )
 {
-    BOOL                IsPrivateNamespaceObject = FALSE;
+    BOOL                IsSimpleContext = FALSE;
     INT                 nPages;
     HWND                hwndDlg;
     PROP_OBJECT_INFO   *propContext = NULL;
@@ -479,32 +589,40 @@ VOID propCreateDialog(
     WCHAR               szCaption[MAX_PATH * 2];
 
     //
+    // Mutual exclusion situation.
+    //
+    if ((NamespaceObject != NULL) && (UnnamedObject != NULL))
+        return;
+
+    IsSimpleContext = (NamespaceObject != NULL) || (UnnamedObject != NULL);
+
+    //
     // Allocate context variable, copy name, type, object path.
     //
-    if (NamespaceObject) {
-        propContext = propContextCreate(
-            lpObjectName,
-            lpObjectType,
-            NULL,
-            NULL);
-        if (propContext) {
-            propContext->IsPrivateNamespaceObject = TRUE;
-            IsPrivateNamespaceObject = TRUE;
-            RtlCopyMemory(
-                &propContext->NamespaceInfo,
-                NamespaceObject,
-                sizeof(PROP_NAMESPACE_INFO));
-        }
-    }
-    else {
-        propContext = propContextCreate(
-            lpObjectName,
-            lpObjectType,
-            g_WinObj.CurrentObjectPath,
-            lpDescription);
-    }
+    propContext = propContextCreate(
+        lpObjectName,
+        lpObjectType,
+        (IsSimpleContext) ? NULL : g_WinObj.CurrentObjectPath,
+        (IsSimpleContext) ? NULL : lpDescription);
+
     if (propContext == NULL)
         return;
+
+    //
+    // Remember namespace or unnamed object info.
+    //
+    if (NamespaceObject) {
+
+        propCopyNamespaceObject(propContext,
+            NamespaceObject);
+
+    }
+    else if (UnnamedObject) {
+
+        propCopyUnnamedObject(propContext,
+            UnnamedObject);
+
+    }
 
     //
     // Remember previously focused window.
@@ -573,6 +691,12 @@ VOID propCreateDialog(
     case ObjectTypePort:
         Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_ALPCPORT);
         break;
+    case ObjectTypeProcess:
+        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_PROCESS);
+        break;
+    case ObjectTypeThread:
+        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_THREAD);
+        break;
     case ObjectTypeType:
     default:
         Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_BASIC);
@@ -615,6 +739,23 @@ VOID propCreateDialog(
     }
 
     //
+    // Create specific page for Process/Thread objects.
+    //
+    if ((propContext->TypeIndex == ObjectTypeProcess) ||
+        (propContext->TypeIndex == ObjectTypeThread)) 
+    {
+        RtlSecureZeroMemory(&Page, sizeof(Page));
+        Page.dwSize = sizeof(PROPSHEETPAGE);
+        Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
+        Page.hInstance = g_WinObj.hInstance;
+        Page.pszTemplate = MAKEINTRESOURCE(IDD_DIALOG_TOKEN);
+        Page.pfnDlgProc = TokenPageDialogProc;
+        Page.pszTitle = TEXT("Token");
+        Page.lParam = (LPARAM)propContext;
+        psp[nPages++] = CreatePropertySheetPage(&Page);
+    }
+
+    //
     // Create additional page(s), depending on object type.
     //
     switch (propContext->TypeIndex) {
@@ -629,10 +770,12 @@ VOID propCreateDialog(
     case ObjectTypeSymbolicLink:
     case ObjectTypeTimer:
     case ObjectTypeJob:
-    case ObjectTypeWinstation:
     case ObjectTypeSession:
     case ObjectTypeIoCompletion:
     case ObjectTypeMemoryPartition:
+    case ObjectTypeProcess:
+    case ObjectTypeThread:
+    case ObjectTypeWinstation:
         RtlSecureZeroMemory(&Page, sizeof(Page));
         Page.dwSize = sizeof(PROPSHEETPAGE);
         Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
@@ -692,10 +835,10 @@ VOID propCreateDialog(
     // Create Security Dialog if available.
     //
     SecurityPage = propSecurityCreatePage(
-        propContext, //Context
-        (POPENOBJECTMETHOD)&propOpenCurrentObject, //OpenObjectMethod
-        (PCLOSEOBJECTMETHOD)&propCloseCurrentObject,//CloseObjectMethod
-        SI_EDIT_AUDITS | SI_EDIT_OWNER | SI_EDIT_PERMS | //psiFlags
+        propContext,                                            //Context
+        (POPENOBJECTMETHOD)&propOpenCurrentObject,              //OpenObjectMethod
+        (PCLOSEOBJECTMETHOD)&propCloseCurrentObject,            //CloseObjectMethod
+        SI_EDIT_OWNER | SI_EDIT_PERMS |                         //psiFlags
         SI_ADVANCED | SI_NO_ACL_PROTECT | SI_NO_TREE_APPLY |
         SI_PAGE_TITLE
     );
@@ -726,20 +869,33 @@ VOID propCreateDialog(
 
     hwndDlg = (HWND)PropertySheet(&PropHeader);
 
-    //remove class icon if any
-    SetClassLongPtr(hwndDlg, GCLP_HICON, (LONG_PTR)NULL);
-
-    if (IsPrivateNamespaceObject) {
-        g_NamespacePropWindow = hwndDlg;
-    }
-    if (propContext->TypeIndex == ObjectTypeDesktop) {
-        g_SubPropWindow = hwndDlg;
-    }
-    else {
-        g_PropWindow = hwndDlg;
-    }
     if (hwndDlg) {
+
+        //remove class icon if any
+        SetClassLongPtr(hwndDlg, GCLP_HICON, (LONG_PTR)NULL);
+
+        if (propContext->ContextType == propPrivateNamespace) {
+            g_NamespacePropWindow = hwndDlg;
+        }
+        else {
+
+            switch (propContext->TypeIndex) {
+            case ObjectTypeProcess:
+            case ObjectTypeThread:
+                g_PsPropWindow = hwndDlg;
+                break;
+            case ObjectTypeDesktop:
+                g_SubPropWindow = hwndDlg;
+                break;
+            default:
+                g_PropWindow = hwndDlg;
+                break;
+            }
+
+        }
+
         SetProp(hwndDlg, T_PROPCONTEXT, (HANDLE)propContext);
+
         PropSheetOriginalWndProc = (WNDPROC)GetWindowLongPtr(hwndDlg, GWLP_WNDPROC);
         if (PropSheetOriginalWndProc) {
             SetWindowLongPtr(hwndDlg, GWLP_WNDPROC, (LONG_PTR)&PropSheetCustomWndProc);

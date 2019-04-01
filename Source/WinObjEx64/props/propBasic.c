@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     1.72
+*  VERSION:     1.73
 *
-*  DATE:        09 Feb 2019
+*  DATE:        30 Mar 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,6 +17,455 @@
 #include "global.h"
 #include "propDlg.h"
 #include "propBasicConsts.h"
+
+/*
+* propSetObjectHeaderAddressInfo
+*
+* Purpose:
+*
+* Set Object & Header address controls text.
+*
+*/
+VOID propSetObjectHeaderAddressInfo(
+    _In_ HWND hwndDlg,
+    _In_ ULONG_PTR ObjectAddress,
+    _In_ ULONG_PTR HeaderAddress
+)
+{
+    WCHAR szBuffer[100];
+
+    //Object Address
+    if (ObjectAddress) {
+        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+        szBuffer[0] = TEXT('0');
+        szBuffer[1] = TEXT('x');
+        u64tohex(ObjectAddress, &szBuffer[2]);
+        SetDlgItemText(hwndDlg, ID_OBJECT_ADDR, szBuffer);
+    }
+    else {
+        SetDlgItemText(hwndDlg, ID_OBJECT_ADDR, TEXT(""));
+    }
+
+    //Header Address
+    if (HeaderAddress) {
+        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+        szBuffer[0] = TEXT('0');
+        szBuffer[1] = TEXT('x');
+        u64tohex(HeaderAddress, &szBuffer[2]);
+        SetDlgItemText(hwndDlg, ID_OBJECT_HEADER, szBuffer);
+    }
+    else {
+        SetDlgItemText(hwndDlg, ID_OBJECT_HEADER, TEXT(""));
+    }
+}
+
+/*
+* propSetProcessMitigationsInfo
+*
+* Purpose:
+*
+* Set Process mitigation information if it specified for this object.
+*
+*/
+VOID propSetProcessMitigationsInfo(
+    _In_ HANDLE hProcess,
+    _In_ BOOL wow64Process,
+    _In_ HWND hwndDlg
+)
+{
+    BOOL bQuery;
+    LRESULT lResult;
+    HWND hwndCB = GetDlgItem(hwndDlg, IDC_PROCESS_MITIGATIONS);
+    PROCESS_MITIGATION_POLICIES_ALL Policies;
+
+    WCHAR szBuffer[1000];
+
+    RtlSecureZeroMemory(&Policies, sizeof(Policies));
+
+    SendMessage(hwndCB, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
+
+    //
+    // DEP state.
+    //
+
+    //
+    // Always ON for 64bit.
+    //
+    bQuery = TRUE;
+    Policies.DEPPolicy.Enable = 1;
+    Policies.DEPPolicy.Permanent = 1;
+
+    if (wow64Process) {
+        Policies.DEPPolicy.Flags = 0;
+        bQuery = supGetProcessDepState(hProcess,
+            &Policies.DEPPolicy);
+    }
+
+    if (bQuery)
+    {
+        if (Policies.DEPPolicy.Flags) {
+            _strcpy(szBuffer, TEXT("DEP "));
+            if (Policies.DEPPolicy.Permanent)
+                _strcat(szBuffer, TEXT("(Permanent)"));
+            else {
+                if (Policies.DEPPolicy.Enable) {
+                    _strcat(szBuffer, TEXT("Enabled"));
+                }
+                else {
+                    _strcat(szBuffer, TEXT("Disabled"));
+                }
+            }
+
+            if (Policies.DEPPolicy.DisableAtlThunkEmulation)
+                _strcat(szBuffer, TEXT(" (ATL thunk emulation is disabled)"));
+
+            SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+        }
+    }
+
+    //
+    // ASLR state.
+    //
+    if (supGetProcessMitigationPolicy(hProcess,
+        (PROCESS_MITIGATION_POLICY)ProcessASLRPolicy,
+        sizeof(PROCESS_MITIGATION_ASLR_POLICY),
+        &Policies.ASLRPolicy))
+    {
+        if (Policies.ASLRPolicy.Flags) {
+            _strcpy(szBuffer, TEXT("ASLR"));
+            if (Policies.ASLRPolicy.EnableHighEntropy) _strcat(szBuffer, TEXT(" (High-Entropy)"));
+            if (Policies.ASLRPolicy.EnableForceRelocateImages) _strcat(szBuffer, TEXT(" (Force Relocate)"));
+            if (Policies.ASLRPolicy.EnableBottomUpRandomization) _strcat(szBuffer, TEXT(" (Bottom-Up)"));
+            if (Policies.ASLRPolicy.DisallowStrippedImages) _strcat(szBuffer, TEXT(" (Disallow Stripped)"));
+            SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+        }
+    }
+
+    //
+    // Dynamic code.
+    //
+    if (supGetProcessMitigationPolicy(hProcess,
+        (PROCESS_MITIGATION_POLICY)ProcessDynamicCodePolicy,
+        sizeof(PROCESS_MITIGATION_DYNAMIC_CODE_POLICY_W10),
+        &Policies.DynamicCodePolicy))
+    {
+        if (Policies.DynamicCodePolicy.Flags) {
+            if (Policies.DynamicCodePolicy.ProhibitDynamicCode) {
+                _strcpy(szBuffer, TEXT("Dynamic code -> Prohibited"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.DynamicCodePolicy.AuditProhibitDynamicCode) {
+                _strcpy(szBuffer, TEXT("Dynamic code -> Audit prohibit"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.DynamicCodePolicy.AllowThreadOptOut) {
+                _strcpy(szBuffer, TEXT("Dynamic code -> Allow thread opt out"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.DynamicCodePolicy.AllowRemoteDowngrade) {
+                _strcpy(szBuffer, TEXT("Dynamic code -> Allow remote downgrade"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+        }
+    }
+
+    //
+    // Strict handle check.
+    //
+    if (supGetProcessMitigationPolicy(hProcess,
+        (PROCESS_MITIGATION_POLICY)ProcessStrictHandleCheckPolicy,
+        sizeof(PROCESS_MITIGATION_STRICT_HANDLE_CHECK_POLICY),
+        &Policies.StrictHandleCheckPolicy))
+    {
+        if (Policies.StrictHandleCheckPolicy.Flags) {
+            if (Policies.StrictHandleCheckPolicy.RaiseExceptionOnInvalidHandleReference) {
+                _strcpy(szBuffer, TEXT("Strict handle checks -> Raise exception on invalid handle reference"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.StrictHandleCheckPolicy.HandleExceptionsPermanentlyEnabled) {
+                _strcpy(szBuffer, TEXT("Strict handle checks -> Handle exceptions permanently enabled"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+        }
+    }
+
+    //
+    // System call disable.
+    //
+    if (supGetProcessMitigationPolicy(hProcess,
+        (PROCESS_MITIGATION_POLICY)ProcessSystemCallDisablePolicy,
+        sizeof(PPROCESS_MITIGATION_SYSTEM_CALL_DISABLE_POLICY),
+        &Policies.SystemCallDisablePolicy))
+    {
+        if (Policies.SystemCallDisablePolicy.Flags) {
+            if (Policies.SystemCallDisablePolicy.DisallowWin32kSystemCalls) {
+                _strcpy(szBuffer, TEXT("SystemCallDisable -> Disallow Win32k calls"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.SystemCallDisablePolicy.AuditDisallowWin32kSystemCalls) {
+                _strcpy(szBuffer, TEXT("SystemCallDisable -> Audit disallow Win32k calls"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+        }
+    }
+
+    //
+    // Extension point disable.
+    //
+    if (supGetProcessMitigationPolicy(hProcess,
+        (PROCESS_MITIGATION_POLICY)ProcessExtensionPointDisablePolicy,
+        sizeof(PROCESS_MITIGATION_EXTENSION_POINT_DISABLE_POLICY),
+        &Policies.ExtensionPointDisablePolicy))
+    {
+        if (Policies.ExtensionPointDisablePolicy.Flags) {
+            if (Policies.ExtensionPointDisablePolicy.DisableExtensionPoints) {
+                _strcpy(szBuffer, TEXT("Extension points disabled"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+        }
+    }
+
+    //
+    // CFG.
+    //
+    if (supGetProcessMitigationPolicy(hProcess,
+        (PROCESS_MITIGATION_POLICY)ProcessControlFlowGuardPolicy,
+        sizeof(PROCESS_MITIGATION_CONTROL_FLOW_GUARD_POLICY_W10),
+        &Policies.ControlFlowGuardPolicy))
+    {
+        if (Policies.ControlFlowGuardPolicy.Flags) {
+            if (Policies.ControlFlowGuardPolicy.EnableControlFlowGuard) {
+                _strcpy(szBuffer, TEXT("CF Guard"));
+
+                if (Policies.ControlFlowGuardPolicy.EnableExportSuppression) {
+                    _strcat(szBuffer, TEXT(" (Export Suppression)"));
+                }
+                if (Policies.ControlFlowGuardPolicy.StrictMode) {
+                    _strcat(szBuffer, TEXT(" (Strict Mode)"));
+                }
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+        }
+    }
+
+    //
+    // Signature.
+    //
+    if (supGetProcessMitigationPolicy(hProcess,
+        (PROCESS_MITIGATION_POLICY)ProcessSignaturePolicy,
+        sizeof(PROCESS_MITIGATION_BINARY_SIGNATURE_POLICY_W10),
+        &Policies.SignaturePolicy))
+    {
+        if (Policies.SignaturePolicy.Flags) {
+            if (Policies.SignaturePolicy.MicrosoftSignedOnly) {
+                _strcpy(szBuffer, TEXT("Signature -> Microsoft signed only"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.SignaturePolicy.StoreSignedOnly) {
+                _strcpy(szBuffer, TEXT("Signature -> Store signed only"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.SignaturePolicy.AuditMicrosoftSignedOnly) {
+                _strcpy(szBuffer, TEXT("Signature -> Audit Microsoft signed only"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.SignaturePolicy.AuditStoreSignedOnly) {
+                _strcpy(szBuffer, TEXT("Signature -> Audit Store signed only"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.SignaturePolicy.MitigationOptIn) {
+                _strcpy(szBuffer, TEXT("Signature -> Opt in"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+        }
+    }
+
+    //
+    // Font disable.
+    //
+    if (supGetProcessMitigationPolicy(hProcess,
+        (PROCESS_MITIGATION_POLICY)ProcessFontDisablePolicy,
+        sizeof(PROCESS_MITIGATION_FONT_DISABLE_POLICY_W10),
+        &Policies.FontDisablePolicy))
+    {
+        if (Policies.FontDisablePolicy.Flags) {
+            if (Policies.FontDisablePolicy.DisableNonSystemFonts) {
+                _strcpy(szBuffer, TEXT("Fonts -> Disable non system fonts"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.FontDisablePolicy.AuditNonSystemFontLoading) {
+                _strcpy(szBuffer, TEXT("Fonts -> Audit non system font loading"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+        }
+    }
+
+    //
+    // Image load.
+    //
+    if (supGetProcessMitigationPolicy(hProcess,
+        (PROCESS_MITIGATION_POLICY)ProcessImageLoadPolicy,
+        sizeof(PROCESS_MITIGATION_IMAGE_LOAD_POLICY_W10),
+        &Policies.ImageLoadPolicy))
+    {
+        if (Policies.ImageLoadPolicy.Flags) {
+            if (Policies.ImageLoadPolicy.PreferSystem32Images) {
+                _strcpy(szBuffer, TEXT("ImageLoad -> Prefer system32 images"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.ImageLoadPolicy.NoRemoteImages) {
+                _strcpy(szBuffer, TEXT("ImageLoad -> No remote images"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.ImageLoadPolicy.NoLowMandatoryLabelImages) {
+                _strcpy(szBuffer, TEXT("ImageLoad -> No low mandatory label images"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.ImageLoadPolicy.AuditNoRemoteImages) {
+                _strcpy(szBuffer, TEXT("ImageLoad -> Audit remote images"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.ImageLoadPolicy.AuditNoLowMandatoryLabelImages) {
+                _strcpy(szBuffer, TEXT("ImageLoad -> Audit no low mandatory label images"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+        }
+    }
+
+    //
+    // Payload restriction.
+    //
+    if (supGetProcessMitigationPolicy(hProcess,
+        (PROCESS_MITIGATION_POLICY)ProcessPayloadRestrictionPolicy,
+        sizeof(PROCESS_MITIGATION_PAYLOAD_RESTRICTION_POLICY_W10),
+        &Policies.PayloadRestrictionPolicy))
+    {
+        if (Policies.PayloadRestrictionPolicy.Flags) {
+
+            if (Policies.PayloadRestrictionPolicy.EnableExportAddressFilter) {
+                _strcpy(szBuffer, TEXT("PayloadRestriction -> Enable export address filter"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+
+            if (Policies.PayloadRestrictionPolicy.AuditExportAddressFilter) {
+                _strcpy(szBuffer, TEXT("PayloadRestriction -> Audit export address filter"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+
+            if (Policies.PayloadRestrictionPolicy.EnableExportAddressFilterPlus) {
+                _strcpy(szBuffer, TEXT("PayloadRestriction -> Enable export address filter plus"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+
+            if (Policies.PayloadRestrictionPolicy.AuditExportAddressFilterPlus) {
+                _strcpy(szBuffer, TEXT("PayloadRestriction -> Audit export address filter plus"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+
+            if (Policies.PayloadRestrictionPolicy.EnableImportAddressFilter) {
+                _strcpy(szBuffer, TEXT("PayloadRestriction -> Enable import address filter"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+
+            if (Policies.PayloadRestrictionPolicy.AuditImportAddressFilter) {
+                _strcpy(szBuffer, TEXT("PayloadRestriction -> Audit import address filter"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+
+            if (Policies.PayloadRestrictionPolicy.EnableRopStackPivot) {
+                _strcpy(szBuffer, TEXT("PayloadRestriction -> Enable rop stack pivot"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+
+            if (Policies.PayloadRestrictionPolicy.AuditRopStackPivot) {
+                _strcpy(szBuffer, TEXT("PayloadRestriction -> Audit rop stack pivot"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+
+            if (Policies.PayloadRestrictionPolicy.EnableRopCallerCheck) {
+                _strcpy(szBuffer, TEXT("PayloadRestriction -> Enable rop caller check"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+
+            if (Policies.PayloadRestrictionPolicy.AuditRopCallerCheck) {
+                _strcpy(szBuffer, TEXT("PayloadRestriction -> Audit rop caller check"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+
+            if (Policies.PayloadRestrictionPolicy.EnableRopSimExec) {
+                _strcpy(szBuffer, TEXT("PayloadRestriction -> Enable rop sim exec"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+             }
+
+            if (Policies.PayloadRestrictionPolicy.AuditRopSimExec) {
+                _strcpy(szBuffer, TEXT("PayloadRestriction -> Audit rop sim exec"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+
+        }
+    }
+
+    //
+    // Child process.
+    //
+    if (supGetProcessMitigationPolicy(hProcess,
+        (PROCESS_MITIGATION_POLICY)ProcessChildProcessPolicy,
+        sizeof(PROCESS_MITIGATION_CHILD_PROCESS_POLICY_W10),
+        &Policies.ChildProcessPolicy))
+    {
+        if (Policies.ChildProcessPolicy.Flags) {
+            if (Policies.ChildProcessPolicy.NoChildProcessCreation) {
+                _strcpy(szBuffer, TEXT("ChildProcess -> No child process creation"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.ChildProcessPolicy.AllowSecureProcessCreation) {
+                _strcpy(szBuffer, TEXT("ChildProcess -> Allow secure process creation"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.ChildProcessPolicy.AuditNoChildProcessCreation) {
+                _strcpy(szBuffer, TEXT("ChildProcess -> Audit no child process creation"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+        }
+    }
+
+    //
+    // Side channel.
+    //
+    if (supGetProcessMitigationPolicy(hProcess,
+        (PROCESS_MITIGATION_POLICY)ProcessSideChannelIsolationPolicy,
+        sizeof(PROCESS_MITIGATION_SIDE_CHANNEL_ISOLATION_POLICY_W10),
+        &Policies.SideChannelIsolationPolicy))
+    {
+        if (Policies.SideChannelIsolationPolicy.Flags) {
+            if (Policies.SideChannelIsolationPolicy.DisablePageCombine) {
+                _strcpy(szBuffer, TEXT("SideChannel -> Disable page combine"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.SideChannelIsolationPolicy.IsolateSecurityDomain) {
+                _strcpy(szBuffer, TEXT("SideChannel -> Isolate security domain"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.SideChannelIsolationPolicy.SmtBranchTargetIsolation) {
+                _strcpy(szBuffer, TEXT("SideChannel -> Smt branch target isolation"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.SideChannelIsolationPolicy.SpeculativeStoreBypassDisable) {
+                _strcpy(szBuffer, TEXT("SideChannel -> Speculative store bypass disalbe"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+
+        }
+    }
+
+    lResult = SendMessage(hwndCB, CB_GETCOUNT, 0, 0);
+    if (lResult != CB_ERR) {
+        if (lResult > 0) {
+            EnableWindow(hwndCB, TRUE);
+            SendMessage(hwndCB, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
+        }
+    }
+}
 
 /*
 * propSetProcessTrustLabelInfo
@@ -36,7 +485,7 @@ VOID propSetProcessTrustLabelInfo(
 
     ULONG ProtectionType = 0, ProtectionLevel = 0, i;
 
-    LPWSTR lpType = L"", lpLevel = L"";
+    LPWSTR lpType = TEXT(""), lpLevel = TEXT("");
 
     WCHAR szBuffer[0x100];
 
@@ -44,7 +493,7 @@ VOID propSetProcessTrustLabelInfo(
     // Re-open current object as we need READ_CONTROL.
     //
     if (!propOpenCurrentObject(Context, &hObject, READ_CONTROL)) {
-        SetDlgItemText(hwndDlg, ID_OBJECT_TRUSTLABEL, L"");
+        SetDlgItemText(hwndDlg, ID_OBJECT_TRUSTLABEL, TEXT(""));
         return;
     }
 
@@ -70,7 +519,7 @@ VOID propSetProcessTrustLabelInfo(
 
         if ((lpType) && (lpLevel)) {
             _strcpy(szBuffer, lpType);
-            _strcat(szBuffer, L"-");
+            _strcat(szBuffer, TEXT("-"));
             _strcat(szBuffer, lpLevel);
 
             ShowWindow(GetDlgItem(hwndDlg, ID_PTL_CAPTION), SW_SHOW);
@@ -83,7 +532,7 @@ VOID propSetProcessTrustLabelInfo(
 
     if (bFail) {
         ShowWindow(GetDlgItem(hwndDlg, ID_PTL_CAPTION), SW_HIDE);
-        SetDlgItemText(hwndDlg, ID_OBJECT_TRUSTLABEL, L"");
+        SetDlgItemText(hwndDlg, ID_OBJECT_TRUSTLABEL, TEXT(""));
     }
 }
 
@@ -404,11 +853,9 @@ VOID propBasicQueryTimer(
             Hours = ConvertedSeconds / 3600;
 
             //Timer remaining
-            RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-            wsprintf(szBuffer, FORMATTED_TIME_VALUE,
-                Hours,
-                Minutes,
-                Seconds);
+            RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+            rtl_swprintf_s(szBuffer, MAX_PATH, FORMATTED_TIME_VALUE,
+                Hours, Minutes, Seconds);
 
             SetDlgItemText(hwndDlg, ID_TIMERREMAINING, szBuffer);
         }
@@ -526,8 +973,7 @@ VOID propBasicQuerySymlink(
     ULONG       bytesNeeded;
     HANDLE      hObject;
     LPWSTR      lpLinkTarget;
-    TIME_FIELDS	SystemTime;
-    WCHAR       szBuffer[MAX_PATH];
+    WCHAR       szBuffer[MAX_PATH + 1];
 
     OBJECT_BASIC_INFORMATION obi;
 
@@ -562,24 +1008,9 @@ VOID propBasicQuerySymlink(
         sizeof(OBJECT_BASIC_INFORMATION), &bytesNeeded);
 
     if (NT_SUCCESS(status)) {
-        FileTimeToLocalFileTime((PFILETIME)&obi.CreationTime, (PFILETIME)&obi.CreationTime);
-        RtlSecureZeroMemory(&SystemTime, sizeof(SystemTime));
-        RtlTimeToTimeFields((PLARGE_INTEGER)&obi.CreationTime, (PTIME_FIELDS)&SystemTime);
-
-        //Month starts from 0 index
-        if (SystemTime.Month - 1 < 0) SystemTime.Month = 1;
-        if (SystemTime.Month > 12) SystemTime.Month = 12;
-
-        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-        wsprintf(szBuffer, FORMATTED_TIME_DATE_VALUE,
-            SystemTime.Hour,
-            SystemTime.Minute,
-            SystemTime.Second,
-            SystemTime.Day,
-            g_szMonths[SystemTime.Month - 1],
-            SystemTime.Year);
-
-        SetDlgItemText(hwndDlg, ID_OBJECT_SYMLINK_CREATION, szBuffer);
+        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+        if (supPrintTimeConverted(&obi.CreationTime, szBuffer, MAX_PATH))
+            SetDlgItemText(hwndDlg, ID_OBJECT_SYMLINK_CREATION, szBuffer);
     }
 
     //
@@ -611,7 +1042,6 @@ VOID propBasicQueryKey(
     NTSTATUS    status;
     ULONG       bytesNeeded;
     HANDLE      hObject;
-    TIME_FIELDS	SystemTime;
     WCHAR       szBuffer[MAX_PATH];
 
     KEY_FULL_INFORMATION  kfi;
@@ -649,26 +1079,9 @@ VOID propBasicQueryKey(
         SetDlgItemText(hwndDlg, ID_KEYVALUES, szBuffer);
 
         //LastWrite time
-        RtlSecureZeroMemory(&SystemTime, sizeof(SystemTime));
-        FileTimeToLocalFileTime((PFILETIME)&kfi.LastWriteTime,
-            (PFILETIME)&kfi.LastWriteTime);
-        RtlTimeToTimeFields((PLARGE_INTEGER)&kfi.LastWriteTime,
-            (PTIME_FIELDS)&SystemTime);
-
-        //Month starts from 0 index
-        if (SystemTime.Month - 1 < 0) SystemTime.Month = 1;
-        if (SystemTime.Month > 12) SystemTime.Month = 12;
-
         RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-        wsprintf(szBuffer, FORMATTED_TIME_DATE_VALUE,
-            SystemTime.Hour,
-            SystemTime.Minute,
-            SystemTime.Second,
-            SystemTime.Day,
-            g_szMonths[SystemTime.Month - 1],
-            SystemTime.Year);
-
-        SetDlgItemText(hwndDlg, ID_KEYLASTWRITE, szBuffer);
+        if (supPrintTimeConverted(&kfi.LastWriteTime, szBuffer, MAX_PATH))
+            SetDlgItemText(hwndDlg, ID_KEYLASTWRITE, szBuffer);
     }
 
     //
@@ -730,9 +1143,11 @@ VOID propBasicQueryMutant(
 
         //State
         RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-        _strcpy(szBuffer, TEXT("Not Held"));
         if (mbi.OwnedByCaller) {
-            wsprintf(szBuffer, TEXT("Held recursively %d times"), mbi.CurrentCount);
+            rtl_swprintf_s(szBuffer, MAX_PATH, TEXT("Held recursively %d times"), mbi.CurrentCount);
+        }
+        else {
+            _strcpy(szBuffer, TEXT("Not Held"));
         }
         SetDlgItemText(hwndDlg, ID_MUTANTSTATE, szBuffer);
     }
@@ -745,6 +1160,10 @@ VOID propBasicQueryMutant(
     }
     propCloseCurrentObject(Context, hObject);
 }
+
+#ifndef IMAGE_SUBSYSTEM_XBOX_CODE_CATALOG
+#define IMAGE_SUBSYSTEM_XBOX_CODE_CATALOG 17
+#endif
 
 /*
 * propBasicQuerySection
@@ -767,11 +1186,12 @@ VOID propBasicQuerySection(
     HANDLE    hObject;
     SIZE_T    bytesNeeded;
     LPWSTR    lpType;
-    RECT      rGB;
     WCHAR     szBuffer[MAX_PATH * 2];
 
     SECTION_BASIC_INFORMATION sbi;
     SECTION_IMAGE_INFORMATION sii;
+
+    ENUMCHILDWNDDATA ChildWndData;
 
     SetDlgItemText(hwndDlg, ID_SECTION_ATTR, T_CannotQuery);
     SetDlgItemText(hwndDlg, ID_SECTIONSIZE, T_CannotQuery);
@@ -846,8 +1266,8 @@ VOID propBasicQuerySection(
         SetDlgItemText(hwndDlg, ID_SECTION_ATTR, szBuffer);
 
         //Size
-        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-        wsprintf(szBuffer, TEXT("0x%I64X"), sbi.MaximumSize.QuadPart);
+        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+        rtl_swprintf_s(szBuffer, MAX_PATH, TEXT("0x%I64X"), sbi.MaximumSize.QuadPart);
         SetDlgItemText(hwndDlg, ID_SECTIONSIZE, szBuffer);
 
         //query image information
@@ -860,23 +1280,24 @@ VOID propBasicQuerySection(
             if (NT_SUCCESS(status)) {
 
                 //show hidden controls
-                if (GetWindowRect(GetDlgItem(hwndDlg, ID_IMAGEINFO), &rGB)) {
-                    EnumChildWindows(hwndDlg, supEnumEnableChildWindows, (LPARAM)&rGB);
+                if (GetWindowRect(GetDlgItem(hwndDlg, ID_IMAGEINFO), &ChildWndData.Rect)) {
+                    ChildWndData.nCmdShow = SW_SHOW;
+                    EnumChildWindows(hwndDlg, supCallbackShowChildWindow, (LPARAM)&ChildWndData);
                 }
 
                 //Entry			
-                RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-                wsprintf(szBuffer, TEXT("0x%I64X"), (ULONG_PTR)sii.TransferAddress);
+                RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+                rtl_swprintf_s(szBuffer, MAX_PATH, TEXT("0x%I64X"), (ULONG_PTR)sii.TransferAddress);
                 SetDlgItemText(hwndDlg, ID_IMAGE_ENTRY, szBuffer);
 
                 //Stack Reserve
-                RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-                wsprintf(szBuffer, TEXT("0x%I64X"), sii.MaximumStackSize);
+                RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+                rtl_swprintf_s(szBuffer, MAX_PATH, TEXT("0x%I64X"), sii.MaximumStackSize);
                 SetDlgItemText(hwndDlg, ID_IMAGE_STACKRESERVE, szBuffer);
 
                 //Stack Commit
-                RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-                wsprintf(szBuffer, TEXT("0x%I64X"), sii.CommittedStackSize);
+                RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+                rtl_swprintf_s(szBuffer, MAX_PATH, TEXT("0x%I64X"), sii.CommittedStackSize);
                 SetDlgItemText(hwndDlg, ID_IMAGE_STACKCOMMIT, szBuffer);
 
                 //Executable			
@@ -915,6 +1336,9 @@ VOID propBasicQuerySection(
                     break;
                 case IMAGE_SUBSYSTEM_WINDOWS_BOOT_APPLICATION:
                     lpType = TEXT("Windows Boot Application");
+                    break;
+                case IMAGE_SUBSYSTEM_XBOX_CODE_CATALOG:
+                    lpType = TEXT("XBox Code Catalog");
                     break;
                 }
                 SetDlgItemText(hwndDlg, ID_IMAGE_SUBSYSTEM, lpType);
@@ -1008,8 +1432,8 @@ VOID propBasicQueryDriver(
     _In_ HWND hwndDlg
 )
 {
-    RECT    rGB;
-    LPWSTR  lpItemText;
+    LPWSTR lpItemText;
+    ENUMCHILDWNDDATA ChildWndData;
 
     if (Context == NULL) {
         return;
@@ -1022,8 +1446,9 @@ VOID propBasicQueryDriver(
     lpItemText = Context->lpDescription;
     if (lpItemText) {
         //show hidden controls
-        if (GetWindowRect(GetDlgItem(hwndDlg, ID_DRIVERINFO), &rGB)) {
-            EnumChildWindows(hwndDlg, supEnumEnableChildWindows, (LPARAM)&rGB);
+        if (GetWindowRect(GetDlgItem(hwndDlg, ID_DRIVERINFO), &ChildWndData.Rect)) {
+            ChildWndData.nCmdShow = SW_SHOW;
+            EnumChildWindows(hwndDlg, supCallbackShowChildWindow, (LPARAM)&ChildWndData);
         }
         SetDlgItemText(hwndDlg, ID_DRIVERDISPLAYNAME, lpItemText);
     }
@@ -1042,8 +1467,8 @@ VOID propBasicQueryDevice(
     _In_ HWND hwndDlg
 )
 {
-    RECT    rGB;
-    LPWSTR  lpItemText;
+    LPWSTR lpItemText;
+    ENUMCHILDWNDDATA ChildWndData;
 
     if (Context == NULL) {
         return;
@@ -1056,8 +1481,9 @@ VOID propBasicQueryDevice(
     lpItemText = Context->lpDescription;
     if (lpItemText) {
         //show hidden controls
-        if (GetWindowRect(GetDlgItem(hwndDlg, ID_DEVICEINFO), &rGB)) {
-            EnumChildWindows(hwndDlg, supEnumEnableChildWindows, (LPARAM)&rGB);
+        if (GetWindowRect(GetDlgItem(hwndDlg, ID_DEVICEINFO), &ChildWndData.Rect)) {
+            ChildWndData.nCmdShow = SW_SHOW;
+            EnumChildWindows(hwndDlg, supCallbackShowChildWindow, (LPARAM)&ChildWndData);
         }
         SetDlgItemText(hwndDlg, ID_DEVICEDESCRIPTION, lpItemText);
     }
@@ -1094,6 +1520,463 @@ VOID propBasicQueryMemoryPartition(
     //
     propSetDefaultInfo(Context, hwndDlg, hObject);
     propCloseCurrentObject(Context, hObject);
+}
+
+/*
+* propBasicQueryProcess
+*
+* Purpose:
+*
+* Set information values for Process object type
+*
+*/
+VOID propBasicQueryProcess(
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ HWND hwndDlg,
+    _In_ BOOL ExtendedInfoAvailable
+)
+{
+    BOOL ProcessParametersRead = FALSE;
+    BOOL RemotePebRead = FALSE;
+    BOOL bSuccess = FALSE;
+
+    ULONG i, BreakOnTermination = 0, memIO;
+    HANDLE hObject;
+    PROCESS_EXTENDED_BASIC_INFORMATION exbi;
+    RTL_USER_PROCESS_PARAMETERS UserProcessParameters;
+    PEB RemotePeb;
+
+    PUNICODE_STRING dynUstr;
+    SIZE_T readBytes;
+
+    PS_PROTECTION PsProtection;
+
+    HWND hwndCB;
+
+    LPWSTR Name;
+    PBYTE Buffer;
+    WCHAR szBuffer[100];
+    KERNEL_USER_TIMES KernelUserTimes;
+
+    if (Context == NULL) {
+        return;
+    }
+
+    //
+    // Open Process object.
+    //
+    hObject = NULL;
+
+    bSuccess = propOpenCurrentObject(Context, &hObject, MAXIMUM_ALLOWED);
+    if (!bSuccess) {
+        bSuccess = propOpenCurrentObject(Context, &hObject, PROCESS_QUERY_INFORMATION);
+        if (!bSuccess) {
+            bSuccess = propOpenCurrentObject(Context, &hObject, PROCESS_QUERY_LIMITED_INFORMATION);
+        }
+    }
+    if (bSuccess) {
+
+        RtlSecureZeroMemory(&UserProcessParameters, sizeof(UserProcessParameters));
+        RtlSecureZeroMemory(&exbi, sizeof(exbi));
+
+        exbi.Size = sizeof(PROCESS_EXTENDED_BASIC_INFORMATION);
+
+        if (NT_SUCCESS(NtQueryInformationProcess(hObject,
+            ProcessBasicInformation,
+            (PVOID)&exbi,
+            sizeof(PROCESS_EXTENDED_BASIC_INFORMATION),
+            &i)))
+        {
+            //
+            // Start time.
+            //
+            RtlSecureZeroMemory(&KernelUserTimes, sizeof(KERNEL_USER_TIMES));
+            NtQueryInformationProcess(hObject, ProcessTimes, 
+                (PVOID)&KernelUserTimes, sizeof(KERNEL_USER_TIMES), &i);
+
+            SetDlgItemText(hwndDlg, IDC_PROCESS_STARTED, T_CannotQuery);
+
+            RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+            if (supPrintTimeConverted(
+                &KernelUserTimes.CreateTime,
+                szBuffer,
+                sizeof(szBuffer) / sizeof(szBuffer[0])))
+            {
+                SetDlgItemText(hwndDlg, IDC_PROCESS_STARTED, szBuffer);
+            }
+
+            //
+            // Process type flags
+            //
+            hwndCB = GetDlgItem(hwndDlg, IDC_PROCESS_TYPE_FLAGS);
+
+            EnableWindow(hwndCB, (exbi.Flags > 0) ? TRUE : FALSE);
+            SendMessage(hwndCB, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
+            if (exbi.Flags > 0) {
+                for (i = 0; i < MAX_KNOWN_PROCESS_TYPE_FLAGS; i++) {
+
+                    if (GET_BIT(exbi.Flags, i))
+
+                        SendMessage(hwndCB,
+                            CB_ADDSTRING,
+                            (WPARAM)0,
+                            (LPARAM)T_ProcessTypeFlags[i]);
+                }
+                SendMessage(hwndCB, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
+            }
+
+            if (exbi.BasicInfo.PebBaseAddress) {
+
+                RtlSecureZeroMemory(&RemotePeb, sizeof(PEB));
+
+                RemotePebRead = NT_SUCCESS(NtReadVirtualMemory(
+                    hObject,
+                    exbi.BasicInfo.PebBaseAddress,
+                    &RemotePeb,
+                    sizeof(PEB),
+                    &readBytes));
+
+                if (RemotePebRead) {
+
+                    ProcessParametersRead = (NT_SUCCESS(NtReadVirtualMemory(
+                        hObject,
+                        (PVOID)RemotePeb.ProcessParameters,
+                        &UserProcessParameters,
+                        sizeof(RTL_USER_PROCESS_PARAMETERS),
+                        &readBytes)));
+                }
+            }
+        }
+
+        //
+        // Process image file.
+        //
+        bSuccess = FALSE;
+        memIO = 0;
+        NtQueryInformationProcess(hObject, ProcessImageFileNameWin32, NULL, 0, &memIO);
+        if (memIO) {
+
+            Buffer = (PBYTE)supHeapAlloc((SIZE_T)memIO);
+            if (Buffer) {
+
+                if (NT_SUCCESS(NtQueryInformationProcess(
+                    hObject,
+                    ProcessImageFileNameWin32,
+                    (PVOID)Buffer,
+                    memIO,
+                    &memIO)))
+                {
+                    dynUstr = (PUNICODE_STRING)Buffer;
+                    if ((dynUstr->Length) && (dynUstr->MaximumLength)) {
+
+                        Name = (LPWSTR)supHeapAlloc(sizeof(UNICODE_NULL) + dynUstr->MaximumLength);
+                        if (Name) {
+
+                            RtlCopyMemory(Name, dynUstr->Buffer, dynUstr->Length);
+                            SetDlgItemText(hwndDlg, IDC_PROCESS_FILENAME, Name);
+                            EnableWindow(GetDlgItem(hwndDlg, IDC_PROCESS_BROWSE), TRUE);
+                            bSuccess = TRUE;
+
+                            supHeapFree(Name);
+                            Name = NULL;
+                        }
+                    }
+                }
+                supHeapFree(Buffer);
+            }
+        }
+
+        if (bSuccess == FALSE) {
+            SetDlgItemText(hwndDlg, IDC_PROCESS_FILENAME, T_COULD_NOT_QUERY);
+        }
+
+        //
+        // Process Command Line.
+        //
+        bSuccess = FALSE;
+        if (g_WinObj.osver.dwBuildNumber >= 9600) {
+            //
+            // Use new NtQIP info class to get command line.
+            //
+            memIO = 0;
+            NtQueryInformationProcess(hObject, ProcessCommandLineInformation, NULL, 0, &memIO);
+            if (memIO) {
+                Buffer = (PBYTE)supHeapAlloc((SIZE_T)memIO);
+                if (Buffer) {
+
+                    if (NT_SUCCESS(NtQueryInformationProcess(
+                        hObject,
+                        ProcessCommandLineInformation,
+                        (PVOID)Buffer,
+                        memIO,
+                        &memIO)))
+                    {
+                        dynUstr = (PUNICODE_STRING)Buffer;
+                        if ((dynUstr->Length) && (dynUstr->MaximumLength)) {
+
+                            Name = (LPWSTR)supHeapAlloc((SIZE_T)dynUstr->MaximumLength + sizeof(UNICODE_NULL));
+                            if (Name) {
+
+                                RtlCopyMemory(Name, dynUstr->Buffer, dynUstr->Length);
+
+                                SetDlgItemText(hwndDlg, IDC_PROCESS_CMDLINE, Name);
+                                bSuccess = TRUE;
+
+                                supHeapFree(Name);
+                                Name = NULL;
+                            }
+                        }
+                    }
+                    supHeapFree(Buffer);
+                }
+            }
+        }
+        else {
+            //
+            // Read command line from PEB.
+            //
+            if (ProcessParametersRead) {
+
+                readBytes = UserProcessParameters.CommandLine.MaximumLength;
+                Buffer = (PBYTE)supHeapAlloc(readBytes + sizeof(UNICODE_NULL));
+                if (Buffer) {
+
+                    if (NT_SUCCESS(NtReadVirtualMemory(
+                        hObject,
+                        UserProcessParameters.CommandLine.Buffer,
+                        Buffer,
+                        UserProcessParameters.CommandLine.Length,
+                        &readBytes)))
+                    {
+                        SetDlgItemText(hwndDlg, IDC_PROCESS_CMDLINE, (LPCWSTR)Buffer);
+                        bSuccess = TRUE;
+                    }
+
+                    supHeapFree(Buffer);
+                }
+            }
+        }
+
+        if (bSuccess == FALSE) {
+            SetDlgItemText(hwndDlg, IDC_PROCESS_CMDLINE, T_COULD_NOT_QUERY);
+        }
+
+        //
+        // Process Current Directory.
+        //
+        bSuccess = FALSE;
+        if (ProcessParametersRead) {
+            readBytes = UserProcessParameters.CurrentDirectory.DosPath.MaximumLength;
+            Buffer = (PBYTE)supHeapAlloc(readBytes + sizeof(UNICODE_NULL));
+            if (Buffer) {
+
+                if (NT_SUCCESS(NtReadVirtualMemory(
+                    hObject,
+                    UserProcessParameters.CurrentDirectory.DosPath.Buffer,
+                    Buffer,
+                    readBytes,
+                    &readBytes)))
+                {
+                    SetDlgItemText(hwndDlg, IDC_PROCESS_CURDIR, (LPCWSTR)Buffer);
+                    bSuccess = TRUE;
+                }
+
+                supHeapFree(Buffer);
+            }
+        }
+
+        if (bSuccess == FALSE) {
+            SetDlgItemText(hwndDlg, IDC_PROCESS_CURDIR, T_COULD_NOT_QUERY);
+        }
+
+        //
+        // Protection
+        //
+        PsProtection.Level = 0;
+        if (NT_SUCCESS(NtQueryInformationProcess(
+            hObject,
+            ProcessProtectionInformation,
+            &PsProtection,
+            sizeof(ULONG),
+            &i)))
+        {
+            if (PsProtection.Level) {
+
+                if (PsProtection.Type < MAX_KNOWN_PS_PROTECTED_TYPE)
+                    Name = T_PSPROTECTED_TYPE[PsProtection.Type];
+                else
+                    Name = T_Unknown;
+
+                _strcpy(szBuffer, Name);
+                _strcat(szBuffer, TEXT("-"));
+
+                if (PsProtection.Signer < MAX_KNOWN_PS_PROTECTED_SIGNER)
+                    Name = T_PSPROTECTED_SIGNER[PsProtection.Signer];
+                else
+                    Name = T_Unknown;
+
+                _strcat(szBuffer, Name);
+
+                SetDlgItemText(hwndDlg, IDC_PROCESS_PROTECTION, szBuffer);
+            }
+        }
+
+        //
+        // Critical Process
+        //
+        if (NT_SUCCESS(NtQueryInformationProcess(
+            hObject,
+            ProcessBreakOnTermination,
+            &BreakOnTermination,
+            sizeof(ULONG),
+            &i)))
+        {
+            SetDlgItemText(hwndDlg, IDC_PROCESS_CRITICAL,
+                (BreakOnTermination != 0) ? TEXT("Yes") : TEXT("No"));
+        }
+
+        //
+        // Mitigations
+        //
+        propSetProcessMitigationsInfo(hObject, exbi.IsWow64Process, hwndDlg);
+
+        //
+        // Query object basic and type info if needed.
+        //
+        if (ExtendedInfoAvailable == FALSE) {
+            propSetDefaultInfo(Context, hwndDlg, hObject);
+        }
+        propCloseCurrentObject(Context, hObject);
+    }
+}
+
+/*
+* propBasicQueryThread
+*
+* Purpose:
+*
+* Set information values for Thread object type
+*
+*/
+VOID propBasicQueryThread(
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ HWND hwndDlg,
+    _In_ BOOL ExtendedInfoAvailable
+)
+{
+    BOOL bSuccess;
+    ULONG i, dummy;
+    HANDLE hObject;
+    
+    TIME_FIELDS TimeFields;
+
+    WCHAR szBuffer[100];
+
+    PSYSTEM_THREAD_INFORMATION Thread;
+
+    PROCESSOR_NUMBER IdealProcessor;
+
+    if (Context == NULL) {
+        return;
+    }
+
+    Thread = &Context->UnnamedObjectInfo.ThreadInformation;
+
+    //
+    // Open Thread object.
+    //
+    hObject = NULL;
+    bSuccess = propOpenCurrentObject(Context, &hObject, MAXIMUM_ALLOWED);
+    if (!bSuccess) {
+        bSuccess = propOpenCurrentObject(Context, &hObject, THREAD_QUERY_INFORMATION);
+        if (!bSuccess) {
+            bSuccess = propOpenCurrentObject(Context, &hObject, THREAD_QUERY_LIMITED_INFORMATION);
+        }
+    }
+    if (bSuccess) {
+
+        //
+        // Start time.
+        //
+        SetDlgItemText(hwndDlg, IDC_THREAD_STARTED, T_CannotQuery);
+
+        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+        if (supPrintTimeConverted(
+            &Thread->CreateTime,
+            szBuffer,
+            sizeof(szBuffer) / sizeof(szBuffer[0])))
+        {
+            SetDlgItemText(hwndDlg, IDC_THREAD_STARTED, szBuffer);
+        }
+
+        //
+        // Kernel/User time.
+        //
+        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+        RtlTimeToTimeFields(&Thread->KernelTime, &TimeFields);
+        rtl_swprintf_s(szBuffer, MAX_PATH, FORMATTED_TIME_VALUE_MS,
+            TimeFields.Hour,
+            TimeFields.Minute,
+            TimeFields.Second,
+            TimeFields.Milliseconds);
+        SetDlgItemText(hwndDlg, IDC_THREAD_KERNELTIME, szBuffer);
+
+        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+        RtlTimeToTimeFields(&Thread->UserTime, &TimeFields);
+        rtl_swprintf_s(szBuffer, MAX_PATH, FORMATTED_TIME_VALUE_MS,
+            TimeFields.Hour,
+            TimeFields.Minute,
+            TimeFields.Second,
+            TimeFields.Milliseconds);
+        SetDlgItemText(hwndDlg, IDC_THREAD_USERTIME, szBuffer);
+
+        //
+        // Context switches.
+        //
+        szBuffer[0] = 0;
+        ultostr(Thread->ContextSwitchCount, szBuffer);
+        SetDlgItemText(hwndDlg, IDC_THREAD_CONTEXTSWITCHES, szBuffer);
+
+        //
+        // Priority.
+        //
+        szBuffer[0] = 0;
+        ultostr(Thread->BasePriority, szBuffer);
+        SetDlgItemText(hwndDlg, IDC_THREAD_BASEPRIORITY, szBuffer);
+        szBuffer[0] = 0;
+        ultostr(Thread->Priority, szBuffer);
+        SetDlgItemText(hwndDlg, IDC_THREAD_DYNPRIORITY, szBuffer);
+
+        //
+        // Ideal processor.
+        //
+        if (NT_SUCCESS(NtQueryInformationThread(hObject, ThreadIdealProcessorEx,
+            (PVOID)&IdealProcessor, sizeof(PROCESSOR_NUMBER), &dummy)))
+        {
+            szBuffer[0] = 0;
+            ultostr(IdealProcessor.Number, szBuffer);
+            SetDlgItemText(hwndDlg, IDC_THREAD_IDEALPROCESSOR, szBuffer);
+        }
+
+        //
+        // Is thread critical.
+        //
+        i = 0;
+        if (NT_SUCCESS(NtQueryInformationThread(hObject, ThreadBreakOnTermination,
+            (PVOID)&i, sizeof(ULONG), &dummy)))
+        {
+            SetDlgItemText(hwndDlg, IDC_THREAD_CRITICAL, (i > 0) ? TEXT("Yes") : TEXT("No"));
+        }
+
+
+        //
+        // Query object basic and type info if needed.
+        //
+        if (ExtendedInfoAvailable == FALSE) {
+            propSetDefaultInfo(Context, hwndDlg, hObject);
+        }
+        propCloseCurrentObject(Context, hObject);
+    }
 }
 
 /*
@@ -1148,7 +2031,7 @@ VOID propBasicQueryAlpcPort(
 
         _strcat(szBuffer, TEXT(" ("));
 
-        ProcessList = supGetSystemInfo(SystemProcessInformation);
+        ProcessList = supGetSystemInfo(SystemProcessInformation, NULL);
         if (ProcessList) {
 
             if (!supQueryProcessNameByEPROCESS(
@@ -1246,10 +2129,10 @@ VOID propBasicQueryJob(
         SetDlgItemText(hwndDlg, ID_JOBTERMINATEDPROCS, szBuffer);
 
         //Total user time
-        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
         RtlSecureZeroMemory(&SystemTime, sizeof(SystemTime));
         RtlTimeToTimeFields(&jbai.TotalUserTime, &SystemTime);
-        wsprintf(szBuffer, FORMATTED_TIME_VALUE_MS,
+        rtl_swprintf_s(szBuffer, MAX_PATH, FORMATTED_TIME_VALUE_MS,
             SystemTime.Hour,
             SystemTime.Minute,
             SystemTime.Second,
@@ -1257,9 +2140,9 @@ VOID propBasicQueryJob(
         SetDlgItemText(hwndDlg, ID_JOBTOTALUMTIME, szBuffer);
 
         //Total kernel time
-        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
         RtlTimeToTimeFields(&jbai.TotalKernelTime, &SystemTime);
-        wsprintf(szBuffer, FORMATTED_TIME_VALUE_MS,
+        rtl_swprintf_s(szBuffer, MAX_PATH, FORMATTED_TIME_VALUE_MS,
             SystemTime.Hour,
             SystemTime.Minute,
             SystemTime.Second,
@@ -1315,11 +2198,11 @@ VOID propBasicQueryJob(
             // If any present then output processes in the list.
             //
             if (pJobProcList->NumberOfProcessIdsInList > 0) {
-                ProcessList = supGetSystemInfo(SystemProcessInformation);
+                ProcessList = supGetSystemInfo(SystemProcessInformation, NULL);
                 if (ProcessList) {
                     for (i = 0; i < pJobProcList->NumberOfProcessIdsInList; i++) {
                         ProcessId = pJobProcList->ProcessIdList[i];
-                        RtlSecureZeroMemory(&szProcessName, sizeof(szProcessName));
+                        RtlSecureZeroMemory(szProcessName, sizeof(szProcessName));
 
                         //
                         // Query process name.
@@ -1333,7 +2216,13 @@ VOID propBasicQueryJob(
                             _strcpy(szProcessName, TEXT("UnknownProcess"));
                         }
 
-                        wsprintf(szBuffer, TEXT("[0x%I64X:%I64u] %ws"), ProcessId, ProcessId, szProcessName);
+                        //
+                        // Build final string.
+                        //
+                        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+                        rtl_swprintf_s(szBuffer, sizeof(szBuffer) / sizeof(szBuffer[0]), 
+                            TEXT("[0x%I64X:%I64u] %wS"), ProcessId, ProcessId, szProcessName);                       
+                        
                         SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
                     }
                     SendMessage(hwndCB, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
@@ -1411,19 +2300,11 @@ VOID propSetBasicInfoEx(
     if (InfoObject == NULL)
         return;
 
-    //Object Address
-    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-    szBuffer[0] = L'0';
-    szBuffer[1] = L'x';
-    u64tohex(InfoObject->ObjectAddress, &szBuffer[2]);
-    SetDlgItemText(hwndDlg, ID_OBJECT_ADDR, szBuffer);
-
-    //Header Address
-    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-    szBuffer[0] = L'0';
-    szBuffer[1] = L'x';
-    u64tohex(InfoObject->HeaderAddress, &szBuffer[2]);
-    SetDlgItemText(hwndDlg, ID_OBJECT_HEADER, szBuffer);
+    //Object & Header Address
+    propSetObjectHeaderAddressInfo(
+        hwndDlg,
+        InfoObject->ObjectAddress,
+        InfoObject->HeaderAddress);
 
     //Reference Count
     RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
@@ -1483,7 +2364,6 @@ VOID propBasicQueryDesktop(
     BOOL        bExtendedInfoAvailable;
     HANDLE      hDesktop;
     ULONG_PTR   ObjectAddress, HeaderAddress, InfoHeaderAddress;
-    WCHAR       szBuffer[MAX_PATH + 1];
     OBJINFO     InfoObject;
 
     if (Context == NULL) {
@@ -1506,8 +2386,10 @@ VOID propBasicQueryDesktop(
     if (supQueryObjectFromHandle(hDesktop, &ObjectAddress, NULL)) {
         HeaderAddress = (ULONG_PTR)OBJECT_TO_OBJECT_HEADER(ObjectAddress);
 
-        //we can use driver
-        if (g_kdctx.hDevice != NULL) {
+        //
+        // If we can use driver, query extended information.
+        //
+        if (kdConnectDriver()) {
             RtlSecureZeroMemory(&InfoObject, sizeof(InfoObject));
             InfoObject.HeaderAddress = HeaderAddress;
             InfoObject.ObjectAddress = ObjectAddress;
@@ -1528,19 +2410,13 @@ VOID propBasicQueryDesktop(
         }
         //cannot query extended info, output what we have
         if (bExtendedInfoAvailable == FALSE) {
-            //Object Address
-            RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-            szBuffer[0] = L'0';
-            szBuffer[1] = L'x';
-            u64tohex(ObjectAddress, &szBuffer[2]);
-            SetDlgItemText(hwndDlg, ID_OBJECT_ADDR, szBuffer);
 
-            //Object Address
-            RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-            szBuffer[0] = L'0';
-            szBuffer[1] = L'x';
-            u64tohex(HeaderAddress, &szBuffer[2]);
-            SetDlgItemText(hwndDlg, ID_OBJECT_HEADER, szBuffer);
+            //Object and Header address
+            propSetObjectHeaderAddressInfo(
+                hwndDlg,
+                ObjectAddress,
+                HeaderAddress);
+
         }
     }
 
@@ -1581,22 +2457,39 @@ VOID propSetBasicInfo(
     if (Context->TypeIndex != ObjectTypeDesktop) {
 
         //
-        // If object is in private namespace then dump it information by object address.
-        // Otherwise query object as usual.
+        // Dump object information depending on context type.
         //
-        if (Context->IsPrivateNamespaceObject) {
+        switch (Context->ContextType) {
+
+        case propPrivateNamespace:
             InfoObject = ObQueryObjectByAddress(Context->NamespaceInfo.ObjectAddress);
-        }
-        else {
-            //
-            // Try to dump object info.
-            //
+            break;
+
+        case propUnnamed:
+            InfoObject = ObQueryObjectByAddress(Context->UnnamedObjectInfo.ObjectAddress);
+            break;
+
+        default:
             InfoObject = ObQueryObject(Context->lpCurrentObjectPath, Context->lpObjectName);
+            break;
         }
+
         ExtendedInfoAvailable = (InfoObject != NULL);
         if (InfoObject == NULL) {
-            SetDlgItemText(hwndDlg, ID_OBJECT_ADDR, L"");
-            SetDlgItemText(hwndDlg, ID_OBJECT_HEADER, L"");
+
+            if (Context->ContextType == propUnnamed) {
+
+                if (Context->UnnamedObjectInfo.ObjectAddress) {
+                    propSetObjectHeaderAddressInfo(
+                        hwndDlg,
+                        Context->UnnamedObjectInfo.ObjectAddress,
+                        (ULONG_PTR)OBJECT_TO_OBJECT_HEADER(Context->UnnamedObjectInfo.ObjectAddress));
+                }
+            }
+            else {
+                SetDlgItemText(hwndDlg, ID_OBJECT_ADDR, TEXT(""));
+                SetDlgItemText(hwndDlg, ID_OBJECT_HEADER, TEXT(""));
+            }
         }
         else {
             //make copy of received dump
@@ -1609,7 +2502,7 @@ VOID propSetBasicInfo(
 
             //
             // Special case for AlpcPort object type.
-            // The only infor we can get is from driver here as we cannot open port directly.
+            // The only information we can get is from driver here as we cannot open port directly.
             // 
             if (Context->TypeIndex == ObjectTypePort) {
                 propBasicQueryAlpcPort(Context, hwndDlg);
@@ -1681,8 +2574,46 @@ VOID propSetBasicInfo(
     case ObjectTypeMemoryPartition:
         propBasicQueryMemoryPartition(Context, hwndDlg);
         break;
+    case ObjectTypeProcess:
+        propBasicQueryProcess(Context, hwndDlg, ExtendedInfoAvailable);
+        break;
+    case ObjectTypeThread:
+        propBasicQueryThread(Context, hwndDlg, ExtendedInfoAvailable);
+        break;
     }
 
+}
+
+/*
+* BasicPropDialogOnCommand
+*
+* Purpose:
+*
+* Basic Properties Dialog WM_COMMAND handler.
+*
+*/
+INT_PTR BasicPropDialogOnCommand(
+    _In_  HWND hwndDlg,
+    _In_  WPARAM wParam
+)
+{
+    INT_PTR iResult = 0;
+    SIZE_T bufferSize;
+    PWCHAR lpImageFileName;
+    HWND hwndImageFileName = GetDlgItem(hwndDlg, IDC_PROCESS_FILENAME);
+
+    if (LOWORD(wParam) == IDC_PROCESS_BROWSE) {
+        bufferSize = UNICODE_STRING_MAX_BYTES + 1;
+        lpImageFileName = (LPWSTR)supHeapAlloc(bufferSize);
+        if (lpImageFileName) {
+            GetWindowText(hwndImageFileName, lpImageFileName, UNICODE_STRING_MAX_BYTES / sizeof(WCHAR));
+            supJumpToFile(lpImageFileName);
+            supHeapFree(lpImageFileName);
+        }
+        iResult = 1;
+    }
+
+    return iResult;
 }
 
 /*
@@ -1692,8 +2623,9 @@ VOID propSetBasicInfo(
 *
 * Basic Properties Dialog Procedure
 *
-* WM_SHOWWINDOW - when wParam is TRUE it sets "Basic" page object information.
 * WM_INITDIALOG - set context window prop.
+* WM_SHOWWINDOW - when wParam is TRUE it sets "Basic" page object information.
+* WM_COMMAND - handle specific controls commands.
 * WM_DESTROY - remove context window prop.
 *
 */
@@ -1727,6 +2659,10 @@ INT_PTR CALLBACK BasicPropDialogProc(
             }
         }
         return 1;
+        break;
+
+    case WM_COMMAND:
+        return BasicPropDialogOnCommand(hwndDlg, wParam);
         break;
 
     case WM_PAINT:

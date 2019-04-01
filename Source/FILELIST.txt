@@ -9,6 +9,10 @@ excepth.h
 extras.c - extras menu handler
 extras.h
 
+extapi.c - Windows 7 missing API support
+extapi.h
+extdef.h - SDK 8.1 missing definitions support
+
 extrasCallbacks.c - Callbacks list
 extrasCallbacks.h
 
@@ -78,6 +82,9 @@ propSecurity.c - "Security" property sheet handler and ISecurityInformation impl
 propSecurity.h
 propSecurityConsts.h - object type access values, generic mappings here
 
+propToken.c - property sheet "Token" handler, window procedure
+propToken.h
+
 propType.c - property sheet "Type" handlers, including window procedure for "Procedures" sheet
 propType.h
 propTypeConsts.h - known object access rights converted to strings listed here
@@ -93,6 +100,7 @@ treelist.c - systreeview32 combined with sysheader32 control
 treelist.h
 
 wine.h - wine support header file
+wine.c
 
 global.h - global include file
 ntos.h - os internals related definitions and prototypes

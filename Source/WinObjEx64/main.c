@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.72
+*  VERSION:     1.73
 *
-*  DATE:        01 Mar 2019
+*  DATE:        30 Mar 2019
 *
 *  Program entry point and main window handler.
 *
@@ -20,9 +20,13 @@
 #include "global.h"
 #include "aboutDlg.h"
 #include "findDlg.h"
-#include "props\propDlg.h"
-#include "extras\extras.h"
-#include "tests\testunit.h"
+#include "treelist/treelist.h"
+#include "props/propDlg.h"
+#include "extras/extras.h"
+#include "tests/testunit.h"
+
+pswprintf_s rtl_swprintf_s;
+pqsort rtl_qsort;
 
 static LONG	SplitterPos = 180;
 static LONG	SortColumn = 0;
@@ -34,6 +38,7 @@ HWND        hwndToolBar = NULL, hwndSplitter = NULL, hwndStatusBar = NULL, MainW
 // Global UI variables.
 //
 
+ATOM g_TreeListAtom;
 HWND g_hwndObjectTree;
 HWND g_hwndObjectList;
 HIMAGELIST g_ListViewImages;
@@ -88,7 +93,7 @@ VOID MainWindowExtrasDisableAdminFeatures(
     //
     // This feature is not unsupported in Wine.
     //
-    if (g_kdctx.IsWine != FALSE) {
+    if (g_WinObj.IsWine) {
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_DRIVERS, FALSE, &mii);
     }
 }
@@ -175,6 +180,7 @@ VOID MainWindowHandleObjectTreeProp(
             szBuffer,
             OBTYPE_NAME_DIRECTORY,
             NULL,
+            NULL,
             NULL);
     }
 }
@@ -220,6 +226,7 @@ VOID MainWindowHandleObjectListProp(
                 lpItemText,
                 lpType,
                 lpDesc,
+                NULL,
                 NULL);
 
             if (lpDesc) {
@@ -250,9 +257,7 @@ VOID MainWindowOnRefresh(
 
     supSetWaitCursor(TRUE);
 
-    if (g_kdctx.hDevice != NULL) {
-        ObCollectionDestroy(&g_kdctx.ObCollection);
-    }
+    ObCollectionDestroy(&g_kdctx.ObCollection);
 
     supFreeSCMSnapshot(NULL);
     sapiFreeSnapshot();
@@ -370,8 +375,10 @@ LRESULT MainWindowHandleWMCommand(
         //
         // Feature require driver usage and not supported in 10586.
         //
-        if ((g_kdctx.hDevice != NULL) && (g_NtBuildNumber != 10586)) {
-            extrasShowPrivateNamespacesDialog(hwnd);
+        if (g_NtBuildNumber != 10586) {
+            if (kdConnectDriver()) {
+                extrasShowPrivateNamespacesDialog(hwnd);
+            }
         }
         break;
 
@@ -383,7 +390,7 @@ LRESULT MainWindowHandleWMCommand(
         // This feature require driver usage.
         //
 #ifndef _DEBUG
-        if (g_kdctx.hDevice != NULL) {
+        if (kdConnectDriver()) {
 #endif
             extrasShowSSDTDialog(hwnd, LOWORD(wParam));
 #ifndef _DEBUG
@@ -396,7 +403,7 @@ LRESULT MainWindowHandleWMCommand(
         //
         // Unsupported in Wine.
         //
-        if (g_kdctx.IsWine == FALSE) {
+        if (g_WinObj.IsWine == FALSE) {
             extrasShowDriversDialog(hwnd);
         }
         break;
@@ -520,6 +527,72 @@ VOID MainWindowTreeViewSelChanged(
 }
 
 /*
+* MainWindowHandleTreePopupMenu
+*
+* Purpose:
+*
+* Object Tree popup menu builder.
+*
+*/
+VOID MainWindowHandleTreePopupMenu(
+    _In_ HWND hwnd,
+    _In_ LPPOINT point
+)
+{
+    HMENU hMenu;
+
+    hMenu = CreatePopupMenu();
+    if (hMenu) {
+        InsertMenu(hMenu, 0, MF_BYCOMMAND, ID_OBJECT_PROPERTIES, T_PROPERTIES);
+
+        supSetMenuIcon(hMenu, ID_OBJECT_PROPERTIES,
+            (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 0));
+
+        TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, point->x, point->y, 0, hwnd, NULL);
+        DestroyMenu(hMenu);
+    }
+}
+
+/*
+* MainWindowHandleObjectPopupMenu
+*
+* Purpose:
+*
+* Object List popup menu builder.
+*
+*/
+VOID MainWindowHandleObjectPopupMenu(
+    _In_ HWND hwnd,
+    _In_ HWND hwndlv,
+    _In_ INT iItem,
+    _In_ LPPOINT point
+)
+{
+    HMENU hMenu;
+    UINT  uEnable = MF_BYCOMMAND | MF_GRAYED;
+
+    hMenu = CreatePopupMenu();
+    if (hMenu == NULL) return;
+
+    InsertMenu(hMenu, 0, MF_BYCOMMAND, ID_OBJECT_PROPERTIES, T_PROPERTIES);
+
+    supSetMenuIcon(hMenu, ID_OBJECT_PROPERTIES,
+        (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 0));
+
+    if (supIsSymlink(hwndlv, iItem)) {
+        InsertMenu(hMenu, 1, MF_BYCOMMAND, ID_OBJECT_GOTOLINKTARGET, T_GOTOLINKTARGET);
+        supSetMenuIcon(hMenu, ID_OBJECT_GOTOLINKTARGET,
+            (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ListViewImages,
+                ObManagerGetImageIndexByTypeName(OBTYPE_NAME_SYMBOLIC_LINK)));
+        uEnable &= ~MF_GRAYED;
+    }
+    EnableMenuItem(GetSubMenu(GetMenu(hwnd), 2), ID_OBJECT_GOTOLINKTARGET, uEnable);
+
+    TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, point->x, point->y, 0, hwnd, NULL);
+    DestroyMenu(hMenu);
+}
+
+/*
 * MainWindowHandleWMNotify
 *
 * Purpose:
@@ -582,7 +655,7 @@ LRESULT MainWindowHandleWMNotify(
                     TreeView_SelectItem(g_hwndObjectTree, SelectedTreeItem);
                     SendMessage(hwndStatusBar, WM_SETTEXT, 0, (LPARAM)g_WinObj.CurrentObjectPath);
                     supSetGotoLinkTargetToolButtonState(hwnd, 0, 0, TRUE, FALSE);
-                    supHandleTreePopupMenu(hwnd, &pt);
+                    MainWindowHandleTreePopupMenu(hwnd, &pt);
                 }
                 break;
             }
@@ -742,7 +815,7 @@ LRESULT CALLBACK MainWindowProc(
             TreeView_GetItemRect(g_hwndObjectTree, TreeView_GetSelection(g_hwndObjectTree), &crc, TRUE);
             crc.top = crc.bottom;
             ClientToScreen(g_hwndObjectTree, (LPPOINT)&crc);
-            supHandleTreePopupMenu(hwnd, (LPPOINT)&crc);
+            MainWindowHandleTreePopupMenu(hwnd, (LPPOINT)&crc);
         }
 
         if ((HWND)wParam == g_hwndObjectList) {
@@ -756,7 +829,7 @@ LRESULT CALLBACK MainWindowProc(
             else
                 GetCursorPos((LPPOINT)&crc);
 
-            supHandleObjectPopupMenu(hwnd, g_hwndObjectList, mark, (LPPOINT)&crc);
+            MainWindowHandleObjectPopupMenu(hwnd, g_hwndObjectList, mark, (LPPOINT)&crc);
         }
         break;
 
@@ -836,15 +909,18 @@ LRESULT CALLBACK MainWindowProc(
 *
 */
 BOOL MainWindowDlgMsgHandler(
-    _In_ MSG msg
+    _In_ MSG msg,
+    _In_ HACCEL hAccTable
 )
 {
     UINT c;
 
     for (c = 0; c < wobjMaxDlgId; c++) {
         if ((g_WinObj.AuxDialogs[c] != NULL)) {
-            if (IsDialogMessage(g_WinObj.AuxDialogs[c], &msg))
+            if (IsDialogMessage(g_WinObj.AuxDialogs[c], &msg)) {
+                TranslateAccelerator(g_WinObj.AuxDialogs[c], hAccTable, &msg);
                 return TRUE;
+            }
         }
     }
 
@@ -868,7 +944,7 @@ BOOL MainWindowDlgMsgHandler(
 *
 */
 BOOL WinObjInitGlobals(
-    _In_ BOOL IsWine)
+    _In_ BOOLEAN IsWine)
 {
     SIZE_T cch;
     BOOL bResult = FALSE, bCond = FALSE;
@@ -878,6 +954,8 @@ BOOL WinObjInitGlobals(
 
     do {
         RtlSecureZeroMemory(&g_WinObj, sizeof(g_WinObj));
+
+        g_WinObj.IsWine = IsWine;
 
         //
         // Query version info.
@@ -956,9 +1034,10 @@ BOOL WinObjInitGlobals(
 */
 UINT WinObjExMain()
 {
+    BOOLEAN                 IsWine = FALSE;
     MSG                     msg1;
     WNDCLASSEX              wincls;
-    BOOL                    IsFullAdmin = FALSE, IsWine = FALSE, rv = TRUE, cond = FALSE, bLocalSystem = FALSE;
+    BOOL                    IsFullAdmin = FALSE, rv = TRUE, cond = FALSE, bLocalSystem = FALSE;
     ATOM                    class_atom = 0;
     INITCOMMONCONTROLSEX    icc;
     LVCOLUMN                col;
@@ -971,6 +1050,11 @@ UINT WinObjExMain()
     HIMAGELIST              TreeViewImages;
 
     IsWine = supIsWine();
+
+    if (!supInitNtdllCRT(IsWine)) {
+        MessageBox(GetDesktopWindow(), TEXT("Could not initialize CRT"), NULL, MB_ICONERROR);
+        return ERROR_APP_INIT_FAILURE;
+    }
 
     //
     // wine 1.6 xenial does not suport this routine.
@@ -991,12 +1075,6 @@ UINT WinObjExMain()
     }
 
     supInit(IsFullAdmin);
-
-    // do not move anywhere
-    // g_kdctx variable initialized BEFORE this.
-    // if you move these lines anywhere above they will be zeroed during kdInit
-    g_kdctx.IsWine = IsWine;
-    g_kdctx.IsFullAdmin = IsFullAdmin;
 
 #ifdef _DEBUG
     TestStart();
@@ -1049,7 +1127,7 @@ UINT WinObjExMain()
         }
 
         //
-        // Main App window.
+        // Create main window.
         //
         MainWindow = CreateWindowEx(
             0,
@@ -1171,6 +1249,11 @@ UINT WinObjExMain()
             NULL);
 
         //
+        // Register treelist control class.
+        //
+        g_TreeListAtom = InitializeTreeListControl();
+
+        //
         // Initialization of views.
         //
         SendMessage(MainWindow, WM_SIZE, 0, 0);
@@ -1192,7 +1275,7 @@ UINT WinObjExMain()
         //
         // Insert run as admin/local system menu entry if not under Wine.
         //
-        if (g_kdctx.IsWine == FALSE) {
+        if (g_WinObj.IsWine == FALSE) {
             //
             // We are running as user, add menu item to request elevation.
             //
@@ -1383,7 +1466,7 @@ UINT WinObjExMain()
             if (rv == -1)
                 break;
 
-            if (MainWindowDlgMsgHandler(msg1))
+            if (MainWindowDlgMsgHandler(msg1, hAccTable))
                 continue;
 
             if (IsDialogMessage(MainWindow, &msg1)) {
@@ -1399,6 +1482,9 @@ UINT WinObjExMain()
 
     if (class_atom != 0)
         UnregisterClass(MAKEINTATOM(class_atom), g_WinObj.hInstance);
+
+    if (g_TreeListAtom != 0)
+        UnregisterClass(MAKEINTATOM(g_TreeListAtom), g_WinObj.hInstance);
 
     //do not move anywhere
 

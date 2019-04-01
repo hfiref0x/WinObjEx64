@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       EXCEPTH.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.73
 *
-*  DATE:        30 Nov 2018
+*  DATE:        17 Mar 2019
 *
 *  Exception handler routines.
 *
@@ -17,7 +17,7 @@
 *
 *******************************************************************************/
 #include "global.h"
-#include "DbgHelp.h"
+#include <DbgHelp.h>
 
 typedef BOOL(WINAPI *pfnMiniDumpWriteDump)(
     _In_ HANDLE hProcess,

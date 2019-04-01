@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.72
+*  VERSION:     1.73
 *
-*  DATE:        01 Mar 2019
+*  DATE:        30 Mar 2019
 *
 *  Common header file for the program support routines.
 *
@@ -20,6 +20,14 @@
 
 #include <cfgmgr32.h>
 #include <setupapi.h>
+
+#define T_DEVICE_PROCEXP152 L"\\Device\\ProcExp152"
+#define PE_DEVICE_TYPE 0x8335
+
+#define IOCTL_PE_OPEN_PROCESS_TOKEN     CTL_CODE(PE_DEVICE_TYPE, 0x3, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define IOCTL_PE_OPEN_PROCESS           CTL_CODE(PE_DEVICE_TYPE, 0xF, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
+#define INITIAL_BUFFER_SIZE (256) * (1024)
 
 typedef struct _SAPIDB {
     LIST_ENTRY ListHead;
@@ -36,6 +44,13 @@ typedef struct _ENUMICONINFO {
     INT cx, cy;
 } ENUMICONINFO, *PENUMICONINFO;
 
+typedef	struct _PHL_ENTRY {
+    LIST_ENTRY ListEntry;
+    HANDLE ProcessHandle;
+    HANDLE UniqueProcessId;
+    PVOID DataPtr;
+} PHL_ENTRY, *PPHL_ENTRY;
+
 typedef struct _OBEX_PROCESS_LOOKUP_ENTRY {
     HANDLE hProcess;
     union {
@@ -44,10 +59,32 @@ typedef struct _OBEX_PROCESS_LOOKUP_ENTRY {
     };
 } OBEX_PROCESS_LOOKUP_ENTRY, *POBEX_PROCESS_LOOKUP_ENTRY;
 
-//
-// Gripper window size
-//
-#define GRIPPER_SIZE 11
+typedef struct _OBEX_THREAD_LOOKUP_ENTRY {
+    HANDLE hThread;
+    PVOID EntryPtr;
+} OBEX_THREAD_LOOKUP_ENTRY, *POBEX_THREAD_LOOKUP_ENTRY;
+
+typedef struct _PROCESS_MITIGATION_POLICIES_ALL {
+    PROCESS_MITIGATION_DEP_POLICY DEPPolicy;
+    PROCESS_MITIGATION_ASLR_POLICY ASLRPolicy;
+    PROCESS_MITIGATION_DYNAMIC_CODE_POLICY_W10 DynamicCodePolicy;
+    PROCESS_MITIGATION_STRICT_HANDLE_CHECK_POLICY StrictHandleCheckPolicy;
+    PROCESS_MITIGATION_SYSTEM_CALL_DISABLE_POLICY_W10 SystemCallDisablePolicy;
+    PROCESS_MITIGATION_EXTENSION_POINT_DISABLE_POLICY ExtensionPointDisablePolicy;
+    PROCESS_MITIGATION_CONTROL_FLOW_GUARD_POLICY_W10 ControlFlowGuardPolicy;
+    PROCESS_MITIGATION_BINARY_SIGNATURE_POLICY_W10 SignaturePolicy;
+    PROCESS_MITIGATION_FONT_DISABLE_POLICY_W10 FontDisablePolicy;
+    PROCESS_MITIGATION_IMAGE_LOAD_POLICY_W10 ImageLoadPolicy;
+    PROCESS_MITIGATION_SYSTEM_CALL_FILTER_POLICY_W10 SystemCallFilterPolicy;
+    PROCESS_MITIGATION_PAYLOAD_RESTRICTION_POLICY_W10 PayloadRestrictionPolicy;
+    PROCESS_MITIGATION_CHILD_PROCESS_POLICY_W10 ChildProcessPolicy;
+    PROCESS_MITIGATION_SIDE_CHANNEL_ISOLATION_POLICY_W10 SideChannelIsolationPolicy;
+} PROCESS_MITIGATION_POLICIES_ALL, *PPROCESS_MITIGATION_POLICIES;
+
+typedef struct _PROCESS_MITIGATION_POLICY_RAW_DATA {
+    PROCESS_MITIGATION_POLICY Policy;
+    ULONG Value;
+} PROCESS_MITIGATION_POLICY_RAW_DATA, *PPROCESS_MITIGATION_POLICY_RAW_DATA;
 
 #define GET_BIT(Integer, Bit) (((Integer) >> (Bit)) & 0x1)
 #define SET_BIT(Integer, Bit) ((Integer) |= 1 << (Bit))
@@ -57,6 +94,11 @@ typedef struct _OBEX_PROCESS_LOOKUP_ENTRY {
 // Conversion buffer size
 //
 #define DBUFFER_SIZE                 512
+
+typedef struct _ENUMCHILDWNDDATA {
+    RECT Rect;
+    INT nCmdShow;
+} ENUMCHILDWNDDATA, *PENUMCHILDWNDDATA;
 
 typedef struct _LANGANDCODEPAGE {
     WORD wLanguage;
@@ -75,6 +117,9 @@ extern POBJECT_TYPES_INFORMATION g_pObjectTypesInfo;
 
 #define PathFileExists(lpszPath) (GetFileAttributes(lpszPath) != (DWORD)-1)
 
+BOOL supInitNtdllCRT(
+    _In_ BOOL IsWine);
+
 #ifndef _DEBUG
 FORCEINLINE PVOID supHeapAlloc(
     _In_ SIZE_T Size);
@@ -89,6 +134,11 @@ BOOL supHeapFree(
     _In_ PVOID Memory);
 #endif
 
+PVOID supVirtualAllocEx(
+    _In_ SIZE_T Size,
+    _In_ ULONG AllocationType,
+    _In_ ULONG Protect);
+
 PVOID supVirtualAlloc(
     _In_ SIZE_T Size);
 
@@ -97,15 +147,19 @@ BOOL supVirtualFree(
 
 BOOL supInitTreeListForDump(
     _In_  HWND  hwndParent,
-    _Out_ ATOM *pTreeListAtom,
     _Out_ HWND *pTreeListHwnd);
 
 VOID supShowHelp(
     _In_ HWND ParentWindow);
 
-_Success_(return != FALSE)
 BOOL supQueryObjectFromHandle(
-    _In_ HANDLE hOject,
+    _In_ HANDLE Object,
+    _Out_ ULONG_PTR *Address,
+    _Out_opt_ USHORT *TypeIndex);
+
+BOOL supQueryObjectFromHandleDump(
+    _In_ HANDLE Object,
+    _In_ PSYSTEM_HANDLE_INFORMATION_EX HandleDump,
     _Out_ ULONG_PTR *Address,
     _Out_opt_ USHORT *TypeIndex);
 
@@ -150,12 +204,6 @@ VOID supSetMenuIcon(
     _In_ UINT Item,
     _In_ ULONG_PTR IconData);
 
-VOID supHandleObjectPopupMenu(
-    _In_ HWND hwnd,
-    _In_ HWND hwndlv,
-    _In_ INT iItem,
-    _In_ LPPOINT point);
-
 VOID supSetGotoLinkTargetToolButtonState(
     _In_ HWND hwnd,
     _In_opt_ HWND hwndlv,
@@ -163,9 +211,9 @@ VOID supSetGotoLinkTargetToolButtonState(
     _In_ BOOL bForce,
     _In_ BOOL bForceEnable);
 
-VOID supHandleTreePopupMenu(
-    _In_ HWND hwnd,
-    _In_ LPPOINT point);
+BOOL supIsSymlink(
+    _In_ HWND hwndList,
+    _In_ INT iItem);
 
 VOID supCreateToolbarButtons(
     _In_ HWND hWndToolbar);
@@ -190,14 +238,6 @@ VOID supClipboardCopy(
 BOOL supEnablePrivilege(
     _In_ DWORD PrivilegeName,
     _In_ BOOL fEnable);
-
-BOOL WINAPI supEnumEnableChildWindows(
-    _In_ HWND hwnd,
-    _In_ LPARAM lParam);
-
-BOOL WINAPI supEnumHideChildWindows(
-    _In_ HWND hwnd,
-    _In_ LPARAM lParam);
 
 LPWSTR supGetItemText(
     _In_ HWND ListView,
@@ -250,6 +290,10 @@ BOOL supQueryProcessName(
     _Inout_	LPWSTR Buffer,
     _In_ DWORD ccBuffer);
 
+BOOL supQueryThreadWin32StartAddress(
+    _In_ HANDLE ThreadHandle,
+    _Out_ PULONG_PTR Win32StartAddress);
+
 BOOL supQueryProcessNameByEPROCESS(
     _In_ ULONG_PTR ValueOfEPROCESS,
     _In_ PVOID ProcessList,
@@ -270,8 +314,14 @@ ULONG supFindModuleEntryByAddress(
     _In_ PRTL_PROCESS_MODULES pModulesList,
     _In_ PVOID Address);
 
+PVOID supGetTokenInfo(
+    _In_ HANDLE TokenHandle,
+    _In_ TOKEN_INFORMATION_CLASS TokenInformationClass,
+    _Out_opt_ PULONG ReturnLength);
+
 PVOID supGetSystemInfo(
-    _In_ SYSTEM_INFORMATION_CLASS InfoClass);
+    _In_ SYSTEM_INFORMATION_CLASS SystemInformationClass,
+    _Out_opt_ PULONG ReturnLength);
 
 HANDLE supOpenDirectory(
     _In_ LPWSTR lpDirectory);
@@ -313,13 +363,6 @@ ULONG_PTR supWriteBufferToFile(
     _In_ BOOL Flush,
     _In_ BOOL Append);
 
-HWND supCreateSzGripWindow(
-    _In_ HWND hwndOwner);
-
-VOID supSzGripWindowOnResize(
-    _In_ HWND hwndOwner,
-    _In_ HWND hwndSizeGrip);
-
 BOOL supIsProcess32bit(
     _In_ HANDLE hProcess);
 
@@ -331,7 +374,7 @@ BOOL supGetWin32FileName(
     _Inout_ LPWSTR Win32FileName,
     _In_ SIZE_T ccWin32FileName);
 
-BOOL supIsWine(
+BOOLEAN supIsWine(
     VOID);
 
 BOOL supQuerySecureBootState(
@@ -408,7 +451,7 @@ INT supGetMaxCompareTwoFixedStrings(
     _In_ LPARAM lParamSort,
     _In_ BOOL Inverse);
 
-HANDLE supOpenNamedObjectFromContext(
+HANDLE supOpenObjectFromContext(
     _In_ PROP_OBJECT_INFO *Context,
     _In_ OBJECT_ATTRIBUTES *ObjectAttributes,
     _In_ ACCESS_MASK DesiredAccess,
@@ -433,6 +476,13 @@ VOID supCopyTreeListSubItemValue(
     _In_ HWND TreeList,
     _In_ UINT ValueIndex);
 
+VOID supCopyListViewSubItemValue(
+    _In_ HWND ListView,
+    _In_ UINT ValueIndex);
+
+VOID supJumpToFile(
+    _In_ LPWSTR lpFilePath);
+
 PVOID supBSearch(
     _In_ PCVOID key,
     _In_ PCVOID base,
@@ -442,3 +492,88 @@ PVOID supBSearch(
         _In_ PCVOID key,
         _In_ PCVOID elt
         ));
+
+_Success_(return != FALSE)
+BOOL supGetProcessDepState(
+    _In_ HANDLE hProcess,
+    _Out_ PPROCESS_MITIGATION_DEP_POLICY DepPolicy);
+
+_Success_(return != FALSE)
+BOOL supGetProcessMitigationPolicy(
+    _In_ HANDLE hProcess,
+    _In_ PROCESS_MITIGATION_POLICY Policy,
+    _In_ SIZE_T Size,
+    _Out_writes_bytes_(Size) PVOID Buffer);
+
+NTSTATUS supOpenProcess(
+    _In_ HANDLE UniqueProcessId,
+    _In_ ACCESS_MASK DesiredAccess,
+    _Out_ PHANDLE ProcessHandle);
+
+NTSTATUS supOpenProcessEx(
+    _In_ HANDLE UniqueProcessId,
+    _Out_ PHANDLE ProcessHandle);
+
+NTSTATUS supOpenProcessTokenEx(
+    _In_ HANDLE ProcessHandle,
+    _Out_ PHANDLE TokenHandle);
+
+NTSTATUS supOpenThread(
+    _In_ PCLIENT_ID ClientId,
+    _In_ ACCESS_MASK DesiredAccess,
+    _Out_ PHANDLE ThreadHandle);
+
+BOOL supPrintTimeConverted(
+    _In_ PLARGE_INTEGER Time,
+    _In_ LPWSTR lpBuffer,
+    _In_ SIZE_T cchBuffer);
+
+BOOL supGetListViewItemParam(
+    _In_ HWND hwndListView,
+    _In_ INT itemIndex,
+    _Out_ PVOID *outParam);
+
+BOOL WINAPI supCallbackShowChildWindow(
+    _In_ HWND hwnd,
+    _In_ LPARAM lParam);
+
+LPWSTR supIntegrityToString(
+    _In_ DWORD IntegrityLevel);
+
+BOOL supLookupSidUserAndDomain(
+    _In_ PSID Sid,
+    _Out_ LPWSTR *lpSidUserAndDomain);
+
+BOOL supQueryProcessEntryById(
+    _In_ HANDLE UniqueProcessId,
+    _In_ PVOID ProcessList,
+    _Out_ PSYSTEM_PROCESSES_INFORMATION *Entry);
+
+BOOL supHandlesQueryObjectAddress(
+    _In_ PSYSTEM_HANDLE_INFORMATION_EX SortedHandleList,
+    _In_ HANDLE ObjectHandle,
+    _Out_ PULONG_PTR ObjectAddress);
+
+PSYSTEM_HANDLE_INFORMATION_EX supHandlesCreateFilteredAndSortedList(
+    _In_ ULONG_PTR FilterUniqueProcessId,
+    _In_ BOOLEAN fObject);
+
+BOOL supHandlesFreeList(
+    PSYSTEM_HANDLE_INFORMATION_EX SortedHandleList);
+
+NTSTATUS supCICustomKernelSignersAllowed(
+    _Out_ PBOOLEAN bAllowed);
+
+VOID supPHLFree(
+    _In_ PLIST_ENTRY ListHead,
+    _In_ BOOLEAN fClose);
+
+HANDLE supPHLGetEntry(
+    _In_ PLIST_ENTRY ListHead,
+    _In_ HANDLE UniqueProcessId);
+
+BOOL supPHLCreate(
+    _Inout_ PLIST_ENTRY ListHead,
+    _In_ PBYTE ProcessList,
+    _Out_ PULONG NumberOfProcesses,
+    _Out_ PULONG NumberOfThreads);

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2018
+*  (C) COPYRIGHT AUTHORS, 2019
 *
 *  TITLE:       EXTRASPSLIST.H
 *
-*  VERSION:     1.70
+*  VERSION:     1.73
 *
-*  DATE:        30 Nov 2018
+*  DATE:        06 Mar 2019
 *
 *  Common header file for Process List dialog.
 *
@@ -18,38 +18,50 @@
 *******************************************************************************/
 #pragma once
 
-#define MAX_KNOWN_PEXBI_PROCESS_FLAGS 9
-static LPWSTR T_PEXBI_PROCESS_FLAGS[MAX_KNOWN_PEXBI_PROCESS_FLAGS] = {
-    L"IsProtectedProcess",
-    L"IsWow64Process",
-    L"IsProcessDeleting",
-    L"IsCrossSessionCreate",
-    L"IsFrozen",
-    L"IsBackground",
-    L"IsStronglyNamed",
-    L"IsSecureProcess",
-    L"IsSubsystemProcess"
+#define MAX_KNOWN_WAITREASON 40
+static LPWSTR T_WAITREASON[MAX_KNOWN_WAITREASON] = {
+    L"Executive",
+    L"FreePage",
+    L"PageIn",
+    L"PoolAllocation",
+    L"DelayExecution",
+    L"Suspended",
+    L"UserRequest",
+    L"WrExecutive",
+    L"WrFreePage",
+    L"WrPageIn",
+    L"WrPoolAllocation",
+    L"WrDelayExecution",
+    L"WrSuspended",
+    L"WrUserRequest",
+    L"WrEventPair",
+    L"WrQueue",
+    L"WrLpcReceive",
+    L"WrLpcReply",
+    L"WrVirtualMemory",
+    L"WrPageOut",
+    L"WrRendezvous",
+    L"WrKeyedEvent",
+    L"WrTerminated",
+    L"WrProcessInSwap",
+    L"WrCpuRateControl",
+    L"WrCalloutStack",
+    L"WrKernel",
+    L"WrResource",
+    L"WrPushLock",
+    L"WrMutex",
+    L"WrQuantumEnd",
+    L"WrDispatchInt",
+    L"WrPreempted",
+    L"WrYieldExecution",
+    L"WrFastMutex",
+    L"WrGuardedMutex",
+    L"WrRundown",
+    L"WrAlertByThreadId",
+    L"WrDeferredPreempt",
+    L"WrPhysicalFault"
 };
 
-#define MAX_KNOWN_PS_PROTECTED_SIGNER 9
-static LPWSTR T_PSPROTECTED_SIGNER[MAX_KNOWN_PS_PROTECTED_SIGNER] = {
-    L"PsProtectedSignerNone",
-    L"PsProtectedSignerAuthenticode",
-    L"PsProtectedSignerCodeGen",
-    L"PsProtectedSignerAntimalware",
-    L"PsProtectedSignerLsa",
-    L"PsProtectedSignerWindows",
-    L"PsProtectedSignerWinTcb",
-    L"PsProtectedSignerWinSystem",
-    L"PsProtectedSignerApp"
-};
-
-#define MAX_KNOWN_PS_PROTECTED_TYPE 3
-static LPWSTR T_PSPROTECTED_TYPE[MAX_KNOWN_PS_PROTECTED_TYPE] = {
-    L"PsProtectedTypeNone",
-    L"PsProtectedTypeProtectedLight",
-    L"PsProtectedTypeProtected"
-};
 
 VOID extrasCreatePsListDialog(
     _In_ HWND hwndParent);

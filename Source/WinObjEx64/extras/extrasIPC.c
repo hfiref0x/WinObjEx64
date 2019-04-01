@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017 - 2018
+*  (C) COPYRIGHT AUTHORS, 2017 - 2019
 *
 *  TITLE:       EXTRASIPC.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.73
 *
-*  DATE:        30 Nov 2018
+*  DATE:        14 Mar 2019
 *
 *  IPC supported: Pipes, Mailslots
 *
@@ -497,7 +497,7 @@ VOID IpcDlgShowProperties(
             Context,
             (POPENOBJECTMETHOD)&IpcOpenObjectMethod,
             NULL, //use default close method
-            SI_EDIT_AUDITS | SI_EDIT_OWNER | SI_EDIT_PERMS |
+            SI_EDIT_OWNER | SI_EDIT_PERMS | 
             SI_ADVANCED | SI_NO_ACL_PROTECT | SI_NO_TREE_APPLY |
             SI_PAGE_TITLE
         );

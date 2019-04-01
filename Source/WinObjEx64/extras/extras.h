@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       EXTRAS.H
 *
-*  VERSION:     1.70
+*  VERSION:     1.73
 *
-*  DATE:        30 Nov 2018
+*  DATE:        02 Mar 2019
 *
 *  Common header file for Extras dialogs.
 *
@@ -20,11 +20,9 @@
 
 typedef struct _EXTRASCONTEXT {
     HWND hwndDlg;
-    union {
-        HWND ListView;
-        HWND TreeList;
-    };
-    HWND SizeGrip;
+    HWND ListView;
+    HWND TreeList;
+    HWND StatusBar;
     HIMAGELIST ImageList;
     LONG lvColumnToSort;
     LONG lvColumnCount;
@@ -60,8 +58,7 @@ VOID extrasDlgHandleNotify(
     _In_opt_ PVOID CustomParameter);
 
 VOID extrasSimpleListResize(
-    _In_ HWND hwndDlg,
-    _In_ HWND hwndSzGrip);
+    _In_ HWND hwndDlg);
 
 VOID extrasSetDlgIcon(
     _In_ HWND hwndDlg);

@@ -4,9 +4,9 @@
 *
 *  TITLE:       INSTDRV.C
 *
-*  VERSION:     1.72
+*  VERSION:     1.73
 *
-*  DATE:        04 Feb 2019
+*  DATE:        07 Mar 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -121,7 +121,7 @@ BOOL scmOpenDevice(
 )
 {
     BOOL bResult = FALSE;
-    TCHAR completeDeviceName[64];
+    TCHAR completeDeviceName[MAX_PATH + 1];
     HANDLE hDevice;
 
     // assume failure
@@ -129,9 +129,9 @@ BOOL scmOpenDevice(
         *lphDevice = NULL;
 
     if (DriverName) {
-
+        
         RtlSecureZeroMemory(completeDeviceName, sizeof(completeDeviceName));
-        wsprintf(completeDeviceName, TEXT("\\\\.\\%s"), DriverName);
+        rtl_swprintf_s(completeDeviceName, MAX_PATH, TEXT("\\\\.\\%wS"), DriverName);
 
         hDevice = CreateFile(completeDeviceName,
             GENERIC_READ | GENERIC_WRITE,

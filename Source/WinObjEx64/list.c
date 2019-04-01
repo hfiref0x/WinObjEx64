@@ -4,9 +4,9 @@
 *
 *  TITLE:       LIST.C
 *
-*  VERSION:     1.72
+*  VERSION:     1.73
 *
-*  DATE:        09 Feb 2019
+*  DATE:        30 Mar 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -235,7 +235,7 @@ VOID ListObjectDirectoryTree(
         // Wine implementation of NtQueryDirectoryObject interface is very basic and incomplete.
         // It doesn't work if no input buffer specified and does not return required buffer size.
         //
-        if (g_kdctx.IsWine) {
+        if (g_WinObj.IsWine) {
             rlen = 1024 * 64;
         }
         else {
@@ -432,7 +432,7 @@ VOID ListObjectsInDirectory(
         // Wine implementation of NtQueryDirectoryObject interface is very basic and incomplete.
         // It doesn't work if no input buffer specified and does not return required buffer size.
         //
-        if (g_kdctx.IsWine) {
+        if (g_WinObj.IsWine) {
             rlen = 1024 * 64;
         }
         else {
@@ -501,7 +501,7 @@ VOID FindObject(
         // Wine implementation of NtQueryDirectoryObject interface is very basic and incomplete.
         // It doesn't work if no input buffer specified and does not return required buffer size.
         //
-        if (g_kdctx.IsWine != FALSE) {
+        if (g_WinObj.IsWine != FALSE) {
             rlen = 1024 * 64;
         }
         else {

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       PROPPROCESS.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.73
 *
-*  DATE:        30 Nov 2018
+*  DATE:        18 Mar 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -155,7 +155,7 @@ VOID ProcessShowProperties(
                 NtQueryInformationProcess(hProcess, ProcessImageFileNameWin32, NULL, 0, &bytesNeeded);
                 if (bytesNeeded) {
 
-                    Buffer = (LPWSTR)supHeapAlloc((SIZE_T)bytesNeeded);
+                    Buffer = (LPWSTR)supHeapAlloc((SIZE_T)bytesNeeded + sizeof(UNICODE_NULL));
                     if (Buffer) {
 
                         //3. query win32 filename
@@ -291,7 +291,7 @@ BOOL ProcessQueryInfo(
         bytesNeeded = 0;
         status = NtQueryInformationProcess(hProcess, ProcessImageFileNameWin32, NULL, 0, &bytesNeeded);
         if ((status == STATUS_INFO_LENGTH_MISMATCH) && (bytesNeeded)) {
-            Buffer = supHeapAlloc((SIZE_T)bytesNeeded);
+            Buffer = supHeapAlloc((SIZE_T)bytesNeeded + sizeof(UNICODE_NULL));
             if (Buffer) {
 
                 status = NtQueryInformationProcess(
@@ -544,11 +544,11 @@ VOID ProcessListSetInfo(
             }
         }
 
-        pHandles = (PSYSTEM_HANDLE_INFORMATION_EX)supGetSystemInfo(SystemExtendedHandleInformation);
+        pHandles = (PSYSTEM_HANDLE_INFORMATION_EX)supGetSystemInfo(SystemExtendedHandleInformation, NULL);
         if (pHandles == NULL)
             break;
 
-        ProcessesList = supGetSystemInfo(SystemProcessInformation);
+        ProcessesList = supGetSystemInfo(SystemProcessInformation, NULL);
         if (ProcessesList == NULL)
             break;
 
@@ -577,7 +577,7 @@ VOID ProcessListSetInfo(
 
         //retake snapshot
         supHeapFree(pHandles);
-        pHandles = (PSYSTEM_HANDLE_INFORMATION_EX)supGetSystemInfo(SystemExtendedHandleInformation);
+        pHandles = (PSYSTEM_HANDLE_INFORMATION_EX)supGetSystemInfo(SystemExtendedHandleInformation, NULL);
         if (pHandles == NULL)
             break;
 

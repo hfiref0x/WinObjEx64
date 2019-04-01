@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       FINDDLG.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.73
 *
-*  DATE:        30 Nov 2018
+*  DATE:        30 Mar 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,17 +17,18 @@
 #include "global.h"
 #include "findDlg.h"
 
-static HWND FindDlgList;
-static HWND FindDlgGrip = 0;
+HWND FindDlgList;
+HWND FindDlgStatusBar = 0;
+HWND FindDialog = 0;
 
 static LONG sizes_init = 0, dx1, dx2, dx3, dx4, dx5, dx6, dx7, dx8, dx9, dx10, dx11, dx12, dx13;
 
 //local FindDlg variable controlling sorting direction
 BOOL bFindDlgSortInverse = FALSE;
 
-static LONG	FindDlgSortColumn = 0;
+// local FindDlg variable to hold selected column
+LONG FindDlgSortColumn = 0;
 
-static HWND FindDialog = NULL;
 
 /*
 * FindDlgCompareFunc
@@ -202,7 +203,7 @@ VOID FindDlgResize(
         SetWindowPos(hwnd, 0, r2.right - dx12, dx13, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
     }
 
-    supSzGripWindowOnResize(FindDialog, FindDlgGrip);
+    SendMessage(FindDlgStatusBar, WM_SIZE, 0, 0);
 
     RedrawWindow(hwndDlg, NULL, 0, RDW_ERASE | RDW_INVALIDATE | RDW_ERASENOW);
 }
@@ -305,7 +306,6 @@ INT_PTR CALLBACK FindDlgProc(
         break;
 
     case WM_CLOSE:
-        if (FindDlgGrip) DestroyWindow(FindDlgGrip);
         DestroyWindow(hwndDlg);
         FindDialog = NULL;
         g_WinObj.AuxDialogs[wobjFindDlgId] = NULL;
@@ -321,6 +321,12 @@ INT_PTR CALLBACK FindDlgProc(
 
             supSetWaitCursor(TRUE);
             EnableWindow(GetDlgItem(hwndDlg, ID_SEARCH_FIND), FALSE);
+
+            //
+            // Update status bar.
+            //
+            _strcpy(search_string, TEXT("Searching..."));
+            SendMessage(GetDlgItem(hwndDlg, ID_SEARCH_STATUSBAR), WM_SETTEXT, 0, (LPARAM)search_string);
 
             ListView_DeleteAllItems(FindDlgList);
             RtlSecureZeroMemory(&search_string, sizeof(search_string));
@@ -345,9 +351,12 @@ INT_PTR CALLBACK FindDlgProc(
                 cci++;
             }
 
+            //
+            // Update status bar with results.
+            //
             ultostr(cci, search_string);
-            _strcat(search_string, TEXT(" Object(s) found"));
-            SendMessage(GetDlgItem(hwndDlg, ID_SEARCH_GROUPBOX), WM_SETTEXT, 0, (LPARAM)search_string);
+            _strcat(search_string, TEXT(" matching object(s)."));
+            SendMessage(GetDlgItem(hwndDlg, ID_SEARCH_STATUSBAR), WM_SETTEXT, 0, (LPARAM)search_string);
 
             ListView_SortItemsEx(FindDlgList, &FindDlgCompareFunc, FindDlgSortColumn);
 
@@ -393,7 +402,7 @@ VOID FindDlgAddTypes(
 
     __try {
         //type collection available, list it
-        if (g_kdctx.IsWine) {
+        if (g_WinObj.IsWine) {
             pObject = OBJECT_TYPES_FIRST_ENTRY_WINE(g_pObjectTypesInfo);
         }
         else {
@@ -450,7 +459,7 @@ VOID FindDlgCreate(
     }
     g_WinObj.AuxDialogs[wobjFindDlgId] = FindDialog;
 
-    FindDlgGrip = supCreateSzGripWindow(FindDialog);
+    FindDlgStatusBar = GetDlgItem(FindDialog, ID_SEARCH_STATUSBAR);
 
     //set dialog icon, because we use shared dlg template this icon must be
     //removed after use, see aboutDlg/propDlg.

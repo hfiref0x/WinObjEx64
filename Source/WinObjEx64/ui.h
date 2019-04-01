@@ -4,9 +4,9 @@
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.72
+*  VERSION:     1.73
 *
-*  DATE:        09 Feb 2019
+*  DATE:        31 Mar 2019
 *
 *  Common header file for the user interface.
 *
@@ -33,7 +33,7 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
     _In_ DWORD_PTR dwData
     );
 
-#define PROGRAM_VERSION         L"1.7.2"
+#define PROGRAM_VERSION         L"1.7.3"
 #ifdef _USE_OWN_DRIVER
 #define PROGRAM_NAME            L"Windows Object Explorer 64-bit (Non-public version)"
 #else 
@@ -41,6 +41,7 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 #endif
 #define PROFRAM_NAME_AND_TITLE  L"Object Explorer for Windows 7/8/8.1/10"
 #define MAINWINDOWCLASSNAME     L"WinObjEx64Class"
+#define PSLISTCLASSNAME         L"winobjex64_pslistdialogclass"
 
 #define T_PROPERTIES            L"Properties...\tEnter"
 #define T_GOTOLINKTARGET        L"Go To Link Target\tCtrl+->"
@@ -48,12 +49,14 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 #define T_RUNASSYSTEM           L"R&un as LocalSystem"
 #define T_COPYTEXTROW           L"Copy Row Selection"
 #define T_COPYEPROCESS          L"Copy EPROCESS value"
+#define T_COPYOBJECT            L"Copy Object value"
 #define T_COPYVALUE             L"Copy Value Field Text"
 #define T_COPYADDRESS           L"Copy Address Field Text"
 #define T_COPYADDINFO           L"Copy Additional Info Field Text"
 #define T_SAVETOFILE            L"Save list to File"
 #define T_DUMPDRIVER            L"Dump Driver"
-#define T_VIEW_REFRESH          L"Refresh"
+#define T_VIEW_REFRESH          L"Refresh\tF5"
+#define T_EMPTY                 L" "
 
 typedef enum _WOBJ_DIALOGS_ID {
     wobjFindDlgId = 0,
@@ -78,12 +81,12 @@ extern HWND g_hwndObjectTree;
 extern HWND g_hwndObjectList;
 extern HIMAGELIST g_ListViewImages;
 extern HIMAGELIST g_ToolBarMenuImages;
+extern ATOM g_TreeListAtom;
 
 //
 // Declared in propObjectDump.c
 //
 extern HWND g_TreeList;
-extern ATOM g_TreeListAtom;
 
 typedef struct _TL_SUBITEMS_FIXED {
     ULONG       ColorFlags;
@@ -100,6 +103,13 @@ typedef struct _TL_SUBITEMS_FIXED {
 
 //Variable typedefs
 
+typedef enum _PROP_CONTEXT_TYPE {
+    propNormal = 0,
+    propPrivateNamespace = 1,
+    propUnnamed = 2,
+    propMax = 3
+} PROP_CONTEXT_TYPE;
+
 typedef struct _PROP_NAMESPACE_INFO {
     ULONG Reserved;
     ULONG SizeOfBoundaryDescriptor;
@@ -107,9 +117,16 @@ typedef struct _PROP_NAMESPACE_INFO {
     ULONG_PTR ObjectAddress;
 } PROP_NAMESPACE_INFO, *PPROP_NAMESPACE_INFO;
 
+typedef struct _PROP_UNNAMED_OBJECT_INFO {
+    ULONG_PTR ObjectAddress;
+    CLIENT_ID ClientId;
+    SYSTEM_THREAD_INFORMATION ThreadInformation;
+    UNICODE_STRING ImageName;
+} PROP_UNNAMED_OBJECT_INFO, *PPROP_UNNAMED_OBJECT_INFO;
+
 typedef struct _PROP_OBJECT_INFO {
-    BOOL IsPrivateNamespaceObject;
-    BOOL IsType; //TRUE if selected object is object type
+    PROP_CONTEXT_TYPE ContextType;
+    BOOL IsType; //TRUE if selected object is an object type
     INT TypeIndex;
     DWORD ObjectFlags;//object specific flags
     LPWSTR lpObjectName;
@@ -121,6 +138,7 @@ typedef struct _PROP_OBJECT_INFO {
     WOBJ_TYPE_DESC *ShadowTypeDescription; //valid only for types, same as TypeDescription for everything else.
     OBJINFO ObjectInfo; //object dump related structures
     PROP_NAMESPACE_INFO NamespaceInfo;
+    PROP_UNNAMED_OBJECT_INFO UnnamedObjectInfo;
 } PROP_OBJECT_INFO, *PPROP_OBJECT_INFO;
 
 typedef struct _VALUE_DESC {
@@ -128,14 +146,9 @@ typedef struct _VALUE_DESC {
     DWORD dwValue;
 } VALUE_DESC, *PVALUE_DESC;
 
-typedef struct _PROCEDURE_DESC {
-    LPWSTR lpDescription;
-    PVOID Procedure;
-} PROCEDURE_DESC, *PPROCEDURE_DESC;
-
 //Constants
-//Display simple "-" if no info available
-#define T_CannotQuery	TEXT("-")
+//Display simple "N/A" if no info available
+#define T_CannotQuery	TEXT("N/A")
 
 //Display for unknown type value
 #define T_UnknownType	TEXT("Unknown Type")

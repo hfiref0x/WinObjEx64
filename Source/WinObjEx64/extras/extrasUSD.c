@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASUSD.C
 *
-*  VERSION:     1.72
+*  VERSION:     1.73
 *
-*  DATE:        04 Feb 2019
+*  DATE:        31 Mar 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -18,11 +18,11 @@
 #include "propObjectDump.h"
 #include "extras.h"
 #include "extrasUSD.h"
+#include "treelist\treelist.h"
 
 EXTRASCONTEXT DlgContext;
 
 HWND UsdTreeList = NULL;
-ATOM UsdTreeListAtom = 0;
 
 /*
 * UsdDumpSharedRegion
@@ -36,16 +36,17 @@ VOID UsdDumpSharedRegion(
     _In_ HWND hwndParent
 )
 {
-    BOOL                  bCond = FALSE, bAny = FALSE;
-    INT                   i;
-    DWORD                 mask;
+    BOOL                bCond = FALSE, bAny = FALSE;
+    UINT                i;
+    DWORD               mask;
 
-    HTREEITEM             h_tviRootItem, h_tviSubItem;
-    LPWSTR                lpType;
-    TL_SUBITEMS_FIXED     subitems;
-    WCHAR                 szValue[MAX_PATH + 1];
+    HTREEITEM           h_tviRootItem, h_tviSubItem, h_tviLast = NULL;
+    LPWSTR              lpType;
+    TL_SUBITEMS_FIXED   subitems;
+    TVITEMEX            itemex;
+    WCHAR               szValue[MAX_PATH + 1];
 
-    PKUSER_SHARED_DATA    pUserSharedData;
+    PKUSER_SHARED_DATA  pUserSharedData;
 
     do {
 
@@ -54,7 +55,7 @@ VOID UsdDumpSharedRegion(
         if (IsBadReadPtr(pUserSharedData, sizeof(KUSER_SHARED_DATA)))
             break;
 
-        if (!supInitTreeListForDump(hwndParent, &UsdTreeListAtom, &UsdTreeList)) {
+        if (!supInitTreeListForDump(hwndParent, &UsdTreeList)) {
             break;
         }
 
@@ -187,11 +188,11 @@ VOID UsdDumpSharedRegion(
                     }
                     RtlSecureZeroMemory(&subitems, sizeof(subitems));
                     RtlSecureZeroMemory(&szValue, sizeof(szValue));
-                    itostr_w(i, szValue);
+                    ultostr(i, szValue);
                     subitems.Text[0] = szValue;
                     subitems.Text[1] = lpType;
                     subitems.Count = 2;
-                    TreeListAddItem(
+                    h_tviLast = TreeListAddItem(
                         UsdTreeList,
                         h_tviSubItem,
                         TVIF_TEXT | TVIF_STATE,
@@ -202,11 +203,23 @@ VOID UsdDumpSharedRegion(
                 }
             }
 
+            //
+            // Output dotted corner.
+            //
+            if (h_tviLast) {
+                RtlSecureZeroMemory(&itemex, sizeof(itemex));
+
+                itemex.hItem = h_tviLast;
+                itemex.mask = TVIF_TEXT | TVIF_HANDLE;
+                itemex.pszText = T_EMPTY;
+
+                TreeList_SetTreeItem(UsdTreeList, &itemex, NULL);
+            }
+
             if (bAny == FALSE) {
                 RtlSecureZeroMemory(&subitems, sizeof(subitems));
-                RtlSecureZeroMemory(&szValue, sizeof(szValue));
-                lpType = L"-";
-                _strcpy(szValue, L"0");
+                lpType = TEXT("-");
+                _strcpy(szValue, TEXT("0"));
                 subitems.Text[0] = szValue;
                 subitems.Text[1] = lpType;
                 subitems.Count = 2;
@@ -248,9 +261,9 @@ VOID UsdDumpSharedRegion(
         //SuiteMask
         RtlSecureZeroMemory(&subitems, sizeof(subitems));
         RtlSecureZeroMemory(&szValue, sizeof(szValue));
-        szValue[0] = L'0';
-        szValue[1] = L'x';
-        ultohex_w(pUserSharedData->SuiteMask, &szValue[2]);
+        szValue[0] = TEXT('0');
+        szValue[1] = TEXT('x');
+        ultohex(pUserSharedData->SuiteMask, &szValue[2]);
         subitems.Text[0] = szValue;
         subitems.Count = 1;
 
@@ -264,20 +277,21 @@ VOID UsdDumpSharedRegion(
             &subitems);
 
         if (h_tviSubItem) {
+            h_tviLast = NULL;
             mask = pUserSharedData->SuiteMask;
             for (i = 0; i < MAX_KNOWN_SUITEMASKS; i++) {
                 if (mask & SuiteMasks[i].dwValue) {
 
                     RtlSecureZeroMemory(&subitems, sizeof(subitems));
                     RtlSecureZeroMemory(&szValue, sizeof(szValue));
-                    szValue[0] = L'0';
-                    szValue[1] = L'x';
-                    ultohex_w(SuiteMasks[i].dwValue, &szValue[2]);
+                    szValue[0] = TEXT('0');
+                    szValue[1] = TEXT('x');
+                    ultohex(SuiteMasks[i].dwValue, &szValue[2]);
                     subitems.Text[0] = szValue;
                     subitems.Text[1] = SuiteMasks[i].lpDescription;
                     subitems.Count = 2;
 
-                    TreeListAddItem(
+                    h_tviLast = TreeListAddItem(
                         UsdTreeList,
                         h_tviSubItem,
                         TVIF_TEXT | TVIF_STATE,
@@ -288,6 +302,19 @@ VOID UsdDumpSharedRegion(
 
                     mask &= ~SuiteMasks[i].dwValue;
                 }
+            }
+
+            //
+            // Output dotted corner.
+            //
+            if (h_tviLast) {
+                RtlSecureZeroMemory(&itemex, sizeof(itemex));
+
+                itemex.hItem = h_tviLast;
+                itemex.mask = TVIF_TEXT | TVIF_HANDLE;
+                itemex.pszText = T_EMPTY;
+
+                TreeList_SetTreeItem(UsdTreeList, &itemex, NULL);
             }
         }
 
@@ -324,9 +351,9 @@ VOID UsdDumpSharedRegion(
             //
 
             RtlSecureZeroMemory(&subitems, sizeof(subitems));
-            RtlSecureZeroMemory(&szValue, sizeof(szValue));
+            RtlSecureZeroMemory(szValue, sizeof(szValue));
 
-            wsprintf(szValue, L"0x%02x", pUserSharedData->MitigationPolicies);
+            rtl_swprintf_s(szValue, MAX_PATH, TEXT("0x%02X"), pUserSharedData->MitigationPolicies);
 
             subitems.Text[0] = szValue;
             subitems.Count = 1;
@@ -389,9 +416,9 @@ VOID UsdDumpSharedRegion(
         //SharedDataFlags
         RtlSecureZeroMemory(&subitems, sizeof(subitems));
         RtlSecureZeroMemory(&szValue, sizeof(szValue));
-        szValue[0] = L'0';
-        szValue[1] = L'x';
-        ultohex_w(pUserSharedData->SharedDataFlags, &szValue[2]);
+        szValue[0] = TEXT('0');
+        szValue[1] = TEXT('x');
+        ultohex(pUserSharedData->SharedDataFlags, &szValue[2]);
         subitems.Text[0] = szValue;
         subitems.Count = 1;
 
@@ -405,16 +432,17 @@ VOID UsdDumpSharedRegion(
             &subitems);
 
         if (h_tviSubItem) {
+            h_tviLast = NULL;
             for (i = 0; i < MAX_KNOWN_SHAREDDATAFLAGS; i++) {
                 if (GET_BIT(pUserSharedData->SharedDataFlags, i)) {
                     RtlSecureZeroMemory(&subitems, sizeof(subitems));
                     RtlSecureZeroMemory(&szValue, sizeof(szValue));
-                    _strcpy_w(szValue, L"BitPos: ");
-                    itostr_w(i, _strend_w(szValue));
+                    _strcpy(szValue, TEXT("BitPos: "));
+                    ultostr(i, _strend(szValue));
                     subitems.Text[0] = szValue;
                     subitems.Text[1] = (LPTSTR)T_SharedDataFlags[i];
                     subitems.Count = 2;
-                    TreeListAddItem(
+                    h_tviLast = TreeListAddItem(
                         UsdTreeList,
                         h_tviSubItem,
                         TVIF_TEXT | TVIF_STATE,
@@ -424,6 +452,20 @@ VOID UsdDumpSharedRegion(
                         &subitems);
                 }
             }
+
+            //
+            // Output dotted corner.
+            //
+            if (h_tviLast) {
+                RtlSecureZeroMemory(&itemex, sizeof(itemex));
+
+                itemex.hItem = h_tviLast;
+                itemex.mask = TVIF_TEXT | TVIF_HANDLE;
+                itemex.pszText = T_EMPTY;
+
+                TreeList_SetTreeItem(UsdTreeList, &itemex, NULL);
+            }
+
         }
 
     } while (bCond);
@@ -454,8 +496,6 @@ INT_PTR CALLBACK UsdDialogProc(
 
     case WM_CLOSE:
         DestroyWindow(UsdTreeList);
-        UnregisterClass(MAKEINTATOM(UsdTreeListAtom), g_WinObj.hInstance);
-
         DestroyWindow(hwndDlg);
         g_WinObj.AuxDialogs[wobjUSDDlgId] = NULL;
         return TRUE;

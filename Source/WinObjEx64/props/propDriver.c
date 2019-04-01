@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       PROPDRIVER.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.73
 *
-*  DATE:        30 Nov 2018
+*  DATE:        07 Mar 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -548,12 +548,13 @@ VOID DriverJumpToKey(
                 WaitForInputIdle(hRegeditProcess, 1000);
             }
             else {
-
+#pragma warning(push)
+#pragma warning(disable: 4306)
                 SendMessage(regeditHwnd,
                     WM_CHAR,
-                    (WPARAM)CharUpper((LPWSTR)(UINT)*ch), //-V204
+                    (WPARAM)CharUpper((LPWSTR)*ch),
                     (LPARAM)0);
-
+#pragma warning(pop)
                 WaitForInputIdle(hRegeditProcess, 1000);
             }
         }

@@ -135,7 +135,7 @@
       <AssemblerOutput>All</AssemblerOutput>
       <BrowseInformation>true</BrowseInformation>
       <CompileAs>CompileAsCpp</CompileAs>
-      <MultiProcessorCompilation>false</MultiProcessorCompilation>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\treelist;$(ProjectDir)\props;$(ProjectDir)\extras;$(ProjectDir)\ntos</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -180,7 +180,6 @@
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <GenerateDebugInformation>No</GenerateDebugInformation>
       <Version>6.0</Version>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <GenerateMapFile>true</GenerateMapFile>
@@ -190,6 +189,8 @@
       <SetChecksum>true</SetChecksum>
       <AdditionalOptions>/NOCOFFGRPINFO %(AdditionalOptions)</AdditionalOptions>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <IgnoreAllDefaultLibraries>
+      </IgnoreAllDefaultLibraries>
     </Link>
     <Manifest>
       <SuppressStartupBanner>false</SuppressStartupBanner>
@@ -336,7 +337,7 @@
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <GenerateDebugInformation>No</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
       <Version>6.0</Version>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <GenerateMapFile>true</GenerateMapFile>
@@ -415,10 +416,12 @@
     <ClCompile Include="props\propObjectDump.c" />
     <ClCompile Include="props\propProcess.c" />
     <ClCompile Include="props\propSecurity.c" />
+    <ClCompile Include="props\propToken.c" />
     <ClCompile Include="props\propType.c" />
     <ClCompile Include="sup.c" />
     <ClCompile Include="tests\testunit.c" />
     <ClCompile Include="treelist\treelist.c" />
+    <ClCompile Include="wine.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc" />
@@ -427,6 +430,7 @@
     <ClInclude Include="aboutDlg.h" />
     <ClInclude Include="excepth.h" />
     <ClInclude Include="extapi.h" />
+    <ClInclude Include="extdef.h" />
     <ClInclude Include="extras\extras.h" />
     <ClInclude Include="extras\extrasCallbacks.h" />
     <ClInclude Include="extras\extrasDrivers.h" />
@@ -461,6 +465,7 @@
     <ClInclude Include="props\propProcess.h" />
     <ClInclude Include="props\propSecurity.h" />
     <ClInclude Include="props\propSecurityConsts.h" />
+    <ClInclude Include="props\propToken.h" />
     <ClInclude Include="props\propType.h" />
     <ClInclude Include="props\propTypeConsts.h" />
     <ClInclude Include="resource.h" />

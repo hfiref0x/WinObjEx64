@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     1.72
+*  VERSION:     1.73
 *
-*  DATE:        04 Feb 2019
+*  DATE:        19 Mar 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -21,50 +21,32 @@
 #include "propTypeConsts.h"
 
 //
-// Global variables for treelist.
+// Global variables for treelist used in properties window page.
 //
 HWND g_TreeList;
-ATOM g_TreeListAtom;
 
 /*
 * propObDumpShowError
 *
 * Purpose:
 *
-* Hide all windows for given hwnd and display error text.
+* Hide all windows for given hwnd and display error text with custom text if specified.
 *
 */
 VOID propObDumpShowError(
-    _In_ HWND hwndDlg
-)
-{
-    RECT rGB;
-
-    if (GetWindowRect(hwndDlg, &rGB)) {
-        EnumChildWindows(hwndDlg, supEnumHideChildWindows, (LPARAM)&rGB);
-    }
-    ShowWindow(GetDlgItem(hwndDlg, ID_OBJECTDUMPERROR), SW_SHOW);
-}
-
-/*
-* propObDumpShowMessage
-*
-* Purpose:
-*
-* Hide all windows for given hwnd and display message text.
-*
-*/
-VOID propObDumpShowMessage(
     _In_ HWND hwndDlg,
-    _In_ LPWSTR lpMessageText
+    _In_opt_ LPWSTR lpMessageText
 )
 {
-    RECT rGB;
+    ENUMCHILDWNDDATA ChildWndData;
 
-    if (GetWindowRect(hwndDlg, &rGB)) {
-        EnumChildWindows(hwndDlg, supEnumHideChildWindows, (LPARAM)&rGB);
+    if (GetWindowRect(hwndDlg, &ChildWndData.Rect)) {
+        ChildWndData.nCmdShow = SW_HIDE;
+        EnumChildWindows(hwndDlg, supCallbackShowChildWindow, (LPARAM)&ChildWndData);
     }
-    SetWindowText(GetDlgItem(hwndDlg, ID_OBJECTDUMPERROR), lpMessageText);
+    if (lpMessageText) {
+        SetWindowText(GetDlgItem(hwndDlg, ID_OBJECTDUMPERROR), lpMessageText);
+    }
     ShowWindow(GetDlgItem(hwndDlg, ID_OBJECTDUMPERROR), SW_SHOW);
 }
 
@@ -87,7 +69,7 @@ VOID propObDumpAddress(
 )
 {
     TL_SUBITEMS_FIXED  subitems;
-    WCHAR              szValue[100];
+    WCHAR              szValue[DUMP_CONVERSION_LENGTH + 1];
 
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
     subitems.Count = 2;
@@ -142,7 +124,7 @@ VOID propObDumpAddressWithModule(
 )
 {
     TL_SUBITEMS_FIXED   subitems;
-    WCHAR               szValue[100], szModuleName[MAX_PATH * 2];
+    WCHAR               szValue[DUMP_CONVERSION_LENGTH + 1], szModuleName[MAX_PATH * 2];
 
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
     subitems.Count = 2;
@@ -243,7 +225,7 @@ VOID propObDumpByte(
 )
 {
     TL_SUBITEMS_FIXED   subitems;
-    WCHAR               szValue[100];
+    WCHAR               szValue[DUMP_CONVERSION_LENGTH + 1];
 
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
 
@@ -258,7 +240,7 @@ VOID propObDumpByte(
         _strcpy(szValue, (BOOL)(Value) ? L"TRUE" : L"FALSE");
     }
     else {
-        wsprintf(szValue, FORMAT_HEXBYTE, Value);
+        rtl_swprintf_s(szValue, DUMP_CONVERSION_LENGTH, FORMAT_HEXBYTE, Value);
     }
 
     subitems.Text[0] = szValue;
@@ -352,7 +334,7 @@ VOID propObDumpUlong(
 )
 {
     TL_SUBITEMS_FIXED   subitems;
-    WCHAR               szValue[100];
+    WCHAR               szValue[DUMP_CONVERSION_LENGTH + 1];
 
     RtlSecureZeroMemory(&szValue, sizeof(szValue));
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
@@ -367,7 +349,7 @@ VOID propObDumpUlong(
 
     if (HexDump) {
         if (IsUShort) {
-            wsprintf(szValue, FORMAT_HEXUSHORT, Value);
+            rtl_swprintf_s(szValue, DUMP_CONVERSION_LENGTH, FORMAT_HEXUSHORT, Value);
         }
         else {
             szValue[0] = L'0';
@@ -377,7 +359,7 @@ VOID propObDumpUlong(
     }
     else {
         if (IsUShort) {
-            wsprintf(szValue, FORMAT_USHORT, Value);
+            rtl_swprintf_s(szValue, DUMP_CONVERSION_LENGTH, FORMAT_USHORT, Value);
         }
         else {
             ultostr(Value, szValue);
@@ -424,7 +406,7 @@ VOID propObDumpUlong64(
 )
 {
     TL_SUBITEMS_FIXED  subitems;
-    WCHAR              szValue[100];
+    WCHAR              szValue[DUMP_CONVERSION_LENGTH + 1];
 
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
     subitems.Count = 2;
@@ -480,7 +462,7 @@ VOID propObDumpULargeInteger(
 {
     HTREEITEM           h_tviSubItem;
     TL_SUBITEMS_FIXED   subitems;
-    WCHAR               szValue[100];
+    WCHAR               szValue[DUMP_CONVERSION_LENGTH + 1];
 
     h_tviSubItem = TreeListAddItem(
         TreeList,
@@ -551,7 +533,7 @@ VOID propObDumpListEntry(
 {
     HTREEITEM           h_tviSubItem;
     TL_SUBITEMS_FIXED   subitems;
-    WCHAR               szValue[100];
+    WCHAR               szValue[DUMP_CONVERSION_LENGTH + 1];
 
     h_tviSubItem = TreeListAddItem(
         TreeList,
@@ -636,7 +618,7 @@ VOID propObDumpUnicodeString(
     HTREEITEM           h_tviSubItem;
     TL_SUBITEMS_FIXED   subitems;
     UNICODE_STRING      uStr;
-    WCHAR               szValue[100];
+    WCHAR               szValue[DUMP_CONVERSION_LENGTH + 1];
 
     RtlSecureZeroMemory(&uStr, sizeof(uStr));
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
@@ -691,8 +673,8 @@ VOID propObDumpUnicodeString(
     //UNICODE_STRING.Length
     //
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
-    RtlSecureZeroMemory(&szValue, sizeof(szValue));
-    wsprintf(szValue, FORMAT_HEXUSHORT, uStr.Length);
+    RtlSecureZeroMemory(szValue, sizeof(szValue));
+    rtl_swprintf_s(szValue, DUMP_CONVERSION_LENGTH, FORMAT_HEXUSHORT, uStr.Length);
     subitems.Count = 2;
     subitems.Text[0] = szValue;
 
@@ -708,9 +690,9 @@ VOID propObDumpUnicodeString(
     //
     //UNICODE_STRING.MaximumLength
     //
-    RtlSecureZeroMemory(&szValue, sizeof(szValue));
+    RtlSecureZeroMemory(szValue, sizeof(szValue));
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
-    wsprintf(szValue, FORMAT_HEXUSHORT, uStr.MaximumLength);
+    rtl_swprintf_s(szValue, DUMP_CONVERSION_LENGTH, FORMAT_HEXUSHORT, uStr.MaximumLength);
     subitems.Count = 2;
     subitems.Text[0] = szValue;
 
@@ -979,14 +961,13 @@ VOID propObDumpDriverObject(
 
         //any errors - abort
         if (!bOkay) {
-            propObDumpShowError(hwndDlg);
+            propObDumpShowError(hwndDlg, NULL);
             return;
         }
 
         g_TreeList = 0;
-        g_TreeListAtom = 0;
-        if (!supInitTreeListForDump(hwndDlg, &g_TreeListAtom, &g_TreeList)) {
-            propObDumpShowError(hwndDlg);
+        if (!supInitTreeListForDump(hwndDlg, &g_TreeList)) {
+            propObDumpShowError(hwndDlg, NULL);
             return;
         }
 
@@ -1133,7 +1114,7 @@ VOID propObDumpDriverObject(
             &subitems);
 
         RtlSecureZeroMemory(&ntosEntry, sizeof(ntosEntry));
-        pModules = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation);
+        pModules = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation, NULL);
 
         if (g_kdctx.IopInvalidDeviceRequest == NULL)
             g_kdctx.IopInvalidDeviceRequest = kdQueryIopInvalidDeviceRequest();
@@ -1405,14 +1386,13 @@ VOID propObDumpDeviceObject(
             sizeof(devObject),
             NULL))
         {
-            propObDumpShowError(hwndDlg);
+            propObDumpShowError(hwndDlg, NULL);
             return;
         }
 
         g_TreeList = 0;
-        g_TreeListAtom = 0;
-        if (!supInitTreeListForDump(hwndDlg, &g_TreeListAtom, &g_TreeList)) {
-            propObDumpShowError(hwndDlg);
+        if (!supInitTreeListForDump(hwndDlg, &g_TreeList)) {
+            propObDumpShowError(hwndDlg, NULL);
             return;
         }
 
@@ -1956,7 +1936,7 @@ VOID propObDumpDirectoryObject(
             ObjectSize,
             NULL))
         {
-            propObDumpShowError(hwndDlg);
+            propObDumpShowError(hwndDlg, NULL);
             return;
         }
 
@@ -2006,9 +1986,8 @@ VOID propObDumpDirectoryObject(
 
 
         g_TreeList = 0;
-        g_TreeListAtom = 0;
-        if (!supInitTreeListForDump(hwndDlg, &g_TreeListAtom, &g_TreeList)) {
-            propObDumpShowError(hwndDlg);
+        if (!supInitTreeListForDump(hwndDlg, &g_TreeList)) {
+            propObDumpShowError(hwndDlg, NULL);
             return;
         }
 
@@ -2042,12 +2021,12 @@ VOID propObDumpDirectoryObject(
             subitems.Count = 2;
 
             RtlSecureZeroMemory(szId, sizeof(szId));
-            wsprintf(szId, TEXT("[ %i ]"), i);
+            rtl_swprintf_s(szId, MAX_PATH, TEXT("[ %i ]"), i);
 
             if (pCompatDirObject->HashBuckets[i]) {
                 RtlSecureZeroMemory(szValue, sizeof(szValue));
-                szValue[0] = L'0';
-                szValue[1] = L'x';
+                szValue[0] = TEXT('0');
+                szValue[1] = TEXT('x');
                 u64tohex((ULONG_PTR)pCompatDirObject->HashBuckets[i], &szValue[2]);
                 subitems.Text[0] = szValue;
                 subitems.Text[1] = T_POBJECT_DIRECTORY_ENTRY;
@@ -2217,7 +2196,7 @@ VOID propObDumpSyncObject(
 
         Object = supHeapAlloc(ObjectSize);
         if (Object == NULL) {
-            propObDumpShowError(hwndDlg);
+            propObDumpShowError(hwndDlg, NULL);
             return;
         }
 
@@ -2228,15 +2207,14 @@ VOID propObDumpSyncObject(
             ObjectSize,
             NULL))
         {
-            propObDumpShowError(hwndDlg);
+            propObDumpShowError(hwndDlg, NULL);
             supHeapFree(Object);
             return;
         }
 
         g_TreeList = 0;
-        g_TreeListAtom = 0;
-        if (!supInitTreeListForDump(hwndDlg, &g_TreeListAtom, &g_TreeList)) {
-            propObDumpShowError(hwndDlg);
+        if (!supInitTreeListForDump(hwndDlg, &g_TreeList)) {
+            propObDumpShowError(hwndDlg, NULL);
             supHeapFree(Object);
             return;
         }
@@ -2274,7 +2252,7 @@ VOID propObDumpSyncObject(
 
             lpDesc2 = NULL;
             if (Header->Size == (sizeof(KEVENT) / sizeof(ULONG))) {
-                lpDesc2 = L"sizeof(KEVENT)/sizeof(ULONG)";
+                lpDesc2 = TEXT("sizeof(KEVENT)/sizeof(ULONG)");
             }
             break;
 
@@ -2282,16 +2260,16 @@ VOID propObDumpSyncObject(
             lpType = T_KMUTANT;
             Mutant = (KMUTANT*)Object;
             Header = &Mutant->Header;
-            lpDesc1 = L"Not Held";
+            lpDesc1 = TEXT("Not Held");
             RtlSecureZeroMemory(szValue, sizeof(szValue));
             if (Mutant->OwnerThread != NULL) {
-                wsprintf(szValue, L"Held %d times", Header->SignalState);
+                rtl_swprintf_s(szValue, MAX_PATH, TEXT("Held %d times"), Header->SignalState);
                 lpDesc1 = szValue;
             }
 
             lpDesc2 = NULL;
             if (Header->Size == (sizeof(KMUTANT) / sizeof(ULONG))) {
-                lpDesc2 = L"sizeof(KMUTANT)/sizeof(ULONG)";
+                lpDesc2 = TEXT("sizeof(KMUTANT)/sizeof(ULONG)");
             }
             break;
 
@@ -2300,10 +2278,10 @@ VOID propObDumpSyncObject(
             Semaphore = (KSEMAPHORE*)Object;
             Header = &Semaphore->Header;
 
-            lpDesc1 = L"Count";
+            lpDesc1 = TEXT("Count");
             lpDesc2 = NULL;
             if (Header->Size == (sizeof(KSEMAPHORE) / sizeof(ULONG))) {
-                lpDesc2 = L"sizeof(KSEMAPHORE)/sizeof(ULONG)";
+                lpDesc2 = TEXT("sizeof(KSEMAPHORE)/sizeof(ULONG)");
             }
             break;
 
@@ -2332,7 +2310,7 @@ VOID propObDumpSyncObject(
         }
 
         if (Header == NULL) {
-            propObDumpShowError(hwndDlg);
+            propObDumpShowError(hwndDlg, NULL);
             supHeapFree(Object);
             return;
         }
@@ -2405,7 +2383,7 @@ VOID propObDumpObjectTypeFlags(
     LPWSTR lpType;
     TL_SUBITEMS_FIXED TreeListSubitems;
 
-    WCHAR szValue[100];
+    WCHAR szValue[DUMP_CONVERSION_LENGTH + 1];
 
     if (ObjectTypeFlags) {
 
@@ -2418,7 +2396,8 @@ VOID propObDumpObjectTypeFlags(
                 lpType = (LPWSTR)ObjectTypeFlagsText[i];
                 TreeListSubitems.Text[0] = NULL;
                 if (j == 0) {
-                    wsprintf(szValue, FORMAT_HEXBYTE, ObjectTypeFlags);
+                    RtlSecureZeroMemory(szValue, sizeof(szValue));
+                    rtl_swprintf_s(szValue, DUMP_CONVERSION_LENGTH, FORMAT_HEXBYTE, ObjectTypeFlags);
                     TreeListSubitems.Text[0] = szValue;
                 }
                 TreeListSubitems.Text[1] = lpType;
@@ -2493,7 +2472,7 @@ VOID propObDumpObjectType(
         //
         // Get loaded modules list.
         //
-        ModulesList = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation);
+        ModulesList = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation, NULL);
         if (ModulesList == NULL)
             break;
 
@@ -2524,8 +2503,7 @@ VOID propObDumpObjectType(
         // Initialize treelist.
         //
         g_TreeList = 0;
-        g_TreeListAtom = 0;
-        if (!supInitTreeListForDump(hwndDlg, &g_TreeListAtom, &g_TreeList))
+        if (!supInitTreeListForDump(hwndDlg, &g_TreeList))
             break;
 
         //
@@ -2759,7 +2737,7 @@ VOID propObDumpObjectType(
     // Show error message on failure.
     //
     if (bOkay == FALSE) {
-        propObDumpShowError(hwndDlg);
+        propObDumpShowError(hwndDlg, NULL);
         return;
     }
 }
@@ -2796,20 +2774,19 @@ VOID propObDumpQueueObject(
             sizeof(Queue),
             NULL))
         {
-            propObDumpShowError(hwndDlg);
+            propObDumpShowError(hwndDlg, NULL);
             return;
         }
 
         g_TreeList = 0;
-        g_TreeListAtom = 0;
-        if (!supInitTreeListForDump(hwndDlg, &g_TreeListAtom, &g_TreeList)) {
-            propObDumpShowError(hwndDlg);
+        if (!supInitTreeListForDump(hwndDlg, &g_TreeList)) {
+            propObDumpShowError(hwndDlg, NULL);
             return;
         }
 
         lpDesc2 = NULL;
         if (Queue.Header.Size == (sizeof(KQUEUE) / sizeof(ULONG))) {
-            lpDesc2 = L"sizeof(KQUEUE)/sizeof(ULONG)";
+            lpDesc2 = TEXT("sizeof(KQUEUE)/sizeof(ULONG)");
         }
 
         h_tviRootItem = TreeListAddItem(
@@ -2825,16 +2802,16 @@ VOID propObDumpQueueObject(
         propObDumpDispatcherHeader(h_tviRootItem, &Queue.Header, NULL, NULL, lpDesc2);
 
         //EntryListHead
-        propObDumpListEntry(g_TreeList, h_tviRootItem, L"EntryListHead", &Queue.EntryListHead);
+        propObDumpListEntry(g_TreeList, h_tviRootItem, TEXT("EntryListHead"), &Queue.EntryListHead);
 
         //CurrentCount
-        propObDumpUlong(g_TreeList, h_tviRootItem, L"CurrentCount", NULL, Queue.CurrentCount, TRUE, FALSE, 0, 0);
+        propObDumpUlong(g_TreeList, h_tviRootItem, TEXT("CurrentCount"), NULL, Queue.CurrentCount, TRUE, FALSE, 0, 0);
 
         //MaximumCount
-        propObDumpUlong(g_TreeList, h_tviRootItem, L"MaximumCount", NULL, Queue.MaximumCount, TRUE, FALSE, 0, 0);
+        propObDumpUlong(g_TreeList, h_tviRootItem, TEXT("MaximumCount"), NULL, Queue.MaximumCount, TRUE, FALSE, 0, 0);
 
         //ThreadListHead
-        propObDumpListEntry(g_TreeList, h_tviRootItem, L"ThreadListHead", &Queue.ThreadListHead);
+        propObDumpListEntry(g_TreeList, h_tviRootItem, TEXT("ThreadListHead"), &Queue.ThreadListHead);
 
     }
     __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
@@ -2873,20 +2850,19 @@ VOID propObDumpFltServerPort(
             sizeof(FltServerPortObject),
             NULL))
         {
-            propObDumpShowError(hwndDlg);
+            propObDumpShowError(hwndDlg, NULL);
             return;
         }
 
         g_TreeList = 0;
-        g_TreeListAtom = 0;
-        if (!supInitTreeListForDump(hwndDlg, &g_TreeListAtom, &g_TreeList)) {
-            propObDumpShowError(hwndDlg);
+        if (!supInitTreeListForDump(hwndDlg, &g_TreeList)) {
+            propObDumpShowError(hwndDlg, NULL);
             return;
         }
 
-        pModules = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation);
+        pModules = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation, NULL);
         if (pModules == NULL) {
-            propObDumpShowError(hwndDlg);
+            propObDumpShowError(hwndDlg, NULL);
             return;
         }
 
@@ -3098,7 +3074,7 @@ VOID propObDumpAlpcPort(
     ALPC_PORT_STATE PortState;
     TL_SUBITEMS_FIXED subitems;
 
-    WCHAR szBuffer[100];
+    WCHAR szBuffer[DUMP_CONVERSION_LENGTH + 1];
 
     union {
         union {
@@ -3116,14 +3092,13 @@ VOID propObDumpAlpcPort(
         &ObjectVersion);
 
     if (PortDumpBuffer == NULL) {
-        propObDumpShowError(hwndDlg);
+        propObDumpShowError(hwndDlg, NULL);
         return;
     }
 
     g_TreeList = 0;
-    g_TreeListAtom = 0;
-    if (!supInitTreeListForDump(hwndDlg, &g_TreeListAtom, &g_TreeList)) {
-        propObDumpShowError(hwndDlg);
+    if (!supInitTreeListForDump(hwndDlg, &g_TreeList)) {
+        propObDumpShowError(hwndDlg, NULL);
         supVirtualFree(PortDumpBuffer);
         return;
     }
@@ -3457,7 +3432,7 @@ VOID propObDumpCallback(
         sizeof(ObjectDump),
         NULL))
     {
-        propObDumpShowError(hwndDlg);
+        propObDumpShowError(hwndDlg, NULL);
         return;
     }
 
@@ -3465,16 +3440,16 @@ VOID propObDumpCallback(
     // Verify object signature.
     //
     if (ObjectDump.Signature != EX_CALLBACK_SIGNATURE) {
-        propObDumpShowError(hwndDlg);
+        propObDumpShowError(hwndDlg, NULL);
         return;
     }
 
     //
     // Create a snapshot list of loaded modules.
     //
-    Modules = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation);
+    Modules = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation, NULL);
     if (Modules == NULL) {
-        propObDumpShowError(hwndDlg);
+        propObDumpShowError(hwndDlg, NULL);
         return;
     }
 
@@ -3482,9 +3457,8 @@ VOID propObDumpCallback(
     // Prepare treelist for output.
     //
     g_TreeList = 0;
-    g_TreeListAtom = 0;
-    if (!supInitTreeListForDump(hwndDlg, &g_TreeListAtom, &g_TreeList)) {
-        propObDumpShowError(hwndDlg);
+    if (!supInitTreeListForDump(hwndDlg, &g_TreeList)) {
+        propObDumpShowError(hwndDlg, NULL);
         return;
     }
 
@@ -3520,7 +3494,7 @@ VOID propObDumpCallback(
             //
             // Abort all output on error.
             //
-            propObDumpShowError(hwndDlg);
+            propObDumpShowError(hwndDlg, NULL);
             break;
         }
 
@@ -3539,7 +3513,7 @@ VOID propObDumpCallback(
     // If nothing found (or possible query error) output this message.
     //
     if (Count == 0) {
-        propObDumpShowMessage(hwndDlg,
+        propObDumpShowError(hwndDlg,
             TEXT("This object has no registered callbacks or there is an query error."));
     }
 
@@ -3559,6 +3533,7 @@ VOID propObDumpSymbolicLink(
     _In_ HWND hwndDlg
 )
 {
+    BOOLEAN IsCallbackLink = FALSE;
     HTREEITEM h_tviRootItem;
 
     PBYTE SymLinkDumpBuffer = NULL;
@@ -3578,7 +3553,7 @@ VOID propObDumpSymbolicLink(
         PBYTE Ref;
     } SymbolicLink;
 
-    WCHAR szBuffer[MAX_PATH], szConvert[64];
+    WCHAR szBuffer[MAX_PATH + 1], szConvert[64];
 
 
     SymLinkDumpBuffer = (PBYTE)ObDumpSymbolicLinkObjectVersionAware(
@@ -3587,7 +3562,7 @@ VOID propObDumpSymbolicLink(
         &ObjectVersion);
 
     if (SymLinkDumpBuffer == NULL) {
-        propObDumpShowError(hwndDlg);
+        propObDumpShowError(hwndDlg, NULL);
         return;
     }
 
@@ -3597,9 +3572,8 @@ VOID propObDumpSymbolicLink(
     // Prepare treelist for output.
     //
     g_TreeList = 0;
-    g_TreeListAtom = 0;
-    if (!supInitTreeListForDump(hwndDlg, &g_TreeListAtom, &g_TreeList)) {
-        propObDumpShowError(hwndDlg);
+    if (!supInitTreeListForDump(hwndDlg, &g_TreeList)) {
+        propObDumpShowError(hwndDlg, NULL);
         supVirtualFree(SymLinkDumpBuffer);
         return;
     }
@@ -3626,8 +3600,12 @@ VOID propObDumpSymbolicLink(
     if (SystemTime.Month - 1 < 0) SystemTime.Month = 1;
     if (SystemTime.Month > 12) SystemTime.Month = 12;
 
-    RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-    wsprintf(szBuffer, FORMATTED_TIME_DATE_VALUE,
+    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+
+    rtl_swprintf_s(
+        szBuffer,
+        MAX_PATH,
+        FORMATTED_TIME_DATE_VALUE,
         SystemTime.Hour,
         SystemTime.Minute,
         SystemTime.Second,
@@ -3655,7 +3633,20 @@ VOID propObDumpSymbolicLink(
         TEXT("CreationTime"),
         &subitems);
 
-    propObDumpUnicodeString(g_TreeList, h_tviRootItem, TEXT("LinkTarget"), &SymbolicLink.u1.LinkV1->LinkTarget, FALSE);
+    if (ObjectVersion > 3) {
+        IsCallbackLink = (SymbolicLink.u1.LinkV4->Flags & 0x10);
+    }
+
+    if (IsCallbackLink) {
+        propObDumpAddress(g_TreeList, h_tviRootItem, TEXT("Callback"), NULL, 
+            SymbolicLink.u1.LinkV4->u1.Callback, 0, 0);
+        propObDumpAddress(g_TreeList, h_tviRootItem, TEXT("CallbackContext"), NULL, 
+            SymbolicLink.u1.LinkV4->u1.CallbackContext, 0, 0);
+    }
+    else {
+        propObDumpUnicodeString(g_TreeList, h_tviRootItem, TEXT("LinkTarget"), &SymbolicLink.u1.LinkV1->LinkTarget, FALSE);
+    }
+
     propObDumpUlong(g_TreeList, h_tviRootItem, TEXT("DosDeviceDriveIndex"), NULL, SymbolicLink.u1.LinkV1->DosDeviceDriveIndex, TRUE, FALSE, 0, 0);
 
     //
@@ -3814,7 +3805,6 @@ INT_PTR CALLBACK ObjectDumpDialogProc(
 
     case WM_DESTROY:
         DestroyWindow(g_TreeList);
-        UnregisterClass(MAKEINTATOM(g_TreeListAtom), g_WinObj.hInstance);
         break;
 
     case WM_INITDIALOG:

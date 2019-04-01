@@ -4,9 +4,11 @@
 *
 *  TITLE:       EXTAPI.C
 *
-*  VERSION:     1.72
+*  VERSION:     1.73
 *
-*  DATE:        06 Feb 2019
+*  DATE:        30 Mar 2019
+*
+*  Support unit for Windows 7 missing API and experimental features.
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -22,11 +24,11 @@ EXTENDED_API_SET g_ExtApiSet;
 extern "C" {
 #endif
 
-HWINSTA StubNtUserOpenWindowStation(
-    _In_ POBJECT_ATTRIBUTES ObjectAttributes,
-    _In_ ACCESS_MASK DesiredAccess);
+    HWINSTA StubNtUserOpenWindowStation(
+        _In_ POBJECT_ATTRIBUTES ObjectAttributes,
+        _In_ ACCESS_MASK DesiredAccess);
 
-extern DWORD dwNtUserOpenWindowStation;
+    extern DWORD dwNtUserOpenWindowStation;
 
 #ifdef __cplusplus
 }
@@ -63,6 +65,9 @@ NTSTATUS ExApiSetInit(
         }
     }
 
+    //
+    // User32 API introduced with Windows 8.
+    //
     hUser32 = GetModuleHandle(TEXT("user32.dll"));
     if (hUser32) {
         g_ExtApiSet.IsImmersiveProcess = (pfnIsImmersiveProcess)GetProcAddress(hUser32, "IsImmersiveProcess");

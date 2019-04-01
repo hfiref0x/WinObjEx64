@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
-*  VERSION:     1.72
+*  VERSION:     1.73
 *
-*  DATE:        10 Feb 2019
+*  DATE:        30 Mar 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -34,7 +34,7 @@ VOID DrvHandlePopupMenu(
     POINT pt1;
     HMENU hMenu;
 
-    if (g_kdctx.hDevice == NULL)
+    if (!kdConnectDriver())
         return;
 
     if (GetCursorPos(&pt1)) {
@@ -161,6 +161,54 @@ VOID DrvDumpDriver(
     if (lpDriverName) supHeapFree(lpDriverName);
 }
 
+
+/*
+* DrvDlgCompareFunc
+*
+* Purpose:
+*
+* Drivers Dialog listview comparer function.
+*
+*/
+INT CALLBACK DrvDlgCompareFunc(
+    _In_ LPARAM lParam1,
+    _In_ LPARAM lParam2,
+    _In_ LPARAM lParamSort
+)
+{
+    INT nResult = 0;
+
+    switch (lParamSort) {
+    case 0: //Load Order
+    case 3: //Size
+        return supGetMaxOfTwoULongFromString(
+            DrvDlgContext.ListView,
+            lParam1,
+            lParam2,
+            lParamSort,
+            DrvDlgContext.bInverseSort);
+
+    case 2: //Address
+        return supGetMaxOfTwoU64FromHex(
+            DrvDlgContext.ListView,
+            lParam1,
+            lParam2,
+            lParamSort,
+            DrvDlgContext.bInverseSort);
+
+    case 1: //Name
+    case 4: //Module
+        return supGetMaxCompareTwoFixedStrings(
+            DrvDlgContext.ListView,
+            lParam1,
+            lParam2,
+            lParamSort,
+            DrvDlgContext.bInverseSort);
+    }
+
+    return nResult;
+}
+
 /*
 * DrvListDrivers
 *
@@ -170,26 +218,31 @@ VOID DrvDumpDriver(
 *
 */
 VOID DrvListDrivers(
-    VOID
+    _In_ BOOL bRefresh
 )
 {
     BOOL   bCond = FALSE;
     INT    index, iImage;
-    ULONG i;
+    ULONG  i, c;
     LVITEM lvitem;
     WCHAR  szBuffer[MAX_PATH + 1];
 
     RTL_PROCESS_MODULES            *pModulesList = NULL;
     PRTL_PROCESS_MODULE_INFORMATION pModule;
 
+    if (bRefresh)
+        ListView_DeleteAllItems(DrvDlgContext.ListView);
+
     do {
-        pModulesList = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation);
+        pModulesList = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation, NULL);
         if (pModulesList == NULL)
             break;
 
         iImage = ObManagerGetImageIndexByTypeIndex(ObjectTypeDriver);
 
-        for (i = 0; i < pModulesList->NumberOfModules; i++) {
+        c = pModulesList->NumberOfModules;
+
+        for (i = 0; i < c; i++) {
 
             pModule = &pModulesList->Modules[i];
 
@@ -252,56 +305,18 @@ VOID DrvListDrivers(
             ListView_SetItem(DrvDlgContext.ListView, &lvitem);
         }
 
+        //
+        // Update status bar.
+        //
+        _strcpy(szBuffer, TEXT("Total: "));
+        ultostr(c, _strend(szBuffer));
+        SetWindowText(DrvDlgContext.StatusBar, szBuffer);
+
     } while (bCond);
 
     if (pModulesList) supHeapFree(pModulesList);
-}
 
-/*
-* DrvDlgCompareFunc
-*
-* Purpose:
-*
-* Drivers Dialog listview comparer function.
-*
-*/
-INT CALLBACK DrvDlgCompareFunc(
-    _In_ LPARAM lParam1,
-    _In_ LPARAM lParam2,
-    _In_ LPARAM lParamSort
-)
-{
-    INT nResult = 0;
-
-    switch (lParamSort) {
-    case 0: //Load Order
-    case 3: //Size
-        return supGetMaxOfTwoULongFromString(
-            DrvDlgContext.ListView,
-            lParam1,
-            lParam2,
-            lParamSort,
-            DrvDlgContext.bInverseSort);
-
-    case 2: //Address
-        return supGetMaxOfTwoU64FromHex(
-            DrvDlgContext.ListView,
-            lParam1,
-            lParam2,
-            lParamSort,
-            DrvDlgContext.bInverseSort);
-
-    case 1: //Name
-    case 4: //Module
-        return supGetMaxCompareTwoFixedStrings(
-            DrvDlgContext.ListView,
-            lParam1,
-            lParam2,
-            lParamSort,
-            DrvDlgContext.bInverseSort);
-    }
-
-    return nResult;
+    ListView_SortItemsEx(DrvDlgContext.ListView, &DrvDlgCompareFunc, DrvDlgContext.lvColumnToSort);
 }
 
 /*
@@ -379,23 +394,28 @@ INT_PTR CALLBACK DriversDialogProc(
         break;
 
     case WM_SIZE:
-        extrasSimpleListResize(hwndDlg, DrvDlgContext.SizeGrip);
+        extrasSimpleListResize(hwndDlg);
         break;
 
     case WM_CLOSE:
-        if (DrvDlgContext.SizeGrip) DestroyWindow(DrvDlgContext.SizeGrip);
         DestroyWindow(hwndDlg);
         g_WinObj.AuxDialogs[wobjDriversDlgId] = NULL;
         return TRUE;
 
     case WM_COMMAND:
-        if (LOWORD(wParam) == IDCANCEL) {
+
+        switch (LOWORD(wParam)) {
+        case IDCANCEL:
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
-            return TRUE;
-        }
-        if (LOWORD(wParam) == ID_OBJECT_COPY) {
+            break;
+        case ID_OBJECT_COPY:
             DrvDumpDriver();
-            return TRUE;
+            break;
+        case ID_VIEW_REFRESH:
+            DrvListDrivers(TRUE);
+            break;
+        default:
+            break;
         }
         break;
 
@@ -442,7 +462,7 @@ VOID extrasCreateDriversDialog(
 
     SetWindowText(DrvDlgContext.hwndDlg, TEXT("Drivers"));
 
-    DrvDlgContext.SizeGrip = supCreateSzGripWindow(DrvDlgContext.hwndDlg);
+    DrvDlgContext.StatusBar = GetDlgItem(DrvDlgContext.hwndDlg, ID_EXTRASLIST_STATUSBAR);
 
     extrasSetDlgIcon(DrvDlgContext.hwndDlg);
 
@@ -461,10 +481,10 @@ VOID extrasCreateDriversDialog(
         RtlSecureZeroMemory(&col, sizeof(col));
         col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
         col.iSubItem++;
-        col.pszText = TEXT("#");
+        col.pszText = TEXT("LoadOrder");
         col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
         col.iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
-        col.cx = 60;
+        col.cx = 100;
         ListView_InsertColumn(DrvDlgContext.ListView, col.iSubItem, &col);
 
         col.iImage = I_IMAGENONE;
@@ -472,7 +492,7 @@ VOID extrasCreateDriversDialog(
         col.iSubItem++;
         col.pszText = TEXT("Name");
         col.iOrder++;
-        col.cx = 160;
+        col.cx = 150;
         ListView_InsertColumn(DrvDlgContext.ListView, col.iSubItem, &col);
 
         col.iSubItem++;
@@ -496,9 +516,8 @@ VOID extrasCreateDriversDialog(
         //remember col count
         DrvDlgContext.lvColumnCount = col.iSubItem;
 
-        DrvListDrivers();
+        DrvListDrivers(FALSE);
         SendMessage(DrvDlgContext.hwndDlg, WM_SIZE, 0, 0);
-
-        ListView_SortItemsEx(DrvDlgContext.ListView, &DrvDlgCompareFunc, 0);
+        SetFocus(DrvDlgContext.ListView);
     }
 }

@@ -4,9 +4,9 @@
 *
 *  TITLE:       OBJECTS.H
 *
-*  VERSION:     1.72
+*  VERSION:     1.73
 *
-*  DATE:        01 Mar 2019
+*  DATE:        18 Mar 2019
 *
 *  Header file for internal Windows object types handling.
 *
@@ -75,7 +75,7 @@ typedef enum _WOBJ_OBJECT_TYPE {
     ObjectTypeDxgkSharedBundle = 48,
     ObjectTypeDxgkSharedProtectedSession = 49,
     ObjectTypeDxgkComposition = 50,
-    ObjectTypeDxgkSharedKeyedMutext = 51,
+    ObjectTypeDxgkSharedKeyedMutex = 51,
     ObjectTypeMemoryPartition = 52,
     ObjectTypeRegistryTransaction = 53,
     ObjectTypeDmaAdapter = 54,
@@ -92,18 +92,14 @@ typedef struct _WOBJ_TYPE_DESC {
     INT ImageIndex; //individual image id for each object type (maybe the same for few objects)
 } WOBJ_TYPE_DESC, *PWOBJ_TYPE_DESC;
 
-//
-// ImageList icon index used from range TYPE_FIRST - TYPE_LAST
-//
-#define TYPE_FIRST 0
-#define TYPE_LAST ObjectTypeUnknown
-
 #define OBTYPE_NAME_DESKTOP         L"Desktop"
 #define OBTYPE_NAME_DEVICE          L"Device"
 #define OBTYPE_NAME_DRIVER          L"Driver"
 #define OBTYPE_NAME_DIRECTORY       L"Directory"
+#define OBTYPE_NAME_PROCESS         L"Process"
 #define OBTYPE_NAME_SECTION         L"Section"
 #define OBTYPE_NAME_SYMBOLIC_LINK   L"SymbolicLink"
+#define OBTYPE_NAME_THREAD          L"Thread"
 #define OBTYPE_NAME_TYPE            L"Type"
 #define OBTYPE_NAME_WINSTATION      L"WindowStation"
 #define OBTYPE_NAME_UNKNOWN         L""
@@ -136,7 +132,7 @@ static WOBJ_TYPE_DESC g_ObjectTypes[] = {
     { L"DxgkCurrentDxgProcessObject", ObjectTypeDxgkCurrentDxgProcessObject, IDI_ICON_DXOBJECT, IDS_DESC_DXGK_CURRENT_DXG_PROCESS_OBJECT },
     { L"DxgkDisplayManagerObject", ObjectTypeDxgkDisplayManager, IDI_ICON_DXOBJECT, IDS_DESC_DXGK_DISPLAY_MANAGER_OBJECT },
     { L"DxgkSharedBundleObject", ObjectTypeDxgkSharedBundle, IDI_ICON_DXOBJECT, IDS_DESC_DXGK_SHARED_BUNDLE_OBJECT },
-    { L"DxgkSharedKeyedMutextObject", ObjectTypeDxgkSharedKeyedMutext, IDI_ICON_DXOBJECT, IDS_DESC_DXGK_SHARED_KEYED_MUTEX_OBJECT},
+    { L"DxgkSharedKeyedMutexObject", ObjectTypeDxgkSharedKeyedMutex, IDI_ICON_DXOBJECT, IDS_DESC_DXGK_SHARED_KEYED_MUTEX_OBJECT},
     { L"DxgkSharedProtectedSessionObject", ObjectTypeDxgkSharedProtectedSession, IDI_ICON_DXOBJECT, IDS_DESC_DXGK_SHARED_PROTECTED_SESSION_OBJECT },
     { L"DxgkSharedResource", ObjectTypeDxgkSharedResource, IDI_ICON_DXOBJECT, IDS_DESC_DXGKSHAREDRES },
     { L"DxgkSharedSwapChainObject", ObjectTypeDxgkSharedSwapChain, IDI_ICON_DXOBJECT, IDS_DESC_DXGKSHAREDSWAPCHAIN },
@@ -160,7 +156,7 @@ static WOBJ_TYPE_DESC g_ObjectTypes[] = {
     { L"Partition", ObjectTypeMemoryPartition, IDI_ICON_MEMORYPARTITION, IDS_DESC_MEMORY_PARTITION },
     { L"PcwObject", ObjectTypePcwObject, IDI_ICON_PCWOBJECT, IDS_DESC_PCWOBJECT },
     { L"PowerRequest", ObjectTypePowerRequest, IDI_ICON_POWERREQUEST, IDS_DESC_POWERREQUEST },
-    { L"Process", ObjectTypeProcess, IDI_ICON_PROCESS, IDS_DESC_PROCESS },
+    { OBTYPE_NAME_PROCESS, ObjectTypeProcess, IDI_ICON_PROCESS, IDS_DESC_PROCESS },
     { L"Profile", ObjectTypeProfile, IDI_ICON_PROFILE, IDS_DESC_PROFILE },
     //{ L"PsSiloContextNonPaged", ObjectTypePsSiloContextNonPaged, IDI_ICON_PSSILOCONTEXT, IDS_DESC_PSSILOCONTEXTNP },
     //{ L"PsSiloContextPaged", ObjectTypePsSiloContextPaged, IDI_ICON_PSSILOCONTEXT, IDS_DESC_PSSILOCONTEXT },
@@ -170,7 +166,7 @@ static WOBJ_TYPE_DESC g_ObjectTypes[] = {
     { L"Semaphore", ObjectTypeSemaphore, IDI_ICON_SEMAPHORE, IDS_DESC_SEMAPHORE },
     { L"Session", ObjectTypeSession, IDI_ICON_SESSION, IDS_DESC_SESSION },
     { OBTYPE_NAME_SYMBOLIC_LINK, ObjectTypeSymbolicLink, IDI_ICON_SYMLINK, IDS_DESC_SYMLINK },
-    { L"Thread", ObjectTypeThread, IDI_ICON_THREAD, IDS_DESC_THREAD },
+    { OBTYPE_NAME_THREAD, ObjectTypeThread, IDI_ICON_THREAD, IDS_DESC_THREAD },
     { L"Timer", ObjectTypeTimer, IDI_ICON_TIMER, IDS_DESC_TIMER },
     { L"TmEn", ObjectTypeTmEn, IDI_ICON_TMEN, IDS_DESC_TMEN },
     { L"TmRm", ObjectTypeTmRm, IDI_ICON_TMRM, IDS_DESC_TMRM },
@@ -187,6 +183,13 @@ static WOBJ_TYPE_DESC g_ObjectTypes[] = {
     { OBTYPE_NAME_WINSTATION, ObjectTypeWinstation, IDI_ICON_WINSTATION, IDS_DESC_WINSTATION },
     { L"WmiGuid", ObjectTypeWMIGuid, IDI_ICON_WMIGUID, IDS_DESC_WMIGUID }
 };
+
+//
+// ImageList icon index used from range TYPE_FIRST - TYPE_LAST
+//
+#define TYPE_FIRST 0
+#define TYPE_LAST RTL_NUMBER_OF(g_ObjectTypes)
+
 
 HIMAGELIST ObManagerLoadImageList(
     VOID);

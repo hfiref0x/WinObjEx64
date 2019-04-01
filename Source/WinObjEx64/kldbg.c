@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.72
+*  VERSION:     1.73
 *
-*  DATE:        22 Feb 2019
+*  DATE:        30 Mar 2019
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -1280,7 +1280,7 @@ BOOL kdFindKiServiceTables(
 * Purpose:
 *
 * Obtain directory object kernel address by opening directory by name
-* and quering resulted handle in NtQuerySystemInformation(SystemHandleInformation) handle dump
+* and quering resulted handle in NtQuerySystemInformation(SystemExtendedHandleInformation) handle dump
 *
 */
 BOOL ObGetDirectoryObjectAddress(
@@ -1684,6 +1684,12 @@ POBJINFO ObQueryObjectByAddress(
     ULONG_PTR ObjectHeaderAddress;
     OBJECT_HEADER ObjectHeader;
 
+    if (ObjectAddress < g_kdctx.SystemRangeStart)
+        return NULL;
+
+    if (!kdConnectDriver())
+        return NULL;
+
     //
     // Read object header, fail is critical.
     //
@@ -1698,7 +1704,7 @@ POBJINFO ObQueryObjectByAddress(
     {
 #ifdef _DEBUG
         OutputDebugStringA(__FUNCTION__);
-        OutputDebugStringA("kdReadSystemMemoryEx(ObjectHeaderAddress(ObjectAddress)) failed");
+        OutputDebugStringA("\r\nkdReadSystemMemoryEx(ObjectHeaderAddress(ObjectAddress)) failed");
 #endif
         return NULL;
     }
@@ -1730,15 +1736,8 @@ POBJINFO ObQueryObject(
     SIZE_T     i, l, rdirLen, ldirSz;
     LPWSTR     SingleDirName, LookupDirName;
 
-    if (
-        (lpObjectName == NULL) ||
-        (lpDirectory == NULL) ||
-        (g_kdctx.hDevice == NULL)
-
-        )
-    {
+    if (!kdConnectDriver())
         return NULL;
-    }
 
     __try {
 
@@ -2230,16 +2229,14 @@ BOOL ObCollectionCreate(
     _In_ BOOL Locked
 )
 {
-    BOOL bResult;
-
-    bResult = FALSE;
-    if (g_kdctx.hDevice == NULL) {
-        return bResult;
-    }
+    BOOL bResult = FALSE;
 
     if (Collection == NULL) {
         return bResult;
     }
+
+    if (!kdConnectDriver())
+        return bResult;
 
     if (!Locked) {
         RtlEnterCriticalSection(&g_kdctx.ListLock);
@@ -2435,6 +2432,69 @@ POBJREF ObCollectionFindByAddress(
 }
 
 /*
+* kdConnectDriver
+*
+* Purpose:
+*
+* Acquire handle of helper driver device if possible.
+*
+* N.B. 
+*
+*   If device handle is already present function immediately return TRUE.
+*   If current token is not elevated admin token function immediately return FALSE.
+*   SE_DEBUG_PRIVILEGE is required, if it cannot be assigned function return FALSE.
+*
+*/
+BOOLEAN kdConnectDriver(
+    VOID)
+{
+    NTSTATUS status;
+    HANDLE deviceHandle = NULL;
+    UNICODE_STRING usDevice;
+    OBJECT_ATTRIBUTES obja;
+    IO_STATUS_BLOCK iost;
+
+    WCHAR szDeviceName[100];
+
+    if (g_kdctx.hDevice != NULL)
+        return TRUE;
+
+    if (g_kdctx.IsFullAdmin == FALSE)
+        return FALSE;
+
+    if (supEnablePrivilege(SE_DEBUG_PRIVILEGE, TRUE)) {
+
+        _strcpy(szDeviceName, TEXT("\\Device\\"));
+        _strcat(szDeviceName, KLDBGDRV);
+        RtlInitUnicodeString(&usDevice, szDeviceName);
+        InitializeObjectAttributes(&obja, &usDevice, OBJ_CASE_INSENSITIVE, NULL, NULL);
+
+        status = NtCreateFile(
+            &deviceHandle,
+            GENERIC_READ | GENERIC_WRITE,
+            &obja,
+            &iost,
+            NULL,
+            0,
+            0,
+            FILE_OPEN,
+            0,
+            NULL,
+            0);
+
+        if (NT_SUCCESS(status)) {
+            g_kdctx.hDevice = deviceHandle;
+            return TRUE;
+        }
+        else {
+            supEnablePrivilege(SE_DEBUG_PRIVILEGE, FALSE);
+        }
+    }
+
+    return FALSE;
+}
+
+/*
 * kdQueryIopInvalidDeviceRequest
 *
 * Purpose:
@@ -2537,7 +2597,6 @@ VOID kdShowError(
 * Wrapper around SysDbgReadVirtual request to the KLDBGDRV
 *
 */
-_Success_(return == TRUE)
 BOOL kdReadSystemMemoryEx(
     _In_ ULONG_PTR Address,
     _Inout_ PVOID Buffer,
@@ -2550,13 +2609,16 @@ BOOL kdReadSystemMemoryEx(
     IO_STATUS_BLOCK iost;
     SYSDBG_VIRTUAL  dbgRequest;
 
-    if (g_kdctx.hDevice == NULL)
-        return FALSE;
+    if (NumberOfBytesRead)
+        *NumberOfBytesRead = 0;
 
     if ((Buffer == NULL) || (BufferSize == 0))
         return FALSE;
 
     if (Address < g_kdctx.SystemRangeStart)
+        return FALSE;
+
+    if (!kdConnectDriver())
         return FALSE;
 
     //
@@ -2622,52 +2684,6 @@ BOOL kdReadSystemMemoryEx(
 
         return FALSE;
     }
-}
-
-/*
-* kdWriteSystemMemory
-*
-* Purpose:
-*
-* Wrapper around SysDbgWriteVirtual request to the KLDBGDRV
-*
-* NOT IMPLEMENTED
-*
-*/
-_Success_(return == TRUE)
-BOOL kdWriteSystemMemory(
-    _In_ ULONG_PTR Address,
-    _In_ PVOID Buffer,
-    _In_ ULONG BufferSize,
-    _Out_opt_ PULONG NumberOfBytesWrite
-)
-{
-    UNREFERENCED_PARAMETER(Address);
-    UNREFERENCED_PARAMETER(Buffer);
-    UNREFERENCED_PARAMETER(BufferSize);
-    UNREFERENCED_PARAMETER(NumberOfBytesWrite);
-    return FALSE;
-}
-
-/*
-* kdReadSystemMemory
-*
-* Purpose:
-*
-* Wrapper around kdReadSystemMemoryEx
-*
-*/
-BOOL kdReadSystemMemory(
-    _In_ ULONG_PTR Address,
-    _Inout_ PVOID Buffer,
-    _In_ ULONG BufferSize
-)
-{
-    return kdReadSystemMemoryEx(
-        Address,
-        Buffer,
-        BufferSize,
-        NULL);
 }
 
 /*
@@ -2740,7 +2756,7 @@ DWORD WINAPI kdQuerySystemInformation(
 
     do {
 
-        miSpace = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation);
+        miSpace = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation, NULL);
         if (miSpace == NULL)
             break;
 
@@ -2827,6 +2843,7 @@ VOID kdInit(
     RtlSecureZeroMemory(&g_SystemCallbacks, sizeof(g_SystemCallbacks));
 
     g_kdctx.ShowKdError = TRUE;
+    g_kdctx.IsFullAdmin = IsFullAdmin;
 
     //
     // Default driver load status.
@@ -2933,14 +2950,14 @@ VOID kdInit(
 }
 
 /*
-* KdFindCiCallbacks
+* kdFindCiCallbacks
 *
 * Purpose:
 *
 * Locate address of ntoskrnl g_CiCallbacks/SeCiCallbacks structure.
 *
 */
-ULONG_PTR KdFindCiCallbacks(
+ULONG_PTR kdFindCiCallbacks(
     _In_ PKLDBGCONTEXT Context
 )
 {

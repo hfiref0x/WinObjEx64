@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       EXTRAS.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.73
 *
-*  DATE:        30 Nov 2018
+*  DATE:        02 Mar 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -33,29 +33,26 @@
 *
 */
 VOID extrasSimpleListResize(
-    _In_ HWND hwndDlg,
-    _In_ HWND hwndSzGrip
+    _In_ HWND hwndDlg
 )
 {
-    RECT r1;
-    HWND hwnd;
-    INT  cy;
+    RECT r, szr;
+    HWND hwnd, hwndStatusBar;
 
-    RtlSecureZeroMemory(&r1, sizeof(r1));
+    RtlSecureZeroMemory(&r, sizeof(RECT));
+    RtlSecureZeroMemory(&szr, sizeof(RECT));
 
     hwnd = GetDlgItem(hwndDlg, ID_EXTRASLIST);
-    GetClientRect(hwndDlg, &r1);
+    hwndStatusBar = GetDlgItem(hwndDlg, ID_EXTRASLIST_STATUSBAR);
+    GetClientRect(hwndDlg, &r);
+    GetClientRect(hwndStatusBar, &szr);
 
-    cy = r1.bottom - 16;
-    if (hwndSzGrip != 0)
-        cy -= GRIPPER_SIZE;
+    SendMessage(hwndStatusBar, WM_SIZE, 0, 0);
 
     SetWindowPos(hwnd, 0, 0, 0,
-        r1.right - 16,
-        cy,
-        SWP_NOMOVE | SWP_NOZORDER);
-
-    supSzGripWindowOnResize(hwndDlg, hwndSzGrip);
+        r.right,
+        r.bottom - szr.bottom,
+        SWP_NOZORDER);
 }
 
 /*

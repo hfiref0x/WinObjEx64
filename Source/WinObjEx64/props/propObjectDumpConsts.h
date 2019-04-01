@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMPCONSTS.H
 *
-*  VERSION:     1.72
+*  VERSION:     1.73
 *
-*  DATE:        04 Feb 2019
+*  DATE:        07 Mar 2019
 *
 *  Consts header file for Object Dump module.
 *
@@ -18,7 +18,9 @@
 *******************************************************************************/
 #pragma once
 
-#define FORMAT_HEXBYTE      L"0x%02x"
+#define DUMP_CONVERSION_LENGTH 99
+
+#define FORMAT_HEXBYTE      L"0x%02X"
 #define FORMAT_HEXUSHORT    L"0x%04X"
 #define FORMAT_HEXDWORD     L"0x%08X"
 #define FORMAT_ULONG        L"%u"

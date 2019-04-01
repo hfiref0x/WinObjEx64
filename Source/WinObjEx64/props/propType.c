@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPTYPE.C
 *
-*  VERSION:     1.72
+*  VERSION:     1.73
 *
-*  DATE:        22 Feb 2019
+*  DATE:        30 Mar 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -552,7 +552,7 @@ BOOL propQueryTypeInfo(
                 break;
             }
 
-            if (g_kdctx.IsWine) {
+            if (g_WinObj.IsWine) {
                 pObject = OBJECT_TYPES_FIRST_ENTRY_WINE(pObjectTypes);
             }
             else {

@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.73
 *
-*  DATE:        30 Mar 2019
+*  DATE:        01 Apr 2019
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -2851,6 +2851,7 @@ VOID kdInit(
     g_kdctx.drvOpenLoadStatus = ERROR_NOT_CAPABLE;
 
     InitializeListHead(&g_kdctx.ObCollection.ListHead);
+    RtlInitializeCriticalSection(&g_kdctx.ListLock);
 
     //
     // Minimum supported client is windows 7
@@ -2942,8 +2943,6 @@ VOID kdInit(
     if (g_kdctx.hDevice != NULL) {
 
         ObpInitInfoBlockOffsets();
-
-        RtlInitializeCriticalSection(&g_kdctx.ListLock);
 
         kdQuerySystemInformation(&g_kdctx);
     }

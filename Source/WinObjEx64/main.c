@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.73
+*  VERSION:     1.74
 *
-*  DATE:        30 Mar 2019
+*  DATE:        19 May 2019
 *
 *  Program entry point and main window handler.
 *
@@ -95,6 +95,7 @@ VOID MainWindowExtrasDisableAdminFeatures(
     //
     if (g_WinObj.IsWine) {
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_DRIVERS, FALSE, &mii);
+        SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_SOFTWARELICENSECACHE, FALSE, &mii);
     }
 }
 
@@ -298,10 +299,11 @@ LRESULT MainWindowHandleWMCommand(
 {
     LPWSTR  lpItemText;
     HWND    hwndFocus;
+    WORD    ControlId = LOWORD(wParam);
 
     UNREFERENCED_PARAMETER(lParam);
 
-    switch (LOWORD(wParam)) {
+    switch (ControlId) {
 
     case ID_FILE_RUNASADMIN:
         if (g_kdctx.IsFullAdmin) {
@@ -358,64 +360,29 @@ LRESULT MainWindowHandleWMCommand(
         MainWindowOnRefresh(hwnd);
         break;
 
-        //Extras -> Pipes
-        //Extras -> Mailslots
     case ID_EXTRAS_PIPES:
     case ID_EXTRAS_MAILSLOTS:
-        extrasShowIPCDialog(hwnd, LOWORD(wParam));
-        break;
-
-        //Extras -> UserSharedData
     case ID_EXTRAS_USERSHAREDDATA:
-        extrasShowUserSharedDataDialog(hwnd);
-        break;
-
-        //Extras -> Private Namespaces
-    case ID_EXTRAS_PRIVATENAMESPACES:
-        //
-        // Feature require driver usage and not supported in 10586.
-        //
-        if (g_NtBuildNumber != 10586) {
-            if (kdConnectDriver()) {
-                extrasShowPrivateNamespacesDialog(hwnd);
-            }
-        }
-        break;
-
-        //Extras -> KiServiceTable
-        //Extras -> W32pServiceTable
+    case ID_EXTRAS_PRIVATENAMESPACES:       
     case ID_EXTRAS_SSDT:
     case ID_EXTRAS_W32PSERVICETABLE:
-        //
-        // This feature require driver usage.
-        //
-#ifndef _DEBUG
-        if (kdConnectDriver()) {
-#endif
-            extrasShowSSDTDialog(hwnd, LOWORD(wParam));
-#ifndef _DEBUG
-        }
-#endif
-        break;
-
-        //Extras -> Drivers
     case ID_EXTRAS_DRIVERS:
-        //
-        // Unsupported in Wine.
-        //
-        if (g_WinObj.IsWine == FALSE) {
-            extrasShowDriversDialog(hwnd);
-        }
-        break;
-
-        // Extras -> Process List
     case ID_EXTRAS_PROCESSLIST:
-        extrasShowPsListDialog(hwnd);
-        break;
-
-        // Extras -> Callbacks
     case ID_EXTRAS_CALLBACKS:
-        extrasShowCallbacksDialog(hwnd);
+    case ID_EXTRAS_SOFTWARELICENSECACHE:
+        //
+        // Extras -> Pipes
+        //           Mailslots
+        //           UserSharedData
+        //           Private Namespaces
+        //           KiServiceTable
+        //           W32pServiceTable
+        //           Drivers
+        //           Process List
+        //           Callbacks
+        //           Software Licensing Cache
+        //
+        extrasShowDialogById(hwnd, ControlId);
         break;
 
     case ID_HELP_ABOUT:
@@ -727,7 +694,10 @@ LRESULT MainWindowHandleWMNotify(
         }
 
         //handle tooltip
+#pragma warning(push)
+#pragma warning(disable: 26454)
         if (hdr->code == TTN_GETDISPINFO) {
+#pragma warning(pop)
             lpttt = (LPTOOLTIPTEXT)lParam;
 
             switch (lpttt->hdr.idFrom) {
@@ -947,7 +917,7 @@ BOOL WinObjInitGlobals(
     _In_ BOOLEAN IsWine)
 {
     SIZE_T cch;
-    BOOL bResult = FALSE, bCond = FALSE;
+    BOOL bResult = FALSE;
     LPWSTR *szArglist;
     INT nArgs = 0;
 
@@ -1014,7 +984,7 @@ BOOL WinObjInitGlobals(
 
         bResult = TRUE;
 
-    } while (bCond);
+    } while (FALSE);
 
     if (bResult == FALSE) {
         if (g_WinObj.Heap)
@@ -1037,7 +1007,7 @@ UINT WinObjExMain()
     BOOLEAN                 IsWine = FALSE;
     MSG                     msg1;
     WNDCLASSEX              wincls;
-    BOOL                    IsFullAdmin = FALSE, rv = TRUE, cond = FALSE, bLocalSystem = FALSE;
+    BOOL                    IsFullAdmin = FALSE, rv = TRUE, bLocalSystem = FALSE;
     ATOM                    class_atom = 0;
     INITCOMMONCONTROLSEX    icc;
     LVCOLUMN                col;
@@ -1478,7 +1448,7 @@ UINT WinObjExMain()
             DispatchMessage(&msg1);
         } while (rv != 0);
 
-    } while (cond);
+    } while (FALSE);
 
     if (class_atom != 0)
         UnregisterClass(MAKEINTATOM(class_atom), g_WinObj.hInstance);

@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPTYPE.C
 *
-*  VERSION:     1.73
+*  VERSION:     1.74
 *
-*  DATE:        30 Mar 2019
+*  DATE:        03 May 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -528,7 +528,7 @@ BOOL propQueryTypeInfo(
     _Out_ POBJECT_TYPE_COMPATIBLE pObjectTypeDump
 )
 {
-    BOOL     bResult = FALSE, cond = FALSE;
+    BOOL     bResult = FALSE;
     ULONG    i;
     SIZE_T   sz;
     LPWSTR   lpType;
@@ -595,7 +595,7 @@ BOOL propQueryTypeInfo(
                 }
                 pObject = OBJECT_TYPES_NEXT_ENTRY(pObject);
             }
-        } while (cond);
+        } while (FALSE);
 
         if (pObjectTypes) {
             supHeapFree(pObjectTypes);

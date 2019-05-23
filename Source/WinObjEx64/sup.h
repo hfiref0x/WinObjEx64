@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.73
+*  VERSION:     1.74
 *
-*  DATE:        30 Mar 2019
+*  DATE:        18 May 2019
 *
 *  Common header file for the program support routines.
 *
@@ -63,6 +63,12 @@ typedef struct _OBEX_THREAD_LOOKUP_ENTRY {
     HANDLE hThread;
     PVOID EntryPtr;
 } OBEX_THREAD_LOOKUP_ENTRY, *POBEX_THREAD_LOOKUP_ENTRY;
+
+// return true to stop enumeration
+typedef BOOL(CALLBACK *PENUMERATE_SL_CACHE_VALUE_DESCRIPTORS_CALLBACK)(
+    _In_ SL_KMEM_CACHE_VALUE_DESCRIPTOR *CacheDescriptor,
+    _In_opt_ PVOID Context
+    );
 
 typedef struct _PROCESS_MITIGATION_POLICIES_ALL {
     PROCESS_MITIGATION_DEP_POLICY DEPPolicy;
@@ -249,8 +255,8 @@ LPWSTR supGetItemText2(
     _In_ HWND ListView,
     _In_ INT nItem,
     _In_ INT nSubItem,
-    _In_ LPWSTR pszText,
-    _In_ UINT cbText);
+    _In_ WCHAR *pszText,
+    _In_ UINT cchText);
 
 BOOL supQueryLinkTarget(
     _In_opt_ HANDLE hRootDirectory,
@@ -525,7 +531,7 @@ NTSTATUS supOpenThread(
 
 BOOL supPrintTimeConverted(
     _In_ PLARGE_INTEGER Time,
-    _In_ LPWSTR lpBuffer,
+    _In_ WCHAR *lpszBuffer,
     _In_ SIZE_T cchBuffer);
 
 BOOL supGetListViewItemParam(
@@ -577,3 +583,17 @@ BOOL supPHLCreate(
     _In_ PBYTE ProcessList,
     _Out_ PULONG NumberOfProcesses,
     _Out_ PULONG NumberOfThreads);
+
+PVOID supSLCacheRead(
+    VOID);
+
+BOOLEAN supSLCacheEnumerate(
+    _In_ PVOID CacheData,
+    _In_opt_ PENUMERATE_SL_CACHE_VALUE_DESCRIPTORS_CALLBACK Callback,
+    _In_opt_ PVOID Context);
+
+HFONT supCreateFontIndirect(
+    _In_ LPWSTR FaceName);
+
+HRESULT WINAPI supShellExecInExplorerProcess(
+    _In_ PCWSTR pszFile);

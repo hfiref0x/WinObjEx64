@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       TREELIST.C
 *
-*  VERSION:     1.27
+*  VERSION:     1.28
 *
-*  DATE:        31 Mar 2018
+*  DATE:        15 May 2019
 *
 *  TreeList control.
 *
@@ -681,7 +681,7 @@ LRESULT CALLBACK TreeListWindowProc(
         }
 
         result = SendMessage((HWND)GetWindowLongPtr(hwnd, TL_TREECONTROL_SLOT), TVM_SETITEM, 0, (LPARAM)&item);
-        HeapFree(hheap, 0, subitems);
+        if (subitems) HeapFree(hheap, 0, subitems);
         return result;
 
     case TVM_INSERTITEM:

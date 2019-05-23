@@ -4,9 +4,9 @@
 *
 *  TITLE:       LIST.C
 *
-*  VERSION:     1.73
+*  VERSION:     1.74
 *
-*  DATE:        30 Mar 2019
+*  DATE:        03 May 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -211,7 +211,6 @@ VOID ListObjectDirectoryTree(
     _In_opt_ HTREEITEM ViewRootHandle
 )
 {
-    BOOL                cond = TRUE;
     NTSTATUS            status;
     ULONG               ctx, rlen;
     HANDLE              hDirectory = NULL;
@@ -276,7 +275,7 @@ VOID ListObjectDirectoryTree(
 
         supHeapFree(objinf);
 
-    } while (cond);
+    } while (TRUE);
 
     NtClose(hDirectory);
 }
@@ -409,7 +408,6 @@ VOID ListObjectsInDirectory(
     _In_ LPWSTR lpObjectDirectory
 )
 {
-    BOOL                cond = TRUE;
     NTSTATUS            status;
     ULONG               ctx, rlen;
     HANDLE              hDirectory = NULL;
@@ -456,7 +454,7 @@ VOID ListObjectsInDirectory(
 
         supHeapFree(objinf);
 
-    } while (cond);
+    } while (TRUE);
 
     NtClose(hDirectory);
 }
@@ -476,7 +474,6 @@ VOID FindObject(
     _In_ PFO_LIST_ITEM *List
 )
 {
-    BOOL                cond = TRUE;
     NTSTATUS            status;
     ULONG               ctx, rlen;
     HANDLE              hDirectory = NULL;
@@ -572,7 +569,7 @@ VOID FindObject(
 
         supHeapFree(objinf);
 
-    } while (cond);
+    } while (TRUE);
 
     NtClose(hDirectory);
 }

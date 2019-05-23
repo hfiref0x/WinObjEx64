@@ -1235,7 +1235,10 @@ INT_PTR PsListHandleNotify(
         switch (hdrcode) {
 
         case NM_DBLCLK:
+#pragma warning(push)
+#pragma warning(disable: 26454)
             nhdr->code = NM_RETURN;
+#pragma warning(pop)
             return PostMessage(hwndDlg, WM_NOTIFY, wParam, lParam);
             break;
 

@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASUSD.C
 *
-*  VERSION:     1.73
+*  VERSION:     1.74
 *
-*  DATE:        31 Mar 2019
+*  DATE:        03 May 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -36,7 +36,7 @@ VOID UsdDumpSharedRegion(
     _In_ HWND hwndParent
 )
 {
-    BOOL                bCond = FALSE, bAny = FALSE;
+    BOOL                bAny = FALSE;
     UINT                i;
     DWORD               mask;
 
@@ -468,7 +468,7 @@ VOID UsdDumpSharedRegion(
 
         }
 
-    } while (bCond);
+    } while (FALSE);
 }
 
 /*

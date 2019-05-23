@@ -4,9 +4,9 @@
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.73
+*  VERSION:     1.74
 *
-*  DATE:        30 Mar 2019
+*  DATE:        17 May 2019
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -33,6 +33,7 @@
 #pragma warning(disable: 4201) // nameless struct/union
 #pragma warning(disable: 6255 6263) // alloca
 #pragma warning(disable: 6320) // Exception-filter expression is the constant EXCEPTION_EXECUTE_HANDLER.
+#pragma warning(disable: 6258) // Using TerminateThread does not allow proper thread clean up.
 
 //
 // Included lib files used by program.
@@ -41,6 +42,7 @@
 #pragma comment(lib, "Aclui.lib")
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "Setupapi.lib")
+#pragma comment(lib, "shlwapi.lib")
 #pragma comment(lib, "Version.lib")
 
 #if defined (_MSC_VER)
@@ -61,6 +63,7 @@
 #include <ShlObj.h>
 #include <ntstatus.h>
 #include <sddl.h>
+#include <slpublic.h>
 #include "resource.h"
 #include "extdef.h"
 #include "wine.h"

@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     1.73
+*  VERSION:     1.74
 *
-*  DATE:        19 Mar 2019
+*  DATE:        03 May 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -904,7 +904,7 @@ VOID propObDumpDriverObject(
     _In_ HWND hwndDlg
 )
 {
-    BOOL                    cond, bOkay;
+    BOOL                    bOkay;
     INT                     i, j;
     HTREEITEM               h_tviRootItem, h_tviSubItem;
     PRTL_PROCESS_MODULES    pModules;
@@ -924,7 +924,6 @@ VOID propObDumpDriverObject(
     }
 
     bOkay = FALSE;
-    cond = FALSE;
 
     __try {
 
@@ -957,7 +956,7 @@ VOID propObDumpDriverObject(
                 break;
             }
 
-        } while (cond);
+        } while (FALSE);
 
         //any errors - abort
         if (!bOkay) {
@@ -2426,7 +2425,7 @@ VOID propObDumpObjectType(
     _In_ HWND hwndDlg
 )
 {
-    BOOL                    bCond = FALSE, bOkay;
+    BOOL                    bOkay;
     HTREEITEM               h_tviRootItem, h_tviSubItem, h_tviGenericMapping;
     UINT                    i;
     LPWSTR                  lpType = NULL;
@@ -2724,7 +2723,7 @@ VOID propObDumpObjectType(
 
         bOkay = TRUE;
 
-    } while (bCond);
+    } while (FALSE);
 
     //
     // Cleanup.

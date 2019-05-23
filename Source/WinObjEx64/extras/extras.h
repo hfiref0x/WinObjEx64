@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRAS.H
 *
-*  VERSION:     1.73
+*  VERSION:     1.74
 *
-*  DATE:        02 Mar 2019
+*  DATE:        12 May 2019
 *
 *  Common header file for Extras dialogs.
 *
@@ -63,25 +63,6 @@ VOID extrasSimpleListResize(
 VOID extrasSetDlgIcon(
     _In_ HWND hwndDlg);
 
-VOID extrasShowIPCDialog(
-    _In_ HWND hwndParent,
-    _In_ ULONG CallerId);
-
-VOID extrasShowUserSharedDataDialog(
-    _In_ HWND hwndParent);
-
-VOID extrasShowPrivateNamespacesDialog(
-    _In_ HWND hwndParent);
-
-VOID extrasShowSSDTDialog(
-    _In_ HWND hwndParent,
-    _In_ ULONG CallerId);
-
-VOID extrasShowDriversDialog(
-    _In_ HWND hwndParent);
-
-VOID extrasShowPsListDialog(
-    _In_ HWND hwndParent);
-
-VOID extrasShowCallbacksDialog(
-    _In_ HWND hwndParent);
+VOID extrasShowDialogById(
+    _In_ HWND ParentWindow,
+    _In_ WORD DialogId);

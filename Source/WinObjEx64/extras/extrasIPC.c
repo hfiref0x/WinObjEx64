@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASIPC.C
 *
-*  VERSION:     1.73
+*  VERSION:     1.74
 *
-*  DATE:        14 Mar 2019
+*  DATE:        03 May 2019
 *
 *  IPC supported: Pipes, Mailslots
 *
@@ -594,7 +594,6 @@ VOID IpcDlgQueryInfo(
     _In_ HWND ListView
 )
 {
-    BOOL                        cond = TRUE;
     BOOLEAN                     bRestartScan;
     ULONG                       QuerySize;
     HANDLE                      hObject = NULL;
@@ -622,7 +621,7 @@ VOID IpcDlgQueryInfo(
 
         c = 0;
         bRestartScan = TRUE;
-        while (cond) {
+        while (TRUE) {
 
             RtlSecureZeroMemory(&iost, sizeof(iost));
 

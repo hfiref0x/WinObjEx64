@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPSECURITY.C
 *
-*  VERSION:     1.73
+*  VERSION:     1.74
 *
-*  DATE:        14 Mar 2019
+*  DATE:        03 May 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -464,7 +464,6 @@ HRESULT propSecurityConstructor(
     _In_ ULONG psiFlags
 )
 {
-    BOOL                        cond = FALSE;
     ULONG                       bytesNeeded = 0L;
     NTSTATUS                    status;
     SIZE_T                      Size;
@@ -560,7 +559,7 @@ HRESULT propSecurityConstructor(
         }
         hResult = S_OK;
 
-    } while (cond);
+    } while (FALSE);
 
     //cleanup
     This->CloseObjectMethod(Context, hObject);

@@ -31,6 +31,9 @@ extrasPN.h
 extrasPSList.c - process list
 extrasPSList.h
 
+extrasSL.c - Software Licensing Cache dialog
+extrasSL.h
+
 extrasUSD.c - UserSharedData dialog
 extrasUSD.h
 
@@ -105,5 +108,8 @@ wine.c
 global.h - global include file
 ntos.h - os internals related definitions and prototypes
 ntalpc.h - alpc port dedicated header file
+ntldr.h - nt pe loader related declarations
+ntldr.c - nt pe loader related declarations and routines
+apisetx.h - apisetschema dedicated header file
 resource.h - studio generated resource header
 ui.h - user interface global constant

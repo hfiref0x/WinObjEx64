@@ -4,9 +4,9 @@
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     1.73
+*  VERSION:     1.74
 *
-*  DATE:        30 Mar 2019
+*  DATE:        18 May 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -19,7 +19,6 @@
 #include "msvcver.h"
 
 HWND g_hwndGlobals;
-HFONT _hFontGlobalsDlg;
 WNDPROC g_GlobalsEditOriginalWndProc;
 
 /*
@@ -266,13 +265,15 @@ LRESULT CALLBACK GlobalsCustomWindowProc(
     _In_ LPARAM lParam
 )
 {
+    HFONT hFont;
+
     switch (uMsg) {
-    case WM_DESTROY:
-        if (_hFontGlobalsDlg) {
-            DeleteObject(_hFontGlobalsDlg);
-        }
-        break;
     case WM_CLOSE:
+        hFont = (HFONT)GetProp(hwnd, T_PROP_FONT);
+        if (hFont) {
+            DeleteObject(hFont);
+        }
+        RemoveProp(hwnd, T_PROP_FONT);
         g_hwndGlobals = NULL;
         break;
     default:
@@ -294,20 +295,9 @@ INT_PTR AboutDialogShowGlobals(
 {
     HWND hwnd;
     LPWSTR lpGlobalInfo;
-    NONCLIENTMETRICS ncm;
+    HFONT hFont = NULL;
 
-    if (g_hwndGlobals == NULL) {
-
-        ncm.cbSize = sizeof(NONCLIENTMETRICS);
-        if (SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(ncm), &ncm, 0)) {
-            ncm.lfCaptionFont.lfHeight += ncm.lfSmCaptionFont.lfHeight / 4;
-            ncm.lfCaptionFont.lfWeight = FW_NORMAL;
-            ncm.lfCaptionFont.lfQuality = CLEARTYPE_QUALITY;
-            ncm.lfCaptionFont.lfPitchAndFamily = FIXED_PITCH | FF_MODERN;
-            _strcpy(ncm.lfCaptionFont.lfFaceName, TEXT("Courier New"));
-
-            _hFontGlobalsDlg = CreateFontIndirect(&ncm.lfCaptionFont);
-        }
+    if (g_hwndGlobals == NULL) {      
 
         hwnd = CreateWindowEx(
             0,
@@ -324,7 +314,11 @@ INT_PTR AboutDialogShowGlobals(
             NULL);
 
         if (hwnd) {
-            SendMessage(hwnd, WM_SETFONT, (WPARAM)_hFontGlobalsDlg, 0);
+            hFont = supCreateFontIndirect(T_DEFAULT_AUX_FONT);
+            if (hFont) {
+                SendMessage(hwnd, WM_SETFONT, (WPARAM)hFont, 0);
+                SetProp(hwnd, T_PROP_FONT, hFont);
+            }
             g_GlobalsEditOriginalWndProc = (WNDPROC)GetWindowLongPtr(hwnd, GWLP_WNDPROC);
             if (g_GlobalsEditOriginalWndProc) {
                 SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)&GlobalsCustomWindowProc);

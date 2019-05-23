@@ -4,9 +4,9 @@
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     1.73
+*  VERSION:     1.74
 *
-*  DATE:        20 Mar 2019
+*  DATE:        12 May 2019
 *
 *  Test code used while debug.
 *
@@ -17,9 +17,9 @@
 *
 *******************************************************************************/
 #include "global.h"
+#include "ntldr.h"
 #include <intrin.h>
 #include <aclapi.h>
-
 
 HANDLE g_TestIoCompletion = NULL, g_TestTransaction = NULL;
 HANDLE g_TestNamespace = NULL, g_TestMutex = NULL;
@@ -28,12 +28,97 @@ HANDLE g_DebugObject = NULL;
 HANDLE g_TestJob = NULL;
 HDESK g_TestDesktop = NULL;
 HANDLE g_TestThread = NULL;
+HANDLE g_TestPortThread = NULL;
+HANDLE g_PortHandle;
 
+typedef struct _LPC_USER_MESSAGE {
+    PORT_MESSAGE	Header;
+    BYTE			Data[128];
+} LPC_USER_MESSAGE, *PLPC_USER_MESSAGE;
+
+typedef struct _QUERY_REQUEST {
+    ULONG	Data;
+} QUERY_REQUEST, *PQUERY_REQUEST;
+
+#define WOBJEX_TEST_PORT L"\\Rpc Control\\WinObjEx_ServiceTestPort48429"
+
+DWORD WINAPI LPCListener(LPVOID lpThreadParameter)
+{
+    NTSTATUS Status;
+    LPC_USER_MESSAGE UserMessage;
+    PQUERY_REQUEST QueryRequest;
+
+    UNICODE_STRING PortName = RTL_CONSTANT_STRING(WOBJEX_TEST_PORT);
+    OBJECT_ATTRIBUTES ObjectAttributes;
+
+    HANDLE ConnectPort;
+
+    UNREFERENCED_PARAMETER(lpThreadParameter);
+
+    InitializeObjectAttributes(&ObjectAttributes, &PortName, OBJ_CASE_INSENSITIVE, NULL, NULL);
+
+    Status = NtCreatePort(&g_PortHandle,
+        &ObjectAttributes,
+        0,
+        sizeof(LPC_USER_MESSAGE),
+        0);
+
+    if (!NT_SUCCESS(Status)) {
+        ExitThread(0);
+    }
+
+    do {
+
+        RtlSecureZeroMemory(&UserMessage, sizeof(UserMessage));
+        if (!NT_SUCCESS(NtListenPort(g_PortHandle, &UserMessage.Header)))
+            break;
+
+        ConnectPort = NULL;
+        if (!NT_SUCCESS(NtAcceptConnectPort(&ConnectPort,
+            NULL,
+            &UserMessage.Header,
+            TRUE,
+            NULL,
+            NULL)))
+        {
+            break;
+        }
+
+        if (NT_SUCCESS(NtCompleteConnectPort(ConnectPort))) {
+
+            __try {
+
+                RtlSecureZeroMemory(&UserMessage, sizeof(UserMessage));
+                NtReplyWaitReceivePort(ConnectPort, NULL, NULL, &UserMessage.Header);
+
+                QueryRequest = (PQUERY_REQUEST)&UserMessage.Data;
+                DbgPrint("Data=%lx", QueryRequest->Data);
+                if (QueryRequest->Data == 1)
+                    break;
+
+            }
+            __except (EXCEPTION_EXECUTE_HANDLER) {
+                DbgPrint("ListenerException%lx", GetExceptionCode());
+            }
+
+        }
+
+        NtClose(ConnectPort);
+
+    } while (TRUE);
+
+    NtClose(g_PortHandle);
+
+    ExitThread(0);
+}
 
 VOID TestApiPort(
     VOID
 )
 {
+    DWORD tid;
+    g_TestPortThread = CreateThread(NULL, 0,
+        (LPTHREAD_START_ROUTINE)LPCListener, NULL, 0, &tid);
 }
 
 VOID TestDebugObject(
@@ -55,7 +140,6 @@ VOID TestMailslot(
     VOID
 )
 {
-    BOOL bCond = FALSE;
     NTSTATUS status;
     OBJECT_ATTRIBUTES obja;
     UNICODE_STRING    ustr = RTL_CONSTANT_STRING(L"\\Device\\Mailslot\\TestMailslot");
@@ -112,7 +196,7 @@ VOID TestMailslot(
             pSD,
             TRUE,
             pACL,
-            FALSE)) 
+            FALSE))
         {
             break;
         }
@@ -133,7 +217,7 @@ VOID TestMailslot(
             __nop();
         }
 
-    } while (bCond);
+    } while (FALSE);
 
     if (pAdminSID) FreeSid(pAdminSID);
     if (pEveryoneSID) FreeSid(pEveryoneSID);
@@ -204,7 +288,6 @@ VOID TestPrivateNamespace(
     VOID
 )
 {
-    BOOL                cond = FALSE;
     DWORD               LastError = 0;
     HANDLE              hBoundaryDescriptor = NULL, hBoundaryDescriptor2 = NULL;
     BYTE                localSID[SECURITY_MAX_SID_SIZE];
@@ -257,9 +340,9 @@ VOID TestPrivateNamespace(
         sa.bInheritHandle = FALSE;
         if (!ConvertStringSecurityDescriptorToSecurityDescriptor(
             TEXT("D:(A;;GA;;;BA)"),
-            SDDL_REVISION_1, 
-            &sa.lpSecurityDescriptor, 
-            NULL)) 
+            SDDL_REVISION_1,
+            &sa.lpSecurityDescriptor,
+            NULL))
         {
             break;
         }
@@ -275,9 +358,9 @@ VOID TestPrivateNamespace(
         }
         g_TestMutex = CreateMutex(NULL, FALSE, TEXT("NamespaceAlias\\TestMutex"));
 
-//        hMutex = OpenMutex(MUTEX_ALL_ACCESS, FALSE, TEXT("NamespaceAlias\\TestMutex"));
-  //      if (hMutex) 
-    //        CloseHandle(hMutex);
+        //        hMutex = OpenMutex(MUTEX_ALL_ACCESS, FALSE, TEXT("NamespaceAlias\\TestMutex"));
+          //      if (hMutex) 
+            //        CloseHandle(hMutex);
 
 
         RtlInitUnicodeString(&MutexName, TEXT("TestMutex"));
@@ -300,9 +383,9 @@ VOID TestPrivateNamespace(
         if (!CreateWellKnownSid(WinWorldSid, NULL, pLocalAdminSID, &cbSID)) {
             break;
         }
-      /*  if (!NT_SUCCESS(RtlAddSIDToBoundaryDescriptor(&hBoundaryDescriptor2, pLocalAdminSID))) {
-            break;
-        }*/
+        /*  if (!NT_SUCCESS(RtlAddSIDToBoundaryDescriptor(&hBoundaryDescriptor2, pLocalAdminSID))) {
+              break;
+          }*/
 
         RtlSecureZeroMemory(&sa, sizeof(sa));
         sa.nLength = sizeof(sa);
@@ -339,7 +422,7 @@ VOID TestPrivateNamespace(
         hMutex2 = OpenMutex(MUTEX_ALL_ACCESS, FALSE, L"NamespaceAlias\\TestMutex");
         if (hMutex2) CloseHandle(hMutex2);
 
-    } while (cond);
+    } while (FALSE);
 
     if (hBoundaryDescriptor) RtlDeleteBoundaryDescriptor(hBoundaryDescriptor);
 }
@@ -414,7 +497,7 @@ VOID TestJob()
                 NULL,
                 NULL,
                 &si,
-                &pi)) 
+                &pi))
             {
                 AssignProcessToJobObject(g_TestJob, pi.hProcess);
                 CloseHandle(pi.hThread);
@@ -430,7 +513,7 @@ VOID TestPsObjectSecurity(
     DWORD dwErr;
     PACL EmptyDacl;
     HANDLE hObject;
-    
+
     if (bThread)
         hObject = GetCurrentThread();
     else
@@ -440,20 +523,20 @@ VOID TestPsObjectSecurity(
     if (EmptyDacl) {
 
         if (!InitializeAcl(
-            EmptyDacl, 
-            sizeof(ACL), 
-            ACL_REVISION)) 
+            EmptyDacl,
+            sizeof(ACL),
+            ACL_REVISION))
         {
             dwErr = GetLastError();
         }
         else {
-            
+
             dwErr = SetSecurityInfo(hObject,
                 SE_KERNEL_OBJECT,
-                DACL_SECURITY_INFORMATION, 
-                NULL, 
-                NULL, 
-                EmptyDacl, 
+                DACL_SECURITY_INFORMATION,
+                NULL,
+                NULL,
+                EmptyDacl,
                 NULL);
         }
 
@@ -511,9 +594,136 @@ VOID TestThread()
     g_TestThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)TokenImpersonationThreadProc, NULL, 0, &tid);
 }
 
+VOID TestApiSetResolve()
+{
+    ULONG i, Version;
+    PVOID Data;
+    BOOL Resolved;
+
+    NTSTATUS Status;
+
+    UNICODE_STRING ApiSetLibrary;
+    UNICODE_STRING ParentLibrary;
+    UNICODE_STRING ResolvedHostLibrary;
+
+    NtLdrApiSetLoadFromPeb(&Version, &Data);
+
+    LPWSTR ToResolve[12] = {
+        L"hui-ms-win-core-app-l1-2-3.dll",
+        L"api-ms-win-nevedomaya-ebanaya-hyinua-l1-1-3.dll",
+        L"api-ms-win-core-appinit-l1-1-0.dll",
+        L"api-ms-win-core-com-private-l1-2-0",
+        L"ext-ms-win-fs-clfs-l1-1-0.dll",
+        L"ext-ms-win-core-app-package-registration-l1-1-1",
+        L"ext-ms-win-shell-ntshrui-l1-1-0.dll",
+        NULL,
+        L"api-ms-win-core-psapi-l1-1-0.dll",
+        L"api-ms-win-core-enclave-l1-1-1.dll",
+        L"api-ms-onecoreuap-print-render-l1-1-0.dll",
+        L"api-ms-win-deprecated-apis-advapi-l1-1-0.dll"
+    };
+
+
+    for (i = 0; i < 12; i++) {
+        RtlInitUnicodeString(&ApiSetLibrary, ToResolve[i]);
+
+        Status = NtLdrApiSetResolveLibrary(Data,
+            &ApiSetLibrary,
+            NULL,
+            &Resolved,
+            &ResolvedHostLibrary);
+
+        if (NT_SUCCESS(Status)) {
+            if (Resolved) {
+                DbgPrint("%wZ\r\n", ResolvedHostLibrary);
+                RtlFreeUnicodeString(&ResolvedHostLibrary);
+            }
+            else {
+                DbgPrint("Could not resolve apiset %wZ\r\n", ApiSetLibrary);
+            }
+        }
+        else {
+            DbgPrint("NtLdrApiSetResolveLibrary failed 0x%lx\r\n", Status);
+        }
+    }
+
+    RtlInitUnicodeString(&ParentLibrary, L"kernel32.dll");
+    RtlInitUnicodeString(&ApiSetLibrary, L"api-ms-win-core-processsecurity-l1-1-0.dll");
+
+    Status = NtLdrApiSetResolveLibrary(Data,
+        &ApiSetLibrary,
+        &ParentLibrary,
+        &Resolved,
+        &ResolvedHostLibrary);
+
+    if (NT_SUCCESS(Status)) {
+        if (Resolved) {
+            DbgPrint("Resolved apiset %wZ\r\n", ResolvedHostLibrary);
+            RtlFreeUnicodeString(&ResolvedHostLibrary);
+        }
+        else {
+            DbgPrint("Could not resolve apiset %wZ\r\n", ApiSetLibrary);
+        }
+    }
+    else {
+        DbgPrint("NtLdrApiSetResolveLibrary failed 0x%lx\r\n", Status);
+    }
+}
+
+BOOL CALLBACK EnumerateSLValueDescriptorCallback(
+    _In_ SL_KMEM_CACHE_VALUE_DESCRIPTOR *CacheDescriptor,
+    _In_opt_ PVOID Context
+)
+{
+    WCHAR *EntryName;
+    CHAR *EntryType;
+
+    UNREFERENCED_PARAMETER(Context);
+
+    EntryName = (PWCHAR)supHeapAlloc(CacheDescriptor->NameLength + sizeof(WCHAR));
+    if (EntryName) {
+
+        RtlCopyMemory(EntryName, CacheDescriptor->Name, CacheDescriptor->NameLength);
+
+        switch (CacheDescriptor->Type) {
+        case SL_DATA_SZ:
+            EntryType = "SL_DATA_SZ";
+            break;
+        case SL_DATA_DWORD:
+            EntryType = "SL_DATA_DWORD";
+            break;
+        case SL_DATA_BINARY:
+            EntryType = "SL_DATA_BINARY";
+            break;
+        case SL_DATA_MULTI_SZ:
+            EntryType = "SL_DATA_MULTI_SZ";
+            break;
+        case SL_DATA_SUM:
+            EntryType = "SL_DATA_SUM";
+            break;
+
+        default:
+            EntryType = "Unknown";
+        }
+
+        DbgPrint("%ws, %s\r\n", EntryName, EntryType);
+        supHeapFree(EntryName);
+
+    }
+    return FALSE;
+}
+
+VOID TestLicenseCache()
+{
+    PVOID CacheData = supSLCacheRead();
+    if (CacheData) {
+        supSLCacheEnumerate(CacheData, EnumerateSLValueDescriptorCallback, NULL);
+        supHeapFree(CacheData);
+    }
+}
+
 VOID TestCall()
 {
-
 }
 
 VOID TestStart(
@@ -521,6 +731,8 @@ VOID TestStart(
 )
 {
     //TestPsObjectSecurity();
+    TestLicenseCache();
+    TestApiSetResolve();
     TestDesktop();
     TestCall();
     TestApiPort();
@@ -563,5 +775,9 @@ VOID TestStop(
     if (g_TestThread) {
         TerminateThread(g_TestThread, 0);
         CloseHandle(g_TestThread);
+    }
+    if (g_TestPortThread) {
+        TerminateThread(g_TestPortThread, 0);
+        CloseHandle(g_TestPortThread);
     }
 }

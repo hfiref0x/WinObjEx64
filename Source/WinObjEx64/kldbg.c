@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.73
+*  VERSION:     1.74
 *
-*  DATE:        01 Apr 2019
+*  DATE:        13 May 2019
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -373,54 +373,68 @@ NTSTATUS ObEnumerateBoundaryDescriptorEntries(
 )
 {
     ULONG EntrySize, TotalItems = 0, NameEntries = 0, IntegrityLabelEntries = 0;
+    ULONG BoundaryDescriptorItems = 0;
     ULONG_PTR DataEnd;
     OBJECT_BOUNDARY_ENTRY *CurrentEntry, *NextEntry;
 
-    if (BoundaryDescriptor->TotalSize < sizeof(OBJECT_BOUNDARY_DESCRIPTOR))
-        return STATUS_INVALID_PARAMETER;
+    __try {
 
-    if (BoundaryDescriptor->Version != 1)
-        return STATUS_INVALID_PARAMETER;
+        if (BoundaryDescriptor->TotalSize < sizeof(OBJECT_BOUNDARY_DESCRIPTOR))
+            return STATUS_INVALID_PARAMETER;
 
-    DataEnd = (ULONG_PTR)BoundaryDescriptor + BoundaryDescriptor->TotalSize;
-    if (DataEnd < (ULONG_PTR)BoundaryDescriptor)
-        return STATUS_INVALID_PARAMETER;
+        if (BoundaryDescriptor->Version != 1)
+            return STATUS_INVALID_PARAMETER;
 
-    CurrentEntry = (OBJECT_BOUNDARY_ENTRY*)((PBYTE)BoundaryDescriptor +
-        sizeof(OBJECT_BOUNDARY_DESCRIPTOR));
+        DataEnd = (ULONG_PTR)RtlOffsetToPointer(BoundaryDescriptor, BoundaryDescriptor->TotalSize);
+        if (DataEnd < (ULONG_PTR)BoundaryDescriptor)
+            return STATUS_INVALID_PARAMETER;
+
+        CurrentEntry = (OBJECT_BOUNDARY_ENTRY*)RtlOffsetToPointer(BoundaryDescriptor, 
+            sizeof(OBJECT_BOUNDARY_DESCRIPTOR));
+
+        BoundaryDescriptorItems = BoundaryDescriptor->Items;
+
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return GetExceptionCode();
+    }
 
     do {
+        __try {
+            EntrySize = CurrentEntry->EntrySize;
+            if (EntrySize < sizeof(OBJECT_BOUNDARY_ENTRY))
+                return STATUS_INVALID_PARAMETER;
 
-        EntrySize = CurrentEntry->EntrySize;
-        if (EntrySize < sizeof(OBJECT_BOUNDARY_ENTRY))
-            return STATUS_INVALID_PARAMETER;
+            TotalItems++;
 
-        TotalItems++;
+            NextEntry = (OBJECT_BOUNDARY_ENTRY*)ALIGN_UP(((PBYTE)CurrentEntry + EntrySize), ULONG_PTR);
 
-        NextEntry = (OBJECT_BOUNDARY_ENTRY*)ALIGN_UP(((PBYTE)CurrentEntry + EntrySize), ULONG_PTR);
+            if ((NextEntry < CurrentEntry) || ((ULONG_PTR)NextEntry > DataEnd))
+                return STATUS_INVALID_PARAMETER;
 
-        if ((NextEntry < CurrentEntry) || ((ULONG_PTR)NextEntry > DataEnd))
-            return STATUS_INVALID_PARAMETER;
-
-        if (CurrentEntry->EntryType == OBNS_Name) {
-            if (++NameEntries > 1)
-                return STATUS_DUPLICATE_NAME;
-        }
-        else
-
-            if (CurrentEntry->EntryType == OBNS_SID) {
-                if (!ObpValidateSidBuffer(
-                    (PSID)((PBYTE)CurrentEntry + sizeof(OBJECT_BOUNDARY_ENTRY)),
-                    EntrySize - sizeof(OBJECT_BOUNDARY_ENTRY)))
-                {
-                    return STATUS_INVALID_PARAMETER;
-                }
+            if (CurrentEntry->EntryType == OBNS_Name) {
+                if (++NameEntries > 1)
+                    return STATUS_DUPLICATE_NAME;
             }
             else
-                if (CurrentEntry->EntryType == OBNS_IntegrityLabel) {
-                    if (++IntegrityLabelEntries > 1)
-                        return STATUS_DUPLICATE_OBJECTID;
+
+                if (CurrentEntry->EntryType == OBNS_SID) {
+                    if (!ObpValidateSidBuffer(
+                        (PSID)((PBYTE)CurrentEntry + sizeof(OBJECT_BOUNDARY_ENTRY)),
+                        EntrySize - sizeof(OBJECT_BOUNDARY_ENTRY)))
+                    {
+                        return STATUS_INVALID_PARAMETER;
+                    }
                 }
+                else
+                    if (CurrentEntry->EntryType == OBNS_IntegrityLabel) {
+                        if (++IntegrityLabelEntries > 1)
+                            return STATUS_DUPLICATE_OBJECTID;
+                    }
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER) {
+            return GetExceptionCode();
+        }
 
         if (Callback) {
             if (Callback(CurrentEntry, Context))
@@ -431,7 +445,7 @@ NTSTATUS ObEnumerateBoundaryDescriptorEntries(
 
     } while ((ULONG_PTR)CurrentEntry < (ULONG_PTR)DataEnd);
 
-    return (TotalItems != BoundaryDescriptor->Items) ? STATUS_INVALID_PARAMETER : STATUS_SUCCESS;
+    return (TotalItems != BoundaryDescriptorItems) ? STATUS_INVALID_PARAMETER : STATUS_SUCCESS;
 }
 
 /*
@@ -734,7 +748,6 @@ UCHAR ObpFindHeaderCookie(
     _In_ PKLDBGCONTEXT Context
 )
 {
-    BOOL       cond = FALSE;
     UCHAR      ObHeaderCookie = 0;
     PBYTE      ptrCode;
     ULONG      Index;
@@ -799,7 +812,7 @@ UCHAR ObpFindHeaderCookie(
                 break;
             }
 
-        } while (cond);
+        } while (FALSE);
 
     }
     __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
@@ -825,8 +838,6 @@ PVOID ObFindPrivateNamespaceLookupTable2(
     _In_ PKLDBGCONTEXT Context
 )
 {
-    BOOL    cond = FALSE;
-
     ULONG_PTR Address = 0;
 
     PVOID   SectionBase;
@@ -960,7 +971,7 @@ PVOID ObFindPrivateNamespaceLookupTable2(
         //
         Address += FIELD_OFFSET(OBP_SILODRIVERSTATE, PrivateNamespaceLookupTable);
 
-    } while (cond);
+    } while (FALSE);
 
     return (PVOID)Address;
 }
@@ -977,7 +988,6 @@ PVOID ObFindPrivateNamespaceLookupTable(
     _In_ PKLDBGCONTEXT Context
 )
 {
-    BOOL       cond = FALSE;
     ULONG      Index;
     PBYTE      Signature, MatchingPattern;
     ULONG      SignatureSize;
@@ -1072,7 +1082,7 @@ PVOID ObFindPrivateNamespaceLookupTable(
         if (!kdAddressInNtOsImage((PVOID)Address))
             break;
 
-    } while (cond);
+    } while (FALSE);
 
     return (PVOID)Address;
 }
@@ -1123,7 +1133,7 @@ BOOL kdFindKiServiceTables(
     _Out_opt_ ULONG *W32pServiceLimit
 )
 {
-    BOOL         cond = FALSE, bResult = FALSE, bS1, bS2;
+    BOOL         bResult = FALSE, bS1, bS2;
     ULONG        Index, SignatureSize;
     LONG         Rel = 0;
     ULONG        SectionSize;
@@ -1265,7 +1275,7 @@ BOOL kdFindKiServiceTables(
 
             bResult = (bS1) && (bS2);
 
-        } while (cond);
+        } while (FALSE);
 
     }
     __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
@@ -1447,8 +1457,7 @@ POBJINFO ObpCopyObjectBasicInfo(
             NULL))
         {
 #ifdef _DEBUG
-            OutputDebugStringA(__FUNCTION__);
-            OutputDebugStringA("kdReadSystemMemoryEx(ObjectHeaderAddress) failed");
+            DbgPrint("%s kdReadSystemMemoryEx(ObjectHeaderAddress) failed\r\n", __FUNCTION__);
 #endif
 
             return NULL;
@@ -1544,8 +1553,7 @@ POBJINFO ObpWalkDirectory(
         {
 
 #ifdef _DEBUG
-            OutputDebugStringA(__FUNCTION__);
-            OutputDebugStringA("kdReadSystemMemoryEx(DirectoryAddress) failed");
+            DbgPrint("%s kdReadSystemMemoryEx(DirectoryAddress) failed\r\n", __FUNCTION__);
 #endif
             return NULL;
         }
@@ -1589,8 +1597,7 @@ POBJINFO ObpWalkDirectory(
                         NULL))
                     {
 #ifdef _DEBUG
-                        OutputDebugStringA(__FUNCTION__);
-                        OutputDebugStringA("kdReadSystemMemoryEx(OBJECT_DIRECTORY_ENTRY(HashEntry)) failed");
+                        DbgPrint("%s kdReadSystemMemoryEx(OBJECT_DIRECTORY_ENTRY(HashEntry)) failed\r\n", __FUNCTION__);
 #endif
                         break;
                     }
@@ -1608,8 +1615,7 @@ POBJINFO ObpWalkDirectory(
                         NULL))
                     {
 #ifdef _DEBUG
-                        OutputDebugStringA(__FUNCTION__);
-                        OutputDebugStringA("kdReadSystemMemoryEx(ObjectHeaderAddress(Entry.Object)) failed");
+                        DbgPrint("%s kdReadSystemMemoryEx(ObjectHeaderAddress(Entry.Object)) failed\r\n", __FUNCTION__);
 #endif
                         goto NextItem;
                     }
@@ -1703,8 +1709,7 @@ POBJINFO ObQueryObjectByAddress(
         NULL))
     {
 #ifdef _DEBUG
-        OutputDebugStringA(__FUNCTION__);
-        OutputDebugStringA("\r\nkdReadSystemMemoryEx(ObjectHeaderAddress(ObjectAddress)) failed");
+        DbgPrint("%s kdReadSystemMemoryEx(ObjectHeaderAddress(ObjectAddress)) failed\r\n", __FUNCTION__);
 #endif
         return NULL;
     }
@@ -1857,8 +1862,7 @@ VOID ObpWalkDirectoryRecursive(
         NULL))
     {
 #ifdef _DEBUG
-        OutputDebugStringA(__FUNCTION__);
-        OutputDebugStringA("kdReadSystemMemoryEx(DirectoryAddress) failed");
+        DbgPrint("%s kdReadSystemMemoryEx(DirectoryAddress) failed\r\n", __FUNCTION__);
 #endif
         return;
     }
@@ -2438,7 +2442,7 @@ POBJREF ObCollectionFindByAddress(
 *
 * Acquire handle of helper driver device if possible.
 *
-* N.B. 
+* N.B.
 *
 *   If device handle is already present function immediately return TRUE.
 *   If current token is not elevated admin token function immediately return FALSE.
@@ -2748,7 +2752,7 @@ DWORD WINAPI kdQuerySystemInformation(
     _In_ PVOID lpParameter
 )
 {
-    BOOL                    cond = FALSE, bResult = FALSE;
+    BOOL                    bResult = FALSE;
     PKLDBGCONTEXT           Context = (PKLDBGCONTEXT)lpParameter;
     PVOID                   MappedKernel = NULL;
     PRTL_PROCESS_MODULES    miSpace = NULL;
@@ -2799,7 +2803,7 @@ DWORD WINAPI kdQuerySystemInformation(
 
         bResult = TRUE;
 
-    } while (cond);
+    } while (FALSE);
 
     if (miSpace != NULL) {
         supHeapFree(miSpace);
@@ -2960,8 +2964,6 @@ ULONG_PTR kdFindCiCallbacks(
     _In_ PKLDBGCONTEXT Context
 )
 {
-    BOOL    bCond = FALSE;
-
     ULONG_PTR Address = 0, Result = 0;
 
     PBYTE   Signature = NULL, ptrCode = NULL, InstructionMatchPattern = NULL;
@@ -3108,7 +3110,7 @@ ULONG_PTR kdFindCiCallbacks(
 
         Result = Address;
 
-    } while (bCond);
+    } while (FALSE);
 
     return Result;
 }

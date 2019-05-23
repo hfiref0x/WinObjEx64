@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDRIVER.C
 *
-*  VERSION:     1.73
+*  VERSION:     1.74
 *
-*  DATE:        07 Mar 2019
+*  DATE:        03 May 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -49,7 +49,7 @@ VOID DriverSetInfo(
     _In_ HWND hwndDlg
 )
 {
-    BOOL                    cond = FALSE, bResult = FALSE, fGroup, bRet;
+    BOOL                    bResult = FALSE, fGroup, bRet;
     INT                     nEndOfList, nEnd, nStart;
     DWORD                   i, bytesNeeded, dwServices, dwGroups;
     LPWSTR                  lpType;
@@ -397,7 +397,7 @@ VOID DriverSetInfo(
 
             CloseServiceHandle(schService);
             schService = NULL;
-        } while (cond);
+        } while (FALSE);
 
         if (psci != NULL)
             supHeapFree(psci);
@@ -436,7 +436,6 @@ VOID DriverJumpToKey(
     _In_ PROP_OBJECT_INFO *Context
 )
 {
-    BOOL              cond = FALSE;
     DWORD             dwProcessId;
     WCHAR            *ch;
     HWND              regeditHwnd, regeditMainHwnd;
@@ -565,7 +564,7 @@ VOID DriverJumpToKey(
         SetForegroundWindow(regeditMainHwnd);
         SetFocus(regeditMainHwnd);
 
-    } while (cond);
+    } while (FALSE);
 
     if (lpRegPath) {
         supHeapFree(lpRegPath);

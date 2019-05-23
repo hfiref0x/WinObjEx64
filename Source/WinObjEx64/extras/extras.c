@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRAS.C
 *
-*  VERSION:     1.73
+*  VERSION:     1.74
 *
-*  DATE:        02 Mar 2019
+*  DATE:        14 May 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -23,6 +23,7 @@
 #include "extrasIPC.h"
 #include "extrasPSList.h"
 #include "extrasCallbacks.h"
+#include "extrasSL.h"
 
 /*
 * extrasSimpleListResize
@@ -132,114 +133,83 @@ VOID extrasSetDlgIcon(
 }
 
 /*
-* extrasShowIPCDialog
+* extrasShowDialogById
 *
 * Purpose:
 *
-* Display Pipe/Mailslots Properties Dialog.
+* Display dialog by it identifier.
 *
 */
-VOID extrasShowIPCDialog(
-    _In_ HWND hwndParent,
-    _In_ ULONG CallerId
-)
+VOID extrasShowDialogById(
+    _In_ HWND ParentWindow,
+    _In_ WORD DialogId)
 {
-    if (CallerId == ID_EXTRAS_MAILSLOTS) 
-        extrasCreateIpcDialog(hwndParent, IpcModeMailSlots);
-    else if (CallerId == ID_EXTRAS_PIPES)
-        extrasCreateIpcDialog(hwndParent, IpcModeNamedPipes);
-}
+    switch (DialogId) {
 
-/*
-* extrasShowUserSharedDataDialog
-*
-* Purpose:
-*
-* Display KUserSharedData dump dialog.
-*
-*/
-VOID extrasShowUserSharedDataDialog(
-    _In_ HWND hwndParent
-)
-{
-    extrasCreateUsdDialog(hwndParent);
-}
+    case ID_EXTRAS_PIPES:
+    case ID_EXTRAS_MAILSLOTS:
+        if (DialogId == ID_EXTRAS_MAILSLOTS)
+            extrasCreateIpcDialog(ParentWindow, IpcModeMailSlots);
+        else
+            extrasCreateIpcDialog(ParentWindow, IpcModeNamedPipes);
+        break;
 
-/*
-* extrasShowPrivateNamespacesDialog
-*
-* Purpose:
-*
-* Display PrivateNamespaces dialog.
-*
-*/
-VOID extrasShowPrivateNamespacesDialog(
-    _In_ HWND hwndParent
-)
-{
-    extrasCreatePNDialog(hwndParent);
-}
+    case ID_EXTRAS_USERSHAREDDATA:
+        extrasCreateUsdDialog(ParentWindow);
+        break;
 
-/*
-* extrasShowSSDTDialog
-*
-* Purpose:
-*
-* Display KiServiceTable (SSDT) dialog.
-*
-*/
-VOID extrasShowSSDTDialog(
-    _In_ HWND hwndParent,
-    _In_ ULONG CallerId
-)
-{
-    if (CallerId == ID_EXTRAS_SSDT)
-        extrasCreateSSDTDialog(hwndParent, SST_Ntos);
-    else if (CallerId == ID_EXTRAS_W32PSERVICETABLE)
-        extrasCreateSSDTDialog(hwndParent, SST_Win32k);
-}
+    case ID_EXTRAS_PRIVATENAMESPACES:
+        //
+        // Feature require driver usage and not supported in 10586.
+        //
+        if (g_NtBuildNumber != 10586) {
+            if (kdConnectDriver()) {
+                extrasCreatePNDialog(ParentWindow);
+            }
+        }
+        break;
 
-/*
-* extrasShowDriversDialog
-*
-* Purpose:
-*
-* Display Drivers list dialog.
-*
-*/
-VOID extrasShowDriversDialog(
-    _In_ HWND hwndParent
-)
-{
-    extrasCreateDriversDialog(hwndParent);
-}
+    case ID_EXTRAS_SSDT:
+    case ID_EXTRAS_W32PSERVICETABLE:
+        //
+        // This feature require driver usage.
+        //
+#ifndef _DEBUG
+        if (kdConnectDriver()) {
+#endif
+            if (DialogId == ID_EXTRAS_SSDT)
+                extrasCreateSSDTDialog(ParentWindow, SST_Ntos);
+            else
+                extrasCreateSSDTDialog(ParentWindow, SST_Win32k);
 
-/*
-* extrasShowPsListDialog
-*
-* Purpose:
-*
-* Display Process list dialog.
-*
-*/
-VOID extrasShowPsListDialog(
-    _In_ HWND hwndParent
-)
-{
-    extrasCreatePsListDialog(hwndParent);
-}
+#ifndef _DEBUG
+        }
+#endif
+        break;
 
-/*
-* extrasShowCallbacksDialog
-*
-* Purpose:
-*
-* Display Callbacks dialog.
-*
-*/
-VOID extrasShowCallbacksDialog(
-    _In_ HWND hwndParent
-)
-{
-    extrasCreateCallbacksDialog(hwndParent);
+    case ID_EXTRAS_DRIVERS:
+        //
+       // Unsupported in Wine.
+       //
+        if (g_WinObj.IsWine == FALSE) {
+            extrasCreateDriversDialog(ParentWindow);
+        }
+        break;
+
+    case ID_EXTRAS_PROCESSLIST:
+        extrasCreatePsListDialog(ParentWindow);
+        break;
+
+    case ID_EXTRAS_CALLBACKS:
+        extrasCreateCallbacksDialog(ParentWindow);
+        break;
+
+    case ID_EXTRAS_SOFTWARELICENSECACHE:
+        extrasCreateSLCacheDialog(ParentWindow);
+        break;
+
+
+    default:
+        break;
+    }
 }

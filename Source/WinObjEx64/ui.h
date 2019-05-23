@@ -4,9 +4,9 @@
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.73
+*  VERSION:     1.74
 *
-*  DATE:        31 Mar 2019
+*  DATE:        12 May 2019
 *
 *  Common header file for the user interface.
 *
@@ -33,7 +33,7 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
     _In_ DWORD_PTR dwData
     );
 
-#define PROGRAM_VERSION         L"1.7.3"
+#define PROGRAM_VERSION         L"1.7.4"
 #ifdef _USE_OWN_DRIVER
 #define PROGRAM_NAME            L"Windows Object Explorer 64-bit (Non-public version)"
 #else 
@@ -69,6 +69,7 @@ typedef enum _WOBJ_DIALOGS_ID {
     wobjPsListDlgId,
     wobjDriversDlgId,
     wobjCallbacksDlgId,
+    wobjSLCacheDlgId,
     wobjMaxDlgId
 } WOBJ_DIALOGS_ID;
 
@@ -165,6 +166,11 @@ typedef struct _VALUE_DESC {
 
 //props used by ipc dialogs
 #define T_IPCDLGCONTEXT TEXT("IpcDlgContext")
+
+//prop for font
+#define T_PROP_FONT TEXT("propFont")
+
+#define T_DEFAULT_AUX_FONT TEXT("Courier New")
 
 //Calendar
 static LPCWSTR g_szMonths[12] = {

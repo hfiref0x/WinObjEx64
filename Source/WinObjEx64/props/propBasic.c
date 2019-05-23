@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     1.73
+*  VERSION:     1.74
 *
-*  DATE:        30 Mar 2019
+*  DATE:        03 May 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -552,7 +552,6 @@ VOID propSetDefaultInfo(
     _In_ HANDLE hObject
 )
 {
-    BOOL     cond = FALSE;
     INT      i;
     HWND     hwndCB;
     NTSTATUS status;
@@ -639,7 +638,7 @@ VOID propSetDefaultInfo(
             SetLastError(RtlNtStatusToDosError(status));
         }
 
-    } while (cond);
+    } while (FALSE);
 
     if (TypeInfo) {
         supHeapFree(TypeInfo);
@@ -2073,7 +2072,6 @@ VOID propBasicQueryJob(
     _In_ BOOL ExtendedInfoAvailable
 )
 {
-    BOOL        cond = FALSE;
     DWORD       i;
     HWND        hwndCB;
     HANDLE      hObject;
@@ -2229,7 +2227,7 @@ VOID propBasicQueryJob(
                     supHeapFree(ProcessList);
                 }
             }
-        } while (cond);
+        } while (FALSE);
 
         if (pJobProcList != NULL) {
             supVirtualFree(pJobProcList);

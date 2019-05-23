@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPN.C
 *
-*  VERSION:     1.73
+*  VERSION:     1.74
 *
-*  DATE:        15 Mar 2019
+*  DATE:        15 May 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -267,6 +267,8 @@ BOOL PNDlgQueryInfo(
     return bResult;
 }
 
+#define MAX_LOOKUP_NAME 256
+
 /*
 * PNDlgOutputSelectedSidInformation
 *
@@ -283,35 +285,44 @@ VOID PNDlgOutputSelectedSidInformation(
     BOOL bNeedFree = FALSE;
     HWND hComboBox;
     LRESULT nSelected;
-    PSID pSid;
-    PWSTR stype;
+    PSID pSid = NULL;
+    LPWSTR SidType, SidValue;
+    SIZE_T SidLength;
 
     DWORD cAccountName = 0, cReferencedDomainName = 0;
 
-    WCHAR szName[256];
-    WCHAR szDomain[256];
+    WCHAR szName[MAX_LOOKUP_NAME];
+    WCHAR szDomain[MAX_LOOKUP_NAME];
     WCHAR szAccountInfo[MAX_PATH * 3];
 
     EXT_SID_NAME_USE peUse;
 
-    WCHAR szSid[MAX_PATH * 2];
 
     //
-    // Not SID specified, get current selection in combobox and use it as SID.
+    // No SID specified, get current selection in combobox and use it as SID.
     //
     if (Sid == NULL) {
         hComboBox = GetDlgItem(hwndDlg, ID_BDESCRIPTOR_SID);
 
         nSelected = SendMessage(hComboBox, CB_GETCURSEL, (WPARAM)0, (LPARAM)0);
+        if (nSelected != CB_ERR) {
 
-        RtlSecureZeroMemory(szSid, sizeof(szSid));
-        SendMessage(hComboBox, CB_GETLBTEXT, nSelected, (LPARAM)&szSid);
+            SidLength = SendMessage(hComboBox, CB_GETLBTEXTLEN, (WPARAM)nSelected, 0);
+            if (SidLength) {
 
-        if (ConvertStringSidToSid(szSid, &pSid)) {
-            bNeedFree = TRUE;
-        }
-        else {
-            return;
+                SidValue = (LPWSTR)supHeapAlloc((1 + SidLength) * sizeof(WCHAR));
+                if (SidValue) {
+
+                    if (CB_ERR != SendMessage(hComboBox, CB_GETLBTEXT, nSelected, (LPARAM)SidValue)) {
+
+                        if (ConvertStringSidToSid(SidValue, &pSid)) {
+                            bNeedFree = TRUE;
+                        }
+                    }
+
+                    supHeapFree(SidValue);
+                }
+            }
         }
     }
     else {
@@ -320,8 +331,19 @@ VOID PNDlgOutputSelectedSidInformation(
     }
 
     //
-   // SID account domain\name (type).
-   //
+    // Convertion failure.
+    //
+    if (pSid == NULL)
+        return;
+
+    //
+    // SID account domain\name (type).
+    //
+    RtlSecureZeroMemory(szName, sizeof(szName));
+    RtlSecureZeroMemory(szDomain, sizeof(szDomain));
+    cAccountName = MAX_LOOKUP_NAME;
+    cReferencedDomainName = MAX_LOOKUP_NAME;
+
     if (LookupAccountSid(
         NULL,
         pSid,
@@ -343,42 +365,42 @@ VOID PNDlgOutputSelectedSidInformation(
         //
         switch (peUse) {
         case ExtSidTypeUser:
-            stype = TEXT(" (SidUserType)");
+            SidType = TEXT(" (SidUserType)");
             break;
         case ExtSidTypeGroup:
-            stype = TEXT(" (SidTypeGroup)");
+            SidType = TEXT(" (SidTypeGroup)");
             break;
         case ExtSidTypeDomain:
-            stype = TEXT(" (SidTypeDomain)");
+            SidType = TEXT(" (SidTypeDomain)");
             break;
         case ExtSidTypeAlias:
-            stype = TEXT(" (SidTypeAlias)");
+            SidType = TEXT(" (SidTypeAlias)");
             break;
         case ExtSidTypeWellKnownGroup:
-            stype = TEXT(" (SidTypeWellKnownGroup)");
+            SidType = TEXT(" (SidTypeWellKnownGroup)");
             break;
         case ExtSidTypeDeletedAccount:
-            stype = TEXT(" (SidTypeDeletedAccount)");
+            SidType = TEXT(" (SidTypeDeletedAccount)");
             break;
         case ExtSidTypeInvalid:
-            stype = TEXT(" (SidTypeInvalid)");
+            SidType = TEXT(" (SidTypeInvalid)");
             break;
         case ExtSidTypeComputer:
-            stype = TEXT(" (SidTypeComputer)");
+            SidType = TEXT(" (SidTypeComputer)");
             break;
         case ExtSidTypeLabel:
-            stype = TEXT(" (SidTypeLabel)");
+            SidType = TEXT(" (SidTypeLabel)");
             break;
         case ExtSidTypeLogonSession:
-            stype = TEXT(" (SidTypeLogonSession)");
+            SidType = TEXT(" (SidTypeLogonSession)");
             break;
         case ExtSidTypeUnknown:
         default:
-            stype = TEXT(" (SidTypeUnknown)");
+            SidType = TEXT(" (SidTypeUnknown)");
             break;
         }
 
-        _strcat(szAccountInfo, stype);
+        _strcat(szAccountInfo, SidType);
     }
     else {
         _strcpy(szAccountInfo, T_CannotQuery);
@@ -542,7 +564,7 @@ VOID PNDlgShowNamespaceInfo(
     SetDlgItemText(hwndDlg, ID_BDESCRIPTOR_SID_ACCOUNT, T_CannotQuery);
     SetDlgItemText(hwndDlg, ID_INTEGRITYLABEL, T_CannotQuery);
     SetDlgItemText(hwndDlg, ID_BDESCRIPTOR_ENTRIES, TEXT("0"));
-    SendMessage(GetDlgItem(hwndDlg, ID_BDESCRIPTOR_SID), CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
+    SendDlgItemMessage(hwndDlg, ID_BDESCRIPTOR_SID, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
     EnableWindow(GetDlgItem(hwndDlg, ID_BDESCRIPTOR_SID_COPY), FALSE);
 
     //
@@ -669,6 +691,57 @@ VOID PNDlgCopySelectedSid(
 }
 
 /*
+* PNDialogShowInfo
+*
+* Purpose:
+*
+* Display information about private namespaces or message if there is none or error.
+*
+*/
+VOID PNDialogShowInfo(
+    _In_ BOOLEAN bRefresh)
+{
+    ENUMCHILDWNDDATA ChildWndData;
+
+    if (bRefresh) {
+        ListView_DeleteAllItems(PnDlgContext.ListView);
+        ObCollectionDestroy(&PNSCollection);
+
+        //
+        // Reset output related controls.
+        //
+        SetDlgItemText(PnDlgContext.hwndDlg, ID_NAMESPACE_ROOT, TEXT(""));
+        SetDlgItemText(PnDlgContext.hwndDlg, ID_OBJECT_ADDR, TEXT(""));
+        SetDlgItemText(PnDlgContext.hwndDlg, ID_SIZEOFBOUNDARYINFO, TEXT(""));
+        SetDlgItemText(PnDlgContext.hwndDlg, ID_BDESCRIPTOR_ADDRESS, TEXT(""));
+        SetDlgItemText(PnDlgContext.hwndDlg, ID_BDESCRIPTOR_NAME, TEXT(""));
+        SetDlgItemText(PnDlgContext.hwndDlg, ID_BDESCRIPTOR_SID_ACCOUNT, T_CannotQuery);
+        SetDlgItemText(PnDlgContext.hwndDlg, ID_INTEGRITYLABEL, T_CannotQuery);
+        SetDlgItemText(PnDlgContext.hwndDlg, ID_BDESCRIPTOR_ENTRIES, TEXT("0"));
+        SendDlgItemMessage(PnDlgContext.hwndDlg, ID_BDESCRIPTOR_SID, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
+        EnableWindow(GetDlgItem(PnDlgContext.hwndDlg, ID_BDESCRIPTOR_SID_COPY), FALSE);
+    }
+
+    if (PNDlgQueryInfo(PnDlgContext.hwndDlg)) {
+        ListView_SortItemsEx(PnDlgContext.ListView, &PNListCompareFunc, 0);
+    }
+    else {
+        if (GetWindowRect(PnDlgContext.hwndDlg, &ChildWndData.Rect)) {
+            ChildWndData.nCmdShow = SW_HIDE;
+            EnumChildWindows(PnDlgContext.hwndDlg, supCallbackShowChildWindow, (LPARAM)&ChildWndData);
+        }
+        ShowWindow(GetDlgItem(PnDlgContext.hwndDlg, ID_PNAMESPACESINFO), SW_SHOW);
+
+        if (PNSNumberOfObjects == 0) {
+            SetDlgItemText(PnDlgContext.hwndDlg, ID_PNAMESPACESINFO, T_NAMESPACENOTHING);
+        }
+        else {
+            SetDlgItemText(PnDlgContext.hwndDlg, ID_PNAMESPACESINFO, T_NAMESPACEQUERYFAILED);
+        }
+    }
+}
+
+/*
 * PNDialogProc
 *
 * Purpose:
@@ -708,6 +781,10 @@ INT_PTR CALLBACK PNDialogProc(
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
             return TRUE;
 
+        case ID_VIEW_REFRESH:
+            PNDialogShowInfo(TRUE);
+            break;
+
         case ID_BDESCRIPTOR_SID:
             if (HIWORD(wParam) == CBN_SELCHANGE) {
                 PNDlgOutputSelectedSidInformation(hwndDlg, NULL);
@@ -741,7 +818,6 @@ VOID extrasCreatePNDialog(
 )
 {
     LVCOLUMN col;
-    ENUMCHILDWNDDATA ChildWndData;
 
     //allow only one dialog
     if (g_WinObj.AuxDialogs[wobjPNSDlgId]) {
@@ -803,22 +879,7 @@ VOID extrasCreatePNDialog(
         //remember columns count
         PnDlgContext.lvColumnCount = col.iSubItem;
 
-        if (PNDlgQueryInfo(PnDlgContext.hwndDlg)) {
-            ListView_SortItemsEx(PnDlgContext.ListView, &PNListCompareFunc, 0);
-        }
-        else {
-            if (GetWindowRect(PnDlgContext.hwndDlg, &ChildWndData.Rect)) {
-                ChildWndData.nCmdShow = SW_HIDE;
-                EnumChildWindows(PnDlgContext.hwndDlg, supCallbackShowChildWindow, (LPARAM)&ChildWndData);
-            }
-            ShowWindow(GetDlgItem(PnDlgContext.hwndDlg, ID_PNAMESPACESINFO), SW_SHOW);
-
-            if (PNSNumberOfObjects == 0) {
-                SetDlgItemText(PnDlgContext.hwndDlg, ID_PNAMESPACESINFO, T_NAMESPACENOTHING);
-            }
-            else {
-                SetDlgItemText(PnDlgContext.hwndDlg, ID_PNAMESPACESINFO, T_NAMESPACEQUERYFAILED);
-            }
-        }
+        //initial call, nothing to refresh
+        PNDialogShowInfo(FALSE);
     }
 }

@@ -1,20 +1,26 @@
+v1.7.4
+added software licensing cache view (extras)
+resolve apisets while viewing shadow table in Windows 10 20H1 >= 18890 builds
+fix displaying sid user/domain information for private namespaces
+added refresh (f5) for private namespace dialog
+
 v1.7.3
-+ threads list in processes dialog
-+ view file properties for KisServiceTable/W32pServiceTable dialogs
-+ process/thread/token object properties dialogs
-+ bugfixes
+threads list in processes dialog
+view file properties for KisServiceTable/W32pServiceTable dialogs
+process/thread/token object properties dialogs
+bugfixes
 
 v1.7.2
-+ symbolic link object dump
-+ internal fixes after profiling
-+ support for 19H1 SeCiCallbacks scan
-+ added and updated more object type descriptions
+symbolic link object dump
+internal fixes after profiling
+support for 19H1 SeCiCallbacks scan
+added and updated more object type descriptions
 
 v1.7.1
-+ SeCiCallbacks/g_CiCallbacks, DbgkLmdCallbacks added to the callbacks viewer
-+ Session object view and access rights, merge pull request #8 #9
-+ fixed regression added in 1.7.0
-+ treelist updated
+SeCiCallbacks/g_CiCallbacks, DbgkLmdCallbacks added to the callbacks viewer
+Session object view and access rights, merge pull request #8 #9
+fixed regression added in 1.7.0
+treelist updated
 
 v1.7.0
 code can now be compiled as C++

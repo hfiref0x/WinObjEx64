@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.73
+*  VERSION:     1.74
 *
-*  DATE:        31 Mar 2019
+*  DATE:        19 May 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -19,6 +19,7 @@
 #include "extras\extrasSSDT.h"
 #include <cfgmgr32.h>
 #include <setupapi.h>
+#include <shlwapi.h>
 
 //
 // Setup info database.
@@ -834,7 +835,7 @@ PVOID supGetSystemInfo(
 {
     INT         c = 0;
     PVOID       Buffer = NULL;
-    ULONG       Size = 0x1000;
+    ULONG       Size = PAGE_SIZE;
     NTSTATUS    status;
     ULONG       memIO = 0;
 
@@ -988,8 +989,8 @@ LPWSTR supGetItemText2(
     _In_ HWND ListView,
     _In_ INT nItem,
     _In_ INT nSubItem,
-    _In_ LPWSTR pszText,
-    _In_ UINT cbText
+    _In_ WCHAR *pszText,
+    _In_ UINT cchText
 )
 {
     LV_ITEM item;
@@ -999,7 +1000,7 @@ LPWSTR supGetItemText2(
     item.iItem = nItem;
     item.iSubItem = nSubItem;
     item.pszText = pszText;
-    item.cchTextMax = (SIZE_T)cbText;
+    item.cchTextMax = (SIZE_T)cchText;
     SendMessage(ListView, LVM_GETITEMTEXT, (WPARAM)item.iItem, (LPARAM)&item);
 
     return item.pszText;
@@ -1200,7 +1201,7 @@ BOOL supUserIsFullAdmin(
     VOID
 )
 {
-    BOOL     bResult = FALSE, cond = FALSE;
+    BOOL     bResult = FALSE;
     HANDLE   hToken = NULL;
     NTSTATUS status;
     DWORD    i, Attributes;
@@ -1253,7 +1254,7 @@ BOOL supUserIsFullAdmin(
         }
         supHeapFree(pTkGroups);
 
-    } while (cond);
+    } while (FALSE);
 
     if (AdministratorsGroup != NULL) {
         RtlFreeSid(AdministratorsGroup);
@@ -1305,8 +1306,10 @@ VOID supSetGotoLinkTargetToolButtonState(
             uEnable &= ~MF_GRAYED;
     }
     else {
-        if (supIsSymlink(hwndlv, iItem)) {
-            uEnable &= ~MF_GRAYED;
+        if (hwndlv) {
+            if (supIsSymlink(hwndlv, iItem)) {
+                uEnable &= ~MF_GRAYED;
+            }
         }
     }
     EnableMenuItem(GetSubMenu(GetMenu(hwnd), 2), ID_OBJECT_GOTOLINKTARGET, uEnable);
@@ -1400,7 +1403,7 @@ BOOL supxQueryKnownDllsLink(
     _In_ PVOID *lpKnownDllsBuffer
 )
 {
-    BOOL                bResult = FALSE, cond = FALSE;
+    BOOL                bResult = FALSE;
     HANDLE              hLink = NULL;
     SIZE_T              memIO;
     ULONG               bytesNeeded;
@@ -1439,7 +1442,7 @@ BOOL supxQueryKnownDllsLink(
             }
         }
 
-    } while (cond);
+    } while (FALSE);
     if (hLink != NULL) NtClose(hLink);
     return bResult;
 }
@@ -1858,7 +1861,7 @@ BOOL supCreateSCMSnapshot(
     _Out_opt_ SCMDB *Snapshot
 )
 {
-    BOOL      cond = FALSE, bResult = FALSE;
+    BOOL      bResult = FALSE;
     SC_HANDLE schSCManager;
     DWORD     dwBytesNeeded = 0, dwServicesReturned = 0, dwSize;
     PVOID     Services = NULL;
@@ -1926,7 +1929,7 @@ BOOL supCreateSCMSnapshot(
 
         CloseServiceHandle(schSCManager);
 
-    } while (cond);
+    } while (FALSE);
 
     if (Snapshot) {
         Snapshot->Entries = Services;
@@ -2537,7 +2540,7 @@ BOOL supQueryDriverDescription(
     _In_ DWORD ccBuffer //size of buffer in chars
 )
 {
-    BOOL    bResult, cond = FALSE;
+    BOOL    bResult;
     LPWSTR  lpServiceName = NULL;
     LPWSTR  lpDisplayName = NULL;
     LPWSTR  lpRegKey = NULL;
@@ -2664,7 +2667,7 @@ BOOL supQueryDriverDescription(
 
             }
 
-        } while (cond);
+        } while (FALSE);
 
         if (vinfo) {
             supHeapFree(vinfo);
@@ -2693,7 +2696,7 @@ BOOL supQuerySectionFileInfo(
     _In_ DWORD ccBuffer //size of buffer in chars
 )
 {
-    BOOL                        bResult, cond = FALSE;
+    BOOL                        bResult;
     HANDLE                      hSection;
     PVOID                       vinfo;
     LPWSTR                      pcValue, lpszFileName, lpszKnownDlls;
@@ -2803,7 +2806,7 @@ BOOL supQuerySectionFileInfo(
             _strncpy(Buffer, ccBuffer, pcValue, dwInfoSize);
         }
 
-    } while (cond);
+    } while (FALSE);
 
     if (hSection) NtClose(hSection);
     if (vinfo) supHeapFree(vinfo);
@@ -3166,7 +3169,7 @@ BOOL supGetWin32FileName(
     _In_ SIZE_T ccWin32FileName
 )
 {
-    BOOL                bCond = FALSE, bResult = FALSE;
+    BOOL                bResult = FALSE;
     NTSTATUS            status = STATUS_UNSUCCESSFUL;
     HANDLE              hFile = NULL;
     UNICODE_STRING      NtFileName;
@@ -3210,7 +3213,7 @@ BOOL supGetWin32FileName(
 
         bResult = TRUE;
 
-    } while (bCond);
+    } while (FALSE);
 
     if (hFile)
         NtClose(hFile);
@@ -3454,7 +3457,7 @@ BOOL supQueryObjectTrustLabel(
     _Out_ PULONG ProtectionType,
     _Out_ PULONG ProtectionLevel)
 {
-    BOOL                            bCond = FALSE, bResult = FALSE;
+    BOOL                            bResult = FALSE;
     BOOLEAN                         saclPresent = FALSE, saclDefaulted = FALSE;
     ULONG                           i, Length = 0, returnLength = 0;
 
@@ -3535,7 +3538,7 @@ BOOL supQueryObjectTrustLabel(
             }
         }
 
-    } while (bCond);
+    } while (FALSE);
 
     if (pSD) supHeapFree(pSD);
 
@@ -3736,7 +3739,7 @@ HANDLE supxGetSystemToken(
 BOOL supRunAsLocalSystem(
     _In_ HWND hwndParent)
 {
-    BOOL bCond = FALSE, bSuccess = FALSE;
+    BOOL bSuccess = FALSE;
     PVOID ProcessList;
     ULONG SessionId = NtCurrentPeb()->SessionId, dummy;
 
@@ -3896,7 +3899,7 @@ BOOL supRunAsLocalSystem(
             CloseHandle(pi.hThread);
         }
 
-    } while (bCond);
+    } while (FALSE);
 
     if (hImpersonationToken) {
         NtClose(hImpersonationToken);
@@ -4493,10 +4496,15 @@ VOID supShowLastError(
     LPWSTR lpMsgBuf = NULL;
 
     if (FormatMessage(
-        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
-        NULL, LastError,
+        FORMAT_MESSAGE_ALLOCATE_BUFFER |
+        FORMAT_MESSAGE_FROM_SYSTEM |
+        FORMAT_MESSAGE_IGNORE_INSERTS,
+        NULL,
+        LastError,
         MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-        (LPWSTR)&lpMsgBuf, 0, NULL))
+        (LPWSTR)&lpMsgBuf,
+        0,
+        NULL))
     {
         MessageBox(hWnd, lpMsgBuf, Source, MB_TOPMOST | MB_ICONERROR);
         LocalFree(lpMsgBuf);
@@ -4892,14 +4900,14 @@ NTSTATUS supOpenThread(
 */
 BOOL supPrintTimeConverted(
     _In_ PLARGE_INTEGER Time,
-    _In_ LPWSTR lpBuffer,
+    _In_ WCHAR *lpszBuffer,
     _In_ SIZE_T cchBuffer
 )
 {
     FILETIME ConvertedTime;
     TIME_FIELDS TimeFields;
 
-    if ((Time == NULL) || (lpBuffer == NULL)) return 0;
+    if ((Time == NULL) || (lpszBuffer == NULL)) return 0;
     if (cchBuffer == 0) return 0;
 
     RtlSecureZeroMemory(&ConvertedTime, sizeof(ConvertedTime));
@@ -4911,7 +4919,7 @@ BOOL supPrintTimeConverted(
         if (TimeFields.Month > 12) TimeFields.Month = 12;
 
         rtl_swprintf_s(
-            lpBuffer,
+            lpszBuffer,
             cchBuffer,
             FORMATTED_TIME_DATE_VALUE,
             TimeFields.Hour,
@@ -5448,4 +5456,400 @@ BOOL supPHLCreate(
     *NumberOfProcesses = numberOfProcesses;
 
     return ((numberOfProcesses > 0) && (numberOfThreads > 0));
+}
+
+/*
+* supxEnumerateSLCacheValueDescriptors
+*
+* Purpose:
+*
+* Walk each SL cache value descriptor entry, validate it and run optional callback.
+*
+*/
+NTSTATUS supxEnumerateSLCacheValueDescriptors(
+    _In_ SL_KMEM_CACHE *Cache,
+    _In_opt_ PENUMERATE_SL_CACHE_VALUE_DESCRIPTORS_CALLBACK Callback,
+    _In_opt_ PVOID Context
+)
+{
+    ULONG_PTR CurrentPosition, MaxPosition;
+    SL_KMEM_CACHE_VALUE_DESCRIPTOR *CacheDescriptor;
+
+    __try {
+
+        if (Cache->TotalSize < sizeof(SL_KMEM_CACHE))
+            return STATUS_INVALID_PARAMETER;
+
+        if (Cache->Version != 1)
+            return STATUS_INVALID_PARAMETER;
+
+        MaxPosition = (ULONG_PTR)RtlOffsetToPointer(Cache, Cache->TotalSize);
+        if (MaxPosition < (ULONG_PTR)Cache)
+            return STATUS_INVALID_PARAMETER;
+
+        CacheDescriptor = (SL_KMEM_CACHE_VALUE_DESCRIPTOR*)&Cache->Descriptors;
+        CurrentPosition = (ULONG_PTR)CacheDescriptor;
+        MaxPosition = (ULONG_PTR)RtlOffsetToPointer(CacheDescriptor, Cache->SizeOfData);
+
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return GetExceptionCode();
+    }
+
+    do {
+        __try {
+            if ((CacheDescriptor->NameLength >= CacheDescriptor->Size) ||
+                (CacheDescriptor->DataLength >= CacheDescriptor->Size))
+            {
+                return STATUS_INTERNAL_ERROR;
+            }
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER) {
+            return GetExceptionCode();
+        }
+
+
+        if (Callback) {
+            if (Callback(CacheDescriptor, Context))
+                break;
+        }
+
+        __try {
+
+            CurrentPosition += CacheDescriptor->Size;
+            if (CurrentPosition >= MaxPosition)
+                break;
+
+            CacheDescriptor = (SL_KMEM_CACHE_VALUE_DESCRIPTOR*)RtlOffsetToPointer(CacheDescriptor, CacheDescriptor->Size);
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER) {
+            return GetExceptionCode();
+        }
+
+    } while (TRUE);
+
+    return STATUS_SUCCESS;
+}
+
+/*
+* supSLCacheRead
+*
+* Purpose:
+*
+* Read software licensing cache.
+*
+* N.B.
+*
+* Use supHeapFree to release allocated memory.
+*
+*/
+PVOID supSLCacheRead(
+    VOID)
+{
+    NTSTATUS Status;
+    ULONG DataLength = 0;
+    PVOID ReturnData = NULL;
+    HANDLE KeyHandle = NULL;
+    UNICODE_STRING ProductPolicyValue = RTL_CONSTANT_STRING(L"ProductPolicy");
+    UNICODE_STRING ProductOptionsKey = RTL_CONSTANT_STRING(L"\\REGISTRY\\MACHINE\\System\\CurrentControlSet\\Control\\ProductOptions");
+    OBJECT_ATTRIBUTES ObjectAttributes;
+
+    KEY_VALUE_PARTIAL_INFORMATION *PolicyData;
+
+    __try {
+
+        InitializeObjectAttributes(&ObjectAttributes, &ProductOptionsKey, OBJ_CASE_INSENSITIVE, NULL, NULL);
+        Status = NtOpenKey(&KeyHandle, KEY_READ, &ObjectAttributes);
+        if (!NT_SUCCESS(Status))
+            return NULL;
+
+        Status = NtQueryValueKey(KeyHandle, &ProductPolicyValue,
+            KeyValuePartialInformation, NULL, 0, &DataLength);
+
+        if (Status == STATUS_BUFFER_TOO_SMALL) {
+            PolicyData = (KEY_VALUE_PARTIAL_INFORMATION*)supHeapAlloc(DataLength);
+            if (PolicyData) {
+
+                Status = NtQueryValueKey(KeyHandle, &ProductPolicyValue,
+                    KeyValuePartialInformation, PolicyData, DataLength, &DataLength);
+
+                if (NT_SUCCESS(Status) && (PolicyData->Type == REG_BINARY)) {
+                    ReturnData = PolicyData;
+                }
+                else {
+                    supHeapFree(PolicyData);
+                }
+            }
+        }
+        NtClose(KeyHandle);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return NULL;
+    }
+
+    return ReturnData;
+}
+
+/*
+* supSLCacheEnumerate
+*
+* Purpose:
+*
+* Enumerate SL value descriptors and run optional callback.
+*
+*/
+BOOLEAN supSLCacheEnumerate(
+    _In_ PVOID CacheData,
+    _In_opt_ PENUMERATE_SL_CACHE_VALUE_DESCRIPTORS_CALLBACK Callback,
+    _In_opt_ PVOID Context)
+{
+    SL_KMEM_CACHE *Cache;
+
+    Cache = (SL_KMEM_CACHE*)((KEY_VALUE_PARTIAL_INFORMATION*)(CacheData))->Data;
+    return NT_SUCCESS(supxEnumerateSLCacheValueDescriptors(Cache, Callback, Context));
+}
+
+/*
+* supCreateFontIndirect
+*
+* Purpose:
+*
+* Create font object.
+*
+*/
+HFONT supCreateFontIndirect(
+    _In_ LPWSTR FaceName)
+{
+    NONCLIENTMETRICS ncm;
+    HFONT hFont = NULL;
+
+    ncm.cbSize = sizeof(NONCLIENTMETRICS);
+    if (SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(ncm), &ncm, 0)) {
+        ncm.lfCaptionFont.lfHeight += ncm.lfSmCaptionFont.lfHeight / 4;
+        ncm.lfCaptionFont.lfWeight = FW_NORMAL;
+        ncm.lfCaptionFont.lfQuality = CLEARTYPE_QUALITY;
+        ncm.lfCaptionFont.lfPitchAndFamily = FIXED_PITCH | FF_MODERN;
+        _strncpy(ncm.lfCaptionFont.lfFaceName, LF_FACESIZE, FaceName, LF_FACESIZE);
+
+        hFont = CreateFontIndirect(&ncm.lfCaptionFont);
+    }
+
+    return hFont;
+}
+
+/*
+* supxGetShellViewForDesktop
+*
+* Purpose:
+*
+* Use the shell view for the desktop using the shell windows automation to find the
+* desktop web browser and then grabs its view.
+*
+* N.B. Taken entirely from Windows SDK sample.
+*
+*/
+HRESULT supxGetShellViewForDesktop(
+    REFIID riid,
+    void **ppv
+)
+{
+    IShellWindows *psw;
+    HRESULT hr;
+    HWND hwnd;
+    IDispatch* pdisp;
+    IShellBrowser *psb;
+    VARIANT vtEmpty;
+    IShellView *psv;
+
+    *ppv = NULL;
+
+#ifdef __cplusplus
+
+    vtEmpty = {};
+    hr = CoCreateInstance(CLSID_ShellWindows, NULL, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&psw));
+    if (SUCCEEDED(hr))
+    {
+        if (S_OK == psw->FindWindowSW(&vtEmpty, &vtEmpty, SWC_DESKTOP, (long*)&hwnd, SWFO_NEEDDISPATCH, &pdisp))
+        {
+            hr = IUnknown_QueryService(pdisp, SID_STopLevelBrowser, IID_PPV_ARGS(&psb));
+            if (SUCCEEDED(hr))
+            {
+
+                hr = psb->QueryActiveShellView(&psv);
+                if (SUCCEEDED(hr))
+                {
+                    hr = psv->QueryInterface(riid, ppv);
+                    psv->Release();
+                }
+                psb->Release();
+            }
+            pdisp->Release();
+        }
+        else
+        {
+            hr = E_FAIL;
+        }
+        psw->Release();
+    }
+
+#else
+
+    vtEmpty.vt = VT_EMPTY;
+    hr = CoCreateInstance(&CLSID_ShellWindows, NULL, CLSCTX_LOCAL_SERVER, &IID_IShellWindows, &psw);
+    if (SUCCEEDED(hr))
+    {
+        if (S_OK == psw->lpVtbl->FindWindowSW(psw, &vtEmpty, &vtEmpty, SWC_DESKTOP, (long*)&hwnd, SWFO_NEEDDISPATCH, &pdisp))
+        {
+            hr = IUnknown_QueryService((IUnknown*)pdisp, &SID_STopLevelBrowser, &IID_IShellBrowser, &psb);
+            if (SUCCEEDED(hr))
+            {
+                hr = psb->lpVtbl->QueryActiveShellView(psb, &psv);
+                if (SUCCEEDED(hr))
+                {
+                    hr = psv->lpVtbl->QueryInterface(psv, riid, ppv);
+                    psv->lpVtbl->Release(psv);
+                }
+                psb->lpVtbl->Release(psb);
+            }
+            pdisp->lpVtbl->Release(pdisp);
+        }
+        else
+        {
+            hr = E_FAIL;
+        }
+        psw->lpVtbl->Release(psw);
+    }
+
+#endif
+    return hr;
+}
+
+/*
+* supxGetShellDispatchFromView
+*
+* Purpose:
+*
+* From a shell view object gets its automation interface and from that gets the shell
+* application object that implements IShellDispatch2 and related interfaces.
+*
+* N.B. Taken entirely from Windows SDK sample.
+*
+*/
+HRESULT supxGetShellDispatchFromView(IShellView *psv, REFIID riid, void **ppv)
+{
+    HRESULT hr;
+    IDispatch *pdispBackground;
+    IShellFolderViewDual *psfvd;
+    IDispatch *pdisp;
+
+    *ppv = NULL;
+
+#ifdef __cplusplus
+
+    hr = psv->GetItemObject(SVGIO_BACKGROUND, IID_PPV_ARGS(&pdispBackground));
+    if (SUCCEEDED(hr))
+    {
+        hr = pdispBackground->QueryInterface(IID_PPV_ARGS(&psfvd));
+        if (SUCCEEDED(hr))
+        {
+            hr = psfvd->get_Application(&pdisp);
+            if (SUCCEEDED(hr))
+            {
+                hr = pdisp->QueryInterface(riid, ppv);
+                pdisp->Release();
+            }
+            psfvd->Release();
+        }
+        pdispBackground->Release();
+    }
+
+#else
+
+    hr = psv->lpVtbl->GetItemObject(psv, SVGIO_BACKGROUND, &IID_IDispatch, &pdispBackground);
+    if (SUCCEEDED(hr))
+    {
+        hr = pdispBackground->lpVtbl->QueryInterface(pdispBackground, &IID_IShellFolderViewDual, &psfvd);
+        if (SUCCEEDED(hr))
+        {
+            hr = psfvd->lpVtbl->get_Application(psfvd, &pdisp);
+            if (SUCCEEDED(hr))
+            {
+                hr = pdisp->lpVtbl->QueryInterface(pdisp, riid, ppv);
+                pdisp->lpVtbl->Release(pdisp);
+            }
+            psfvd->lpVtbl->Release(psfvd);
+        }
+        pdispBackground->lpVtbl->Release(pdispBackground);
+    }
+
+#endif
+    return hr;
+}
+
+/*
+* supShellExecInExplorerProcess
+*
+* Purpose:
+*
+* Run ShellExecute from Windows Explorer process through shell interfaces
+* making it run with IL of Windows Explorer and not WinObjEx64.
+*
+* N.B. Taken entirely from Windows SDK sample.
+*
+*/
+HRESULT WINAPI supShellExecInExplorerProcess(
+    _In_ PCWSTR pszFile)
+{
+    HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    IShellView *psv;
+    IShellDispatch2 *psd;
+    BSTR bstrFile;
+    VARIANT vtEmpty;
+
+    if (SUCCEEDED(hr)) {
+
+#ifdef __cplusplus
+
+        hr = supxGetShellViewForDesktop(IID_PPV_ARGS(&psv));
+        if (SUCCEEDED(hr))
+        {
+            hr = supxGetShellDispatchFromView(psv, IID_PPV_ARGS(&psd));
+            if (SUCCEEDED(hr))
+            {
+                bstrFile = SysAllocString(pszFile);
+                hr = bstrFile ? S_OK : E_OUTOFMEMORY;
+                if (SUCCEEDED(hr))
+                {
+                    vtEmpty = {};
+                    hr = psd->ShellExecuteW(bstrFile, vtEmpty, vtEmpty, vtEmpty, vtEmpty);
+                    SysFreeString(bstrFile);
+                }
+                psd->Release();
+            }
+            psv->Release();
+        }
+
+#else
+        hr = supxGetShellViewForDesktop(&IID_IShellView, &psv);
+        if (SUCCEEDED(hr)) {
+            hr = supxGetShellDispatchFromView(psv, &IID_IShellDispatch2, &psd);
+            if (SUCCEEDED(hr))
+            {
+                bstrFile = SysAllocString(pszFile);
+                hr = bstrFile ? S_OK : E_OUTOFMEMORY;
+                if (SUCCEEDED(hr))
+                {
+                    vtEmpty.vt = VT_EMPTY;
+                    hr = psd->lpVtbl->ShellExecuteW(psd, bstrFile, vtEmpty, vtEmpty, vtEmpty, vtEmpty);
+                    SysFreeString(bstrFile);
+                }
+
+                psd->lpVtbl->Release(psd);
+            }
+            psv->lpVtbl->Release(psv);
+        }
+#endif
+        CoUninitialize();
+    }
+    return hr;
 }

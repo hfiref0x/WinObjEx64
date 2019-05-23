@@ -118,7 +118,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseNotSignedWithDriver|x64'">
     <OutDir>.\output\$(Platform)\$(Configuration)\bin\</OutDir>
     <IntDir>.\output\$(Platform)\$(Configuration)\</IntDir>
-    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet>SecurityRules.ruleset</CodeAnalysisRuleSet>
     <PostBuildEventUseInBuild>
     </PostBuildEventUseInBuild>
     <RunCodeAnalysis>true</RunCodeAnalysis>
@@ -376,6 +376,7 @@
     <ClCompile Include="extras\extrasIPC.c" />
     <ClCompile Include="extras\extrasPN.c" />
     <ClCompile Include="extras\extrasPSList.c" />
+    <ClCompile Include="extras\extrasSL.c" />
     <ClCompile Include="extras\extrasSSDT.c" />
     <ClCompile Include="extras\extrasUSD.c" />
     <ClCompile Include="findDlg.c" />
@@ -408,6 +409,7 @@
     <ClCompile Include="minirtl\_strncpy.c" />
     <ClCompile Include="minirtl\_strstr.c" />
     <ClCompile Include="minirtl\_strstri.c" />
+    <ClCompile Include="ntos\ntldr.c" />
     <ClCompile Include="objects.c" />
     <ClCompile Include="props\propBasic.c" />
     <ClCompile Include="props\propDesktop.c" />
@@ -437,6 +439,7 @@
     <ClInclude Include="extras\extrasIPC.h" />
     <ClInclude Include="extras\extrasPN.h" />
     <ClInclude Include="extras\extrasPSList.h" />
+    <ClInclude Include="extras\extrasSL.h" />
     <ClInclude Include="extras\extrasSSDT.h" />
     <ClInclude Include="extras\extrasUSD.h" />
     <ClInclude Include="findDlg.h" />
@@ -450,7 +453,9 @@
     <ClInclude Include="minirtl\minirtl.h" />
     <ClInclude Include="minirtl\rtltypes.h" />
     <ClInclude Include="msvcver.h" />
+    <ClInclude Include="ntos\apisetx.h" />
     <ClInclude Include="ntos\ntalpc.h" />
+    <ClInclude Include="ntos\ntldr.h" />
     <ClInclude Include="ntos\ntos.h" />
     <ClInclude Include="objects.h" />
     <ClInclude Include="kldbg_patterns.h" />

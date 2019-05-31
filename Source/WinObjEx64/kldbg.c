@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.74
 *
-*  DATE:        13 May 2019
+*  DATE:        27 May 2019
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -2550,7 +2550,7 @@ PVOID kdQueryIopInvalidDeviceRequest(
 *
 * Purpose:
 *
-* Perform check is the current OS booted with DEBUG flag
+* Perform check is the current OS booted with DEBUG flag.
 *
 */
 BOOL kdIsDebugBoot(

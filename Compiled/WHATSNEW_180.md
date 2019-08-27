@@ -19,5 +19,4 @@ ApiSet viewer implemented as plugin. Can view current system apiset or parse and
 
  - **Other**
  
- Run as LocalSystem feature improved (issue #14)
- Compatibility improvements for upcoming Windows 10 20H1 release.
+  Run as LocalSystem feature improved (issue #14), compatibility improvements for upcoming Windows 10 20H1 release.

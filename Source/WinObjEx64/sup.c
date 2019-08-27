@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.74
+*  VERSION:     1.80
 *
-*  DATE:        19 May 2019
+*  DATE:        16 July 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -818,19 +818,21 @@ PVOID supGetTokenInfo(
 }
 
 /*
-* supGetSystemInfo
+* supGetSystemInfoEx
 *
 * Purpose:
 *
 * Returns buffer with system information by given SystemInformationClass.
 *
-* Returned buffer must be freed with supHeapFree after usage.
+* Returned buffer must be freed with MemFreeRoutine type after usage.
 * Function will return error after 20 attempts.
 *
 */
-PVOID supGetSystemInfo(
+PVOID supGetSystemInfoEx(
     _In_ SYSTEM_INFORMATION_CLASS SystemInformationClass,
-    _Out_opt_ PULONG ReturnLength
+    _Out_opt_ PULONG ReturnLength,
+    _In_ PMEMALLOCROUTINE MemAllocRoutine,
+    _In_ PMEMFREEROUTINE MemFreeRoutine
 )
 {
     INT         c = 0;
@@ -843,7 +845,7 @@ PVOID supGetSystemInfo(
         *ReturnLength = 0;
 
     do {
-        Buffer = supHeapAlloc((SIZE_T)Size);
+        Buffer = MemAllocRoutine((SIZE_T)Size);
         if (Buffer != NULL) {
             status = NtQuerySystemInformation(SystemInformationClass, Buffer, Size, &memIO);
         }
@@ -851,7 +853,7 @@ PVOID supGetSystemInfo(
             return NULL;
         }
         if (status == STATUS_INFO_LENGTH_MISMATCH) {
-            supHeapFree(Buffer);
+            MemFreeRoutine(Buffer);
             Buffer = NULL;
             Size *= 2;
             c++;
@@ -869,10 +871,32 @@ PVOID supGetSystemInfo(
     }
 
     if (Buffer) {
-        supHeapFree(Buffer);
+        MemFreeRoutine(Buffer);
     }
 
     return NULL;
+}
+
+/*
+* supGetSystemInfo
+*
+* Purpose:
+*
+* Returns buffer with system information by given SystemInformationClass.
+*
+* Returned buffer must be freed with supHeapFree after usage.
+* Function will return error after 20 attempts.
+*
+*/
+PVOID supGetSystemInfo(
+    _In_ SYSTEM_INFORMATION_CLASS SystemInformationClass,
+    _Out_opt_ PULONG ReturnLength
+)
+{
+    return supGetSystemInfoEx(SystemInformationClass,
+        ReturnLength,
+        (PMEMALLOCROUTINE)supHeapAlloc,
+        (PMEMFREEROUTINE)supHeapFree);
 }
 
 /*
@@ -1461,6 +1485,8 @@ VOID supInit(
     _In_ BOOL IsFullAdmin
 )
 {
+    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+
     supQueryKnownDlls();
     kdInit(IsFullAdmin);
 
@@ -2630,7 +2656,7 @@ BOOL supQueryDriverDescription(
             if (ERROR_SUCCESS == lRet) {
 
                 dwHandle = 0;
-                dwSize = GetFileVersionInfoSize(szImagePath, &dwHandle);
+                dwSize = GetFileVersionInfoSizeEx(0, szImagePath, &dwHandle);
                 if (dwSize == 0)
                     break;
 
@@ -2640,7 +2666,7 @@ BOOL supQueryDriverDescription(
                     break;
 
                 // query it from file
-                if (!GetFileVersionInfo(szImagePath, 0, dwSize, vinfo))
+                if (!GetFileVersionInfoEx(0, szImagePath, 0, dwSize, vinfo))
                     break;
 
                 // query codepage and language id info
@@ -3668,21 +3694,32 @@ NTSTATUS supIsLocalSystem(
 *
 * Purpose:
 *
-* Find NT AUTHORITY\System process and duplicate it token.
+* Find winlogon process and duplicate it token.
 *
 */
-HANDLE supxGetSystemToken(
-    PVOID ProcessList)
+NTSTATUS supxGetSystemToken(
+    _In_ PVOID ProcessList,
+    _Out_ PHANDLE SystemToken)
 {
-    BOOL bSystemToken = FALSE;
+    BOOL bSystemToken = FALSE, bEnabled = FALSE;
+    NTSTATUS Status = STATUS_UNSUCCESSFUL;
     ULONG NextEntryDelta = 0;
     HANDLE hObject = NULL;
     HANDLE hToken = NULL;
+
+    ULONG WinlogonSessionId;
+    UNICODE_STRING usWinlogon = RTL_CONSTANT_STRING(L"winlogon.exe");
 
     union {
         PSYSTEM_PROCESSES_INFORMATION Processes;
         PBYTE ListRef;
     } List;
+
+    *SystemToken = NULL;
+
+    WinlogonSessionId = WTSGetActiveConsoleSessionId();
+    if (WinlogonSessionId == 0xFFFFFFFF)
+        return STATUS_INVALID_SESSION;
 
     List.ListRef = (PBYTE)ProcessList;
 
@@ -3690,31 +3727,46 @@ HANDLE supxGetSystemToken(
 
         List.ListRef += NextEntryDelta;
 
-        if (List.Processes->ThreadCount &&
-            List.Processes->InheritedFromUniqueProcessId)
-        {
+        if (RtlEqualUnicodeString(&usWinlogon, &List.Processes->ImageName, TRUE)) {
 
-            if (NT_SUCCESS(supOpenProcess(
-                List.Processes->UniqueProcessId,
-                PROCESS_QUERY_INFORMATION,
-                &hObject)))
-            {
+            if (List.Processes->SessionId == WinlogonSessionId) {
 
-                if (NT_SUCCESS(NtOpenProcessToken(
-                    hObject,
-                    TOKEN_DUPLICATE | TOKEN_ASSIGN_PRIMARY | TOKEN_IMPERSONATE | TOKEN_QUERY,
-                    &hToken)))
-                {
-                    if (NT_SUCCESS(supIsLocalSystem(hToken, &bSystemToken))) {
-                        if (bSystemToken) {
-                            NtClose(hObject);
-                            return hToken;
+                Status = supOpenProcess(
+                    List.Processes->UniqueProcessId,
+                    PROCESS_QUERY_LIMITED_INFORMATION,
+                    &hObject);
+
+                if (NT_SUCCESS(Status)) {
+
+                    Status = NtOpenProcessToken(
+                        hObject,
+                        TOKEN_DUPLICATE | TOKEN_ASSIGN_PRIMARY | TOKEN_IMPERSONATE | TOKEN_QUERY,
+                        &hToken);
+
+                    if (NT_SUCCESS(Status)) {
+
+                        Status = supIsLocalSystem(hToken, &bSystemToken);
+
+                        if (NT_SUCCESS(Status) && (bSystemToken)) {
+
+                            Status = supPrivilegeEnabled(hToken, SE_TCB_PRIVILEGE, &bEnabled);
+                            if (NT_SUCCESS(Status)) {
+                                if (bEnabled) {
+                                    NtClose(hObject);
+                                    *SystemToken = hToken;
+                                    return STATUS_SUCCESS;
+                                }
+                                else {
+                                    Status = STATUS_PRIVILEGE_NOT_HELD;
+                                }
+                            }
                         }
+                        NtClose(hToken);
                     }
-                    NtClose(hToken);
+
+                    NtClose(hObject);
                 }
 
-                NtClose(hObject);
             }
         }
 
@@ -3722,8 +3774,7 @@ HANDLE supxGetSystemToken(
 
     } while (NextEntryDelta);
 
-
-    return NULL;
+    return Status;
 }
 
 /*
@@ -3740,10 +3791,11 @@ BOOL supRunAsLocalSystem(
     _In_ HWND hwndParent)
 {
     BOOL bSuccess = FALSE;
+    NTSTATUS Status;
     PVOID ProcessList;
     ULONG SessionId = NtCurrentPeb()->SessionId, dummy;
 
-    HANDLE hSystemToken, hPrimaryToken = NULL, hImpersonationToken = NULL;
+    HANDLE hSystemToken = NULL, hPrimaryToken = NULL, hImpersonationToken = NULL;
 
     BOOLEAN bThreadImpersonated = FALSE;
 
@@ -3770,27 +3822,37 @@ BOOL supRunAsLocalSystem(
     obja.SecurityQualityOfService = &sqos;
 
     ProcessList = supGetSystemInfo(SystemProcessInformation, NULL);
-    if (ProcessList == NULL)
-        return FALSE;
+    if (ProcessList == NULL) {
+        MessageBox(
+            hwndParent,
+            TEXT("Could not allocate process list, abort."),
+            PROGRAM_NAME,
+            MB_ICONINFORMATION);
 
+        return FALSE;
+    }
+
+    //
+    // Optionally, enable debug privileges.
+    // 
     supEnablePrivilege(SE_DEBUG_PRIVILEGE, TRUE);
 
     //
-    // Get LocalSystem token.
+    // Get LocalSystem token from winlogon.
     //
-    hSystemToken = supxGetSystemToken(ProcessList);
+    Status = supxGetSystemToken(ProcessList, &hSystemToken);
 
     supHeapFree(ProcessList);
 
     do {
+        //
+        // Check supxGetSystemToken result.
+        //
+        if (!NT_SUCCESS(Status) || (hSystemToken == NULL)) {
 
-        if (hSystemToken == NULL) {
-
-            MessageBox(
-                hwndParent,
-                TEXT("No suitable system token found. Make sure you are running as administrator"),
-                PROGRAM_NAME,
-                MB_ICONINFORMATION);
+            supShowNtStatus(hwndParent,
+                TEXT("No suitable system token found. Make sure you are running as administrator, code 0x"),
+                Status);
 
             break;
         }
@@ -3798,41 +3860,50 @@ BOOL supRunAsLocalSystem(
         //
         // Duplicate as impersonation token.
         //
-        if (!NT_SUCCESS(NtDuplicateToken(
+        Status = NtDuplicateToken(
             hSystemToken,
             TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_QUERY |
             TOKEN_ASSIGN_PRIMARY | TOKEN_ADJUST_PRIVILEGES,
             &obja,
             FALSE,
             TokenImpersonation,
-            &hImpersonationToken)))
-        {
+            &hImpersonationToken);
+
+        if (!NT_SUCCESS(Status)) {
+
+            supShowNtStatus(hwndParent, TEXT("Error duplicating impersonation token, code 0x"), Status);
             break;
         }
 
         //
         // Duplicate as primary token.
         //
-        if (!NT_SUCCESS(NtDuplicateToken(
+        Status = NtDuplicateToken(
             hSystemToken,
             TOKEN_ALL_ACCESS,
             &obja,
             FALSE,
             TokenPrimary,
-            &hPrimaryToken)))
-        {
+            &hPrimaryToken);
+
+        if (!NT_SUCCESS(Status)) {
+
+            supShowNtStatus(hwndParent, TEXT("Error duplicating primary token, code 0x"), Status);
             break;
         }
 
         //
         // Impersonate system token.
         //
-        if (!NT_SUCCESS(NtSetInformationThread(
+        Status = NtSetInformationThread(
             NtCurrentThread(),
             ThreadImpersonationToken,
             &hImpersonationToken,
-            sizeof(HANDLE))))
-        {
+            sizeof(HANDLE));
+
+        if (!NT_SUCCESS(Status)) {
+
+            supShowNtStatus(hwndParent, TEXT("Error while impersonating primary token, code 0x"), Status);
             break;
         }
 
@@ -3849,26 +3920,30 @@ BOOL supRunAsLocalSystem(
         TokenPrivileges->Privileges[0].Luid.HighPart = 0;
         TokenPrivileges->Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
 
-        if (!NT_SUCCESS(NtAdjustPrivilegesToken(
+        Status = NtAdjustPrivilegesToken(
             hImpersonationToken,
             FALSE,
             TokenPrivileges,
             0,
             NULL,
-            (PULONG)&dummy)))
-        {
+            (PULONG)&dummy);
+
+        if (!NT_SUCCESS(Status)) {
+            supShowNtStatus(hwndParent, TEXT("Error adjusting token privileges, code 0x"), Status);
             break;
         }
 
         //
         // Set session id to primary token.
         //
-        if (!NT_SUCCESS(NtSetInformationToken(
+        Status = NtSetInformationToken(
             hPrimaryToken,
             TokenSessionId,
             &SessionId,
-            sizeof(ULONG))))
-        {
+            sizeof(ULONG));
+
+        if (!NT_SUCCESS(Status)) {
+            supShowNtStatus(hwndParent, TEXT("Error setting session id, code 0x"), Status);
             break;
         }
 
@@ -3897,6 +3972,9 @@ BOOL supRunAsLocalSystem(
         if (bSuccess) {
             CloseHandle(pi.hProcess);
             CloseHandle(pi.hThread);
+        }
+        else {
+            supShowLastError(hwndParent, TEXT("Run as LocalSystem"), GetLastError());
         }
 
     } while (FALSE);
@@ -4508,6 +4586,34 @@ VOID supShowLastError(
     {
         MessageBox(hWnd, lpMsgBuf, Source, MB_TOPMOST | MB_ICONERROR);
         LocalFree(lpMsgBuf);
+    }
+}
+
+/*
+* supShowNtStatus
+*
+* Purpose:
+*
+* Display detailed last nt status to user.
+*
+*/
+VOID supShowNtStatus(
+    _In_ HWND hWnd,
+    _In_ LPWSTR lpText,
+    _In_ NTSTATUS Status
+)
+{
+    PTCHAR lpMsg;
+    SIZE_T Length = _strlen(lpText);
+    lpMsg = (PTCHAR)supHeapAlloc(Length + 100);
+    if (lpMsg) {
+        _strcpy(lpMsg, lpText);
+        ultohex((ULONG)Status, _strend(lpMsg));
+        MessageBox(hWnd, lpMsg, PROGRAM_NAME, MB_ICONERROR);
+        supHeapFree(lpMsg);
+    }
+    else {
+        DbgPrint("Memory allocation failure\r\n");
     }
 }
 
@@ -5852,4 +5958,35 @@ HRESULT WINAPI supShellExecInExplorerProcess(
         CoUninitialize();
     }
     return hr;
+}
+
+/*
+* supPrivilegeEnabled
+*
+* Purpose:
+*
+* Tests if the given token has the given privilege enabled/enabled by default.
+*
+*/
+NTSTATUS supPrivilegeEnabled(
+    _In_ HANDLE ClientToken,
+    _In_ ULONG Privilege,
+    _Out_ LPBOOL pfResult
+)
+{
+    NTSTATUS status;
+    PRIVILEGE_SET Privs;
+    BOOLEAN bResult = FALSE;
+
+    Privs.Control = PRIVILEGE_SET_ALL_NECESSARY;
+    Privs.PrivilegeCount = 1;
+    Privs.Privilege[0].Luid.LowPart = Privilege;
+    Privs.Privilege[0].Luid.HighPart = 0;
+    Privs.Privilege[0].Attributes = SE_PRIVILEGE_ENABLED_BY_DEFAULT | SE_PRIVILEGE_ENABLED;
+
+    status = NtPrivilegeCheck(ClientToken, &Privs, &bResult);
+
+    *pfResult = bResult;
+
+    return status;
 }

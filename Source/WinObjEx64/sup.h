@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.74
+*  VERSION:     1.80
 *
-*  DATE:        18 May 2019
+*  DATE:        29 June 2019
 *
 *  Common header file for the program support routines.
 *
@@ -69,6 +69,12 @@ typedef BOOL(CALLBACK *PENUMERATE_SL_CACHE_VALUE_DESCRIPTORS_CALLBACK)(
     _In_ SL_KMEM_CACHE_VALUE_DESCRIPTOR *CacheDescriptor,
     _In_opt_ PVOID Context
     );
+
+typedef PVOID(*PMEMALLOCROUTINE)(
+    _In_ SIZE_T NumberOfBytes);
+
+typedef BOOL(*PMEMFREEROUTINE)(
+    _In_ PVOID Memory);
 
 typedef struct _PROCESS_MITIGATION_POLICIES_ALL {
     PROCESS_MITIGATION_DEP_POLICY DEPPolicy;
@@ -328,6 +334,12 @@ PVOID supGetTokenInfo(
 PVOID supGetSystemInfo(
     _In_ SYSTEM_INFORMATION_CLASS SystemInformationClass,
     _Out_opt_ PULONG ReturnLength);
+
+PVOID supGetSystemInfoEx(
+    _In_ SYSTEM_INFORMATION_CLASS SystemInformationClass,
+    _Out_opt_ PULONG ReturnLength,
+    _In_ PMEMALLOCROUTINE MemAllocRoutine,
+    _In_ PMEMFREEROUTINE MemFreeRoutine);
 
 HANDLE supOpenDirectory(
     _In_ LPWSTR lpDirectory);
@@ -597,3 +609,13 @@ HFONT supCreateFontIndirect(
 
 HRESULT WINAPI supShellExecInExplorerProcess(
     _In_ PCWSTR pszFile);
+
+NTSTATUS supPrivilegeEnabled(
+    _In_ HANDLE ClientToken,
+    _In_ ULONG Privilege,
+    _Out_ LPBOOL pfResult);
+
+VOID supShowNtStatus(
+    _In_ HWND hWnd,
+    _In_ LPWSTR lpText,
+    _In_ NTSTATUS Status);

@@ -4,9 +4,9 @@
 *
 *  TITLE:       TESTUNIT.H
 *
-*  VERSION:     1.73
+*  VERSION:     1.80
 *
-*  DATE:        17 Mar 2019
+*  DATE:        16 July 2019
 *
 *  Common header file for test code.
 *
@@ -20,4 +20,4 @@
 
 VOID TestStart();
 VOID TestStop();
-VOID TestException(VOID);
+VOID TestException(_In_ BOOL bNaked);

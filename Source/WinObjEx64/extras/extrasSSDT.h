@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       EXTRASSSDT.H
 *
-*  VERSION:     1.70
+*  VERSION:     1.80
 *
-*  DATE:        30 Nov 2018
+*  DATE:        20 July 2019
 *
 *  Common header file for Service Table dialog.
 *
@@ -32,6 +32,18 @@ typedef enum _SSDT_DLG_MODE {
     SST_Win32k = 1,
     SST_Max
 } SSDT_DLG_MODE;
+
+typedef struct _W32K_API_SET_TABLE_HOST {
+	PWCHAR HostName;
+	PCHAR TableName;
+	PCHAR TableSizeName;
+	ULONG HostEntriesCount;
+} W32K_API_SET_TABLE_HOST, *PW32K_API_SET_TABLE_HOST;
+
+typedef struct _W32K_API_SET_TABLE_ENTRY {
+	PVOID HostEntriesArray;
+	W32K_API_SET_TABLE_HOST *Host;
+} W32K_API_SET_TABLE_ENTRY, *PW32K_API_SET_TABLE_ENTRY;
 
 VOID extrasCreateSSDTDialog(
     _In_ HWND hwndParent,

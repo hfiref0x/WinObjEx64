@@ -66,75 +66,6 @@
     <ClCompile Include="sup.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="minirtl\_strcat.c">
-      <Filter>minirtl</Filter>
-    </ClCompile>
-    <ClCompile Include="minirtl\_strcmp.c">
-      <Filter>minirtl</Filter>
-    </ClCompile>
-    <ClCompile Include="minirtl\_strcmpi.c">
-      <Filter>minirtl</Filter>
-    </ClCompile>
-    <ClCompile Include="minirtl\_strcpy.c">
-      <Filter>minirtl</Filter>
-    </ClCompile>
-    <ClCompile Include="minirtl\_strend.c">
-      <Filter>minirtl</Filter>
-    </ClCompile>
-    <ClCompile Include="minirtl\_strlen.c">
-      <Filter>minirtl</Filter>
-    </ClCompile>
-    <ClCompile Include="minirtl\_strncmp.c">
-      <Filter>minirtl</Filter>
-    </ClCompile>
-    <ClCompile Include="minirtl\_strncmpi.c">
-      <Filter>minirtl</Filter>
-    </ClCompile>
-    <ClCompile Include="minirtl\_strncpy.c">
-      <Filter>minirtl</Filter>
-    </ClCompile>
-    <ClCompile Include="minirtl\_strstr.c">
-      <Filter>minirtl</Filter>
-    </ClCompile>
-    <ClCompile Include="minirtl\_strstri.c">
-      <Filter>minirtl</Filter>
-    </ClCompile>
-    <ClCompile Include="minirtl\hextou64.c">
-      <Filter>minirtl</Filter>
-    </ClCompile>
-    <ClCompile Include="minirtl\hextoul.c">
-      <Filter>minirtl</Filter>
-    </ClCompile>
-    <ClCompile Include="minirtl\i64tostr.c">
-      <Filter>minirtl</Filter>
-    </ClCompile>
-    <ClCompile Include="minirtl\itostr.c">
-      <Filter>minirtl</Filter>
-    </ClCompile>
-    <ClCompile Include="minirtl\strtoi.c">
-      <Filter>minirtl</Filter>
-    </ClCompile>
-    <ClCompile Include="minirtl\strtoi64.c">
-      <Filter>minirtl</Filter>
-    </ClCompile>
-    <ClCompile Include="minirtl\strtou64.c">
-      <Filter>minirtl</Filter>
-    </ClCompile>
-    <ClCompile Include="minirtl\strtoul.c">
-      <Filter>minirtl</Filter>
-    </ClCompile>
-    <ClCompile Include="minirtl\u64tohex.c">
-      <Filter>minirtl</Filter>
-    </ClCompile>
-    <ClCompile Include="minirtl\u64tostr.c">
-      <Filter>minirtl</Filter>
-    </ClCompile>
-    <ClCompile Include="minirtl\ultohex.c">
-      <Filter>minirtl</Filter>
-    </ClCompile>
-    <ClCompile Include="minirtl\ultostr.c">
-      <Filter>minirtl</Filter>
-    </ClCompile>
     <ClCompile Include="hde\hde64.c">
       <Filter>hde</Filter>
     </ClCompile>
@@ -189,17 +120,11 @@
     <ClCompile Include="extras\extrasIPC.c">
       <Filter>Source Files\extras</Filter>
     </ClCompile>
-    <ClCompile Include="treelist\treelist.c">
-      <Filter>treelist</Filter>
-    </ClCompile>
     <ClCompile Include="extras\extrasPSList.c">
       <Filter>Source Files\extras</Filter>
     </ClCompile>
     <ClCompile Include="extras\extrasCallbacks.c">
       <Filter>Source Files\extras</Filter>
-    </ClCompile>
-    <ClCompile Include="minirtl\_strchr.c">
-      <Filter>minirtl</Filter>
     </ClCompile>
     <ClCompile Include="props\propToken.c">
       <Filter>Source Files\props</Filter>
@@ -207,11 +132,89 @@
     <ClCompile Include="wine.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ntos\ntldr.c">
-      <Filter>ntos</Filter>
-    </ClCompile>
     <ClCompile Include="extras\extrasSL.c">
       <Filter>Source Files\extras</Filter>
+    </ClCompile>
+    <ClCompile Include="plugmngr.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\_strcat.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\_strchr.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\_strcmp.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\_strcmpi.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\_strcpy.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\_strend.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\_strlen.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\_strncmp.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\_strncmpi.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\_strncpy.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\_strstr.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\_strstri.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\hextou64.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\hextoul.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\i64tostr.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\itostr.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\strtoi.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\strtoi64.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\strtou64.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\strtoul.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\u64tohex.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\u64tostr.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\ultohex.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\ultostr.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\ntos\ntldr.c">
+      <Filter>ntos</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\treelist\treelist.c">
+      <Filter>treelist</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -253,12 +256,6 @@
     <ClInclude Include="ui.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="minirtl\minirtl.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="minirtl\rtltypes.h">
-      <Filter>minirtl</Filter>
-    </ClInclude>
     <ClInclude Include="hde\hde64.h">
       <Filter>hde</Filter>
     </ClInclude>
@@ -276,15 +273,6 @@
     </ClInclude>
     <ClInclude Include="tests\testunit.h">
       <Filter>tests</Filter>
-    </ClInclude>
-    <ClInclude Include="ntos\ntos.h">
-      <Filter>ntos</Filter>
-    </ClInclude>
-    <ClInclude Include="ntos\ntalpc.h">
-      <Filter>ntos</Filter>
-    </ClInclude>
-    <ClInclude Include="treelist\treelist.h">
-      <Filter>treelist</Filter>
     </ClInclude>
     <ClInclude Include="msvcver.h">
       <Filter>Header Files</Filter>
@@ -364,14 +352,32 @@
     <ClInclude Include="extdef.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ntos\apisetx.h">
-      <Filter>ntos</Filter>
-    </ClInclude>
-    <ClInclude Include="ntos\ntldr.h">
-      <Filter>ntos</Filter>
-    </ClInclude>
     <ClInclude Include="extras\extrasSL.h">
       <Filter>Source Files\extras</Filter>
+    </ClInclude>
+    <ClInclude Include="plugmngr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\minirtl\minirtl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\minirtl\rtltypes.h">
+      <Filter>minirtl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\ntos\apisetx.h">
+      <Filter>ntos</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\ntos\ntalpc.h">
+      <Filter>ntos</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\ntos\ntldr.h">
+      <Filter>ntos</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\ntos\ntos.h">
+      <Filter>ntos</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\treelist\treelist.h">
+      <Filter>treelist</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -545,8 +551,8 @@
     </Image>
   </ItemGroup>
   <ItemGroup>
-    <MASM Include="ntuser\StubNtUserOpenWindowStation.asm">
-      <Filter>Source Files</Filter>
+    <MASM Include="..\Shared\ntuser\StubNtUserOpenWindowStation.asm">
+      <Filter>ntuser</Filter>
     </MASM>
   </ItemGroup>
 </Project>

@@ -4,9 +4,9 @@
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     1.74
+*  VERSION:     1.80
 *
-*  DATE:        12 May 2019
+*  DATE:        02 Aug 2019
 *
 *  Test code used while debug.
 *
@@ -16,8 +16,10 @@
 * PARTICULAR PURPOSE.
 *
 *******************************************************************************/
+#define OEMRESOURCE
+
 #include "global.h"
-#include "ntldr.h"
+#include "ntos\ntldr.h"
 #include <intrin.h>
 #include <aclapi.h>
 
@@ -428,15 +430,20 @@ VOID TestPrivateNamespace(
 }
 
 VOID TestException(
-    VOID
+    _In_ BOOL bNaked
 )
 {
-    __try {
+    if (bNaked) 
         *(PBYTE)(NULL) = 0;
-    }
-    __except (exceptFilter(GetExceptionCode(), GetExceptionInformation()))
-    {
-        __nop();
+    else {
+
+        __try {
+            *(PBYTE)(NULL) = 0;
+        }
+        __except (exceptFilter(GetExceptionCode(), GetExceptionInformation()))
+        {
+            __nop();
+        }
     }
 }
 
@@ -724,17 +731,18 @@ VOID TestLicenseCache()
 
 VOID TestCall()
 {
+
 }
 
 VOID TestStart(
     VOID
 )
 {
-    //TestPsObjectSecurity();
-    TestLicenseCache();
-    TestApiSetResolve();
-    TestDesktop();
     TestCall();
+    //TestPsObjectSecurity();
+    //TestLicenseCache();
+    //TestApiSetResolve();
+    TestDesktop();
     TestApiPort();
     TestDebugObject();
     TestMailslot();

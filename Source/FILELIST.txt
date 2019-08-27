@@ -1,115 +1,224 @@
-Alphabetical order
+winobjex64\aboutDlg.c
+winobjex64\aboutDlg.h
 
-aboutDlg.c - About dialog routines including window dialog procedure
-aboutDlg.h
+* About dialog routines including window dialog procedure
 
-excepth.c - custom access violation exception handler including minidump
-excepth.h
+winobjex64\excepth.c
+winobjex64\excepth.h
 
-extras.c - extras menu handler
-extras.h
+* Custom access violation exception handler including minidump
 
-extapi.c - Windows 7 missing API support
-extapi.h
-extdef.h - SDK 8.1 missing definitions support
+winobjex64\extras\extras.c
+winobjex64\extras\extras.h
 
-extrasCallbacks.c - Callbacks list
-extrasCallbacks.h
+* Extras menu handler
 
-extrasDrivers.c - Drivers list
-extrasDrivers.h
+winobjex64\extapi.c
+winobjex64\extapi.h
 
-extrasSSDT.c - KiServiceTable list
-extrasSSDT.h
+* Windows 7 missing API support
 
-extrasIPC.c - Pipes and mailslots dialog
-extrasIPC.h
+winobjex64\extdef.h
 
-extrasPN.c - private namespaces
-extrasPN.h
+* SDK 8.1 missing definitions support
 
-extrasPSList.c - process list
-extrasPSList.h
+winobjex64\extas\extrasCallbacks.c
+winobjex64\extras\extrasCallbacks.h
 
-extrasSL.c - Software Licensing Cache dialog
-extrasSL.h
+* Windows kernel callbacks list
 
-extrasUSD.c - UserSharedData dialog
-extrasUSD.h
+winobjex64\extras\extrasDrivers.c
+winobjex64\extras\extrasDrivers.h
 
-findDlg.c - Find Object routines including window dialog procedure
-findDlg.h
+* Drivers list
 
-instdrv.c - driver installation routines
-instdrv.h
+winobjex64\extras\extrasSSDT.c
+winobjex64\extras\extrasSSDT.h
 
-kldbg.c - Windows Kernel Debugging Driver support routines, object related internal API set
-kldbg.h
-kldbg_pattern.h - patterns used to find undocumented stuff
+* KiServiceTable/W32pServiceTable list
 
-list.c - treeview and listview handlers for main window
-list.h
+winobjex64\extras\extrasIPC.c
+winobjex64\extras\extrasIPC.h
 
-main.c - program entry point and initialization routines, main window dialog procedure handler
+* Pipes and mailslots dialog
 
-minirtl.c - set of reimplemented rtl routines
-minirtl.h
+winobjex64\extras\extrasPN.c
+winobjex64\extras\extrasPN.h
 
-msvcver.h - MS VisualC compiler versions header file
+* Windows Private Namespaces dialog
 
-objects.c - known objects support functions
-objects.h - known objects table
+winobjex64\extras\extrasPSList.c
+winobjex64\extras\extrasPSList.h
 
-propBasic.c - property sheet "Basic" handlers, including window procedures
-propBasic.h
-propBasicConsts.h
+* Process list dialog
 
-propDesktop.c - property sheet "Desktop" handlers
-propDesktop.h
+winobjex64\extras\extrasSL.c
+winobjex64\extras\extrasSL.h
 
-propDlg.c - "Properties" property sheet creation and window procedures, all sheets created here
-propDlg.h
+* Software Licensing Cache dialog
 
-propDriver.c - property sheet "Driver" handlers, including window procedures
-propDriver.h
-propDriverConsts.h
+winobjex64\extras\extrasUSD.c
+winobjex64\extras\extrasUSD.h
 
-propObjectDump.c - dumping and decoding kernel objects for "Object" property sheet
-propObjectDump.h
-propObjectDumpConsts.h - kernel object string converted constants 
+* UserSharedData dialog
 
-propProcess.c - property sheet "Process" handler, window procedure
-propProcess.h
+winobjex64\findDlg.c
+winobjex64\findDlg.h
 
-propSecurity.c - "Security" property sheet handler and ISecurityInformation implementation
-propSecurity.h
-propSecurityConsts.h - object type access values, generic mappings here
+* Find Object routines including window dialog procedure
 
-propToken.c - property sheet "Token" handler, window procedure
-propToken.h
+winobjex64\instdrv.c
+winobjex64\instdrv.h
 
-propType.c - property sheet "Type" handlers, including window procedure for "Procedures" sheet
-propType.h
-propTypeConsts.h - known object access rights converted to strings listed here
+* Helper driver installation routines
 
-sup.c - support api set
-sup.h
-supConsts.h
+winobjex64\kldbg.c
+winobjex64\kldbg.h
 
-testunit.c - all objects test code here
-testunit.h
+* Windows Kernel Debugging Driver support routines, object related internal API set
 
-treelist.c - systreeview32 combined with sysheader32 control
-treelist.h
+winobjex64\kldbg_pattern.h
 
-wine.h - wine support header file
-wine.c
+* Signature patterns used to find undocumented stuff
 
-global.h - global include file
-ntos.h - os internals related definitions and prototypes
-ntalpc.h - alpc port dedicated header file
-ntldr.h - nt pe loader related declarations
-ntldr.c - nt pe loader related declarations and routines
-apisetx.h - apisetschema dedicated header file
-resource.h - studio generated resource header
-ui.h - user interface global constant
+winobjex64\list.c
+winobjex64\list.h
+
+* Treeview and listview handlers for main window
+
+winobjex64\main.c
+
+* Program entry point and initialization routines, main window dialog procedure handler
+
+winobjex64\minirtl\minirtl.c
+winobjex64\minirtl\minirtl.h
+
+* Set of reimplemented rtl routines
+
+winobjex64\msvcver.h
+
+* MS VisualC compiler versions header file
+
+winobjex64\objects.c
+
+* Known objects support functions
+
+winobjex64\objects.h
+
+* Known objects table
+
+winobjex64\plugmngr.c
+winobjex64\plugmngr.h
+
+* Plugin manager
+
+winobjex64\props\propBasic.c
+winobjex64\props\propBasic.h
+winobjex64\props\propBasicConsts.h
+
+* Property sheet "Basic" handlers, including window procedures and consts
+
+winobjex64\props\propDesktop.c
+winobjex64\props\propDesktop.h
+
+* Property sheet "Desktop" handlers
+
+winobjex64\props\propDlg.c
+winobjex64\props\propDlg.h
+
+* "Properties" property sheet creation and window procedures, all sheets created here
+
+winobjex64\props\propDriver.c - property sheet "Driver" handlers, including window procedures
+winobjex64\props\propDriver.h
+winobjex64\props\propDriverConsts.h
+
+winobjex64\props\propObjectDump.c 
+winobjex64\props\propObjectDump.h
+
+* Dumping and decoding kernel objects for "Object" property sheet
+
+winobjex64\props\propObjectDumpConsts.h
+
+* Kernel object string converted constants
+
+winobjex64\props\propProcess.c
+winobjex64\props\propProcess.h
+
+* Property sheet "Process" handler, window procedure
+
+winobjex64\props\propSecurity.c
+winobjex64\props\propSecurity.h
+
+* "Security" property sheet handler and ISecurityInformation implementation
+
+winobjex64\props\propSecurityConsts.h
+
+* Object type access values, generic mappings here
+
+winobjex64\props\propToken.c
+winobjex64\props\propToken.h
+
+* Property sheet "Token" handler, window procedure
+
+winobjex64\props\propType.c
+winobjex64\props\propType.h
+
+* Property sheet "Type" handlers, including window procedure for "Procedures" sheet
+
+winobjex64\props\propTypeConsts.h
+
+* Known object access rights converted to strings listed here
+
+winobjex64\sup.c
+winobjex64\sup.h
+winobjex64\supConsts.h
+
+* Support api set and consts
+
+winobjex64\tests\testunit.c
+winobjex64\tests\testunit.h
+
+* All objects test code here
+
+shared\treelist\treelist.c
+shared\treelist\treelist.h
+
+* systreeview32 combined with sysheader32 control
+
+winobjex64\wine.h
+winobjex64\wine.c
+
+* Wine support header file
+
+winobjex64\global.h
+
+* Global include file
+
+shared\ntos\ntos.h
+
+* NT os internals related definitions and prototypes
+
+shared\ntos\ntalpc.h
+
+* MS ALPC port dedicated header file
+
+shared\ntos\ntldr.c
+shared\ntos\ntldr.h
+
+* NT PE loader related declarations and routines
+
+shared\ntos\apisetx.h
+
+* MS ApiSetSchema dedicated header file
+
+shared\ntuser\StubNtUserOpenWindowStation.asm
+
+* NtUserOpenWindowStation stub code
+
+winobjex64\resource.h
+
+* Visual Studio generated resource header
+
+winobjex64\ui.h
+
+* User interface global constant

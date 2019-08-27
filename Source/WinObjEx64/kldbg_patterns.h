@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG_PATTERNS.H
 *
-*  VERSION:     1.72
+*  VERSION:     1.80
 *
-*  DATE:        03 Feb 2019
+*  DATE:        20 July 2019
 *
 *  Header with search patterns used by KLDBG.
 *
@@ -18,6 +18,18 @@
 *******************************************************************************/
 
 #pragma once
+
+//
+// Win32kApiSetTable signatures
+//
+// 18936+
+BYTE Win32kApiSetTableMovPattern[] = {
+    0x45, 0x8B, 0xEC
+};
+
+BYTE Win32kApiSetTableLeaPattern[] = {
+    0x4C, 0x8D, 0x35
+};
 
 //
 // ObpLookupNamespaceEntry signatures
@@ -34,7 +46,7 @@ BYTE NamespacePattern8[] = {
 };
 
 /*+++
- 
+
  Host Server Silo signature patterns
 
 +++*/

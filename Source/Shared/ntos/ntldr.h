@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTLDR.H
 *
-*  VERSION:     1.12
+*  VERSION:     1.16
 *
-*  DATE:        08 May 2019
+*  DATE:        20 July 2019
 *
 *  Common header file for the NTLDR definitions.
 *
@@ -59,7 +59,7 @@ LPCSTR NtRawIATEntryToImport(
     _Out_opt_ LPCSTR *ImportModuleName);
 
 _Success_(return != 0)
-ULONG NtRawEnumExports(
+ULONG NtRawEnumW32kExports(
     _In_ HANDLE HeapHandle,
     _In_ LPVOID Module,
     _Out_ PWIN32_SHADOWTABLE* Table);

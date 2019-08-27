@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXCEPTH.C
 *
-*  VERSION:     1.73
+*  VERSION:     1.80
 *
-*  DATE:        17 Mar 2019
+*  DATE:        16 July 2019
 *
 *  Exception handler routines.
 *
@@ -100,16 +100,16 @@ VOID exceptShowException(
     ULONGLONG IdFile;
 
     RtlSecureZeroMemory(&szMessage, sizeof(szMessage));
-    _strcpy(szMessage, TEXT("Sorry, exception occurred at address: \n0x"));
+    _strcpy(szMessage, TEXT("Sorry, exception occurred at address: \r\n0x"));
     u64tohex((ULONG_PTR)ExceptionPointers->ExceptionRecord->ExceptionAddress, _strend(szMessage));
 
     if (ExceptionPointers->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {
         switch (ExceptionPointers->ExceptionRecord->ExceptionInformation[0]) {
         case 0:
-            _strcat(szMessage, TEXT("\n\nAttempt to read at address: \n0x"));
+            _strcat(szMessage, TEXT("\r\n\nAttempt to read at address: \r\n0x"));
             break;
         case 1:
-            _strcat(szMessage, TEXT("\n\nAttempt to write at address: \n0x"));
+            _strcat(szMessage, TEXT("\r\n\nAttempt to write at address: \r\n0x"));
             break;
         }
         u64tohex(ExceptionPointers->ExceptionRecord->ExceptionInformation[1], _strend(szMessage));
@@ -117,11 +117,14 @@ VOID exceptShowException(
     IdFile = GetTickCount64();
 
     if (exceptWriteDump(ExceptionPointers, IdFile)) {
-        _strcat(szMessage, TEXT("\n\nMinidump wobjex"));
+        _strcat(szMessage, TEXT("\r\n\nMinidump wobjex"));
         u64tostr(IdFile, _strend(szMessage));
         _strcat(szMessage, TEXT(".dmp is in %TEMP% directory"));
     }
-    _strcat(szMessage, TEXT("\n\nPlease report this to the developers, thanks"));
+    else {
+        _strcat(szMessage, TEXT("\r\n\nThere is an error while saving minidump."));
+    }
+    _strcat(szMessage, TEXT("\r\n\nPlease report this to the developers, thanks"));
     MessageBox(GetForegroundWindow(), szMessage, NULL, MB_ICONERROR);
 }
 

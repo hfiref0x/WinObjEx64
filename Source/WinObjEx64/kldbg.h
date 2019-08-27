@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.73
+*  VERSION:     1.80
 *
-*  DATE:        30 Mar 2019
+*  DATE:        20 July 2019
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -177,6 +177,11 @@ typedef struct _NOTIFICATION_CALLBACKS {
 
 extern NOTIFICATION_CALLBACKS g_SystemCallbacks;
 
+typedef struct _W32K_API_SET_ADAPTER_PATTERN {
+    ULONG Size;
+    PVOID Data;
+} W32K_API_SET_ADAPTER_PATTERN, *PW32K_API_SET_ADAPTER_PATTERN;
+
 // return true to stop enumeration
 typedef BOOL(CALLBACK *PENUMERATE_COLLECTION_CALLBACK)(
     _In_ POBJREF CollectionEntry,
@@ -298,6 +303,9 @@ BOOL kdFindKiServiceTables(
 ULONG_PTR kdFindCiCallbacks(
     _In_ PKLDBGCONTEXT Context);
 
+ULONG_PTR kdQueryWin32kApiSetTable(
+	_In_ HMODULE hWin32k);
+
 BOOL kdReadSystemMemoryEx(
     _In_ ULONG_PTR Address,
     _Inout_ PVOID Buffer,
@@ -323,3 +331,7 @@ VOID kdShowError(
     _In_ ULONG InputBufferLength,
     _In_ NTSTATUS Status,
     _In_ PIO_STATUS_BLOCK Iosb);
+
+UCHAR kdGetInstructionLength(
+    _In_ PVOID ptrCode,
+    _Out_ PULONG ptrFlags);

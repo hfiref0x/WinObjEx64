@@ -136,7 +136,7 @@
       <BrowseInformation>true</BrowseInformation>
       <CompileAs>CompileAsCpp</CompileAs>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\treelist;$(ProjectDir)\props;$(ProjectDir)\extras;$(ProjectDir)\ntos</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\Shared;$(ProjectDir);$(ProjectDir)\props;$(ProjectDir)\extras</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -172,7 +172,7 @@
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <ControlFlowGuard>Guard</ControlFlowGuard>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\treelist;$(ProjectDir)\props;$(ProjectDir)\extras;$(ProjectDir)\ntos</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\Shared;$(ProjectDir);$(ProjectDir)\props;$(ProjectDir)\extras</AdditionalIncludeDirectories>
       <CompileAs>CompileAsC</CompileAs>
       <EnablePREfast>false</EnablePREfast>
     </ClCompile>
@@ -191,6 +191,7 @@
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <IgnoreAllDefaultLibraries>
       </IgnoreAllDefaultLibraries>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
     </Link>
     <Manifest>
       <SuppressStartupBanner>false</SuppressStartupBanner>
@@ -227,7 +228,7 @@
       <ExpandAttributedSource>true</ExpandAttributedSource>
       <AssemblerOutput>All</AssemblerOutput>
       <CompileAs>CompileAsC</CompileAs>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\treelist;$(ProjectDir)\props;$(ProjectDir)\extras;$(ProjectDir)\ntos</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\Shared;$(ProjectDir);$(ProjectDir)\props;$(ProjectDir)\extras</AdditionalIncludeDirectories>
       <EnablePREfast>true</EnablePREfast>
     </ClCompile>
     <Link>
@@ -257,7 +258,7 @@
       </Command>
     </CustomBuildStep>
     <PostBuildEvent>
-      <Command>$(ProjectDir)..\signing\signapp.cmd .\output\$(Platform)\$(Configuration)\$(ProjectName).exe</Command>
+      <Command>$(ProjectDir)..\signing\signapp.cmd .\output\$(Platform)\$(Configuration)\bin\$(ProjectName).exe</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseSignedWithDriver|x64'">
@@ -278,7 +279,7 @@
       <ExpandAttributedSource>true</ExpandAttributedSource>
       <AssemblerOutput>All</AssemblerOutput>
       <CompileAs>CompileAsC</CompileAs>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\treelist;$(ProjectDir)\props;$(ProjectDir)\extras;$(ProjectDir)\ntos</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\Shared;$(ProjectDir);$(ProjectDir)\props;$(ProjectDir)\extras</AdditionalIncludeDirectories>
       <EnablePREfast>true</EnablePREfast>
     </ClCompile>
     <Link>
@@ -308,7 +309,7 @@
       </Command>
     </CustomBuildStep>
     <PostBuildEvent>
-      <Command>$(ProjectDir)..\signing\signapp.cmd .\output\$(Platform)\$(Configuration)\$(ProjectName).exe</Command>
+      <Command>$(ProjectDir)..\signing\signapp.cmd .\output\$(Platform)\$(Configuration)\bin\$(ProjectName).exe</Command>
     </PostBuildEvent>
     <ResourceCompile>
       <PreprocessorDefinitions>_UseOwnDriver;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -330,7 +331,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <ControlFlowGuard>Guard</ControlFlowGuard>
       <CompileAs>CompileAsC</CompileAs>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\treelist;$(ProjectDir)\props;$(ProjectDir)\extras;$(ProjectDir)\ntos</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\Shared;$(ProjectDir);$(ProjectDir)\props;$(ProjectDir)\extras</AdditionalIncludeDirectories>
       <EnablePREfast>true</EnablePREfast>
     </ClCompile>
     <Link>
@@ -367,6 +368,32 @@
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\Shared\minirtl\hextou64.c" />
+    <ClCompile Include="..\Shared\minirtl\hextoul.c" />
+    <ClCompile Include="..\Shared\minirtl\i64tostr.c" />
+    <ClCompile Include="..\Shared\minirtl\itostr.c" />
+    <ClCompile Include="..\Shared\minirtl\strtoi.c" />
+    <ClCompile Include="..\Shared\minirtl\strtoi64.c" />
+    <ClCompile Include="..\Shared\minirtl\strtou64.c" />
+    <ClCompile Include="..\Shared\minirtl\strtoul.c" />
+    <ClCompile Include="..\Shared\minirtl\u64tohex.c" />
+    <ClCompile Include="..\Shared\minirtl\u64tostr.c" />
+    <ClCompile Include="..\Shared\minirtl\ultohex.c" />
+    <ClCompile Include="..\Shared\minirtl\ultostr.c" />
+    <ClCompile Include="..\Shared\minirtl\_strcat.c" />
+    <ClCompile Include="..\Shared\minirtl\_strchr.c" />
+    <ClCompile Include="..\Shared\minirtl\_strcmp.c" />
+    <ClCompile Include="..\Shared\minirtl\_strcmpi.c" />
+    <ClCompile Include="..\Shared\minirtl\_strcpy.c" />
+    <ClCompile Include="..\Shared\minirtl\_strend.c" />
+    <ClCompile Include="..\Shared\minirtl\_strlen.c" />
+    <ClCompile Include="..\Shared\minirtl\_strncmp.c" />
+    <ClCompile Include="..\Shared\minirtl\_strncmpi.c" />
+    <ClCompile Include="..\Shared\minirtl\_strncpy.c" />
+    <ClCompile Include="..\Shared\minirtl\_strstr.c" />
+    <ClCompile Include="..\Shared\minirtl\_strstri.c" />
+    <ClCompile Include="..\Shared\ntos\ntldr.c" />
+    <ClCompile Include="..\Shared\treelist\treelist.c" />
     <ClCompile Include="aboutDlg.c" />
     <ClCompile Include="excepth.c" />
     <ClCompile Include="extapi.c" />
@@ -385,32 +412,8 @@
     <ClCompile Include="kldbg.c" />
     <ClCompile Include="list.c" />
     <ClCompile Include="main.c" />
-    <ClCompile Include="minirtl\hextou64.c" />
-    <ClCompile Include="minirtl\hextoul.c" />
-    <ClCompile Include="minirtl\i64tostr.c" />
-    <ClCompile Include="minirtl\itostr.c" />
-    <ClCompile Include="minirtl\strtoi.c" />
-    <ClCompile Include="minirtl\strtoi64.c" />
-    <ClCompile Include="minirtl\strtou64.c" />
-    <ClCompile Include="minirtl\strtoul.c" />
-    <ClCompile Include="minirtl\u64tohex.c" />
-    <ClCompile Include="minirtl\u64tostr.c" />
-    <ClCompile Include="minirtl\ultohex.c" />
-    <ClCompile Include="minirtl\ultostr.c" />
-    <ClCompile Include="minirtl\_strcat.c" />
-    <ClCompile Include="minirtl\_strchr.c" />
-    <ClCompile Include="minirtl\_strcmp.c" />
-    <ClCompile Include="minirtl\_strcmpi.c" />
-    <ClCompile Include="minirtl\_strcpy.c" />
-    <ClCompile Include="minirtl\_strend.c" />
-    <ClCompile Include="minirtl\_strlen.c" />
-    <ClCompile Include="minirtl\_strncmp.c" />
-    <ClCompile Include="minirtl\_strncmpi.c" />
-    <ClCompile Include="minirtl\_strncpy.c" />
-    <ClCompile Include="minirtl\_strstr.c" />
-    <ClCompile Include="minirtl\_strstri.c" />
-    <ClCompile Include="ntos\ntldr.c" />
     <ClCompile Include="objects.c" />
+    <ClCompile Include="plugmngr.c" />
     <ClCompile Include="props\propBasic.c" />
     <ClCompile Include="props\propDesktop.c" />
     <ClCompile Include="props\propDlg.c" />
@@ -422,13 +425,19 @@
     <ClCompile Include="props\propType.c" />
     <ClCompile Include="sup.c" />
     <ClCompile Include="tests\testunit.c" />
-    <ClCompile Include="treelist\treelist.c" />
     <ClCompile Include="wine.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\Shared\minirtl\minirtl.h" />
+    <ClInclude Include="..\Shared\minirtl\rtltypes.h" />
+    <ClInclude Include="..\Shared\ntos\apisetx.h" />
+    <ClInclude Include="..\Shared\ntos\ntalpc.h" />
+    <ClInclude Include="..\Shared\ntos\ntldr.h" />
+    <ClInclude Include="..\Shared\ntos\ntos.h" />
+    <ClInclude Include="..\Shared\treelist\treelist.h" />
     <ClInclude Include="aboutDlg.h" />
     <ClInclude Include="excepth.h" />
     <ClInclude Include="extapi.h" />
@@ -450,15 +459,10 @@
     <ClInclude Include="instdrv.h" />
     <ClInclude Include="kldbg.h" />
     <ClInclude Include="list.h" />
-    <ClInclude Include="minirtl\minirtl.h" />
-    <ClInclude Include="minirtl\rtltypes.h" />
     <ClInclude Include="msvcver.h" />
-    <ClInclude Include="ntos\apisetx.h" />
-    <ClInclude Include="ntos\ntalpc.h" />
-    <ClInclude Include="ntos\ntldr.h" />
-    <ClInclude Include="ntos\ntos.h" />
     <ClInclude Include="objects.h" />
     <ClInclude Include="kldbg_patterns.h" />
+    <ClInclude Include="plugmngr.h" />
     <ClInclude Include="props\propBasic.h" />
     <ClInclude Include="props\propBasicConsts.h" />
     <ClInclude Include="props\propDesktop.h" />
@@ -477,7 +481,6 @@
     <ClInclude Include="sup.h" />
     <ClInclude Include="supConsts.h" />
     <ClInclude Include="tests\testunit.h" />
-    <ClInclude Include="treelist\treelist.h" />
     <ClInclude Include="ui.h" />
     <ClInclude Include="wine.h" />
   </ItemGroup>
@@ -540,19 +543,7 @@
     <Image Include="rsrc\pipe.ico" />
   </ItemGroup>
   <ItemGroup>
-    <MASM Include="ntuser\StubNtUserOpenWindowStation.asm">
-      <FileType>Document</FileType>
-      <TreatWarningsAsErrors Condition="'$(Configuration)|$(Platform)'=='ReleaseSignedWithDriver|x64'">true</TreatWarningsAsErrors>
-      <TreatWarningsAsErrors Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</TreatWarningsAsErrors>
-      <TreatWarningsAsErrors Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</TreatWarningsAsErrors>
-      <TreatWarningsAsErrors Condition="'$(Configuration)|$(Platform)'=='ReleaseNotSignedWithDriver|x64'">true</TreatWarningsAsErrors>
-      <TreatWarningsAsErrors Condition="'$(Configuration)|$(Platform)'=='ReleaseSigned|x64'">true</TreatWarningsAsErrors>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='ReleaseNotSignedWithDriver|x64'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='ReleaseSigned|x64'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='ReleaseSignedWithDriver|x64'">false</ExcludedFromBuild>
-    </MASM>
+    <MASM Include="..\Shared\ntuser\StubNtUserOpenWindowStation.asm" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

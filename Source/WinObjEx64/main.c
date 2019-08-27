@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.74
+*  VERSION:     1.80
 *
-*  DATE:        19 May 2019
+*  DATE:        29 June 2019
 *
 *  Program entry point and main window handler.
 *
@@ -402,6 +402,10 @@ LRESULT MainWindowHandleWMCommand(
 
     default:
         break;
+    }
+
+    if ((ControlId >= ID_MENU_PLUGINS) && (ControlId < WINOBJEX_MAX_PLUGINS)) {
+        PluginManagerProcessEntry(hwnd, ControlId);
     }
     return FALSE;
 }
@@ -1395,6 +1399,8 @@ UINT WinObjExMain()
 
         hAccTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
 
+        PluginManagerCreate(MainWindow);
+
         //create ObjectList columns
         RtlSecureZeroMemory(&col, sizeof(col));
         col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
@@ -1455,6 +1461,8 @@ UINT WinObjExMain()
 
     if (g_TreeListAtom != 0)
         UnregisterClass(MAKEINTATOM(g_TreeListAtom), g_WinObj.hInstance);
+
+    PluginManagerDestroy();
 
     //do not move anywhere
 

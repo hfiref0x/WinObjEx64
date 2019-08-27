@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     1.74
+*  VERSION:     1.80
 *
-*  DATE:        08 May 2019
+*  DATE:        02 Aug 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -378,7 +378,7 @@ VOID SdtOutputTable(
     default:
         break;
     }
-    
+
     SetWindowText(Context->StatusBar, szBuffer);
 
     iImage = ObManagerGetImageIndexByTypeIndex(ObjectTypeDevice);
@@ -606,6 +606,348 @@ VOID SdtListTable(
     }
 }
 
+//
+// Win32kApiSetTable adapter patterns
+//
+BYTE Win32kApiSetAdapterPattern1[] = {
+   0x4C, 0x8B, 0x15
+};
+BYTE Win32kApiSetAdapterPattern2[] = {
+   0x48, 0x8B, 0x05
+};
+
+#define W32K_API_SET_ADAPTERS_COUNT 2
+
+W32K_API_SET_ADAPTER_PATTERN W32kApiSetAdapters[W32K_API_SET_ADAPTERS_COUNT] = {
+    { sizeof(Win32kApiSetAdapterPattern1), Win32kApiSetAdapterPattern1 },
+    { sizeof(Win32kApiSetAdapterPattern2), Win32kApiSetAdapterPattern2 }
+};
+
+/*
+* ApiSetExtractReferenceFromAdapter
+*
+* Purpose:
+*
+* Extract apiset reference from adapter code.
+*
+*/
+ULONG_PTR ApiSetExtractReferenceFromAdapter(
+    _In_ PBYTE ptrFunction
+)
+{
+    BOOL       bFound;
+    PBYTE      ptrCode = ptrFunction;
+    ULONG      Index = 0, i;
+    ULONG_PTR  Reference = 0;
+    LONG       Rel = 0;
+    hde64s     hs;
+
+    ULONG      PatternSize;
+    PVOID      PatternData;
+
+    __try {
+
+        do {
+            hde64_disasm((void*)(ptrCode + Index), &hs);
+            if (hs.flags & F_ERROR)
+                break;
+
+            if (hs.len == 7) {
+
+                bFound = FALSE;
+
+                for (i = 0; i < W32K_API_SET_ADAPTERS_COUNT; i++) {
+
+                    PatternSize = W32kApiSetAdapters[i].Size;
+                    PatternData = W32kApiSetAdapters[i].Data;
+
+                    if (PatternSize == RtlCompareMemory(&ptrCode[Index],
+                        PatternData,
+                        PatternSize))
+                    {
+                        Rel = *(PLONG)(ptrCode + Index + (hs.len - 4));
+                        bFound = TRUE;
+                        break;
+                    }
+
+                }
+
+                if (bFound)
+                    break;
+            }
+
+            Index += hs.len;
+
+        } while (Index < 32);
+
+        if (Rel == 0)
+            return 0;
+
+        Reference = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
+
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return 0;
+    }
+
+    return Reference;
+}
+
+/*
+* ApiSetResolveWin32kTableEntry
+*
+* Purpose:
+*
+* Find entry in Win32kApiSetTable.
+*
+* Function return TRUE on success and sets ResolvedEntry parameter.
+*
+*/
+BOOLEAN ApiSetResolveWin32kTableEntry(
+    _In_ ULONG_PTR ApiSetTable,
+    _In_ PBYTE MappedImageBase,
+    _In_ ULONG_PTR LookupEntry,
+    _Out_ PW32K_API_SET_TABLE_ENTRY *ResolvedEntry
+)
+{
+    BOOLEAN bResult = FALSE;
+    PW32K_API_SET_TABLE_ENTRY Entry = (PW32K_API_SET_TABLE_ENTRY)ApiSetTable;
+    ULONG EntriesCount;
+    ULONG_PTR EntryValue;
+    PULONG_PTR ArrayPtr;
+
+    UNREFERENCED_PARAMETER(MappedImageBase);
+
+    *ResolvedEntry = NULL;
+
+    __try {
+        while (Entry->Host) {
+
+            EntriesCount = Entry->Host->HostEntriesCount;
+            ArrayPtr = (PULONG_PTR)Entry->HostEntriesArray;
+            while (EntriesCount) {
+
+                EntryValue = (ULONG_PTR)ArrayPtr;
+                ArrayPtr++;
+                EntriesCount--;
+
+                if (EntryValue == LookupEntry) {
+                    *ResolvedEntry = Entry;
+                    bResult = TRUE;
+                    break;
+                }
+
+            }
+            Entry = (PW32K_API_SET_TABLE_ENTRY)RtlOffsetToPointer(Entry, sizeof(W32K_API_SET_TABLE_ENTRY));
+        }
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        DbgPrint("Win32kApiSet list exception %lx\r\n", GetExceptionCode());
+        return FALSE;
+    }
+
+    return bResult;
+}
+
+/*
+* ApiSetLoadResolvedModule
+*
+* Purpose:
+*
+* Final apiset resolving and loading actual file.
+*
+* Function return NTSTATUS value and sets ResolvedEntry parameter.
+*
+*/
+NTSTATUS ApiSetLoadResolvedModule(
+    _In_ PVOID ApiSetMap,
+    _In_ PUNICODE_STRING ApiSetToResolve,
+    _Out_ PANSI_STRING ConvertedModuleName,
+    _Out_ HMODULE *DllModule
+)
+{
+    BOOL            ResolvedResult;
+    NTSTATUS        Status;
+    UNICODE_STRING  usResolvedModule;
+
+    ResolvedResult = FALSE;
+    RtlInitEmptyUnicodeString(&usResolvedModule, NULL, 0);
+
+    //
+    // Resolve ApiSet.
+    //
+    Status = NtLdrApiSetResolveLibrary(ApiSetMap,
+        ApiSetToResolve,
+        NULL,
+        &ResolvedResult,
+        &usResolvedModule);
+
+    if (NT_SUCCESS(Status)) {
+
+        if (ResolvedResult) {
+            //
+            // ApiSet resolved, load result library.
+            //
+            *DllModule = LoadLibraryEx(usResolvedModule.Buffer, NULL, DONT_RESOLVE_DLL_REFERENCES);
+
+            //
+            // Convert resolved name back to ANSI for module query.
+            //
+            RtlUnicodeStringToAnsiString(ConvertedModuleName,
+                &usResolvedModule,
+                TRUE);
+
+            RtlFreeUnicodeString(&usResolvedModule);
+            Status = STATUS_SUCCESS;
+        }
+    }
+    else {
+        //
+        // Change status code for dbg output.
+        //
+        if (Status == STATUS_UNSUCCESSFUL)
+            Status = STATUS_APISET_NOT_PRESENT;
+    }
+
+    return Status;
+}
+
+/*
+* SdtResolveServiceEntryModule
+*
+* Purpose:
+*
+* Find a module for shadow table entry by parsing apisets(if present) and/or forwarders (if present).
+*
+* Function return NTSTATUS value and sets ResolvedModule, ResolvedModuleName, FunctionName parameters.
+*
+*/
+_Success_(return == STATUS_SUCCESS)
+NTSTATUS SdtResolveServiceEntryModule(
+    _In_ PBYTE FunctionPtr,
+    _In_ HMODULE MappedWin32k,
+    _In_opt_ PVOID ApiSetMap,
+    _In_ ULONG_PTR Win32kApiSetTable,
+    _In_ PWIN32_SHADOWTABLE ShadowTableEntry,
+    _Out_ HMODULE *ResolvedModule,
+    _Out_ PANSI_STRING ResolvedModuleName,
+    _Out_ LPCSTR *FunctionName
+)
+{
+    BOOLEAN         NeedApiSetResolve = (g_NtBuildNumber > 18885);
+    BOOLEAN         Win32kApiSetTableExpected = (g_NtBuildNumber > 18935);
+
+    NTSTATUS        resultStatus = STATUS_UNSUCCESSFUL, resolveStatus;
+
+    HMODULE         DllModule = NULL;
+
+    LONG32          JmpAddress;
+    ULONG_PTR       ApiSetReference;
+
+    LPCSTR	        ModuleName;
+    UNICODE_STRING  usApiSetEntry, usModuleName;
+
+    hde64s hs;
+
+    PW32K_API_SET_TABLE_ENTRY Win32kApiSetEntry;
+
+
+    *ResolvedModule = NULL;
+
+    hde64_disasm((void*)FunctionPtr, &hs);
+    if (hs.flags & F_ERROR) {
+        return STATUS_INTERNAL_ERROR;
+    }
+
+    do {
+
+        //
+        // See if this is new Win32kApiSetTable adapter.
+        //
+        if (Win32kApiSetTableExpected) {
+
+            ApiSetReference = ApiSetExtractReferenceFromAdapter(FunctionPtr);
+            if (ApiSetReference) {
+
+                if (!ApiSetResolveWin32kTableEntry(Win32kApiSetTable,
+                    (PBYTE)MappedWin32k,
+                    ApiSetReference,
+                    &Win32kApiSetEntry))
+                {
+                    return STATUS_APISET_NOT_PRESENT;
+                }
+
+                RtlInitUnicodeString(&usApiSetEntry, Win32kApiSetEntry->Host->HostName);
+                resolveStatus = ApiSetLoadResolvedModule(ApiSetMap, &usApiSetEntry, ResolvedModuleName, &DllModule);
+                if (NT_SUCCESS(resolveStatus)) {
+                    if (DllModule) {
+                        *ResolvedModule = DllModule;
+                        *FunctionName = ShadowTableEntry->Name;
+                        return STATUS_SUCCESS;
+                    }
+                    else {
+                        return STATUS_DRIVER_UNABLE_TO_LOAD;
+                    }
+                }
+                else {
+                    return resolveStatus;
+                }
+
+            }
+            else {
+                resultStatus = STATUS_APISET_NOT_HOSTED;
+            }
+        }
+
+        JmpAddress = *(PLONG32)(FunctionPtr + (hs.len - 4)); // retrieve the offset
+        FunctionPtr = FunctionPtr + hs.len + JmpAddress; // hs.len -> length of jmp instruction
+
+        *FunctionName = NtRawIATEntryToImport(MappedWin32k, FunctionPtr, &ModuleName);
+        if (*FunctionName == NULL) {
+            resultStatus = STATUS_PROCEDURE_NOT_FOUND;
+            break;
+        }
+
+        //
+        // Convert module name to UNICODE.
+        //
+        if (RtlCreateUnicodeStringFromAsciiz(&usModuleName, (PSTR)ModuleName)) {
+
+            //
+            // Check whatever ApiSet resolving required.
+            //
+            if (NeedApiSetResolve) {
+
+                resolveStatus = ApiSetLoadResolvedModule(ApiSetMap,
+                    &usModuleName,
+                    ResolvedModuleName, &DllModule);
+
+                if (!NT_SUCCESS(resolveStatus)) {
+                    RtlFreeUnicodeString(&usModuleName);
+                    return resolveStatus;
+                }
+
+            }
+            else {
+                //
+                // No ApiSet resolve required, load as usual.
+                //
+                DllModule = LoadLibraryEx(usModuleName.Buffer, NULL, DONT_RESOLVE_DLL_REFERENCES);
+                RtlUnicodeStringToAnsiString(ResolvedModuleName, &usModuleName, TRUE);
+            }
+
+            RtlFreeUnicodeString(&usModuleName);
+
+            *ResolvedModule = DllModule;
+            resultStatus = (DllModule != NULL) ? STATUS_SUCCESS : STATUS_DRIVER_UNABLE_TO_LOAD;
+        }
+
+
+    } while (FALSE);
+
+    return resultStatus;
+}
+
 /*
 * SdtListTableShadow
 *
@@ -621,9 +963,10 @@ VOID SdtListTableShadow(
 )
 {
     BOOLEAN     NeedApiSetResolve = (g_NtBuildNumber > 18885);
+    BOOLEAN     Win32kApiSetTableExpected = (g_NtBuildNumber > 18935);
+    NTSTATUS    Status;
     ULONG       w32u_limit, w32k_limit, c;
-    LONG32      jmpaddr;
-    HMODULE     w32u = NULL, w32k = NULL, impdll, forwdll;
+    HMODULE     w32u = NULL, w32k = NULL, DllModule, forwdll;
     PBYTE       fptr;
     PULONG      pServiceLimit, pServiceTable;
     LPCSTR	    ModuleName, FunctionName, ForwarderDot, ForwarderFunctionName;
@@ -633,20 +976,18 @@ VOID SdtListTableShadow(
     PWIN32_SHADOWTABLE  table, itable;
     RESOLVE_INFO        rfn;
 
-    BOOL                            ResolvedResult;
-    ANSI_STRING                     ResolvedModuleAnsi;
-    UNICODE_STRING                  ResolvedModule, usModuleName;
+    ULONG_PTR   Win32kApiSetTable = 0;
+
     PVOID                           ApiSetMap = NULL;
     ULONG                           ApiSetSchemaVersion = 0;
 
-    BOOLEAN                         ModuleNameAllocated = FALSE;
     PRTL_PROCESS_MODULE_INFORMATION Module, ForwardModule;
     PRTL_PROCESS_MODULES            pModules = NULL;
 
     LOAD_MODULE_ENTRY               LoadedModulesHead;
     PLOAD_MODULE_ENTRY              ModuleEntry = NULL, PreviousEntry = NULL;
 
-    hde64s hs;
+    ANSI_STRING ResolvedModuleName;
 
     WCHAR szBuffer[MAX_PATH * 2];
     CHAR szForwarderModuleName[MAX_PATH];
@@ -708,7 +1049,7 @@ VOID SdtListTableShadow(
                 __leave;
             }
 
-            w32u_limit = NtRawEnumExports(EnumerationHeap, w32u, &table);
+            w32u_limit = NtRawEnumW32kExports(EnumerationHeap, w32u, &table);
 
             //
             // Load win32k.
@@ -721,6 +1062,13 @@ VOID SdtListTableShadow(
                 __leave;
             }
 
+            if (Win32kApiSetTableExpected) {
+                //
+                // Locate Win32kApiSetTable variable. Failure will result in unresolved apiset adapters.
+                //
+                Win32kApiSetTable = kdQueryWin32kApiSetTable(w32k);
+            }
+
             //
             // Query win32k!W32pServiceLimit.
             //
@@ -730,6 +1078,9 @@ VOID SdtListTableShadow(
                 __leave;
             }
 
+            //
+            // Check whatever win32u is compatible with win32k data.
+            //
             w32k_limit = *pServiceLimit;
             if (w32k_limit != w32u_limit) {
                 MessageBox(hwndDlg, TEXT("Not all services found in win32u"), NULL, MB_ICONERROR);
@@ -793,179 +1144,161 @@ VOID SdtListTableShadow(
                         fptr = (PBYTE)w32k + itable->KernelStubAddress;
                         itable->KernelStubAddress += win32kBase;
 
-                        hde64_disasm((void*)fptr, &hs);
-                        if (hs.flags & F_ERROR) {
-                            OutputDebugString(TEXT("SdtListTableShadow, HDE Error\r\n"));
-                            break;
-                        }
+                        DllModule = NULL;
+                        RtlSecureZeroMemory(&ResolvedModuleName, sizeof(ResolvedModuleName));
 
-                        while (fptr) {
+                        Status = SdtResolveServiceEntryModule(fptr,
+                            w32k,
+                            ApiSetMap,
+                            Win32kApiSetTable,
+                            itable,
+                            &DllModule,
+                            &ResolvedModuleName,
+                            &FunctionName);
 
-                            jmpaddr = *(PLONG32)(fptr + (hs.len - 4)); // retrieve the offset
-                            fptr = fptr + hs.len + jmpaddr; // hs.len -> length of jmp instruction
+                        if (!NT_SUCCESS(Status)) {
 
-                            FunctionName = NtRawIATEntryToImport(w32k, fptr, &ModuleName);
-                            if (FunctionName == NULL) {
-                                OutputDebugString(TEXT("SdtListTableShadow, could not resolve function name\r\n"));
+                            //
+                            // Most of this errors are not critical and ok.
+                            //
+
+                            switch (Status) {
+
+                            case STATUS_INTERNAL_ERROR:
+                                DbgPrint("SdtListTableShadow, HDE Error\r\n");
+                                break;
+
+                            case STATUS_APISET_NOT_HOSTED:
+                                //
+                                // Corresponding apiset not found.
+                                //
+                                DbgPrint("SdtListTableShadow not an apiset adapter for %s\r\n",
+                                    itable->Name);
+                                break;
+
+                            case STATUS_APISET_NOT_PRESENT:
+                                //
+                                // ApiSet extension present but empty.
+                                // 
+                                DbgPrint("SdtListTableShadow, extension contains a host for a non-existent apiset %s\r\n",
+                                    itable->Name);
+                                break;
+
+                            case STATUS_PROCEDURE_NOT_FOUND:
+                                //
+                                // Not a critical issue. This mean we cannot pass this service next to forwarder lookup code.
+                                //
+                                DbgPrint("SdtListTableShadow, could not resolve function name in module for service id %lu, service name %s\r\n",
+                                    itable->Index,
+                                    itable->Name);
+                                break;
+
+                            case STATUS_DRIVER_UNABLE_TO_LOAD:
+                                DbgPrint("SdtListTableShadow, could not load import dll %s\r\n", ResolvedModuleName.Buffer);
+                                break;
+
+                            default:
                                 break;
                             }
 
-                            impdll = NULL;
-                            ModuleNameAllocated = FALSE;
+                            break;
+                        }
+
+                        if (DllModule == NULL) {
+                            break;
+                        }
+
+                        ModuleName = ResolvedModuleName.Buffer;
+
+                        //
+                        // Rememeber loaded module to the internal list.
+                        //
+                        ModuleEntry = (PLOAD_MODULE_ENTRY)RtlAllocateHeap(EnumerationHeap,
+                            HEAP_ZERO_MEMORY,
+                            sizeof(LOAD_MODULE_ENTRY));
+
+                        if (ModuleEntry) {
+                            ModuleEntry->Next = LoadedModulesHead.Next;
+                            ModuleEntry->hModule = DllModule;
+                            LoadedModulesHead.Next = ModuleEntry;
+                        }
+
+                        if (!NT_SUCCESS(NtRawGetProcAddress(DllModule, FunctionName, &rfn))) {
+                            DbgPrint("SdtListTableShadow: Could not resolve function %s address\r\n", FunctionName);
+                            break;
+                        }
+
+                        if (rfn.ResultType == ForwarderString) {
+
+                            ForwarderDot = _strchr_a(rfn.ForwarderName, '.');
+                            ForwarderFunctionName = ForwarderDot + 1;
 
                             //
-                            // Convert module name to UNICODE.
+                            // Build forwarder module name.
                             //
-                            if (RtlCreateUnicodeStringFromAsciiz(&usModuleName, (PSTR)ModuleName)) {
+                            RtlSecureZeroMemory(szForwarderModuleName, sizeof(szForwarderModuleName));
+                            _strncpy_a(szForwarderModuleName, sizeof(szForwarderModuleName),
+                                rfn.ForwarderName, ForwarderDot - &rfn.ForwarderName[0]);
 
-                                //
-                                // Check whatever ApiSet resolving required.
-                                //
-                                if (NeedApiSetResolve) {
+                            _strcat_a(szForwarderModuleName, ".SYS");
 
-                                    ResolvedResult = FALSE;
-                                    RtlInitEmptyUnicodeString(&ResolvedModule, NULL, 0);
+                            ForwardModule = (PRTL_PROCESS_MODULE_INFORMATION)supFindModuleEntryByName(pModules,
+                                szForwarderModuleName);
 
-                                    //
-                                    // Resolve ApiSet.
-                                    //
-                                    if (NT_SUCCESS(NtLdrApiSetResolveLibrary(ApiSetMap,
-                                        &usModuleName,
-                                        NULL,
-                                        &ResolvedResult,
-                                        &ResolvedModule)))
-                                    {
-                                        if (ResolvedResult) {
+                            if (ForwardModule) {
 
-                                            //
-                                            // ApiSet resolved, load result library.
-                                            //
-                                            impdll = LoadLibraryEx(ResolvedModule.Buffer, NULL, DONT_RESOLVE_DLL_REFERENCES);
+                                if (ForwarderFunctionName) {
 
-                                            //
-                                            // Convert resolved name back to ANSI for module query.
-                                            //
-                                            if (NT_SUCCESS(RtlUnicodeStringToAnsiString(&ResolvedModuleAnsi,
-                                                &ResolvedModule,
-                                                TRUE)))
-                                            {
-                                                ModuleNameAllocated = TRUE;
-                                                ModuleName = ResolvedModuleAnsi.Buffer;
-                                            }
+                                    forwdll = LoadLibraryExA(szForwarderModuleName, NULL, DONT_RESOLVE_DLL_REFERENCES);
+                                    if (forwdll) {
+
+                                        //
+                                        // Remember loaded module to the internal list.
+                                        //
+                                        ModuleEntry = (PLOAD_MODULE_ENTRY)RtlAllocateHeap(EnumerationHeap,
+                                            HEAP_ZERO_MEMORY,
+                                            sizeof(LOAD_MODULE_ENTRY));
+
+                                        if (ModuleEntry) {
+                                            ModuleEntry->Next = LoadedModulesHead.Next;
+                                            ModuleEntry->hModule = forwdll;
+                                            LoadedModulesHead.Next = ModuleEntry;
                                         }
-                                        else {
-                                            DbgPrint("Could not resolve apiset %wZ\r\n", usModuleName);
+
+                                        if (NT_SUCCESS(NtRawGetProcAddress(forwdll, ForwarderFunctionName, &rfn))) {
+
+                                            //
+                                            // Calculate routine kernel mode address.
+                                            //
+                                            itable->KernelStubTargetAddress =
+                                                (ULONG_PTR)ForwardModule->ImageBase + ((ULONG_PTR)rfn.Function - (ULONG_PTR)forwdll);
                                         }
+
+                                    }
+                                    else {
+                                        OutputDebugString(TEXT("SdtListTableShadow, could not load forwarded module\r\n"));
                                     }
 
-                                }
-                                else {
-                                    //
-                                    // No ApiSet resolve required, load as usual.
-                                    //
-                                    impdll = LoadLibraryEx(usModuleName.Buffer, NULL, DONT_RESOLVE_DLL_REFERENCES);
-                                }
-                                RtlFreeUnicodeString(&usModuleName);
-                            }
+                                } // if (ForwarderFunctionName)
 
-                            if (impdll == NULL) {
-                                OutputDebugString(TEXT("SdtListTableShadow, could not load import dll\r\n"));
-                                break;
-                            }
+                            }//if (ForwardModule)
 
-                            //
-                            // Rememeber loaded module to the internal list.
-                            //
-                            ModuleEntry = (PLOAD_MODULE_ENTRY)RtlAllocateHeap(EnumerationHeap,
-                                HEAP_ZERO_MEMORY,
-                                sizeof(LOAD_MODULE_ENTRY));
-
-                            if (ModuleEntry) {
-                                ModuleEntry->Next = LoadedModulesHead.Next;
-                                ModuleEntry->hModule = impdll;
-                                LoadedModulesHead.Next = ModuleEntry;
-                            }
-
-                            if (!NT_SUCCESS(NtRawGetProcAddress(impdll, FunctionName, &rfn))) {
-                                OutputDebugString(TEXT("SdtListTableShadow, could not resolve function address\r\n"));
-                                break;
-                            }
-
-                            if (rfn.ResultType == ForwarderString) {
-
-                                ForwarderDot = _strchr_a(rfn.ForwarderName, '.');
-                                ForwarderFunctionName = ForwarderDot + 1;
-
-                                //
-                                // Build forwarder module name.
-                                //
-                                RtlSecureZeroMemory(szForwarderModuleName, sizeof(szForwarderModuleName));
-                                _strncpy_a(szForwarderModuleName, sizeof(szForwarderModuleName),
-                                    rfn.ForwarderName, ForwarderDot - &rfn.ForwarderName[0]);
-
-                                _strcat_a(szForwarderModuleName, ".SYS");
-
-                                ForwardModule = (PRTL_PROCESS_MODULE_INFORMATION)supFindModuleEntryByName(pModules,
-                                    szForwarderModuleName);
-
-                                if (ForwardModule) {
-
-                                    if (ForwarderFunctionName) {
-
-                                        forwdll = LoadLibraryExA(szForwarderModuleName, NULL, DONT_RESOLVE_DLL_REFERENCES);
-                                        if (forwdll) {
-
-                                            //
-                                            // Remember loaded module to the internal list.
-                                            //
-                                            ModuleEntry = (PLOAD_MODULE_ENTRY)RtlAllocateHeap(EnumerationHeap,
-                                                HEAP_ZERO_MEMORY,
-                                                sizeof(LOAD_MODULE_ENTRY));
-
-                                            if (ModuleEntry) {
-                                                ModuleEntry->Next = LoadedModulesHead.Next;
-                                                ModuleEntry->hModule = forwdll;
-                                                LoadedModulesHead.Next = ModuleEntry;
-                                            }
-
-                                            if (NT_SUCCESS(NtRawGetProcAddress(forwdll, ForwarderFunctionName, &rfn))) {
-
-                                                //
-                                                // Calculate routine kernel mode address.
-                                                //
-                                                itable->KernelStubTargetAddress =
-                                                    (ULONG_PTR)ForwardModule->ImageBase + ((ULONG_PTR)rfn.Function - (ULONG_PTR)forwdll);
-                                            }
-
-                                        }
-                                        else {
-                                            OutputDebugString(TEXT("SdtListTableShadow, could not load forwarded module\r\n"));
-                                        }
-
-                                    } // if (ForwarderFunctionName)
-
-                                }//if (ForwardModule)
-
-                            }
-                            else {
-                                //
-                                // Calculate routine kernel mode address.
-                                //
-                                Module = (PRTL_PROCESS_MODULE_INFORMATION)supFindModuleEntryByName(pModules, ModuleName);
-                                if (Module) {
-                                    itable->KernelStubTargetAddress =
-                                        (ULONG_PTR)Module->ImageBase + ((ULONG_PTR)rfn.Function - (ULONG_PTR)impdll);
-                                }
-
-                                //
-                                // In case if ApiSet resolving was used and module name allocated from resolved name - free used memory.
-                                //
-                                if (ModuleNameAllocated)
-                                    RtlFreeAnsiString(&ResolvedModuleAnsi);
-
-                            }
-                            break;
                         }
+                        else {
+                            //
+                            // Calculate routine kernel mode address.
+                            //
+                            Module = (PRTL_PROCESS_MODULE_INFORMATION)supFindModuleEntryByName(pModules, ModuleName);
+                            if (Module) {
+                                itable->KernelStubTargetAddress =
+                                    (ULONG_PTR)Module->ImageBase + ((ULONG_PTR)rfn.Function - (ULONG_PTR)DllModule);
+                            }
+
+                            RtlFreeAnsiString(&ResolvedModuleName);
+
+                        }
+                        //break;
+                    //}
                     }
                     itable = itable->NextService;
                 }
@@ -998,7 +1331,8 @@ VOID SdtListTableShadow(
                         //
                         g_pSDTShadow[g_SDTShadowLimit].Address = itable->KernelStubTargetAddress;
 
-                    } else {
+                    }
+                    else {
                         //
                         // Query failed, output stub address.
                         //
@@ -1134,7 +1468,7 @@ VOID extrasCreateSSDTDialog(
     pDlgContext->StatusBar = GetDlgItem(hwndDlg, ID_EXTRASLIST_STATUSBAR);
 
     _strcpy(szText, TEXT("Viewing "));
-    if (Mode ==  SST_Ntos)
+    if (Mode == SST_Ntos)
         _strcat(szText, TEXT("ntoskrnl service table"));
     else
         _strcat(szText, TEXT("win32k service table"));

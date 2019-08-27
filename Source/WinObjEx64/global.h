@@ -4,9 +4,9 @@
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.74
+*  VERSION:     1.80
 *
-*  DATE:        17 May 2019
+*  DATE:        02 June 2019
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -85,6 +85,7 @@
 #include "instdrv.h"
 #include "excepth.h"
 #include "extapi.h"
+#include "plugmngr.h"
 #include "tests\testunit.h"
 
 #if defined(__cplusplus)

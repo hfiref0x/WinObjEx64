@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPSLIST.C
 *
-*  VERSION:     1.73
+*  VERSION:     1.80
 *
-*  DATE:        20 Mar 2019
+*  DATE:        01 July 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1171,7 +1171,6 @@ INT_PTR PsListHandleNotify(
     _In_ LPARAM lParam
 )
 {
-    UINT    hdrcode;
     LPNMHDR nhdr = (LPNMHDR)lParam;
     INT     nImageIndex;
 
@@ -1230,9 +1229,7 @@ INT_PTR PsListHandleNotify(
     }
     else if (nhdr->hwndFrom == TreeControl) {
 
-        hdrcode = nhdr->code;
-
-        switch (hdrcode) {
+        switch (nhdr->code) {
 
         case NM_DBLCLK:
 #pragma warning(push)

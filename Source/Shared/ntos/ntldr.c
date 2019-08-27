@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTLDR.C
 *
-*  VERSION:     1.14
+*  VERSION:     1.16
 *
-*  DATE:        15 May 2019
+*  DATE:        20 July 2019
 *
 *  NT loader related code.
 *
@@ -110,7 +110,7 @@ NTSTATUS NtRawGetProcAddress(
 }
 
 /*
-* NtRawEnumExports
+* NtRawEnumW32kExports
 *
 * Purpose:
 *
@@ -118,7 +118,7 @@ NTSTATUS NtRawGetProcAddress(
 *
 */
 _Success_(return != 0)
-ULONG NtRawEnumExports(
+ULONG NtRawEnumW32kExports(
     _In_ HANDLE HeapHandle,
     _In_ LPVOID Module,
     _Out_ PWIN32_SHADOWTABLE* Table
@@ -523,7 +523,7 @@ NTSTATUS NtLdrApiSetResolveLibrary(
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {
         Code = GetExceptionCode();
-        DbgPrint("NtLdrApiSetResolveLibrary exception %lx", Code);
+        DbgPrint("NtLdrApiSetResolveLibrary exception %lx\r\n", Code);
         return Code;
     }
 

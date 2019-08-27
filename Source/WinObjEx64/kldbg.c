@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.74
+*  VERSION:     1.80
 *
-*  DATE:        27 May 2019
+*  DATE:        08 Aug 2019
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -274,6 +274,8 @@ NTSTATUS ObCopyBoundaryDescriptor(
     ULONG_PTR BoundaryDescriptorAddress;
     OBJECT_BOUNDARY_DESCRIPTOR BoundaryDescriptorHeader, *CopyDescriptor;
 
+    *BoundaryDescriptor = NULL;
+
     BoundaryDescriptorAddress = (ULONG_PTR)RtlOffsetToPointer(
         NamespaceLookupEntry,
         sizeof(OBJECT_NAMESPACE_ENTRY));
@@ -327,8 +329,10 @@ NTSTATUS ObCopyBoundaryDescriptor(
         if (BoundaryDescriptorSize)
             *BoundaryDescriptorSize = TotalSize;
     }
-    else
+    else {
+        supHeapFree(CopyDescriptor);
         return STATUS_DEVICE_NOT_READY;
+    }
 
     return STATUS_SUCCESS;
 }
@@ -389,7 +393,7 @@ NTSTATUS ObEnumerateBoundaryDescriptorEntries(
         if (DataEnd < (ULONG_PTR)BoundaryDescriptor)
             return STATUS_INVALID_PARAMETER;
 
-        CurrentEntry = (OBJECT_BOUNDARY_ENTRY*)RtlOffsetToPointer(BoundaryDescriptor, 
+        CurrentEntry = (OBJECT_BOUNDARY_ENTRY*)RtlOffsetToPointer(BoundaryDescriptor,
             sizeof(OBJECT_BOUNDARY_DESCRIPTOR));
 
         BoundaryDescriptorItems = BoundaryDescriptor->Items;
@@ -2488,10 +2492,12 @@ BOOLEAN kdConnectDriver(
 
         if (NT_SUCCESS(status)) {
             g_kdctx.hDevice = deviceHandle;
+            g_kdctx.drvOpenLoadStatus = ERROR_SUCCESS;
             return TRUE;
         }
         else {
             supEnablePrivilege(SE_DEBUG_PRIVILEGE, FALSE);
+            g_kdctx.drvOpenLoadStatus = ERROR_NOT_CAPABLE;
         }
     }
 
@@ -2953,6 +2959,36 @@ VOID kdInit(
 }
 
 /*
+* kdGetInstructionLength
+*
+* Purpose:
+*
+* Wrapper for hde64_disasm.
+*
+*/
+UCHAR kdGetInstructionLength(
+    _In_ PVOID ptrCode,
+    _Out_ PULONG ptrFlags)
+{
+    hde64s  hs;
+
+    __try {
+
+        hde64_disasm((void*)ptrCode, &hs);
+        if (hs.flags & F_ERROR) {
+            *ptrFlags = hs.flags;
+            return 0;
+        }
+        *ptrFlags = hs.flags;
+        return hs.len;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        DbgPrint("GetInstructionLength exception %lx", GetExceptionCode());
+        return 0;
+    }
+}
+
+/*
 * kdFindCiCallbacks
 *
 * Purpose:
@@ -3034,6 +3070,7 @@ ULONG_PTR kdFindCiCallbacks(
             SignatureSize = sizeof(SeCiCallbacksPattern_17134_17763);
             break;
 
+        case 18362:
         default:
             Signature = SeCiCallbacksPattern_19H1;
             SignatureSize = sizeof(SeCiCallbacksPattern_19H1);
@@ -3113,6 +3150,106 @@ ULONG_PTR kdFindCiCallbacks(
     } while (FALSE);
 
     return Result;
+}
+
+/*
+* kdQueryWin32kApiSetTable
+*
+* Purpose:
+*
+* Locate address of win32k!Win32kApiSetTable structure.
+*
+* N.B.
+* It would be much easier if MS will export this symbol.
+*
+*/
+ULONG_PTR kdQueryWin32kApiSetTable(
+    _In_ HMODULE hWin32k
+)
+{
+    PBYTE	    ptrCode = (PBYTE)hWin32k;
+
+    PVOID       SectionBase, SearchPattern;
+    ULONG       SectionSize = 0, Index, SearchPatternSize = 0;
+
+    ULONG_PTR   Address = 0;
+    LONG        Rel = 0;
+    hde64s      hs;
+
+    __try {
+
+        //
+        // Locate .text image section as required variable is always in .text.
+        //
+        SectionBase = supLookupImageSectionByName(
+            TEXT_SECTION,
+            TEXT_SECTION_LEGNTH,
+            (PVOID)hWin32k,
+            &SectionSize);
+
+        if ((SectionBase == 0) || (SectionSize == 0))
+            return 0;
+
+        Index = 0;
+        ptrCode = (PBYTE)SectionBase;
+
+        do {
+            hde64_disasm((void*)(ptrCode + Index), &hs);
+            if (hs.flags & F_ERROR)
+                break;
+
+            SearchPatternSize = sizeof(Win32kApiSetTableMovPattern);
+            SearchPattern = Win32kApiSetTableMovPattern;
+
+            //
+            // mov r13d, r12d (as per 18936/41)
+            //
+            if (hs.len == 3) {
+
+                if (SearchPatternSize == RtlCompareMemory(&ptrCode[Index],
+                    SearchPattern,
+                    SearchPatternSize))
+                {
+                    Index += hs.len;
+                    hde64_disasm((void*)(ptrCode + Index), &hs);
+                    if (hs.flags & F_ERROR)
+                        break;
+
+                    //
+                    // lea r14, Win32kApiSetTable (as per 18936/41)
+                    //
+                    if (hs.len == 7) {
+
+                        SearchPatternSize = sizeof(Win32kApiSetTableLeaPattern);
+                        SearchPattern = Win32kApiSetTableLeaPattern;
+
+                        if (SearchPatternSize == RtlCompareMemory(&ptrCode[Index],
+                            SearchPattern,
+                            SearchPatternSize))
+                        {
+                            Rel = *(PLONG)(ptrCode + Index + (hs.len - 4));
+                            break;
+                        }
+                    }
+
+                }
+            }
+
+            Index += hs.len;
+
+        } while (Index < SectionSize - 10);
+
+        if (Rel == 0)
+            return 0;
+
+        Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
+
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        DbgPrint("kdQueryWin32kApiSetTable ex %lx", GetExceptionCode());
+    }
+
+    return Address;
 }
 
 /*

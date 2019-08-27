@@ -1,3 +1,10 @@
+v1.8.0
+improved run as localsystem feature
+added plugin subsystem
+added example plugin
+added Sonar plugin - NDIS protocols viewer
+added ApiSetView plugin - ApiSetSchema viewer (supported v2, v4, v6)
+
 v1.7.4
 added software licensing cache view (extras)
 resolve apisets while viewing shadow table in Windows 10 20H1 >= 18890 builds

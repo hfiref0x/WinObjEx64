@@ -4,9 +4,9 @@
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.80
+*  VERSION:     1.81
 *
-*  DATE:        22 June 2019
+*  DATE:        08 Oct 2019
 *
 *  Common header file for the user interface.
 *
@@ -33,7 +33,7 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
     _In_ DWORD_PTR dwData
     );
 
-#define PROGRAM_VERSION         L"1.8.0"
+#define PROGRAM_VERSION         L"1.8.1"
 #ifdef _USE_OWN_DRIVER
 #define PROGRAM_NAME            L"Windows Object Explorer 64-bit (Non-public version)"
 #else 

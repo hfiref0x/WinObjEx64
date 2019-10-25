@@ -1,3 +1,7 @@
+v1.8.1
+19H2 support
+Preliminary 20H1 support
+
 v1.8.0
 improved run as localsystem feature
 added plugin subsystem

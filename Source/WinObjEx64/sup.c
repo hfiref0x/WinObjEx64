@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.80
+*  VERSION:     1.81
 *
-*  DATE:        16 July 2019
+*  DATE:        09 Oct 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1806,14 +1806,15 @@ BOOL supQueryProcessNameByEPROCESS(
 
     List.ListRef = (PBYTE)ProcessList;
 
-    ProcessListCount = 0;
-    NextEntryDelta = 0;
+    ProcessListCount = 0;   
 
     //
     // Build process handle list.
     //
     SavedProcessList = (OBEX_PROCESS_LOOKUP_ENTRY*)supHeapAlloc(NumberOfProcesses * sizeof(OBEX_PROCESS_LOOKUP_ENTRY));
     if (SavedProcessList) {
+
+        NextEntryDelta = 0;
 
         do {
             List.ListRef += NextEntryDelta;

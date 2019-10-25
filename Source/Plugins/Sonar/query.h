@@ -4,9 +4,9 @@
 *
 *  TITLE:       QUERY.H
 *
-*  VERSION:     1.00
+*  VERSION:     1.01
 *
-*  DATE:        11 Aug 2019
+*  DATE:        28 Sep 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -24,7 +24,7 @@ typedef struct _PROTOCOL_BLOCK_VERSIONS {
             NDIS_PROTOCOL_BLOCK_9200 *v2;
             NDIS_PROTOCOL_BLOCK_9600_17134 *v3;
             NDIS_PROTOCOL_BLOCK_17763 *v4;
-            NDIS_PROTOCOL_BLOCK_18362 *v5;
+            NDIS_PROTOCOL_BLOCK_18362_18363 *v5;
         } Versions;
         PVOID Ref;
     } u1;
@@ -44,8 +44,8 @@ typedef struct _OPEN_BLOCK_VERSIONS {
                 NDIS_OPEN_BLOCK_14393_17134 *v4;
             } u_v4;
             union {
-                NDIS_COMMON_OPEN_BLOCK_17763_18362 *v5c;
-                NDIS_OPEN_BLOCK_17763_18362 *v5;
+                NDIS_COMMON_OPEN_BLOCK_17763_18363 *v5c;
+                NDIS_OPEN_BLOCK_17763_18363 *v5;
             } u_v5;
         } Versions;
         PVOID Ref;

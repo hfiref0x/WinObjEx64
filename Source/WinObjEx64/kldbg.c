@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.80
+*  VERSION:     1.81
 *
-*  DATE:        08 Aug 2019
+*  DATE:        09 Oct 2019
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -3071,6 +3071,7 @@ ULONG_PTR kdFindCiCallbacks(
             break;
 
         case 18362:
+        case 18363:
         default:
             Signature = SeCiCallbacksPattern_19H1;
             SignatureSize = sizeof(SeCiCallbacksPattern_19H1);
@@ -3202,13 +3203,16 @@ ULONG_PTR kdQueryWin32kApiSetTable(
             SearchPattern = Win32kApiSetTableMovPattern;
 
             //
-            // mov r13d, r12d (as per 18936/41)
+            // Locate MOV pattern.
             //
             if (hs.len == 3) {
 
+                SearchPatternSize = sizeof(Win32kApiSetTableMovPattern);
+                SearchPattern = Win32kApiSetTableMovPattern;
+
                 if (SearchPatternSize == RtlCompareMemory(&ptrCode[Index],
                     SearchPattern,
-                    SearchPatternSize))
+                    SearchPatternSize)) 
                 {
                     Index += hs.len;
                     hde64_disasm((void*)(ptrCode + Index), &hs);
@@ -3216,7 +3220,7 @@ ULONG_PTR kdQueryWin32kApiSetTable(
                         break;
 
                     //
-                    // lea r14, Win32kApiSetTable (as per 18936/41)
+                    // lea reg, Win32kApiSetTable
                     //
                     if (hs.len == 7) {
 

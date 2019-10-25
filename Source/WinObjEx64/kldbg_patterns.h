@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG_PATTERNS.H
 *
-*  VERSION:     1.80
+*  VERSION:     1.81
 *
-*  DATE:        20 July 2019
+*  DATE:        18 Oct 2019
 *
 *  Header with search patterns used by KLDBG.
 *
@@ -22,13 +22,13 @@
 //
 // Win32kApiSetTable signatures
 //
-// 18936+
+// 18995
 BYTE Win32kApiSetTableMovPattern[] = {
-    0x45, 0x8B, 0xEC
+    0x49, 0x8B, 0xFE
 };
 
 BYTE Win32kApiSetTableLeaPattern[] = {
-    0x4C, 0x8D, 0x35
+    0x4C, 0x8D, 0x2D
 };
 
 //

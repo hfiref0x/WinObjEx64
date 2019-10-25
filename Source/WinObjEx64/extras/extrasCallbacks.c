@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASCALLBACKS.C
 *
-*  VERSION:     1.80
+*  VERSION:     1.81
 *
-*  DATE:        08 Aug 2019
+*  DATE:        20 Sep 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -188,8 +188,8 @@ static const BYTE CiCallbackIndexes_Win10RS3[CI_CALLBACK_NAMES_W10RS3_COUNT] = {
     22  //CiGetBuildExpiryTime
 };
 
-#define CI_CALLBACK_NAMES_W10RS4_19H1_COUNT 24
-static const BYTE CiCallbackIndexes_Win10RS4_19H1[CI_CALLBACK_NAMES_W10RS4_19H1_COUNT] = { //Windows 10 RS4/RS5/19H1
+#define CI_CALLBACK_NAMES_W10RS4_19H2_COUNT 24
+static const BYTE CiCallbackIndexes_Win10RS4_19H2[CI_CALLBACK_NAMES_W10RS4_19H2_COUNT] = { //Windows 10 RS4/RS5/19H1/19H2
     0,  //CiSetFileCache
     1,  //CiGetFileCache
     2,  //CiQueryInformation
@@ -272,9 +272,10 @@ LPWSTR GetCiRoutineNameFromIndex(
     case 17134:
     case 17763:
     case 18362:
+    case 18363:
     default:
-        Indexes = CiCallbackIndexes_Win10RS4_19H1;
-        ArrayCount = CI_CALLBACK_NAMES_W10RS4_19H1_COUNT;
+        Indexes = CiCallbackIndexes_Win10RS4_19H2;
+        ArrayCount = CI_CALLBACK_NAMES_W10RS4_19H2_COUNT;
         break;
     }
 

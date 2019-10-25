@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.H
 *
-*  VERSION:     1.00
+*  VERSION:     1.03
 *
-*  DATE:        11 Aug 2019
+*  DATE:        10 Oct 2019
 *
 *  WinObjEx64 Sonar plugin.
 *
@@ -23,6 +23,8 @@ HINSTANCE g_ThisDLL;
 BOOL g_PluginQuit = FALSE;
 
 int  y_splitter_pos = 300, y_capture_pos = 0, y_splitter_max = 0;
+
+#define SONAR_MAX_TESTED_BUILD 18999
 
 //
 // Sonar gui context.
@@ -1246,6 +1248,12 @@ DWORD WINAPI PluginThread(
         g_ctx.AccTable = LoadAccelerators(g_ctx.ParamBlock.hInstance, MAKEINTRESOURCE(WINOBJEX64_ACC_TABLE));
 
         OnResize(MainWindow);
+
+        if (g_ctx.ParamBlock.osver.dwBuildNumber > SONAR_MAX_TESTED_BUILD) {
+            MessageBox(MainWindow, 
+                TEXT("Current Windows build is untested, this plugin may output wrong data."),
+                TEXT("Sonar"), MB_ICONINFORMATION);
+        }
 
         ListProtocols(FALSE);
 

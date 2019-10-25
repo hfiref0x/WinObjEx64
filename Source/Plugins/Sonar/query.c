@@ -4,9 +4,9 @@
 *
 *  TITLE:       QUERY.C
 *
-*  VERSION:     1.00
+*  VERSION:     1.02
 *
-*  DATE:        11 Aug 2019
+*  DATE:        08 Oct 2019
 *
 *  Query NDIS specific data.
 *
@@ -44,9 +44,9 @@ NdisDeregisterProtocol
 48 8B 3D 9A AF F8 FF                                            mov     rdi, cs:ndisProtocolList
 17763
 48 8B 3D C4 7F F8 FF                                            mov     rdi, cs:ndisProtocolList
-18362
+18362/18363
 48 8B 3D A2 CE FA FF                                            mov     rdi, cs:ndisProtocolList
-18912
+18995
 48 8B 3D BA 92 FA FF                                            mov     rdi, cs:ndisProtocolList
 
 */
@@ -280,8 +280,9 @@ PVOID DumpProtocolBlockVersionAware(
         ObjectVersion = 4;
         break;
     case 18362:
+    case 18363:
     default:
-        ObjectSize = sizeof(NDIS_PROTOCOL_BLOCK_18362);
+        ObjectSize = sizeof(NDIS_PROTOCOL_BLOCK_18362_18363);
         ObjectVersion = 5;
         break;
 
@@ -341,8 +342,9 @@ PVOID DumpOpenBlockVersionAware(
         break;
     case 17763:
     case 18362:
+    case 18363:
     default:
-        ObjectSize = sizeof(NDIS_OPEN_BLOCK_17763_18362);
+        ObjectSize = sizeof(NDIS_OPEN_BLOCK_17763_18363);
         ObjectVersion = 5;
         break;
     }
@@ -457,12 +459,11 @@ ULONG GetNextProtocolOffset(
         Offset = FIELD_OFFSET(NDIS_PROTOCOL_BLOCK_17763, NextProtocol);
         break;
     case 18362:
-        Offset = FIELD_OFFSET(NDIS_PROTOCOL_BLOCK_18362, NextProtocol);
+    case 18363:
+    default:
+        Offset = FIELD_OFFSET(NDIS_PROTOCOL_BLOCK_18362_18363, NextProtocol);
         break;
 
-    default:
-        Offset = 0;
-        break;
     }
 
     return Offset;
@@ -1036,7 +1037,7 @@ BOOL CreateCompatibleOpenBlock(
         OpenBlock->Handlers.WTransferDataHandler = BlockRef->u1.Versions.u_v4.v4c->WTransferDataHandler;
         break;
 
-    case 5: //17763..18362
+    case 5: //17763..18363
         OpenBlock->ProtocolNextOpen = BlockRef->u1.Versions.u_v5.v5c->ProtocolNextOpen;
         OpenBlock->BindDeviceName = BlockRef->u1.Versions.u_v5.v5c->BindDeviceName;
         OpenBlock->RootDeviceName = BlockRef->u1.Versions.u_v5.v5c->RootDeviceName;

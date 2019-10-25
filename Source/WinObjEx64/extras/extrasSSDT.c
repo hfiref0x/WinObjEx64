@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     1.80
+*  VERSION:     1.81
 *
-*  DATE:        02 Aug 2019
+*  DATE:        18 Oct 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -720,11 +720,16 @@ BOOLEAN ApiSetResolveWin32kTableEntry(
 
     *ResolvedEntry = NULL;
 
+    //
+    // Lookup entry in table.
+    //
     __try {
         while (Entry->Host) {
-
             EntriesCount = Entry->Host->HostEntriesCount;
             ArrayPtr = (PULONG_PTR)Entry->HostEntriesArray;
+            //
+            // Search inside table host entry array.
+            //
             while (EntriesCount) {
 
                 EntryValue = (ULONG_PTR)ArrayPtr;
@@ -742,6 +747,9 @@ BOOLEAN ApiSetResolveWin32kTableEntry(
         }
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {
+        //
+        // Should never be here. Only in case if table structure changed or ApiSetTable address points to invalid data.
+        //
         DbgPrint("Win32kApiSet list exception %lx\r\n", GetExceptionCode());
         return FALSE;
     }
@@ -992,6 +1000,7 @@ VOID SdtListTableShadow(
     WCHAR szBuffer[MAX_PATH * 2];
     CHAR szForwarderModuleName[MAX_PATH];
 
+
 #ifndef _DEBUG
     HWND hwndBanner;
 
@@ -1067,6 +1076,12 @@ VOID SdtListTableShadow(
                 // Locate Win32kApiSetTable variable. Failure will result in unresolved apiset adapters.
                 //
                 Win32kApiSetTable = kdQueryWin32kApiSetTable(w32k);
+                if (Win32kApiSetTable == 0) {
+                    MessageBox(hwndDlg, 
+                        TEXT("Win32kApiSetTable was not found, win32k adapters targets will not be determinated."), 
+                        NULL, 
+                        MB_ICONINFORMATION);
+                }
             }
 
             //

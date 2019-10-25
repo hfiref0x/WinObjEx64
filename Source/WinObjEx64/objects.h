@@ -4,9 +4,9 @@
 *
 *  TITLE:       OBJECTS.H
 *
-*  VERSION:     1.73
+*  VERSION:     1.81
 *
-*  DATE:        18 Mar 2019
+*  DATE:        10 Oct 2019
 *
 *  Header file for internal Windows object types handling.
 *
@@ -71,16 +71,17 @@ typedef enum _WOBJ_OBJECT_TYPE {
     ObjectTypeDxgkSharedSwapChain = 44,
     ObjectTypeDxgkSharedSyncObject = 45,
     ObjectTypeDxgkCurrentDxgProcessObject = 46,
-    ObjectTypeDxgkDisplayManager = 47,
-    ObjectTypeDxgkSharedBundle = 48,
-    ObjectTypeDxgkSharedProtectedSession = 49,
-    ObjectTypeDxgkComposition = 50,
-    ObjectTypeDxgkSharedKeyedMutex = 51,
-    ObjectTypeMemoryPartition = 52,
-    ObjectTypeRegistryTransaction = 53,
-    ObjectTypeDmaAdapter = 54,
-    ObjectTypeDmaDomain = 55,
-    ObjectTypeUnknown = 56,
+    ObjectTypeDxgkCurrentDxgThreadObject = 47,
+    ObjectTypeDxgkDisplayManager = 48,
+    ObjectTypeDxgkSharedBundle = 49,
+    ObjectTypeDxgkSharedProtectedSession = 50,
+    ObjectTypeDxgkComposition = 51,
+    ObjectTypeDxgkSharedKeyedMutex = 52,
+    ObjectTypeMemoryPartition = 53,
+    ObjectTypeRegistryTransaction = 54,
+    ObjectTypeDmaAdapter = 55,
+    ObjectTypeDmaDomain = 56,
+    ObjectTypeUnknown = 57,
     ObjectTypeMax
 } WOBJ_OBJECT_TYPE;
 
@@ -130,6 +131,7 @@ static WOBJ_TYPE_DESC g_ObjectTypes[] = {
     { OBTYPE_NAME_DRIVER, ObjectTypeDriver, IDI_ICON_DRIVER, IDS_DESC_DRIVER },
     { L"DxgkCompositionObject", ObjectTypeDxgkComposition, IDI_ICON_DXOBJECT, IDS_DESC_DXGK_COMPOSITION_OBJECT },
     { L"DxgkCurrentDxgProcessObject", ObjectTypeDxgkCurrentDxgProcessObject, IDI_ICON_DXOBJECT, IDS_DESC_DXGK_CURRENT_DXG_PROCESS_OBJECT },
+    { L"DxgkCurrentDxgThreadObject", ObjectTypeDxgkCurrentDxgThreadObject, IDI_ICON_DXOBJECT, IDS_DESC_DXGK_CURRENT_DXG_THREAD_OBJECT },
     { L"DxgkDisplayManagerObject", ObjectTypeDxgkDisplayManager, IDI_ICON_DXOBJECT, IDS_DESC_DXGK_DISPLAY_MANAGER_OBJECT },
     { L"DxgkSharedBundleObject", ObjectTypeDxgkSharedBundle, IDI_ICON_DXOBJECT, IDS_DESC_DXGK_SHARED_BUNDLE_OBJECT },
     { L"DxgkSharedKeyedMutexObject", ObjectTypeDxgkSharedKeyedMutex, IDI_ICON_DXOBJECT, IDS_DESC_DXGK_SHARED_KEYED_MUTEX_OBJECT},

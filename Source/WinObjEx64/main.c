@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.80
+*  VERSION:     1.82
 *
-*  DATE:        29 June 2019
+*  DATE:        23 Nov 2019
 *
 *  Program entry point and main window handler.
 *
@@ -156,11 +156,18 @@ VOID MainWindowHandleObjectTreeProp(
     _In_ HWND hwnd
 )
 {
-    TV_ITEM tvi;
-    WCHAR   szBuffer[MAX_PATH + 1];
+    TV_ITEM                     tvi;
+    PROP_DIALOG_CREATE_SETTINGS propSettings;
 
-    if (g_PropWindow != NULL)
+    WCHAR                       szBuffer[MAX_PATH + 1];
+
+    //
+    // Only one object properties dialog at the same time allowed.
+    //
+    if (g_PropWindow != NULL) {
+        SetActiveWindow(g_PropWindow);
         return;
+    }
 
     if (SelectedTreeItem == NULL)
         return;
@@ -176,13 +183,12 @@ VOID MainWindowHandleObjectTreeProp(
     tvi.hItem = SelectedTreeItem;
     if (TreeView_GetItem(g_hwndObjectTree, &tvi)) {
 
-        propCreateDialog(
-            hwnd,
-            szBuffer,
-            OBTYPE_NAME_DIRECTORY,
-            NULL,
-            NULL,
-            NULL);
+        RtlSecureZeroMemory(&propSettings, sizeof(propSettings));
+        propSettings.hwndParent = hwnd;
+        propSettings.lpObjectName = szBuffer;
+        propSettings.lpObjectType = OBTYPE_NAME_DIRECTORY;
+
+        propCreateDialog(&propSettings);
     }
 }
 
@@ -200,6 +206,8 @@ VOID MainWindowHandleObjectListProp(
 {
     INT     nSelected;
     LPWSTR  lpItemText, lpType, lpDesc = NULL;
+
+    PROP_DIALOG_CREATE_SETTINGS propSettings;
 
     if (g_PropWindow != NULL)
         return;
@@ -222,13 +230,14 @@ VOID MainWindowHandleObjectListProp(
             //lpDesc is not important, we can work if it NULL
             lpDesc = supGetItemText(g_hwndObjectList, nSelected, 2, NULL);
 
-            propCreateDialog(
-                hwnd,
-                lpItemText,
-                lpType,
-                lpDesc,
-                NULL,
-                NULL);
+            RtlSecureZeroMemory(&propSettings, sizeof(propSettings));
+
+            propSettings.hwndParent = hwnd;
+            propSettings.lpObjectName = lpItemText;
+            propSettings.lpObjectType = lpType;
+            propSettings.lpDescription = lpDesc;
+
+            propCreateDialog(&propSettings);
 
             if (lpDesc) {
                 supHeapFree(lpDesc);
@@ -898,8 +907,8 @@ BOOL MainWindowDlgMsgHandler(
         }
     }
 
-    if (g_SubPropWindow != NULL)
-        if (IsDialogMessage(g_SubPropWindow, &msg))
+    if (g_DesktopPropWindow != NULL)
+        if (IsDialogMessage(g_DesktopPropWindow, &msg))
             return TRUE;
 
     if (g_PropWindow != NULL)
@@ -981,7 +990,7 @@ BOOL WinObjInitGlobals(
         szArglist = CommandLineToArgvW(GetCommandLineW(), &nArgs);
         if (szArglist) {
             if (nArgs > 1) {
-                g_WinObj.EnableExperimentalFeatures = (_strcmpi(szArglist[1], L"-exp") == 0);
+                g_WinObj.UseExperimentalFeatures = (_strcmpi(szArglist[1], L"-exp") == 0);
             }
             LocalFree(szArglist);
         }
@@ -1097,7 +1106,7 @@ UINT WinObjExMain()
         }
 
         if (IsWine != FALSE) {
-            _strcat(szWindowTitle, L" (Wine emulation)");
+            _strcat(szWindowTitle, L" (Wine)");
         }
 
         //

@@ -4,9 +4,9 @@
 *
 *  TITLE:       OBJECTS.H
 *
-*  VERSION:     1.81
+*  VERSION:     1.82
 *
-*  DATE:        10 Oct 2019
+*  DATE:        13 Nov 2019
 *
 *  Header file for internal Windows object types handling.
 *
@@ -97,10 +97,12 @@ typedef struct _WOBJ_TYPE_DESC {
 #define OBTYPE_NAME_DEVICE          L"Device"
 #define OBTYPE_NAME_DRIVER          L"Driver"
 #define OBTYPE_NAME_DIRECTORY       L"Directory"
+#define OBTYPE_NAME_FILE            L"File"
 #define OBTYPE_NAME_PROCESS         L"Process"
 #define OBTYPE_NAME_SECTION         L"Section"
 #define OBTYPE_NAME_SYMBOLIC_LINK   L"SymbolicLink"
 #define OBTYPE_NAME_THREAD          L"Thread"
+#define OBTYPE_NAME_TOKEN           L"Token"
 #define OBTYPE_NAME_TYPE            L"Type"
 #define OBTYPE_NAME_WINSTATION      L"WindowStation"
 #define OBTYPE_NAME_UNKNOWN         L""
@@ -144,7 +146,7 @@ static WOBJ_TYPE_DESC g_ObjectTypes[] = {
     // { L"EtwSessionDemuxEntry", ObjectTypeEtwSessionDemuxEntry, IDI_ICON_ETWSESSIONDEMUXENTRY, IDS_DESC_ETWSESSIONDEMUXENTRY },
     { L"Event", ObjectTypeEvent, IDI_ICON_EVENT, IDS_DESC_EVENT },
     { L"EventPair", ObjectTypeEventPair, IDI_ICON_EVENTPAIR, IDS_DESC_EVENTPAIR },
-    { L"File", ObjectTypeFile, IDI_ICON_FILE, IDS_DESC_FILE },
+    { OBTYPE_NAME_FILE, ObjectTypeFile, IDI_ICON_FILE, IDS_DESC_FILE },
     { L"FilterCommunicationPort", ObjectTypeFltComnPort, IDI_ICON_FLTCOMMPORT, IDS_DESC_FLT_COMM_PORT },
     { L"FilterConnectionPort", ObjectTypeFltConnPort, IDI_ICON_FLTCONNPORT, IDS_DESC_FLT_CONN_PORT },
     { L"IoCompletion", ObjectTypeIoCompletion, IDI_ICON_IOCOMPLETION, IDS_DESC_IOCOMPLETION },
@@ -174,7 +176,7 @@ static WOBJ_TYPE_DESC g_ObjectTypes[] = {
     { L"TmRm", ObjectTypeTmRm, IDI_ICON_TMRM, IDS_DESC_TMRM },
     { L"TmTm", ObjectTypeTmTm, IDI_ICON_TMTM, IDS_DESC_TMTM },
     { L"TmTx", ObjectTypeTmTx, IDI_ICON_TMTX, IDS_DESC_TMTX },
-    { L"Token", ObjectTypeToken, IDI_ICON_TOKEN, IDS_DESC_TOKEN },
+    { OBTYPE_NAME_TOKEN, ObjectTypeToken, IDI_ICON_TOKEN, IDS_DESC_TOKEN },
     { L"TpWorkerFactory", ObjectTypeTpWorkerFactory, IDI_ICON_TPWORKERFACTORY,IDS_DESC_TPWORKERFACTORY },
     { OBTYPE_NAME_TYPE, ObjectTypeType, IDI_ICON_TYPE, IDS_DESC_TYPE },
     //{ L"UserApcReserve", ObjectTypeUserApcReserve, IDI_ICON_USERAPCRESERVE, IDS_DESC_USERAPCRESERVE },

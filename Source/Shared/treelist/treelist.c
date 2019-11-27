@@ -4,9 +4,9 @@
 *
 *  TITLE:       TREELIST.C
 *
-*  VERSION:     1.28
+*  VERSION:     1.29
 *
-*  DATE:        15 May 2019
+*  DATE:        24 Nov 2019
 *
 *  TreeList control.
 *
@@ -135,7 +135,6 @@ LRESULT TreeListCustomDraw(
     HBRUSH          brush;
     HPEN            pen;
     RECT            hr, ir, subr;
-    SIZE            tsz;
     LONG            i, ColumnCount, cx;
     PTL_SUBITEMS    subitem;
     HGDIOBJ         prev;
@@ -199,28 +198,33 @@ LRESULT TreeListCustomDraw(
 
     if (item.cChildren == 1) // msdn: The item has one or more child items.
     {
-        RtlSecureZeroMemory(&tsz, sizeof(tsz));
-        if (GetThemePartSize(tl_theme, pdraw->nmcd.hdc, TVP_GLYPH, GLPS_CLOSED, NULL, TS_TRUE, &tsz) != S_OK) {
-            tsz.cx = 8;
-            tsz.cy = 8;
-        }
-
-        subr.top = ir.top + (((ir.bottom - ir.top) - tsz.cy) / 2);
-        subr.bottom = subr.top + tsz.cy;
-        subr.left = ir.left - tsz.cx - 3;
+        subr.top = ir.top;
+        subr.bottom = subr.top + ir.bottom - ir.top;
+        subr.left = ir.left - (ir.bottom - ir.top);
 
         if (ImgList != NULL)
             subr.left -= 38;
 
-        subr.right = ir.left - 3;
+        subr.right = ir.left;
 
-        if ((item.state & TVIS_EXPANDED) == 0)
-            i = GLPS_CLOSED;
-        else
-            i = GLPS_OPENED;
-
-        FillRect(pdraw->nmcd.hdc, &subr, WHITE_BRUSH);
-        DrawThemeBackground(tl_theme, pdraw->nmcd.hdc, TVP_GLYPH, i, &subr, NULL);
+        FillRect(pdraw->nmcd.hdc, &subr, (HBRUSH)WHITE_BRUSH);
+        if (S_OK != DrawThemeBackground(tl_theme, pdraw->nmcd.hdc, TVP_GLYPH, item.state & TVIS_EXPANDED ? GLPS_OPENED : GLPS_CLOSED, &subr, NULL))
+        {
+            if ((item.state & TVIS_EXPANDED) == 0)
+            {
+                MoveToEx(pdraw->nmcd.hdc, subr.left + 4, subr.top + 4, NULL);
+                LineTo(pdraw->nmcd.hdc, subr.left + 9, subr.top + 9);
+                LineTo(pdraw->nmcd.hdc, subr.left + 4, subr.top + 14);
+                LineTo(pdraw->nmcd.hdc, subr.left + 4, subr.top + 4);
+            }
+            else
+            {
+                MoveToEx(pdraw->nmcd.hdc, subr.left + 2, subr.top + 6, NULL);
+                LineTo(pdraw->nmcd.hdc, subr.left + 7, subr.top + 11);
+                LineTo(pdraw->nmcd.hdc, subr.left + 12, subr.top + 6);
+                LineTo(pdraw->nmcd.hdc, subr.left + 2, subr.top + 6);
+            }
+        }
     }
 
     cx = 0;

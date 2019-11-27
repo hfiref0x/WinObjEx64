@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.80
+*  VERSION:     1.82
 *
-*  DATE:        29 June 2019
+*  DATE:        11 Nov 2019
 *
 *  Common header file for the program support routines.
 *
@@ -619,3 +619,22 @@ VOID supShowNtStatus(
     _In_ HWND hWnd,
     _In_ LPWSTR lpText,
     _In_ NTSTATUS Status);
+
+UINT supGetDPIValue(
+    _In_opt_ HWND hWnd);
+
+BOOLEAN supLoadIconForObjectType(
+    _In_ HWND hwndDlg,
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ HIMAGELIST ImageList,
+    _In_ BOOLEAN IsShadow);
+
+VOID supDestroyIconForObjectType(
+    _In_ PROP_OBJECT_INFO *Context);
+
+NTSTATUS supOpenTokenByParam(
+    _In_ CLIENT_ID *ClientId,
+    _In_ OBJECT_ATTRIBUTES *ObjectAttributes,
+    _In_ ACCESS_MASK TokenDesiredAccess,
+    _In_ BOOL IsThreadToken,
+    _Out_ PHANDLE TokenHandle);

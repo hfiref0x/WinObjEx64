@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
-*  VERSION:     1.74
+*  VERSION:     1.82
 *
-*  DATE:        17 May 2019
+*  DATE:        18 Nov 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -222,7 +222,7 @@ VOID DrvListDrivers(
 )
 {
     INT    index, iImage;
-    ULONG  i, c;
+    ULONG  i;
     LVITEM lvitem;
     WCHAR  szBuffer[MAX_PATH + 1];
 
@@ -239,9 +239,7 @@ VOID DrvListDrivers(
 
         iImage = ObManagerGetImageIndexByTypeIndex(ObjectTypeDriver);
 
-        c = pModulesList->NumberOfModules;
-
-        for (i = 0; i < c; i++) {
+        for (i = 0; i < pModulesList->NumberOfModules; i++) {
 
             pModule = &pModulesList->Modules[i];
 
@@ -254,7 +252,7 @@ VOID DrvListDrivers(
             lvitem.mask = LVIF_TEXT | LVIF_IMAGE;
             lvitem.iItem = MAXINT;
             lvitem.iImage = iImage;
-            RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+            szBuffer[0] = 0;
             ultostr(pModule->LoadOrderIndex, szBuffer);
             lvitem.pszText = szBuffer;
             index = ListView_InsertItem(DrvDlgContext.ListView, &lvitem);
@@ -276,15 +274,15 @@ VOID DrvListDrivers(
             ListView_SetItem(DrvDlgContext.ListView, &lvitem);
 
             //Address
-            RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
             szBuffer[0] = L'0';
             szBuffer[1] = L'x';
+            szBuffer[2] = 0;
             u64tohex((ULONG_PTR)pModule->ImageBase, &szBuffer[2]);
             lvitem.iSubItem++;
             ListView_SetItem(DrvDlgContext.ListView, &lvitem);
 
             //Size
-            RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+            szBuffer[0] = 0;
             ultostr(pModule->ImageSize, szBuffer);
             lvitem.iSubItem++;
             ListView_SetItem(DrvDlgContext.ListView, &lvitem);
@@ -308,7 +306,7 @@ VOID DrvListDrivers(
         // Update status bar.
         //
         _strcpy(szBuffer, TEXT("Total: "));
-        ultostr(c, _strend(szBuffer));
+        ultostr(ListView_GetItemCount(DrvDlgContext.ListView), _strend(szBuffer));
         SetWindowText(DrvDlgContext.StatusBar, szBuffer);
 
     } while (FALSE);

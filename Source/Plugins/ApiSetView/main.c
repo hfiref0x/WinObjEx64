@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.H
 *
-*  VERSION:     1.00
+*  VERSION:     1.01
 *
-*  DATE:        09 Aug 2019
+*  DATE:        15 Nov 2019
 *
 *  WinObjEx64 ApiSetView plugin.
 *
@@ -234,14 +234,28 @@ BOOL InitTreeList(
     HDITEM   hdritem;
     RECT     rc;
 
+    UINT uDpi;
+    INT dpiScaledX, dpiScaledY, iScaledWidth, iScaledHeight, iScaleSubX, iScaleSubY;
+
     if (pTreeListHwnd == NULL) {
         return FALSE;
     }
 
-    GetClientRect(hwndParent, &rc);
+    uDpi = g_ctx.ParamBlock.uiGetDPIValue(NULL);
+    dpiScaledX = MulDiv(10, uDpi, DefaultSystemDpi);
+    dpiScaledY = dpiScaledX;
+
+    GetWindowRect(hwndParent, &rc);
+
+    iScaleSubX = MulDiv(24, uDpi, DefaultSystemDpi);
+    iScaleSubY = MulDiv(200, uDpi, DefaultSystemDpi);
+    iScaledWidth = (rc.right - rc.left) - dpiScaledX - iScaleSubX;
+    iScaledHeight = (rc.bottom - rc.top) - dpiScaledY - iScaleSubY;
+
     TreeList = CreateWindowEx(WS_EX_CLIENTEDGE, WC_TREELIST, NULL,
-        WS_VISIBLE | WS_CHILD | WS_TABSTOP | TLSTYLE_COLAUTOEXPAND | TLSTYLE_LINKLINES, 10, 10,
-        rc.right - 20, rc.bottom - 180, hwndParent, NULL, NULL, NULL);
+        WS_VISIBLE | WS_CHILD | WS_TABSTOP | TLSTYLE_COLAUTOEXPAND | TLSTYLE_LINKLINES, 
+        dpiScaledX, dpiScaledY,
+        iScaledWidth, iScaledHeight, hwndParent, NULL, NULL, NULL);
 
     if (TreeList == NULL) {
         *pTreeListHwnd = NULL;

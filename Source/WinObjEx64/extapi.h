@@ -4,11 +4,11 @@
 *
 *  TITLE:       EXTAPI.H
 *
-*  VERSION:     1.73
+*  VERSION:     1.82
 *
-*  DATE:        30 Mar 2019
+*  DATE:        02 Nov 2019
 *
-*  Header for Windows 7 missing API and experimental features declaration.
+*  Header for pre Windows10 missing API and experimental features declaration.
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -41,13 +41,29 @@ typedef HWINSTA(NTAPI* pfnNtUserOpenWindowStation)(
     _In_ ACCESS_MASK DesiredAccess
     );
 
-#define EXTAPI_ALL_MAPPED 3
+typedef DPI_AWARENESS_CONTEXT (WINAPI *pfnGetThreadDpiAwarenessContext)(
+    VOID);
+
+typedef DPI_AWARENESS (WINAPI *pfnGetAwarenessFromDpiAwarenessContext)(
+    _In_ DPI_AWARENESS_CONTEXT value);
+
+typedef UINT (WINAPI *pfnGetDpiForWindow)(
+    _In_ HWND hwnd);
+
+typedef UINT (WINAPI *pfnGetDpiForSystem)(
+    VOID);
+
+#define EXTAPI_ALL_MAPPED 7
 
 typedef struct _EXTENDED_API_SET {
     ULONG NumberOfAPI;
     pfnNtOpenPartition NtOpenPartition;
     pfnNtUserOpenWindowStation NtUserOpenWindowStation;
     pfnIsImmersiveProcess IsImmersiveProcess;
+    pfnGetThreadDpiAwarenessContext GetThreadDpiAwarenessContext;
+    pfnGetAwarenessFromDpiAwarenessContext GetAwarenessFromDpiAwarenessContext;
+    pfnGetDpiForWindow GetDpiForWindow;
+    pfnGetDpiForSystem GetDpiForSystem;
 } EXTENDED_API_SET, *PEXTENDED_API_SET;
 
 NTSTATUS ExApiSetInit(

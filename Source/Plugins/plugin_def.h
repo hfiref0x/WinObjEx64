@@ -4,9 +4,9 @@
 *
 *  TITLE:       PLUGIN_DEF.H
 *
-*  VERSION:     1.00
+*  VERSION:     1.01
 *
-*  DATE:        08 Aug 2019
+*  DATE:        02 Nov 2019
 *
 *  Common header file for the plugin subsystem definitions.
 *
@@ -86,6 +86,9 @@ typedef VOID(*pfnuiShowFileProperties)(
     _In_ HWND hwndDlg,
     _In_ LPWSTR lpFileName);
 
+typedef UINT(*pfnuiGetDPIValue)(
+    _In_opt_ HWND hWnd);
+
 typedef struct _WINOBJEX_PARAM_BLOCK {
     HWND ParentWindow;
     HINSTANCE hInstance;
@@ -107,6 +110,7 @@ typedef struct _WINOBJEX_PARAM_BLOCK {
     pfnuiCopyTreeListSubItemValue uiCopyTreeListSubItemValue;
     pfnuiCopyListViewSubItemValue uiCopyListViewSubItemValue;
     pfnuiShowFileProperties uiShowFileProperties;
+    pfnuiGetDPIValue uiGetDPIValue;
 
 } WINOBJEX_PARAM_BLOCK, *PWINOBJEX_PARAM_BLOCK;
 

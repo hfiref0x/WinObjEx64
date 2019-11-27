@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.81
+*  VERSION:     1.82
 *
-*  DATE:        09 Oct 2019
+*  DATE:        24 Nov 2019
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -1314,7 +1314,7 @@ BOOL ObGetDirectoryObjectAddress(
         return bFound;
 
     if (lpDirectory == NULL) {
-        lpTarget = L"\\";
+        lpTarget = KM_OBJECTS_ROOT_DIRECTORY;
     }
     else {
         lpTarget = lpDirectory;
@@ -1569,7 +1569,7 @@ POBJINFO ObpWalkDirectory(
         //
         // Check if root special case.
         //
-        if (_strcmpi(lpObjectToFind, L"\\") == 0) {
+        if (_strcmpi(lpObjectToFind, KM_OBJECTS_ROOT_DIRECTORY) == 0) {
 
             return ObpCopyObjectBasicInfo(
                 DirectoryAddress,
@@ -2286,7 +2286,7 @@ BOOL ObCollectionCreate(
                     TRUE,
                     &Collection->ListHead,
                     Collection->Heap,
-                    L"\\",
+                    KM_OBJECTS_ROOT_DIRECTORY,
                     g_kdctx.DirectoryRootAddress,
                     g_kdctx.DirectoryTypeIndex);
 
@@ -2567,8 +2567,13 @@ BOOL kdIsDebugBoot(
     SYSTEM_KERNEL_DEBUGGER_INFORMATION kdInfo;
 
     RtlSecureZeroMemory(&kdInfo, sizeof(kdInfo));
-    NtQuerySystemInformation(SystemKernelDebuggerInformation, &kdInfo, sizeof(kdInfo), &rl);
-    return kdInfo.KernelDebuggerEnabled;
+    if (NT_SUCCESS(NtQuerySystemInformation(SystemKernelDebuggerInformation,
+        &kdInfo, sizeof(kdInfo), &rl)))
+    {
+        return kdInfo.KernelDebuggerEnabled;
+    }
+
+    return FALSE;
 }
 
 /*
@@ -2989,171 +2994,6 @@ UCHAR kdGetInstructionLength(
 }
 
 /*
-* kdFindCiCallbacks
-*
-* Purpose:
-*
-* Locate address of ntoskrnl g_CiCallbacks/SeCiCallbacks structure.
-*
-*/
-ULONG_PTR kdFindCiCallbacks(
-    _In_ PKLDBGCONTEXT Context
-)
-{
-    ULONG_PTR Address = 0, Result = 0;
-
-    PBYTE   Signature = NULL, ptrCode = NULL, InstructionMatchPattern = NULL;
-    ULONG   SignatureSize = 0, InstructionMatchLength;
-    ULONG   InstructionExactMatchLength;
-
-    PVOID   SectionBase;
-    ULONG   SectionSize = 0, Index;
-
-    LONG    Rel = 0;
-    hde64s  hs;
-
-    ULONG_PTR NtOsBase = (ULONG_PTR)Context->NtOsBase;
-    HMODULE hNtOs = (HMODULE)Context->NtOsImageMap;
-
-    do {
-        //
-        // Locate PAGE image section as required variable is always in PAGE.
-        //
-        SectionBase = supLookupImageSectionByName(
-            PAGE_SECTION,
-            PAGE_SECTION_LEGNTH,
-            (PVOID)hNtOs,
-            &SectionSize);
-
-        if ((SectionBase == 0) || (SectionSize == 0))
-            break;
-
-        InstructionMatchPattern = SeCiCallbacksMatchingPattern; //default matching pattern
-        InstructionMatchLength = 7; //lea
-        InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern);
-
-        switch (g_NtBuildNumber) {
-
-        case 7601:
-            Signature = g_CiCallbacksPattern_7601;
-            SignatureSize = sizeof(g_CiCallbacksPattern_7601);
-            InstructionMatchPattern = g_CiCallbacksMatchingPattern;
-            InstructionExactMatchLength = RTL_NUMBER_OF(g_CiCallbacksMatchingPattern);
-            break;
-
-        case 9200:
-        case 9600:
-            Signature = SeCiCallbacksPattern_9200_9600;
-            SignatureSize = sizeof(SeCiCallbacksPattern_9200_9600);
-            break;
-
-        case 10240:
-        case 10586:
-            Signature = SeCiCallbacksPattern_10240_10586;
-            SignatureSize = sizeof(SeCiCallbacksPattern_10240_10586);
-            break;
-
-        case 14393:
-            Signature = SeCiCallbacksPattern_14393;
-            SignatureSize = sizeof(SeCiCallbacksPattern_14393);
-            break;
-
-        case 15063:
-        case 16299:
-            Signature = SeCiCallbacksPattern_15063_16299;
-            SignatureSize = sizeof(SeCiCallbacksPattern_15063_16299);
-            break;
-
-        case 17134:
-        case 17763:
-            Signature = SeCiCallbacksPattern_17134_17763;
-            SignatureSize = sizeof(SeCiCallbacksPattern_17134_17763);
-            break;
-
-        case 18362:
-        case 18363:
-        default:
-            Signature = SeCiCallbacksPattern_19H1;
-            SignatureSize = sizeof(SeCiCallbacksPattern_19H1);
-            InstructionMatchPattern = SeCiCallbacksMatchingPattern_19H1;
-            InstructionMatchLength = 10; //mov
-            InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern_19H1);
-            break;
-        }
-
-        //if ((SignatureSize) && (Signature)) {
-
-        ptrCode = (PBYTE)supFindPattern(
-            (PBYTE)SectionBase,
-            SectionSize,
-            Signature,
-            SignatureSize);
-        //}
-
-        if (ptrCode == NULL)
-            break;
-
-        if (g_NtBuildNumber <= 7601) {
-
-            //
-            // Find reference to g_CiCallbacks in code.
-            //
-
-            Index = 0; //pattern search include target instruction, do not skip
-
-        }
-        else {
-
-            //
-            // Find reference to SeCiCallbacks/g_CiCallbacks in code.
-            //
-
-            Index = SignatureSize; //skip signature instructions
-
-        }
-
-        do {
-            hde64_disasm((void*)(ptrCode + Index), &hs);
-            if (hs.flags & F_ERROR)
-                break;
-            //
-            // mov cs:g_CiCallbacks, rax (for Windows 7)
-            // lea rcx, SeCiCallbacks (for 8/10 TH/RS)
-            // mov cs:SeCiCallbacks (19H1)
-            //
-            if (hs.len == InstructionMatchLength) {
-
-                //
-                // Match block found.
-                //
-                if (RtlCompareMemory((VOID*)&ptrCode[Index], (VOID*)InstructionMatchPattern,
-                    InstructionExactMatchLength) == InstructionExactMatchLength)
-                {
-                    Rel = *(PLONG)(ptrCode + Index + InstructionExactMatchLength);
-                    break;
-                }
-            }
-            Index += hs.len;
-
-        } while (Index < 64);
-
-        if (Rel == 0)
-            break;
-
-        Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-        Address = NtOsBase + Address - (ULONG_PTR)hNtOs;
-
-        if (!kdAddressInNtOsImage((PVOID)Address))
-            break;
-
-        Result = Address;
-
-    } while (FALSE);
-
-    return Result;
-}
-
-/*
 * kdQueryWin32kApiSetTable
 *
 * Purpose:
@@ -3212,7 +3052,7 @@ ULONG_PTR kdQueryWin32kApiSetTable(
 
                 if (SearchPatternSize == RtlCompareMemory(&ptrCode[Index],
                     SearchPattern,
-                    SearchPatternSize)) 
+                    SearchPatternSize))
                 {
                     Index += hs.len;
                     hde64_disasm((void*)(ptrCode + Index), &hs);

@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPPROCESS.C
 *
-*  VERSION:     1.74
+*  VERSION:     1.82
 *
-*  DATE:        03 May 2019
+*  DATE:        18 Nov 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -497,41 +497,52 @@ VOID ProcessListSetInfo(
     }
 
     do {
-        //object info not present
+        //
+        // When object address is unknown, open object and query it address.
+        // These DesiredAccess flag is used to open currently viewed object,
+        // here listed access rights for each object properties dialog 
+        // where "Process" tab included.
+        //
         if (ObjectAddress == 0) {
             switch (Context->TypeIndex) {
-            case ObjectTypeDirectory:
-                DesiredAccess = DIRECTORY_QUERY;
-                break;
-            case ObjectTypeEvent:
-                DesiredAccess = EVENT_QUERY_STATE;
-                break;
-            case ObjectTypeMutant:
-                DesiredAccess = MUTANT_QUERY_STATE;
-                break;
-            case ObjectTypeSemaphore:
-                DesiredAccess = SEMAPHORE_QUERY_STATE;
-                break;
             case ObjectTypeSection:
                 DesiredAccess = SECTION_QUERY;
                 break;
             case ObjectTypeSymbolicLink:
                 DesiredAccess = SYMBOLIC_LINK_QUERY;
                 break;
-            case ObjectTypeTimer:
-                DesiredAccess = TIMER_QUERY_STATE;
+            case ObjectTypeEvent:
+                DesiredAccess = EVENT_QUERY_STATE;
                 break;
             case ObjectTypeJob:
                 DesiredAccess = JOB_OBJECT_QUERY;
                 break;
+            case ObjectTypeMutant:
+                DesiredAccess = MUTANT_QUERY_STATE;
+                break;
+            case ObjectTypeDirectory:
+                DesiredAccess = DIRECTORY_QUERY;
+                break;
             case ObjectTypeWinstation:
                 DesiredAccess = WINSTA_READATTRIBUTES;
+                break;
+            case ObjectTypeSemaphore:
+                DesiredAccess = SEMAPHORE_QUERY_STATE;
+                break;
+            case ObjectTypeTimer:
+                DesiredAccess = TIMER_QUERY_STATE;
+                break;
+            case ObjectTypeSession:
+                DesiredAccess = SESSION_QUERY_ACCESS;
                 break;
             case ObjectTypeIoCompletion:
                 DesiredAccess = IO_COMPLETION_QUERY_STATE;
                 break;
             case ObjectTypeMemoryPartition:
                 DesiredAccess = MEMORY_PARTITION_QUERY_ACCESS;
+                break;
+            case ObjectTypeToken:
+                DesiredAccess = TOKEN_QUERY;
                 break;
             default:
                 DesiredAccess = MAXIMUM_ALLOWED;

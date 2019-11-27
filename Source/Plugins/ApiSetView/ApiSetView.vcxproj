@@ -86,6 +86,7 @@
     </ClCompile>
     <Link>
       <ModuleDefinitionFile>export.def</ModuleDefinitionFile>
+      <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

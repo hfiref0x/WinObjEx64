@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDESKTOP.C
 *
-*  VERSION:     1.73
+*  VERSION:     1.82
 *
-*  DATE:        05 Mar 2019
+*  DATE:        23 Nov 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -167,11 +167,11 @@ VOID DesktopListSetInfo(
 
     ListView_DeleteAllItems(pDlgContext->ListView);
 
-    if (g_WinObj.EnableExperimentalFeatures)
+    if (g_WinObj.UseExperimentalFeatures)
         hObject = supOpenWindowStationFromContextEx(Context, FALSE, WINSTA_ENUMDESKTOPS);
     else
         hObject = supOpenWindowStationFromContext(Context, FALSE, WINSTA_ENUMDESKTOPS);
-    
+
     if (hObject) {
 
         enumParam.ObjectContext = Context;
@@ -179,7 +179,7 @@ VOID DesktopListSetInfo(
 
         EnumDesktops(hObject, DesktopListEnumProc, (LPARAM)&enumParam);
 
-        if (g_WinObj.EnableExperimentalFeatures) {
+        if (g_WinObj.UseExperimentalFeatures) {
             NtClose((HANDLE)hObject);
         }
         else {
@@ -215,7 +215,7 @@ VOID DesktopListCreate(
     if (pDlgContext->ImageList) {
 
         //desktop image
-        hImage = (HICON)LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_DESKTOP), 
+        hImage = (HICON)LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_DESKTOP),
             IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
 
         if (hImage) {
@@ -224,14 +224,14 @@ VOID DesktopListCreate(
         }
 
         //sort images
-        hImage = (HICON)LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP), 
+        hImage = (HICON)LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTUP),
             IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
 
         if (hImage) {
             ImageList_ReplaceIcon(pDlgContext->ImageList, -1, hImage);
             DestroyIcon(hImage);
         }
-        hImage = (HICON)LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN), 
+        hImage = (HICON)LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_SORTDOWN),
             IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
 
         if (hImage) {
@@ -330,6 +330,62 @@ Done:
 }
 
 /*
+* DesktopListShowProperties
+*
+* Purpose:
+*
+* Desktop properies double click handler.
+*
+*/
+VOID DesktopListShowProperties(
+    _In_ HWND hwndDlg
+)
+{
+    EXTRASCONTEXT *pDlgContext;
+    SIZE_T ItemTextSize, i, l;
+    LPWSTR lpName, lpItemText;
+
+    PROP_DIALOG_CREATE_SETTINGS propSettings;
+
+    if (g_DesktopPropWindow) {
+        SetActiveWindow(g_DesktopPropWindow);
+        return;
+    }
+
+    //
+    // A very basic support for this type.
+    // Desktop described by win32k PDESKTOP structure which is totally undocumented.
+    //
+    pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+    if (pDlgContext) {
+
+        ItemTextSize = 0;
+        lpItemText = supGetItemText(
+            pDlgContext->ListView,
+            ListView_GetSelectionMark(pDlgContext->ListView),
+            0,
+            &ItemTextSize);
+
+        if (lpItemText) {
+            l = 0;
+            for (i = 0; i < ItemTextSize / sizeof(WCHAR); i++)
+                if (lpItemText[i] == L'\\')
+                    l = i + 1;
+            lpName = &lpItemText[l];
+
+            RtlSecureZeroMemory(&propSettings, sizeof(propSettings));
+            propSettings.hwndParent = hwndDlg;
+            propSettings.lpObjectName = lpName;
+            propSettings.lpObjectType = OBTYPE_NAME_DESKTOP;
+
+            propCreateDialog(&propSettings);
+
+            supHeapFree(lpItemText);
+        }
+    }
+}
+
+/*
 * DesktopListHandleNotify
 *
 * Purpose:
@@ -343,8 +399,6 @@ VOID DesktopListHandleNotify(
 )
 {
     INT      nImageIndex;
-    SIZE_T   sz, i, l;
-    LPWSTR   lpItemText, lpName;
 
     EXTRASCONTEXT *pDlgContext;
 
@@ -383,38 +437,7 @@ VOID DesktopListHandleNotify(
         break;
 
     case NM_DBLCLK:
-        //
-        // A very basic support for this type.
-        // Desktop described by win32k PDESKTOP structure which is totally undocumented.
-        //
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
-
-            sz = 0;
-            lpItemText = supGetItemText(
-                pDlgContext->ListView,
-                ListView_GetSelectionMark(pDlgContext->ListView),
-                0,
-                &sz);
-
-            if (lpItemText) {
-                l = 0;
-                for (i = 0; i < sz; i++)
-                    if (lpItemText[i] == L'\\')
-                        l = i + 1;
-                lpName = &lpItemText[l];
-
-                propCreateDialog(
-                    hwndDlg,
-                    lpName,
-                    OBTYPE_NAME_DESKTOP,
-                    NULL,
-                    NULL,
-                    NULL);
-
-                supHeapFree(lpItemText);
-            }
-        }
+        DesktopListShowProperties(hwndDlg);
         break;
 
     default:
@@ -472,7 +495,6 @@ INT_PTR CALLBACK DesktopListDialogProc(
         nhdr = (LPNMLISTVIEW)lParam;
         DesktopListHandleNotify(hwndDlg, nhdr);
         return 1;
-        break;
 
     case WM_DESTROY:
         pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
@@ -497,7 +519,6 @@ INT_PTR CALLBACK DesktopListDialogProc(
             }
         }
         return 1;
-        break;
 
     }
     return 0;

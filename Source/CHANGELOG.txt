@@ -1,3 +1,13 @@
+v1.8.2
+added Token object properties
+added PsAltSystemCallHandlers to callbacks dialog
+fix High DPI issues
+fix Pipe security dialog not shown where available
+multiple Wine/Wine Staging misbehavior
+corrected typo in DebugObject description
+more 20H1 support changes
+various minor changes
+
 v1.8.1
 19H2 support
 Preliminary 20H1 support

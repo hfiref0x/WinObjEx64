@@ -4,9 +4,9 @@
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     1.80
+*  VERSION:     1.82
 *
-*  DATE:        02 Aug 2019
+*  DATE:        13 Nov 2019
 *
 *  Test code used while debug.
 *
@@ -588,7 +588,7 @@ DWORD WINAPI TokenImpersonationThreadProc(PVOID Parameter)
         Sleep(1000);
         OutputDebugString(TEXT("WinObjEx64 test thread\r\n"));
         i += 1;
-    } while (i < 100);
+    } while (i < 1000);
 
     if (!RevertToSelf())
         Beep(0, 0);
@@ -752,7 +752,7 @@ VOID TestStart(
     TestTimer();
     TestTransaction();
     TestWinsta();
-    //TestThread();
+    TestThread();
     //TestJob();
 }
 

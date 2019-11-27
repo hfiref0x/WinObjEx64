@@ -4,11 +4,11 @@
 *
 *  TITLE:       EXTAPI.C
 *
-*  VERSION:     1.73
+*  VERSION:     1.82
 *
-*  DATE:        30 Mar 2019
+*  DATE:        02 Nov 2019
 *
-*  Support unit for Windows 7 missing API and experimental features.
+*  Support unit for pre Windows 10 missing API and experimental features.
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -74,6 +74,25 @@ NTSTATUS ExApiSetInit(
         if (g_ExtApiSet.IsImmersiveProcess) {
             g_ExtApiSet.NumberOfAPI += 1;
         }
+        g_ExtApiSet.GetAwarenessFromDpiAwarenessContext =
+            (pfnGetAwarenessFromDpiAwarenessContext)GetProcAddress(hUser32, "GetAwarenessFromDpiAwarenessContext");
+        if (g_ExtApiSet.GetAwarenessFromDpiAwarenessContext) {
+            g_ExtApiSet.NumberOfAPI += 1;
+        }
+        g_ExtApiSet.GetDpiForSystem = (pfnGetDpiForSystem)GetProcAddress(hUser32, "GetDpiForSystem");
+        if (g_ExtApiSet.GetDpiForSystem) {
+            g_ExtApiSet.NumberOfAPI += 1;
+        }
+        g_ExtApiSet.GetDpiForWindow = (pfnGetDpiForWindow)GetProcAddress(hUser32, "GetDpiForWindow");
+        if (g_ExtApiSet.GetDpiForWindow) {
+            g_ExtApiSet.NumberOfAPI += 1;
+        }
+        g_ExtApiSet.GetThreadDpiAwarenessContext = (pfnGetThreadDpiAwarenessContext)
+            GetProcAddress(hUser32, "GetThreadDpiAwarenessContext");
+        if (g_ExtApiSet.GetThreadDpiAwarenessContext) {
+            g_ExtApiSet.NumberOfAPI += 1;
+        }
+
     }
 
     //

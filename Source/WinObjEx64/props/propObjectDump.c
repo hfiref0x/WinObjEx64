@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     1.74
+*  VERSION:     1.82
 *
-*  DATE:        03 May 2019
+*  DATE:        09 Nov 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -702,7 +702,7 @@ VOID propObDumpUnicodeString(
         TVIF_TEXT | TVIF_STATE,
         0,
         0,
-        TEXT("MaximumLength"),
+        T_MAXIMUMLENGTH,
         &subitems);
 
     //
@@ -1053,7 +1053,7 @@ VOID propObDumpDriverObject(
                         TVIF_TEXT | TVIF_STATE,
                         0,
                         0,
-                        (j == 0) ? T_FLAGS : NULL,
+                        (j == 0) ? T_FLAGS : T_EmptyString,
                         &subitems);
 
                     drvObject.Flags &= ~drvFlags[i].dwValue;
@@ -1399,8 +1399,13 @@ VOID propObDumpDeviceObject(
         //DEVICE_OBJECT
         //
 
-        h_tviRootItem = TreeListAddItem(g_TreeList, NULL, TVIF_TEXT | TVIF_STATE, TVIS_EXPANDED,
-            TVIS_EXPANDED, L"DEVICE_OBJECT", NULL);
+        h_tviRootItem = TreeListAddItem(g_TreeList, 
+            NULL, 
+            TVIF_TEXT | TVIF_STATE, 
+            TVIS_EXPANDED,
+            TVIS_EXPANDED, 
+            L"DEVICE_OBJECT", 
+            NULL);
 
         //Type
         BgColor = 0;
@@ -1500,8 +1505,13 @@ VOID propObDumpDeviceObject(
                         subitems.Text[1] = lpType;
                     }
 
-                    TreeListAddItem(g_TreeList, h_tviRootItem, TVIF_TEXT | TVIF_STATE, 0,
-                        TVIS_EXPANDED, (j == 0) ? T_FLAGS : NULL, &subitems);
+                    TreeListAddItem(g_TreeList, 
+                        h_tviRootItem, 
+                        TVIF_TEXT | TVIF_STATE, 
+                        0,
+                        TVIS_EXPANDED, 
+                        (j == 0) ? T_FLAGS : T_EmptyString, 
+                        &subitems);
 
                     devObject.Flags &= ~devFlags[i].dwValue;
                     j++;
@@ -1543,8 +1553,13 @@ VOID propObDumpDeviceObject(
                         subitems.Text[1] = lpType;
                     }
 
-                    TreeListAddItem(g_TreeList, h_tviRootItem, TVIF_TEXT | TVIF_STATE, 0,
-                        0, (j == 0) ? T_CHARACTERISTICS : NULL, &subitems);
+                    TreeListAddItem(g_TreeList, 
+                        h_tviRootItem, 
+                        TVIF_TEXT | TVIF_STATE, 
+                        0,
+                        0, 
+                        (j == 0) ? T_CHARACTERISTICS : T_EmptyString, 
+                        &subitems);
 
                     devObject.Characteristics &= ~devChars[i].dwValue;
                     j++;
@@ -2400,8 +2415,13 @@ VOID propObDumpObjectTypeFlags(
                     TreeListSubitems.Text[0] = szValue;
                 }
                 TreeListSubitems.Text[1] = lpType;
-                TreeListAddItem(g_TreeList, h_tviSubItem, TVIF_TEXT | TVIF_STATE, 0,
-                    0, (j == 0) ? ((SetEntry) ? EntryName : NULL) : NULL, &TreeListSubitems);
+                TreeListAddItem(g_TreeList, 
+                    h_tviSubItem, 
+                    TVIF_TEXT | TVIF_STATE, 
+                    0,
+                    0, 
+                    (j == 0) ? ((SetEntry) ? EntryName : T_EmptyString) : T_EmptyString,
+                    &TreeListSubitems);
                 j++;
             }
         }

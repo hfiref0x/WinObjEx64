@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.03
 *
-*  DATE:        10 Oct 2019
+*  DATE:        26 Nov 2019
 *
 *  WinObjEx64 Sonar plugin.
 *
@@ -24,7 +24,7 @@ BOOL g_PluginQuit = FALSE;
 
 int  y_splitter_pos = 300, y_capture_pos = 0, y_splitter_max = 0;
 
-#define SONAR_MAX_TESTED_BUILD 18999
+#define SONAR_MAX_TESTED_BUILD 19030
 
 //
 // Sonar gui context.

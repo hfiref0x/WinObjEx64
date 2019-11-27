@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASIPC.C
 *
-*  VERSION:     1.74
+*  VERSION:     1.82
 *
-*  DATE:        03 May 2019
+*  DATE:        13 Nov 2019
 *
 *  IPC supported: Pipes, Mailslots
 *
@@ -368,10 +368,9 @@ INT_PTR CALLBACK IpcTypeDialogProc(
     _In_  LPARAM lParam
 )
 {
-    HDC               hDc;
-    PAINTSTRUCT       Paint;
     PROPSHEETPAGE    *pSheet = NULL;
     PROP_OBJECT_INFO *Context = NULL;
+    HICON             hIcon;
 
     EXTRASCONTEXT *pDlgContext;
 
@@ -381,6 +380,21 @@ INT_PTR CALLBACK IpcTypeDialogProc(
         pSheet = (PROPSHEETPAGE *)lParam;
         if (pSheet) {
             SetProp(hwndDlg, T_PROPCONTEXT, (HANDLE)pSheet->lParam);
+            Context = (PROP_OBJECT_INFO*)pSheet->lParam;
+            if (Context) {
+                pDlgContext = (EXTRASCONTEXT*)Context->Tag;
+                if (pDlgContext) {
+
+                    hIcon = ImageList_GetIcon(pDlgContext->ImageList,
+                        0,
+                        ILD_NORMAL | ILD_TRANSPARENT);
+                    if (hIcon) {
+                        SendMessage(GetDlgItem(hwndDlg, ID_OBJECT_ICON), STM_SETIMAGE, IMAGE_ICON, (LPARAM)hIcon);
+                        pDlgContext->ObjectIcon = hIcon;
+                    }
+
+                }
+            }
         }
         return 1;
         break;
@@ -407,22 +421,15 @@ INT_PTR CALLBACK IpcTypeDialogProc(
         return 1;
         break;
 
-    case WM_PAINT:
+    case WM_DESTROY:
         Context = (PROP_OBJECT_INFO*)GetProp(hwndDlg, T_PROPCONTEXT);
         if (Context) {
             pDlgContext = (EXTRASCONTEXT*)Context->Tag;
             if (pDlgContext) {
-                hDc = BeginPaint(hwndDlg, &Paint);
-                if (hDc) {
-                    ImageList_Draw(pDlgContext->ImageList, 0, hDc, 24, 34, ILD_NORMAL | ILD_TRANSPARENT);
-                    EndPaint(hwndDlg, &Paint);
-                }
-                return 1;
+                DestroyIcon(pDlgContext->ObjectIcon);
+                pDlgContext->ObjectIcon = NULL;
             }
         }
-        break;
-
-    case WM_DESTROY:
         RemoveProp(hwndDlg, T_PROPCONTEXT);
         break;
 
@@ -451,7 +458,7 @@ VOID IpcDlgShowProperties(
     PROPSHEETHEADER     PropHeader;
     WCHAR               szCaption[MAX_PATH];
 
-    Context = propContextCreate(NULL, NULL, NULL, NULL);
+    Context = propContextCreate(NULL, OBTYPE_NAME_FILE, NULL, NULL);
     if (Context == NULL) {
         return;
     }

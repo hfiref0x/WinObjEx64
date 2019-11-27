@@ -4,9 +4,9 @@
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     1.74
+*  VERSION:     1.82
 *
-*  DATE:        27 May 2019
+*  DATE:        24 Nov 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -14,14 +14,11 @@
 * PARTICULAR PURPOSE.
 *
 *******************************************************************************/
-#define OEMRESOURCE
 #include "global.h"
 #include "msvcver.h"
+#include <Richedit.h>
 
 #undef _WINE_NB_DEBUG
-
-HWND g_hwndGlobals;
-WNDPROC g_GlobalsEditOriginalWndProc;
 
 /*
 * AboutDialogInit
@@ -47,7 +44,13 @@ VOID AboutDialogInit(
     SYSTEM_VHD_BOOT_INFORMATION *psvbi;
 
     SetDlgItemText(hwndDlg, ID_ABOUT_PROGRAM, PROFRAM_NAME_AND_TITLE);
-    SetDlgItemText(hwndDlg, ID_ABOUT_BUILDINFO, PROGRAM_VERSION);
+
+    rtl_swprintf_s(szBuffer, 100, TEXT("%lu.%lu.%lu"),
+        PROGRAM_MAJOR_VERSION,
+        PROGRAM_MINOR_VERSION,
+        PROGRAM_REVISION_NUMBER);
+
+    SetDlgItemText(hwndDlg, ID_ABOUT_BUILDINFO, szBuffer);
 
     //
     // Set dialog icon.
@@ -122,7 +125,6 @@ VOID AboutDialogInit(
         if (wine_str) {
             _strcpy_a(wine_str, "Wine ");
             _strcat_a(wine_str, wine_ver);
-            _strcat_a(wine_str, " emulation");
             SetDlgItemTextA(hwndDlg, ID_ABOUT_OSNAME, wine_str);
             supHeapFree(wine_str);
         }
@@ -196,6 +198,121 @@ VOID AboutDialogInit(
 }
 
 /*
+* AddParameterValue
+*
+* Purpose:
+*
+* Add text to the multiline richedit tabbed control.
+*
+*/
+VOID AddParameterValue(
+    _In_ HWND OutputWindow,
+    _In_ LPWSTR Parameter,
+    _In_ LPWSTR Value)
+{
+    LONG StartPos = 0;
+
+    CHARFORMAT CharFormat;
+    CHARRANGE CharRange, SelectedRange;
+
+    CharRange.cpMax = 0x7FFFFFFF;
+    CharRange.cpMin = 0x7FFFFFFF;
+
+    SendMessage(OutputWindow, EM_EXSETSEL, (WPARAM)0, (LPARAM)&CharRange);
+    SendMessage(OutputWindow, EM_EXGETSEL, (WPARAM)0, (LPARAM)&SelectedRange);
+    StartPos = SelectedRange.cpMin;
+
+    RtlSecureZeroMemory(&CharFormat, sizeof(CharFormat));
+    CharFormat.cbSize = sizeof(CharFormat);
+    CharFormat.dwMask = CFM_BOLD;
+    CharFormat.dwEffects = 0;
+
+    SendMessage(OutputWindow, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&CharFormat);
+
+    if (StartPos) {
+        SendMessage(OutputWindow, EM_REPLACESEL, (WPARAM)0, (LPARAM)L"\r\n");
+        StartPos += 1;
+    }
+
+    SendMessage(OutputWindow, EM_REPLACESEL, (WPARAM)0, (LPARAM)Parameter);
+    SendMessage(OutputWindow, EM_REPLACESEL, (WPARAM)0, (LPARAM)L":\t");
+    SendMessage(OutputWindow, EM_REPLACESEL, (WPARAM)0, (LPARAM)Value);
+
+    CharFormat.dwEffects = CFE_BOLD;
+
+    CharRange.cpMin = StartPos;
+    CharRange.cpMax = (LONG)_strlen(Parameter) + StartPos + 1;
+
+    SendMessage(OutputWindow, EM_EXSETSEL, (WPARAM)0, (LPARAM)&CharRange);
+    SendMessage(OutputWindow, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&CharFormat);
+}
+
+/*
+* AddParameterValue64Hex
+*
+* Purpose:
+*
+* Add text to the multiline richedit tabbed control (hex value).
+*
+*/
+VOID AddParameterValue64Hex(
+    _In_ HWND OutputWindow,
+    _In_ LPWSTR Parameter,
+    _In_ ULONG_PTR Value)
+{
+    WCHAR szBuffer[32];
+
+    szBuffer[0] = L'0';
+    szBuffer[1] = L'x';
+    szBuffer[2] = 0;
+    u64tohex(Value, &szBuffer[2]);
+    AddParameterValue(OutputWindow, Parameter, szBuffer);
+}
+
+/*
+* AddParameterValue32Hex
+*
+* Purpose:
+*
+* Add text to the multiline richedit tabbed control (hex value).
+*
+*/
+VOID AddParameterValue32Hex(
+    _In_ HWND OutputWindow,
+    _In_ LPWSTR Parameter,
+    _In_ ULONG Value)
+{
+    WCHAR szBuffer[16];
+
+    szBuffer[0] = L'0';
+    szBuffer[1] = L'x';
+    szBuffer[2] = 0;
+    ultohex(Value, &szBuffer[2]);
+    AddParameterValue(OutputWindow, Parameter, szBuffer);
+}
+
+/*
+* AddParameterValueUlong
+*
+* Purpose:
+*
+* Add text to the multiline richedit tabbed control (ulong value).
+*
+*/
+VOID AddParameterValueUlong(
+    _In_ HWND OutputWindow,
+    _In_ LPWSTR Parameter,
+    _In_ ULONG Value)
+{
+    WCHAR szBuffer[16];
+
+    szBuffer[0] = 0;
+    ultostr(Value, szBuffer);
+    AddParameterValue(OutputWindow, Parameter, szBuffer);
+}
+
+
+/*
 * AboutDialogCollectGlobals
 *
 * Purpose:
@@ -204,129 +321,331 @@ VOID AboutDialogInit(
 *
 */
 VOID AboutDialogCollectGlobals(
-    _In_ HWND hwndParent,
-    _In_ LPWSTR lpDestBuffer
+    _In_ HWND hwndDlg,
+    _In_ HWND hwndParent
 )
 {
-    BOOLEAN bAllowed;
+    BOOLEAN bCustomSignersAllowed;
+
+    WCHAR szBuffer[MAX_PATH * 4];
+    WCHAR szTemp[MAX_PATH];
+
+    SYSTEM_CODEINTEGRITY_INFORMATION CodeIntegrity;
+    SYSTEM_KERNEL_VA_SHADOW_INFORMATION KernelVaShadow;
+    SYSTEM_SPECULATION_CONTROL_INFORMATION SpeculationControl;
+    SYSTEM_INFO SystemInfo;
+    ULONG Dummy;
+
+    HKEY hKey;
+    DWORD dwType, cbData, dwValue;
+
+    PARAFORMAT ParaFormat;
+    CHARRANGE CharRange;
+
+    HWND hwndOutput = GetDlgItem(hwndDlg, IDC_GLOBALS);
+
+    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+    RtlSecureZeroMemory(szTemp, sizeof(szTemp));
 
     //
-    // Copy os name as is.
+    // Prepare RichEdit.
     //
-    GetDlgItemText(hwndParent, ID_ABOUT_OSNAME, lpDestBuffer, MAX_PATH);
+    SendMessage(hwndOutput, EM_SETEVENTMASK, (WPARAM)0, (LPARAM)0);
+    SendMessage(hwndOutput, WM_SETREDRAW, (WPARAM)0, (LPARAM)0);
 
-    _strcat(lpDestBuffer, TEXT("\r\n"));
+    RtlSecureZeroMemory(&ParaFormat, sizeof(ParaFormat));
+    ParaFormat.cbSize = sizeof(ParaFormat);
+    ParaFormat.cTabCount = 1;
+    ParaFormat.dwMask = PFM_TABSTOPS;
+    ParaFormat.rgxTabs[0] = 3500;
+    SendMessage(hwndOutput, EM_SETPARAFORMAT, (WPARAM)0, (LPARAM)&ParaFormat);
 
-    _strcat(lpDestBuffer, TEXT("IsSecureBoot: "));
-    ultostr(g_kdctx.IsSecureBoot, _strend(lpDestBuffer));
-    _strcat(lpDestBuffer, TEXT("\r\n"));
+    //
+    // Collect information.
 
-    _strcat(lpDestBuffer, TEXT("EnableExperimentalFeatures: "));
-    ultostr(g_WinObj.EnableExperimentalFeatures, _strend(lpDestBuffer));
-    _strcat(lpDestBuffer, TEXT("\r\n"));
+    //
+    //
+    // Generic environment information, WinObjEx64 version.
+    //
+    rtl_swprintf_s(szBuffer, 100, TEXT("%lu.%lu.%lu"),
+        PROGRAM_MAJOR_VERSION,
+        PROGRAM_MINOR_VERSION,
+        PROGRAM_REVISION_NUMBER);
 
-    _strcat(lpDestBuffer, TEXT("IsWine: "));
-    ultostr(g_WinObj.IsWine, _strend(lpDestBuffer));
-    _strcat(lpDestBuffer, TEXT("\r\n"));
+    AddParameterValue(hwndOutput, TEXT("Windows Object Explorer 64"), szBuffer);
 
-    _strcat(lpDestBuffer, TEXT("drvOpenLoadStatus: "));
-    ultostr(g_kdctx.drvOpenLoadStatus, _strend(lpDestBuffer));
-    if (g_kdctx.drvOpenLoadStatus == 0) {
-        _strcat(lpDestBuffer, TEXT(" (reported as OK)"));
+    //
+    // OS version.
+    //
+    GetDlgItemText(hwndParent, ID_ABOUT_OSNAME, szBuffer, MAX_PATH);
+    AddParameterValue(hwndOutput, TEXT("Operation System"), szBuffer);
+
+    //
+    // CPU.
+    //
+    if (ERROR_SUCCESS == RegOpenKeyEx(
+        HKEY_LOCAL_MACHINE,
+        TEXT("HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0"),
+        0,
+        KEY_QUERY_VALUE,
+        &hKey))
+    {
+        RtlSecureZeroMemory(szTemp, sizeof(szTemp));
+        szBuffer[0] = 0;
+
+        cbData = 128;
+        dwType = REG_NONE;
+        if (ERROR_SUCCESS == RegQueryValueEx(
+            hKey,
+            TEXT("Identifier"),
+            NULL,
+            &dwType,
+            (LPBYTE)&szTemp,
+            &cbData))
+        {
+            _strcat(szBuffer, szTemp);
+        }
+
+        _strcat(szBuffer, TEXT(", "));
+
+        cbData = 128;
+        dwType = REG_NONE;
+        if (ERROR_SUCCESS == RegQueryValueEx(
+            hKey,
+            TEXT("VendorIdentifier"),
+            NULL,
+            &dwType,
+            (LPBYTE)&szTemp,
+            &cbData))
+        {
+            _strcat(szBuffer, szTemp);
+        }
+
+        _strcat(szBuffer, TEXT(", "));
+
+        cbData = sizeof(DWORD);
+        dwType = REG_NONE;
+        dwValue = 0;
+        if (ERROR_SUCCESS == RegQueryValueEx(
+            hKey,
+            TEXT("~MHz"),
+            NULL,
+            &dwType,
+            (LPBYTE)&dwValue,
+            &cbData))
+        {
+            szTemp[0] = L'~';
+            szTemp[1] = 0;
+            ultostr(dwValue, &szTemp[1]);
+            _strcat(szTemp, TEXT("MHz"));
+            _strcat(szBuffer, szTemp);
+        }
+
+        AddParameterValue(hwndOutput, TEXT("Processor"), szBuffer);
+
+        RegCloseKey(hKey);
     }
-    _strcat(lpDestBuffer, TEXT("\r\n"));
 
-    _strcat(lpDestBuffer, TEXT("IsFullAdmin: "));
-    ultostr(g_kdctx.IsFullAdmin, _strend(lpDestBuffer));
-    _strcat(lpDestBuffer, TEXT("\r\n"));
+    GetSystemInfo(&SystemInfo);
 
-    _strcat(lpDestBuffer, TEXT("IsOurLoad: "));
-    ultostr(g_kdctx.IsOurLoad, _strend(lpDestBuffer));
-    _strcat(lpDestBuffer, TEXT("\r\n"));
+    rtl_swprintf_s(szBuffer,
+        MAX_PATH,
+        TEXT("%lu, Mask 0x%08lX"),
+        SystemInfo.dwNumberOfProcessors,
+        SystemInfo.dwActiveProcessorMask);
 
-    _strcat(lpDestBuffer, TEXT("DirectoryRootAddress: 0x"));
-    u64tohex(g_kdctx.DirectoryRootAddress, _strend(lpDestBuffer));
-    _strcat(lpDestBuffer, TEXT("\r\n"));
+    AddParameterValue(hwndOutput, TEXT("Number of Processors"), szBuffer);
 
-    _strcat(lpDestBuffer, TEXT("DirectoryTypeIndex: "));
-    ultostr(g_kdctx.DirectoryTypeIndex, _strend(lpDestBuffer));
-    _strcat(lpDestBuffer, TEXT("\r\n"));
+    //
+    // List g_kdctx.
+    //
+    szBuffer[0] = 0;
+    ultostr(g_kdctx.drvOpenLoadStatus, szBuffer);
+    if (g_kdctx.drvOpenLoadStatus == 0) {
+        _strcat(szBuffer, TEXT(" (reported as OK)"));
+    }
+    AddParameterValue(hwndOutput, TEXT("drvOpenLoadStatus"), szBuffer);
 
-    _strcat(lpDestBuffer, TEXT("hDevice: 0x"));
-    u64tostr((ULONG_PTR)g_kdctx.hDevice, _strend(lpDestBuffer));
-    _strcat(lpDestBuffer, TEXT("\r\n"));
+    AddParameterValueUlong(hwndOutput, TEXT("IsSecureBoot"), g_kdctx.IsSecureBoot);
 
-    _strcat(lpDestBuffer, TEXT("IopInvalidDeviceRequest: 0x"));
-    u64tostr((ULONG_PTR)g_kdctx.IopInvalidDeviceRequest, _strend(lpDestBuffer));
-    _strcat(lpDestBuffer, TEXT("\r\n"));
+    AddParameterValueUlong(hwndOutput, TEXT("IsFullAdmin"), g_kdctx.IsFullAdmin);
 
-    _strcat(lpDestBuffer, TEXT("KiServiceLimit: 0x"));
-    ultohex(g_kdctx.KiServiceLimit, _strend(lpDestBuffer));
-    _strcat(lpDestBuffer, TEXT("\r\n"));
+    AddParameterValueUlong(hwndOutput, TEXT("IsOurLoad"), g_kdctx.IsOurLoad);
 
-    _strcat(lpDestBuffer, TEXT("KiServiceTableAddress: 0x"));
-    u64tohex(g_kdctx.KiServiceTableAddress, _strend(lpDestBuffer));
-    _strcat(lpDestBuffer, TEXT("\r\n"));
+    AddParameterValue64Hex(hwndOutput, TEXT("DirectoryRootAddress"), g_kdctx.DirectoryRootAddress);
 
-    _strcat(lpDestBuffer, TEXT("NtOsBase: 0x"));
-    u64tohex((ULONG_PTR)g_kdctx.NtOsBase, _strend(lpDestBuffer));
-    _strcat(lpDestBuffer, TEXT("\r\n"));
+    AddParameterValueUlong(hwndOutput, TEXT("DirectoryTypeIndex"), g_kdctx.DirectoryTypeIndex);
 
-    _strcat(lpDestBuffer, TEXT("NtOsSize: 0x"));
-    ultohex(g_kdctx.NtOsSize, _strend(lpDestBuffer));
-    _strcat(lpDestBuffer, TEXT("\r\n"));
+    AddParameterValue64Hex(hwndOutput, TEXT("hDevice"), (ULONG_PTR)g_kdctx.hDevice);
 
-    _strcat(lpDestBuffer, TEXT("ObHeaderCookie: 0x"));
-    ultohex((ULONG)g_kdctx.ObHeaderCookie, _strend(lpDestBuffer));
-    _strcat(lpDestBuffer, TEXT("\r\n"));
+    AddParameterValue64Hex(hwndOutput, TEXT("IopInvalidDeviceRequest"), (ULONG_PTR)g_kdctx.IopInvalidDeviceRequest);
 
-    _strcat(lpDestBuffer, TEXT("PrivateNamespaceLookupTable: 0x"));
-    u64tohex((ULONG_PTR)g_kdctx.PrivateNamespaceLookupTable, _strend(lpDestBuffer));
-    _strcat(lpDestBuffer, TEXT("\r\n"));
+    AddParameterValueUlong(hwndOutput, TEXT("KiServiceLimit"), g_kdctx.KiServiceLimit);
 
-    _strcat(lpDestBuffer, TEXT("SystemRangeStart: 0x"));
-    u64tohex((ULONG_PTR)g_kdctx.SystemRangeStart, _strend(lpDestBuffer));
-    _strcat(lpDestBuffer, TEXT("\r\n"));
+    AddParameterValue64Hex(hwndOutput, TEXT("KiServiceTableAddress"), (ULONG_PTR)g_kdctx.KiServiceTableAddress);
 
-    if (NT_SUCCESS(supCICustomKernelSignersAllowed(&bAllowed))) {
-        _strcat(lpDestBuffer, TEXT("Licensed for Custom Kernel Signers: "));
-        if (bAllowed)
-            _strcat(lpDestBuffer, TEXT("yes\r\n"));
-        else
-            _strcat(lpDestBuffer, TEXT("no\r\n"));
+    AddParameterValue64Hex(hwndOutput, TEXT("NtOsBase"), (ULONG_PTR)g_kdctx.NtOsBase);
+
+    AddParameterValueUlong(hwndOutput, TEXT("NtOsSize"), g_kdctx.NtOsSize);
+
+    AddParameterValue64Hex(hwndOutput, TEXT("NtOsImageMap"), (ULONG_PTR)g_kdctx.NtOsImageMap);
+
+    AddParameterValueUlong(hwndOutput, TEXT("ObHeaderCookie"), g_kdctx.ObHeaderCookie);
+
+    AddParameterValue64Hex(hwndOutput, TEXT("PrivateNamespaceLookupTable"), (ULONG_PTR)g_kdctx.PrivateNamespaceLookupTable);
+
+    AddParameterValue64Hex(hwndOutput, TEXT("SystemRangeStart"), (ULONG_PTR)g_kdctx.SystemRangeStart);
+
+    //
+    // List g_WinObj (UI specific).
+    //
+    AddParameterValueUlong(hwndOutput, TEXT("UseExperimentalFeatures"), g_WinObj.UseExperimentalFeatures);
+    AddParameterValueUlong(hwndOutput, TEXT("IsWine"), g_WinObj.IsWine);
+
+    //
+    // List other data.
+    //
+    if (NT_SUCCESS(supCICustomKernelSignersAllowed(&bCustomSignersAllowed))) {
+        AddParameterValueUlong(hwndOutput, TEXT("CICustomKernelSignersAllowed"), (ULONG)bCustomSignersAllowed);
+    }
+    AddParameterValueUlong(hwndOutput, TEXT("DPI Value"), (ULONG)supGetDPIValue(NULL));
+
+    CodeIntegrity.Length = sizeof(CodeIntegrity);
+    CodeIntegrity.CodeIntegrityOptions = 0;
+    if (NT_SUCCESS(NtQuerySystemInformation(
+        SystemCodeIntegrityInformation,
+        &CodeIntegrity,
+        sizeof(CodeIntegrity),
+        &Dummy)))
+    {
+        AddParameterValueUlong(hwndOutput, TEXT("CI Options Value"), CodeIntegrity.CodeIntegrityOptions);
+
+        if (CodeIntegrity.CodeIntegrityOptions) {
+            if (CodeIntegrity.CodeIntegrityOptions & CODEINTEGRITY_OPTION_ENABLED)
+                AddParameterValue(hwndOutput, TEXT("CI Options"), TEXT("CODEINTEGRITY_OPTION_ENABLED"));
+        }
+    }
+
+    KernelVaShadow.Flags = 0;
+    if (NT_SUCCESS(NtQuerySystemInformation(
+        SystemKernelVaShadowInformation,
+        &KernelVaShadow,
+        sizeof(KernelVaShadow),
+        &Dummy)))
+    {
+        AddParameterValue32Hex(hwndOutput, TEXT("KvaShadow Flags"), KernelVaShadow.Flags);
+    }
+
+    SpeculationControl.Flags = 0;
+    if (NT_SUCCESS(NtQuerySystemInformation(
+        SystemSpeculationControlInformation,
+        &SpeculationControl,
+        sizeof(SpeculationControl),
+        &Dummy)))
+    {
+        AddParameterValue32Hex(hwndOutput, TEXT("SpeculationControl Flags"), SpeculationControl.Flags);
+    }
+
+    //
+    // End work with RichEdit.
+    //
+    SendMessage(hwndOutput, WM_SETREDRAW, (WPARAM)TRUE, (LPARAM)0);
+    InvalidateRect(hwndOutput, NULL, TRUE);
+
+    SendMessage(hwndOutput, EM_SETEVENTMASK, (WPARAM)0, (LPARAM)ENM_SELCHANGE);
+
+    CharRange.cpMax = 0;
+    CharRange.cpMin = 0;
+    SendMessage(hwndOutput, EM_EXSETSEL, (WPARAM)0, (LPARAM)&CharRange);
+
+    SetFocus(hwndOutput);
+}
+
+/*
+* GlobalsCopyToClipboard
+*
+* Purpose:
+*
+* Copy globals to the clipboard.
+*
+*/
+VOID GlobalsCopyToClipboard(
+    _In_ HWND hwndDlg
+)
+{
+    SIZE_T BufferSize;
+    PWCHAR Buffer;
+
+    GETTEXTLENGTHEX gtl;
+    GETTEXTEX gt;
+
+    HWND hwndControl = GetDlgItem(hwndDlg, IDC_GLOBALS);
+
+    gtl.flags = GTL_USECRLF;
+    gtl.codepage = 1200;
+
+    BufferSize = SendMessage(hwndControl, EM_GETTEXTLENGTHEX, (WPARAM)&gtl, 0);
+    if (BufferSize) {
+
+        BufferSize *= sizeof(WCHAR);
+
+        Buffer = (PWCHAR)supHeapAlloc(BufferSize);
+        if (Buffer) {
+
+            gt.flags = GT_USECRLF;
+            gt.cb = (ULONG)BufferSize;
+
+            gt.codepage = 1200;
+            gt.lpDefaultChar = NULL;
+            gt.lpUsedDefChar = NULL;
+            SendMessage(hwndControl, EM_GETTEXTEX, (WPARAM)&gt, (LPARAM)Buffer);
+
+            supClipboardCopy(Buffer, BufferSize);
+
+            supHeapFree(Buffer);
+        }
     }
 }
 
 /*
-* GlobalsCustomWindowProc
+* GlobalsWindowProc
 *
 * Purpose:
 *
-* Globals custom window procedure.
+* Globals dialog window procedure.
 *
 */
-LRESULT CALLBACK GlobalsCustomWindowProc(
+LRESULT CALLBACK GlobalsWindowProc(
     _In_ HWND hwnd,
     _In_ UINT uMsg,
     _In_ WPARAM wParam,
     _In_ LPARAM lParam
 )
 {
-    HFONT hFont;
+    HWND hwndParent = (HWND)lParam;
 
     switch (uMsg) {
-    case WM_CLOSE:
-        hFont = (HFONT)GetProp(hwnd, T_PROP_FONT);
-        if (hFont) {
-            DeleteObject(hFont);
-        }
-        RemoveProp(hwnd, T_PROP_FONT);
-        g_hwndGlobals = NULL;
+    case WM_INITDIALOG:
+
+        AboutDialogCollectGlobals(hwnd, hwndParent);
         break;
+
+    case WM_COMMAND:
+        switch (LOWORD(wParam)) {
+        case IDC_GLOBALS_COPY:
+            GlobalsCopyToClipboard(hwnd);
+            break;
+        case IDCANCEL:
+            return EndDialog(hwnd, S_OK);
+            break;
+        default:
+            break;
+        }
+
     default:
         break;
     }
-    return CallWindowProc(g_GlobalsEditOriginalWndProc, hwnd, uMsg, wParam, lParam);
+    return 0;
 }
 
 /*
@@ -334,64 +653,37 @@ LRESULT CALLBACK GlobalsCustomWindowProc(
 *
 * Purpose:
 *
-* Output global variables to multiline edit window.
+* Prepare and show globals window.
 *
 */
-INT_PTR AboutDialogShowGlobals(
-    _In_ HWND hwndParent)
+VOID AboutDialogShowGlobals(
+    _In_ HWND hwndParent
+)
 {
-    HWND hwnd;
-    LPWSTR lpGlobalInfo;
-    HFONT hFont = NULL;
+    HANDLE RichEditHandle;
 
-    if (g_hwndGlobals == NULL) {      
+    WCHAR szBuffer[MAX_PATH * 2];
 
-        hwnd = CreateWindowEx(
-            0,
-            WC_EDIT,
-            TEXT("WinObjEx64 Globals"),
-            WS_OVERLAPPEDWINDOW | WS_VSCROLL | ES_MULTILINE,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
-            640,
-            480,
-            hwndParent,
-            0,
-            g_WinObj.hInstance,
-            NULL);
+    RichEditHandle = GetModuleHandle(T_RICHEDIT_LIB);
+    if (RichEditHandle == NULL) {
 
-        if (hwnd) {
-            hFont = supCreateFontIndirect(T_DEFAULT_AUX_FONT);
-            if (hFont) {
-                SendMessage(hwnd, WM_SETFONT, (WPARAM)hFont, 0);
-                SetProp(hwnd, T_PROP_FONT, hFont);
-            }
-            g_GlobalsEditOriginalWndProc = (WNDPROC)GetWindowLongPtr(hwnd, GWLP_WNDPROC);
-            if (g_GlobalsEditOriginalWndProc) {
-                SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)&GlobalsCustomWindowProc);
-            }
-        }
-        g_hwndGlobals = hwnd;
-    }
-    else {
-        SetActiveWindow(g_hwndGlobals);
+        rtl_swprintf_s(
+            szBuffer,
+            MAX_PATH * 2, TEXT("%s\\%s"),
+            g_WinObj.szSystemDirectory,
+            T_RICHEDIT_LIB);
+
+        RichEditHandle = LoadLibraryEx(szBuffer, NULL, 0);
     }
 
-    //
-    // Set text to window.
-    //
-    if (g_hwndGlobals) {
-        lpGlobalInfo = (LPWSTR)supVirtualAlloc(PAGE_SIZE);
-        if (lpGlobalInfo) {
-            AboutDialogCollectGlobals(hwndParent, lpGlobalInfo);
-            SetWindowText(g_hwndGlobals, lpGlobalInfo);
-            SendMessage(g_hwndGlobals, EM_SETREADONLY, (WPARAM)1, 0);
-            supVirtualFree(lpGlobalInfo);
-        }
-        ShowWindow(g_hwndGlobals, SW_SHOWNORMAL);
-    }
+    if (RichEditHandle == NULL)
+        return;
 
-    return 1;
+    DialogBoxParam(g_WinObj.hInstance,
+        MAKEINTRESOURCE(IDD_DIALOG_GLOBALS),
+        hwndParent,
+        (DLGPROC)&GlobalsWindowProc,
+        (LPARAM)hwndParent);
 }
 
 /*
@@ -428,7 +720,7 @@ INT_PTR CALLBACK AboutDialogProc(
             return EndDialog(hwndDlg, S_OK);
             break;
         case IDC_ABOUT_GLOBALS:
-            return AboutDialogShowGlobals(hwndDlg);
+            AboutDialogShowGlobals(hwndDlg);
             break;
         default:
             break;

@@ -38,6 +38,7 @@ In order to build from source you need Microsoft Visual Studio 2013 U4 or Visual
 
 [Whats New in 1.8.0](https://github.com/hfiref0x/WinObjEx64/blob/master/Compiled/WHATSNEW_180.md)
 
+[Complete changelog](https://github.com/hfiref0x/WinObjEx64/blob/master/Source/CHANGELOG.txt)
 
 # Authors
 

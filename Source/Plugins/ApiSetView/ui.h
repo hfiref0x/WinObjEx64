@@ -4,9 +4,9 @@
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.00
+*  VERSION:     1.01
 *
-*  DATE:        08 Aug 2019
+*  DATE:        02 Nov 2019
 *
 *  WinObjEx64 ApiSetView UI constants, definitions and includes.
 *
@@ -22,6 +22,7 @@
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "uxtheme.lib")
 
+#define DefaultSystemDpi            96
 #define WINOBJEX64_ICON_MAIN        174
 
 typedef struct _GUI_CONTEXT {

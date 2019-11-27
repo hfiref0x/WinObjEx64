@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRAS.H
 *
-*  VERSION:     1.74
+*  VERSION:     1.82
 *
-*  DATE:        12 May 2019
+*  DATE:        04 Nov 2019
 *
 *  Common header file for Extras dialogs.
 *
@@ -31,6 +31,7 @@ typedef struct _EXTRASCONTEXT {
         ULONG_PTR Reserved;
         ULONG_PTR DialogMode;
     };
+    HICON ObjectIcon;
 } EXTRASCONTEXT, *PEXTRASCONTEXT;
 
 typedef struct _EXTRASCALLBACK {

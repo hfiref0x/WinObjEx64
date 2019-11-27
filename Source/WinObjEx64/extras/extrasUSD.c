@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASUSD.C
 *
-*  VERSION:     1.74
+*  VERSION:     1.82
 *
-*  DATE:        03 May 2019
+*  DATE:        09 Nov 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -47,6 +47,8 @@ VOID UsdDumpSharedRegion(
     WCHAR               szValue[MAX_PATH + 1];
 
     PKUSER_SHARED_DATA  pUserSharedData;
+    HWND hwnd;
+
 
     do {
 
@@ -54,6 +56,8 @@ VOID UsdDumpSharedRegion(
 
         if (IsBadReadPtr(pUserSharedData, sizeof(KUSER_SHARED_DATA)))
             break;
+
+        hwnd = GetDlgItem(hwndParent, ID_USDDUMPGROUPBOX);
 
         if (!supInitTreeListForDump(hwndParent, &UsdTreeList)) {
             break;
@@ -180,7 +184,7 @@ VOID UsdDumpSharedRegion(
             for (i = 0; i < PROCESSOR_FEATURE_MAX; i++) {
                 if (pUserSharedData->ProcessorFeatures[i]) {
                     bAny = TRUE;
-                    if (i > 32) {
+                    if (i >= RTL_NUMBER_OF(T_PROCESSOR_FEATURES)) {
                         lpType = T_Unknown;
                     }
                     else {
@@ -198,7 +202,7 @@ VOID UsdDumpSharedRegion(
                         TVIF_TEXT | TVIF_STATE,
                         (UINT)0,
                         (UINT)0,
-                        (LPWSTR)NULL,
+                        (LPWSTR)T_EmptyString,
                         &subitems);
                 }
             }
@@ -229,7 +233,7 @@ VOID UsdDumpSharedRegion(
                     TVIF_TEXT | TVIF_STATE,
                     (UINT)0,
                     (UINT)0,
-                    (LPWSTR)NULL,
+                    (LPWSTR)T_EmptyString,
                     &subitems);
             }
         }
@@ -297,7 +301,7 @@ VOID UsdDumpSharedRegion(
                         TVIF_TEXT | TVIF_STATE,
                         (UINT)0,
                         (UINT)0,
-                        (LPWSTR)NULL,
+                        (LPWSTR)T_EmptyString,
                         &subitems);
 
                     mask &= ~SuiteMasks[i].dwValue;
@@ -448,7 +452,7 @@ VOID UsdDumpSharedRegion(
                         TVIF_TEXT | TVIF_STATE,
                         (UINT)0,
                         (UINT)0,
-                        (LPWSTR)NULL,
+                        (LPWSTR)T_EmptyString,
                         &subitems);
                 }
             }

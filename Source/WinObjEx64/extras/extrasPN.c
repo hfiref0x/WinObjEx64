@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPN.C
 *
-*  VERSION:     1.74
+*  VERSION:     1.82
 *
-*  DATE:        15 May 2019
+*  DATE:        18 Nov 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -51,9 +51,15 @@ VOID PNDlgShowObjectProperties(
 
     OBJREFPNS           pnsInfo;
     PROP_NAMESPACE_INFO propNamespace;
+    PROP_DIALOG_CREATE_SETTINGS propSettings;
 
-    if (g_NamespacePropWindow != NULL)
+    //
+    // Only one namespace object properties dialog at the same time allowed.
+    //
+    if (g_NamespacePropWindow != NULL) {
+        SetActiveWindow(g_NamespacePropWindow);
         return;
+    }
 
     if (ListView_GetSelectedCount(PnDlgContext.ListView) == 0) {
         return;
@@ -94,13 +100,13 @@ VOID PNDlgShowObjectProperties(
         lpType = supGetItemText(PnDlgContext.ListView, nSelected, 1, NULL);
         if (lpType) {
 
-            propCreateDialog(
-                NULL,
-                lpName,
-                lpType,
-                NULL,
-                &propNamespace,
-                NULL);
+            RtlSecureZeroMemory(&propSettings, sizeof(propSettings));
+
+            propSettings.lpObjectName = lpName;
+            propSettings.lpObjectType = lpType;
+            propSettings.NamespaceObject = &propNamespace;
+
+            propCreateDialog(&propSettings);
 
             supHeapFree(lpType);
         }

@@ -4,9 +4,9 @@
 *
 *  TITLE:       PLUGMNGR.C
 *
-*  VERSION:     1.80
+*  VERSION:     1.82
 *
-*  DATE:        02 Aug 2019
+*  DATE:        02 Nov 2019
 *
 *  Plugin manager.
 *
@@ -469,6 +469,7 @@ VOID PluginManagerProcessEntry(
             ParamBlock.uiCopyTreeListSubItemValue = (pfnuiCopyTreeListSubItemValue)&supCopyTreeListSubItemValue;
             ParamBlock.uiCopyListViewSubItemValue = (pfnuiCopyListViewSubItemValue)&supCopyListViewSubItemValue;
             ParamBlock.uiShowFileProperties = (pfnuiShowFileProperties)&supShowProperties;
+            ParamBlock.uiGetDPIValue = (pfnuiGetDPIValue)&supGetDPIValue;
 
             RtlCopyMemory(&ParamBlock.osver, &g_WinObj.osver, sizeof(RTL_OSVERSIONINFOW));
 

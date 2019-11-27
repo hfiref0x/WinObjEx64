@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPSLIST.C
 *
-*  VERSION:     1.80
+*  VERSION:     1.82
 *
-*  DATE:        01 July 2019
+*  DATE:        18 Nov 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -285,8 +285,13 @@ VOID PsListHandleObjectProp(
     PUNICODE_STRING ImageName = NULL;
 
     PROP_UNNAMED_OBJECT_INFO *tempEntry;
+    PROP_DIALOG_CREATE_SETTINGS propSettings;
 
+    //
+    // Only one process/thread properties dialog at the same time allowed.
+    //
     if (g_PsPropWindow != NULL) {
+        SetActiveWindow(g_PsPropWindow);
         return;
     }
 
@@ -355,13 +360,13 @@ VOID PsListHandleObjectProp(
         ultostr(HandleToULong(ObjectEntry->ClientId.UniqueThread), _strend(lpName));
     }
 
-    propCreateDialog(
-        0,
-        lpName,
-        (bProcessList) ? OBTYPE_NAME_PROCESS : OBTYPE_NAME_THREAD,
-        NULL,
-        NULL,
-        ObjectEntry);
+    RtlSecureZeroMemory(&propSettings, sizeof(propSettings));
+
+    propSettings.lpObjectName = lpName;
+    propSettings.lpObjectType = (bProcessList) ? OBTYPE_NAME_PROCESS : OBTYPE_NAME_THREAD;
+    propSettings.UnnamedObject = ObjectEntry;
+
+    propCreateDialog(&propSettings);
 
     supHeapFree(lpName);
 }

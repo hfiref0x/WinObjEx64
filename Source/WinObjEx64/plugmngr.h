@@ -4,9 +4,9 @@
 *
 *  TITLE:       PLUGINMNGR.H
 *
-*  VERSION:     1.80
+*  VERSION:     1.82
 *
-*  DATE:        16 July 2019
+*  DATE:        02 Nov 2019
 *
 *  Common header file for the plugin manager.
 *
@@ -89,9 +89,12 @@ typedef VOID(*pfnuiCopyListViewSubItemValue)(
     _In_ HWND ListView,
     _In_ UINT ValueIndex);
 
-typedef VOID (*pfnuiShowFileProperties)(
+typedef VOID(*pfnuiShowFileProperties)(
     _In_ HWND hwndDlg,
     _In_ LPWSTR lpFileName);
+
+typedef UINT(*pfnuiGetDPIValue)(
+    _In_opt_ HWND hWnd);
 
 typedef struct _WINOBJEX_PARAM_BLOCK {
     HWND ParentWindow;
@@ -114,6 +117,7 @@ typedef struct _WINOBJEX_PARAM_BLOCK {
     pfnuiCopyTreeListSubItemValue uiCopyTreeListSubItemValue;
     pfnuiCopyListViewSubItemValue uiCopyListViewSubItemValue;
     pfnuiShowFileProperties uiShowFileProperties;
+    pfnuiGetDPIValue uiGetDPIValue;
 
 } WINOBJEX_PARAM_BLOCK, *PWINOBJEX_PARAM_BLOCK;
 

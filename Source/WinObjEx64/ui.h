@@ -4,9 +4,9 @@
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.81
+*  VERSION:     1.82
 *
-*  DATE:        08 Oct 2019
+*  DATE:        24 Nov 2019
 *
 *  Common header file for the user interface.
 *
@@ -18,8 +18,13 @@
 *******************************************************************************/
 #pragma once
 
-#define SplitterSize          3
-#define SplitterMargin        80
+#define SplitterSize                3
+#define SplitterMargin              80
+
+#define DefaultSystemDpi            96
+#define TreeListDumpObjWndPosX      12
+#define TreeListDumpObjWndPosY      20
+#define TreeListDumpObjWndScaleSub  4
 
 typedef	struct _OE_LIST_ITEM {
     struct _OE_LIST_ITEM *Prev;
@@ -33,7 +38,11 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
     _In_ DWORD_PTR dwData
     );
 
-#define PROGRAM_VERSION         L"1.8.1"
+#define PROGRAM_MAJOR_VERSION       1
+#define PROGRAM_MINOR_VERSION       8
+#define PROGRAM_REVISION_NUMBER     2
+#define PROGRAM_BUILD_NUMBER        1911
+
 #ifdef _USE_OWN_DRIVER
 #define PROGRAM_NAME            L"Windows Object Explorer 64-bit (Non-public version)"
 #else 
@@ -57,6 +66,8 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 #define T_DUMPDRIVER            L"Dump Driver"
 #define T_VIEW_REFRESH          L"Refresh\tF5"
 #define T_EMPTY                 L" "
+
+#define T_RICHEDIT_LIB          TEXT("RICHED32.DLL")
 
 typedef enum _WOBJ_DIALOGS_ID {
     wobjFindDlgId = 0,
@@ -123,6 +134,7 @@ typedef struct _PROP_UNNAMED_OBJECT_INFO {
     CLIENT_ID ClientId;
     SYSTEM_THREAD_INFORMATION ThreadInformation;
     UNICODE_STRING ImageName;
+    BOOL IsThreadToken;
 } PROP_UNNAMED_OBJECT_INFO, *PPROP_UNNAMED_OBJECT_INFO;
 
 typedef struct _PROP_OBJECT_INFO {
@@ -137,10 +149,21 @@ typedef struct _PROP_OBJECT_INFO {
     ULONG_PTR Tag;
     WOBJ_TYPE_DESC *TypeDescription;
     WOBJ_TYPE_DESC *ShadowTypeDescription; //valid only for types, same as TypeDescription for everything else.
+    HICON ObjectIcon;
+    HICON ObjectTypeIcon;
     OBJINFO ObjectInfo; //object dump related structures
     PROP_NAMESPACE_INFO NamespaceInfo;
     PROP_UNNAMED_OBJECT_INFO UnnamedObjectInfo;
 } PROP_OBJECT_INFO, *PPROP_OBJECT_INFO;
+
+typedef struct _PROP_DIALOG_CREATE_SETTINGS {
+    HWND hwndParent;
+    LPWSTR lpObjectName;
+    LPCWSTR lpObjectType;
+    LPWSTR lpDescription;
+    PROP_NAMESPACE_INFO *NamespaceObject;
+    PROP_UNNAMED_OBJECT_INFO *UnnamedObject;
+} PROP_DIALOG_CREATE_SETTINGS, *PPROP_DIALOG_CREATE_SETTINGS;
 
 typedef struct _VALUE_DESC {
     LPWSTR lpDescription;
@@ -151,12 +174,24 @@ typedef struct _VALUE_DESC {
 //Display simple "N/A" if no info available
 #define T_CannotQuery	TEXT("N/A")
 
+//Value is not defined
+#define T_None          TEXT("None")
+#define T_NoneValue     TEXT("(None)")
+
+//Value is invalid
+#define T_Invalid       TEXT("Invalid")
+#define T_InvalidValue  TEXT("(Invalid)")
+
 //Display for unknown type value
 #define T_UnknownType	TEXT("Unknown Type")
 #define T_UnknownFlag	TEXT("Unknown Flag")
 
 //Display for unknown value
 #define T_Unknown		TEXT("Unknown")
+#define T_UnknownValue  TEXT("(Unknown)")
+
+//Empty string
+#define T_EmptyString   TEXT("")
 
 //prop used by sheets
 #define T_PROPCONTEXT	TEXT("propContext")
@@ -166,11 +201,6 @@ typedef struct _VALUE_DESC {
 
 //props used by ipc dialogs
 #define T_IPCDLGCONTEXT TEXT("IpcDlgContext")
-
-//prop for font
-#define T_PROP_FONT TEXT("propFont")
-
-#define T_DEFAULT_AUX_FONT TEXT("Courier New")
 
 //Calendar
 static LPCWSTR g_szMonths[12] = {

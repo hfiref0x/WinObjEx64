@@ -444,6 +444,7 @@
     <ClInclude Include="extdef.h" />
     <ClInclude Include="extras\extras.h" />
     <ClInclude Include="extras\extrasCallbacks.h" />
+    <ClInclude Include="extras\extrasCallbacksPatterns.h" />
     <ClInclude Include="extras\extrasDrivers.h" />
     <ClInclude Include="extras\extrasIPC.h" />
     <ClInclude Include="extras\extrasPN.h" />

@@ -4,9 +4,9 @@
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.80
+*  VERSION:     1.82
 *
-*  DATE:        02 June 2019
+*  DATE:        24 Nov 2019
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -111,7 +111,7 @@ extern pswprintf_s rtl_swprintf_s;
 extern pqsort rtl_qsort;
 
 typedef struct _WINOBJ_GLOBALS {
-    BOOLEAN EnableExperimentalFeatures;
+    BOOLEAN UseExperimentalFeatures;
     BOOLEAN IsWine;
     HINSTANCE hInstance;
     HANDLE Heap;

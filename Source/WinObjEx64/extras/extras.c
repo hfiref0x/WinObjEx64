@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRAS.C
 *
-*  VERSION:     1.74
+*  VERSION:     1.82
 *
-*  DATE:        14 May 2019
+*  DATE:        19 Nov 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -189,8 +189,9 @@ VOID extrasShowDialogById(
 
     case ID_EXTRAS_DRIVERS:
         //
-       // Unsupported in Wine.
-       //
+        // Unsupported in Wine.
+        // The list is empty or contains user mode dlls/application itself.
+        //
         if (g_WinObj.IsWine == FALSE) {
             extrasCreateDriversDialog(ParentWindow);
         }

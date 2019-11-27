@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMPCONSTS.H
 *
-*  VERSION:     1.73
+*  VERSION:     1.82
 *
-*  DATE:        07 Mar 2019
+*  DATE:        09 Mar 2019
 *
 *  Consts header file for Object Dump module.
 *
@@ -74,6 +74,7 @@
 #define T_CHARACTERISTICS           L"Characteristics"
 #define T_FLAGS                     L"Flags"
 #define T_LENGTH                    L"Length"
+#define T_MAXIMUMLENGTH             L"MaximumLength"
 #define T_TYPEINDEX                 L"Index"
 #define T_REFNOTFOUND               L"! Reference not found"
 

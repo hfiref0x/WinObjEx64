@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPTYPE.C
 *
-*  VERSION:     1.74
+*  VERSION:     1.82
 *
-*  DATE:        03 May 2019
+*  DATE:        11 Nov 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -779,6 +779,31 @@ VOID propSetTypeInfo(
 }
 
 /*
+* TypePropDialogOnInit
+*
+* Purpose:
+*
+* Type Dialog WM_INITDIALOG handler.
+*
+*/
+VOID TypePropDialogOnInit(
+    _In_  HWND hwndDlg,
+    _In_  LPARAM lParam)
+{
+    PROPSHEETPAGE    *pSheet = NULL;
+
+    pSheet = (PROPSHEETPAGE *)lParam;
+    if (pSheet) {
+        SetProp(hwndDlg, T_PROPCONTEXT, (HANDLE)pSheet->lParam);
+        supLoadIconForObjectType(hwndDlg,
+            (PROP_OBJECT_INFO*)pSheet->lParam,
+            g_ListViewImages,
+            TRUE);
+    }
+    propSetTypeListView(hwndDlg);
+}
+
+/*
 * TypePropDialogProc
 *
 * Purpose:
@@ -797,9 +822,6 @@ INT_PTR CALLBACK TypePropDialogProc(
     _In_ LPARAM lParam
 )
 {
-    HDC               hDc;
-    PAINTSTRUCT       Paint;
-    PROPSHEETPAGE    *pSheet = NULL;
     PROP_OBJECT_INFO *Context = NULL;
 
     switch (uMsg) {
@@ -819,11 +841,7 @@ INT_PTR CALLBACK TypePropDialogProc(
         break;
 
     case WM_INITDIALOG:
-        pSheet = (PROPSHEETPAGE *)lParam;
-        if (pSheet) {
-            SetProp(hwndDlg, T_PROPCONTEXT, (HANDLE)pSheet->lParam);
-        }
-        propSetTypeListView(hwndDlg);
+        TypePropDialogOnInit(hwndDlg, lParam);
         return 1;
         break;
 
@@ -832,19 +850,6 @@ INT_PTR CALLBACK TypePropDialogProc(
             if (HIWORD(wParam) == LBN_SELCHANGE) {
                 Context = (PROP_OBJECT_INFO*)GetProp(hwndDlg, T_PROPCONTEXT);
                 propSetTypeDecodedAttributes(Context, hwndDlg);
-            }
-        }
-        return 1;
-        break;
-
-    case WM_PAINT:
-        Context = (PROP_OBJECT_INFO*)GetProp(hwndDlg, T_PROPCONTEXT);
-        if (Context) {
-            hDc = BeginPaint(hwndDlg, &Paint);
-            if (hDc) {
-                ImageList_Draw(g_ListViewImages, Context->ShadowTypeDescription->ImageIndex, hDc, 24, 34,
-                    ILD_NORMAL | ILD_TRANSPARENT);
-                EndPaint(hwndDlg, &Paint);
             }
         }
         return 1;

@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.81
+*  VERSION:     1.82
 *
-*  DATE:        09 Oct 2019
+*  DATE:        23 Nov 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -265,6 +265,53 @@ BOOL supVirtualFree(
 }
 
 /*
+* supGetDPIValue
+*
+* Purpose:
+*
+* Return DPI value for system or specific window (win10+).
+*
+*/
+UINT supGetDPIValue(
+    _In_opt_ HWND hWnd
+)
+{
+    HDC hDc;
+
+    UINT uDpi = DefaultSystemDpi;
+    DPI_AWARENESS dpiAwareness;
+
+    if (g_NtBuildNumber >= 14393) {
+        
+        dpiAwareness = g_ExtApiSet.GetAwarenessFromDpiAwarenessContext(
+            g_ExtApiSet.GetThreadDpiAwarenessContext());
+
+        switch (dpiAwareness) {
+
+        // Scale the window to the system DPI
+        case DPI_AWARENESS_SYSTEM_AWARE:
+            uDpi = g_ExtApiSet.GetDpiForSystem();
+            break;
+
+        // Scale the window to the monitor DPI
+        case DPI_AWARENESS_PER_MONITOR_AWARE:
+            uDpi = g_ExtApiSet.GetDpiForWindow(hWnd);
+            break;
+        }
+
+    }
+    else {
+        hDc = GetDC(0);
+        if (hDc) {
+            uDpi = (UINT)GetDeviceCaps(hDc, LOGPIXELSX);
+            ReleaseDC(0, hDc);
+        }
+    }
+
+    return uDpi;
+}
+
+/*
 * supInitTreeListForDump
 *
 * Purpose:
@@ -277,18 +324,31 @@ BOOL supInitTreeListForDump(
     _Out_ HWND *pTreeListHwnd
 )
 {
-    HWND     TreeList;
+    HWND     TreeList, hWndGroupBox;
     HDITEM   hdritem;
     RECT     rc;
+
+    UINT uDpi;
+    INT dpiScaledX, dpiScaledY, iScaledWidth, iScaledHeight, iScaleSub;
 
     if (pTreeListHwnd == NULL) {
         return FALSE;
     }
+    
+    uDpi = supGetDPIValue(NULL);
+    dpiScaledX = MulDiv(TreeListDumpObjWndPosX, uDpi, DefaultSystemDpi);
+    dpiScaledY = MulDiv(TreeListDumpObjWndPosY, uDpi, DefaultSystemDpi);
 
-    GetClientRect(hwndParent, &rc);
+    hWndGroupBox = GetDlgItem(hwndParent, ID_OBJECTDUMPGROUPBOX);
+    GetWindowRect(hWndGroupBox, &rc);
+    iScaleSub = MulDiv(TreeListDumpObjWndScaleSub, uDpi, DefaultSystemDpi);
+    iScaledWidth = (rc.right - rc.left) - dpiScaledX  - iScaleSub;
+    iScaledHeight = (rc.bottom - rc.top) - dpiScaledY - iScaleSub;
+
     TreeList = CreateWindowEx(WS_EX_STATICEDGE, WC_TREELIST, NULL,
-        WS_VISIBLE | WS_CHILD | WS_TABSTOP | TLSTYLE_COLAUTOEXPAND | TLSTYLE_LINKLINES, 12, 20,
-        rc.right - 26, rc.bottom - 34, hwndParent, NULL, NULL, NULL);
+        WS_VISIBLE | WS_CHILD | WS_TABSTOP | TLSTYLE_COLAUTOEXPAND | TLSTYLE_LINKLINES, 
+        dpiScaledX, dpiScaledY,
+        iScaledWidth, iScaledHeight, hwndParent, NULL, NULL, NULL);
 
     if (TreeList == NULL) {
         *pTreeListHwnd = NULL;
@@ -964,7 +1024,7 @@ LPWSTR supGetItemText(
     _In_ HWND ListView,
     _In_ INT nItem,
     _In_ INT nSubItem,
-    _Out_opt_ PSIZE_T lpSize
+    _Out_opt_ PSIZE_T lpSize //length in bytes
 )
 {
     INT     len;
@@ -1152,7 +1212,7 @@ VOID supRunAsAdmin(
         shinfo.lpVerb = TEXT("runas");
         shinfo.lpFile = szPath;
         shinfo.nShow = SW_SHOW;
-        if (g_WinObj.EnableExperimentalFeatures)
+        if (g_WinObj.UseExperimentalFeatures)
             shinfo.lpParameters = TEXT("-exp");
         if (ShellExecuteEx(&shinfo)) {
             PostQuitMessage(0);
@@ -1497,6 +1557,7 @@ VOID supInit(
     sapiCreateSetupDBSnapshot();
     g_pObjectTypesInfo = (POBJECT_TYPES_INFORMATION)supGetObjectTypesInfo();
 
+    //Result ignored intentionally and used only in debug.
     ExApiSetInit();
 }
 
@@ -3960,7 +4021,7 @@ BOOL supRunAsLocalSystem(
         bSuccess = CreateProcessAsUser(
             hPrimaryToken,
             szApplication,
-            g_WinObj.EnableExperimentalFeatures ? GetCommandLine() : NULL,
+            g_WinObj.UseExperimentalFeatures ? GetCommandLine() : NULL,
             NULL,
             NULL,
             FALSE,
@@ -4367,6 +4428,54 @@ INT supGetMaxCompareTwoFixedStrings(
 }
 
 /*
+* supOpenTokenByParam
+*
+* Purpose:
+*
+* Open token handle with given desired access for process/thread.
+*
+*/
+NTSTATUS supOpenTokenByParam(
+    _In_ CLIENT_ID *ClientId,
+    _In_ OBJECT_ATTRIBUTES *ObjectAttributes,
+    _In_ ACCESS_MASK TokenDesiredAccess,
+    _In_ BOOL IsThreadToken,
+    _Out_ PHANDLE TokenHandle)
+{
+    NTSTATUS Status = STATUS_ACCESS_DENIED;
+    HANDLE TokenOwnerHandle = NULL, ObjectHandle = NULL;
+
+    *TokenHandle = NULL;
+
+    if (IsThreadToken) {
+
+        Status = NtOpenThread(&TokenOwnerHandle,
+            THREAD_QUERY_INFORMATION,
+            ObjectAttributes,
+            ClientId);
+        if (NT_SUCCESS(Status)) {
+            Status = NtOpenThreadToken(TokenOwnerHandle, TokenDesiredAccess, FALSE, &ObjectHandle);
+            NtClose(TokenOwnerHandle);
+        }
+
+    }
+    else {
+
+        Status = supOpenProcess(ClientId->UniqueProcess,
+            PROCESS_QUERY_INFORMATION,
+            &TokenOwnerHandle);
+        if (NT_SUCCESS(Status)) {
+            Status = NtOpenProcessToken(TokenOwnerHandle, TokenDesiredAccess, &ObjectHandle);
+            NtClose(TokenOwnerHandle);
+        }
+    }
+
+    *TokenHandle = ObjectHandle;
+
+    return Status;
+}
+
+/*
 * supOpenObjectFromContext
 *
 * Purpose:
@@ -4440,6 +4549,18 @@ HANDLE supOpenObjectFromContext(
             status = NtOpenThread(&hObject, DesiredAccess,
                 ObjectAttributes,
                 &Context->UnnamedObjectInfo.ClientId);
+        }
+        else
+            status = STATUS_INVALID_PARAMETER;
+        break;
+
+    case ObjectTypeToken:
+        if (Context->ContextType == propUnnamed) {
+            status = supOpenTokenByParam(&Context->UnnamedObjectInfo.ClientId,
+                ObjectAttributes,
+                DesiredAccess,
+                Context->UnnamedObjectInfo.IsThreadToken,
+                &hObject);
         }
         else
             status = STATUS_INVALID_PARAMETER;
@@ -4539,7 +4660,7 @@ BOOL supCloseObjectFromContext(
 
         switch (Context->TypeIndex) {
         case ObjectTypeWinstation:
-            if (g_WinObj.EnableExperimentalFeatures) {
+            if (g_WinObj.UseExperimentalFeatures) {
                 bResult = NT_SUCCESS(NtClose(hObject));
             }
             else {
@@ -5990,4 +6111,70 @@ NTSTATUS supPrivilegeEnabled(
     *pfResult = bResult;
 
     return status;
+}
+
+/*
+* supLoadIconForObjectType
+*
+* Purpose:
+*
+* Load icon for object (or its type) which properties is currently viewed.
+*
+*/
+BOOLEAN supLoadIconForObjectType(
+    _In_ HWND hwndDlg,
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ HIMAGELIST ImageList,
+    _In_ BOOLEAN IsShadow)
+{
+    HICON hIcon;
+    INT ImageIndex;
+
+    if (IsShadow)
+        ImageIndex = Context->ShadowTypeDescription->ImageIndex;
+    else
+        ImageIndex = Context->TypeDescription->ImageIndex;
+
+    hIcon = ImageList_GetIcon(
+        ImageList,
+        ImageIndex,
+        ILD_NORMAL | ILD_TRANSPARENT);
+
+    if (hIcon) {
+
+        SendMessage(GetDlgItem(hwndDlg, ID_OBJECT_ICON), STM_SETIMAGE, IMAGE_ICON, (LPARAM)hIcon);
+
+        if (IsShadow)
+            Context->ObjectTypeIcon = hIcon;
+        else 
+            Context->ObjectIcon = hIcon;
+
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+/*
+* supDestroyIconForObjectType
+*
+* Purpose:
+*
+* Destroy icon used to represent object (or its type) which properties is currently viewed.
+*
+*/
+VOID supDestroyIconForObjectType(
+    _In_ PROP_OBJECT_INFO *Context
+)
+{
+    if (Context->IsType) {
+        if (Context->ObjectTypeIcon) {
+            DestroyIcon(Context->ObjectTypeIcon);
+            Context->ObjectTypeIcon = NULL;
+        }
+    }
+    if (Context->ObjectIcon) {
+        DestroyIcon(Context->ObjectIcon);
+        Context->ObjectIcon = NULL;
+    }
 }

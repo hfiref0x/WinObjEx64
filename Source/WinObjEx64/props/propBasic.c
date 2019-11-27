@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     1.74
+*  VERSION:     1.82
 *
-*  DATE:        03 May 2019
+*  DATE:        24 Nov 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,6 +17,13 @@
 #include "global.h"
 #include "propDlg.h"
 #include "propBasicConsts.h"
+
+//
+// Forward.
+//
+VOID propSetBasicInfoEx(
+    _In_ HWND hwndDlg,
+    _In_ POBJINFO InfoObject);
 
 /*
 * propSetObjectHeaderAddressInfo
@@ -58,6 +65,8 @@ VOID propSetObjectHeaderAddressInfo(
         SetDlgItemText(hwndDlg, ID_OBJECT_HEADER, TEXT(""));
     }
 }
+
+
 
 /*
 * propSetProcessMitigationsInfo
@@ -395,7 +404,7 @@ VOID propSetProcessMitigationsInfo(
             if (Policies.PayloadRestrictionPolicy.EnableRopSimExec) {
                 _strcpy(szBuffer, TEXT("PayloadRestriction -> Enable rop sim exec"));
                 SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
-             }
+            }
 
             if (Policies.PayloadRestrictionPolicy.AuditRopSimExec) {
                 _strcpy(szBuffer, TEXT("PayloadRestriction -> Audit rop sim exec"));
@@ -451,7 +460,7 @@ VOID propSetProcessMitigationsInfo(
                 SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
             }
             if (Policies.SideChannelIsolationPolicy.SpeculativeStoreBypassDisable) {
-                _strcpy(szBuffer, TEXT("SideChannel -> Speculative store bypass disalbe"));
+                _strcpy(szBuffer, TEXT("SideChannel -> Speculative store bypass disable"));
                 SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
             }
 
@@ -485,7 +494,7 @@ VOID propSetProcessTrustLabelInfo(
 
     ULONG ProtectionType = 0, ProtectionLevel = 0, i;
 
-    LPWSTR lpType = TEXT(""), lpLevel = TEXT("");
+    LPWSTR lpType = T_EmptyString, lpLevel = T_EmptyString;
 
     WCHAR szBuffer[0x100];
 
@@ -493,7 +502,7 @@ VOID propSetProcessTrustLabelInfo(
     // Re-open current object as we need READ_CONTROL.
     //
     if (!propOpenCurrentObject(Context, &hObject, READ_CONTROL)) {
-        SetDlgItemText(hwndDlg, ID_OBJECT_TRUSTLABEL, TEXT(""));
+        SetDlgItemText(hwndDlg, ID_OBJECT_TRUSTLABEL, T_EmptyString);
         return;
     }
 
@@ -532,7 +541,7 @@ VOID propSetProcessTrustLabelInfo(
 
     if (bFail) {
         ShowWindow(GetDlgItem(hwndDlg, ID_PTL_CAPTION), SW_HIDE);
-        SetDlgItemText(hwndDlg, ID_OBJECT_TRUSTLABEL, TEXT(""));
+        SetDlgItemText(hwndDlg, ID_OBJECT_TRUSTLABEL, T_EmptyString);
     }
 }
 
@@ -1590,7 +1599,7 @@ VOID propBasicQueryProcess(
             // Start time.
             //
             RtlSecureZeroMemory(&KernelUserTimes, sizeof(KERNEL_USER_TIMES));
-            NtQueryInformationProcess(hObject, ProcessTimes, 
+            NtQueryInformationProcess(hObject, ProcessTimes,
                 (PVOID)&KernelUserTimes, sizeof(KERNEL_USER_TIMES), &i);
 
             SetDlgItemText(hwndDlg, IDC_PROCESS_STARTED, T_CannotQuery);
@@ -1866,7 +1875,7 @@ VOID propBasicQueryThread(
     BOOL bSuccess;
     ULONG i, dummy;
     HANDLE hObject;
-    
+
     TIME_FIELDS TimeFields;
 
     WCHAR szBuffer[100];
@@ -2218,9 +2227,9 @@ VOID propBasicQueryJob(
                         // Build final string.
                         //
                         RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-                        rtl_swprintf_s(szBuffer, sizeof(szBuffer) / sizeof(szBuffer[0]), 
-                            TEXT("[0x%I64X:%I64u] %wS"), ProcessId, ProcessId, szProcessName);                       
-                        
+                        rtl_swprintf_s(szBuffer, sizeof(szBuffer) / sizeof(szBuffer[0]),
+                            TEXT("[0x%I64X:%I64u] %wS"), ProcessId, ProcessId, szProcessName);
+
                         SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
                     }
                     SendMessage(hwndCB, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
@@ -2279,69 +2288,331 @@ VOID propBasicQuerySession(
 }
 
 /*
-* propSetBasicInfoEx
+* propFormatTokenAttribute
 *
 * Purpose:
 *
-* Set information values received with kldbgdrv help
+* Convert token attributes to readable string.
 *
 */
-VOID propSetBasicInfoEx(
-    _In_ HWND hwndDlg,
-    _In_ POBJINFO InfoObject
+LPWSTR propFormatTokenAttribute(
+    _In_ PTOKEN_SECURITY_ATTRIBUTE_V1 Attribute,
+    _In_ ULONG ValueIndex
 )
 {
-    INT     i;
-    HWND    hwndCB;
-    WCHAR   szBuffer[MAX_PATH];
+    BOOLEAN IsSimpleConvert = FALSE;
+    LPWSTR Result = NULL, TempString = NULL;
+    PSID TempSid;
+    SIZE_T ResultLength;
+    UNICODE_STRING *TempUstringPtr;
+    TOKEN_SECURITY_ATTRIBUTE_FQBN_VALUE *TempFQBNPtr;
+    WCHAR szTemp[MAX_PATH + 1];
 
-    if (InfoObject == NULL)
-        return;
+    SIZE_T MinimumResultLength = 100;
 
-    //Object & Header Address
-    propSetObjectHeaderAddressInfo(
-        hwndDlg,
-        InfoObject->ObjectAddress,
-        InfoObject->HeaderAddress);
+    __try { //rely on private structures
 
-    //Reference Count
-    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-    i64tostr(InfoObject->ObjectHeader.PointerCount, _strend(szBuffer));
-    SetDlgItemText(hwndDlg, ID_OBJECT_REFC, szBuffer);
+        switch (Attribute->ValueType) {
+        case TOKEN_SECURITY_ATTRIBUTE_TYPE_INT64:
+            RtlSecureZeroMemory(szTemp, sizeof(szTemp));
+            i64tostr(Attribute->Values.pInt64[ValueIndex], szTemp);
+            IsSimpleConvert = TRUE;
+            break;
 
-    //Handle Count
-    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-    i64tostr(InfoObject->ObjectHeader.HandleCount, _strend(szBuffer));
-    SetDlgItemText(hwndDlg, ID_OBJECT_HANDLES, szBuffer);
+        case TOKEN_SECURITY_ATTRIBUTE_TYPE_UINT64:
+            RtlSecureZeroMemory(szTemp, sizeof(szTemp));
+            u64tostr(Attribute->Values.pUint64[ValueIndex], szTemp);
+            IsSimpleConvert = TRUE;
+            break;
 
-    //NonPagedPoolCharge
-    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-    ultostr(InfoObject->ObjectQuotaHeader.NonPagedPoolCharge, szBuffer);
-    SetDlgItemText(hwndDlg, ID_OBJECT_NP_CHARGE, szBuffer);
+        case TOKEN_SECURITY_ATTRIBUTE_TYPE_BOOLEAN:
+            if (Attribute->Values.pInt64[ValueIndex] != 0)
+                _strcpy(szTemp, TEXT("True"));
+            else
+                _strcpy(szTemp, TEXT("False"));
 
-    //PagedPoolCharge
-    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-    ultostr(InfoObject->ObjectQuotaHeader.PagedPoolCharge, _strend(szBuffer));
-    SetDlgItemText(hwndDlg, ID_OBJECT_PP_CHARGE, szBuffer);
+            IsSimpleConvert = TRUE;
+            break;
 
-    //Attributes
-    hwndCB = GetDlgItem(hwndDlg, IDC_OBJECT_FLAGS);
-    if (hwndCB) {
-        EnableWindow(hwndCB, (InfoObject->ObjectHeader.Flags > 0) ? TRUE : FALSE);
-        SendMessage(hwndCB, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
-        if (InfoObject->ObjectHeader.Flags > 0) {
-            for (i = 0; i < 8; i++) {
+        case TOKEN_SECURITY_ATTRIBUTE_TYPE_OCTET_STRING:
+            _strcpy(szTemp, TEXT("(Octet String)"));
+            IsSimpleConvert = TRUE;
+            break;
 
-                if (GET_BIT(InfoObject->ObjectHeader.Flags, i))
+        case TOKEN_SECURITY_ATTRIBUTE_TYPE_FQBN:
+            TempFQBNPtr = &Attribute->Values.pFqbn[ValueIndex];
+            ResultLength = TempFQBNPtr->Name.Length;
+            if (ResultLength == 0)
+                break;
 
-                    SendMessage(hwndCB,
-                        CB_ADDSTRING,
-                        (WPARAM)0,
-                        (LPARAM)T_ObjectFlags[i]);
+            Result = (LPWSTR)supHeapAlloc((MinimumResultLength + ResultLength) * sizeof(WCHAR));
+            if (Result) {
+                rtl_swprintf_s(Result, MinimumResultLength,
+                    TEXT("[%lu] Version %I64u: "), ValueIndex, Attribute->Values.pFqbn[ValueIndex].Version);
+
+                RtlCopyMemory(_strend(Result),
+                    TempFQBNPtr->Name.Buffer,
+                    TempFQBNPtr->Name.Length);
             }
-            SendMessage(hwndCB, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
+            break;
+
+        case TOKEN_SECURITY_ATTRIBUTE_TYPE_SID:
+            TempSid = Attribute->Values.pOctetString[ValueIndex].pValue;
+            if (RtlValidSid(TempSid)) {
+                if (ConvertSidToStringSid(TempSid, &TempString)) {
+                    ResultLength = _strlen(TempString);
+                    Result = (LPWSTR)supHeapAlloc((MinimumResultLength + ResultLength) * sizeof(WCHAR));
+                    if (Result) {
+                        rtl_swprintf_s(Result, MinimumResultLength + ResultLength,
+                            TEXT("[%lu] %s"), ValueIndex, TempString);
+                    }
+                    LocalFree(TempString);
+                }
+            }
+            break;
+
+        case TOKEN_SECURITY_ATTRIBUTE_TYPE_STRING:
+            TempUstringPtr = &Attribute->Values.pString[ValueIndex];
+            ResultLength = TempUstringPtr->Length;
+            if (ResultLength == 0)
+                break;
+
+            Result = (LPWSTR)supHeapAlloc((MinimumResultLength + ResultLength) * sizeof(WCHAR));
+            if (Result) {
+                rtl_swprintf_s(Result, MinimumResultLength,
+                    TEXT("[%lu] "), ValueIndex);
+
+                RtlCopyMemory(_strend(Result),
+                    TempUstringPtr->Buffer,
+                    TempUstringPtr->Length);
+            }
+            break;
+
+        default:
+            _strcpy(szTemp, T_UnknownValue);
+            IsSimpleConvert = TRUE;
+            break;
+
+        }
+
+        if (IsSimpleConvert) {
+            ResultLength = _strlen(szTemp);
+            Result = (LPWSTR)supHeapAlloc((MinimumResultLength + ResultLength) * sizeof(WCHAR));
+            if (Result) {
+                rtl_swprintf_s(Result, MinimumResultLength + ResultLength,
+                    TEXT("[%lu] %s"), ValueIndex, szTemp);
+            }
         }
     }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return NULL;
+    }
+    return Result;
+}
+
+/*
+* propBasicQueryToken
+*
+* Purpose:
+*
+* Set information values for Token object type
+*
+*/
+VOID propBasicQueryToken(
+    _In_ PROP_OBJECT_INFO *Context,
+    _In_ HWND hwndDlg,
+    _In_ BOOL ExtendedInfoAvailable
+)
+{
+    BOOLEAN bFlagSet = FALSE;
+    HANDLE hObject;
+    PTOKEN_SECURITY_ATTRIBUTES_INFORMATION SecurityAttributes;
+    PTOKEN_SECURITY_ATTRIBUTE_V1 Attribute;
+    ULONG ReturnLength = 0, i, j;
+    TVINSERTSTRUCT TVItem;
+    HTREEITEM RootItem;
+    LPWSTR lpType;
+    WCHAR szBuffer[MAX_PATH + 1];
+
+    HWND TreeView = GetDlgItem(hwndDlg, IDC_TOKEN_ATTRLIST);
+
+    SetWindowTheme(TreeView, TEXT("Explorer"), NULL);
+    TreeView_DeleteAllItems(TreeView);
+
+    if (Context == NULL) {
+        return;
+    }
+
+    //
+    // Open Token object.
+    //
+    hObject = NULL;
+    if (!propOpenCurrentObject(Context, &hObject, TOKEN_QUERY)) {
+        return;
+    }
+
+    //
+    // List security attributes.
+    //
+    SecurityAttributes = (PTOKEN_SECURITY_ATTRIBUTES_INFORMATION)
+        supGetTokenInfo(hObject, TokenSecurityAttributes, &ReturnLength);
+
+    if (SecurityAttributes) {
+
+        for (i = 0; i < SecurityAttributes->AttributeCount; i++) {
+
+            Attribute = &SecurityAttributes->Attribute.pAttributeV1[i];
+
+            //
+            // Atribute Name (root element).
+            //
+            RtlSecureZeroMemory(&TVItem, sizeof(TVItem));
+            TVItem.hParent = NULL;
+            TVItem.item.mask = TVIF_TEXT | TVIF_STATE;
+            TVItem.item.state = TVIS_EXPANDED;
+            TVItem.item.stateMask = TVIS_EXPANDED;
+
+            lpType = (LPWSTR)supHeapAlloc(Attribute->Name.Length + sizeof(UNICODE_NULL));
+            if (lpType) {
+                RtlCopyMemory(lpType, Attribute->Name.Buffer, Attribute->Name.Length);
+                TVItem.item.pszText = lpType;
+            }
+            else
+                TVItem.item.pszText = Attribute->Name.Buffer;
+            RootItem = TreeView_InsertItem(TreeView, &TVItem);
+            if (lpType) supHeapFree(lpType);
+
+            //
+            // Attribute ValueType
+            //
+            switch (Attribute->ValueType) {
+            case TOKEN_SECURITY_ATTRIBUTE_TYPE_INVALID:
+                lpType = T_Invalid;
+                break;
+            case TOKEN_SECURITY_ATTRIBUTE_TYPE_INT64:
+                lpType = TEXT("Int64");
+                break;
+            case TOKEN_SECURITY_ATTRIBUTE_TYPE_UINT64:
+                lpType = TEXT("UInt64");
+                break;
+            case TOKEN_SECURITY_ATTRIBUTE_TYPE_STRING:
+                lpType = TEXT("String");
+                break;
+            case TOKEN_SECURITY_ATTRIBUTE_TYPE_FQBN:
+                lpType = TEXT("FQBN");
+                break;
+            case TOKEN_SECURITY_ATTRIBUTE_TYPE_SID:
+                lpType = TEXT("SID");
+                break;
+            case TOKEN_SECURITY_ATTRIBUTE_TYPE_BOOLEAN:
+                lpType = TEXT("Boolean");
+                break;
+            case TOKEN_SECURITY_ATTRIBUTE_TYPE_OCTET_STRING:
+                lpType = TEXT("Octet string");
+                break;
+            default:
+                lpType = T_UnknownValue;
+                break;
+            }
+            _strcpy(szBuffer, TEXT("Type: "));
+            _strcat(szBuffer, lpType);
+            TVItem.hParent = RootItem;
+            TVItem.item.mask = TVIF_TEXT;
+            TVItem.item.pszText = szBuffer;
+            TreeView_InsertItem(TreeView, &TVItem);
+
+            //
+            // Attribute Flags
+            //
+            _strcpy(szBuffer, TEXT("Flags: "));
+
+            if (Attribute->Flags == 0) {
+                _strcat(szBuffer, T_NoneValue);
+            }
+            else {
+
+                _strcat(szBuffer, TEXT("("));
+                ultohex(Attribute->Flags, _strend(szBuffer));
+                _strcat(szBuffer, TEXT(") "));
+
+                if (Attribute->Flags & TOKEN_SECURITY_ATTRIBUTE_NON_INHERITABLE) {
+                    if (bFlagSet) _strcat(szBuffer, TEXT(", "));
+                    _strcat(szBuffer, TEXT("Non-inheritable"));
+                    bFlagSet = TRUE;
+                }
+                if (Attribute->Flags & TOKEN_SECURITY_ATTRIBUTE_VALUE_CASE_SENSITIVE) {
+                    if (bFlagSet) _strcat(szBuffer, TEXT(", "));
+                    _strcat(szBuffer, TEXT("Case-sensitive"));
+                    bFlagSet = TRUE;
+                }
+                if (Attribute->Flags & TOKEN_SECURITY_ATTRIBUTE_USE_FOR_DENY_ONLY) {
+                    if (bFlagSet) _strcat(szBuffer, TEXT(", "));
+                    _strcat(szBuffer, TEXT("Use for deny only"));
+                    bFlagSet = TRUE;
+                }
+                if (Attribute->Flags & TOKEN_SECURITY_ATTRIBUTE_DISABLED_BY_DEFAULT) {
+                    if (bFlagSet) _strcat(szBuffer, TEXT(", "));
+                    _strcat(szBuffer, TEXT("Default disabled"));
+                    bFlagSet = TRUE;
+                }
+                if (Attribute->Flags & TOKEN_SECURITY_ATTRIBUTE_DISABLED) {
+                    if (bFlagSet) _strcat(szBuffer, TEXT(", "));
+                    _strcat(szBuffer, TEXT("Disabled"));
+                    bFlagSet = TRUE;
+                }
+                if (Attribute->Flags & TOKEN_SECURITY_ATTRIBUTE_MANDATORY) {
+                    if (bFlagSet) _strcat(szBuffer, TEXT(", "));
+                    _strcat(szBuffer, TEXT("Mandatory"));
+                    bFlagSet = TRUE;
+                }
+                if (Attribute->Flags & TOKEN_SECURITY_ATTRIBUTE_COMPARE_IGNORE) {
+                    if (bFlagSet) _strcat(szBuffer, TEXT(", "));
+                    _strcat(szBuffer, TEXT("Compare-ignore"));
+                }
+
+            }
+            TreeView_InsertItem(TreeView, &TVItem);
+
+            _strcpy(szBuffer, TEXT("Values"));
+            TVItem.hParent = RootItem;
+            TVItem.item.mask = TVIF_TEXT | TVIF_STATE;
+            TVItem.item.state = TVIS_EXPANDED;
+            TVItem.item.stateMask = TVIS_EXPANDED;
+            TVItem.item.pszText = szBuffer;
+            RootItem = TreeView_InsertItem(TreeView, &TVItem);
+
+            for (j = 0; j < Attribute->ValueCount; j++) {
+
+                TVItem.hParent = RootItem;
+                TVItem.item.mask = TVIF_TEXT;
+
+                lpType = propFormatTokenAttribute(Attribute, j);
+                if (lpType) {
+                    TVItem.item.pszText = lpType;
+                }
+                else {
+                    TVItem.item.pszText = T_InvalidValue;
+                }
+
+                TreeView_InsertItem(TreeView, &TVItem);
+
+                if (lpType)
+                    supHeapFree(lpType);
+
+            }
+
+        }
+
+        supHeapFree(SecurityAttributes);
+    }
+
+    //
+    // Query object basic and type info if needed.
+    //
+    if (ExtendedInfoAvailable == FALSE) {
+        propSetDefaultInfo(Context, hwndDlg, hObject);
+    }
+    propCloseCurrentObject(Context, hObject);
 }
 
 /*
@@ -2425,6 +2696,72 @@ VOID propBasicQueryDesktop(
         propSetDefaultInfo(Context, hwndDlg, hDesktop);
     }
     propCloseCurrentObject(Context, (HANDLE)hDesktop);
+}
+
+/*
+* propSetBasicInfoEx
+*
+* Purpose:
+*
+* Set information values received with kldbgdrv help
+*
+*/
+VOID propSetBasicInfoEx(
+    _In_ HWND hwndDlg,
+    _In_ POBJINFO InfoObject
+)
+{
+    INT     i;
+    HWND    hwndCB;
+    WCHAR   szBuffer[MAX_PATH];
+
+    if (InfoObject == NULL)
+        return;
+
+    //Object & Header Address
+    propSetObjectHeaderAddressInfo(
+        hwndDlg,
+        InfoObject->ObjectAddress,
+        InfoObject->HeaderAddress);
+
+    //Reference Count
+    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+    i64tostr(InfoObject->ObjectHeader.PointerCount, _strend(szBuffer));
+    SetDlgItemText(hwndDlg, ID_OBJECT_REFC, szBuffer);
+
+    //Handle Count
+    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+    i64tostr(InfoObject->ObjectHeader.HandleCount, _strend(szBuffer));
+    SetDlgItemText(hwndDlg, ID_OBJECT_HANDLES, szBuffer);
+
+    //NonPagedPoolCharge
+    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+    ultostr(InfoObject->ObjectQuotaHeader.NonPagedPoolCharge, szBuffer);
+    SetDlgItemText(hwndDlg, ID_OBJECT_NP_CHARGE, szBuffer);
+
+    //PagedPoolCharge
+    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+    ultostr(InfoObject->ObjectQuotaHeader.PagedPoolCharge, _strend(szBuffer));
+    SetDlgItemText(hwndDlg, ID_OBJECT_PP_CHARGE, szBuffer);
+
+    //Attributes
+    hwndCB = GetDlgItem(hwndDlg, IDC_OBJECT_FLAGS);
+    if (hwndCB) {
+        EnableWindow(hwndCB, (InfoObject->ObjectHeader.Flags > 0) ? TRUE : FALSE);
+        SendMessage(hwndCB, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
+        if (InfoObject->ObjectHeader.Flags > 0) {
+            for (i = 0; i < 8; i++) {
+
+                if (GET_BIT(InfoObject->ObjectHeader.Flags, i))
+
+                    SendMessage(hwndCB,
+                        CB_ADDSTRING,
+                        (WPARAM)0,
+                        (LPARAM)T_ObjectFlags[i]);
+            }
+            SendMessage(hwndCB, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
+        }
+    }
 }
 
 /*
@@ -2578,6 +2915,9 @@ VOID propSetBasicInfo(
     case ObjectTypeThread:
         propBasicQueryThread(Context, hwndDlg, ExtendedInfoAvailable);
         break;
+    case ObjectTypeToken:
+        propBasicQueryToken(Context, hwndDlg, ExtendedInfoAvailable);
+        break;
     }
 
 }
@@ -2615,6 +2955,31 @@ INT_PTR BasicPropDialogOnCommand(
 }
 
 /*
+* BasicPropDialogOnInit
+*
+* Purpose:
+*
+* Basic Properties Dialog WM_INITDIALOG handler.
+*
+*/
+VOID BasicPropDialogOnInit(
+    _In_  HWND hwndDlg,
+    _In_  LPARAM lParam
+)
+{
+    PROPSHEETPAGE    *pSheet = NULL;
+
+    pSheet = (PROPSHEETPAGE *)lParam;
+    if (pSheet) {
+        SetProp(hwndDlg, T_PROPCONTEXT, (HANDLE)pSheet->lParam);
+        supLoadIconForObjectType(hwndDlg,
+            (PROP_OBJECT_INFO*)pSheet->lParam,
+            g_ListViewImages,
+            FALSE);
+    }
+}
+
+/*
 * BasicPropDialogProc
 *
 * Purpose:
@@ -2634,50 +2999,26 @@ INT_PTR CALLBACK BasicPropDialogProc(
     _In_  LPARAM lParam
 )
 {
-    HDC               hDc;
-    PAINTSTRUCT       Paint;
-    PROPSHEETPAGE    *pSheet = NULL;
     PROP_OBJECT_INFO *Context = NULL;
 
     switch (uMsg) {
 
     case WM_INITDIALOG:
-        pSheet = (PROPSHEETPAGE *)lParam;
-        if (pSheet) {
-            SetProp(hwndDlg, T_PROPCONTEXT, (HANDLE)pSheet->lParam);
-        }
+        BasicPropDialogOnInit(hwndDlg, lParam);
         return 1;
-        break;
 
     case WM_SHOWWINDOW:
         if (wParam) {
             Context = (PROP_OBJECT_INFO*)GetProp(hwndDlg, T_PROPCONTEXT);
             if (Context) {
                 propSetBasicInfo(Context, hwndDlg);
+                return 1;
             }
         }
-        return 1;
         break;
 
     case WM_COMMAND:
         return BasicPropDialogOnCommand(hwndDlg, wParam);
-        break;
-
-    case WM_PAINT:
-
-        Context = (PROP_OBJECT_INFO*)GetProp(hwndDlg, T_PROPCONTEXT);
-        if (Context) {
-            hDc = BeginPaint(hwndDlg, &Paint);
-            if (hDc) {
-
-                ImageList_Draw(g_ListViewImages, Context->TypeDescription->ImageIndex, hDc, 24, 34,
-                    ILD_NORMAL | ILD_TRANSPARENT);
-
-                EndPaint(hwndDlg, &Paint);
-            }
-        }
-        return 1;
-        break;
 
     case WM_DESTROY:
         RemoveProp(hwndDlg, T_PROPCONTEXT);

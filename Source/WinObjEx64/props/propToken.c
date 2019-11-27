@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPTOKEN.C
 *
-*  VERSION:     1.73
+*  VERSION:     1.82
 *
-*  DATE:        14 Mar 2019
+*  DATE:        14 Nov 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -18,6 +18,11 @@
 #include "propDlg.h"
 
 HWND g_hwndTokenPageList;
+
+#define T_TOKEN_PROP_CID_PID    TEXT("propTokenPid")
+#define T_TOKEN_PROP_CID_TID    TEXT("propTokenTid")
+#define T_TOKEN_PROP_TYPE       TEXT("propTokenType")
+
 
 /*
 * TokenPageShowError
@@ -436,11 +441,83 @@ VOID TokenPageListInfo(
 }
 
 /*
+* TokenPageShowAdvancedProperties
+*
+* Purpose:
+*
+* Show properties of selected token object.
+*
+*/
+VOID TokenPageShowAdvancedProperties(
+    _In_ HWND hwndDlg)
+{
+    OBJECT_ATTRIBUTES ObjectAttributes = RTL_INIT_OBJECT_ATTRIBUTES((PUNICODE_STRING)NULL, 0);
+    PROP_UNNAMED_OBJECT_INFO TokenObject;
+    PROP_DIALOG_CREATE_SETTINGS propSettings;
+
+    LPWSTR TokenStingFormatProcess = TEXT("Process Token, PID:%llu");
+    LPWSTR TokenStingFormatThread = TEXT("Thread Token, PID:%llu, TID:%llu");
+
+    HANDLE TokenHandle = NULL;
+    WCHAR szFakeName[MAX_PATH + 1];
+
+    //
+    // Only one token properties dialog at the same time allowed.
+    //
+    if (g_PsTokenWindow != NULL) {
+        SetActiveWindow(g_PsTokenWindow);
+        return;
+    }
+
+    RtlSecureZeroMemory(&TokenObject, sizeof(PROP_UNNAMED_OBJECT_INFO));
+
+    TokenObject.ClientId.UniqueProcess =
+        GetProp(hwndDlg, T_TOKEN_PROP_CID_PID);
+
+    TokenObject.ClientId.UniqueThread =
+        GetProp(hwndDlg, T_TOKEN_PROP_CID_TID);
+
+    TokenObject.IsThreadToken =
+        (BOOL)HandleToULong(GetProp(hwndDlg, T_TOKEN_PROP_TYPE));
+
+    RtlSecureZeroMemory(szFakeName, sizeof(szFakeName));
+
+    if (NT_SUCCESS(supOpenTokenByParam(&TokenObject.ClientId,
+        &ObjectAttributes,
+        TOKEN_QUERY,
+        TokenObject.IsThreadToken,
+        &TokenHandle)))
+    {
+        supQueryObjectFromHandle(TokenHandle, &TokenObject.ObjectAddress, NULL);
+        NtClose(TokenHandle);
+    }
+
+    RtlSecureZeroMemory(&propSettings, sizeof(propSettings));
+
+    if (TokenObject.IsThreadToken) {
+        rtl_swprintf_s(szFakeName, MAX_PATH, TokenStingFormatThread,
+            TokenObject.ClientId.UniqueProcess,
+            TokenObject.ClientId.UniqueThread);
+    }
+    else {
+        rtl_swprintf_s(szFakeName, MAX_PATH, TokenStingFormatProcess,
+            TokenObject.ClientId.UniqueProcess);
+    }
+
+    propSettings.hwndParent = hwndDlg;
+    propSettings.lpObjectName = szFakeName;
+    propSettings.lpObjectType = OBTYPE_NAME_TOKEN;
+    propSettings.UnnamedObject = &TokenObject;
+
+    propCreateDialog(&propSettings);
+}
+
+/*
 * TokenPageHandlePopup
 *
 * Purpose:
 *
-* Token page list popup construction
+* Token page list popup construction.
 *
 */
 VOID TokenPageHandlePopup(
@@ -456,6 +533,80 @@ VOID TokenPageHandlePopup(
         TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, point->x, point->y, 0, hwndDlg, NULL);
         DestroyMenu(hMenu);
     }
+}
+
+/*
+* TokenPageDialogOnCommand
+*
+* Purpose:
+*
+* Token page WM_COMMAND handler.
+*
+*/
+INT_PTR TokenPageDialogOnCommand(
+    _In_ HWND hwndDlg,
+    _In_ WPARAM wParam
+)
+{
+    INT_PTR Result = 0;
+
+    switch (LOWORD(wParam)) {
+    case ID_OBJECT_COPY:
+        supCopyListViewSubItemValue(g_hwndTokenPageList, 0);
+        Result = 1;
+        break;
+    case IDC_TOKEN_ADVANCED:
+        TokenPageShowAdvancedProperties(hwndDlg);
+        Result = 1;
+        break;
+    default:
+        break;
+    }
+
+    return Result;
+}
+
+/*
+* TokenPageDialogOnInit
+*
+* Purpose:
+*
+* Token page WM_INITDIALOG handler.
+*
+*/
+INT_PTR TokenPageDialogOnInit(
+    _In_ HWND hwndDlg,
+    _In_ LPARAM lParam)
+{
+    PROPSHEETPAGE    *pSheet = NULL;
+    PROP_OBJECT_INFO *Context = NULL;
+
+    pSheet = (PROPSHEETPAGE *)lParam;
+    if (pSheet) {
+        Context = (PROP_OBJECT_INFO *)pSheet->lParam;
+
+        //
+        // Remember client id.
+        //
+        SetProp(hwndDlg,
+            T_TOKEN_PROP_CID_PID,
+            Context->UnnamedObjectInfo.ClientId.UniqueProcess);
+
+        SetProp(hwndDlg,
+            T_TOKEN_PROP_CID_TID,
+            Context->UnnamedObjectInfo.ClientId.UniqueThread);
+
+        SetProp(hwndDlg,
+            T_TOKEN_PROP_TYPE,
+            UlongToHandle((ULONG)(Context->TypeDescription->Index == ObjectTypeThread)));
+
+        //
+        // Show token summary information.
+        //
+        TokenPageListInfo(Context, hwndDlg);
+    }
+
+    return 1;
 }
 
 /*
@@ -476,8 +627,6 @@ INT_PTR CALLBACK TokenPageDialogProc(
     _In_  LPARAM lParam
 )
 {
-    PROPSHEETPAGE    *pSheet = NULL;
-    PROP_OBJECT_INFO *Context = NULL;
     RECT crc;
     INT mark;
 
@@ -504,19 +653,19 @@ INT_PTR CALLBACK TokenPageDialogProc(
         break;
 
     case WM_COMMAND:
-        if (LOWORD(wParam) == ID_OBJECT_COPY) {
-            supCopyListViewSubItemValue(g_hwndTokenPageList, 0);
-            return 1;
-        }
-        break;
+        return TokenPageDialogOnCommand(hwndDlg, wParam);
 
     case WM_INITDIALOG:
-        pSheet = (PROPSHEETPAGE *)lParam;
-        if (pSheet) {
-            Context = (PROP_OBJECT_INFO *)pSheet->lParam;
-            TokenPageListInfo(Context, hwndDlg);
-        }
-        return 1;
+        return TokenPageDialogOnInit(hwndDlg, lParam);
+
+    case WM_DESTROY:
+        RemoveProp(hwndDlg, T_TOKEN_PROP_CID_PID);
+        RemoveProp(hwndDlg, T_TOKEN_PROP_CID_TID);
+        RemoveProp(hwndDlg, T_TOKEN_PROP_TYPE);
+        break;
+
+    default:
+        break;
     }
     return 0;
 }

@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASCALLBACKS.C
 *
-*  VERSION:     1.81
+*  VERSION:     1.82
 *
-*  DATE:        20 Sep 2019
+*  DATE:        24 Nov 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,10 +17,194 @@
 #include "global.h"
 #include "extras.h"
 #include "extrasCallbacks.h"
+#include "extras/extrasCallbacksPatterns.h"
 #include "treelist\treelist.h"
 #include "hde/hde64.h"
 
 ULONG g_CallbacksCount;
+
+typedef struct _OBEX_CALLBACK_DISPATCH_ENTRY OBEX_CALLBACK_DISPATCH_ENTRY;
+
+typedef ULONG_PTR(CALLBACK *POBEX_FINDCALLBACK_ROUTINE)(
+    _In_opt_ ULONG_PTR QueryFlags);
+
+typedef VOID(CALLBACK *POBEX_DISPLAYCALLBACK_ROUTINE)(
+    _In_ HWND TreeList,
+    _In_ LPWSTR CallbackType,
+    _In_ ULONG_PTR KernelVariableAddress,
+    _In_ PRTL_PROCESS_MODULES Modules);
+
+typedef NTSTATUS(CALLBACK *POBEX_QUERYCALLBACK_ROUTINE)(
+    _In_opt_ ULONG_PTR QueryFlags,
+    _In_ POBEX_DISPLAYCALLBACK_ROUTINE DisplayRoutine,
+    _In_opt_ POBEX_FINDCALLBACK_ROUTINE FindRoutine,
+    _In_opt_ LPWSTR CallbackType,
+    _In_ HWND TreeList,
+    _In_ PRTL_PROCESS_MODULES Modules,
+    _Inout_opt_ PULONG_PTR SystemCallbacksRef);
+
+#define OBEX_FINDCALLBACK_ROUTINE(n) ULONG_PTR CALLBACK n(    \
+    _In_opt_ ULONG_PTR QueryFlags)
+
+#define OBEX_QUERYCALLBACK_ROUTINE(n) NTSTATUS CALLBACK n(    \
+    _In_opt_ ULONG_PTR QueryFlags,                            \
+    _In_ POBEX_DISPLAYCALLBACK_ROUTINE DisplayRoutine,        \
+    _In_opt_ POBEX_FINDCALLBACK_ROUTINE FindRoutine,         \
+    _In_opt_ LPWSTR CallbackType,                             \
+    _In_ HWND TreeList,                                       \
+    _In_ PRTL_PROCESS_MODULES Modules,                        \
+    _Inout_opt_ PULONG_PTR SystemCallbacksRef)
+
+#define OBEX_DISPLAYCALLBACK_ROUTINE(n) VOID CALLBACK n(     \
+    _In_ HWND TreeList,                               \
+    _In_ LPWSTR CallbackType,                         \
+    _In_ ULONG_PTR KernelVariableAddress,             \
+    _In_ PRTL_PROCESS_MODULES Modules)
+
+typedef struct _OBEX_CALLBACK_DISPATCH_ENTRY {
+    ULONG_PTR QueryFlags;
+    LPWSTR CallbackType;
+    POBEX_QUERYCALLBACK_ROUTINE QueryRoutine;
+    POBEX_DISPLAYCALLBACK_ROUTINE DisplayRoutine;
+    POBEX_FINDCALLBACK_ROUTINE FindRoutine;
+    PULONG_PTR SystemCallbacksRef;
+} OBEX_CALLBACK_DISPATCH_ENTRY, *POBEX_CALLBACK_DISPATCH_ENTRY;
+
+OBEX_QUERYCALLBACK_ROUTINE(QueryIopFsListsCallbacks);
+OBEX_QUERYCALLBACK_ROUTINE(QueryCallbackGeneric);
+
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpPsCallbacks);
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpKeBugCheckCallbacks);
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpKeBugCheckReasonCallbacks);
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpCmCallbacks);
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoCallbacks);
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpObCallbacks);
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpSeFileSystemCallbacks);
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCallbacks);
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpDbgPrintCallbacks);
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoFsRegistrationCallbacks);
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoFileSystemCallbacks);
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpDbgkLCallbacks);
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpPsAltSystemCallHandlers);
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks);
+
+OBEX_FINDCALLBACK_ROUTINE(FindPspCreateProcessNotifyRoutine);
+OBEX_FINDCALLBACK_ROUTINE(FindPspCreateThreadNotifyRoutine);
+OBEX_FINDCALLBACK_ROUTINE(FindPspLoadImageNotifyRoutine);
+OBEX_FINDCALLBACK_ROUTINE(FindKeBugCheckCallbackHead);
+OBEX_FINDCALLBACK_ROUTINE(FindKeBugCheckReasonCallbackHead);
+OBEX_FINDCALLBACK_ROUTINE(FindCmCallbackHead);
+OBEX_FINDCALLBACK_ROUTINE(FindIopNotifyShutdownQueueHeadHead);
+OBEX_FINDCALLBACK_ROUTINE(FindPopRegisteredPowerSettingCallbacks);
+OBEX_FINDCALLBACK_ROUTINE(FindSeFileSystemNotifyRoutinesHead);
+OBEX_FINDCALLBACK_ROUTINE(FindIopFsNotifyChangeQueueHead);
+OBEX_FINDCALLBACK_ROUTINE(FindObjectTypeCallbackListHeadByType);
+OBEX_FINDCALLBACK_ROUTINE(FindRtlpDebugPrintCallbackList);
+OBEX_FINDCALLBACK_ROUTINE(FindDbgkLmdCallbacks);
+OBEX_FINDCALLBACK_ROUTINE(FindPsAltSystemCallHandlers);
+OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks);
+
+OBEX_CALLBACK_DISPATCH_ENTRY g_CallbacksDispatchTable[] = {
+    {
+        0, L"CreateProcess",
+        QueryCallbackGeneric, DumpPsCallbacks, FindPspCreateProcessNotifyRoutine,
+        &g_SystemCallbacks.PspCreateProcessNotifyRoutine
+    },
+    {
+        0, L"CreateThread",
+        QueryCallbackGeneric, DumpPsCallbacks, FindPspCreateThreadNotifyRoutine,
+        &g_SystemCallbacks.PspCreateThreadNotifyRoutine
+    },
+    {
+        0, L"LoadImage",
+        QueryCallbackGeneric, DumpPsCallbacks, FindPspLoadImageNotifyRoutine,
+        &g_SystemCallbacks.PspLoadImageNotifyRoutine
+    },
+    {
+        0, L"KeBugCheck",
+        QueryCallbackGeneric, DumpKeBugCheckCallbacks, FindKeBugCheckCallbackHead,
+        &g_SystemCallbacks.KeBugCheckCallbackHead
+    },
+    {
+        0, L"KeBugCheckReason",
+        QueryCallbackGeneric, DumpKeBugCheckReasonCallbacks, FindKeBugCheckReasonCallbackHead,
+        &g_SystemCallbacks.KeBugCheckReasonCallbackHead
+    },
+    {
+        0, L"CmRegistry",
+        QueryCallbackGeneric, DumpCmCallbacks, FindCmCallbackHead,
+        &g_SystemCallbacks.CmCallbackListHead
+    },
+    {
+        0, L"Shutdown",
+        QueryCallbackGeneric, DumpIoCallbacks, FindIopNotifyShutdownQueueHeadHead,
+        &g_SystemCallbacks.IopNotifyShutdownQueueHead
+    },
+    {
+        1, L"LastChanceShutdown",
+        QueryCallbackGeneric, DumpIoCallbacks, FindIopNotifyShutdownQueueHeadHead,
+        &g_SystemCallbacks.IopNotifyLastChanceShutdownQueueHead
+    },
+    {
+        0, L"ObProcess",
+        QueryCallbackGeneric, DumpObCallbacks, FindObjectTypeCallbackListHeadByType,
+        &g_SystemCallbacks.ObProcessCallbackHead },
+    {
+        1, L"ObThread",
+        QueryCallbackGeneric, DumpObCallbacks, FindObjectTypeCallbackListHeadByType,
+        &g_SystemCallbacks.ObThreadCallbackHead
+    },
+    {
+        2, L"ObDesktop", 
+        QueryCallbackGeneric, DumpObCallbacks, FindObjectTypeCallbackListHeadByType,
+        &g_SystemCallbacks.ObDesktopCallbackHead
+    },
+    {
+        0, L"SeFileSystem",
+        QueryCallbackGeneric, DumpSeFileSystemCallbacks, FindSeFileSystemNotifyRoutinesHead,
+        &g_SystemCallbacks.SeFileSystemNotifyRoutinesHead
+    },
+    {
+        1, L"SeFileSystemEx",
+        QueryCallbackGeneric, DumpSeFileSystemCallbacks, FindSeFileSystemNotifyRoutinesHead,
+        &g_SystemCallbacks.SeFileSystemNotifyRoutinesExHead
+    },
+    {
+        0, L"PowerSettings",
+        QueryCallbackGeneric, DumpPoCallbacks, FindPopRegisteredPowerSettingCallbacks,
+        &g_SystemCallbacks.PopRegisteredPowerSettingCallbacks
+    },
+    {
+        0, L"DebugPrint",
+        QueryCallbackGeneric, DumpDbgPrintCallbacks, FindRtlpDebugPrintCallbackList,
+        &g_SystemCallbacks.RtlpDebugPrintCallbackList
+    },
+    {
+        0, L"IoFsRegistration",
+        QueryCallbackGeneric, DumpIoFsRegistrationCallbacks, FindIopFsNotifyChangeQueueHead,
+        &g_SystemCallbacks.IopFsNotifyChangeQueueHead
+    },
+    {
+        0, NULL,
+        QueryIopFsListsCallbacks, DumpIoFileSystemCallbacks, NULL,
+        NULL
+    },
+    {
+        0, L"DbgkLmd",
+        QueryCallbackGeneric, DumpDbgkLCallbacks, FindDbgkLmdCallbacks,
+        &g_SystemCallbacks.DbgkLmdCallbacks
+    },
+    {
+        0, L"AltSystemCall",
+        QueryCallbackGeneric, DumpPsAltSystemCallHandlers, FindPsAltSystemCallHandlers,
+        &g_SystemCallbacks.PsAltSystemCallHandlers
+    },
+    {
+        0, L"CiCallbacks",
+        QueryCallbackGeneric, DumpCiCallbacks, FindCiCallbacks,
+        &g_SystemCallbacks.CiCallbacks
+    }
+};
 
 //
 // All available names for CiCallbacks. Unknown is expected to be XBOX callback.
@@ -290,6 +474,168 @@ LPWSTR GetCiRoutineNameFromIndex(
 }
 
 /*
+* FindCiCallbacks
+*
+* Purpose:
+*
+* Locate address of ntoskrnl g_CiCallbacks/SeCiCallbacks structure.
+*
+*/
+OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
+{
+    ULONG_PTR Address = 0, Result = 0;
+
+    PBYTE   Signature = NULL, ptrCode = NULL, InstructionMatchPattern = NULL;
+    ULONG   SignatureSize = 0, InstructionMatchLength;
+    ULONG   InstructionExactMatchLength;
+
+    PVOID   SectionBase;
+    ULONG   SectionSize = 0, Index;
+
+    LONG    Rel = 0;
+    hde64s  hs;
+
+    ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
+    HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
+
+    UNREFERENCED_PARAMETER(QueryFlags);
+
+    do {
+        //
+        // Locate PAGE image section as required variable is always in PAGE.
+        //
+        SectionBase = supLookupImageSectionByName(
+            PAGE_SECTION,
+            PAGE_SECTION_LEGNTH,
+            (PVOID)hNtOs,
+            &SectionSize);
+
+        if ((SectionBase == 0) || (SectionSize == 0))
+            break;
+
+        InstructionMatchPattern = SeCiCallbacksMatchingPattern; //default matching pattern
+        InstructionMatchLength = 7; //lea
+        InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern);
+
+        switch (g_NtBuildNumber) {
+
+        case 7601:
+            Signature = g_CiCallbacksPattern_7601;
+            SignatureSize = sizeof(g_CiCallbacksPattern_7601);
+            InstructionMatchPattern = g_CiCallbacksMatchingPattern;
+            InstructionExactMatchLength = RTL_NUMBER_OF(g_CiCallbacksMatchingPattern);
+            break;
+
+        case 9200:
+        case 9600:
+            Signature = SeCiCallbacksPattern_9200_9600;
+            SignatureSize = sizeof(SeCiCallbacksPattern_9200_9600);
+            break;
+
+        case 10240:
+        case 10586:
+            Signature = SeCiCallbacksPattern_10240_10586;
+            SignatureSize = sizeof(SeCiCallbacksPattern_10240_10586);
+            break;
+
+        case 14393:
+            Signature = SeCiCallbacksPattern_14393;
+            SignatureSize = sizeof(SeCiCallbacksPattern_14393);
+            break;
+
+        case 15063:
+        case 16299:
+            Signature = SeCiCallbacksPattern_15063_16299;
+            SignatureSize = sizeof(SeCiCallbacksPattern_15063_16299);
+            break;
+
+        case 17134:
+        case 17763:
+            Signature = SeCiCallbacksPattern_17134_17763;
+            SignatureSize = sizeof(SeCiCallbacksPattern_17134_17763);
+            break;
+
+        case 18362:
+        case 18363:
+        default:
+            Signature = SeCiCallbacksPattern_19H1;
+            SignatureSize = sizeof(SeCiCallbacksPattern_19H1);
+            InstructionMatchPattern = SeCiCallbacksMatchingPattern_19H1;
+            InstructionMatchLength = 10; //mov
+            InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern_19H1);
+            break;
+        }
+
+        ptrCode = (PBYTE)supFindPattern(
+            (PBYTE)SectionBase,
+            SectionSize,
+            Signature,
+            SignatureSize);
+
+        if (ptrCode == NULL)
+            break;
+
+        if (g_NtBuildNumber <= 7601) {
+
+            //
+            // Find reference to g_CiCallbacks in code.
+            //
+
+            Index = 0; //pattern search include target instruction, do not skip
+
+        }
+        else {
+
+            //
+            // Find reference to SeCiCallbacks/g_CiCallbacks in code.
+            //
+
+            Index = SignatureSize; //skip signature instructions
+
+        }
+
+        do {
+            hde64_disasm((void*)(ptrCode + Index), &hs);
+            if (hs.flags & F_ERROR)
+                break;
+            //
+            // mov cs:g_CiCallbacks, rax (for Windows 7)
+            // lea rcx, SeCiCallbacks (for 8/10 TH/RS)
+            // mov cs:SeCiCallbacks (19H1)
+            //
+            if (hs.len == InstructionMatchLength) {
+
+                //
+                // Match block found.
+                //
+                if (RtlCompareMemory((VOID*)&ptrCode[Index], (VOID*)InstructionMatchPattern,
+                    InstructionExactMatchLength) == InstructionExactMatchLength)
+                {
+                    Rel = *(PLONG)(ptrCode + Index + InstructionExactMatchLength);
+                    break;
+                }
+            }
+            Index += hs.len;
+
+        } while (Index < 64);
+
+        if (Rel == 0)
+            break;
+
+        Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
+        Address = NtOsBase + Address - (ULONG_PTR)hNtOs;
+
+        if (!kdAddressInNtOsImage((PVOID)Address))
+            break;
+
+        Result = Address;
+
+    } while (FALSE);
+
+    return Result;
+}
+
+/*
 * FindIopFileSystemQueueHeads
 *
 * Purpose:
@@ -299,7 +645,6 @@ LPWSTR GetCiRoutineNameFromIndex(
 *   IoRegisterFileSystem
 *
 */
-_Success_(return == TRUE)
 BOOL FindIopFileSystemQueueHeads(
     _Out_ ULONG_PTR *IopCdRomFileSystemQueueHead,
     _Out_ ULONG_PTR *IopDiskFileSystemQueueHead,
@@ -315,6 +660,14 @@ BOOL FindIopFileSystemQueueHeads(
 
     ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
     HMODULE hNtOs = (HINSTANCE)g_kdctx.NtOsImageMap;
+
+    //
+    // Assume failure.
+    //
+    *IopCdRomFileSystemQueueHead = 0;
+    *IopDiskFileSystemQueueHead = 0;
+    *IopTapeFileSystemQueueHead = 0;
+    *IopNetworkFileSystemQueueHead = 0;
 
     ptrCode = (PBYTE)GetProcAddress(hNtOs, "IoRegisterFileSystem");
 
@@ -451,9 +804,7 @@ BOOL FindIopFileSystemQueueHeads(
 *   IoRegisterFsRegistrationChange
 *
 */
-ULONG_PTR FindIopFsNotifyChangeQueueHead(
-    VOID
-)
+OBEX_FINDCALLBACK_ROUTINE(FindIopFsNotifyChangeQueueHead)
 {
     ULONG Index;
     LONG Rel = 0;
@@ -463,6 +814,8 @@ ULONG_PTR FindIopFsNotifyChangeQueueHead(
 
     ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
     HMODULE hNtOs = (HINSTANCE)g_kdctx.NtOsImageMap;
+
+    UNREFERENCED_PARAMETER(QueryFlags);
 
     ptrCode = (PBYTE)GetProcAddress(hNtOs, "IoUnregisterFsRegistrationChange");
 
@@ -519,9 +872,7 @@ ULONG_PTR FindIopFsNotifyChangeQueueHead(
 *   DbgSetDebugPrintCallback
 *
 */
-ULONG_PTR FindRtlpDebugPrintCallbackList(
-    VOID
-)
+OBEX_FINDCALLBACK_ROUTINE(FindRtlpDebugPrintCallbackList)
 {
     ULONG Index;
     LONG Rel = 0;
@@ -531,6 +882,8 @@ ULONG_PTR FindRtlpDebugPrintCallbackList(
 
     ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
     HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
+
+    UNREFERENCED_PARAMETER(QueryFlags);
 
     ptrCode = (PBYTE)GetProcAddress(hNtOs, "DbgSetDebugPrintCallback");
     if (ptrCode == NULL)
@@ -624,9 +977,7 @@ ULONG_PTR FindRtlpDebugPrintCallbackList(
 *   PoRegisterPowerSettingCallback
 *
 */
-ULONG_PTR FindPopRegisteredPowerSettingCallbacks(
-    VOID
-)
+OBEX_FINDCALLBACK_ROUTINE(FindPopRegisteredPowerSettingCallbacks)
 {
     ULONG Index;
     LONG Rel = 0;
@@ -636,6 +987,8 @@ ULONG_PTR FindPopRegisteredPowerSettingCallbacks(
 
     ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
     HMODULE hNtOs = (HINSTANCE)g_kdctx.NtOsImageMap;
+
+    UNREFERENCED_PARAMETER(QueryFlags);
 
     ptrCode = (PBYTE)GetProcAddress(hNtOs, "PoRegisterPowerSettingCallback");
 
@@ -694,9 +1047,9 @@ ULONG_PTR FindPopRegisteredPowerSettingCallbacks(
 *   SeRegisterLogonSessionTerminatedRoutineEx
 *
 */
-ULONG_PTR FindSeFileSystemNotifyRoutinesHead(
-    _In_ BOOL Extended)
+OBEX_FINDCALLBACK_ROUTINE(FindSeFileSystemNotifyRoutinesHead)
 {
+    BOOL Extended = (BOOL)QueryFlags;
     ULONG Index;
     LONG Rel = 0;
     ULONG_PTR Address = 0;
@@ -760,7 +1113,7 @@ ULONG_PTR FindSeFileSystemNotifyRoutinesHead(
 }
 
 /*
-* GetObjectTypeCallbackListHeadByType
+* FindObjectTypeCallbackListHeadByType
 *
 * Purpose:
 *
@@ -769,13 +1122,12 @@ ULONG_PTR FindSeFileSystemNotifyRoutinesHead(
 *   ObRegisterCallbacks
 *
 */
-ULONG_PTR GetObjectTypeCallbackListHeadByType(
-    _In_ ULONG Type
-)
+OBEX_FINDCALLBACK_ROUTINE(FindObjectTypeCallbackListHeadByType)
 {
+    ULONG Type = (ULONG)QueryFlags;
     ULONG_PTR ListHead = 0;
     ULONG ObjectSize, ObjectVersion = 0, CallbackListOffset = 0;
-    LPWSTR lpType = NULL;
+    LPWSTR TypeName = NULL;
     POBJINFO CurrentObject = NULL;
     PVOID ObjectTypeInformation = NULL;
 
@@ -791,21 +1143,23 @@ ULONG_PTR GetObjectTypeCallbackListHeadByType(
 
     switch (Type) {
     case 0: //PsProcessType
-        lpType = TEXT("Process");
+        TypeName = TEXT("Process");
         break;
     case 1: //PsThreadType
-        lpType = TEXT("Thread");
+        TypeName = TEXT("Thread");
+        break;
+    case 2:
+        //ExDesktopObjectType
+        TypeName = TEXT("Desktop");
         break;
     default:
-        //ExDesktopObjectType
-        lpType = TEXT("Desktop");
-        break;
+        return 0;
     }
 
     //
     // Get the reference to the object.
     //
-    CurrentObject = ObQueryObject(T_OBJECTTYPES, lpType);
+    CurrentObject = ObQueryObject(T_OBJECTTYPES, TypeName);
     if (CurrentObject == NULL)
         return 0;
 
@@ -869,9 +1223,9 @@ ULONG_PTR GetObjectTypeCallbackListHeadByType(
 *   IoRegisterLastChanceShutdownNotification
 *
 */
-ULONG_PTR FindIopNotifyShutdownQueueHeadHead(
-    _In_ BOOL bLastChance)
+OBEX_FINDCALLBACK_ROUTINE(FindIopNotifyShutdownQueueHeadHead)
 {
+    BOOL bLastChance = (BOOL)QueryFlags;
     ULONG Index;
     LONG Rel = 0;
     ULONG_PTR Address = 0;
@@ -940,8 +1294,7 @@ ULONG_PTR FindIopNotifyShutdownQueueHeadHead(
 *   CmRegisterCallbackEx
 *
 */
-ULONG_PTR FindCmCallbackHead(
-    VOID)
+OBEX_FINDCALLBACK_ROUTINE(FindCmCallbackHead)
 {
     ULONG Index, resultOffset;
     LONG Rel = 0, FirstInstructionLength;
@@ -951,6 +1304,8 @@ ULONG_PTR FindCmCallbackHead(
 
     ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
     HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
+
+    UNREFERENCED_PARAMETER(QueryFlags);
 
     ptrCode = (PBYTE)GetProcAddress(hNtOs, "CmUnRegisterCallback");
     if (ptrCode == NULL)
@@ -1023,8 +1378,7 @@ ULONG_PTR FindCmCallbackHead(
 *   KeRegisterBugCheckReasonCallback
 *
 */
-ULONG_PTR FindKeBugCheckReasonCallbackHead(
-    VOID)
+OBEX_FINDCALLBACK_ROUTINE(FindKeBugCheckReasonCallbackHead)
 {
     ULONG Index;
     LONG Rel = 0;
@@ -1034,6 +1388,8 @@ ULONG_PTR FindKeBugCheckReasonCallbackHead(
 
     ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
     HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
+
+    UNREFERENCED_PARAMETER(QueryFlags);
 
     ptrCode = (PBYTE)GetProcAddress(hNtOs, "KeRegisterBugCheckReasonCallback");
     if (ptrCode == NULL)
@@ -1085,8 +1441,7 @@ ULONG_PTR FindKeBugCheckReasonCallbackHead(
 *   KeRegisterBugCheckCallback
 *
 */
-ULONG_PTR FindKeBugCheckCallbackHead(
-    VOID)
+OBEX_FINDCALLBACK_ROUTINE(FindKeBugCheckCallbackHead)
 {
     ULONG Index;
     LONG Rel = 0;
@@ -1096,6 +1451,8 @@ ULONG_PTR FindKeBugCheckCallbackHead(
 
     ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
     HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
+
+    UNREFERENCED_PARAMETER(QueryFlags);
 
     ptrCode = (PBYTE)GetProcAddress(hNtOs, "KeRegisterBugCheckCallback");
     if (ptrCode == NULL)
@@ -1148,8 +1505,7 @@ ULONG_PTR FindKeBugCheckCallbackHead(
 *   PsSetLoadImageNotifyRoutineEx
 *
 */
-ULONG_PTR FindPspLoadImageNotifyRoutine(
-    VOID)
+OBEX_FINDCALLBACK_ROUTINE(FindPspLoadImageNotifyRoutine)
 {
     ULONG Index;
     LONG Rel = 0;
@@ -1163,6 +1519,8 @@ ULONG_PTR FindPspLoadImageNotifyRoutine(
     ptrCode = (PBYTE)GetProcAddress(hNtOs, "PsRemoveLoadImageNotifyRoutine");
     if (ptrCode == NULL)
         return 0;
+
+    UNREFERENCED_PARAMETER(QueryFlags);
 
     Index = 0;
     Rel = 0;
@@ -1210,8 +1568,7 @@ ULONG_PTR FindPspLoadImageNotifyRoutine(
 *   PsSetCreateThreadNotifyRoutineEx
 *
 */
-ULONG_PTR FindPspCreateThreadNotifyRoutine(
-    VOID)
+OBEX_FINDCALLBACK_ROUTINE(FindPspCreateThreadNotifyRoutine)
 {
     ULONG Index;
     LONG Rel = 0;
@@ -1221,6 +1578,8 @@ ULONG_PTR FindPspCreateThreadNotifyRoutine(
 
     ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
     HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
+
+    UNREFERENCED_PARAMETER(QueryFlags);
 
     ptrCode = (PBYTE)GetProcAddress(hNtOs, "PsRemoveCreateThreadNotifyRoutine");
     if (ptrCode == NULL)
@@ -1271,8 +1630,7 @@ ULONG_PTR FindPspCreateThreadNotifyRoutine(
 *   DbgkLkmdRegisterCallback
 *
 */
-ULONG_PTR FindDbgkLmdCallbacks(
-    VOID)
+OBEX_FINDCALLBACK_ROUTINE(FindDbgkLmdCallbacks)
 {
     ULONG Index;
     LONG Rel = 0;
@@ -1282,6 +1640,8 @@ ULONG_PTR FindDbgkLmdCallbacks(
 
     ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
     HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
+
+    UNREFERENCED_PARAMETER(QueryFlags);
 
     ptrCode = (PBYTE)GetProcAddress(hNtOs, "DbgkLkmdUnregisterCallback");
     if (ptrCode == NULL)
@@ -1341,14 +1701,15 @@ ULONG_PTR FindDbgkLmdCallbacks(
 *   PsSetCreateProcessNotifyRoutineEx2
 *
 */
-ULONG_PTR FindPspCreateProcessNotifyRoutine(
-    VOID)
+OBEX_FINDCALLBACK_ROUTINE(FindPspCreateProcessNotifyRoutine)
 {
     ULONG Index;
     LONG Rel = 0;
     ULONG_PTR Address = 0;
     PBYTE ptrCode;
     hde64s hs;
+
+    UNREFERENCED_PARAMETER(QueryFlags);
 
     ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
     HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
@@ -1418,6 +1779,81 @@ ULONG_PTR FindPspCreateProcessNotifyRoutine(
 
     return Address;
 }
+
+/*
+* FindPsAltSystemCallHandlers
+*
+* Purpose:
+*
+* Return array address of callbacks registered with:
+*
+*   PsRegisterAltSystemCallHandler
+*
+*/
+OBEX_FINDCALLBACK_ROUTINE(FindPsAltSystemCallHandlers)
+{
+    ULONG_PTR Address = 0, Result = 0;
+
+    ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
+    HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
+
+    ULONG   Index, InstructionExactMatchLength;
+    PBYTE   ptrCode;
+    LONG    Rel = 0;
+    hde64s  hs;
+
+    UNREFERENCED_PARAMETER(QueryFlags);
+
+    ptrCode = (PBYTE)GetProcAddress(hNtOs, "PsRegisterAltSystemCallHandler");
+    if (ptrCode == NULL)
+        return 0;
+
+    InstructionExactMatchLength = sizeof(PsAltSystemCallHandlersPattern);
+
+    do {
+
+        Index = 0;
+
+        do {
+            hde64_disasm((void*)(ptrCode + Index), &hs);
+            if (hs.flags & F_ERROR)
+                break;
+            //
+            // lea reg, PsAltSystemCallHandlers
+            //
+            if (hs.len == 7) {
+
+                //
+                // Match block found.
+                //
+                if (RtlCompareMemory((VOID*)&ptrCode[Index],
+                    (VOID*)PsAltSystemCallHandlersPattern,
+                    InstructionExactMatchLength) == InstructionExactMatchLength)
+                {
+                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    break;
+                }
+            }
+            Index += hs.len;
+
+        } while (Index < 128);
+
+        if (Rel == 0)
+            break;
+
+        Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
+        Address = NtOsBase + Address - (ULONG_PTR)hNtOs;
+
+        if (!kdAddressInNtOsImage((PVOID)Address))
+            break;
+
+        Result = Address;
+
+    } while (FALSE);
+
+    return Result;
+}
+
 
 /*
 * AddRootEntryToList
@@ -1561,12 +1997,7 @@ VOID AddZeroEntryToList(
 * Read Psp* callback data from kernel and send it to output window.
 *
 */
-VOID DumpPsCallbacks(
-    _In_ HWND TreeList,
-    _In_ LPWSTR lpCallbackType,
-    _In_ ULONG_PTR RoutinesArrayAddress,
-    _In_ PRTL_PROCESS_MODULES Modules
-)
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpPsCallbacks)
 {
     ULONG c;
     ULONG_PTR Address, Function;
@@ -1577,12 +2008,12 @@ VOID DumpPsCallbacks(
     //
     // Add callback root entry to the treelist.
     //
-    RootItem = AddRootEntryToList(TreeList, lpCallbackType);
+    RootItem = AddRootEntryToList(TreeList, CallbackType);
     if (RootItem == 0)
         return;
 
     RtlSecureZeroMemory(Callbacks, sizeof(Callbacks));
-    if (kdReadSystemMemory(RoutinesArrayAddress,
+    if (kdReadSystemMemory(KernelVariableAddress,
         &Callbacks, sizeof(Callbacks)))
     {
 
@@ -1614,12 +2045,7 @@ VOID DumpPsCallbacks(
 * Read DbgkL* callback data from kernel and send it to output window.
 *
 */
-VOID DumpDbgkLCallbacks(
-    _In_ HWND TreeList,
-    _In_ LPWSTR lpCallbackType,
-    _In_ ULONG_PTR RoutinesArrayAddress,
-    _In_ PRTL_PROCESS_MODULES Modules
-)
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpDbgkLCallbacks)
 {
     ULONG c;
     ULONG_PTR Address, Function;
@@ -1630,12 +2056,12 @@ VOID DumpDbgkLCallbacks(
     //
     // Add callback root entry to the treelist.
     //
-    RootItem = AddRootEntryToList(TreeList, lpCallbackType);
+    RootItem = AddRootEntryToList(TreeList, CallbackType);
     if (RootItem == 0)
         return;
 
     RtlSecureZeroMemory(Callbacks, sizeof(Callbacks));
-    if (kdReadSystemMemory(RoutinesArrayAddress,
+    if (kdReadSystemMemory(KernelVariableAddress,
         &Callbacks, sizeof(Callbacks)))
     {
 
@@ -1660,6 +2086,51 @@ VOID DumpDbgkLCallbacks(
 }
 
 /*
+* DumpPsAltSystemCallHandlers
+*
+* Purpose:
+*
+* Read PsAltSystemCallHandlers data from kernel and send it to output window.
+*
+*/
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpPsAltSystemCallHandlers)
+{
+    ULONG i;
+    ULONG_PTR AltSystemCallHandlers[MAX_ALT_SYSTEM_CALL_HANDLERS];
+
+    HTREEITEM RootItem;
+
+    //
+    // Add callback root entry to the treelist.
+    //
+    RootItem = AddRootEntryToList(TreeList, CallbackType);
+    if (RootItem == 0)
+        return;
+
+    RtlSecureZeroMemory(AltSystemCallHandlers, sizeof(AltSystemCallHandlers));
+    if (kdReadSystemMemory(KernelVariableAddress,
+        &AltSystemCallHandlers, sizeof(AltSystemCallHandlers)))
+    {
+
+        for (i = 0; i < MAX_ALT_SYSTEM_CALL_HANDLERS; i++) {
+
+            if (AltSystemCallHandlers[i]) {
+
+                if (AltSystemCallHandlers[i] < g_kdctx.SystemRangeStart)
+                    continue;
+
+                AddEntryToList(TreeList,
+                    RootItem,
+                    AltSystemCallHandlers[i],
+                    NULL,
+                    Modules);
+            }
+        }
+    }
+
+}
+
+/*
 * DumpKeBugCheckCallbacks
 *
 * Purpose:
@@ -1667,13 +2138,9 @@ VOID DumpDbgkLCallbacks(
 * Read KeBugCheck callback data from kernel and send it to output window.
 *
 */
-VOID DumpKeBugCheckCallbacks(
-    _In_ HWND TreeList,
-    _In_ LPWSTR lpCallbackType,
-    _In_ ULONG_PTR ListHead,
-    _In_ PRTL_PROCESS_MODULES Modules
-)
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpKeBugCheckCallbacks)
 {
+    ULONG_PTR ListHead = KernelVariableAddress;
     LIST_ENTRY ListEntry;
 
     KBUGCHECK_CALLBACK_RECORD CallbackRecord;
@@ -1683,7 +2150,7 @@ VOID DumpKeBugCheckCallbacks(
     //
     // Add callback root entry to the treelist.
     //
-    RootItem = AddRootEntryToList(TreeList, lpCallbackType);
+    RootItem = AddRootEntryToList(TreeList, CallbackType);
     if (RootItem == 0)
         return;
 
@@ -1774,13 +2241,10 @@ LPWSTR KeBugCheckReasonToString(
 * Read KeBugCheckReason callback data from kernel and send it to output window.
 *
 */
-VOID DumpKeBugCheckReasonCallbacks(
-    _In_ HWND TreeList,
-    _In_ LPWSTR lpCallbackType,
-    _In_ ULONG_PTR ListHead,
-    _In_ PRTL_PROCESS_MODULES Modules
-)
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpKeBugCheckReasonCallbacks)
 {
+    ULONG_PTR ListHead = KernelVariableAddress;
+
     LIST_ENTRY ListEntry;
 
     KBUGCHECK_REASON_CALLBACK_RECORD CallbackRecord;
@@ -1790,7 +2254,7 @@ VOID DumpKeBugCheckReasonCallbacks(
     //
     // Add callback root entry to the treelist.
     //
-    RootItem = AddRootEntryToList(TreeList, lpCallbackType);
+    RootItem = AddRootEntryToList(TreeList, CallbackType);
     if (RootItem == 0)
         return;
 
@@ -1842,13 +2306,10 @@ VOID DumpKeBugCheckReasonCallbacks(
 * Read Cm Registry callback data from kernel and send it to output window.
 *
 */
-VOID DumpCmCallbacks(
-    _In_ HWND TreeList,
-    _In_ LPWSTR lpCallbackType,
-    _In_ ULONG_PTR ListHead,
-    _In_ PRTL_PROCESS_MODULES Modules
-)
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpCmCallbacks)
 {
+    ULONG_PTR ListHead = KernelVariableAddress;
+
     LIST_ENTRY ListEntry;
 
     CM_CALLBACK_CONTEXT_BLOCK CallbackRecord;
@@ -1858,7 +2319,7 @@ VOID DumpCmCallbacks(
     //
     // Add callback root entry to the treelist.
     //
-    RootItem = AddRootEntryToList(TreeList, lpCallbackType);
+    RootItem = AddRootEntryToList(TreeList, CallbackType);
     if (RootItem == 0)
         return;
 
@@ -1910,13 +2371,10 @@ VOID DumpCmCallbacks(
 * Read Io related callback data from kernel and send it to output window.
 *
 */
-VOID DumpIoCallbacks(
-    _In_ HWND TreeList,
-    _In_ LPWSTR lpCallbackType,
-    _In_ ULONG_PTR ListHead,
-    _In_ PRTL_PROCESS_MODULES Modules
-)
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoCallbacks)
 {
+    ULONG_PTR ListHead = KernelVariableAddress;
+
     LIST_ENTRY ListEntry;
 
     SHUTDOWN_PACKET EntryPacket;
@@ -1933,7 +2391,7 @@ VOID DumpIoCallbacks(
     //
     // Add callback root entry to the treelist.
     //
-    RootItem = AddRootEntryToList(TreeList, lpCallbackType);
+    RootItem = AddRootEntryToList(TreeList, CallbackType);
     if (RootItem == 0)
         return;
 
@@ -2019,14 +2477,11 @@ VOID DumpIoCallbacks(
 * Read Ob callback data from kernel and send it to output window.
 *
 */
-VOID DumpObCallbacks(
-    _In_ HWND TreeList,
-    _In_ LPWSTR lpCallbackType,
-    _In_ ULONG_PTR ListHead,
-    _In_ PRTL_PROCESS_MODULES Modules
-)
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpObCallbacks)
 {
     BOOL bAltitudeRead, bNeedFree;
+
+    ULONG_PTR ListHead = KernelVariableAddress;
 
     LPWSTR lpInfoBuffer = NULL, lpType;
 
@@ -2043,7 +2498,7 @@ VOID DumpObCallbacks(
     //
     // Add callback root entry to the treelist.
     //
-    RootItem = AddRootEntryToList(TreeList, lpCallbackType);
+    RootItem = AddRootEntryToList(TreeList, CallbackType);
     if (RootItem == 0)
         return;
 
@@ -2161,19 +2616,14 @@ VOID DumpObCallbacks(
 }
 
 /*
-* DumpSeCallbacks
+* DumpSeFileSystemCallbacks
 *
 * Purpose:
 *
 * Read Se related callback data from kernel and send it to output window.
 *
 */
-VOID DumpSeCallbacks(
-    _In_ HWND TreeList,
-    _In_ LPWSTR lpCallbackType,
-    _In_ ULONG_PTR EntryHead,
-    _In_ PRTL_PROCESS_MODULES Modules
-)
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpSeFileSystemCallbacks)
 {
     ULONG_PTR Next;
 
@@ -2185,7 +2635,7 @@ VOID DumpSeCallbacks(
     //
     // Add callback root entry to the treelist.
     //
-    RootItem = AddRootEntryToList(TreeList, lpCallbackType);
+    RootItem = AddRootEntryToList(TreeList, CallbackType);
     if (RootItem == 0)
         return;
 
@@ -2194,7 +2644,7 @@ VOID DumpSeCallbacks(
     //
     RtlSecureZeroMemory(&SeEntry, sizeof(SeEntry));
 
-    if (!kdReadSystemMemoryEx(EntryHead,
+    if (!kdReadSystemMemoryEx(KernelVariableAddress,
         (PVOID)&SeEntry,
         sizeof(SeEntry),
         NULL))
@@ -2238,12 +2688,7 @@ VOID DumpSeCallbacks(
 * Read Po callback data from kernel and send it to output window.
 *
 */
-VOID DumpPoCallbacks(
-    _In_ HWND TreeList,
-    _In_ LPWSTR lpCallbackType,
-    _In_ ULONG_PTR ListHead,
-    _In_ PRTL_PROCESS_MODULES Modules
-)
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCallbacks)
 {
     LIST_ENTRY ListEntry;
 
@@ -2256,6 +2701,7 @@ VOID DumpPoCallbacks(
     } CallbackData;
 
     ULONG ReadSize;
+    ULONG_PTR ListHead = KernelVariableAddress;
     SIZE_T BufferSize;
     LPWSTR GuidString;
     PVOID Buffer = NULL;
@@ -2269,7 +2715,7 @@ VOID DumpPoCallbacks(
     //
     // Add callback root entry to the treelist.
     //
-    RootItem = AddRootEntryToList(TreeList, lpCallbackType);
+    RootItem = AddRootEntryToList(TreeList, CallbackType);
     if (RootItem == 0)
         return;
 
@@ -2375,13 +2821,9 @@ VOID DumpPoCallbacks(
 * Read Dbg callback data from kernel and send it to output window.
 *
 */
-VOID DumpDbgPrintCallbacks(
-    _In_ HWND TreeList,
-    _In_ LPWSTR lpCallbackType,
-    _In_ ULONG_PTR ListHead,
-    _In_ PRTL_PROCESS_MODULES Modules
-)
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpDbgPrintCallbacks)
 {
+    ULONG_PTR ListHead = KernelVariableAddress;
     ULONG_PTR RecordAddress;
 
     LIST_ENTRY ListEntry;
@@ -2393,7 +2835,7 @@ VOID DumpDbgPrintCallbacks(
     //
     // Add callback root entry to the treelist.
     //
-    RootItem = AddRootEntryToList(TreeList, lpCallbackType);
+    RootItem = AddRootEntryToList(TreeList, CallbackType);
     if (RootItem == 0)
         return;
 
@@ -2450,23 +2892,20 @@ VOID DumpDbgPrintCallbacks(
 * Read Io File System registration related callback data from kernel and send it to output window.
 *
 */
-VOID DumpIoFsRegistrationCallbacks(
-    _In_ HWND TreeList,
-    _In_ LPWSTR lpCallbackType,
-    _In_ ULONG_PTR ListHead,
-    _In_ PRTL_PROCESS_MODULES Modules
-)
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoFsRegistrationCallbacks)
 {
     LIST_ENTRY ListEntry;
 
     NOTIFICATION_PACKET CallbackRecord;
+
+    ULONG_PTR ListHead = KernelVariableAddress;
 
     HTREEITEM RootItem;
 
     //
     // Add callback root entry to the treelist.
     //
-    RootItem = AddRootEntryToList(TreeList, lpCallbackType);
+    RootItem = AddRootEntryToList(TreeList, CallbackType);
     if (RootItem == 0)
         return;
 
@@ -2522,16 +2961,13 @@ VOID DumpIoFsRegistrationCallbacks(
 * Read Io File System related callback data from kernel and send it to output window.
 *
 */
-VOID DumpIoFileSystemCallbacks(
-    _In_ HWND TreeList,
-    _In_ LPWSTR lpCallbackType,
-    _In_ ULONG_PTR ListHead,
-    _In_ PRTL_PROCESS_MODULES Modules
-)
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoFileSystemCallbacks)
 {
     BOOL bNeedFree;
 
     LIST_ENTRY ListEntry, NextEntry;
+
+    ULONG_PTR ListHead = KernelVariableAddress;
 
     ULONG_PTR DeviceObjectAddress = 0, BaseAddress = 0;
 
@@ -2546,7 +2982,7 @@ VOID DumpIoFileSystemCallbacks(
     //
     // Add callback root entry to the treelist.
     //
-    RootItem = AddRootEntryToList(TreeList, lpCallbackType);
+    RootItem = AddRootEntryToList(TreeList, CallbackType);
     if (RootItem == 0)
         return;
 
@@ -2672,12 +3108,7 @@ VOID DumpIoFileSystemCallbacks(
 * Read SeCiCallbacks/g_CiCallbacks related callback data from kernel and send it to output window.
 *
 */
-VOID DumpCiCallbacks(
-    _In_ HWND TreeList,
-    _In_ LPWSTR lpCallbackType,
-    _In_ ULONG_PTR CiCallbacks,
-    _In_ PRTL_PROCESS_MODULES Modules
-)
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks)
 {
     HTREEITEM RootItem;
 
@@ -2694,7 +3125,7 @@ VOID DumpCiCallbacks(
     //
     // Add callback root entry to the treelist.
     //
-    RootItem = AddRootEntryToList(TreeList, lpCallbackType);
+    RootItem = AddRootEntryToList(TreeList, CallbackType);
     if (RootItem == 0)
         return;
 
@@ -2704,7 +3135,7 @@ VOID DumpCiCallbacks(
         CallbacksData = (PULONG_PTR)supVirtualAlloc((SIZE_T)SizeOfCiCallbacks);
         if (CallbacksData) {
 
-            if (kdReadSystemMemoryEx(CiCallbacks,
+            if (kdReadSystemMemoryEx(KernelVariableAddress,
                 CallbacksData,
                 (ULONG)SizeOfCiCallbacks,
                 &BytesRead))
@@ -2741,7 +3172,7 @@ VOID DumpCiCallbacks(
         //
         // Probe size element.
         //
-        if (!kdReadSystemMemoryEx(CiCallbacks,
+        if (!kdReadSystemMemoryEx(KernelVariableAddress,
             &SizeOfCiCallbacks,
             sizeof(ULONG_PTR),
             &BytesRead))
@@ -2758,7 +3189,7 @@ VOID DumpCiCallbacks(
         CallbacksData = (PULONG_PTR)supVirtualAlloc((SIZE_T)SizeOfCiCallbacks);
         if (CallbacksData) {
 
-            if (kdReadSystemMemoryEx(CiCallbacks,
+            if (kdReadSystemMemoryEx(KernelVariableAddress,
                 CallbacksData,
                 (ULONG)SizeOfCiCallbacks,
                 &BytesRead))
@@ -2800,72 +3231,21 @@ VOID DumpCiCallbacks(
 }
 
 /*
-* CallbacksList
+* QueryIopFsListsCallbacks
 *
 * Purpose:
 *
-* Find callbacks pointers and list them to output window.
+* Query and list Io Fs lists callbacks.
 *
 */
-VOID CallbacksList(
-    _In_ HWND hwndDlg,
-    _In_ HWND TreeList)
+OBEX_QUERYCALLBACK_ROUTINE(QueryIopFsListsCallbacks)
 {
-    PRTL_PROCESS_MODULES Modules = NULL;
-
-    WCHAR szText[100];
+    UNREFERENCED_PARAMETER(QueryFlags);
+    UNREFERENCED_PARAMETER(CallbackType);
+    UNREFERENCED_PARAMETER(FindRoutine);
+    UNREFERENCED_PARAMETER(SystemCallbacksRef);
 
     __try {
-        //
-        // Query all addresses.
-        //
-        if (g_SystemCallbacks.PspCreateProcessNotifyRoutine == 0)
-            g_SystemCallbacks.PspCreateProcessNotifyRoutine = FindPspCreateProcessNotifyRoutine();
-
-        if (g_SystemCallbacks.PspCreateThreadNotifyRoutine == 0)
-            g_SystemCallbacks.PspCreateThreadNotifyRoutine = FindPspCreateThreadNotifyRoutine();
-
-        if (g_SystemCallbacks.PspLoadImageNotifyRoutine == 0)
-            g_SystemCallbacks.PspLoadImageNotifyRoutine = FindPspLoadImageNotifyRoutine();
-
-        if (g_SystemCallbacks.KeBugCheckCallbackHead == 0)
-            g_SystemCallbacks.KeBugCheckCallbackHead = FindKeBugCheckCallbackHead();
-
-        if (g_SystemCallbacks.KeBugCheckReasonCallbackHead == 0)
-            g_SystemCallbacks.KeBugCheckReasonCallbackHead = FindKeBugCheckReasonCallbackHead();
-
-        if (g_SystemCallbacks.IopNotifyShutdownQueueHead == 0)
-            g_SystemCallbacks.IopNotifyShutdownQueueHead = FindIopNotifyShutdownQueueHeadHead(FALSE);
-
-        if (g_SystemCallbacks.IopNotifyLastChanceShutdownQueueHead == 0)
-            g_SystemCallbacks.IopNotifyLastChanceShutdownQueueHead = FindIopNotifyShutdownQueueHeadHead(TRUE);
-
-        if (g_SystemCallbacks.CmCallbackListHead == 0)
-            g_SystemCallbacks.CmCallbackListHead = FindCmCallbackHead();
-
-        if (g_SystemCallbacks.ObProcessCallbackHead == 0)
-            g_SystemCallbacks.ObProcessCallbackHead = GetObjectTypeCallbackListHeadByType(0);
-
-        if (g_SystemCallbacks.ObThreadCallbackHead == 0)
-            g_SystemCallbacks.ObThreadCallbackHead = GetObjectTypeCallbackListHeadByType(1);
-
-        if (g_SystemCallbacks.ObDesktopCallbackHead == 0)
-            g_SystemCallbacks.ObDesktopCallbackHead = GetObjectTypeCallbackListHeadByType(2);
-
-        if (g_SystemCallbacks.SeFileSystemNotifyRoutinesHead == 0)
-            g_SystemCallbacks.SeFileSystemNotifyRoutinesHead = FindSeFileSystemNotifyRoutinesHead(FALSE);
-
-        if (g_SystemCallbacks.SeFileSystemNotifyRoutinesExHead == 0)
-            g_SystemCallbacks.SeFileSystemNotifyRoutinesExHead = FindSeFileSystemNotifyRoutinesHead(TRUE);
-
-        if (g_SystemCallbacks.PopRegisteredPowerSettingCallbacks == 0)
-            g_SystemCallbacks.PopRegisteredPowerSettingCallbacks = FindPopRegisteredPowerSettingCallbacks();
-
-        if (g_SystemCallbacks.RtlpDebugPrintCallbackList == 0)
-            g_SystemCallbacks.RtlpDebugPrintCallbackList = FindRtlpDebugPrintCallbackList();
-
-        if (g_SystemCallbacks.IopFsNotifyChangeQueueHead == 0)
-            g_SystemCallbacks.IopFsNotifyChangeQueueHead = FindIopFsNotifyChangeQueueHead();
 
         if ((g_SystemCallbacks.IopCdRomFileSystemQueueHead == 0) ||
             (g_SystemCallbacks.IopDiskFileSystemQueueHead == 0) ||
@@ -2880,19 +3260,114 @@ VOID CallbacksList(
 #ifdef _DEBUG
                 OutputDebugString(TEXT("Could not locate all Iop listheads\r\n"));
 #endif
+                return STATUS_NOT_FOUND;
             }
         }
 
-        if (g_SystemCallbacks.DbgkLmdCallbacks == 0)
-            g_SystemCallbacks.DbgkLmdCallbacks = FindDbgkLmdCallbacks();
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return GetExceptionCode();
+    }
 
-        if (g_SystemCallbacks.CiCallbacks == 0)
-            g_SystemCallbacks.CiCallbacks = (ULONG_PTR)kdFindCiCallbacks(&g_kdctx);
+    __try {
+
+        if (g_SystemCallbacks.IopDiskFileSystemQueueHead) {
+
+            DisplayRoutine(TreeList,
+                TEXT("IoDiskFs"),
+                g_SystemCallbacks.IopDiskFileSystemQueueHead,
+                Modules);
+        }
+        if (g_SystemCallbacks.IopCdRomFileSystemQueueHead) {
+
+            DisplayRoutine(TreeList,
+                TEXT("IoCdRomFs"),
+                g_SystemCallbacks.IopCdRomFileSystemQueueHead,
+                Modules);
+        }
+        if (g_SystemCallbacks.IopNetworkFileSystemQueueHead) {
+
+            DisplayRoutine(TreeList,
+                TEXT("IoNetworkFs"),
+                g_SystemCallbacks.IopNetworkFileSystemQueueHead,
+                Modules);
+        }
+        if (g_SystemCallbacks.IopTapeFileSystemQueueHead) {
+
+            DisplayRoutine(TreeList,
+                TEXT("IoTapeFs"),
+                g_SystemCallbacks.IopTapeFileSystemQueueHead,
+                Modules);
+        }
 
     }
-    __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
-        return;
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return GetExceptionCode();
     }
+
+    return STATUS_SUCCESS;
+}
+
+/*
+* QueryCallbackGeneric
+*
+* Purpose:
+*
+* Query and list kernel mode data for most types of callbacks/notifies.
+*
+*/
+OBEX_QUERYCALLBACK_ROUTINE(QueryCallbackGeneric)
+{
+    ULONG_PTR QueryAddress = 0;
+
+    __try {
+
+        QueryAddress = *SystemCallbacksRef;
+
+        if (QueryAddress == 0)
+            QueryAddress = FindRoutine(QueryFlags);
+
+        *SystemCallbacksRef = QueryAddress;
+
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return GetExceptionCode();
+    }
+
+    __try {
+        if (QueryAddress) {
+            DisplayRoutine(TreeList,
+                CallbackType,
+                QueryAddress,
+                Modules);
+        }
+        else
+            return STATUS_NOT_FOUND;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return GetExceptionCode();
+    }
+
+    return STATUS_SUCCESS;
+}
+
+/*
+* DisplayCallbacksList
+*
+* Purpose:
+*
+* Find callbacks pointers and list them to output window.
+*
+*/
+VOID DisplayCallbacksList(
+    _In_ HWND hwndDlg,
+    _In_ HWND TreeList)
+{
+    NTSTATUS QueryStatus;
+    ULONG i;
+    PRTL_PROCESS_MODULES Modules = NULL;
+
+    WCHAR szText[200];
 
     __try {
 
@@ -2902,233 +3377,36 @@ VOID CallbacksList(
             __leave;
         }
 
-
         //
-        // List process callbacks.
+        // List callbacks.
         //
 
-        if (g_SystemCallbacks.PspCreateProcessNotifyRoutine) {
+        for (i = 0; i < RTL_NUMBER_OF(g_CallbacksDispatchTable); i++) {
+            QueryStatus = g_CallbacksDispatchTable[i].QueryRoutine(
+                g_CallbacksDispatchTable[i].QueryFlags,
+                g_CallbacksDispatchTable[i].DisplayRoutine,
+                g_CallbacksDispatchTable[i].FindRoutine,
+                g_CallbacksDispatchTable[i].CallbackType,
+                TreeList,
+                Modules,
+                g_CallbacksDispatchTable[i].SystemCallbacksRef);
 
-            DumpPsCallbacks(TreeList,
-                TEXT("CreateProcess"),
-                g_SystemCallbacks.PspCreateProcessNotifyRoutine,
-                Modules);
+            if (!NT_SUCCESS(QueryStatus)) {
 
-        }
-
-        //
-        // List thread callbacks.
-        //
-        if (g_SystemCallbacks.PspCreateThreadNotifyRoutine) {
-
-            DumpPsCallbacks(TreeList,
-                TEXT("CreateThread"),
-                g_SystemCallbacks.PspCreateThreadNotifyRoutine,
-                Modules);
-
-        }
-
-        //
-        // List load image callbacks.
-        //
-        if (g_SystemCallbacks.PspLoadImageNotifyRoutine) {
-
-            DumpPsCallbacks(TreeList,
-                TEXT("LoadImage"),
-                g_SystemCallbacks.PspLoadImageNotifyRoutine,
-                Modules);
-
-        }
-
-        //
-        // List KeBugCheck callbacks.
-        //
-        if (g_SystemCallbacks.KeBugCheckCallbackHead) {
-
-            DumpKeBugCheckCallbacks(TreeList,
-                TEXT("BugCheck"),
-                g_SystemCallbacks.KeBugCheckCallbackHead,
-                Modules);
-
-        }
-
-        if (g_SystemCallbacks.KeBugCheckReasonCallbackHead) {
-
-            DumpKeBugCheckReasonCallbacks(TreeList,
-                TEXT("BugCheckReason"),
-                g_SystemCallbacks.KeBugCheckReasonCallbackHead,
-                Modules);
-
-        }
-
-        //
-        // List Cm callbacks
-        //
-        if (g_SystemCallbacks.CmCallbackListHead) {
-
-            DumpCmCallbacks(TreeList,
-                TEXT("CmRegistry"),
-                g_SystemCallbacks.CmCallbackListHead,
-                Modules);
-
-        }
-
-        //
-        // List Io Shutdown callbacks.
-        //
-        if (g_SystemCallbacks.IopNotifyShutdownQueueHead) {
-
-            DumpIoCallbacks(TreeList,
-                TEXT("Shutdown"),
-                g_SystemCallbacks.IopNotifyShutdownQueueHead,
-                Modules);
-
-        }
-        if (g_SystemCallbacks.IopNotifyLastChanceShutdownQueueHead) {
-
-            DumpIoCallbacks(TreeList,
-                TEXT("LastChanceShutdown"),
-                g_SystemCallbacks.IopNotifyLastChanceShutdownQueueHead,
-                Modules);
-
-        }
-
-        //
-        // List Ob callbacks.
-        //
-        if (g_SystemCallbacks.ObProcessCallbackHead) {
-
-            DumpObCallbacks(TreeList,
-                TEXT("ObProcess"),
-                g_SystemCallbacks.ObProcessCallbackHead,
-                Modules);
-
-        }
-        if (g_SystemCallbacks.ObThreadCallbackHead) {
-
-            DumpObCallbacks(TreeList,
-                TEXT("ObThread"),
-                g_SystemCallbacks.ObThreadCallbackHead,
-                Modules);
-
-        }
-        if (g_SystemCallbacks.ObDesktopCallbackHead) {
-
-            DumpObCallbacks(TreeList,
-                TEXT("ObDesktop"),
-                g_SystemCallbacks.ObDesktopCallbackHead,
-                Modules);
-
-        }
-
-        //
-        // List Se callbacks.
-        //
-        if (g_SystemCallbacks.SeFileSystemNotifyRoutinesHead) {
-
-            DumpSeCallbacks(TreeList,
-                TEXT("SeFileSystem"),
-                g_SystemCallbacks.SeFileSystemNotifyRoutinesHead,
-                Modules);
-
-        }
-        if (g_SystemCallbacks.SeFileSystemNotifyRoutinesExHead) {
-
-            DumpSeCallbacks(TreeList,
-                TEXT("SeFileSystemEx"),
-                g_SystemCallbacks.SeFileSystemNotifyRoutinesExHead,
-                Modules);
-
-        }
-
-        //
-        // List Po callbacks.
-        //
-        if (g_SystemCallbacks.PopRegisteredPowerSettingCallbacks) {
-
-            DumpPoCallbacks(TreeList,
-                TEXT("PowerSettings"),
-                g_SystemCallbacks.PopRegisteredPowerSettingCallbacks,
-                Modules);
-
-        }
-
-        //
-        // List Dbg callbacks
-        //
-        if (g_SystemCallbacks.RtlpDebugPrintCallbackList) {
-
-            DumpDbgPrintCallbacks(TreeList,
-                TEXT("DbgPrint"),
-                g_SystemCallbacks.RtlpDebugPrintCallbackList,
-                Modules);
-
-        }
-
-        //
-        // List IoFsRegistration callbacks
-        //
-        if (g_SystemCallbacks.IopFsNotifyChangeQueueHead) {
-
-            DumpIoFsRegistrationCallbacks(TreeList,
-                TEXT("IoFsRegistration"),
-                g_SystemCallbacks.IopFsNotifyChangeQueueHead,
-                Modules);
-
-        }
-
-        //
-        // List Io File System callbacks
-        //
-        if (g_SystemCallbacks.IopDiskFileSystemQueueHead) {
-
-            DumpIoFileSystemCallbacks(TreeList,
-                TEXT("IoDiskFs"),
-                g_SystemCallbacks.IopDiskFileSystemQueueHead,
-                Modules);
-        }
-        if (g_SystemCallbacks.IopCdRomFileSystemQueueHead) {
-
-            DumpIoFileSystemCallbacks(TreeList,
-                TEXT("IoCdRomFs"),
-                g_SystemCallbacks.IopCdRomFileSystemQueueHead,
-                Modules);
-        }
-        if (g_SystemCallbacks.IopNetworkFileSystemQueueHead) {
-
-            DumpIoFileSystemCallbacks(TreeList,
-                TEXT("IoNetworkFs"),
-                g_SystemCallbacks.IopNetworkFileSystemQueueHead,
-                Modules);
-        }
-        if (g_SystemCallbacks.IopTapeFileSystemQueueHead) {
-
-            DumpIoFileSystemCallbacks(TreeList,
-                TEXT("IoTapeFs"),
-                g_SystemCallbacks.IopTapeFileSystemQueueHead,
-                Modules);
-        }
-
-        //
-        // List DbgkLmdCallbacks
-        //
-        if (g_SystemCallbacks.DbgkLmdCallbacks) {
-
-            DumpDbgkLCallbacks(TreeList,
-                TEXT("DbgkLmdCallback"),
-                g_SystemCallbacks.DbgkLmdCallbacks,
-                Modules);
-        }
-
-        //
-        // List CI callbacks
-        //
-        if (g_SystemCallbacks.CiCallbacks) {
-
-            DumpCiCallbacks(TreeList,
-                TEXT("CiCallbacks"),
-                g_SystemCallbacks.CiCallbacks,
-                Modules);
+                if (QueryStatus == STATUS_NOT_FOUND) {
+#ifdef _DEBUG
+                    DbgPrint("Callback type %ws was not found\r\n",
+                        g_CallbacksDispatchTable[i].CallbackType);
+#endif
+                }
+                else {
+                    _strcpy(szText, TEXT("There is an error while query callback of type "));
+                    _strcat(szText, g_CallbacksDispatchTable[i].CallbackType);
+                    _strcat(szText, TEXT(", Code 0x"));
+                    ultohex(QueryStatus, _strend(szText));
+                    MessageBox(hwndDlg, szText, NULL, MB_ICONERROR);
+                }
+            }
         }
 
         //
@@ -3261,7 +3539,7 @@ VOID CallbackDialogContentRefresh(
 
         g_CallbacksCount = 0;
 
-        CallbacksList(hwndDlg, pDlgContext->TreeList);
+        DisplayCallbacksList(hwndDlg, pDlgContext->TreeList);
 
     }
     __finally {
@@ -3414,7 +3692,7 @@ VOID extrasCreateCallbacksDialog(
         RtlSecureZeroMemory(&hdritem, sizeof(hdritem));
         hdritem.mask = HDI_FORMAT | HDI_TEXT | HDI_WIDTH;
         hdritem.fmt = HDF_LEFT | HDF_BITMAP_ON_RIGHT | HDF_STRING;
-        hdritem.cxy = 150;
+        hdritem.cxy = 160;
         hdritem.pszText = TEXT("Routine Address");
         TreeList_InsertHeaderItem(pDlgContext->TreeList, 0, &hdritem);
 

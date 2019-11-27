@@ -379,6 +379,9 @@
     <ClInclude Include="..\Shared\treelist\treelist.h">
       <Filter>treelist</Filter>
     </ClInclude>
+    <ClInclude Include="extras\extrasCallbacksPatterns.h">
+      <Filter>Source Files\extras</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="rsrc\pipe.ico">

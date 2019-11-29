@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.82
 *
-*  DATE:        24 Nov 2019
+*  DATE:        27 Nov 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -610,8 +610,8 @@ VOID propSetDefaultInfo(
             EnableWindow(hwndCB, (obi.Attributes > 0) ? TRUE : FALSE);
             if (obi.Attributes != 0) {
                 for (i = 0; i < 8; i++) {
-                    if (GET_BIT(obi.Attributes, i)) SendMessage(hwndCB, CB_ADDSTRING,
-                        (WPARAM)0, (LPARAM)T_ObjectFlags[i]);
+                    if (GET_BIT(obi.Attributes, i))
+                        SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)T_ObjectFlags[i]);
                 }
                 SendMessage(hwndCB, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
             }
@@ -2275,7 +2275,7 @@ VOID propBasicQuerySession(
     // Open Session object.
     //
     hObject = NULL;
-    if (!propOpenCurrentObject(Context, &hObject, MAXIMUM_ALLOWED)) {
+    if (!propOpenCurrentObject(Context, &hObject, SESSION_QUERY_ACCESS)) {
         return;
     }
 
@@ -2345,7 +2345,7 @@ LPWSTR propFormatTokenAttribute(
             if (ResultLength == 0)
                 break;
 
-            Result = (LPWSTR)supHeapAlloc((MinimumResultLength + ResultLength) * sizeof(WCHAR));
+            Result = (LPWSTR)supHeapAlloc(ResultLength + (MinimumResultLength * sizeof(WCHAR)));
             if (Result) {
                 rtl_swprintf_s(Result, MinimumResultLength,
                     TEXT("[%lu] Version %I64u: "), ValueIndex, Attribute->Values.pFqbn[ValueIndex].Version);
@@ -2377,7 +2377,7 @@ LPWSTR propFormatTokenAttribute(
             if (ResultLength == 0)
                 break;
 
-            Result = (LPWSTR)supHeapAlloc((MinimumResultLength + ResultLength) * sizeof(WCHAR));
+            Result = (LPWSTR)supHeapAlloc(ResultLength + (MinimumResultLength * sizeof(WCHAR)));
             if (Result) {
                 rtl_swprintf_s(Result, MinimumResultLength,
                     TEXT("[%lu] "), ValueIndex);

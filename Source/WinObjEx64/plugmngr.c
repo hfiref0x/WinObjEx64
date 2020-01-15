@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019
+*  (C) COPYRIGHT AUTHORS, 2019 - 2020
 *
 *  TITLE:       PLUGMNGR.C
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        02 Nov 2019
+*  DATE:        05 Jan 2020
 *
 *  Plugin manager.
 *
@@ -20,7 +20,7 @@
 #include "global.h"
 
 LIST_ENTRY g_PluginsListHead;
-UINT g_PluginCount = ID_MENU_PLUGINS;
+UINT g_PluginCount = 0;
 
 /*
 * PluginManagerDllIsPlugin
@@ -47,13 +47,19 @@ BOOL PluginManagerDllIsPlugin(
         versionInfo = supHeapAlloc((SIZE_T)dwSize);
         if (versionInfo) {
 
+#pragma warning(push)
+#pragma warning(disable: 6388) //disable warning regarding reserved parameter
             if (GetFileVersionInfoEx(0, lpszPluginName, dwHandle, dwSize, versionInfo)) {
+#pragma warning(pop)
 
                 dwSize = 0;
-                if (VerQueryValue(versionInfo, VERSION_TRANSLATION, (LPVOID*)&lpTranslate, (PUINT)&dwSize)) {
+                if (VerQueryValue(versionInfo, T_VERSION_TRANSLATION, (LPVOID*)&lpTranslate, (PUINT)&dwSize)) {
 
-                    rtl_swprintf_s(szBuffer, MAX_PATH, VERSION_DESCRIPTION,
-                        lpTranslate[0].wLanguage, lpTranslate[0].wCodePage);
+                    RtlStringCchPrintfSecure(szBuffer,
+                        MAX_PATH,
+                        FORMAT_VERSION_DESCRIPTION,
+                        lpTranslate[0].wLanguage,
+                        lpTranslate[0].wCodePage);
 
                     lpFileDescription = NULL;
                     dwSize = 0;
@@ -135,7 +141,7 @@ DWORD WINAPI PluginManagerWorkerThread(
 
     WCHAR szSearchDirectory[1024];
     WCHAR szPluginPath[1024];
-    
+
     DWORD dwSize;
 
     SIZE_T Length;
@@ -145,7 +151,7 @@ DWORD WINAPI PluginManagerWorkerThread(
     HMENU hMainMenu = GetMenu(MainWindow), hPluginMenu = NULL;
     MENUITEMINFO MenuItem;
 
-    WINOBJEX_PLUGIN_INTERNAL *PluginEntry;
+    WINOBJEX_PLUGIN_INTERNAL* PluginEntry;
     pfnPluginInit PluginInit;
     HMODULE hPlugin;
 
@@ -215,16 +221,16 @@ DWORD WINAPI PluginManagerWorkerThread(
                         if (PluginInitialized) {
 
                             InsertHeadList(&g_PluginsListHead, &PluginEntry->ListEntry);
-                            
+
                             //
                             // Set state change callback here.
                             //
                             PluginEntry->Plugin.StateChangeCallback = (pfnStateChangeCallback)&PluginManagerStateChangeCallback;
-                            
+
                             //
                             // Remember plugin id.
                             //
-                            PluginEntry->Id = g_PluginCount;
+                            PluginEntry->Id = ID_MENU_PLUGINS + g_PluginCount;
                             g_PluginCount += 1;
 
                             if (MenuInitialized == FALSE) {
@@ -323,7 +329,7 @@ VOID PluginManagerCreate(
 VOID PluginManagerDestroy()
 {
     PLIST_ENTRY Head, Next;
-    WINOBJEX_PLUGIN_INTERNAL *PluginEntry;
+    WINOBJEX_PLUGIN_INTERNAL* PluginEntry;
 
     Head = &g_PluginsListHead;
     Next = Head->Flink;
@@ -349,12 +355,12 @@ VOID PluginManagerDestroy()
 * Lookup entry in plugins list by plugin id.
 *
 */
-WINOBJEX_PLUGIN_INTERNAL *PluginManagerGetEntryById(
+WINOBJEX_PLUGIN_INTERNAL* PluginManagerGetEntryById(
     _In_ UINT Id
 )
 {
     PLIST_ENTRY Head, Next;
-    WINOBJEX_PLUGIN_INTERNAL *PluginEntry;
+    WINOBJEX_PLUGIN_INTERNAL* PluginEntry;
 
     Head = &g_PluginsListHead;
     Next = Head->Flink;
@@ -383,7 +389,7 @@ VOID PluginManagerProcessEntry(
 )
 {
     NTSTATUS Status;
-    WINOBJEX_PLUGIN_INTERNAL *PluginEntry;
+    WINOBJEX_PLUGIN_INTERNAL* PluginEntry;
 
     WINOBJEX_PARAM_BLOCK ParamBlock;
 
@@ -438,11 +444,11 @@ VOID PluginManagerProcessEntry(
                 return;
             }
 
-            if (PluginEntry->Plugin.NeedDriver && g_kdctx.drvOpenLoadStatus != ERROR_SUCCESS) {
+            if (PluginEntry->Plugin.NeedDriver && g_kdctx.DriverOpenLoadStatus != STATUS_SUCCESS) {
                 MessageBox(ParentWindow, TEXT("This plugin require driver usage to run"), PROGRAM_NAME, MB_ICONINFORMATION);
                 return;
             }
-            
+
             RtlSecureZeroMemory(&ParamBlock, sizeof(ParamBlock));
             ParamBlock.ParentWindow = ParentWindow;
             ParamBlock.hInstance = g_WinObj.hInstance;
@@ -484,7 +490,7 @@ VOID PluginManagerProcessEntry(
         }
 
     }
-    __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
+    __except (WOBJ_EXCEPTION_FILTER) {
         return;
     }
 }

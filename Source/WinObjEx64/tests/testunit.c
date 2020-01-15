@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        13 Nov 2019
+*  DATE:        05 Jan 2020
 *
 *  Test code used while debug.
 *
@@ -440,7 +440,7 @@ VOID TestException(
         __try {
             *(PBYTE)(NULL) = 0;
         }
-        __except (exceptFilter(GetExceptionCode(), GetExceptionInformation()))
+        __except (WOBJ_EXCEPTION_FILTER)
         {
             __nop();
         }
@@ -729,6 +729,11 @@ VOID TestLicenseCache()
     }
 }
 
+VOID PreHashTypes()
+{
+    ObManagerTest();
+}
+
 VOID TestCall()
 {
 
@@ -753,6 +758,7 @@ VOID TestStart(
     TestTransaction();
     TestWinsta();
     TestThread();
+    //PreHashTypes();
     //TestJob();
 }
 

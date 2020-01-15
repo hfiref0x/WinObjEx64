@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019
+*  (C) COPYRIGHT AUTHORS, 2019 - 2020
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.00
+*  VERSION:     1.03
 *
-*  DATE:        16 July 2019
+*  DATE:        21 Dec 2019
 *
 *  WinObjEx64 Sonar UI constants, definitions and includes.
 *
@@ -36,6 +36,10 @@
 
 #define Y_SPLITTER_SIZE 4
 #define Y_SPLITTER_MIN  100
+
+#define DefaultSystemDpi            96
+
+#define SCALE_DPI_VALUE(Value) MulDiv(Value, g_CurrentDPI, DefaultSystemDpi)
 
 typedef struct _SONARCONTEXT {
     //

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019
+*  (C) COPYRIGHT AUTHORS, 2019 - 2020
 *
 *  TITLE:       QUERY.C
 *
-*  VERSION:     1.00
+*  VERSION:     1.02
 *
-*  DATE:        15 Aug 2019
+*  DATE:        12 Dec 2019
 *
 *  Query and output ApiSet specific data.
 *
@@ -19,6 +19,17 @@
 
 #include "global.h"
 
+VOID ApiSetViewShowError(
+    _In_ LPWSTR ErrorMsg);
+
+/*
+* TreeListAddItem
+*
+* Purpose:
+*
+* Insert new treelist item.
+*
+*/
 HTREEITEM TreeListAddItem(
     _In_ HWND TreeList,
     _In_opt_ HTREEITEM hParent,
@@ -27,10 +38,20 @@ HTREEITEM TreeListAddItem(
     _In_ UINT stateMask,
     _In_opt_ LPWSTR pszText,
     _In_opt_ PVOID subitems
-);
+)
+{
+    TVINSERTSTRUCT  tvitem;
+    PTL_SUBITEMS    si = (PTL_SUBITEMS)subitems;
 
-VOID ApiSetViewShowError(
-    _In_ LPWSTR ErrorMsg);
+    RtlSecureZeroMemory(&tvitem, sizeof(tvitem));
+    tvitem.hParent = hParent;
+    tvitem.item.mask = mask;
+    tvitem.item.state = state;
+    tvitem.item.stateMask = stateMask;
+    tvitem.item.pszText = pszText;
+    tvitem.hInsertAfter = TVI_LAST;
+    return TreeList_InsertTreeItem(TreeList, &tvitem, si);
+}
 
 /*
 * OutNamespaceEntryEx
@@ -366,37 +387,6 @@ void ListApiSetV6(
 }
 
 /*
-* TreeListAddItem
-*
-* Purpose:
-*
-* Insert new treelist item.
-*
-*/
-HTREEITEM TreeListAddItem(
-    _In_ HWND TreeList,
-    _In_opt_ HTREEITEM hParent,
-    _In_ UINT mask,
-    _In_ UINT state,
-    _In_ UINT stateMask,
-    _In_opt_ LPWSTR pszText,
-    _In_opt_ PVOID subitems
-)
-{
-    TVINSERTSTRUCT  tvitem;
-    PTL_SUBITEMS    si = (PTL_SUBITEMS)subitems;
-
-    RtlSecureZeroMemory(&tvitem, sizeof(tvitem));
-    tvitem.hParent = hParent;
-    tvitem.item.mask = mask;
-    tvitem.item.state = state;
-    tvitem.item.stateMask = stateMask;
-    tvitem.item.pszText = pszText;
-    tvitem.hInsertAfter = TVI_LAST;
-    return TreeList_InsertTreeItem(TreeList, &tvitem, si);
-}
-
-/*
 * ApiSetViewShowError
 *
 * Purpose:
@@ -415,6 +405,201 @@ VOID ApiSetViewShowError(
 }
 
 /*
+* ListApiSetFromFileWorker
+*
+* Purpose:
+*
+* Worker thread.
+*
+*/
+VOID ListApiSetFromFileWorker(
+    _In_opt_ LPWSTR lpFileName)
+{
+    ULONG Result = ERROR_SUCCESS;
+    UINT i;
+
+    HMODULE MappedApiSetImage;
+    LPWSTR FileName;
+
+    PBYTE BaseAddress;
+    PIMAGE_NT_HEADERS NtHeaders;
+    IMAGE_SECTION_HEADER* SectionTableEntry;
+    ULONG DataSize = 0;
+    PBYTE DataPtr = NULL;
+    ULONG SchemaVersion;
+
+    WCHAR szSystemDirectory[MAX_PATH + 1], szBuffer[MAX_PATH * 2];
+
+    HTREEITEM h_tviRootItem;
+
+    //
+    // Disable controls.
+    //
+    EnableWindow(GetDlgItem(g_ctx.MainWindow, IDC_BROWSE_BUTTON), FALSE);
+    EnableWindow(GetDlgItem(g_ctx.MainWindow, IDC_SEARCH_BUTTON), FALSE);
+
+    do {
+
+        //
+        // Select apiset dll name.
+        //
+
+        if (lpFileName == NULL) {
+            RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+            RtlSecureZeroMemory(szSystemDirectory, sizeof(szSystemDirectory));
+            GetSystemDirectory(szSystemDirectory, MAX_PATH);
+            StringCchPrintf(szBuffer, MAX_PATH, TEXT("%s\\apisetschema.dll"), szSystemDirectory);
+            FileName = szBuffer;
+        }
+        else {
+            FileName = lpFileName;
+        }
+
+        //
+        // Reset output controls.
+        //
+
+        TreeList_ClearTree(g_ctx.TreeList);
+        SetDlgItemText(g_ctx.MainWindow, IDC_SCHEMA_VERSION, TEXT(""));
+        SetDlgItemText(g_ctx.MainWindow, IDC_SCHEMA_FILE, TEXT(""));
+
+        //
+        // Load library and locate apiset section.
+        //
+
+        MappedApiSetImage = LoadLibraryEx(FileName, NULL, LOAD_LIBRARY_AS_DATAFILE);
+
+        if (MappedApiSetImage == NULL) {
+            ApiSetViewShowError(TEXT("ApiSetView: could not load apiset library"));
+            Result = GetLastError();
+            break;
+        }
+
+        SetDlgItemText(g_ctx.MainWindow, IDC_SCHEMA_FILE, FileName);
+
+        BaseAddress = (PBYTE)(((ULONG_PTR)MappedApiSetImage) & ~3);
+
+        NtHeaders = RtlImageNtHeader(BaseAddress);
+
+        SectionTableEntry = IMAGE_FIRST_SECTION(NtHeaders);
+
+        i = NtHeaders->FileHeader.NumberOfSections;
+        while (i > 0) {
+            if (_strncmpi_a((CHAR*)&SectionTableEntry->Name,
+                API_SET_SECTION_NAME,
+                sizeof(API_SET_SECTION_NAME)) == 0)
+            {
+                DataSize = SectionTableEntry->SizeOfRawData;
+                DataPtr = (PBYTE)BaseAddress + SectionTableEntry->PointerToRawData;
+                break;
+            }
+            i -= 1;
+            SectionTableEntry += 1;
+        }
+
+        //
+        // Warn user if apiset section was not found.
+        //
+        if ((DataPtr == NULL) || (DataSize == 0)) {
+            ApiSetViewShowError(TEXT("ApiSetView: could not locate \".apiset\" section in target dll"));
+            Result = ERROR_INVALID_DATA;
+            break;
+        }
+
+        //
+        // Check supported schema version.
+        //
+        SchemaVersion = *(ULONG*)DataPtr;
+        if (SchemaVersion != 2 && 
+            SchemaVersion != 4 
+            && SchemaVersion != 6) 
+        {
+            StringCchPrintf(szBuffer, MAX_PATH,
+                TEXT("ApiSetView: Unknown schema version %lu"), SchemaVersion);
+
+            ApiSetViewShowError(szBuffer);
+            Result = ERROR_INVALID_DATATYPE;
+            break;
+        }
+
+        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+        ultostr(SchemaVersion, szBuffer);
+        SetDlgItemText(g_ctx.MainWindow, IDC_SCHEMA_VERSION, szBuffer);
+
+        //
+        // Parse and output apiset.
+        //
+
+        h_tviRootItem = TreeListAddItem(
+            g_ctx.TreeList,
+            (HTREEITEM)NULL,
+            TVIF_TEXT | TVIF_STATE,
+            TVIS_EXPANDED,
+            TVIS_EXPANDED,
+            TEXT("ApiSetSchema"),
+            (PVOID)NULL);
+
+        if (h_tviRootItem) {
+            __try {
+                switch (SchemaVersion) {
+                case API_SET_SCHEMA_VERSION_V2:
+
+                    ListApiSetV2(
+                        DataPtr,
+                        h_tviRootItem);
+
+                    break;
+
+                case API_SET_SCHEMA_VERSION_V4:
+
+                    ListApiSetV4(
+                        DataPtr,
+                        h_tviRootItem);
+
+                    break;
+
+                case API_SET_SCHEMA_VERSION_V6:
+
+                    ListApiSetV6(
+                        DataPtr,
+                        h_tviRootItem);
+
+                    break;
+
+                default:
+                    break;
+                }
+            }
+            __except (EXCEPTION_EXECUTE_HANDLER) {
+
+                RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+
+                StringCchPrintf(
+                    szBuffer, 
+                    MAX_PATH,
+                    TEXT("ApiSetView: Exception %lu thrown while processing apiset, schema version %lu"),
+                    GetExceptionCode(),
+                    SchemaVersion);
+
+                ApiSetViewShowError(szBuffer);
+
+            }
+        }
+
+    } while (FALSE);
+
+    if (MappedApiSetImage) FreeLibrary(MappedApiSetImage);
+
+    //
+    // Reenable controls.
+    //
+    EnableWindow(GetDlgItem(g_ctx.MainWindow, IDC_BROWSE_BUTTON), TRUE);
+    EnableWindow(GetDlgItem(g_ctx.MainWindow, IDC_SEARCH_BUTTON), TRUE);
+
+    ExitThread(Result);
+}
+
+/*
 * ListApiSetFromFile
 *
 * Purpose:
@@ -425,162 +610,16 @@ VOID ApiSetViewShowError(
 VOID ListApiSetFromFile(
     _In_opt_ LPWSTR lpFileName)
 {
-    UINT i;
+    HANDLE hThread;
+    DWORD dwThreadId;
 
-    HMODULE MappedApiSetImage;
-    LPWSTR FileName;
+    hThread = CreateThread(
+        NULL, 
+        0,
+        (LPTHREAD_START_ROUTINE)ListApiSetFromFileWorker,
+        lpFileName,
+        0,
+        &dwThreadId);
 
-    PBYTE BaseAddress;
-    PIMAGE_NT_HEADERS NtHeaders;
-    IMAGE_SECTION_HEADER *SectionTableEntry;
-    ULONG DataSize = 0;
-    PBYTE DataPtr = NULL;
-    ULONG SchemaVersion;
-
-    WCHAR szSystemDirectory[MAX_PATH + 1], szBuffer[MAX_PATH * 2];
-
-    HTREEITEM h_tviRootItem;
-
-    //
-    // Select apiset dll name.
-    //
-
-    if (lpFileName == NULL) {
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-        RtlSecureZeroMemory(szSystemDirectory, sizeof(szSystemDirectory));
-        GetSystemDirectory(szSystemDirectory, MAX_PATH);
-        StringCchPrintf(szBuffer, MAX_PATH, TEXT("%s\\apisetschema.dll"), szSystemDirectory);
-        FileName = szBuffer;
-    }
-    else {
-        FileName = lpFileName;
-    }
-
-    //
-    // Reset output controls.
-    //
-
-    TreeList_ClearTree(g_ctx.TreeList);
-    SetDlgItemText(g_ctx.MainWindow, IDC_SCHEMA_VERSION, TEXT(""));
-    SetDlgItemText(g_ctx.MainWindow, IDC_SCHEMA_FILE, TEXT(""));
-
-    //
-    // Load library and locate apiset section.
-    //
-
-    MappedApiSetImage = LoadLibraryEx(FileName, NULL, LOAD_LIBRARY_AS_DATAFILE);
-
-    if (MappedApiSetImage == NULL) {
-        ApiSetViewShowError(TEXT("ApiSetView: could not load apiset library"));
-        return;
-    }
-
-    SetDlgItemText(g_ctx.MainWindow, IDC_SCHEMA_FILE, FileName);
-
-    BaseAddress = (PBYTE)(((ULONG_PTR)MappedApiSetImage) & ~3);
-
-    NtHeaders = RtlImageNtHeader(BaseAddress);
-
-    SectionTableEntry = IMAGE_FIRST_SECTION(NtHeaders);
-
-    i = NtHeaders->FileHeader.NumberOfSections;
-    while (i > 0) {
-        if (_strncmpi_a((CHAR*)&SectionTableEntry->Name,
-            API_SET_SECTION_NAME,
-            sizeof(API_SET_SECTION_NAME)) == 0)
-        {
-            DataSize = SectionTableEntry->SizeOfRawData;
-            DataPtr = (PBYTE)BaseAddress + SectionTableEntry->PointerToRawData;
-            break;
-        }
-        i -= 1;
-        SectionTableEntry += 1;
-    }
-
-    //
-    // Warn user if apiset section was not found.
-    //
-    if ((DataPtr == NULL) || (DataSize == 0)) {
-
-        ApiSetViewShowError(TEXT("ApiSetView: could not locate \".apiset\" section in target dll"));
-        return;
-    }
-
-    //
-    // Check supported schema version.
-    //
-    SchemaVersion = *(ULONG*)DataPtr;
-    if (SchemaVersion != 2 && SchemaVersion != 4 && SchemaVersion != 6) {
-
-        StringCchPrintf(szBuffer, MAX_PATH,
-            TEXT("ApiSetView: Unknown schema version %lu"), SchemaVersion);
-
-        ApiSetViewShowError(szBuffer);
-
-        return;
-    }
-
-    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-    ultostr(SchemaVersion, szBuffer);
-    SetDlgItemText(g_ctx.MainWindow, IDC_SCHEMA_VERSION, szBuffer);
-
-    //
-    // Parse and output apiset.
-    //
-
-    h_tviRootItem = TreeListAddItem(
-        g_ctx.TreeList,
-        (HTREEITEM)NULL,
-        TVIF_TEXT | TVIF_STATE,
-        TVIS_EXPANDED,
-        TVIS_EXPANDED,
-        TEXT("ApiSetSchema"),
-        (PVOID)NULL);
-
-    if (h_tviRootItem) {
-        __try {
-            switch (SchemaVersion) {
-            case API_SET_SCHEMA_VERSION_V2:
-
-                ListApiSetV2(
-                    DataPtr,
-                    h_tviRootItem);
-
-                break;
-
-            case API_SET_SCHEMA_VERSION_V4:
-
-                ListApiSetV4(
-                    DataPtr,
-                    h_tviRootItem);
-
-                break;
-
-            case API_SET_SCHEMA_VERSION_V6:
-
-                ListApiSetV6(
-                    DataPtr,
-                    h_tviRootItem);
-
-                break;
-
-            default:
-                break;
-            }
-        }
-        __except (EXCEPTION_EXECUTE_HANDLER) {
-
-            RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-
-            StringCchPrintf(szBuffer, MAX_PATH,
-                TEXT("ApiSetView: Exception %lu thrown while processing apiset, schema version %lu"),
-                GetExceptionCode(),
-                SchemaVersion);
-
-            ApiSetViewShowError(szBuffer);
-
-        }
-    }
-
-    FreeLibrary(MappedApiSetImage);
+    if (hThread) CloseHandle(hThread);
 }

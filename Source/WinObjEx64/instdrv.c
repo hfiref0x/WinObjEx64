@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019, portions (C) Mark Russinovich, FileMon
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020, portions (C) Mark Russinovich, FileMon
 *
 *  TITLE:       INSTDRV.C
 *
-*  VERSION:     1.73
+*  VERSION:     1.83
 *
-*  DATE:        07 Mar 2019
+*  DATE:        15 Dec 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -88,7 +88,6 @@ BOOL scmStartDriver(
         ret = StartService(schService, 0, NULL);
 
         resultStatus = GetLastError();
-
         if (resultStatus == ERROR_SERVICE_ALREADY_RUNNING) {
             ret = TRUE;
             resultStatus = ERROR_SUCCESS;
@@ -131,7 +130,11 @@ BOOL scmOpenDevice(
     if (DriverName) {
         
         RtlSecureZeroMemory(completeDeviceName, sizeof(completeDeviceName));
-        rtl_swprintf_s(completeDeviceName, MAX_PATH, TEXT("\\\\.\\%wS"), DriverName);
+        
+        RtlStringCchPrintfSecure(completeDeviceName, 
+            MAX_PATH, 
+            TEXT("\\\\.\\%wS"), 
+            DriverName);
 
         hDevice = CreateFile(completeDeviceName,
             GENERIC_READ | GENERIC_WRITE,

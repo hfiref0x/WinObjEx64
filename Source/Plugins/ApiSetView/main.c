@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019
+*  (C) COPYRIGHT AUTHORS, 2019 - 2020
 *
 *  TITLE:       MAIN.H
 *
-*  VERSION:     1.01
+*  VERSION:     1.02
 *
-*  DATE:        15 Nov 2019
+*  DATE:        12 Dec 2019
 *
 *  WinObjEx64 ApiSetView plugin.
 *
@@ -119,10 +119,13 @@ VOID HandleSearchSchema(
         (WPARAM)MAX_PATH,
         (LPARAM)&szSchemaName);
 
+#pragma warning(push)
+#pragma warning(disable: 6054)
     hItem = TreeView_FindLabel(
         g_ctx.TreeList,
         TreeView_GetRoot(g_ctx.TreeList),
         szSchemaName);
+#pragma warning(pop)
 
     if (hItem) {
         TreeList_EnsureVisible(g_ctx.TreeList, hItem);

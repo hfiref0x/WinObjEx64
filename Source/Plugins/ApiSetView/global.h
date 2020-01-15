@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019
+*  (C) COPYRIGHT AUTHORS, 2019 - 2020
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.00
+*  VERSION:     1.02
 *
-*  DATE:        08 Aug 2019
+*  DATE:        12 Dec 2019
 *
 *  Common header file for the Windows Object Explorer ApiSetView plugin.
 *
@@ -37,7 +37,10 @@
 #include <ntstatus.h>
 #pragma warning(pop)
 
-#pragma warning(disable: 6320) //Exception-filter expression is the constant EXCEPTION_EXECUTE_HANDLER
+#pragma warning(disable: 6258) // TerminateThread
+#pragma warning(disable: 6320) // Exception-filter expression is the constant EXCEPTION_EXECUTE_HANDLER
+#pragma warning(disable: 26812) // Prefer 'enum class' over 'enum'
+
 
 #include "ntos/ntos.h"
 #include "ntos/apisetx.h"

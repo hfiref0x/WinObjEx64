@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       LIST.H
 *
-*  VERSION:     1.60
+*  VERSION:     1.83
 *
-*  DATE:        24 Oct 2018
+*  DATE:        22 Dec 2019
 *
 *  Common header file main program logic.
 *
@@ -25,15 +25,6 @@ typedef	struct _FO_LIST_ITEM {
     WCHAR	NameBuffer[2];
 } FO_LIST_ITEM, *PFO_LIST_ITEM;
 
-HTREEITEM TreeListAddItem(
-    _In_ HWND TreeList,
-    _In_opt_ HTREEITEM hParent,
-    _In_ UINT mask,
-    _In_ UINT state,
-    _In_ UINT stateMask,
-    _In_opt_ LPWSTR pszText,
-    _In_opt_ PVOID subitems);
-
 VOID ListToObject(
     _In_ LPWSTR ObjectName);
 
@@ -41,10 +32,6 @@ VOID ListObjectDirectoryTree(
     _In_ LPWSTR SubDirName,
     _In_opt_ HANDLE RootHandle,
     _In_opt_ HTREEITEM ViewRootHandle);
-
-VOID AddListViewItem(
-    _In_ HANDLE hObjectRootDirectory,
-    _In_ POBJECT_DIRECTORY_INFORMATION objinf);
 
 VOID FindObject(
     _In_ LPWSTR DirName,

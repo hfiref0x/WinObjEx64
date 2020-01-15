@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       PROPTYPE.C
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        11 Nov 2019
+*  DATE:        05 Jan 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -15,7 +15,6 @@
 *
 *******************************************************************************/
 #include "global.h"
-#include "propDlg.h"
 #include "propTypeConsts.h"
 
 /*
@@ -41,7 +40,6 @@ VOID propSetTypeFlagValue(
 
     RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
     lvitem.mask = LVIF_TEXT;
-    lvitem.iSubItem = 0;
     lvitem.pszText = lpFlag;
     lvitem.iItem = MAXINT;
     nIndex = ListView_InsertItem(hListView, &lvitem);
@@ -51,7 +49,6 @@ VOID propSetTypeFlagValue(
     szBuffer[1] = L'x';
     ultohex(Value, &szBuffer[2]);
 
-    lvitem.mask = LVIF_TEXT;
     lvitem.iSubItem = 1;
     lvitem.pszText = szBuffer;
     lvitem.iItem = nIndex;
@@ -207,7 +204,8 @@ VOID propSetTypeDecodeValue(
         Count = MAX_KNOWN_IOCOMPLETION_ATTRIBUTES;
         break;
 
-        //Transaction Object
+        //RegistryTransaction/Transaction Object
+    case ObjectTypeRegistryTransaction:
     case ObjectTypeTmTx:
         Desc = a_TmTxProp;
         Count = MAX_KNOWN_TMTX_ATTRIBUTES;
@@ -317,10 +315,15 @@ VOID propSetTypeFlags(
         SendMessage(hwndCB, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
         if (bObjectFlagsSet) {
             EnableWindow(hwndCB, TRUE);
-            for (i = 0; i < 8; i++) {
-                if (GET_BIT(ObjectFlags, i)) SendMessage(hwndCB, CB_ADDSTRING,
-                    (WPARAM)0, (LPARAM)T_ObjectTypeFlags[i]);
-            }
+            for (i = 0; i < 8; i++)
+                if (GET_BIT(ObjectFlags, i)) {
+
+                    SendMessage(hwndCB,
+                        CB_ADDSTRING,
+                        (WPARAM)0,
+                        (LPARAM)T_ObjectTypeFlags[i]);
+                }
+
             SendMessage(hwndCB, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
         }
     }
@@ -356,7 +359,8 @@ VOID propSetTypeAttributes(
     nIndex = SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&T_InvalidAttributes);
     SendMessage(hListAttrbites, LB_SETITEMDATA, (WPARAM)nIndex,
         (LPARAM)ObjectTypeDump->TypeInfo.InvalidAttributes);
-    _strcpy(szBuffer, FORMATTED_ATTRIBUTE);
+
+    _strcpy(szBuffer, T_FORMATTED_ATTRIBUTE);
     ultohex(ObjectTypeDump->TypeInfo.InvalidAttributes, _strend(szBuffer));
     SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
 
@@ -364,7 +368,8 @@ VOID propSetTypeAttributes(
     nIndex = SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&T_ValidAccess);
     SendMessage(hListAttrbites, LB_SETITEMDATA, (WPARAM)nIndex,
         (LPARAM)ObjectTypeDump->TypeInfo.ValidAccessMask);
-    _strcpy(szBuffer, FORMATTED_ATTRIBUTE);
+
+    _strcpy(szBuffer, T_FORMATTED_ATTRIBUTE);
     ultohex(ObjectTypeDump->TypeInfo.ValidAccessMask, _strend(szBuffer));
     SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
 
@@ -372,7 +377,8 @@ VOID propSetTypeAttributes(
     nIndex = SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&T_GenericRead);
     SendMessage(hListAttrbites, LB_SETITEMDATA, (WPARAM)nIndex,
         (LPARAM)ObjectTypeDump->TypeInfo.GenericMapping.GenericRead);
-    _strcpy(szBuffer, FORMATTED_ATTRIBUTE);
+
+    _strcpy(szBuffer, T_FORMATTED_ATTRIBUTE);
     ultohex(ObjectTypeDump->TypeInfo.GenericMapping.GenericRead, _strend(szBuffer));
     SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
 
@@ -380,7 +386,8 @@ VOID propSetTypeAttributes(
     nIndex = SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&T_GenericWrite);
     SendMessage(hListAttrbites, LB_SETITEMDATA, (WPARAM)nIndex,
         (LPARAM)ObjectTypeDump->TypeInfo.GenericMapping.GenericWrite);
-    _strcpy(szBuffer, FORMATTED_ATTRIBUTE);
+
+    _strcpy(szBuffer, T_FORMATTED_ATTRIBUTE);
     ultohex(ObjectTypeDump->TypeInfo.GenericMapping.GenericWrite, _strend(szBuffer));
     SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
 
@@ -388,7 +395,8 @@ VOID propSetTypeAttributes(
     nIndex = SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&T_GenericExecute);
     SendMessage(hListAttrbites, LB_SETITEMDATA, (WPARAM)nIndex,
         (LPARAM)ObjectTypeDump->TypeInfo.GenericMapping.GenericExecute);
-    _strcpy(szBuffer, FORMATTED_ATTRIBUTE);
+
+    _strcpy(szBuffer, T_FORMATTED_ATTRIBUTE);
     ultohex(ObjectTypeDump->TypeInfo.GenericMapping.GenericExecute, _strend(szBuffer));
     SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
 
@@ -396,7 +404,8 @@ VOID propSetTypeAttributes(
     nIndex = SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&T_GenericAll);
     SendMessage(hListAttrbites, LB_SETITEMDATA, (WPARAM)nIndex,
         (LPARAM)ObjectTypeDump->TypeInfo.GenericMapping.GenericAll);
-    _strcpy(szBuffer, FORMATTED_ATTRIBUTE);
+
+    _strcpy(szBuffer, T_FORMATTED_ATTRIBUTE);
     ultohex(ObjectTypeDump->TypeInfo.GenericMapping.GenericAll, _strend(szBuffer));
     SendMessage(hListAttrbites, LB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
 }
@@ -410,7 +419,7 @@ VOID propSetTypeAttributes(
 *
 */
 VOID propSetTypeDecodedAttributes(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg
 )
 {
@@ -419,9 +428,7 @@ VOID propSetTypeDecodedAttributes(
     DWORD           i, dwFlags, a_Count;
     PVALUE_DESC     a_Desc;
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     hListRights = GetDlgItem(hwndDlg, ID_TYPE_ACL_LIST);
     if (hListRights == NULL) {
@@ -484,8 +491,7 @@ VOID propSetTypeListView(
     _In_ HWND hwndDlg
 )
 {
-    HWND        hListRights;
-    LVCOLUMN    col;
+    HWND hListRights;
 
     hListRights = GetDlgItem(hwndDlg, ID_TYPE_ACL_LIST);
     if (hListRights == NULL)
@@ -496,20 +502,15 @@ VOID propSetTypeListView(
 
     SetWindowTheme(hListRights, TEXT("Explorer"), NULL);
 
-    RtlSecureZeroMemory(&col, sizeof(col));
-    col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH;
-    col.iSubItem = 1;
-    col.pszText = TEXT("Flag");
-    col.fmt = LVCFMT_LEFT;
-    col.iOrder = 0;
-    col.cx = 190;
-    ListView_InsertColumn(hListRights, col.iSubItem, &col);
+    supAddListViewColumn(hListRights, 0, 0, 0,
+        I_IMAGENONE,
+        LVCFMT_LEFT,
+        TEXT("Flag"), 190);
 
-    col.iSubItem = 2;
-    col.pszText = TEXT("Value");
-    col.iOrder = 1;
-    col.cx = 80;
-    ListView_InsertColumn(hListRights, col.iSubItem, &col);
+    supAddListViewColumn(hListRights, 1, 1, 1,
+        I_IMAGENONE,
+        LVCFMT_LEFT,
+        TEXT("Value"), 80);
 }
 
 /*
@@ -601,7 +602,7 @@ BOOL propQueryTypeInfo(
             supHeapFree(pObjectTypes);
         }
     }
-    __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
+    __except (WOBJ_EXCEPTION_FILTER) {
         return FALSE;
     }
     return bResult;
@@ -617,7 +618,7 @@ BOOL propQueryTypeInfo(
 *
 */
 VOID propSetTypeInfo(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO * Context,
     _In_ HWND hwndDlg
 )
 {
@@ -627,16 +628,14 @@ VOID propSetTypeInfo(
     POBJINFO                   pObject = NULL;
     LPCWSTR                    lpTypeDescription = NULL;
     OBJECT_TYPE_COMPATIBLE     ObjectTypeDump;
-    WCHAR                      szBuffer[MAX_PATH];
+    WCHAR                      szConvertBuffer[64];
     WCHAR                      szType[MAX_PATH * 2];
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     RealTypeIndex = Context->ShadowTypeDescription->Index;
     if ((RealTypeIndex > ObjectTypeUnknown)) {
-        RealTypeIndex = ObjectTypeUnknown;       
+        RealTypeIndex = ObjectTypeUnknown;
     }
 
     //if type is not known set it description to it type name
@@ -730,25 +729,26 @@ VOID propSetTypeInfo(
     }
 
     if (bOkay) {
+        RtlSecureZeroMemory(szConvertBuffer, sizeof(szConvertBuffer));
+
         //Object count
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-        u64tostr(ObjectTypeDump.TotalNumberOfObjects, _strend(szBuffer));
-        SetDlgItemText(hwndDlg, ID_TYPE_COUNT, szBuffer);
+        u64tostr(ObjectTypeDump.TotalNumberOfObjects, szConvertBuffer);
+        SetDlgItemText(hwndDlg, ID_TYPE_COUNT, szConvertBuffer);
 
         //Handle count
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-        u64tostr(ObjectTypeDump.TotalNumberOfHandles, _strend(szBuffer));
-        SetDlgItemText(hwndDlg, ID_TYPE_HANDLECOUNT, szBuffer);
+        szConvertBuffer[0] = 0;
+        u64tostr(ObjectTypeDump.TotalNumberOfHandles, szConvertBuffer);
+        SetDlgItemText(hwndDlg, ID_TYPE_HANDLECOUNT, szConvertBuffer);
 
         //Peek object count
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-        u64tostr(ObjectTypeDump.HighWaterNumberOfObjects, _strend(szBuffer));
-        SetDlgItemText(hwndDlg, ID_TYPE_PEAKCOUNT, szBuffer);
+        szConvertBuffer[0] = 0;
+        u64tostr(ObjectTypeDump.HighWaterNumberOfObjects, szConvertBuffer);
+        SetDlgItemText(hwndDlg, ID_TYPE_PEAKCOUNT, szConvertBuffer);
 
         //Peek handle count
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-        u64tostr(ObjectTypeDump.HighWaterNumberOfHandles, _strend(szBuffer));
-        SetDlgItemText(hwndDlg, ID_TYPE_PEAKHANDLECOUNT, szBuffer);
+        szConvertBuffer[0] = 0;
+        u64tostr(ObjectTypeDump.HighWaterNumberOfHandles, szConvertBuffer);
+        SetDlgItemText(hwndDlg, ID_TYPE_PEAKHANDLECOUNT, szConvertBuffer);
 
         //PoolType
         lpTypeDescription = T_Unknown;
@@ -761,14 +761,14 @@ VOID propSetTypeInfo(
         SetDlgItemText(hwndDlg, ID_TYPE_POOLTYPE, lpTypeDescription);
 
         //Default NonPagedPoolCharge
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-        u64tostr(ObjectTypeDump.TypeInfo.DefaultNonPagedPoolCharge, szBuffer);
-        SetDlgItemText(hwndDlg, ID_TYPE_NPCHARGE, szBuffer);
+        szConvertBuffer[0] = 0;
+        u64tostr(ObjectTypeDump.TypeInfo.DefaultNonPagedPoolCharge, szConvertBuffer);
+        SetDlgItemText(hwndDlg, ID_TYPE_NPCHARGE, szConvertBuffer);
 
         //Default PagedPoolCharge
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-        u64tostr(ObjectTypeDump.TypeInfo.DefaultPagedPoolCharge, _strend(szBuffer));
-        SetDlgItemText(hwndDlg, ID_TYPE_PPCHARGE, szBuffer);
+        szConvertBuffer[0] = 0;
+        u64tostr(ObjectTypeDump.TypeInfo.DefaultPagedPoolCharge, szConvertBuffer);
+        SetDlgItemText(hwndDlg, ID_TYPE_PPCHARGE, szConvertBuffer);
 
         //Type flags
         propSetTypeFlags(hwndDlg, ObjectTypeDump.TypeInfo.ObjectTypeFlags);
@@ -790,9 +790,9 @@ VOID TypePropDialogOnInit(
     _In_  HWND hwndDlg,
     _In_  LPARAM lParam)
 {
-    PROPSHEETPAGE    *pSheet = NULL;
+    PROPSHEETPAGE* pSheet = NULL;
 
-    pSheet = (PROPSHEETPAGE *)lParam;
+    pSheet = (PROPSHEETPAGE*)lParam;
     if (pSheet) {
         SetProp(hwndDlg, T_PROPCONTEXT, (HANDLE)pSheet->lParam);
         supLoadIconForObjectType(hwndDlg,
@@ -822,7 +822,7 @@ INT_PTR CALLBACK TypePropDialogProc(
     _In_ LPARAM lParam
 )
 {
-    PROP_OBJECT_INFO *Context = NULL;
+    PROP_OBJECT_INFO* Context = NULL;
 
     switch (uMsg) {
     case WM_SHOWWINDOW:
@@ -838,12 +838,10 @@ INT_PTR CALLBACK TypePropDialogProc(
             }
         }
         return 1;
-        break;
 
     case WM_INITDIALOG:
         TypePropDialogOnInit(hwndDlg, lParam);
         return 1;
-        break;
 
     case WM_COMMAND:
         if (LOWORD(wParam) == ID_TYPE_ATTRLIST) {
@@ -853,7 +851,6 @@ INT_PTR CALLBACK TypePropDialogProc(
             }
         }
         return 1;
-        break;
 
     case WM_DESTROY:
         RemoveProp(hwndDlg, T_PROPCONTEXT);

@@ -1,13 +1,13 @@
 /************************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019 
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020 
 *  Translated from Microsoft sources/debugger or mentioned elsewhere.
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.123
+*  VERSION:     1.125
 *
-*  DATE:        16 Nov 2019
+*  DATE:        25 Dec 2019
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -4771,12 +4771,25 @@ typedef struct _GDI_SHARED_MEMORY {
     GDI_HANDLE_ENTRY Handles[GDI_MAX_HANDLE_COUNT];
 } GDI_SHARED_MEMORY, *PGDI_SHARED_MEMORY;
 
+#ifndef FLS_MAXIMUM_AVAILABLE
 #define FLS_MAXIMUM_AVAILABLE 128
-#define TLS_MINIMUM_AVAILABLE 64
-#define TLS_EXPANSION_SLOTS 1024
+#endif
 
+#ifndef TLS_MINIMUM_AVAILABLE
+#define TLS_MINIMUM_AVAILABLE 64
+#endif
+
+#ifndef TLS_EXPANSION_SLOTS
+#define TLS_EXPANSION_SLOTS 1024
+#endif
+
+#ifndef DOS_MAX_COMPONENT_LENGTH
 #define DOS_MAX_COMPONENT_LENGTH 255
+#endif
+
+#ifndef DOS_MAX_PATH_LENGTH
 #define DOS_MAX_PATH_LENGTH (DOS_MAX_COMPONENT_LENGTH + 5)
+#endif
 
 typedef struct _CURDIR {
     UNICODE_STRING DosPath;
@@ -10105,6 +10118,38 @@ NTSTATUS
 NTAPI
 NtLockRegistryKey(
     _In_ HANDLE KeyHandle);
+
+NTSYSAPI
+NTSTATUS
+NTAPI 
+NtCreateRegistryTransaction(
+    _Out_ PHANDLE Handle,
+    _In_ ACCESS_MASK DesiredAccess, //generic + TRANSACTION_*
+    _In_ POBJECT_ATTRIBUTES ObjectAttributes,
+    _In_ DWORD Flags);
+
+NTSYSAPI
+NTSTATUS
+NTAPI 
+NtCommitRegistryTransaction(
+    _In_ HANDLE RegistryHandle,
+    _In_ BOOL Wait);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtOpenRegistryTransaction(
+    _Out_ PHANDLE RegistryHandle,
+    _In_ ACCESS_MASK DesiredAccess,
+    _In_ POBJECT_ATTRIBUTES ObjectAttributes);
+
+NTSYSAPI
+NTSTATUS
+NTAPI 
+NtRollbackRegistryTransaction(
+    _In_ HANDLE RegistryHandle,
+    _In_ BOOL Wait);
+
 
 /************************************************************************************
 *

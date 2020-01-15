@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       EXTRASUSD.C
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        09 Nov 2019
+*  DATE:        05 Jan 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -67,7 +67,7 @@ VOID UsdDumpSharedRegion(
         //KUSER_SHARED_DATA
         //
 
-        h_tviRootItem = TreeListAddItem(
+        h_tviRootItem = supTreeListAddItem(
             UsdTreeList,
             (HTREEITEM)NULL,
             TVIF_TEXT | TVIF_STATE,
@@ -85,7 +85,7 @@ VOID UsdDumpSharedRegion(
         subitems.Text[0] = pUserSharedData->NtSystemRoot;
         subitems.Count = 1;
 
-        TreeListAddItem(
+        supTreeListAddItem(
             UsdTreeList,
             h_tviRootItem,
             TVIF_TEXT | TVIF_STATE,
@@ -171,7 +171,7 @@ VOID UsdDumpSharedRegion(
         }
 
         //ProcessorFeatures
-        h_tviSubItem = TreeListAddItem(
+        h_tviSubItem = supTreeListAddItem(
             UsdTreeList,
             h_tviRootItem,
             TVIF_TEXT | TVIF_STATE,
@@ -196,7 +196,7 @@ VOID UsdDumpSharedRegion(
                     subitems.Text[0] = szValue;
                     subitems.Text[1] = lpType;
                     subitems.Count = 2;
-                    h_tviLast = TreeListAddItem(
+                    h_tviLast = supTreeListAddItem(
                         UsdTreeList,
                         h_tviSubItem,
                         TVIF_TEXT | TVIF_STATE,
@@ -227,7 +227,7 @@ VOID UsdDumpSharedRegion(
                 subitems.Text[0] = szValue;
                 subitems.Text[1] = lpType;
                 subitems.Count = 2;
-                TreeListAddItem(
+                supTreeListAddItem(
                     UsdTreeList,
                     h_tviSubItem,
                     TVIF_TEXT | TVIF_STATE,
@@ -271,7 +271,7 @@ VOID UsdDumpSharedRegion(
         subitems.Text[0] = szValue;
         subitems.Count = 1;
 
-        h_tviSubItem = TreeListAddItem(
+        h_tviSubItem = supTreeListAddItem(
             UsdTreeList,
             h_tviRootItem,
             TVIF_TEXT | TVIF_STATE,
@@ -295,7 +295,7 @@ VOID UsdDumpSharedRegion(
                     subitems.Text[1] = SuiteMasks[i].lpDescription;
                     subitems.Count = 2;
 
-                    h_tviLast = TreeListAddItem(
+                    h_tviLast = supTreeListAddItem(
                         UsdTreeList,
                         h_tviSubItem,
                         TVIF_TEXT | TVIF_STATE,
@@ -335,7 +335,7 @@ VOID UsdDumpSharedRegion(
 
         //MitigationPolicies
 
-        if (g_NtBuildNumber < 9200) {
+        if (g_NtBuildNumber < NT_WIN8_RTM) {
 
             propObDumpByte(
                 UsdTreeList,
@@ -357,12 +357,15 @@ VOID UsdDumpSharedRegion(
             RtlSecureZeroMemory(&subitems, sizeof(subitems));
             RtlSecureZeroMemory(szValue, sizeof(szValue));
 
-            rtl_swprintf_s(szValue, MAX_PATH, TEXT("0x%02X"), pUserSharedData->MitigationPolicies);
+            RtlStringCchPrintfSecure(szValue, 
+                MAX_PATH, 
+                TEXT("0x%02X"), 
+                pUserSharedData->MitigationPolicies);
 
             subitems.Text[0] = szValue;
             subitems.Count = 1;
 
-            h_tviSubItem = TreeListAddItem(
+            h_tviSubItem = supTreeListAddItem(
                 UsdTreeList,
                 h_tviRootItem,
                 TVIF_TEXT | TVIF_STATE,
@@ -426,7 +429,7 @@ VOID UsdDumpSharedRegion(
         subitems.Text[0] = szValue;
         subitems.Count = 1;
 
-        h_tviSubItem = TreeListAddItem(
+        h_tviSubItem = supTreeListAddItem(
             UsdTreeList,
             h_tviRootItem,
             TVIF_TEXT | TVIF_STATE,
@@ -446,7 +449,7 @@ VOID UsdDumpSharedRegion(
                     subitems.Text[0] = szValue;
                     subitems.Text[1] = (LPTSTR)T_SharedDataFlags[i];
                     subitems.Count = 2;
-                    h_tviLast = TreeListAddItem(
+                    h_tviLast = supTreeListAddItem(
                         UsdTreeList,
                         h_tviSubItem,
                         TVIF_TEXT | TVIF_STATE,
@@ -526,19 +529,17 @@ VOID extrasCreateUsdDialog(
     _In_ HWND hwndParent
 )
 {
-    //allow only one dialog
-    if (g_WinObj.AuxDialogs[wobjUSDDlgId]) {
-        SetActiveWindow(g_WinObj.AuxDialogs[wobjUSDDlgId]);
-        return;
-    }
+    //
+    // Allow only one dialog.
+    //
+    ENSURE_DIALOG_UNIQUE(g_WinObj.AuxDialogs[wobjUSDDlgId]);
 
     RtlSecureZeroMemory(&DlgContext, sizeof(DlgContext));
     DlgContext.hwndDlg = CreateDialogParam(g_WinObj.hInstance, MAKEINTRESOURCE(IDD_DIALOG_USD),
         hwndParent, &UsdDialogProc, 0);
 
-    if (DlgContext.hwndDlg == NULL) {
+    if (DlgContext.hwndDlg == NULL)
         return;
-    }
 
     g_WinObj.AuxDialogs[wobjUSDDlgId] = DlgContext.hwndDlg;
 

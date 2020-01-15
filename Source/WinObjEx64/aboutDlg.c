@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        24 Nov 2019
+*  DATE:        05 Jan 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,8 +17,24 @@
 #include "global.h"
 #include "msvcver.h"
 #include <Richedit.h>
+#include "winedebug.h"
 
-#undef _WINE_NB_DEBUG
+VALUE_DESC CodeIntegrityValuesList[] = {
+    { L"CODEINTEGRITY_OPTION_ENABLED", CODEINTEGRITY_OPTION_ENABLED },
+    { L"CODEINTEGRITY_OPTION_TESTSIGN", CODEINTEGRITY_OPTION_TESTSIGN },
+    { L"CODEINTEGRITY_OPTION_UMCI_ENABLED", CODEINTEGRITY_OPTION_UMCI_ENABLED },
+    { L"CODEINTEGRITY_OPTION_UMCI_AUDITMODE_ENABLED", CODEINTEGRITY_OPTION_UMCI_AUDITMODE_ENABLED },
+    { L"CODEINTEGRITY_OPTION_UMCI_EXCLUSIONPATHS_ENABLED", CODEINTEGRITY_OPTION_UMCI_EXCLUSIONPATHS_ENABLED },
+    { L"CODEINTEGRITY_OPTION_TEST_BUILD", CODEINTEGRITY_OPTION_TEST_BUILD },
+    { L"CODEINTEGRITY_OPTION_PREPRODUCTION_BUILD", CODEINTEGRITY_OPTION_PREPRODUCTION_BUILD },
+    { L"CODEINTEGRITY_OPTION_DEBUGMODE_ENABLED", CODEINTEGRITY_OPTION_DEBUGMODE_ENABLED },
+    { L"CODEINTEGRITY_OPTION_FLIGHT_BUILD", CODEINTEGRITY_OPTION_FLIGHT_BUILD },
+    { L"CODEINTEGRITY_OPTION_FLIGHTING_ENABLED", CODEINTEGRITY_OPTION_FLIGHTING_ENABLED },
+    { L"CODEINTEGRITY_OPTION_HVCI_KMCI_ENABLED", CODEINTEGRITY_OPTION_HVCI_KMCI_ENABLED },
+    { L"CODEINTEGRITY_OPTION_HVCI_KMCI_AUDITMODE_ENABLED", CODEINTEGRITY_OPTION_HVCI_KMCI_AUDITMODE_ENABLED },
+    { L"CODEINTEGRITY_OPTION_HVCI_KMCI_STRICTMODE_ENABLED", CODEINTEGRITY_OPTION_HVCI_KMCI_STRICTMODE_ENABLED },
+    { L"CODEINTEGRITY_OPTION_HVCI_IUM_ENABLED", CODEINTEGRITY_OPTION_HVCI_IUM_ENABLED }
+};
 
 /*
 * AboutDialogInit
@@ -33,6 +49,7 @@ VOID AboutDialogInit(
 )
 {
     BOOLEAN  bSecureBoot = FALSE;
+    BOOLEAN  bHVCIEnabled = FALSE, bHVCIStrict = FALSE, bHVCIIUMEnabled = FALSE;
     ULONG    returnLength;
     NTSTATUS status;
     HANDLE   hImage;
@@ -41,11 +58,13 @@ VOID AboutDialogInit(
     PCHAR    wine_ver, wine_str;
 
     SYSTEM_BOOT_ENVIRONMENT_INFORMATION sbei;
-    SYSTEM_VHD_BOOT_INFORMATION *psvbi;
+    SYSTEM_VHD_BOOT_INFORMATION* psvbi;
 
     SetDlgItemText(hwndDlg, ID_ABOUT_PROGRAM, PROFRAM_NAME_AND_TITLE);
 
-    rtl_swprintf_s(szBuffer, 100, TEXT("%lu.%lu.%lu"),
+    RtlStringCchPrintfSecure(szBuffer,
+        MAX_PATH,
+        TEXT("%lu.%lu.%lu"),
         PROGRAM_MAJOR_VERSION,
         PROGRAM_MINOR_VERSION,
         PROGRAM_REVISION_NUMBER);
@@ -88,15 +107,10 @@ VOID AboutDialogInit(
     // Set build date and time.
     //
     RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-    MultiByteToWideChar(CP_ACP, 0, __DATE__, (INT)_strlen_a(__DATE__), _strend(szBuffer), 40);
+    MultiByteToWideChar(CP_ACP, 0, __DATE__, (INT)_strlen_a(__DATE__), szBuffer, 40);
     _strcat(szBuffer, TEXT(" "));
     MultiByteToWideChar(CP_ACP, 0, __TIME__, (INT)_strlen_a(__TIME__), _strend(szBuffer), 40);
     SetDlgItemText(hwndDlg, ID_ABOUT_BUILDDATE, szBuffer);
-
-#ifdef _WINE_NB_DEBUG
-    g_WinObj.IsWine = TRUE;
-    wine_ver = "4.9";
-#endif
 
     //
     // Fill OS name.
@@ -106,8 +120,13 @@ VOID AboutDialogInit(
         _strcpy(szBuffer, TEXT("Reported as "));
     }
 
-    rtl_swprintf_s(_strend(szBuffer), 100, TEXT("Windows NT %1u.%1u (build %u"),
-        g_WinObj.osver.dwMajorVersion, g_WinObj.osver.dwMinorVersion, g_WinObj.osver.dwBuildNumber);
+    RtlStringCchPrintfSecure(_strend(szBuffer),
+        100,
+        TEXT("Windows NT %1u.%1u (build %u"),
+        g_WinObj.osver.dwMajorVersion,
+        g_WinObj.osver.dwMinorVersion,
+        g_WinObj.osver.dwBuildNumber);
+
     if (g_WinObj.osver.szCSDVersion[0]) {
         _strcat(szBuffer, TEXT(", "));
         _strcat(szBuffer, g_WinObj.osver.szCSDVersion);
@@ -118,9 +137,7 @@ VOID AboutDialogInit(
     // Fill boot options.
     //   
     if (g_WinObj.IsWine) {
-#ifndef _WINE_NB_DEBUG
         wine_ver = (PCHAR)wine_get_version();
-#endif
         wine_str = (PCHAR)supHeapAlloc(_strlen_a(wine_ver) + MAX_PATH);
         if (wine_str) {
             _strcpy_a(wine_str, "Wine ");
@@ -186,6 +203,18 @@ VOID AboutDialogInit(
                     _strcat(szBuffer, TEXT(" SecureBoot"));
                 }
                 g_kdctx.IsSecureBoot = bSecureBoot;
+
+                if (bSecureBoot) {
+                    if (supQueryHVCIState(&bHVCIEnabled, &bHVCIStrict, &bHVCIIUMEnabled)) {
+                        if (bHVCIEnabled) {
+                            _strcat(szBuffer, TEXT(", HVCI"));
+                            if (bHVCIStrict)
+                                _strcat(szBuffer, TEXT(" (strict)"));
+                            if (bHVCIIUMEnabled)
+                                _strcat(szBuffer, TEXT(", IUM"));
+                        }
+                    }
+                }
             }
         }
         else {
@@ -327,6 +356,8 @@ VOID AboutDialogCollectGlobals(
 {
     BOOLEAN bCustomSignersAllowed;
 
+    ULONG Index, Value, SaveValue;
+
     WCHAR szBuffer[MAX_PATH * 4];
     WCHAR szTemp[MAX_PATH];
 
@@ -367,7 +398,9 @@ VOID AboutDialogCollectGlobals(
     //
     // Generic environment information, WinObjEx64 version.
     //
-    rtl_swprintf_s(szBuffer, 100, TEXT("%lu.%lu.%lu"),
+    RtlStringCchPrintfSecure(szBuffer,
+        100,
+        TEXT("%lu.%lu.%lu"),
         PROGRAM_MAJOR_VERSION,
         PROGRAM_MINOR_VERSION,
         PROGRAM_REVISION_NUMBER);
@@ -448,7 +481,7 @@ VOID AboutDialogCollectGlobals(
 
     GetSystemInfo(&SystemInfo);
 
-    rtl_swprintf_s(szBuffer,
+    RtlStringCchPrintfSecure(szBuffer,
         MAX_PATH,
         TEXT("%lu, Mask 0x%08lX"),
         SystemInfo.dwNumberOfProcessors,
@@ -459,12 +492,14 @@ VOID AboutDialogCollectGlobals(
     //
     // List g_kdctx.
     //
-    szBuffer[0] = 0;
-    ultostr(g_kdctx.drvOpenLoadStatus, szBuffer);
-    if (g_kdctx.drvOpenLoadStatus == 0) {
+    szBuffer[0] = L'0';
+    szBuffer[1] = L'x';
+    szBuffer[2] = 0;
+    ultohex(g_kdctx.DriverOpenLoadStatus, &szBuffer[2]);
+    if (g_kdctx.DriverOpenLoadStatus == STATUS_SUCCESS) {
         _strcat(szBuffer, TEXT(" (reported as OK)"));
     }
-    AddParameterValue(hwndOutput, TEXT("drvOpenLoadStatus"), szBuffer);
+    AddParameterValue(hwndOutput, TEXT("DriverOpenLoadStatus"), szBuffer);
 
     AddParameterValueUlong(hwndOutput, TEXT("IsSecureBoot"), g_kdctx.IsSecureBoot);
 
@@ -476,13 +511,13 @@ VOID AboutDialogCollectGlobals(
 
     AddParameterValueUlong(hwndOutput, TEXT("DirectoryTypeIndex"), g_kdctx.DirectoryTypeIndex);
 
-    AddParameterValue64Hex(hwndOutput, TEXT("hDevice"), (ULONG_PTR)g_kdctx.hDevice);
+    AddParameterValue64Hex(hwndOutput, TEXT("KLDBG DeviceHandle"), (ULONG_PTR)g_kdctx.DeviceHandle);
 
     AddParameterValue64Hex(hwndOutput, TEXT("IopInvalidDeviceRequest"), (ULONG_PTR)g_kdctx.IopInvalidDeviceRequest);
 
-    AddParameterValueUlong(hwndOutput, TEXT("KiServiceLimit"), g_kdctx.KiServiceLimit);
+    AddParameterValueUlong(hwndOutput, TEXT("KiServiceLimit"), g_kdctx.KeServiceDescriptorTable.Limit);
 
-    AddParameterValue64Hex(hwndOutput, TEXT("KiServiceTableAddress"), (ULONG_PTR)g_kdctx.KiServiceTableAddress);
+    AddParameterValue64Hex(hwndOutput, TEXT("KiServiceTableAddress"), (ULONG_PTR)g_kdctx.KeServiceDescriptorTable.Base);
 
     AddParameterValue64Hex(hwndOutput, TEXT("NtOsBase"), (ULONG_PTR)g_kdctx.NtOsBase);
 
@@ -518,11 +553,32 @@ VOID AboutDialogCollectGlobals(
         sizeof(CodeIntegrity),
         &Dummy)))
     {
-        AddParameterValueUlong(hwndOutput, TEXT("CI Options Value"), CodeIntegrity.CodeIntegrityOptions);
+        AddParameterValue32Hex(hwndOutput, TEXT("CI Options Value"), CodeIntegrity.CodeIntegrityOptions);
 
         if (CodeIntegrity.CodeIntegrityOptions) {
-            if (CodeIntegrity.CodeIntegrityOptions & CODEINTEGRITY_OPTION_ENABLED)
-                AddParameterValue(hwndOutput, TEXT("CI Options"), TEXT("CODEINTEGRITY_OPTION_ENABLED"));
+
+            for (Index = 0; Index < RTL_NUMBER_OF(CodeIntegrityValuesList); Index++) {
+
+                if (CodeIntegrity.CodeIntegrityOptions & CodeIntegrityValuesList[Index].dwValue) {
+                    AddParameterValue(
+                        hwndOutput,
+                        TEXT("CI Option"),
+                        CodeIntegrityValuesList[Index].lpDescription);
+                    CodeIntegrity.CodeIntegrityOptions &= ~CodeIntegrityValuesList[Index].dwValue;
+                }
+            }
+
+            if (CodeIntegrity.CodeIntegrityOptions) {
+                Value = 1;
+                SaveValue = CodeIntegrity.CodeIntegrityOptions;
+                while (SaveValue) {
+                    if (SaveValue & Value) {
+                        AddParameterValue32Hex(hwndOutput, TEXT("CI Option (unknown)"), Value);
+                        SaveValue &= ~Value;
+                    }
+                    Value *= 2;
+                }
+            }
         }
     }
 
@@ -667,9 +723,11 @@ VOID AboutDialogShowGlobals(
     RichEditHandle = GetModuleHandle(T_RICHEDIT_LIB);
     if (RichEditHandle == NULL) {
 
-        rtl_swprintf_s(
-            szBuffer,
-            MAX_PATH * 2, TEXT("%s\\%s"),
+        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+
+        RtlStringCchPrintfSecure(szBuffer,
+            sizeof(szBuffer) / sizeof(szBuffer[0]),
+            TEXT("%s\\%s"),
             g_WinObj.szSystemDirectory,
             T_RICHEDIT_LIB);
 

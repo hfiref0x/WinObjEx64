@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       PROPSECURITY.C
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        18 Nov 2019
+*  DATE:        05 Jan 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -65,10 +65,10 @@ BOOL propSecurityObjectSupported(
 *
 */
 PSI_ACCESS propGetAccessTable(
-    _In_ IObjectSecurity * This
+    _In_ IObjectSecurity* This
 )
 {
-    SI_ACCESS *AccessTable = NULL;
+    SI_ACCESS* AccessTable = NULL;
 
     switch (This->ObjectContext->TypeIndex) {
 
@@ -157,7 +157,7 @@ PSI_ACCESS propGetAccessTable(
         This->dwAccessMax = MAX_KNOWN_THREAD_ACCESS_VALUE;
         AccessTable = (PSI_ACCESS)&ThreadAccessValues;
         break;
-    
+
     case ObjectTypeToken:
         This->dwAccessMax = MAX_KNOWN_TOKEN_ACCESS_VALUE;
         AccessTable = (PSI_ACCESS)&TokenAccessValues;
@@ -236,9 +236,9 @@ ACCESS_MASK propGetObjectAccessMask(
 }
 
 HRESULT STDMETHODCALLTYPE QueryInterface(
-    _In_ IObjectSecurity * This,
+    _In_ IObjectSecurity* This,
     _In_ REFIID riid,
-    _Out_ void **ppvObject
+    _Out_ void** ppvObject
 )
 {
 #if defined(__cplusplus)
@@ -259,7 +259,7 @@ HRESULT STDMETHODCALLTYPE QueryInterface(
 }
 
 ULONG STDMETHODCALLTYPE AddRef(
-    _In_ IObjectSecurity * This
+    _In_ IObjectSecurity* This
 )
 {
     This->RefCount++;
@@ -267,7 +267,7 @@ ULONG STDMETHODCALLTYPE AddRef(
 }
 
 ULONG STDMETHODCALLTYPE Release(
-    _In_ IObjectSecurity * This
+    _In_ IObjectSecurity* This
 )
 {
     This->RefCount--;
@@ -283,7 +283,7 @@ ULONG STDMETHODCALLTYPE Release(
 }
 
 HRESULT STDMETHODCALLTYPE GetObjectInformation(
-    _In_ IObjectSecurity * This,
+    _In_ IObjectSecurity* This,
     _Out_ PSI_OBJECT_INFO pObjectInfo
 )
 {
@@ -295,12 +295,12 @@ HRESULT STDMETHODCALLTYPE GetObjectInformation(
 }
 
 HRESULT STDMETHODCALLTYPE GetAccessRights(
-    _In_ IObjectSecurity * This,
+    _In_ IObjectSecurity* This,
     _In_ const GUID* pguidObjectType,
     _In_ DWORD dwFlags,
-    _Out_ PSI_ACCESS *ppAccess,
-    _Out_ ULONG *pcAccesses,
-    _Out_ ULONG *piDefaultAccess
+    _Out_ PSI_ACCESS* ppAccess,
+    _Out_ ULONG* pcAccesses,
+    _Out_ ULONG* piDefaultAccess
 )
 {
     UNREFERENCED_PARAMETER(pguidObjectType);
@@ -314,9 +314,9 @@ HRESULT STDMETHODCALLTYPE GetAccessRights(
 }
 
 HRESULT STDMETHODCALLTYPE GetSecurity(
-    _In_ IObjectSecurity * This,
+    _In_ IObjectSecurity* This,
     _In_ SECURITY_INFORMATION RequestedInformation,
-    _Out_ PSECURITY_DESCRIPTOR *ppSecurityDescriptor,
+    _Out_ PSECURITY_DESCRIPTOR* ppSecurityDescriptor,
     _In_ BOOL fDefault
 )
 {
@@ -377,7 +377,7 @@ Done:
 }
 
 HRESULT STDMETHODCALLTYPE SetSecurity(
-    _In_ IObjectSecurity * This,
+    _In_ IObjectSecurity* This,
     _In_ SECURITY_INFORMATION SecurityInformation,
     _In_ PSECURITY_DESCRIPTOR pSecurityDescriptor
 )
@@ -399,10 +399,10 @@ HRESULT STDMETHODCALLTYPE SetSecurity(
 }
 
 HRESULT STDMETHODCALLTYPE MapGeneric(
-    _In_ IObjectSecurity * This,
-    _In_ const GUID *pguidObjectType,
-    _In_ UCHAR *pAceFlags,
-    _In_ ACCESS_MASK *pMask
+    _In_ IObjectSecurity* This,
+    _In_ const GUID* pguidObjectType,
+    _In_ UCHAR* pAceFlags,
+    _In_ ACCESS_MASK* pMask
 )
 {
     UNREFERENCED_PARAMETER(pguidObjectType);
@@ -413,9 +413,9 @@ HRESULT STDMETHODCALLTYPE MapGeneric(
 }
 
 HRESULT STDMETHODCALLTYPE GetInheritTypes(
-    _In_ IObjectSecurity * This,
-    _Out_ PSI_INHERIT_TYPE *ppInheritTypes,
-    _Out_ ULONG *pcInheritTypes
+    _In_ IObjectSecurity* This,
+    _Out_ PSI_INHERIT_TYPE* ppInheritTypes,
+    _Out_ ULONG* pcInheritTypes
 )
 {
     UNREFERENCED_PARAMETER(This);
@@ -426,7 +426,7 @@ HRESULT STDMETHODCALLTYPE GetInheritTypes(
 }
 
 HRESULT STDMETHODCALLTYPE PropertySheetPageCallback(
-    _In_ IObjectSecurity * This,
+    _In_ IObjectSecurity* This,
     _In_ HWND hwnd,
     _In_ UINT uMsg,
     _In_ SI_PAGE_TYPE uPage
@@ -463,8 +463,8 @@ ObjectSecurityVtbl g_Vtbl = {
 *
 */
 HRESULT propSecurityConstructor(
-    _In_ IObjectSecurity *This,
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ IObjectSecurity* This,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ POPENOBJECTMETHOD OpenObjectMethod,
     _In_opt_ PCLOSEOBJECTMETHOD CloseObjectMethod,
     _In_ ULONG psiFlags
@@ -475,7 +475,7 @@ HRESULT propSecurityConstructor(
     SIZE_T                      Size;
     HRESULT                     hResult;
     HANDLE                      hObject = NULL;
-    SI_ACCESS                  *TypeAccessTable = NULL;
+    PSI_ACCESS                  TypeAccessTable = NULL;
     POBJECT_TYPE_INFORMATION    TypeInfo = NULL;
 
     This->ObjectContext = Context;
@@ -594,13 +594,13 @@ HRESULT propSecurityConstructor(
 *
 */
 HPROPSHEETPAGE propSecurityCreatePage(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ POPENOBJECTMETHOD OpenObjectMethod,
     _In_opt_ PCLOSEOBJECTMETHOD CloseObjectMethod,
     _In_ ULONG psiFlags
 )
 {
-    IObjectSecurity *psi;
+    IObjectSecurity* psi;
 
     if (
         (Context == NULL) ||
@@ -619,9 +619,9 @@ HPROPSHEETPAGE propSecurityCreatePage(
         return NULL;
 
     if (S_OK != propSecurityConstructor(
-        psi, 
+        psi,
         Context,
-        OpenObjectMethod, 
+        OpenObjectMethod,
         CloseObjectMethod,
         psiFlags))
     {

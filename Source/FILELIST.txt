@@ -16,7 +16,7 @@ winobjex64\extras\extras.h
 winobjex64\extapi.c
 winobjex64\extapi.h
 
-* Windows 7 missing API support
+* Windows 7/8/8.1 missing API support
 
 winobjex64\extdef.h
 
@@ -24,6 +24,7 @@ winobjex64\extdef.h
 
 winobjex64\extas\extrasCallbacks.c
 winobjex64\extras\extrasCallbacks.h
+winobjex64\extras\extrasCallbacksPatterns.h
 
 * Windows kernel callbacks list
 
@@ -187,8 +188,9 @@ shared\treelist\treelist.h
 
 winobjex64\wine.h
 winobjex64\wine.c
+winobjex64\winedebug.h
 
-* Wine support header file
+* Wine support files
 
 winobjex64\global.h
 

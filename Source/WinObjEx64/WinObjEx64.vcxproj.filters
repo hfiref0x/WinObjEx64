@@ -382,6 +382,9 @@
     <ClInclude Include="extras\extrasCallbacksPatterns.h">
       <Filter>Source Files\extras</Filter>
     </ClInclude>
+    <ClInclude Include="winedebug.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="rsrc\pipe.ico">

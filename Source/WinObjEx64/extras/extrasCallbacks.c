@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2018 - 2019
+*  (C) COPYRIGHT AUTHORS, 2018 - 2020
 *
 *  TITLE:       EXTRASCALLBACKS.C
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        24 Nov 2019
+*  DATE:        05 Jan 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -18,7 +18,7 @@
 #include "extras.h"
 #include "extrasCallbacks.h"
 #include "extras/extrasCallbacksPatterns.h"
-#include "treelist\treelist.h"
+#include "treelist/treelist.h"
 #include "hde/hde64.h"
 
 ULONG g_CallbacksCount;
@@ -416,47 +416,47 @@ LPWSTR GetCiRoutineNameFromIndex(
 
     switch (g_NtBuildNumber) {
 
-    case 7600:
-    case 7601:
+    case NT_WIN7_RTM:
+    case NT_WIN7_SP1:
         Indexes = CiCallbackIndexes_Win7;
         ArrayCount = CI_CALLBACKS_NAMES_W7_COUNT;
         break;
 
-    case 9200:
+    case NT_WIN8_RTM:
         Indexes = CiCallbackIndexes_Win8;
         ArrayCount = CI_CALLBACK_NAMES_W8_COUNT;
         break;
 
-    case 9600:
+    case NT_WIN8_BLUE:
         Indexes = CiCallbackIndexes_Win81;
         ArrayCount = CI_CALLBACK_NAMES_W81_COUNT;
         break;
 
-    case 10240:
-    case 10586:
+    case NT_WIN10_THRESHOLD1:
+    case NT_WIN10_THRESHOLD2:
         Indexes = CiCallbackIndexes_Win10Threshold;
         ArrayCount = CI_CALLBACK_NAMES_W10THRESHOLD_COUNT;
         break;
 
-    case 14393:
+    case NT_WIN10_REDSTONE1:
         Indexes = CiCallbackIndexes_Win10RS1;
         ArrayCount = CI_CALLBACK_NAMES_W10RS1_COUNT;
         break;
 
-    case 15063:
+    case NT_WIN10_REDSTONE2:
         Indexes = CiCallbackIndexes_Win10RS2;
         ArrayCount = CI_CALLBACK_NAMES_W10RS2_COUNT;
         break;
 
-    case 16299:
+    case NT_WIN10_REDSTONE3:
         Indexes = CiCallbackIndexes_Win10RS3;
         ArrayCount = CI_CALLBACK_NAMES_W10RS3_COUNT;
         break;
 
-    case 17134:
-    case 17763:
-    case 18362:
-    case 18363:
+    case NT_WIN10_REDSTONE4:
+    case NT_WIN10_REDSTONE5:
+    case NT_WIN10_19H1:
+    case NT_WIN10_19H2:
     default:
         Indexes = CiCallbackIndexes_Win10RS4_19H2;
         ArrayCount = CI_CALLBACK_NAMES_W10RS4_19H2_COUNT;
@@ -519,44 +519,44 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
 
         switch (g_NtBuildNumber) {
 
-        case 7601:
+        case NT_WIN7_SP1:
             Signature = g_CiCallbacksPattern_7601;
             SignatureSize = sizeof(g_CiCallbacksPattern_7601);
             InstructionMatchPattern = g_CiCallbacksMatchingPattern;
             InstructionExactMatchLength = RTL_NUMBER_OF(g_CiCallbacksMatchingPattern);
             break;
 
-        case 9200:
-        case 9600:
+        case NT_WIN8_RTM:
+        case NT_WIN8_BLUE:
             Signature = SeCiCallbacksPattern_9200_9600;
             SignatureSize = sizeof(SeCiCallbacksPattern_9200_9600);
             break;
 
-        case 10240:
-        case 10586:
+        case NT_WIN10_THRESHOLD1:
+        case NT_WIN10_THRESHOLD2:
             Signature = SeCiCallbacksPattern_10240_10586;
             SignatureSize = sizeof(SeCiCallbacksPattern_10240_10586);
             break;
 
-        case 14393:
+        case NT_WIN10_REDSTONE1:
             Signature = SeCiCallbacksPattern_14393;
             SignatureSize = sizeof(SeCiCallbacksPattern_14393);
             break;
 
-        case 15063:
-        case 16299:
+        case NT_WIN10_REDSTONE2:
+        case NT_WIN10_REDSTONE3:
             Signature = SeCiCallbacksPattern_15063_16299;
             SignatureSize = sizeof(SeCiCallbacksPattern_15063_16299);
             break;
 
-        case 17134:
-        case 17763:
+        case NT_WIN10_REDSTONE4:
+        case NT_WIN10_REDSTONE5:
             Signature = SeCiCallbacksPattern_17134_17763;
             SignatureSize = sizeof(SeCiCallbacksPattern_17134_17763);
             break;
 
-        case 18362:
-        case 18363:
+        case NT_WIN10_19H1:
+        case NT_WIN10_19H2:
         default:
             Signature = SeCiCallbacksPattern_19H1;
             SignatureSize = sizeof(SeCiCallbacksPattern_19H1);
@@ -575,7 +575,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
         if (ptrCode == NULL)
             break;
 
-        if (g_NtBuildNumber <= 7601) {
+        if (g_NtBuildNumber <= NT_WIN7_SP1) {
 
             //
             // Find reference to g_CiCallbacks in code.
@@ -678,7 +678,7 @@ BOOL FindIopFileSystemQueueHeads(
     Rel = 0;
     Count = 0;
 
-    if (g_NtBuildNumber < 9200) {
+    if (g_NtBuildNumber < NT_WIN8_RTM) {
 
         do {
             hde64_disasm(ptrCode + Index, &hs);
@@ -1049,7 +1049,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindPopRegisteredPowerSettingCallbacks)
 */
 OBEX_FINDCALLBACK_ROUTINE(FindSeFileSystemNotifyRoutinesHead)
 {
-    BOOL Extended = (BOOL)QueryFlags;
+    BOOL Extended = (BOOL)(ULONG)QueryFlags;
     ULONG Index;
     LONG Rel = 0;
     ULONG_PTR Address = 0;
@@ -1225,7 +1225,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindObjectTypeCallbackListHeadByType)
 */
 OBEX_FINDCALLBACK_ROUTINE(FindIopNotifyShutdownQueueHeadHead)
 {
-    BOOL bLastChance = (BOOL)QueryFlags;
+    BOOL bLastChance = (BOOL)(ULONG)QueryFlags;
     ULONG Index;
     LONG Rel = 0;
     ULONG_PTR Address = 0;
@@ -1868,7 +1868,7 @@ HTREEITEM AddRootEntryToList(
     _In_ LPWSTR lpCallbackType
 )
 {
-    return TreeListAddItem(
+    return supTreeListAddItem(
         TreeList,
         NULL,
         TVIF_TEXT | TVIF_STATE,
@@ -1928,7 +1928,7 @@ VOID AddEntryToList(
     TreeListSubItems.Text[0] = szBuffer;
     TreeListSubItems.Text[1] = lpAdditionalInfo;
 
-    TreeListAddItem(
+    supTreeListAddItem(
         TreeList,
         RootItem,
         TVIF_TEXT | TVIF_STATE,
@@ -1979,7 +1979,7 @@ VOID AddZeroEntryToList(
         TreeListSubItems.Text[1] = lpAdditionalInfo;
     }
 
-    TreeListAddItem(
+    supTreeListAddItem(
         TreeList,
         RootItem,
         TVIF_TEXT | TVIF_STATE,
@@ -2725,7 +2725,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCallbacks)
     // Determinate size of structure to read.
     //
     ReadSize = sizeof(POP_POWER_SETTING_REGISTRATION_V1);
-    if (g_NtBuildNumber >= 14393)
+    if (g_NtBuildNumber >= NT_WIN10_REDSTONE1)
         ReadSize = sizeof(POP_POWER_SETTING_REGISTRATION_V2);
 
     __try {
@@ -3129,7 +3129,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks)
     if (RootItem == 0)
         return;
 
-    if (g_NtBuildNumber <= 7601) {
+    if (g_NtBuildNumber <= NT_WIN7_SP1) {
         SizeOfCiCallbacks = 3 * sizeof(ULONG_PTR);
 
         CallbacksData = (PULONG_PTR)supVirtualAlloc((SIZE_T)SizeOfCiCallbacks);
@@ -3195,7 +3195,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks)
                 &BytesRead))
             {
                 SizeOfCiCallbacks -= sizeof(ULONG_PTR); //exclude structure sizeof
-                bRevisionMarker = (g_NtBuildNumber >= 14393); //there is a revision marker at the end of this structure.
+                bRevisionMarker = (g_NtBuildNumber >= NT_WIN10_REDSTONE1); //there is a revision marker at the end of this structure.
                 if (bRevisionMarker) SizeOfCiCallbacks -= sizeof(ULONG_PTR); //exclude marker (windows 10 + revision)
 
                 c = (ULONG)(SizeOfCiCallbacks / sizeof(ULONG_PTR));
@@ -3320,6 +3320,17 @@ OBEX_QUERYCALLBACK_ROUTINE(QueryCallbackGeneric)
 {
     ULONG_PTR QueryAddress = 0;
 
+    //
+    // All parameters must be valid for this variant of Query callback.
+    //
+    if ((DisplayRoutine == NULL) ||
+        (FindRoutine == NULL) ||
+        (SystemCallbacksRef == NULL) ||
+        (CallbackType == NULL))
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
+
     __try {
 
         QueryAddress = *SystemCallbacksRef;
@@ -3329,6 +3340,7 @@ OBEX_QUERYCALLBACK_ROUTINE(QueryCallbackGeneric)
 
         *SystemCallbacksRef = QueryAddress;
 
+
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {
         return GetExceptionCode();
@@ -3336,7 +3348,8 @@ OBEX_QUERYCALLBACK_ROUTINE(QueryCallbackGeneric)
 
     __try {
         if (QueryAddress) {
-            DisplayRoutine(TreeList,
+            DisplayRoutine(
+                TreeList,
                 CallbackType,
                 QueryAddress,
                 Modules);
@@ -3651,15 +3664,10 @@ VOID extrasCreateCallbacksDialog(
 
     EXTRASCONTEXT  *pDlgContext;
 
-
-    //allow only one dialog
-    if (g_WinObj.AuxDialogs[wobjCallbacksDlgId]) {
-        if (IsIconic(g_WinObj.AuxDialogs[wobjCallbacksDlgId]))
-            ShowWindow(g_WinObj.AuxDialogs[wobjCallbacksDlgId], SW_RESTORE);
-        else
-            SetActiveWindow(g_WinObj.AuxDialogs[wobjCallbacksDlgId]);
-        return;
-    }
+    //
+    // Allow only one dialog.
+    //
+    ENSURE_DIALOG_UNIQUE_WITH_RESTORE(g_WinObj.AuxDialogs[wobjCallbacksDlgId]);
 
     pDlgContext = (EXTRASCONTEXT*)supHeapAlloc(sizeof(EXTRASCONTEXT));
     if (pDlgContext == NULL)
@@ -3672,9 +3680,8 @@ VOID extrasCreateCallbacksDialog(
         &CallbacksDialogProc,
         (LPARAM)pDlgContext);
 
-    if (hwndDlg == NULL) {
+    if (hwndDlg == NULL)
         return;
-    }
 
     pDlgContext->hwndDlg = hwndDlg;
     g_WinObj.AuxDialogs[wobjCallbacksDlgId] = hwndDlg;

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019
+*  (C) COPYRIGHT AUTHORS, 2019 - 2020
 *
 *  TITLE:       EXTRASPSLIST.C
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        18 Nov 2019
+*  DATE:        05 Jan 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -46,14 +46,14 @@ LIST_ENTRY g_PsListHead;
 * Allocate PROP_UNNAMED_OBJECT_INFO entry.
 *
 */
-PROP_UNNAMED_OBJECT_INFO *PsxAllocateUnnamedObjectEntry(
+PROP_UNNAMED_OBJECT_INFO* PsxAllocateUnnamedObjectEntry(
     _In_ PVOID Data,
     _In_ WOBJ_OBJECT_TYPE ObjectType
 )
 {
     PSYSTEM_PROCESSES_INFORMATION processEntry;
     PSYSTEM_THREAD_INFORMATION threadEntry;
-    PROP_UNNAMED_OBJECT_INFO *objectEntry;
+    PROP_UNNAMED_OBJECT_INFO* objectEntry;
 
     if (Data == NULL)
         return NULL;
@@ -104,8 +104,8 @@ int __cdecl PsxSCMLookupCallback(
 )
 {
     int i;
-    ENUM_SERVICE_STATUS_PROCESS *elem1 = (ENUM_SERVICE_STATUS_PROCESS*)first;
-    ENUM_SERVICE_STATUS_PROCESS *elem2 = (ENUM_SERVICE_STATUS_PROCESS*)second;
+    ENUM_SERVICE_STATUS_PROCESS* elem1 = (ENUM_SERVICE_STATUS_PROCESS*)first;
+    ENUM_SERVICE_STATUS_PROCESS* elem2 = (ENUM_SERVICE_STATUS_PROCESS*)second;
 
     if (elem1->ServiceStatusProcess.dwProcessId == elem2->ServiceStatusProcess.dwProcessId)
         i = 0;
@@ -235,14 +235,14 @@ INT CALLBACK PsListCompareFunc(
 * Return pointer to data from selected object list entry.
 *
 */
-PROP_UNNAMED_OBJECT_INFO *PsListGetObjectEntry(
+PROP_UNNAMED_OBJECT_INFO* PsListGetObjectEntry(
     _In_ BOOL bTreeList,
     _In_opt_ HTREEITEM hTreeItem)
 {
     INT nSelected;
     TVITEMEX itemex;
-    TL_SUBITEMS_FIXED *subitems = NULL;
-    PROP_UNNAMED_OBJECT_INFO *ObjectEntry = NULL;
+    TL_SUBITEMS_FIXED* subitems = NULL;
+    PROP_UNNAMED_OBJECT_INFO* ObjectEntry = NULL;
 
     if (bTreeList) {
 
@@ -284,16 +284,13 @@ VOID PsListHandleObjectProp(
 
     PUNICODE_STRING ImageName = NULL;
 
-    PROP_UNNAMED_OBJECT_INFO *tempEntry;
+    PROP_UNNAMED_OBJECT_INFO* tempEntry;
     PROP_DIALOG_CREATE_SETTINGS propSettings;
 
     //
     // Only one process/thread properties dialog at the same time allowed.
     //
-    if (g_PsPropWindow != NULL) {
-        SetActiveWindow(g_PsPropWindow);
-        return;
-    }
+    ENSURE_DIALOG_UNIQUE(g_PsPropWindow);
 
     if (bProcessList) {
 
@@ -381,10 +378,10 @@ VOID PsListHandleObjectProp(
 */
 BOOLEAN PsListProcessInServicesList(
     _In_ HANDLE ProcessId,
-    _In_ SCMDB *ServicesList
+    _In_ SCMDB* ServicesList
 )
 {
-    ENUM_SERVICE_STATUS_PROCESS *SearchEntrySCM = NULL, EntrySCM;
+    ENUM_SERVICE_STATUS_PROCESS* SearchEntrySCM = NULL, EntrySCM;
 
     if (ProcessId == NULL) return FALSE;
 
@@ -412,14 +409,14 @@ HTREEITEM AddProcessEntryTreeList(
     _In_opt_ HANDLE ProcessHandle,
     _In_ PVOID Data,
     _In_ ULONG_PTR ObjectAddress,
-    _In_opt_ SCMDB *ServicesList,
+    _In_opt_ SCMDB* ServicesList,
     _In_opt_ PSID OurSid
 )
 {
     HTREEITEM hTreeItem = NULL;
     PSID ProcessSid = NULL;
     HANDLE UniqueProcessId;
-    PROP_UNNAMED_OBJECT_INFO *objectEntry;
+    PROP_UNNAMED_OBJECT_INFO* objectEntry;
     TL_SUBITEMS_FIXED subitems;
 
     ULONG Length, r;
@@ -555,7 +552,7 @@ HTREEITEM AddProcessEntryTreeList(
         supHeapFree(ProcessSid);
     }
 
-    hTreeItem = TreeListAddItem(
+    hTreeItem = supTreeListAddItem(
         PsDlgContext.TreeList,
         RootItem,
         TVIF_TEXT | TVIF_STATE,
@@ -572,7 +569,7 @@ HTREEITEM AddProcessEntryTreeList(
     return hTreeItem;
 }
 
-typedef BOOL(CALLBACK *FINDITEMCALLBACK)(
+typedef BOOL(CALLBACK* FINDITEMCALLBACK)(
     HWND TreeList,
     HTREEITEM htItem,
     ULONG_PTR UserContext
@@ -593,7 +590,7 @@ BOOL CALLBACK FindItemMatchCallback(
 )
 {
     HANDLE             ParentProcessId = (HANDLE)UserContext;
-    TL_SUBITEMS_FIXED *subitems = NULL;
+    TL_SUBITEMS_FIXED* subitems = NULL;
     TVITEMEX           itemex;
 
     PROP_UNNAMED_OBJECT_INFO* Entry;
@@ -731,7 +728,7 @@ LPWSTR PsListGetThreadStateAsString(
 *
 */
 DWORD WINAPI CreateThreadListProc(
-    _In_ PROP_UNNAMED_OBJECT_INFO *ObjectEntry
+    _In_ PROP_UNNAMED_OBJECT_INFO* ObjectEntry
 )
 {
     INT ItemIndex;
@@ -743,8 +740,8 @@ DWORD WINAPI CreateThreadListProc(
     PRTL_PROCESS_MODULES pModules = NULL;
     PSYSTEM_HANDLE_INFORMATION_EX SortedHandleList = NULL;
 
-    PROP_UNNAMED_OBJECT_INFO *objectEntry, *threadEntry;
-    OBEX_THREAD_LOOKUP_ENTRY *stl = NULL, *stlptr;
+    PROP_UNNAMED_OBJECT_INFO* objectEntry, * threadEntry;
+    OBEX_THREAD_LOOKUP_ENTRY* stl = NULL, * stlptr;
 
     LVITEM lvitem;
     WCHAR szBuffer[MAX_PATH];
@@ -846,14 +843,11 @@ DWORD WINAPI CreateThreadListProc(
                 //
                 // State
                 //
-                lvitem.mask = LVIF_TEXT;
                 lvitem.iSubItem++;
-
                 lvitem.pszText = PsListGetThreadStateAsString(
                     threadEntry->ThreadInformation.State,
                     threadEntry->ThreadInformation.WaitReason, szBuffer);
 
-                lvitem.iItem = ItemIndex;
                 ListView_SetItem(PsDlgContext.ListView, &lvitem);
 
                 // Query thread specific information - object and win32 start address (need elevation).
@@ -898,10 +892,8 @@ DWORD WINAPI CreateThreadListProc(
                 szBuffer[2] = 0;
                 u64tohex(objectAddress, &szBuffer[2]);
 
-                lvitem.mask = LVIF_TEXT;
                 lvitem.iSubItem++;
                 lvitem.pszText = szBuffer;
-                lvitem.iItem = ItemIndex;
                 ListView_SetItem(PsDlgContext.ListView, &lvitem);
 
                 //
@@ -913,10 +905,8 @@ DWORD WINAPI CreateThreadListProc(
 
                 u64tohex((ULONG_PTR)startAddress, &szBuffer[2]);
 
-                lvitem.mask = LVIF_TEXT;
                 lvitem.iSubItem++;
                 lvitem.pszText = szBuffer;
-                lvitem.iItem = ItemIndex;
                 ListView_SetItem(PsDlgContext.ListView, &lvitem);
 
                 //
@@ -933,10 +923,8 @@ DWORD WINAPI CreateThreadListProc(
                         _strcpy(szBuffer, T_Unknown);
                     }
                 }
-                lvitem.mask = LVIF_TEXT;
                 lvitem.iSubItem++;
                 lvitem.pszText = szBuffer;
-                lvitem.iItem = ItemIndex;
                 ListView_SetItem(PsDlgContext.ListView, &lvitem);
             }
 
@@ -1028,13 +1016,13 @@ DWORD WINAPI CreateProcessListProc(
 
             ServiceEnumType = SERVICE_WIN32 | SERVICE_INTERACTIVE_PROCESS;
 
-            if (g_NtBuildNumber >= 10240)
+            if (g_NtBuildNumber >= NT_WIN10_THRESHOLD1)
                 ServiceEnumType |= SERVICE_USER_SERVICE | SERVICE_USERSERVICE_INSTANCE;
 
             if (!supCreateSCMSnapshot(ServiceEnumType, &ServicesList))
                 __leave;
 
-            rtl_qsort(ServicesList.Entries,
+            RtlQuickSort(ServicesList.Entries,
                 ServicesList.NumberOfEntries,
                 sizeof(ENUM_SERVICE_STATUS_PROCESS),
                 PsxSCMLookupCallback);
@@ -1184,7 +1172,7 @@ INT_PTR PsListHandleNotify(
 
     HWND TreeControl;
 
-    PROP_UNNAMED_OBJECT_INFO *ObjectEntry;
+    PROP_UNNAMED_OBJECT_INFO* ObjectEntry;
 
     UNREFERENCED_PARAMETER(hwndDlg);
 
@@ -1208,7 +1196,7 @@ INT_PTR PsListHandleNotify(
 
         case LVN_COLUMNCLICK:
             PsDlgContext.bInverseSort = !PsDlgContext.bInverseSort;
-            PsDlgContext.lvColumnToSort = ((NMLISTVIEW *)lParam)->iSubItem;
+            PsDlgContext.lvColumnToSort = ((NMLISTVIEW*)lParam)->iSubItem;
 
             ListView_SortItemsEx(PsDlgContext.ListView, &PsListCompareFunc, (LPARAM)PsDlgContext.lvColumnToSort);
 
@@ -1288,7 +1276,7 @@ VOID PsListHandleThreadRefresh(
     VOID
 )
 {
-    PROP_UNNAMED_OBJECT_INFO *ObjectEntry;
+    PROP_UNNAMED_OBJECT_INFO* ObjectEntry;
 
     ObjectEntry = PsListGetObjectEntry(TRUE, NULL);
     if (ObjectEntry) {
@@ -1466,19 +1454,14 @@ VOID extrasCreatePsListDialog(
 {
     LONG_PTR    wndStyles;
     HDITEM      hdritem;
-    LVCOLUMN    col;
     WNDCLASSEX  wincls;
 
     INT SbParts[] = { 160, 320, -1 };
 
-    //allow only one dialog
-    if (g_WinObj.AuxDialogs[wobjPsListDlgId]) {
-        if (IsIconic(g_WinObj.AuxDialogs[wobjPsListDlgId]))
-            ShowWindow(g_WinObj.AuxDialogs[wobjPsListDlgId], SW_RESTORE);
-        else
-            SetActiveWindow(g_WinObj.AuxDialogs[wobjPsListDlgId]);
-        return;
-    }
+    //
+    // Allow only one dialog.
+    //
+    ENSURE_DIALOG_UNIQUE_WITH_RESTORE(g_WinObj.AuxDialogs[wobjPsListDlgId]);
 
     RtlSecureZeroMemory(&wincls, sizeof(wincls));
     wincls.cbSize = sizeof(WNDCLASSEX);
@@ -1501,9 +1484,8 @@ VOID extrasCreatePsListDialog(
         NULL,
         0);
 
-    if (PsDlgContext.hwndDlg == NULL) {
+    if (PsDlgContext.hwndDlg == NULL)
         return;
-    }
 
     if (g_kdctx.IsFullAdmin == FALSE) {
         SetWindowText(PsDlgContext.hwndDlg, TEXT("Processes (Non elevated mode, not all information can be queried)"));
@@ -1523,49 +1505,41 @@ VOID extrasCreatePsListDialog(
             LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_LABELTIP | LVS_EX_DOUBLEBUFFER);
         SetWindowTheme(PsDlgContext.ListView, TEXT("Explorer"), NULL);
 
-        RtlSecureZeroMemory(&col, sizeof(col));
-        col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
-        col.iSubItem++;
-        col.pszText = TEXT("TID");
-        col.fmt = LVCFMT_CENTER | LVCFMT_BITMAP_ON_RIGHT;
-        col.iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
-        col.cx = 60;
-        ListView_InsertColumn(PsDlgContext.ListView, col.iSubItem, &col);
+        //
+        // Add listview columns.
+        //
 
-        col.iImage = I_IMAGENONE;
-        col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
+        supAddListViewColumn(PsDlgContext.ListView, 0, 0, 0,
+            ImageList_GetImageCount(g_ListViewImages) - 1,
+            LVCFMT_CENTER | LVCFMT_BITMAP_ON_RIGHT,
+            TEXT("TID"), 60);
 
-        col.iSubItem++;
-        col.pszText = TEXT("Priority");
-        col.iOrder++;
-        col.cx = 100;
-        ListView_InsertColumn(PsDlgContext.ListView, col.iSubItem, &col);
+        supAddListViewColumn(PsDlgContext.ListView, 1, 1, 1,
+            I_IMAGENONE,
+            LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
+            TEXT("Priority"), 100);
 
-        col.iSubItem++;
-        col.pszText = TEXT("State");
-        col.iOrder++;
-        col.cx = 150;
-        ListView_InsertColumn(PsDlgContext.ListView, col.iSubItem, &col);
+        supAddListViewColumn(PsDlgContext.ListView, 2, 2, 2,
+            I_IMAGENONE,
+            LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
+            TEXT("State"), 150);
 
-        col.iSubItem++;
-        col.pszText = TEXT("Object");
-        col.iOrder++;
-        col.cx = 150;
-        ListView_InsertColumn(PsDlgContext.ListView, col.iSubItem, &col);
+        supAddListViewColumn(PsDlgContext.ListView, 3, 3, 3,
+            I_IMAGENONE,
+            LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
+            TEXT("Object"), 150);
 
-        col.iSubItem++;
-        col.pszText = TEXT("StartAddress");
-        col.iOrder++;
-        col.cx = 140;
-        ListView_InsertColumn(PsDlgContext.ListView, col.iSubItem, &col);
+        supAddListViewColumn(PsDlgContext.ListView, 4, 4, 4,
+            I_IMAGENONE,
+            LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
+            TEXT("StartAddress"), 140);
 
-        col.iSubItem++;
-        col.pszText = TEXT("Module (System threads)");
-        col.iOrder++;
-        col.cx = 200;
-        ListView_InsertColumn(PsDlgContext.ListView, col.iSubItem, &col);
+        supAddListViewColumn(PsDlgContext.ListView, 5, 5, 5,
+            I_IMAGENONE,
+            LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
+            TEXT("Module (System threads)"), 200);
 
-        PsDlgContext.lvColumnCount = col.iSubItem;
+        PsDlgContext.lvColumnCount = PSLIST_COLUMN_COUNT;
     }
 
     if (PsDlgContext.TreeList) {

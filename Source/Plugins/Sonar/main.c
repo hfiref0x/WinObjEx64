@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019
+*  (C) COPYRIGHT AUTHORS, 2019 - 2020
 *
 *  TITLE:       MAIN.H
 *
 *  VERSION:     1.03
 *
-*  DATE:        26 Nov 2019
+*  DATE:        05 Jan 2020
 *
 *  WinObjEx64 Sonar plugin.
 *
@@ -21,10 +21,13 @@
 
 HINSTANCE g_ThisDLL;
 BOOL g_PluginQuit = FALSE;
+ULONG g_CurrentDPI;
 
 int  y_splitter_pos = 300, y_capture_pos = 0, y_splitter_max = 0;
 
-#define SONAR_MAX_TESTED_BUILD 19030
+#define SONAR_MAX_TESTED_BUILD 19037
+
+#define PROTOCOLLIST_COLUMN_COUNT 3
 
 //
 // Sonar gui context.
@@ -45,6 +48,41 @@ ATOM g_ClassAtom = 0;
 
 VOID ListProtocols(
     _In_ BOOL bRefresh);
+
+/*
+* AddListViewColumn
+*
+* Purpose:
+*
+* Wrapper for ListView_InsertColumn.
+*
+*/
+INT AddListViewColumn(
+    _In_ HWND ListViewHwnd,
+    _In_ INT ColumnIndex,
+    _In_ INT SubItemIndex,
+    _In_ INT OrderIndex,
+    _In_ INT ImageIndex,
+    _In_ INT Format,
+    _In_ LPWSTR Text,
+    _In_ INT Width
+)
+{
+    LVCOLUMN column;
+
+    column.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER;
+
+    if (ImageIndex != I_IMAGENONE) column.mask |= LVCF_IMAGE;
+
+    column.fmt = Format;
+    column.cx = SCALE_DPI_VALUE(Width);
+    column.pszText = Text;
+    column.iSubItem = SubItemIndex;
+    column.iOrder = OrderIndex;
+    column.iImage = ImageIndex;
+
+    return ListView_InsertColumn(ListViewHwnd, ColumnIndex, &column);
+}
 
 /*
 * TreeListAddItem
@@ -409,7 +447,10 @@ NTSTATUS ConvertToUnicode(
 {
     ANSI_STRING ansiString;
 
+#pragma warning(push)
+#pragma warning(disable: 6001)
     RtlInitString(&ansiString, AnsiString);
+#pragma warning(pop)
     return RtlAnsiStringToUnicodeString(UnicodeString, &ansiString, TRUE);
 }
 
@@ -427,20 +468,18 @@ VOID xxxDumpProtocolBlock(
     _In_opt_ LPWSTR lpszAdditionalInfo
 )
 {
-    INT itemIndex;
+    INT lvItemIndex;
     LVITEM lvItem;
 
     RtlSecureZeroMemory(&lvItem, sizeof(lvItem));
-    lvItem.mask = LVIF_TEXT | LVIF_IMAGE;
-    lvItem.iSubItem = 0;
+    lvItem.mask = LVIF_TEXT;
     lvItem.iItem = MAXINT;
-    lvItem.iImage = I_IMAGENONE;
     lvItem.pszText = lpszItem;
-    itemIndex = ListView_InsertItem(g_ctx.ListView, &lvItem);
+    lvItemIndex = ListView_InsertItem(g_ctx.ListView, &lvItem);
 
     lvItem.pszText = lpszValue;
     lvItem.iSubItem = 1;
-    lvItem.iItem = itemIndex;
+    lvItem.iItem = lvItemIndex;
     ListView_SetItem(g_ctx.ListView, &lvItem);
 
     if (lpszAdditionalInfo) {
@@ -450,7 +489,6 @@ VOID xxxDumpProtocolBlock(
         lvItem.pszText = TEXT("");
     }
     lvItem.iSubItem = 2;
-    lvItem.iItem = itemIndex;
     ListView_SetItem(g_ctx.ListView, &lvItem);
 }
 
@@ -792,8 +830,11 @@ VOID ShowPropertiesHandler(
         SendMessage(g_ctx.ListView, LVM_GETITEMTEXT, (WPARAM)item.iItem, (LPARAM)&item);
 
         RtlSecureZeroMemory(szConvertedFileName, sizeof(szConvertedFileName));
+#pragma warning(push)
+#pragma warning(disable: 6054)
         if (g_ctx.ParamBlock.GetWin32FileName(szBuffer, szConvertedFileName, MAX_PATH))
             g_ctx.ParamBlock.uiShowFileProperties(g_ctx.MainWindow, szConvertedFileName);
+#pragma warning(pop)
     }
 }
 
@@ -1072,7 +1113,6 @@ DWORD WINAPI PluginThread(
     HWND        MainWindow;
 
     HDITEM      hdritem;
-    LVCOLUMN    col;
 
     BOOL rv;
     MSG msg1;
@@ -1081,7 +1121,12 @@ DWORD WINAPI PluginThread(
 
     do {
 
+#pragma warning(push)
+#pragma warning(disable: 6031)
         CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+#pragma warning(pop)
+
+        g_CurrentDPI = g_ctx.ParamBlock.uiGetDPIValue(NULL);
 
         //
         // Create main window.
@@ -1093,8 +1138,8 @@ DWORD WINAPI PluginThread(
             WS_VISIBLE | WS_OVERLAPPEDWINDOW,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            800,
-            600,
+            SCALE_DPI_VALUE(800),
+            SCALE_DPI_VALUE(600),
             NULL,
             NULL,
             g_ThisDLL,
@@ -1191,35 +1236,25 @@ DWORD WINAPI PluginThread(
         // Init listview columns.
         //
 
-        RtlSecureZeroMemory(&col, sizeof(col));
-        col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
-        col.iSubItem++;
-        col.pszText = TEXT("Item");
-        col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
-        col.cx = 300;
-        col.iImage = I_IMAGENONE;
-        ListView_InsertColumn(g_ctx.ListView, col.iSubItem, &col);
+        AddListViewColumn(g_ctx.ListView, 0, 0, 0,
+            I_IMAGENONE,
+            LVCFMT_LEFT,
+            TEXT("Item"), 300);
 
-        col.fmt = LVCFMT_LEFT;
-        col.iSubItem++;
-        col.pszText = TEXT("Value");
-        col.iOrder++;
-        col.cx = 140;
-        col.iImage = I_IMAGENONE;
-        ListView_InsertColumn(g_ctx.ListView, col.iSubItem, &col);
+        AddListViewColumn(g_ctx.ListView, 1, 1, 1,
+            I_IMAGENONE,
+            LVCFMT_LEFT,
+            TEXT("Value"), 140);
 
-        col.fmt = LVCFMT_LEFT;
-        col.iSubItem++;
-        col.pszText = TEXT("Additional Information");
-        col.iOrder++;
-        col.cx = 300;
-        col.iImage = I_IMAGENONE;
-        ListView_InsertColumn(g_ctx.ListView, col.iSubItem, &col);
+        AddListViewColumn(g_ctx.ListView, 2, 2, 2,
+            I_IMAGENONE,
+            LVCFMT_LEFT,
+            TEXT("Additional Information"), 300);
 
         //
         // Remember column count.
         //
-        g_ctx.lvColumnCount = 3;
+        g_ctx.lvColumnCount = PROTOCOLLIST_COLUMN_COUNT;
 
         //
         // Init treelist.
@@ -1227,15 +1262,15 @@ DWORD WINAPI PluginThread(
         RtlSecureZeroMemory(&hdritem, sizeof(hdritem));
         hdritem.mask = HDI_FORMAT | HDI_TEXT | HDI_WIDTH;
         hdritem.fmt = HDF_LEFT | HDF_BITMAP_ON_RIGHT | HDF_STRING;
-        hdritem.cxy = 300;
+        hdritem.cxy = SCALE_DPI_VALUE(300);
         hdritem.pszText = TEXT("Protocol");
         TreeList_InsertHeaderItem(g_ctx.TreeList, 0, &hdritem);
 
-        hdritem.cxy = 130;
+        hdritem.cxy = SCALE_DPI_VALUE(130);
         hdritem.pszText = TEXT("Object");
         TreeList_InsertHeaderItem(g_ctx.TreeList, 1, &hdritem);
 
-        hdritem.cxy = 2000;
+        hdritem.cxy = SCALE_DPI_VALUE(200);
         hdritem.pszText = TEXT("Additional Information");
         TreeList_InsertHeaderItem(g_ctx.TreeList, 2, &hdritem);
 
@@ -1339,7 +1374,10 @@ void CALLBACK StopPlugin(
     if (g_ctx.WorkerThread) {
         InterlockedExchange((PLONG)&g_PluginQuit, TRUE);
         if (WaitForSingleObject(g_ctx.WorkerThread, 1000) == WAIT_TIMEOUT) {
+#pragma warning(push)
+#pragma warning(disable: 6258)
             TerminateThread(g_ctx.WorkerThread, 0);
+#pragma warning(pop)
         }
         CloseHandle(g_ctx.WorkerThread);
         g_ctx.WorkerThread = NULL;

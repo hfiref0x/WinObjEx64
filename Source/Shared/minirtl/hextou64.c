@@ -1,6 +1,6 @@
 #include "rtltypes.h"
 
-unsigned long long hextou64_a(char *s)
+unsigned long long hextou64_a(char* s)
 {
 	unsigned long long	r = 0;
 	char			c;
@@ -12,10 +12,10 @@ unsigned long long hextou64_a(char *s)
 		c = locase_a(*s);
 		s++;
 		if (_isdigit_a(c))
-			r = 16 * r + (c - '0');
+			r = 16 * r + (unsigned long int)c - (unsigned long int)'0';
 		else
 			if ((c >= 'a') && (c <= 'f'))
-				r = 16 * r + (c - 'a' + 10);
+				r = 16 * r + (unsigned long int)c - (unsigned long int)'a' + 10;
 			else
 				break;
 	}
@@ -34,10 +34,10 @@ unsigned long long hextou64_w(wchar_t *s)
 		c = locase_w(*s);
 		s++;
 		if (_isdigit_w(c))
-			r = 16*r + (c-L'0');
+			r = 16 * r + (unsigned long int)c - (unsigned long int)L'0';
 		else
 			if ((c >= L'a') && (c <= L'f'))
-				r = 16*r + (c-L'a'+10);
+				r = 16 * r + (unsigned long int)c - (unsigned long int)L'a' + 10;
 			else
 				break;
 	}

@@ -22,17 +22,20 @@ In order to use all program features Windows must be booted in the DEBUG mode.
 # Build 
 
 WinObjEx64 comes with full source code.
-In order to build from source you need Microsoft Visual Studio 2013 U4 or Visual Studio 2015 and later versions.
+In order to build from source you need Microsoft Visual Studio 2015/2017/2019 and later versions.
 
 ## Instructions
 
 * Select Platform ToolSet first for project in solution you want to build (Project->Properties->General): 
   * v120 for Visual Studio 2013;
   * v140 for Visual Studio 2015; 
-  * v141 for Visual Studio 2017.
+  * v141 for Visual Studio 2017;
+  * v142 for Visual Studio 2019.
 * For v140 and above set Target Platform Version (Project->Properties->General):
-  * If v140 then select 8.1 (Note that Windows 8.1 SDK must be installed);
-  * If v141 then select 10.0.17134.0 (Note that Windows 10.0.17134 SDK must be installed). 
+  * If v140 then select 8.1;
+  * If v141/v142 then select 10.
+* Minimum required Windows SDK version 8.1
+ 
  
 # What is new
 
@@ -43,6 +46,6 @@ In order to build from source you need Microsoft Visual Studio 2013 U4 or Visual
 # Authors
 
 
-(c) 2015 - 2019 WinObjEx64 Project
+(c) 2015 - 2020 WinObjEx64 Project
 
 Original WinObjEx (c) 2003 - 2005 Four-F

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019
+*  (C) COPYRIGHT AUTHORS, 2019 - 2020
 *
 *  TITLE:       EXTRASSL.C
 *
-*  VERSION:     1.74
+*  VERSION:     1.83
 *
-*  DATE:        18 May 2019
+*  DATE:        05 Jan 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -33,44 +33,13 @@ INT CALLBACK SLCacheListCompareFunc(
     _In_ LPARAM lParamSort
 )
 {
-    LPWSTR lpItem1 = NULL, lpItem2 = NULL;
-    INT    nResult = 0;
-
     EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)lParamSort;
 
-    lpItem1 = supGetItemText(pDlgContext->ListView,
-        (INT)lParam1,
-        (INT)pDlgContext->lvColumnToSort,
-        NULL);
-
-    lpItem2 = supGetItemText(pDlgContext->ListView,
-        (INT)lParam2,
-        (INT)pDlgContext->lvColumnToSort,
-        NULL);
-
-    if ((lpItem1 == NULL) && (lpItem2 == NULL)) {
-        nResult = 0;
-        goto Done;
-    }
-    if ((lpItem1 == NULL) && (lpItem2 != NULL)) {
-        nResult = (pDlgContext->bInverseSort) ? 1 : -1;
-        goto Done;
-    }
-    if ((lpItem2 == NULL) && (lpItem1 != NULL)) {
-        nResult = (pDlgContext->bInverseSort) ? -1 : 1;
-        goto Done;
-    }
-
-    if (pDlgContext->bInverseSort)
-        nResult = _strcmpi(lpItem2, lpItem1);
-    else
-        nResult = _strcmpi(lpItem1, lpItem2);
-
-Done:
-    if (lpItem1) supHeapFree(lpItem1);
-    if (lpItem2) supHeapFree(lpItem2);
-
-    return nResult;
+    return supListViewBaseComparer(pDlgContext->ListView,
+        pDlgContext->bInverseSort,
+        lParam1,
+        lParam2,
+        pDlgContext->lvColumnToSort);
 }
 
 /*
@@ -85,7 +54,7 @@ SL_KMEM_CACHE_VALUE_DESCRIPTOR* xxxSLCacheGetSelectedDescriptor(
     _In_ HWND hwndListView)
 {
     INT nSelected;
-    SL_KMEM_CACHE_VALUE_DESCRIPTOR *CacheDescriptor = NULL;
+    SL_KMEM_CACHE_VALUE_DESCRIPTOR* CacheDescriptor = NULL;
 
     //
     // Leave if nothing selected.
@@ -101,7 +70,10 @@ SL_KMEM_CACHE_VALUE_DESCRIPTOR* xxxSLCacheGetSelectedDescriptor(
     //
     // Query associated data.
     //
-    if (!supGetListViewItemParam(hwndListView, nSelected, (PVOID*)&CacheDescriptor)) {
+    if (!supGetListViewItemParam(hwndListView, 
+        nSelected, 
+        (PVOID*)&CacheDescriptor)) 
+    {
         return NULL;
     }
 
@@ -117,7 +89,7 @@ SL_KMEM_CACHE_VALUE_DESCRIPTOR* xxxSLCacheGetSelectedDescriptor(
 *
 */
 LPWSTR xxxSLCacheGetDescriptorDataType(
-    _In_ SL_KMEM_CACHE_VALUE_DESCRIPTOR *CacheDescriptor
+    _In_ SL_KMEM_CACHE_VALUE_DESCRIPTOR* CacheDescriptor
 )
 {
     LPWSTR DataType;
@@ -159,7 +131,7 @@ VOID SLCacheDialogDisplayDescriptorData(
     _In_ HWND hwndListView
 )
 {
-    SL_KMEM_CACHE_VALUE_DESCRIPTOR *CacheDescriptor;
+    SL_KMEM_CACHE_VALUE_DESCRIPTOR* CacheDescriptor;
 
     LPWSTR lpText, DataType;
     PCHAR DataPtr;
@@ -270,7 +242,7 @@ VOID SLCacheDialogViewBinaryData(
     _In_ HWND hwndListView
 )
 {
-    SL_KMEM_CACHE_VALUE_DESCRIPTOR *CacheDescriptor;
+    SL_KMEM_CACHE_VALUE_DESCRIPTOR* CacheDescriptor;
     PCHAR DataPtr;
 
     WCHAR szFileName[MAX_PATH * 2];
@@ -318,7 +290,7 @@ VOID SLCacheDialogHandleNotify(
 )
 {
     INT nImageIndex;
-    EXTRASCONTEXT *pDlgContext;
+    EXTRASCONTEXT* pDlgContext;
 
     if (nhdr == NULL)
         return;
@@ -333,7 +305,7 @@ VOID SLCacheDialogHandleNotify(
             if (pDlgContext) {
 
                 pDlgContext->bInverseSort = !pDlgContext->bInverseSort;
-                pDlgContext->lvColumnToSort = ((NMLISTVIEW *)nhdr)->iSubItem;
+                pDlgContext->lvColumnToSort = ((NMLISTVIEW*)nhdr)->iSubItem;
                 ListView_SortItemsEx(pDlgContext->ListView, &SLCacheListCompareFunc, pDlgContext);
 
                 nImageIndex = ImageList_GetImageCount(g_ListViewImages);
@@ -381,7 +353,7 @@ INT_PTR CALLBACK SLCacheDialogProc(
     _In_  LPARAM lParam
 )
 {
-    EXTRASCONTEXT *pDlgContext;
+    EXTRASCONTEXT* pDlgContext;
     LPNMLISTVIEW nhdr = (LPNMLISTVIEW)lParam;
 
     switch (uMsg) {
@@ -443,13 +415,13 @@ INT_PTR CALLBACK SLCacheDialogProc(
 *
 */
 BOOL CALLBACK SLCacheEnumerateCallback(
-    _In_ SL_KMEM_CACHE_VALUE_DESCRIPTOR *CacheDescriptor,
+    _In_ SL_KMEM_CACHE_VALUE_DESCRIPTOR* CacheDescriptor,
     _In_opt_ PVOID Context
 )
 {
-    INT itemIndex;
+    INT lvItemIndex;
     LPWSTR EntryName, EntryType;
-    EXTRASCONTEXT *pDlgContext = (EXTRASCONTEXT*)Context;
+    EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)Context;
     LVITEM lvItem;
 
     WCHAR szBuffer[100];
@@ -465,12 +437,11 @@ BOOL CALLBACK SLCacheEnumerateCallback(
         //Name
         RtlSecureZeroMemory(&lvItem, sizeof(lvItem));
         lvItem.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM;
-        lvItem.iSubItem = 0;
         lvItem.iItem = MAXINT;
         lvItem.iImage = g_SLCacheImageIndex;
         lvItem.pszText = EntryName;
         lvItem.lParam = (LPARAM)CacheDescriptor;
-        itemIndex = ListView_InsertItem(pDlgContext->ListView, &lvItem);
+        lvItemIndex = ListView_InsertItem(pDlgContext->ListView, &lvItem);
 
         EntryType = xxxSLCacheGetDescriptorDataType(CacheDescriptor);
         if (EntryType == NULL) {
@@ -483,7 +454,7 @@ BOOL CALLBACK SLCacheEnumerateCallback(
         lvItem.mask = LVIF_TEXT;
         lvItem.iSubItem = 1;
         lvItem.pszText = EntryType;
-        lvItem.iItem = itemIndex;
+        lvItem.iItem = lvItemIndex;
         ListView_SetItem(pDlgContext->ListView, &lvItem);
 
         supHeapFree(EntryName);
@@ -508,8 +479,7 @@ VOID extrasCreateSLCacheDialog(
     PVOID           SLCacheData;
 
     HWND            hwndDlg;
-    LVCOLUMN        col;
-    EXTRASCONTEXT  *pDlgContext;
+    EXTRASCONTEXT* pDlgContext;
 
     ENUMCHILDWNDDATA ChildWndData;
     WCHAR szBuffer[100];
@@ -517,13 +487,7 @@ VOID extrasCreateSLCacheDialog(
     //
     // Allow only one dialog, if it already open - activate it.
     //
-    if (g_WinObj.AuxDialogs[wobjSLCacheDlgId]) {
-        if (IsIconic(g_WinObj.AuxDialogs[wobjSLCacheDlgId]))
-            ShowWindow(g_WinObj.AuxDialogs[wobjSLCacheDlgId], SW_RESTORE);
-        else
-            SetActiveWindow(g_WinObj.AuxDialogs[wobjSLCacheDlgId]);
-        return;
-    }
+    ENSURE_DIALOG_UNIQUE_WITH_RESTORE(g_WinObj.AuxDialogs[wobjSLCacheDlgId]);
 
     pDlgContext = (EXTRASCONTEXT*)supHeapAlloc(sizeof(EXTRASCONTEXT));
     if (pDlgContext == NULL)
@@ -544,7 +508,7 @@ VOID extrasCreateSLCacheDialog(
     g_WinObj.AuxDialogs[wobjSLCacheDlgId] = hwndDlg;
 
     extrasSetDlgIcon(hwndDlg);
-    
+
     //
     // Read and enumerate cache.
     //
@@ -570,25 +534,21 @@ VOID extrasCreateSLCacheDialog(
             //
             // Create ListView columns.
             //
-            RtlSecureZeroMemory(&col, sizeof(col));
-            col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
-            col.iSubItem++;
-            col.pszText = TEXT("Name");
-            col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
-            col.iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
-            col.cx = 450;
-            ListView_InsertColumn(pDlgContext->ListView, col.iSubItem, &col);
 
-            col.iImage = I_IMAGENONE;
+            supAddListViewColumn(pDlgContext->ListView, 0, 0, 0,
+                ImageList_GetImageCount(g_ListViewImages) - 1,
+                LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
+                TEXT("Name"), 450);
 
-            col.iSubItem++;
-            col.pszText = TEXT("Type");
-            col.iOrder = 1;
-            col.cx = 120;
-            ListView_InsertColumn(pDlgContext->ListView, col.iSubItem, &col);
+            supAddListViewColumn(pDlgContext->ListView, 1, 1, 1,
+                I_IMAGENONE,
+                LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
+                TEXT("Type"), 120);
 
-            //remember columns count
-            pDlgContext->lvColumnCount = col.iSubItem;
+            //
+            // Remember columns count.
+            //
+            pDlgContext->lvColumnCount = SLLIST_COLUMN_COUNT;
 
             //
             // Remember image index.

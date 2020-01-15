@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       PROPDLG.C
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        23 Nov 2019
+*  DATE:        05 Jan 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -15,7 +15,6 @@
 *
 *******************************************************************************/
 #include "global.h"
-#include "propDlg.h"
 #include "propBasic.h"
 #include "propType.h"
 #include "propDriver.h"
@@ -51,7 +50,7 @@ HWND g_NamespacePropWindow = NULL;
 *
 */
 BOOL propCloseCurrentObject(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HANDLE hObject
 )
 {
@@ -67,7 +66,7 @@ BOOL propCloseCurrentObject(
 *
 */
 BOOL propOpenCurrentObject(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _Out_ PHANDLE phObject,
     _In_ ACCESS_MASK DesiredAccess
 )
@@ -217,14 +216,10 @@ BOOL propOpenCurrentObject(
         //
         // Open object in directory.
         //
-        RtlInitUnicodeString(&ustr, Context->lpObjectName);
-        InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, hDirectory, NULL);
-        hObject = NULL;
-        status = NtOpenDirectoryObject(&hObject, DesiredAccess, &obja); //DIRECTORY_QUERY for query
 
-        SetLastError(RtlNtStatusToDosError(status));
+        hObject = supOpenDirectory(hDirectory, Context->lpObjectName, DesiredAccess);
+        bResult = (hObject != NULL);
 
-        bResult = ((NT_SUCCESS(status)) && (hObject != NULL));
         if (bResult) {
             *phObject = hObject;
         }
@@ -286,7 +281,7 @@ PPROP_OBJECT_INFO propContextCreate(
 )
 {
     BOOL              bSelectedObject = FALSE, bSelectedDirectory = FALSE;
-    PROP_OBJECT_INFO *Context;
+    PROP_OBJECT_INFO* Context;
 
     __try {
         //
@@ -366,7 +361,7 @@ PPROP_OBJECT_INFO propContextCreate(
         }
 
     }
-    __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
+    __except (WOBJ_EXCEPTION_FILTER) {
         return NULL;
     }
     return Context;
@@ -381,7 +376,7 @@ PPROP_OBJECT_INFO propContextCreate(
 *
 */
 VOID propContextDestroy(
-    _In_ PROP_OBJECT_INFO *Context
+    _In_ PROP_OBJECT_INFO* Context
 )
 {
     __try {
@@ -421,7 +416,7 @@ VOID propContextDestroy(
         supHeapFree(Context);
 
     }
-    __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
+    __except (WOBJ_EXCEPTION_FILTER) {
         return;
     }
 }
@@ -443,7 +438,7 @@ LRESULT WINAPI PropSheetCustomWndProc(
     _In_ LPARAM lParam
 )
 {
-    PROP_OBJECT_INFO *Context = NULL;
+    PROP_OBJECT_INFO* Context = NULL;
 
     switch (Msg) {
 
@@ -464,7 +459,8 @@ LRESULT WINAPI PropSheetCustomWndProc(
     case WM_CLOSE:
         if (hwnd == g_PsTokenWindow) {
             g_PsTokenWindow = NULL;
-        } else if (hwnd == g_PsPropWindow) {
+        }
+        else if (hwnd == g_PsPropWindow) {
             g_PsPropWindow = NULL;
         }
         else if (hwnd == g_NamespacePropWindow) {
@@ -483,7 +479,7 @@ LRESULT WINAPI PropSheetCustomWndProc(
             }
             g_PropWindow = NULL;
         }
-        
+
         return DestroyWindow(hwnd);
         break;
 
@@ -508,8 +504,8 @@ LRESULT WINAPI PropSheetCustomWndProc(
 *
 */
 VOID propCopyNamespaceObject(
-    _In_ PROP_OBJECT_INFO *DestinationContext,
-    _In_ PROP_NAMESPACE_INFO *NamespaceObject
+    _In_ PROP_OBJECT_INFO* DestinationContext,
+    _In_ PROP_NAMESPACE_INFO* NamespaceObject
 )
 {
     DestinationContext->ContextType = propPrivateNamespace;
@@ -529,8 +525,8 @@ VOID propCopyNamespaceObject(
 *
 */
 VOID propCopyUnnamedObject(
-    _In_ PROP_OBJECT_INFO *DestinationContext,
-    _In_ PROP_UNNAMED_OBJECT_INFO *SourceObject
+    _In_ PROP_OBJECT_INFO* DestinationContext,
+    _In_ PROP_UNNAMED_OBJECT_INFO* SourceObject
 )
 {
     PVOID CopyBuffer;
@@ -583,17 +579,17 @@ VOID propCopyUnnamedObject(
 *
 */
 VOID propCreateDialog(
-    _In_ PROP_DIALOG_CREATE_SETTINGS *Settings
+    _In_ PROP_DIALOG_CREATE_SETTINGS* Settings
 )
 {
-    BOOL                IsSimpleContext = FALSE;
-    INT                 nPages;
-    HWND                hwndDlg;
-    PROP_OBJECT_INFO   *propContext = NULL;
-    HPROPSHEETPAGE      SecurityPage;
-    PROPSHEETPAGE       Page;
-    PROPSHEETHEADER     PropHeader;
-    WCHAR               szCaption[MAX_PATH * 2];
+    BOOL              IsSimpleContext = FALSE;
+    INT               nPages;
+    HWND              hwndDlg;
+    PROP_OBJECT_INFO* propContext = NULL;
+    HPROPSHEETPAGE    SecurityPage;
+    PROPSHEETPAGE     Page;
+    PROPSHEETHEADER   PropHeader;
+    WCHAR             szCaption[MAX_PATH * 2];
 
     //
     // Mutual exclusion situation.
@@ -720,7 +716,7 @@ VOID propCreateDialog(
     //
     // Create Objects page for supported types.
     //
-    if (g_kdctx.hDevice != NULL) {
+    if (g_kdctx.DeviceHandle != NULL) {
         switch (propContext->TypeIndex) {
         case ObjectTypeDirectory:
         case ObjectTypeDriver:
@@ -752,7 +748,7 @@ VOID propCreateDialog(
     // Create specific page for Process/Thread objects.
     //
     if ((propContext->TypeIndex == ObjectTypeProcess) ||
-        (propContext->TypeIndex == ObjectTypeThread)) 
+        (propContext->TypeIndex == ObjectTypeThread))
     {
         RtlSecureZeroMemory(&Page, sizeof(Page));
         Page.dwSize = sizeof(PROPSHEETPAGE);

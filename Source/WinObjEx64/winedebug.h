@@ -1,14 +1,14 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2019 - 2020
 *
-*  TITLE:       EXCEPTH.H
+*  TITLE:       WINEDEBUG.H
 *
 *  VERSION:     1.83
 *
-*  DATE:        05 Jan 2020
+*  DATE:        01 Dec 2019
 *
-*  Common header file for the exception handling routines.
+*  Wine debug definition header.
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -16,10 +16,8 @@
 * PARTICULAR PURPOSE.
 *
 *******************************************************************************/
+
 #pragma once
 
-INT exceptFilter(
-    _In_ UINT ExceptionCode,
-    _In_ EXCEPTION_POINTERS *ExceptionPointers);
-
-#define WOBJ_EXCEPTION_FILTER exceptFilter(GetExceptionCode(), GetExceptionInformation())
+#define _WINE_DEBUG_MODE
+#undef _WINE_DEBUG_MODE

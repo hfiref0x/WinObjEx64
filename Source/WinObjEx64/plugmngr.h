@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019
+*  (C) COPYRIGHT AUTHORS, 2019 - 2020
 *
 *  TITLE:       PLUGINMNGR.H
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        02 Nov 2019
+*  DATE:        24 Dec 2019
 *
 *  Common header file for the plugin manager.
 *
@@ -25,7 +25,8 @@
 #define WINOBJEX_PLUGIN_EXPORT "PluginInit"
 
 #define ID_MENU_PLUGINS       60000
-#define WINOBJEX_MAX_PLUGINS  ID_MENU_PLUGINS + 20
+#define WINOBJEX_MAX_PLUGINS  20
+#define ID_MENU_PLUGINS_MAX   (ID_MENU_PLUGINS + WINOBJEX_MAX_PLUGINS)
 
 //
 // VERSION_INFO "FileDescription" value used for validating plugin.

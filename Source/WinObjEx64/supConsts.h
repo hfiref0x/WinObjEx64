@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       SUPCONSTS.H
 *
-*  VERSION:     1.70
+*  VERSION:     1.83
 *
-*  DATE:        30 Nov 2018
+*  DATE:        13 Dec 2019
 *
 *  Consts header file for support unit.
 *
@@ -21,16 +21,15 @@
 #define T_SECUREBOOTSTATEKEY        L"System\\CurrentControlSet\\Control\\SecureBoot\\State"
 #define T_SECUREBOOTSTATEVALUE      L"UEFISecureBootEnabled"
 
-#define VERSION_TRANSLATION         L"\\VarFileInfo\\Translation"
-#define VERSION_DESCRIPTION         L"\\StringFileInfo\\%04x%04x\\FileDescription"
+#define T_VERSION_TRANSLATION       L"\\VarFileInfo\\Translation"
+#define FORMAT_VERSION_DESCRIPTION  L"\\StringFileInfo\\%04x%04x\\FileDescription"
 #define HHCTRLOCXKEY                L"CLSID\\{ADB880A6-D8FF-11CF-9377-00AA003B7A11}\\InprocServer32"
 #define T_OBJECTTYPES               L"\\ObjectTypes"
 
-
-#define FORMATTED_TIME_DATE_VALUE   L"%02hd:%02hd:%02hd, %02hd %ws %04hd"
-#define FORMATTED_TIME_VALUE        L"%I64u:%02hd:%02hd"
-#define FORMATTED_TIME_VALUE_MS     L"%hd:%02hd:%02hd.%03hd"
-#define FORMATTED_ATTRIBUTE         L"           0x"
+#define FORMAT_TIME_DATE_VALUE      L"%02hd:%02hd:%02hd, %02hd %ws %04hd"
+#define FORMAT_TIME_VALUE           L"%I64u:%02hd:%02hd"
+#define FORMAT_TIME_VALUE_MS        L"%hd:%02hd:%02hd.%03hd"
+#define T_FORMATTED_ATTRIBUTE       L"           0x"
 
 #define HHCTRLOCX                   L"hhctrl.ocx"
 

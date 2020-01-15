@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019
+*  (C) COPYRIGHT AUTHORS, 2019 - 2020
 *
 *  TITLE:       PROPTOKEN.C
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        14 Nov 2019
+*  DATE:        05 Jan 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -63,7 +63,6 @@ VOID TokenPageInitControls(
     _In_ BOOLEAN IsAppContainer
 )
 {
-    LVCOLUMN col;
     LVGROUP lvg;
 
     g_hwndTokenPageList = GetDlgItem(hwndDlg, IDC_TOKEN_PRIVLIST);
@@ -75,20 +74,15 @@ VOID TokenPageInitControls(
 
     SetWindowTheme(g_hwndTokenPageList, TEXT("Explorer"), NULL);
 
-    RtlSecureZeroMemory(&col, sizeof(col));
-    col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH;
-    col.iSubItem = 1;
-    col.pszText = TEXT("Name");
-    col.fmt = LVCFMT_LEFT;
-    col.iOrder = 0;
-    col.cx = 400;
-    ListView_InsertColumn(g_hwndTokenPageList, col.iSubItem, &col);
+    supAddListViewColumn(g_hwndTokenPageList, 0, 0, 0,
+        I_IMAGENONE,
+        LVCFMT_LEFT,
+        TEXT("Name"), 400);
 
-    col.iSubItem = 2;
-    col.pszText = TEXT("Status");
-    col.iOrder = 1;
-    col.cx = 150;
-    ListView_InsertColumn(g_hwndTokenPageList, col.iSubItem, &col);
+    supAddListViewColumn(g_hwndTokenPageList, 1, 1, 1,
+        I_IMAGENONE,
+        LVCFMT_LEFT,
+        TEXT("Status"), 150);
 
     RtlSecureZeroMemory(&lvg, sizeof(lvg));
     lvg.cbSize = sizeof(LVGROUP);
@@ -136,7 +130,6 @@ VOID TokenPageListAdd(
 
     RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
     lvitem.mask = LVIF_TEXT | LVIF_GROUPID;
-    lvitem.iSubItem = 0;
     lvitem.pszText = lpName;
     lvitem.iItem = MAXINT;
     lvitem.iGroupId = GroupIndex;
@@ -158,7 +151,7 @@ VOID TokenPageListAdd(
 *
 */
 VOID TokenPageListInfo(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg
 )
 {
@@ -455,8 +448,8 @@ VOID TokenPageShowAdvancedProperties(
     PROP_UNNAMED_OBJECT_INFO TokenObject;
     PROP_DIALOG_CREATE_SETTINGS propSettings;
 
-    LPWSTR TokenStingFormatProcess = TEXT("Process Token, PID:%llu");
-    LPWSTR TokenStingFormatThread = TEXT("Thread Token, PID:%llu, TID:%llu");
+    LPWSTR FormatStringTokenProcess = TEXT("Process Token, PID:%llu");
+    LPWSTR FormatStringTokenThread = TEXT("Thread Token, PID:%llu, TID:%llu");
 
     HANDLE TokenHandle = NULL;
     WCHAR szFakeName[MAX_PATH + 1];
@@ -464,10 +457,7 @@ VOID TokenPageShowAdvancedProperties(
     //
     // Only one token properties dialog at the same time allowed.
     //
-    if (g_PsTokenWindow != NULL) {
-        SetActiveWindow(g_PsTokenWindow);
-        return;
-    }
+    ENSURE_DIALOG_UNIQUE(g_PsTokenWindow);
 
     RtlSecureZeroMemory(&TokenObject, sizeof(PROP_UNNAMED_OBJECT_INFO));
 
@@ -495,13 +485,21 @@ VOID TokenPageShowAdvancedProperties(
     RtlSecureZeroMemory(&propSettings, sizeof(propSettings));
 
     if (TokenObject.IsThreadToken) {
-        rtl_swprintf_s(szFakeName, MAX_PATH, TokenStingFormatThread,
+
+        RtlStringCchPrintfSecure(szFakeName,
+            MAX_PATH,
+            FormatStringTokenThread,
             TokenObject.ClientId.UniqueProcess,
             TokenObject.ClientId.UniqueThread);
+
     }
     else {
-        rtl_swprintf_s(szFakeName, MAX_PATH, TokenStingFormatProcess,
+
+        RtlStringCchPrintfSecure(szFakeName,
+            MAX_PATH,
+            FormatStringTokenProcess,
             TokenObject.ClientId.UniqueProcess);
+
     }
 
     propSettings.hwndParent = hwndDlg;
@@ -578,12 +576,12 @@ INT_PTR TokenPageDialogOnInit(
     _In_ HWND hwndDlg,
     _In_ LPARAM lParam)
 {
-    PROPSHEETPAGE    *pSheet = NULL;
-    PROP_OBJECT_INFO *Context = NULL;
+    PROPSHEETPAGE* pSheet = NULL;
+    PROP_OBJECT_INFO* Context = NULL;
 
-    pSheet = (PROPSHEETPAGE *)lParam;
+    pSheet = (PROPSHEETPAGE*)lParam;
     if (pSheet) {
-        Context = (PROP_OBJECT_INFO *)pSheet->lParam;
+        Context = (PROP_OBJECT_INFO*)pSheet->lParam;
 
         //
         // Remember client id.

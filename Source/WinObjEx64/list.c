@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       LIST.C
 *
-*  VERSION:     1.74
+*  VERSION:     1.83
 *
-*  DATE:        03 May 2019
+*  DATE:        05 Jan 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -15,38 +15,6 @@
 *
 *******************************************************************************/
 #include "global.h"
-#include "treelist\treelist.h"
-
-/*
-* TreeListAddItem
-*
-* Purpose:
-*
-* Insert new treelist item.
-*
-*/
-HTREEITEM TreeListAddItem(
-    _In_ HWND TreeList,
-    _In_opt_ HTREEITEM hParent,
-    _In_ UINT mask,
-    _In_ UINT state,
-    _In_ UINT stateMask,
-    _In_opt_ LPWSTR pszText,
-    _In_opt_ PVOID subitems
-)
-{
-    TVINSERTSTRUCT  tvitem;
-    PTL_SUBITEMS    si = (PTL_SUBITEMS)subitems;
-
-    RtlSecureZeroMemory(&tvitem, sizeof(tvitem));
-    tvitem.hParent = hParent;
-    tvitem.item.mask = mask;
-    tvitem.item.state = state;
-    tvitem.item.stateMask = stateMask;
-    tvitem.item.pszText = pszText;
-    tvitem.hInsertAfter = TVI_LAST;
-    return TreeList_InsertTreeItem(TreeList, &tvitem, si);
-}
 
 /*
 * GetNextSub
@@ -89,7 +57,7 @@ VOID ListToObject(
 )
 {
     BOOL        currentfound = FALSE;
-    INT         i, s;
+    INT         i, iSelectedItem;
     HTREEITEM   lastfound, item;
     LVITEM      lvitem;
     TVITEMEX    ritem;
@@ -100,11 +68,13 @@ VOID ListToObject(
 
     if (*ObjectName != '\\')
         return;
+
     ObjectName++;
     item = TreeView_GetRoot(g_hwndObjectTree);
     lastfound = item;
 
     while ((item != NULL) && (*ObjectName != 0)) {
+
         item = TreeView_GetChild(g_hwndObjectTree, item);
         object[0] = 0; //mars workaround
         RtlSecureZeroMemory(object, sizeof(object));
@@ -138,6 +108,7 @@ VOID ListToObject(
         return;
 
     for (i = 0; i < MAXINT; i++) {
+
         RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
         RtlSecureZeroMemory(&sobject, sizeof(sobject));
         lvitem.mask = LVIF_TEXT;
@@ -148,12 +119,13 @@ VOID ListToObject(
             break;
 
         if (_strcmpi(sobject, object) == 0) {
-            s = ListView_GetSelectionMark(g_hwndObjectList);
+
+            iSelectedItem = ListView_GetSelectionMark(g_hwndObjectList);
             lvitem.mask = LVIF_STATE;
             lvitem.stateMask = LVIS_SELECTED | LVIS_FOCUSED;
 
-            if (s >= 0) {
-                lvitem.iItem = s;
+            if (iSelectedItem >= 0) {
+                lvitem.iItem = iSelectedItem;
                 lvitem.state = 0;
                 ListView_SetItem(g_hwndObjectList, &lvitem);
             }
@@ -162,6 +134,7 @@ VOID ListToObject(
             lvitem.state = LVIS_SELECTED | LVIS_FOCUSED;
             ListView_SetItem(g_hwndObjectList, &lvitem);
             ListView_EnsureVisible(g_hwndObjectList, i, FALSE);
+            ListView_SetSelectionMark(g_hwndObjectList, i);
             SetFocus(g_hwndObjectList);
             return;
         }
@@ -211,23 +184,18 @@ VOID ListObjectDirectoryTree(
     _In_opt_ HTREEITEM ViewRootHandle
 )
 {
-    NTSTATUS            status;
-    ULONG               ctx, rlen;
-    HANDLE              hDirectory = NULL;
-    OBJECT_ATTRIBUTES   objattr;
-    UNICODE_STRING      objname;
+    NTSTATUS            ntStatus;
+    ULONG               queryContext = 0, rLength;
+    HANDLE              directoryHandle = NULL;
 
-    POBJECT_DIRECTORY_INFORMATION objinf;
+    POBJECT_DIRECTORY_INFORMATION directoryEntry;
 
     ViewRootHandle = AddTreeViewItem(SubDirName, ViewRootHandle);
-    RtlInitUnicodeString(&objname, SubDirName);
-    InitializeObjectAttributes(&objattr, &objname, OBJ_CASE_INSENSITIVE, RootHandle, NULL);
-    status = NtOpenDirectoryObject(&hDirectory, DIRECTORY_QUERY, &objattr);
-    if (!NT_SUCCESS(status)) {
-        return;
-    }
 
-    ctx = 0;
+    directoryHandle = supOpenDirectory(RootHandle, SubDirName, DIRECTORY_QUERY);
+    if (directoryHandle == NULL)
+        return;
+
     do {
 
         //
@@ -235,49 +203,58 @@ VOID ListObjectDirectoryTree(
         // It doesn't work if no input buffer specified and does not return required buffer size.
         //
         if (g_WinObj.IsWine) {
-            rlen = 1024 * 64;
+            rLength = 1024 * 64;
         }
         else {
-            rlen = 0;
-            status = NtQueryDirectoryObject(hDirectory, NULL, 0, TRUE, FALSE, &ctx, &rlen);
-            if (status != STATUS_BUFFER_TOO_SMALL)
+            
+            //
+            // Request required buffer length.
+            //
+            rLength = 0;
+            ntStatus = NtQueryDirectoryObject(directoryHandle, 
+                NULL, 
+                0, 
+                TRUE, 
+                FALSE, 
+                &queryContext, 
+                &rLength);
+
+            if (ntStatus != STATUS_BUFFER_TOO_SMALL)
                 break;
         }
 
-        objinf = (POBJECT_DIRECTORY_INFORMATION)supHeapAlloc((SIZE_T)rlen);
-        if (objinf == NULL)
+        directoryEntry = (POBJECT_DIRECTORY_INFORMATION)supHeapAlloc((SIZE_T)rLength);
+        if (directoryEntry == NULL)
             break;
 
-        status = NtQueryDirectoryObject(
-            hDirectory, 
-            objinf, 
-            rlen, 
-            TRUE, 
-            FALSE, 
-            &ctx, 
-            &rlen);
+        ntStatus = NtQueryDirectoryObject(directoryHandle,
+            directoryEntry,
+            rLength,
+            TRUE,
+            FALSE,
+            &queryContext,
+            &rLength);
 
-        if (!NT_SUCCESS(status)) {
-            supHeapFree(objinf);
+        if (!NT_SUCCESS(ntStatus)) {
+            supHeapFree(directoryEntry);
             break;
         }
 
-        if (0 == _strncmpi(
-            objinf->TypeName.Buffer, 
+        if (0 == _strncmpi(directoryEntry->TypeName.Buffer,
             OBTYPE_NAME_DIRECTORY,
-            objinf->TypeName.Length / sizeof(WCHAR)))
+            directoryEntry->TypeName.Length / sizeof(WCHAR)))
         {
             ListObjectDirectoryTree(
-                objinf->Name.Buffer, 
-                hDirectory, 
+                directoryEntry->Name.Buffer,
+                directoryHandle,
                 ViewRootHandle);
         }
 
-        supHeapFree(objinf);
+        supHeapFree(directoryEntry);
 
     } while (TRUE);
 
-    NtClose(hDirectory);
+    NtClose(directoryHandle);
 }
 
 /*
@@ -289,110 +266,117 @@ VOID ListObjectDirectoryTree(
 *
 */
 VOID AddListViewItem(
-    _In_ HANDLE hObjectRootDirectory,
-    _In_ POBJECT_DIRECTORY_INFORMATION objinf
+    _In_ HANDLE RootDirectoryHandle,
+    _In_ POBJECT_DIRECTORY_INFORMATION DirectoryObjectEntry
 )
 {
     BOOL    bFound = FALSE;
-    INT     index;
-    SIZE_T  cch;
-    LVITEM  lvitem;
+    INT     lvItemIndex;
+    PWSTR   objectTypeName, objectName;
+    LVITEM  lvItem;
     WCHAR   szBuffer[MAX_PATH + 1];
 
-    if (!objinf) return;
+    WOBJ_TYPE_DESC* typeDesc;
 
-    RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
-    lvitem.mask = LVIF_TEXT | LVIF_IMAGE;
-    lvitem.iSubItem = 0;
-    lvitem.pszText = objinf->Name.Buffer;
-    lvitem.iItem = MAXINT;
-    lvitem.iImage = ObManagerGetImageIndexByTypeName(objinf->TypeName.Buffer);
-    index = ListView_InsertItem(g_hwndObjectList, &lvitem);
+    if (!DirectoryObjectEntry) return;
 
-    lvitem.mask = LVIF_TEXT;
-    lvitem.iSubItem = 1;
-    lvitem.pszText = objinf->TypeName.Buffer;
-    lvitem.iItem = index;
-    ListView_SetItem(g_hwndObjectList, &lvitem);
+    objectTypeName = DirectoryObjectEntry->TypeName.Buffer;
+    typeDesc = ObManagerGetEntryByTypeName(objectTypeName);
 
-    cch = objinf->TypeName.Length / sizeof(WCHAR);
+    objectName = DirectoryObjectEntry->Name.Buffer;
+
+    //
+    // Object name column.
+    //
+    RtlSecureZeroMemory(&lvItem, sizeof(lvItem));
+    lvItem.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM;
+    lvItem.pszText = objectName;
+    lvItem.iItem = MAXINT;
+    lvItem.iImage = typeDesc->ImageIndex;
+    lvItem.lParam = typeDesc->Index;
+    lvItemIndex = ListView_InsertItem(g_hwndObjectList, &lvItem);
+
+    //
+    // Object type column.
+    //
+    lvItem.mask = LVIF_TEXT;
+    lvItem.iSubItem = 1;
+    lvItem.pszText = objectTypeName;
+    lvItem.iItem = lvItemIndex;
+    ListView_SetItem(g_hwndObjectList, &lvItem);
+
     RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
 
-    //check SymbolicLink
-    if (_strncmpi(objinf->TypeName.Buffer, OBTYPE_NAME_SYMBOLIC_LINK, cch) == 0) {
-       
-        bFound = supQueryLinkTarget(hObjectRootDirectory,
-            &objinf->Name, 
-            szBuffer, 
+    //
+    // Look for object type in well known type names hashes.
+    // If found - query information for additional description field.
+    //
+
+    switch (typeDesc->NameHash) {
+    
+    case OBTYPE_HASH_SYMBOLIC_LINK:
+        
+        bFound = supQueryLinkTarget(RootDirectoryHandle,
+            &DirectoryObjectEntry->Name,
+            szBuffer,
             MAX_PATH * sizeof(WCHAR));
-        
-        goto Done;
-    }
 
-    //check Section
-    if (_strncmpi(objinf->TypeName.Buffer, OBTYPE_NAME_SECTION, cch) == 0) {
+        break;
+
+    case OBTYPE_HASH_SECTION:
         
-        bFound = supQuerySectionFileInfo(hObjectRootDirectory,
-            &objinf->Name, 
-            szBuffer, 
+        bFound = supQuerySectionFileInfo(RootDirectoryHandle,
+            &DirectoryObjectEntry->Name,
+            szBuffer,
             MAX_PATH);
 
-        goto Done;
-    }
+        break;
 
-    //check Driver
-    if (_strncmpi(objinf->TypeName.Buffer, OBTYPE_NAME_DRIVER, cch) == 0) {
-        
-        bFound = supQueryDriverDescription(
-            objinf->Name.Buffer,
-            szBuffer, 
+    case OBTYPE_HASH_DRIVER:
+
+        bFound = supQueryDriverDescription(objectName,
+            szBuffer,
             MAX_PATH);
 
-        goto Done;
-    }
+        break;
 
-    //check Device
-    if (_strncmpi(objinf->TypeName.Buffer, OBTYPE_NAME_DEVICE, cch) == 0) {
-        
-        bFound = supQueryDeviceDescription(
-            objinf->Name.Buffer,
-            szBuffer, 
+    case OBTYPE_HASH_DEVICE:
+
+        bFound = supQueryDeviceDescription(objectName,
+            szBuffer,
             MAX_PATH);
 
-        goto Done;
-    }
+        break;
 
-    //check WindowStation
-    if (_strncmpi(objinf->TypeName.Buffer, OBTYPE_NAME_WINSTATION, cch) == 0) {
-        
-        bFound = supQueryWinstationDescription(
-            objinf->Name.Buffer,
-            szBuffer, 
+    case OBTYPE_HASH_WINSTATION:
+
+        bFound = supQueryWinstationDescription(objectName,
+            szBuffer,
             MAX_PATH);
 
-        goto Done;
-    }
+        break;
 
-    //check Type
-    if (_strncmpi(objinf->TypeName.Buffer, OBTYPE_NAME_TYPE, cch) == 0) {
+    case OBTYPE_HASH_TYPE:
 
-        bFound = supQueryTypeInfo(
-            objinf->Name.Buffer,
-            szBuffer, 
+        bFound = supQueryTypeInfo(objectName,
+            szBuffer,
             MAX_PATH);
 
+        break;
+
+    default:
+        break;
     }
 
-Done:
     //
     // Finally add information column if something found.
     //
     if (bFound != FALSE) {
-        lvitem.mask = LVIF_TEXT;
-        lvitem.iSubItem = 2;
-        lvitem.pszText = szBuffer;
-        lvitem.iItem = index;
-        ListView_SetItem(g_hwndObjectList, &lvitem);
+        lvItem.mask = LVIF_TEXT;
+        lvItem.iSubItem = 2;
+        lvItem.pszText = szBuffer;
+        lvItem.iItem = lvItemIndex;
+        ListView_SetItem(g_hwndObjectList, &lvItem);
     }
 }
 
@@ -408,22 +392,18 @@ VOID ListObjectsInDirectory(
     _In_ LPWSTR lpObjectDirectory
 )
 {
-    NTSTATUS            status;
-    ULONG               ctx, rlen;
-    HANDLE              hDirectory = NULL;
-    OBJECT_ATTRIBUTES   objattr;
-    UNICODE_STRING      objname;
+    NTSTATUS            ntStatus;
+    ULONG               queryContext = 0, rLength;
+    HANDLE              directoryHandle = NULL;
 
     POBJECT_DIRECTORY_INFORMATION objinf;
 
     ListView_DeleteAllItems(g_hwndObjectList);
-    RtlInitUnicodeString(&objname, lpObjectDirectory);
-    InitializeObjectAttributes(&objattr, &objname, OBJ_CASE_INSENSITIVE, NULL, NULL);
-    status = NtOpenDirectoryObject(&hDirectory, DIRECTORY_QUERY, &objattr);
-    if (!NT_SUCCESS(status))
+
+    directoryHandle = supOpenDirectory(NULL, lpObjectDirectory, DIRECTORY_QUERY);
+    if (directoryHandle == NULL)
         return;
 
-    ctx = 0;
     do {
 
         //
@@ -431,32 +411,32 @@ VOID ListObjectsInDirectory(
         // It doesn't work if no input buffer specified and does not return required buffer size.
         //
         if (g_WinObj.IsWine) {
-            rlen = 1024 * 64;
+            rLength = 1024 * 64;
         }
         else {
-            rlen = 0;
-            status = NtQueryDirectoryObject(hDirectory, NULL, 0, TRUE, FALSE, &ctx, &rlen);
-            if (status != STATUS_BUFFER_TOO_SMALL)
+            rLength = 0;
+            ntStatus = NtQueryDirectoryObject(directoryHandle, NULL, 0, TRUE, FALSE, &queryContext, &rLength);
+            if (ntStatus != STATUS_BUFFER_TOO_SMALL)
                 break;
         }
 
-        objinf = (POBJECT_DIRECTORY_INFORMATION)supHeapAlloc((SIZE_T)rlen);
+        objinf = (POBJECT_DIRECTORY_INFORMATION)supHeapAlloc((SIZE_T)rLength);
         if (objinf == NULL)
             break;
 
-        status = NtQueryDirectoryObject(hDirectory, objinf, rlen, TRUE, FALSE, &ctx, &rlen);
-        if (!NT_SUCCESS(status)) {
+        ntStatus = NtQueryDirectoryObject(directoryHandle, objinf, rLength, TRUE, FALSE, &queryContext, &rLength);
+        if (!NT_SUCCESS(ntStatus)) {
             supHeapFree(objinf);
             break;
         }
 
-        AddListViewItem(hDirectory, objinf);
+        AddListViewItem(directoryHandle, objinf);
 
         supHeapFree(objinf);
 
     } while (TRUE);
 
-    NtClose(hDirectory);
+    NtClose(directoryHandle);
 }
 
 /*
@@ -471,26 +451,23 @@ VOID FindObject(
     _In_ LPWSTR DirName,
     _In_opt_ LPWSTR NameSubstring,
     _In_opt_ LPWSTR TypeName,
-    _In_ PFO_LIST_ITEM *List
+    _In_ PFO_LIST_ITEM* List
 )
 {
     NTSTATUS            status;
     ULONG               ctx, rlen;
-    HANDLE              hDirectory = NULL;
+    HANDLE              directoryHandle = NULL;
     SIZE_T              sdlen;
     LPWSTR              newdir;
-    OBJECT_ATTRIBUTES   objattr;
-    UNICODE_STRING      objname;
     PFO_LIST_ITEM       tmp;
 
     POBJECT_DIRECTORY_INFORMATION objinf;
 
-    RtlInitUnicodeString(&objname, DirName);
-    sdlen = _strlen(DirName);
-    InitializeObjectAttributes(&objattr, &objname, OBJ_CASE_INSENSITIVE, NULL, NULL);
-    status = NtOpenDirectoryObject(&hDirectory, DIRECTORY_QUERY, &objattr);
-    if (!NT_SUCCESS(status))
+    directoryHandle = supOpenDirectory(NULL, DirName, DIRECTORY_QUERY);
+    if (directoryHandle == NULL)
         return;
+
+    sdlen = _strlen(DirName);
 
     ctx = 0;
     do {
@@ -503,7 +480,7 @@ VOID FindObject(
         }
         else {
             rlen = 0;
-            status = NtQueryDirectoryObject(hDirectory, NULL, 0, TRUE, FALSE, &ctx, &rlen);
+            status = NtQueryDirectoryObject(directoryHandle, NULL, 0, TRUE, FALSE, &ctx, &rlen);
             if (status != STATUS_BUFFER_TOO_SMALL)
                 break;
         }
@@ -512,7 +489,7 @@ VOID FindObject(
         if (objinf == NULL)
             break;
 
-        status = NtQueryDirectoryObject(hDirectory, objinf, rlen, TRUE, FALSE, &ctx, &rlen);
+        status = NtQueryDirectoryObject(directoryHandle, objinf, rlen, TRUE, FALSE, &ctx, &rlen);
         if (!NT_SUCCESS(status)) {
             supHeapFree(objinf);
             break;
@@ -571,5 +548,5 @@ VOID FindObject(
 
     } while (TRUE);
 
-    NtClose(hDirectory);
+    NtClose(directoryHandle);
 }

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        23 Nov 2019
+*  DATE:        05 Jan 2020
 *
 *  Program entry point and main window handler.
 *
@@ -43,6 +43,7 @@ HWND g_hwndObjectTree;
 HWND g_hwndObjectList;
 HIMAGELIST g_ListViewImages;
 HIMAGELIST g_ToolBarMenuImages;
+ULONG g_CurrentDPI;
 
 WINOBJ_GLOBALS g_WinObj;
 
@@ -58,7 +59,7 @@ VOID MainWindowExtrasDisableAdminFeatures(
     _In_ HWND hWnd
 )
 {
-    HMENU hExtrasSubMenu = GetSubMenu(GetMenu(hWnd), 4);
+    HMENU hExtrasSubMenu = GetSubMenu(GetMenu(hWnd), IDMM_EXTRAS);
 
     MENUITEMINFO mii;
 
@@ -69,7 +70,7 @@ VOID MainWindowExtrasDisableAdminFeatures(
     //
     // These features require driver usage.
     //
-    if (g_kdctx.hDevice == NULL) {
+    if (g_kdctx.DeviceHandle == NULL) {
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_SSDT, FALSE, &mii);
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_PRIVATENAMESPACES, FALSE, &mii);
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_W32PSERVICETABLE, FALSE, &mii);
@@ -79,23 +80,26 @@ VOID MainWindowExtrasDisableAdminFeatures(
     //
     // This feature is not supported in Windows 10 10586.
     //
-    if (g_NtBuildNumber == 10586) {
+    if (g_NtBuildNumber == NT_WIN10_THRESHOLD2) {
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_PRIVATENAMESPACES, FALSE, &mii);
     }
 
     //
     // This feature is only supported starting from Windows 10 14393 (RS1).
     //
-    if (g_NtBuildNumber < 14393) {
+    if (g_NtBuildNumber < NT_WIN10_REDSTONE1) {
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_W32PSERVICETABLE, FALSE, &mii);
     }
 
     //
-    // This feature is not unsupported in Wine.
+    // These features are not unsupported in Wine.
     //
     if (g_WinObj.IsWine) {
+        SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_CALLBACKS, FALSE, &mii);
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_DRIVERS, FALSE, &mii);
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_SOFTWARELICENSECACHE, FALSE, &mii);
+        SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_SSDT, FALSE, &mii);
+        SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_W32PSERVICETABLE, FALSE, &mii);
     }
 }
 
@@ -113,35 +117,11 @@ INT CALLBACK MainWindowObjectListCompareFunc(
     _In_ LPARAM lParamSort
 )
 {
-    INT    nResult = 0;
-    LPWSTR lpItem1 = NULL, lpItem2 = NULL;
-
-    lpItem1 = supGetItemText(g_hwndObjectList, (INT)lParam1, (INT)lParamSort, NULL);
-    lpItem2 = supGetItemText(g_hwndObjectList, (INT)lParam2, (INT)lParamSort, NULL);
-
-    if ((lpItem1 == NULL) && (lpItem2 == NULL)) {
-        nResult = 0;
-        goto Done;
-    }
-    if ((lpItem1 == NULL) && (lpItem2 != NULL)) {
-        nResult = (bMainWndSortInverse) ? 1 : -1;
-        goto Done;
-    }
-    if ((lpItem2 == NULL) && (lpItem1 != NULL)) {
-        nResult = (bMainWndSortInverse) ? -1 : 1;
-        goto Done;
-    }
-
-    if (bMainWndSortInverse)
-        nResult = _strcmpi(lpItem2, lpItem1);
-    else
-        nResult = _strcmpi(lpItem1, lpItem2);
-
-Done:
-    if (lpItem1) supHeapFree(lpItem1);
-    if (lpItem2) supHeapFree(lpItem2);
-
-    return nResult;
+    return supListViewBaseComparer(g_hwndObjectList,
+        bMainWndSortInverse,
+        lParam1,
+        lParam2,
+        lParamSort);
 }
 
 /*
@@ -156,27 +136,22 @@ VOID MainWindowHandleObjectTreeProp(
     _In_ HWND hwnd
 )
 {
-    TV_ITEM                     tvi;
+    TV_ITEM tvi;
+    WCHAR szBuffer[MAX_PATH + 1];
     PROP_DIALOG_CREATE_SETTINGS propSettings;
-
-    WCHAR                       szBuffer[MAX_PATH + 1];
 
     //
     // Only one object properties dialog at the same time allowed.
     //
-    if (g_PropWindow != NULL) {
-        SetActiveWindow(g_PropWindow);
-        return;
-    }
+    ENSURE_DIALOG_UNIQUE(g_PropWindow);
 
     if (SelectedTreeItem == NULL)
         return;
 
-    szBuffer[0] = 0; //mars workaround
-
-    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
     RtlSecureZeroMemory(&tvi, sizeof(TV_ITEM));
 
+    szBuffer[0] = 0;
+    RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
     tvi.pszText = szBuffer;
     tvi.cchTextMax = MAX_PATH;
     tvi.mask = TVIF_TEXT;
@@ -209,18 +184,24 @@ VOID MainWindowHandleObjectListProp(
 
     PROP_DIALOG_CREATE_SETTINGS propSettings;
 
+    //
+    // Only one object properties dialog allowed at same time.
+    //
     if (g_PropWindow != NULL)
         return;
 
-    //nothing selected, go away
-    if (ListView_GetSelectedCount(g_hwndObjectList) == 0) {
+    //
+    // Query selection, leave on failure.
+    //
+    if (ListView_GetSelectedCount(g_hwndObjectList) == 0)
         return;
-    }
 
+    //
+    // Query selected index, leave on failure.
+    //
     nSelected = ListView_GetSelectionMark(g_hwndObjectList);
-    if (nSelected == -1) {
+    if (nSelected == -1)
         return;
-    }
 
     lpItemText = supGetItemText(g_hwndObjectList, nSelected, 0, NULL);
     if (lpItemText) {
@@ -257,13 +238,11 @@ VOID MainWindowHandleObjectListProp(
 *
 */
 VOID MainWindowOnRefresh(
-    _In_ HWND hwnd
+    VOID
 )
 {
-    LPWSTR  CurrentPath = NULL;
-    SIZE_T  len;
-
-    UNREFERENCED_PARAMETER(hwnd);
+    LPWSTR CurrentPath = NULL;
+    SIZE_T len;
 
     supSetWaitCursor(TRUE);
 
@@ -282,7 +261,6 @@ VOID MainWindowOnRefresh(
 
     TreeView_DeleteAllItems(g_hwndObjectTree);
     ListObjectDirectoryTree(L"\\", NULL, NULL);
-    TreeView_SelectItem(g_hwndObjectTree, TreeView_GetRoot(g_hwndObjectTree));
 
     if (CurrentPath) {
         ListToObject(CurrentPath);
@@ -302,15 +280,12 @@ VOID MainWindowOnRefresh(
 */
 LRESULT MainWindowHandleWMCommand(
     _In_ HWND hwnd,
-    _In_ WPARAM wParam,
-    _In_ LPARAM lParam
+    _In_ WPARAM wParam
 )
 {
-    LPWSTR  lpItemText;
-    HWND    hwndFocus;
-    WORD    ControlId = LOWORD(wParam);
-
-    UNREFERENCED_PARAMETER(lParam);
+    LPWSTR lpItemText;
+    HWND   hwndFocus;
+    WORD   ControlId = LOWORD(wParam);
 
     switch (ControlId) {
 
@@ -338,7 +313,9 @@ LRESULT MainWindowHandleWMCommand(
         break;
 
     case ID_OBJECT_GOTOLINKTARGET:
-        lpItemText = supGetItemText(g_hwndObjectList, ListView_GetSelectionMark(g_hwndObjectList), 2, NULL);
+        lpItemText = supGetItemText(g_hwndObjectList,
+            ListView_GetSelectionMark(g_hwndObjectList), 2, NULL);
+
         if (lpItemText) {
             if (_strcmpi(lpItemText, L"\\??") == 0) {
                 ListToObject(L"\\GLOBAL??");
@@ -349,7 +326,9 @@ LRESULT MainWindowHandleWMCommand(
             supHeapFree(lpItemText);
         }
         else {
-            lpItemText = supGetItemText(g_hwndObjectList, ListView_GetSelectionMark(g_hwndObjectList), 0, NULL);
+            lpItemText = supGetItemText(g_hwndObjectList,
+                ListView_GetSelectionMark(g_hwndObjectList), 0, NULL);
+
             if (lpItemText) {
                 if ((_strcmpi(lpItemText, L"GLOBALROOT") == 0) &&
                     (_strcmpi(g_WinObj.CurrentObjectPath, L"\\GLOBAL??") == 0))
@@ -366,13 +345,13 @@ LRESULT MainWindowHandleWMCommand(
         break;
 
     case ID_VIEW_REFRESH:
-        MainWindowOnRefresh(hwnd);
+        MainWindowOnRefresh();
         break;
 
     case ID_EXTRAS_PIPES:
     case ID_EXTRAS_MAILSLOTS:
     case ID_EXTRAS_USERSHAREDDATA:
-    case ID_EXTRAS_PRIVATENAMESPACES:       
+    case ID_EXTRAS_PRIVATENAMESPACES:
     case ID_EXTRAS_SSDT:
     case ID_EXTRAS_W32PSERVICETABLE:
     case ID_EXTRAS_DRIVERS:
@@ -413,7 +392,7 @@ LRESULT MainWindowHandleWMCommand(
         break;
     }
 
-    if ((ControlId >= ID_MENU_PLUGINS) && (ControlId < WINOBJEX_MAX_PLUGINS)) {
+    if ((ControlId >= ID_MENU_PLUGINS) && (ControlId < ID_MENU_PLUGINS_MAX)) {
         PluginManagerProcessEntry(hwnd, ControlId);
     }
     return FALSE;
@@ -431,11 +410,11 @@ VOID MainWindowTreeViewSelChanged(
     _In_ LPNMTREEVIEWW trhdr
 )
 {
-    WCHAR           text[MAX_PATH + 2];
-    HTREEITEM       hitem, root;
-    TVITEMEX        sitem;
-    POE_LIST_ITEM   list = NULL, prevlist = NULL;
-    SIZE_T          p = 1; // size of empty string buffer in characters
+    HTREEITEM       treeItem, treeRoot;
+    TVITEMEX        tvexItem;
+    POE_LIST_ITEM   objectListItem = NULL, prevObjectListItem = NULL;
+    SIZE_T          objectPathLength = 1; // size of empty string buffer in characters
+    WCHAR           szTreeItemText[MAX_PATH + 1];
 
     if (trhdr == NULL)
         return;
@@ -446,31 +425,34 @@ VOID MainWindowTreeViewSelChanged(
     if (g_WinObj.CurrentObjectPath != NULL)
         supHeapFree(g_WinObj.CurrentObjectPath);
 
-    root = TreeView_GetRoot(trhdr->hdr.hwndFrom);
+    RtlSecureZeroMemory(&tvexItem, sizeof(tvexItem));
 
-    // build the path from bottom to top and counting string buffer size
-    for (hitem = trhdr->itemNew.hItem; hitem != root;
-        hitem = TreeView_GetParent(trhdr->hdr.hwndFrom, hitem))
+    treeRoot = TreeView_GetRoot(trhdr->hdr.hwndFrom);
+
+    //
+    // Build the path from bottom to top and counting string buffer size.
+    //
+    for (treeItem = trhdr->itemNew.hItem; treeItem != treeRoot;
+        treeItem = TreeView_GetParent(trhdr->hdr.hwndFrom, treeItem))
     {
-        RtlSecureZeroMemory(&sitem, sizeof(sitem));
-        RtlSecureZeroMemory(&text, sizeof(text));
-        sitem.mask = TVIF_HANDLE | TVIF_TEXT;
-        sitem.hItem = hitem;
-        sitem.pszText = text;
-        sitem.cchTextMax = MAX_PATH;
-        TreeView_GetItem(trhdr->hdr.hwndFrom, &sitem);
+        RtlSecureZeroMemory(&szTreeItemText, sizeof(szTreeItemText));
+        tvexItem.mask = TVIF_HANDLE | TVIF_TEXT;
+        tvexItem.hItem = treeItem;
+        tvexItem.pszText = szTreeItemText;
+        tvexItem.cchTextMax = MAX_PATH;
+        TreeView_GetItem(trhdr->hdr.hwndFrom, &tvexItem);
 
-        p += _strlen(text) + 1; //+1 for '\'
+        objectPathLength += _strlen(szTreeItemText) + 1; //+1 for '\'
 
-        list = (POE_LIST_ITEM)supHeapAlloc(sizeof(OE_LIST_ITEM));
-        if (list) {
-            list->Prev = prevlist;
-            list->TreeItem = hitem;
+        objectListItem = (POE_LIST_ITEM)supHeapAlloc(sizeof(OE_LIST_ITEM));
+        if (objectListItem) {
+            objectListItem->Prev = prevObjectListItem;
+            objectListItem->TreeItem = treeItem;
         }
-        prevlist = list;
+        prevObjectListItem = objectListItem;
     }
 
-    if (list == NULL) {
+    if (objectListItem == NULL) {
         g_WinObj.CurrentObjectPath = (LPWSTR)supHeapAlloc(2 * sizeof(WCHAR));
         if (g_WinObj.CurrentObjectPath) {
             g_WinObj.CurrentObjectPath[0] = L'\\';
@@ -479,28 +461,32 @@ VOID MainWindowTreeViewSelChanged(
         return;
     }
 
-    list = prevlist;
-    g_WinObj.CurrentObjectPath = (LPWSTR)supHeapAlloc(p * sizeof(WCHAR));
+    objectListItem = prevObjectListItem;
+    g_WinObj.CurrentObjectPath = (LPWSTR)supHeapAlloc(objectPathLength * sizeof(WCHAR));
     if (g_WinObj.CurrentObjectPath) {
-        p = 0;
-        // building the final string
-        while (list != NULL) {
-            RtlSecureZeroMemory(&sitem, sizeof(sitem));
-            RtlSecureZeroMemory(&text, sizeof(text));
-            sitem.mask = TVIF_HANDLE | TVIF_TEXT;
-            sitem.hItem = list->TreeItem;
-            sitem.pszText = text;
-            sitem.cchTextMax = MAX_PATH;
-            TreeView_GetItem(trhdr->hdr.hwndFrom, &sitem);
 
-            g_WinObj.CurrentObjectPath[p] = L'\\';
-            p++;
-            _strcpy(g_WinObj.CurrentObjectPath + p, text);
-            p += _strlen(text);
+        objectPathLength = 0;
 
-            prevlist = list->Prev;
-            supHeapFree(list);
-            list = prevlist;
+        //
+        // Building the final string.
+        //
+        while (objectListItem != NULL) {
+
+            RtlSecureZeroMemory(&szTreeItemText, sizeof(szTreeItemText));
+            tvexItem.mask = TVIF_HANDLE | TVIF_TEXT;
+            tvexItem.hItem = objectListItem->TreeItem;
+            tvexItem.pszText = szTreeItemText;
+            tvexItem.cchTextMax = MAX_PATH;
+            TreeView_GetItem(trhdr->hdr.hwndFrom, &tvexItem);
+
+            g_WinObj.CurrentObjectPath[objectPathLength] = L'\\';
+            objectPathLength++;
+            _strcpy(g_WinObj.CurrentObjectPath + objectPathLength, szTreeItemText);
+            objectPathLength += _strlen(szTreeItemText);
+
+            prevObjectListItem = objectListItem->Prev;
+            supHeapFree(objectListItem);
+            objectListItem = prevObjectListItem;
         }
     }
     return;
@@ -559,14 +545,18 @@ VOID MainWindowHandleObjectPopupMenu(
     supSetMenuIcon(hMenu, ID_OBJECT_PROPERTIES,
         (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 0));
 
-    if (supIsSymlink(hwndlv, iItem)) {
+    if (supIsSymbolicLinkObject(hwndlv, iItem)) {
+
         InsertMenu(hMenu, 1, MF_BYCOMMAND, ID_OBJECT_GOTOLINKTARGET, T_GOTOLINKTARGET);
+
         supSetMenuIcon(hMenu, ID_OBJECT_GOTOLINKTARGET,
-            (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ListViewImages,
-                ObManagerGetImageIndexByTypeName(OBTYPE_NAME_SYMBOLIC_LINK)));
-        uEnable &= ~MF_GRAYED;
+            (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance,
+                g_ListViewImages,
+                g_TypeSymbolicLink.ImageIndex));
+
+        uEnable = MF_BYCOMMAND;
     }
-    EnableMenuItem(GetSubMenu(GetMenu(hwnd), 2), ID_OBJECT_GOTOLINKTARGET, uEnable);
+    EnableMenuItem(GetSubMenu(GetMenu(hwnd), IDMM_OBJECT), ID_OBJECT_GOTOLINKTARGET, uEnable);
 
     TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, point->x, point->y, 0, hwnd, NULL);
     DestroyMenu(hMenu);
@@ -582,7 +572,6 @@ VOID MainWindowHandleObjectPopupMenu(
 */
 LRESULT MainWindowHandleWMNotify(
     _In_ HWND hwnd,
-    _In_ WPARAM wParam,
     _In_ LPARAM lParam
 )
 {
@@ -596,9 +585,7 @@ LRESULT MainWindowHandleWMNotify(
     LVITEM          lvitem;
     TVHITTESTINFO   hti;
     POINT           pt;
-    WCHAR           item_string[MAX_PATH + 1];
-
-    UNREFERENCED_PARAMETER(wParam);
+    WCHAR           szItemString[MAX_PATH + 1];
 
     if (hdr) {
 
@@ -639,6 +626,7 @@ LRESULT MainWindowHandleWMNotify(
                 }
                 break;
             }
+
         }
 
         if (hdr->hwndFrom == g_hwndObjectList) {
@@ -651,25 +639,25 @@ LRESULT MainWindowHandleWMNotify(
                     lvitem.stateMask = LVIS_SELECTED | LVIS_FOCUSED;
                     ListView_SetItem(g_hwndObjectList, &lvitem);
                 }
-
                 break;
+
             case LVN_ITEMCHANGED:
                 lvn = (LPNMLISTVIEW)lParam;
-                RtlSecureZeroMemory(&item_string, sizeof(item_string));
-                ListView_GetItemText(g_hwndObjectList, lvn->iItem, 0, item_string, MAX_PATH);
+                RtlSecureZeroMemory(&szItemString, sizeof(szItemString));
+                ListView_GetItemText(g_hwndObjectList, lvn->iItem, 0, szItemString, MAX_PATH);
                 lcp = _strlen(g_WinObj.CurrentObjectPath);
                 if (lcp) {
-                    str = (LPWSTR)supHeapAlloc((lcp + sizeof(item_string) + 4) * sizeof(WCHAR));
+                    str = (LPWSTR)supHeapAlloc((lcp + sizeof(szItemString) + 4) * sizeof(WCHAR));
                     if (str == NULL)
                         break;
                     _strcpy(str, g_WinObj.CurrentObjectPath);
 
                     if ((str[0] == '\\') && (str[1] == 0)) {
-                        _strcpy(str + lcp, item_string);
+                        _strcpy(str + lcp, szItemString);
                     }
                     else {
                         str[lcp] = '\\';
-                        _strcpy(str + lcp + 1, item_string);
+                        _strcpy(str + lcp + 1, szItemString);
                     }
                     SendMessage(hwndStatusBar, WM_SETTEXT, 0, (LPARAM)str);
                     supHeapFree(str);
@@ -680,7 +668,7 @@ LRESULT MainWindowHandleWMNotify(
                 //handle sort by column
             case LVN_COLUMNCLICK:
                 bMainWndSortInverse = !bMainWndSortInverse;
-                SortColumn = ((NMLISTVIEW *)lParam)->iSubItem;
+                SortColumn = ((NMLISTVIEW*)lParam)->iSubItem;
                 ListView_SortItemsEx(g_hwndObjectList, &MainWindowObjectListCompareFunc, SortColumn);
 
                 nImageIndex = ImageList_GetImageCount(g_ListViewImages);
@@ -691,7 +679,7 @@ LRESULT MainWindowHandleWMNotify(
 
                 supUpdateLvColumnHeaderImage(
                     g_hwndObjectList,
-                    3,
+                    MAIN_OBJLIST_COLUMN_COUNT,
                     SortColumn,
                     nImageIndex);
 
@@ -748,24 +736,25 @@ VOID MainWindowResizeHandler(
     LONG posY, sizeY, sizeX;
 
     if (hwndToolBar != NULL) {
+
         SendMessage(hwndToolBar, WM_SIZE, 0, 0);
         SendMessage(hwndStatusBar, WM_SIZE, 0, 0);
-        RtlSecureZeroMemory(&ToolBarRect, sizeof(ToolBarRect));
-        RtlSecureZeroMemory(&StatusBarRect, sizeof(StatusBarRect));
-        GetWindowRect(hwndToolBar, &ToolBarRect);
-        GetWindowRect(hwndStatusBar, &StatusBarRect);
 
-        sizeX = ToolBarRect.right - ToolBarRect.left;
-        if (sPos > sizeX - SplitterMargin)
-            sPos = sizeX - SplitterMargin - 1;
+        if (GetWindowRect(hwndToolBar, &ToolBarRect) &&
+            GetWindowRect(hwndStatusBar, &StatusBarRect)) {
 
-        sizeY = StatusBarRect.top - ToolBarRect.bottom;
-        posY = ToolBarRect.bottom - ToolBarRect.top;
-        sizeX = ToolBarRect.right - ToolBarRect.left - sPos - SplitterSize;
+            sizeX = ToolBarRect.right - ToolBarRect.left;
+            if (sPos > sizeX - SplitterMargin)
+                sPos = sizeX - SplitterMargin - 1;
 
-        SetWindowPos(g_hwndObjectTree, NULL, 0, posY, sPos, sizeY, 0);
-        SetWindowPos(g_hwndObjectList, NULL, sPos + SplitterSize, posY, sizeX, sizeY, 0);
-        SetWindowPos(hwndSplitter, NULL, sPos, posY, SplitterSize, sizeY, 0);
+            sizeY = StatusBarRect.top - ToolBarRect.bottom;
+            posY = ToolBarRect.bottom - ToolBarRect.top;
+            sizeX = ToolBarRect.right - ToolBarRect.left - sPos - SplitterSize;
+
+            SetWindowPos(g_hwndObjectTree, NULL, 0, posY, sPos, sizeY, 0);
+            SetWindowPos(g_hwndObjectList, NULL, sPos + SplitterSize, posY, sizeX, sizeY, 0);
+            SetWindowPos(hwndSplitter, NULL, sPos, posY, SplitterSize, sizeY, 0);
+        }
     }
 }
 
@@ -795,7 +784,10 @@ LRESULT CALLBACK MainWindowProc(
         RtlSecureZeroMemory(&crc, sizeof(crc));
 
         if ((HWND)wParam == g_hwndObjectTree) {
-            TreeView_GetItemRect(g_hwndObjectTree, TreeView_GetSelection(g_hwndObjectTree), &crc, TRUE);
+
+            TreeView_GetItemRect(g_hwndObjectTree,
+                TreeView_GetSelection(g_hwndObjectTree), (PRECT)&crc, TRUE);
+
             crc.top = crc.bottom;
             ClientToScreen(g_hwndObjectTree, (LPPOINT)&crc);
             MainWindowHandleTreePopupMenu(hwnd, (LPPOINT)&crc);
@@ -817,11 +809,11 @@ LRESULT CALLBACK MainWindowProc(
         break;
 
     case WM_COMMAND:
-        MainWindowHandleWMCommand(hwnd, wParam, lParam);
+        MainWindowHandleWMCommand(hwnd, wParam);
         break;
 
     case WM_NOTIFY:
-        MainWindowHandleWMNotify(hwnd, wParam, lParam);
+        MainWindowHandleWMNotify(hwnd, lParam);
         break;
 
     case WM_MEASUREITEM:
@@ -875,8 +867,8 @@ LRESULT CALLBACK MainWindowProc(
 
     case WM_GETMINMAXINFO:
         if (lParam) {
-            ((PMINMAXINFO)lParam)->ptMinTrackSize.x = 400;
-            ((PMINMAXINFO)lParam)->ptMinTrackSize.y = 256;
+            ((PMINMAXINFO)lParam)->ptMinTrackSize.x = SCALE_DPI_VALUE(400);
+            ((PMINMAXINFO)lParam)->ptMinTrackSize.y = SCALE_DPI_VALUE(256);
         }
         break;
     }
@@ -892,7 +884,7 @@ LRESULT CALLBACK MainWindowProc(
 *
 */
 BOOL MainWindowDlgMsgHandler(
-    _In_ MSG msg,
+    _In_ LPMSG lpMsg,
     _In_ HACCEL hAccTable
 )
 {
@@ -900,19 +892,19 @@ BOOL MainWindowDlgMsgHandler(
 
     for (c = 0; c < wobjMaxDlgId; c++) {
         if ((g_WinObj.AuxDialogs[c] != NULL)) {
-            if (IsDialogMessage(g_WinObj.AuxDialogs[c], &msg)) {
-                TranslateAccelerator(g_WinObj.AuxDialogs[c], hAccTable, &msg);
+            if (IsDialogMessage(g_WinObj.AuxDialogs[c], lpMsg)) {
+                TranslateAccelerator(g_WinObj.AuxDialogs[c], hAccTable, lpMsg);
                 return TRUE;
             }
         }
     }
 
     if (g_DesktopPropWindow != NULL)
-        if (IsDialogMessage(g_DesktopPropWindow, &msg))
+        if (IsDialogMessage(g_DesktopPropWindow, lpMsg))
             return TRUE;
 
     if (g_PropWindow != NULL)
-        if (IsDialogMessage(g_PropWindow, &msg))
+        if (IsDialogMessage(g_PropWindow, lpMsg))
             return TRUE;
 
     return FALSE;
@@ -926,12 +918,12 @@ BOOL MainWindowDlgMsgHandler(
 * Initialize global variables.
 *
 */
-BOOL WinObjInitGlobals(
+INT WinObjInitGlobals(
     _In_ BOOLEAN IsWine)
 {
     SIZE_T cch;
-    BOOL bResult = FALSE;
-    LPWSTR *szArglist;
+    INT Result = wobjInitSuccess;
+    LPWSTR* szArglist;
     INT nArgs = 0;
 
 
@@ -957,8 +949,10 @@ BOOL WinObjInitGlobals(
         // Create dedicated heap.
         //
         g_WinObj.Heap = RtlCreateHeap(HEAP_GROWABLE, NULL, 0, 0, NULL, NULL);
-        if (g_WinObj.Heap == NULL)
+        if (g_WinObj.Heap == NULL) {
+            Result = wobjInitNoHeap;
             break;
+        }
 
         if (IsWine == FALSE) {
             RtlSetHeapInformation(g_WinObj.Heap, HeapEnableTerminationOnCorruption, NULL, 0);
@@ -969,20 +963,26 @@ BOOL WinObjInitGlobals(
         // Remember %TEMP% directory.
         //
         cch = ExpandEnvironmentStrings(L"%temp%", g_WinObj.szTempDirectory, MAX_PATH);
-        if ((cch == 0) || (cch > MAX_PATH))
+        if ((cch == 0) || (cch > MAX_PATH)) {
+            Result = wobjInitNoTemp;
             break;
+        }
 
         //
         // Remember Windows directory.
         //
-        if (!GetWindowsDirectory(g_WinObj.szWindowsDirectory, MAX_PATH))
+        if (!GetWindowsDirectory(g_WinObj.szWindowsDirectory, MAX_PATH)) {
+            Result = wobjInitNoWinDir;
             break;
+        }
 
         //
         // Remember System32 directory.
         //
-        if (!GetSystemDirectory(g_WinObj.szSystemDirectory, MAX_PATH))
+        if (!GetSystemDirectory(g_WinObj.szSystemDirectory, MAX_PATH)) {
+            Result = wobjInitNoSys32Dir;
             break;
+        }
 
         //
         // Check command line parameters.
@@ -995,16 +995,16 @@ BOOL WinObjInitGlobals(
             LocalFree(szArglist);
         }
 
-        bResult = TRUE;
+        Result = wobjInitSuccess;
 
     } while (FALSE);
 
-    if (bResult == FALSE) {
+    if (Result != wobjInitSuccess) {
         if (g_WinObj.Heap)
             RtlDestroyHeap(g_WinObj.Heap);
     }
 
-    return bResult;
+    return Result;
 }
 
 /*
@@ -1018,46 +1018,72 @@ BOOL WinObjInitGlobals(
 UINT WinObjExMain()
 {
     BOOLEAN                 IsWine = FALSE;
-    MSG                     msg1;
-    WNDCLASSEX              wincls;
-    BOOL                    IsFullAdmin = FALSE, rv = TRUE, bLocalSystem = FALSE;
-    ATOM                    class_atom = 0;
-    INITCOMMONCONTROLSEX    icc;
-    LVCOLUMN                col;
-    SHSTOCKICONINFO         sii;
+
+    ATOM                    classAtom = 0;
+    BOOL                    bIsFullAdmin = FALSE, bRet = TRUE, bLocalSystem = FALSE;
+
+    HWND                    hDesktopWnd = GetDesktopWindow();
     HMENU                   hMenu;
     HACCEL                  hAccTable = 0;
-    WCHAR                   szWindowTitle[100];
     HICON                   hIcon;
-    HANDLE                  hToken;
+    HANDLE                  processToken;
+
+    MSG                     msg;
+    INITCOMMONCONTROLSEX    iccx;
+    WNDCLASSEX              wndClass;
     HIMAGELIST              TreeViewImages;
+
+    WCHAR                   szWindowTitle[100];
 
     IsWine = supIsWine();
 
-    if (!supInitNtdllCRT(IsWine)) {
-        MessageBox(GetDesktopWindow(), TEXT("Could not initialize CRT"), NULL, MB_ICONERROR);
+    if (!supInitMSVCRT()) {
+        MessageBox(hDesktopWnd, T_WOBJINIT_NOCRT, NULL, MB_ICONERROR);
         return ERROR_APP_INIT_FAILURE;
     }
 
     //
-    // wine 1.6 xenial does not suport this routine.
+    // Wine 1.6 xenial does not suport this routine.
     //
     if (IsWine == FALSE) {
         RtlSetHeapInformation(NULL, HeapEnableTerminationOnCorruption, NULL, 0);
     }
 
-    if (!WinObjInitGlobals(IsWine))
+    switch (WinObjInitGlobals(IsWine)) {
+
+    case wobjInitNoHeap:
+        MessageBox(hDesktopWnd, T_WOBJINIT_NOHEAP, NULL, MB_ICONERROR);
         return ERROR_APP_INIT_FAILURE;
 
-    // do not move anywhere
-    IsFullAdmin = supUserIsFullAdmin();
+    case wobjInitNoTemp:
+        MessageBox(hDesktopWnd, T_WOBJINIT_NOTEMP, NULL, MB_ICONERROR);
+        return ERROR_APP_INIT_FAILURE;
 
-    // check compatibility
-    if (IsWine != FALSE) {
-        IsFullAdmin = FALSE;
+    case wobjInitNoWinDir:
+        MessageBox(hDesktopWnd, T_WOBJINIT_NOWINDIR, NULL, MB_ICONERROR);
+        return ERROR_APP_INIT_FAILURE;
+
+    case wobjInitNoSys32Dir:
+        MessageBox(hDesktopWnd, T_WOBJINIT_NOSYS32DIR, NULL, MB_ICONERROR);
+        return ERROR_APP_INIT_FAILURE;
+
+    default:
+        break;
     }
 
-    supInit(IsFullAdmin);
+    //
+    // !Do not move anywhere!
+    //
+    bIsFullAdmin = supUserIsFullAdmin();
+
+    //
+    // Drop admin related features on Wine.
+    //
+    if (IsWine != FALSE) {
+        bIsFullAdmin = FALSE;
+    }
+
+    supInit(bIsFullAdmin);
 
 #ifdef _DEBUG
     TestStart();
@@ -1067,14 +1093,14 @@ UINT WinObjExMain()
         //
         // Create main window and it components.
         //
-        wincls.cbSize = sizeof(WNDCLASSEX);
-        wincls.style = 0;
-        wincls.lpfnWndProc = &MainWindowProc;
-        wincls.cbClsExtra = 0;
-        wincls.cbWndExtra = 0;
-        wincls.hInstance = g_WinObj.hInstance;
+        wndClass.cbSize = sizeof(WNDCLASSEX);
+        wndClass.style = 0;
+        wndClass.lpfnWndProc = &MainWindowProc;
+        wndClass.cbClsExtra = 0;
+        wndClass.cbWndExtra = 0;
+        wndClass.hInstance = g_WinObj.hInstance;
 
-        wincls.hIcon = (HICON)LoadImage(
+        wndClass.hIcon = (HICON)LoadImage(
             g_WinObj.hInstance,
             MAKEINTRESOURCE(IDI_ICON_MAIN),
             IMAGE_ICON,
@@ -1082,7 +1108,7 @@ UINT WinObjExMain()
             0,
             LR_SHARED);
 
-        wincls.hCursor = (HCURSOR)LoadImage(
+        wndClass.hCursor = (HCURSOR)LoadImage(
             NULL,
             MAKEINTRESOURCE(OCR_SIZEWE),
             IMAGE_CURSOR,
@@ -1090,23 +1116,25 @@ UINT WinObjExMain()
             0,
             LR_SHARED);
 
-        wincls.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-        wincls.lpszMenuName = MAKEINTRESOURCE(IDR_MENU1);
-        wincls.lpszClassName = MAINWINDOWCLASSNAME;
-        wincls.hIconSm = 0;
+        wndClass.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+        wndClass.lpszMenuName = MAKEINTRESOURCE(IDR_MENU1);
+        wndClass.lpszClassName = MAINWINDOWCLASSNAME;
+        wndClass.hIconSm = 0;
 
-        class_atom = RegisterClassEx(&wincls);
-        if (class_atom == 0)
+        classAtom = RegisterClassEx(&wndClass);
+        if (classAtom == 0) {
+            MessageBox(hDesktopWnd, T_WOBJINIT_NOCLASS, NULL, MB_ICONERROR);
             break;
+        }
 
         RtlSecureZeroMemory(szWindowTitle, sizeof(szWindowTitle));
         _strcpy(szWindowTitle, PROGRAM_NAME);
-        if (IsFullAdmin != FALSE) {
-            _strcat(szWindowTitle, L" (Administrator)");
+        if (bIsFullAdmin != FALSE) {
+            _strcat(szWindowTitle, TEXT(" (Administrator)"));
         }
 
         if (IsWine != FALSE) {
-            _strcat(szWindowTitle, L" (Wine)");
+            _strcat(szWindowTitle, TEXT(" (Wine)"));
         }
 
         //
@@ -1114,25 +1142,29 @@ UINT WinObjExMain()
         //
         MainWindow = CreateWindowEx(
             0,
-            MAKEINTATOM(class_atom),
+            MAKEINTATOM(classAtom),
             szWindowTitle,
             WS_VISIBLE | WS_OVERLAPPEDWINDOW,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            800,
-            600,
+            SCALE_DPI_VALUE(800),
+            SCALE_DPI_VALUE(600),
             NULL,
             NULL,
             g_WinObj.hInstance,
             NULL);
 
-        if (MainWindow == NULL)
+        if (MainWindow == NULL) {
+            MessageBox(hDesktopWnd, T_WOBJINIT_NOMAINWINDOW, NULL, MB_ICONERROR);
             break;
+        }
 
-        icc.dwSize = sizeof(icc);
-        icc.dwICC = ICC_LISTVIEW_CLASSES | ICC_TREEVIEW_CLASSES | ICC_BAR_CLASSES | ICC_TAB_CLASSES;
-        if (!InitCommonControlsEx(&icc))
+        iccx.dwSize = sizeof(iccx);
+        iccx.dwICC = ICC_LISTVIEW_CLASSES | ICC_TREEVIEW_CLASSES | ICC_BAR_CLASSES | ICC_TAB_CLASSES;
+        if (!InitCommonControlsEx(&iccx)) {
+            MessageBox(hDesktopWnd, T_WOBJINIT_NOICCX, NULL, MB_ICONERROR);
             break;
+        }
 
         //
         // Status Bar window.
@@ -1169,8 +1201,10 @@ UINT WinObjExMain()
             g_WinObj.hInstance,
             NULL);
 
-        if (g_hwndObjectTree == NULL)
+        if (g_hwndObjectTree == NULL) {
+            MessageBox(hDesktopWnd, T_WOBJINIT_NOTREEWND, NULL, MB_ICONERROR);
             break;
+        }
 
         //
         // ListView window.
@@ -1190,8 +1224,10 @@ UINT WinObjExMain()
             g_WinObj.hInstance,
             NULL);
 
-        if (g_hwndObjectList == NULL)
+        if (g_hwndObjectList == NULL) {
+            MessageBox(hDesktopWnd, T_WOBJINIT_NOLISTWND, NULL, MB_ICONERROR);
             break;
+        }
 
         //
         // Toolbar window.
@@ -1211,8 +1247,10 @@ UINT WinObjExMain()
             g_WinObj.hInstance,
             NULL);
 
-        if (hwndToolBar == NULL)
+        if (hwndToolBar == NULL) {
+            MessageBox(hDesktopWnd, T_WOBJINIT_NOTLBARWND, NULL, MB_ICONERROR);
             break;
+        }
 
         //
         // Spliter window.
@@ -1262,37 +1300,42 @@ UINT WinObjExMain()
             //
             // We are running as user, add menu item to request elevation.
             //
-            if (IsFullAdmin == FALSE) {
-                hMenu = GetSubMenu(GetMenu(MainWindow), 0);
+            if (bIsFullAdmin == FALSE) {
+                hMenu = GetSubMenu(GetMenu(MainWindow), IDMM_FILE);
                 InsertMenu(hMenu, 0, MF_BYPOSITION, ID_FILE_RUNASADMIN, T_RUNASADMIN);
                 InsertMenu(hMenu, 1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-                //set menu shield icon
-                RtlSecureZeroMemory(&sii, sizeof(sii));
-                sii.cbSize = sizeof(sii);
-                if (SHGetStockIconInfo(SIID_SHIELD, SHGSI_ICON | SHGFI_SMALLICON, &sii) == S_OK) {
-                    supSetMenuIcon(hMenu, ID_FILE_RUNASADMIN, (ULONG_PTR)sii.hIcon);
-                }
+
+                //
+                // Set menu shield icon.
+                //
+                hIcon = supGetStockIcon(SIID_SHIELD, SHGSI_ICON | SHGFI_SMALLICON);
+                if (hIcon)
+                    supSetMenuIcon(hMenu, ID_FILE_RUNASADMIN, (ULONG_PTR)hIcon);
+
             }
             else {
                 //
                 // We are running with admin privileges, determine if we need to 
                 // insert run as LocalSystem menu entry.
                 //
-                hToken = supGetCurrentProcessToken();
-                if (hToken) {
-                    if (NT_SUCCESS(supIsLocalSystem(hToken, &bLocalSystem))) {
+                processToken = supGetCurrentProcessToken();
+                if (processToken) {
+                    if (NT_SUCCESS(supIsLocalSystem(processToken, &bLocalSystem))) {
                         if (bLocalSystem == FALSE) {
                             //
                             // Not LocalSystem account, insert item.
                             //
-                            hMenu = GetSubMenu(GetMenu(MainWindow), 0);
+                            hMenu = GetSubMenu(GetMenu(MainWindow), IDMM_FILE);
                             InsertMenu(hMenu, 0, MF_BYPOSITION, ID_FILE_RUNASADMIN, T_RUNASSYSTEM);
                             InsertMenu(hMenu, 1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-                            RtlSecureZeroMemory(&sii, sizeof(sii));
-                            sii.cbSize = sizeof(sii);
-                            if (SHGetStockIconInfo(SIID_DESKTOPPC, SHGSI_ICON | SHGFI_SMALLICON, &sii) == S_OK) {
-                                supSetMenuIcon(hMenu, ID_FILE_RUNASADMIN, (ULONG_PTR)sii.hIcon);
-                            }
+
+                            //
+                            // Set menu LocalSystem icon.
+                            //
+                            hIcon = supGetStockIcon(SIID_DESKTOPPC, SHGSI_ICON | SHGFI_SMALLICON);
+                            if (hIcon)
+                                supSetMenuIcon(hMenu, ID_FILE_RUNASADMIN, (ULONG_PTR)hIcon);
+
                         }
                         else {
                             //
@@ -1304,7 +1347,7 @@ UINT WinObjExMain()
                             SetWindowText(MainWindow, szWindowTitle);
                         }
                     }
-                    NtClose(hToken);
+                    NtClose(processToken);
                 }
             }
         }
@@ -1353,92 +1396,94 @@ UINT WinObjExMain()
         }
 
         //set menu icons
-        hMenu = GetSubMenu(GetMenu(MainWindow), 1);
+        hMenu = GetSubMenu(GetMenu(MainWindow), IDMM_VIEW);
         if (hMenu && g_ToolBarMenuImages) {
             supSetMenuIcon(hMenu, ID_VIEW_REFRESH,
                 (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 1));
         }
-        hMenu = GetSubMenu(GetMenu(MainWindow), 2);
+        hMenu = GetSubMenu(GetMenu(MainWindow), IDMM_OBJECT);
         if (hMenu && g_ListViewImages) {
+
             supSetMenuIcon(hMenu, ID_OBJECT_PROPERTIES,
                 (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 0));
+
             supSetMenuIcon(hMenu, ID_OBJECT_GOTOLINKTARGET,
-                (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ListViewImages,
-                    ObManagerGetImageIndexByTypeName(OBTYPE_NAME_SYMBOLIC_LINK)));
+                (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance,
+                    g_ListViewImages,
+                    g_TypeSymbolicLink.ImageIndex));
         }
 
         //set object -> find object menu image
-        hMenu = GetSubMenu(GetMenu(MainWindow), 3);
+        hMenu = GetSubMenu(GetMenu(MainWindow), IDMM_FIND);
         if (hMenu && g_ToolBarMenuImages) {
             supSetMenuIcon(hMenu, ID_FIND_FINDOBJECT,
                 (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 2));
         }
 
-        //set extras -> menu images
-        hMenu = GetSubMenu(GetMenu(MainWindow), 4);
+        //
+        // Set extras -> menu images.
+        //
+        hMenu = GetSubMenu(GetMenu(MainWindow), IDMM_EXTRAS);
         if (hMenu && g_ToolBarMenuImages) {
-            // pipes & mailslots
+
+            //
+            // Pipes & mailslots images.
+            //
             supSetMenuIcon(hMenu, ID_EXTRAS_MAILSLOTS,
                 (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 5));
             supSetMenuIcon(hMenu, ID_EXTRAS_PIPES,
                 (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 6));
 
-            // process list menu image
-            RtlSecureZeroMemory(&sii, sizeof(sii));
-            sii.cbSize = sizeof(sii);
-            if (SHGetStockIconInfo(SIID_APPLICATION, SHGSI_ICON | SHGFI_SMALLICON, &sii) == S_OK) {
-                supSetMenuIcon(hMenu, ID_EXTRAS_PROCESSLIST, (ULONG_PTR)sii.hIcon);
-            }
+            //
+            // Process list menu image.
+            //
+            hIcon = supGetStockIcon(SIID_APPLICATION, SHGSI_ICON | SHGFI_SMALLICON);
+            if (hIcon)
+                supSetMenuIcon(hMenu, ID_EXTRAS_PROCESSLIST, (ULONG_PTR)hIcon);
 
-            // private namespaces menu image
-            if (SHGetStockIconInfo(SIID_STACK, SHGSI_ICON | SHGFI_SMALLICON, &sii) == S_OK) {
-                supSetMenuIcon(hMenu, ID_EXTRAS_PRIVATENAMESPACES, (ULONG_PTR)sii.hIcon);
-            }
+            //
+            // Private namespaces menu image.
+            //
+            hIcon = supGetStockIcon(SIID_STACK, SHGSI_ICON | SHGFI_SMALLICON);
+            if (hIcon)
+                supSetMenuIcon(hMenu, ID_EXTRAS_PRIVATENAMESPACES, (ULONG_PTR)hIcon);
+
         }
 
-        //set help menu image
-        hMenu = GetSubMenu(GetMenu(MainWindow), 5);
+        //
+        // Set help menu image.
+        //
+        hMenu = GetSubMenu(GetMenu(MainWindow), IDMM_HELP);
         if (hMenu) {
-            RtlSecureZeroMemory(&sii, sizeof(sii));
-            sii.cbSize = sizeof(sii);
-            if (SHGetStockIconInfo(SIID_HELP, SHGSI_ICON | SHGFI_SMALLICON, &sii) == S_OK) {
-                supSetMenuIcon(hMenu, ID_HELP_HELP, (ULONG_PTR)sii.hIcon);
-            }
+
+            hIcon = supGetStockIcon(SIID_HELP, SHGSI_ICON | SHGFI_SMALLICON);
+            if (hIcon)
+                supSetMenuIcon(hMenu, ID_HELP_HELP, (ULONG_PTR)hIcon);
+
         }
 
         hAccTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
 
         PluginManagerCreate(MainWindow);
 
-        //create ObjectList columns
-        RtlSecureZeroMemory(&col, sizeof(col));
-        col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
-        col.iSubItem = 1;
-        col.pszText = TEXT("Name");
-        col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
-        col.iOrder = 0;
-        if (g_ListViewImages) {
-            col.iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
-        }
-        else {
-            col.iImage = I_IMAGENONE;
-        }
-        col.cx = 300;
-        ListView_InsertColumn(g_hwndObjectList, 1, &col);
+        //
+        // Create ObjectList columns.
+        //
 
-        col.iImage = I_IMAGENONE;
+        supAddListViewColumn(g_hwndObjectList, 0, 0, 0,
+            g_ListViewImages ? ImageList_GetImageCount(g_ListViewImages) - 1 : I_IMAGENONE,
+            LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
+            TEXT("Name"), 300);
 
-        col.iSubItem = 2;
-        col.pszText = TEXT("Type");
-        col.iOrder = 1;
-        col.cx = 100;
-        ListView_InsertColumn(g_hwndObjectList, 2, &col);
+        supAddListViewColumn(g_hwndObjectList, 1, 1, 1,
+            I_IMAGENONE,
+            LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
+            TEXT("Type"), 100);
 
-        col.iSubItem = 3;
-        col.pszText = TEXT("Additional Information");
-        col.iOrder = 2;
-        col.cx = 170;
-        ListView_InsertColumn(g_hwndObjectList, 3, &col);
+        supAddListViewColumn(g_hwndObjectList, 2, 2, 2,
+            I_IMAGENONE,
+            LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
+            TEXT("Additional Information"), 170);
 
         ListObjectDirectoryTree(L"\\", NULL, NULL);
 
@@ -1446,27 +1491,28 @@ UINT WinObjExMain()
         SetFocus(g_hwndObjectTree);
 
         do {
-            rv = GetMessage(&msg1, NULL, 0, 0);
+            bRet = GetMessage(&msg, NULL, 0, 0);
 
-            if (rv == -1)
+            if (bRet == -1)
                 break;
 
-            if (MainWindowDlgMsgHandler(msg1, hAccTable))
+            if (MainWindowDlgMsgHandler(&msg, hAccTable))
                 continue;
 
-            if (IsDialogMessage(MainWindow, &msg1)) {
-                TranslateAccelerator(MainWindow, hAccTable, &msg1);
+            if (IsDialogMessage(MainWindow, &msg)) {
+                TranslateAccelerator(MainWindow, hAccTable, &msg);
                 continue;
             }
 
-            TranslateMessage(&msg1);
-            DispatchMessage(&msg1);
-        } while (rv != 0);
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+
+        } while (bRet != 0);
 
     } while (FALSE);
 
-    if (class_atom != 0)
-        UnregisterClass(MAKEINTATOM(class_atom), g_WinObj.hInstance);
+    if (classAtom != 0)
+        UnregisterClass(MAKEINTATOM(classAtom), g_WinObj.hInstance);
 
     if (g_TreeListAtom != 0)
         UnregisterClass(MAKEINTATOM(g_TreeListAtom), g_WinObj.hInstance);
@@ -1503,7 +1549,7 @@ void main()
 #pragma comment(linker, "/ENTRY:WinMain")
 int CALLBACK WinMain(
     _In_ HINSTANCE hInstance,
-    _In_ HINSTANCE hPrevInstance,
+    _In_opt_ HINSTANCE hPrevInstance,
     _In_ LPSTR     lpCmdLine,
     _In_ int       nCmdShow
 )

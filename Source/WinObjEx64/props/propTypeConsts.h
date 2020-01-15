@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       PROPTYPECONSTS.H
 *
-*  VERSION:     1.72
+*  VERSION:     1.83
 *
-*  DATE:        13 Feb 2019
+*  DATE:        25 Dec 2019
 *
 *  Consts header file for Type property sheet.
 *
@@ -349,7 +349,7 @@ static VALUE_DESC a_WmiGuidProp[MAX_KNOWN_WMIGUID_ATTRIBUTES] = {
     { L"TRACELOG_JOIN_GROUP", TRACELOG_JOIN_GROUP }
 };
 
-//Known TmTx Access Rights
+//Known TmTx/RegistryTransaction Access Rights
 #define MAX_KNOWN_TMTX_ATTRIBUTES 7
 static VALUE_DESC a_TmTxProp[MAX_KNOWN_TMTX_ATTRIBUTES] = {
     { L"TRANSACTION_QUERY_INFORMATION", TRANSACTION_QUERY_INFORMATION },

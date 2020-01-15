@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       PROPDLG.H
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        18 Nov 2019
+*  DATE:        05 Jan 2020
 *
 *  Common header file for properties dialog.
 *

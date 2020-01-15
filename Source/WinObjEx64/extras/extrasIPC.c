@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017 - 2019
+*  (C) COPYRIGHT AUTHORS, 2017 - 2020
 *
 *  TITLE:       EXTRASIPC.C
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        13 Nov 2019
+*  DATE:        05 Jan 2020
 *
 *  IPC supported: Pipes, Mailslots
 *
@@ -127,7 +127,7 @@ LPWSTR IpcCreateObjectPathWithName(
 *
 */
 BOOL CALLBACK IpcOpenObjectMethod(
-    _In_	PROP_OBJECT_INFO *Context,
+    _In_	PROP_OBJECT_INFO* Context,
     _Inout_ PHANDLE	phObject,
     _In_	ACCESS_MASK	DesiredAccess
 )
@@ -164,6 +164,37 @@ BOOL CALLBACK IpcOpenObjectMethod(
 }
 
 /*
+* IpcVerifyContextParameter
+*
+* Purpose:
+*
+* Sanity check of PROP_OBJECT_INFO context.
+*
+*/
+BOOLEAN IpcVerifyContextParameter(
+    _In_ PROP_OBJECT_INFO* Context,
+    _In_ HWND hwndDlg,
+    _In_ IPC_DIALOG_MODE DialogMode)
+{
+    if (Context == NULL) {
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        IpcDisplayError(hwndDlg, DialogMode);
+        return FALSE;
+    }
+    if (
+        (Context->lpObjectName == NULL) ||
+        (Context->lpCurrentObjectPath == NULL)
+        )
+    {
+        SetLastError(ERROR_OBJECT_NOT_FOUND);
+        IpcDisplayError(hwndDlg, DialogMode);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+/*
 * IpcMailslotQueryInfo
 *
 * Purpose:
@@ -172,7 +203,7 @@ BOOL CALLBACK IpcOpenObjectMethod(
 *
 */
 VOID IpcMailslotQueryInfo(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg
 )
 {
@@ -183,21 +214,11 @@ VOID IpcMailslotQueryInfo(
 
     FILE_MAILSLOT_QUERY_INFORMATION fmqi;
 
-    //validate context
-    if (Context == NULL) {
-        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
-        IpcDisplayError(hwndDlg, IpcModeMailSlots);
+    //
+    // Verify context.
+    //
+    if (!IpcVerifyContextParameter(Context, hwndDlg, IpcModeMailSlots))
         return;
-    }
-    if (
-        (Context->lpObjectName == NULL) ||
-        (Context->lpCurrentObjectPath == NULL)
-        )
-    {
-        SetLastError(ERROR_OBJECT_NOT_FOUND);
-        IpcDisplayError(hwndDlg, IpcModeMailSlots);
-        return;
-    }
 
     hMailslot = NULL;
     if (!IpcOpenObjectMethod(Context, &hMailslot, GENERIC_READ)) {
@@ -211,7 +232,7 @@ VOID IpcMailslotQueryInfo(
     RtlSecureZeroMemory(&fmqi, sizeof(fmqi));
     status = NtQueryInformationFile(hMailslot, &iost, &fmqi, sizeof(fmqi), FileMailslotQueryInformation);
     if (NT_SUCCESS(status)) {
-        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
 
         //mailslot quota
         ultostr(fmqi.MailslotQuota, szBuffer);
@@ -230,7 +251,7 @@ VOID IpcMailslotQueryInfo(
         SetDlgItemText(hwndDlg, ID_MAILSLOT_MAXMESSAGESZ, szBuffer);
 
         //read timeout
-        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
         ultohex(fmqi.ReadTimeout.LowPart, szBuffer);
         _strcat(szBuffer, L":");
         ultohex(fmqi.ReadTimeout.HighPart, _strend(szBuffer));
@@ -248,7 +269,7 @@ VOID IpcMailslotQueryInfo(
 *
 */
 VOID IpcPipeQueryInfo(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg
 )
 {
@@ -259,21 +280,11 @@ VOID IpcPipeQueryInfo(
     IO_STATUS_BLOCK             iost;
     FILE_PIPE_LOCAL_INFORMATION fpli;
 
-    //validate context
-    if (Context == NULL) {
-        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
-        IpcDisplayError(hwndDlg, IpcModeNamedPipes);
+    //
+    // Verify context.
+    //
+    if (!IpcVerifyContextParameter(Context, hwndDlg, IpcModeNamedPipes))
         return;
-    }
-    if (
-        (Context->lpObjectName == NULL) ||
-        (Context->lpCurrentObjectPath == NULL)
-        )
-    {
-        SetLastError(ERROR_OBJECT_NOT_FOUND);
-        IpcDisplayError(hwndDlg, IpcModeNamedPipes);
-        return;
-    }
 
     SetDlgItemText(hwndDlg, ID_PIPE_FULLPATH, Context->lpCurrentObjectPath);
 
@@ -315,13 +326,13 @@ VOID IpcPipeQueryInfo(
         }
         SetDlgItemText(hwndDlg, ID_PIPE_ACCESSMODE, lpType);
 
+        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+
         //CurrentInstances
-        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
         ultostr(fpli.CurrentInstances, szBuffer);
         SetDlgItemText(hwndDlg, ID_PIPE_CURINSTANCES, szBuffer);
 
         //MaximumInstances
-        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
         if (fpli.MaximumInstances == MAXDWORD) {
             _strcpy(szBuffer, TEXT("Unlimited"));
         }
@@ -331,17 +342,14 @@ VOID IpcPipeQueryInfo(
         SetDlgItemText(hwndDlg, ID_PIPE_MAXINSTANCES, szBuffer);
 
         //InboundQuota
-        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
         ultostr(fpli.InboundQuota, szBuffer);
         SetDlgItemText(hwndDlg, ID_PIPE_INBUFFER, szBuffer);
 
         //OutboundQuota
-        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
         ultostr(fpli.OutboundQuota, szBuffer);
         SetDlgItemText(hwndDlg, ID_PIPE_OUTBUFFER, szBuffer);
 
         //WriteQuotaAvailable
-        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
         ultostr(fpli.WriteQuotaAvailable, szBuffer);
         SetDlgItemText(hwndDlg, ID_PIPE_WRITEQUOTAAVAIL, szBuffer);
     }
@@ -368,16 +376,16 @@ INT_PTR CALLBACK IpcTypeDialogProc(
     _In_  LPARAM lParam
 )
 {
-    PROPSHEETPAGE    *pSheet = NULL;
-    PROP_OBJECT_INFO *Context = NULL;
+    PROPSHEETPAGE* pSheet = NULL;
+    PROP_OBJECT_INFO* Context = NULL;
     HICON             hIcon;
 
-    EXTRASCONTEXT *pDlgContext;
+    EXTRASCONTEXT* pDlgContext;
 
     switch (uMsg) {
 
     case WM_INITDIALOG:
-        pSheet = (PROPSHEETPAGE *)lParam;
+        pSheet = (PROPSHEETPAGE*)lParam;
         if (pSheet) {
             SetProp(hwndDlg, T_PROPCONTEXT, (HANDLE)pSheet->lParam);
             Context = (PROP_OBJECT_INFO*)pSheet->lParam;
@@ -448,23 +456,22 @@ INT_PTR CALLBACK IpcTypeDialogProc(
 */
 VOID IpcDlgShowProperties(
     _In_ INT iItem,
-    _In_ EXTRASCONTEXT *pDlgContext
+    _In_ EXTRASCONTEXT* pDlgContext
 )
 {
     INT                 nPages = 0;
-    PROP_OBJECT_INFO   *Context;
+    PROP_OBJECT_INFO* Context;
     HPROPSHEETPAGE      SecurityPage = NULL;
     PROPSHEETPAGE       Page;
     PROPSHEETHEADER     PropHeader;
     WCHAR               szCaption[MAX_PATH];
 
     Context = propContextCreate(NULL, OBTYPE_NAME_FILE, NULL, NULL);
-    if (Context == NULL) {
+    if (Context == NULL)
         return;
-    }
 
     Context->lpObjectName = supGetItemText(pDlgContext->ListView, iItem, 0, NULL);
-    Context->lpCurrentObjectPath = IpcCreateObjectPathWithName(Context->lpObjectName, 
+    Context->lpCurrentObjectPath = IpcCreateObjectPathWithName(Context->lpObjectName,
         (IPC_DIALOG_MODE)pDlgContext->DialogMode);
     Context->Tag = (ULONG_PTR)pDlgContext;
 
@@ -504,7 +511,7 @@ VOID IpcDlgShowProperties(
             Context,
             (POPENOBJECTMETHOD)&IpcOpenObjectMethod,
             NULL, //use default close method
-            SI_EDIT_OWNER | SI_EDIT_PERMS | 
+            SI_EDIT_OWNER | SI_EDIT_PERMS |
             SI_ADVANCED | SI_NO_ACL_PROTECT | SI_NO_TREE_APPLY |
             SI_PAGE_TITLE
         );
@@ -545,47 +552,19 @@ INT CALLBACK IpcDlgCompareFunc(
     _In_ LPARAM lParamSort //pointer to EXTRASCALLBACK
 )
 {
-    LPWSTR lpItem1, lpItem2;
-    INT    nResult = 0;
-
-    EXTRASCONTEXT *pDlgContext;
-    EXTRASCALLBACK *CallbackParam = (EXTRASCALLBACK*)lParamSort;
+    EXTRASCONTEXT* pDlgContext;
+    EXTRASCALLBACK* CallbackParam = (EXTRASCALLBACK*)lParamSort;
 
     if (CallbackParam == NULL)
         return 0;
 
     pDlgContext = &IpcDlgContext[CallbackParam->Value];
 
-    lpItem1 = supGetItemText(pDlgContext->ListView, (INT)lParam1, (INT)CallbackParam->lParam, NULL);
-    lpItem2 = supGetItemText(pDlgContext->ListView, (INT)lParam2, (INT)CallbackParam->lParam, NULL);
-
-    if ((lpItem1 == NULL) && (lpItem2 == NULL)) {
-        nResult = 0;
-        goto Done;
-    }
-
-    if ((lpItem1 == NULL) && (lpItem2 != NULL)) {
-        nResult = (pDlgContext->bInverseSort) ? 1 : -1;
-        goto Done;
-    }
-    if ((lpItem2 == NULL) && (lpItem1 != NULL)) {
-        nResult = (pDlgContext->bInverseSort) ? -1 : 1;
-        goto Done;
-    }
-
-    if (pDlgContext->bInverseSort)
-        nResult = _strcmpi(lpItem2, lpItem1);
-    else
-        nResult = _strcmpi(lpItem1, lpItem2);
-
-Done:
-    if (lpItem1) {
-        supHeapFree(lpItem1);
-    }
-    if (lpItem2) {
-        supHeapFree(lpItem2);
-    }
-    return nResult;
+    return supListViewBaseComparer(pDlgContext->ListView,
+        pDlgContext->bInverseSort,
+        lParam1,
+        lParam2,
+        (LPARAM)CallbackParam->lParam);
 }
 
 /*
@@ -604,7 +583,7 @@ VOID IpcDlgQueryInfo(
     BOOLEAN                     bRestartScan;
     ULONG                       QuerySize;
     HANDLE                      hObject = NULL;
-    FILE_DIRECTORY_INFORMATION *DirectoryInfo = NULL;
+    FILE_DIRECTORY_INFORMATION* DirectoryInfo = NULL;
     NTSTATUS                    status;
     OBJECT_ATTRIBUTES           obja;
     UNICODE_STRING              uStr;
@@ -687,7 +666,7 @@ VOID IpcDlgQueryInfo(
 */
 VOID IpcDlgHandleNotify(
     _In_ LPARAM lParam,
-    _In_ EXTRASCONTEXT *pDlgContext
+    _In_ EXTRASCONTEXT* pDlgContext
 )
 {
     LVCOLUMN col;
@@ -750,7 +729,7 @@ INT_PTR CALLBACK IpcDlgProc(
 )
 {
     INT dlgIndex;
-    EXTRASCONTEXT *pDlgContext;
+    EXTRASCONTEXT* pDlgContext;
 
     switch (uMsg) {
     case WM_NOTIFY:
@@ -819,9 +798,8 @@ VOID extrasCreateIpcDialog(
     HICON    hIcon;
     SIZE_T   sz = 0;
     LPWSTR   lpObjectsRoot = NULL, lpObjectRelativePath = NULL;
-    LVCOLUMN col;
 
-    EXTRASCONTEXT *pDlgContext;
+    EXTRASCONTEXT* pDlgContext;
 
     EXTRASCALLBACK CallbackParam;
 
@@ -837,7 +815,7 @@ VOID extrasCreateIpcDialog(
     }
 
     //
-    // Allow only one dialog.
+    // Allow only one dialog, recreate it if exist.
     //
     if (g_WinObj.AuxDialogs[dlgIndex]) {
         SendMessage(g_WinObj.AuxDialogs[dlgIndex], WM_CLOSE, 0, 0);
@@ -919,15 +897,10 @@ VOID extrasCreateIpcDialog(
 
         SetWindowTheme(pDlgContext->ListView, TEXT("Explorer"), NULL);
 
-        RtlSecureZeroMemory(&col, sizeof(col));
-        col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
-        col.iSubItem = 1;
-        col.pszText = TEXT("Name");
-        col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
-        col.iOrder = 0;
-        col.iImage = 2;
-        col.cx = 500;
-        ListView_InsertColumn(pDlgContext->ListView, 1, &col);
+        supAddListViewColumn(pDlgContext->ListView, 0, 0, 0,
+            2,
+            LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
+            TEXT("Name"), 500);
 
         IpcDlgQueryInfo(lpObjectsRoot, pDlgContext->ListView);
 

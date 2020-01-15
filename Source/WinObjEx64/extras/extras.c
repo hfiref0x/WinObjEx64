@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       EXTRAS.C
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        19 Nov 2019
+*  DATE:        21 Dec 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -66,7 +66,7 @@ VOID extrasSimpleListResize(
 */
 VOID extrasDlgHandleNotify(
     _In_ LPNMLISTVIEW nhdr,
-    _In_ EXTRASCONTEXT *Context,
+    _In_ EXTRASCONTEXT* Context,
     _In_ DlgCompareFunction CompareFunc,
     _In_opt_ CustomNotifyFunction CustomHandler,
     _In_opt_ PVOID CustomParameter
@@ -85,7 +85,7 @@ VOID extrasDlgHandleNotify(
     case LVN_COLUMNCLICK:
 
         Context->bInverseSort = !Context->bInverseSort;
-        Context->lvColumnToSort = ((NMLISTVIEW *)nhdr)->iSubItem;
+        Context->lvColumnToSort = ((NMLISTVIEW*)nhdr)->iSubItem;
         ListView_SortItemsEx(Context->ListView, CompareFunc, Context->lvColumnToSort);
 
         nImageIndex = ImageList_GetImageCount(g_ListViewImages);
@@ -162,9 +162,12 @@ VOID extrasShowDialogById(
         //
         // Feature require driver usage and not supported in 10586.
         //
-        if (g_NtBuildNumber != 10586) {
+        if (g_NtBuildNumber != NT_WIN10_THRESHOLD2) {
             if (kdConnectDriver()) {
                 extrasCreatePNDialog(ParentWindow);
+            }
+            else {
+                MessageBox(ParentWindow, T_DRIVER_REQUIRED, NULL, MB_ICONINFORMATION);
             }
         }
         break;
@@ -202,7 +205,12 @@ VOID extrasShowDialogById(
         break;
 
     case ID_EXTRAS_CALLBACKS:
-        extrasCreateCallbacksDialog(ParentWindow);
+        if (kdConnectDriver()) {
+            extrasCreateCallbacksDialog(ParentWindow);
+        }
+        else {
+            MessageBox(ParentWindow, T_DRIVER_REQUIRED, NULL, MB_ICONINFORMATION);
+        }
         break;
 
     case ID_EXTRAS_SOFTWARELICENSECACHE:

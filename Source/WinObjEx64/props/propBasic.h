@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       PROPTYPE.H
 *
-*  VERSION:     1.52
+*  VERSION:     1.83
 *
-*  DATE:        08 Jan 2018
+*  DATE:        05 Jan 2020
 *
 *  Common header file for Basic property sheet.
 *

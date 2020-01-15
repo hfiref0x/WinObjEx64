@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        24 Nov 2019
+*  DATE:        05 Jan 2020
 *
 *  Common header file for the user interface.
 *
@@ -18,6 +18,8 @@
 *******************************************************************************/
 #pragma once
 
+#define SCALE_DPI_VALUE(Value) MulDiv(Value, g_CurrentDPI, DefaultSystemDpi)
+
 #define SplitterSize                3
 #define SplitterMargin              80
 
@@ -25,6 +27,20 @@
 #define TreeListDumpObjWndPosX      12
 #define TreeListDumpObjWndPosY      20
 #define TreeListDumpObjWndScaleSub  4
+
+//
+// ListView column counts
+//
+
+#define MAIN_OBJLIST_COLUMN_COUNT 3
+#define FINDLIST_COLUMN_COUNT 2
+#define DRVLIST_COLUMN_COUNT 5
+#define PROCESSLIST_COLUMN_COUNT 4
+#define PNLIST_COLUMN_COUNT 3
+#define PSLIST_COLUMN_COUNT 6
+#define SSDTLIST_COLUMN_COUNT 4
+#define SLLIST_COLUMN_COUNT 2
+
 
 typedef	struct _OE_LIST_ITEM {
     struct _OE_LIST_ITEM *Prev;
@@ -40,8 +56,8 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 
 #define PROGRAM_MAJOR_VERSION       1
 #define PROGRAM_MINOR_VERSION       8
-#define PROGRAM_REVISION_NUMBER     2
-#define PROGRAM_BUILD_NUMBER        1911
+#define PROGRAM_REVISION_NUMBER     3
+#define PROGRAM_BUILD_NUMBER        2001
 
 #ifdef _USE_OWN_DRIVER
 #define PROGRAM_NAME            L"Windows Object Explorer 64-bit (Non-public version)"
@@ -65,7 +81,13 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 #define T_SAVETOFILE            L"Save list to File"
 #define T_DUMPDRIVER            L"Dump Driver"
 #define T_VIEW_REFRESH          L"Refresh\tF5"
+#define T_RESCAN                L"Rescan"
 #define T_EMPTY                 L" "
+
+#define T_DRIVER_REQUIRED       TEXT("Support from helper driver is required for this feature.\r\n\r\n\
+If you see this message it can be caused by:\r\n\
+1) Support driver is not loaded or cannot be opened due to insufficient security rights;\r\n\
+2) There is a internal error processing request to the heper driver.")
 
 #define T_RICHEDIT_LIB          TEXT("RICHED32.DLL")
 
@@ -85,6 +107,28 @@ typedef enum _WOBJ_DIALOGS_ID {
 } WOBJ_DIALOGS_ID;
 
 #define MAX_TEXT_CONVERSION_ULONG64 32
+
+//
+// Main menu initialization id's
+//
+
+// File
+#define IDMM_FILE   0
+
+// View
+#define IDMM_VIEW   1
+
+// Object
+#define IDMM_OBJECT 2
+
+// Find
+#define IDMM_FIND   3
+
+// Extras
+#define IDMM_EXTRAS 4
+
+// Help
+#define IDMM_HELP   5
 
 //
 // Declared in main.c
@@ -156,6 +200,29 @@ typedef struct _PROP_OBJECT_INFO {
     PROP_UNNAMED_OBJECT_INFO UnnamedObjectInfo;
 } PROP_OBJECT_INFO, *PPROP_OBJECT_INFO;
 
+#define VALIDATE_PROP_CONTEXT(Context) { if (Context == NULL) return; }
+
+//
+// If dialog already present - activate it window and return.
+//
+#define ENSURE_DIALOG_UNIQUE(Dialog) {      \
+    if (Dialog != NULL) {                   \
+        SetActiveWindow(Dialog);            \
+        return;                             \
+    }                                       \
+}
+
+// If dialog already present - activate/restore it window and return.
+#define ENSURE_DIALOG_UNIQUE_WITH_RESTORE(Dialog) {         \
+    if (Dialog != NULL) {                                   \
+        if (IsIconic(Dialog))                               \
+            ShowWindow(Dialog, SW_RESTORE);                 \
+        else                                                \
+            SetActiveWindow(Dialog);                        \
+        return;                                             \
+    }                                                       \
+}
+
 typedef struct _PROP_DIALOG_CREATE_SETTINGS {
     HWND hwndParent;
     LPWSTR lpObjectName;
@@ -173,6 +240,7 @@ typedef struct _VALUE_DESC {
 //Constants
 //Display simple "N/A" if no info available
 #define T_CannotQuery	TEXT("N/A")
+#define T_NotAssigned   T_CannotQuery
 
 //Value is not defined
 #define T_None          TEXT("None")
@@ -217,3 +285,21 @@ static LPCWSTR g_szMonths[12] = {
     L"Nov",
     L"Dec"
 };
+
+#define wobjInitSuccess         0
+#define wobjInitNoHeap          -1
+#define wobjInitNoTemp          -2
+#define wobjInitNoWinDir        -3
+#define wobjInitNoSys32Dir      -4
+
+#define T_WOBJINIT_NOCRT TEXT("Could not initialize CRT, abort")
+#define T_WOBJINIT_NOHEAP TEXT("Could not initialize WinObjEx64, could not allocate heap")
+#define T_WOBJINIT_NOTEMP TEXT("Could not initialize WinObjEx64, could not locate %temp%")
+#define T_WOBJINIT_NOWINDIR TEXT("Could not initialize WinObjEx64, could not locate Windows directory")
+#define T_WOBJINIT_NOSYS32DIR TEXT("Could not initialize WinObjEx64, could not locate System32 directory")
+#define T_WOBJINIT_NOCLASS TEXT("Could not register WinObjEx64 window class, abort")
+#define T_WOBJINIT_NOMAINWINDOW TEXT("Could not create WinObjEx64 main window, abort")
+#define T_WOBJINIT_NOICCX TEXT("Could not initialize commctrl classes, abort")
+#define T_WOBJINIT_NOLISTWND TEXT("Could not create tree window, abort")
+#define T_WOBJINIT_NOTREEWND TEXT("Could not create list window, abort")
+#define T_WOBJINIT_NOTLBARWND TEXT("Could not create toolbar window, abort")

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019
+*  (C) COPYRIGHT AUTHORS, 2019 - 2020
 *
 *  TITLE:       WINE.C
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        11 Nov 2019
+*  DATE:        01 Dec 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,6 +17,7 @@
 
 #include "global.h"
 #include "ntos/ntldr.h"
+#include "winedebug.h"
 
 /*
 * wine_get_version
@@ -28,7 +29,8 @@
 * N.B. This function bypasses current WineStaging hide exports hack.
 *
 */
-const char *wine_get_version(void)
+#ifndef _WINE_DEBUG_MODE
+const char* wine_get_version(void)
 {
     pwine_get_version pfn = NULL;
     HMODULE hmod;
@@ -36,6 +38,10 @@ const char *wine_get_version(void)
 
     hmod = GetModuleHandle(TEXT("ntdll.dll"));
     if (hmod) {
+
+        rfn.ForwarderName = NULL;
+        rfn.Function = NULL;
+        rfn.ResultType = FunctionCode;
 
         if (NT_SUCCESS(NtRawGetProcAddress(
             (LPVOID)hmod,
@@ -51,6 +57,12 @@ const char *wine_get_version(void)
     }
     return NULL;
 }
+#else
+const char* wine_get_version(void)
+{
+    return "4.9";
+}
+#endif
 
 
 /*
@@ -60,29 +72,12 @@ const char *wine_get_version(void)
 *
 * Query if there is a Wine layer enabled.
 *
-* N.B. This function bypasses current WineStaging hide exports hack.
-*
 */
 int is_wine(void)
 {
-    pwine_get_version pfn = NULL;
-    HMODULE hmod;
-    RESOLVE_INFO rfn;
+    CONST CHAR* szWine;
 
-    hmod = GetModuleHandle(TEXT("ntdll.dll"));
-    if (hmod) {
+    szWine = wine_get_version();
 
-        if (NT_SUCCESS(NtRawGetProcAddress(
-            (LPVOID)hmod,
-            "wine_get_version",
-            &rfn)))
-        {
-            if (rfn.ResultType == FunctionCode)
-                pfn = (pwine_get_version)rfn.Function;
-        }
-
-        if (pfn)
-            return 1;
-    }
-    return 0;
+    return (szWine != NULL);
 }

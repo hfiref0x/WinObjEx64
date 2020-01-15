@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019
+*  (C) COPYRIGHT AUTHORS, 2019 - 2020
 *
 *  TITLE:       EXTRASCALLBACKSPATTERNS.H
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        19 Nov 2019
+*  DATE:        15 Dec 2019
 *
 *  Header with search patterns used by Callbacks dialog routines.
 *
@@ -18,14 +18,6 @@
 *******************************************************************************/
 
 #pragma once
-
-#ifndef PAGE_SECTION
-#define PAGE_SECTION "PAGE"
-#endif
-
-#ifndef PAGE_SECTION_LEGNTH
-#define PAGE_SECTION_LEGNTH sizeof(PAGE_SECTION)
-#endif
 
 //
 // PsAltSystemCallHandlers

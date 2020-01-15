@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       EXCEPTH.C
 *
-*  VERSION:     1.80
+*  VERSION:     1.83
 *
-*  DATE:        16 July 2019
+*  DATE:        05 Jan 2020
 *
 *  Exception handler routines.
 *
@@ -19,15 +19,14 @@
 #include "global.h"
 #include <DbgHelp.h>
 
-typedef BOOL(WINAPI *pfnMiniDumpWriteDump)(
+typedef BOOL(WINAPI* pfnMiniDumpWriteDump)(
     _In_ HANDLE hProcess,
     _In_ DWORD ProcessId,
     _In_ HANDLE hFile,
     _In_ MINIDUMP_TYPE DumpType,
     _In_opt_ PMINIDUMP_EXCEPTION_INFORMATION ExceptionParam,
     _In_opt_ PMINIDUMP_USER_STREAM_INFORMATION UserStreamParam,
-    _In_opt_ PMINIDUMP_CALLBACK_INFORMATION CallbackParam
-    );
+    _In_opt_ PMINIDUMP_CALLBACK_INFORMATION CallbackParam);
 
 pfnMiniDumpWriteDump pMiniDumpWriteDump;
 
@@ -40,7 +39,7 @@ pfnMiniDumpWriteDump pMiniDumpWriteDump;
 *
 */
 BOOL exceptWriteDump(
-    _In_ EXCEPTION_POINTERS *ExceptionPointers,
+    _In_ EXCEPTION_POINTERS* ExceptionPointers,
     _In_ ULONGLONG IdFile
 )
 {
@@ -93,7 +92,7 @@ BOOL exceptWriteDump(
 *
 */
 VOID exceptShowException(
-    _In_ EXCEPTION_POINTERS *ExceptionPointers
+    _In_ EXCEPTION_POINTERS* ExceptionPointers
 )
 {
     WCHAR     szMessage[MAX_PATH * 2];
@@ -138,7 +137,7 @@ VOID exceptShowException(
 */
 INT exceptFilter(
     _In_ UINT ExceptionCode,
-    _In_ EXCEPTION_POINTERS *ExceptionPointers
+    _In_ EXCEPTION_POINTERS* ExceptionPointers
 )
 {
     if (ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {

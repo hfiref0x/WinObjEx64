@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       PROPPROCESS.C
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        18 Nov 2019
+*  DATE:        05 Jan 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,9 +17,6 @@
 #include "global.h"
 #include "propDlg.h"
 #include "extras.h"
-
-//number of columns, revise this unit code after any change to this number
-#define PROCESSLIST_COLUMN_COUNT 4
 
 /*
 * ProcessListCompareFunc
@@ -36,12 +33,12 @@ INT CALLBACK ProcessListCompareFunc(
 )
 {
     INT       nResult = 0;
-    LPWSTR    lpItem1 = NULL, lpItem2 = NULL;
+    LPWSTR    lpItem1 = NULL, lpItem2 = NULL, FirstToCompare, SecondToCompare;
     ULONG_PTR Value1, Value2;
 
     LPARAM lvColumnToSort;
 
-    EXTRASCONTEXT *pDlgContext;
+    EXTRASCONTEXT* pDlgContext;
 
     pDlgContext = (EXTRASCONTEXT*)lpContextParam;
     if (pDlgContext == NULL)
@@ -85,12 +82,19 @@ INT CALLBACK ProcessListCompareFunc(
         //
         // Name column.
         //
-        if (pDlgContext->bInverseSort)
-            nResult = _strcmpi(lpItem2, lpItem1);
+        if (pDlgContext->bInverseSort) {
+            FirstToCompare = lpItem2;
+            SecondToCompare = lpItem1;
+        }
         else
-            nResult = _strcmpi(lpItem1, lpItem2);
+        {
+            FirstToCompare = lpItem1;
+            SecondToCompare = lpItem2;
+        }
 
+        nResult = _strcmpi(FirstToCompare, SecondToCompare);
         break;
+
     case 1:
         //
         // Id column.
@@ -179,7 +183,7 @@ VOID ProcessShowProperties(
             }
         }
     }
-    __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
+    __except (WOBJ_EXCEPTION_FILTER) {
         return;
     }
 }
@@ -200,7 +204,7 @@ VOID ProcessListHandleNotify(
     INT     nImageIndex;
     LPNMHDR nhdr = (LPNMHDR)lParam;
 
-    EXTRASCONTEXT *pDlgContext;
+    EXTRASCONTEXT* pDlgContext;
 
     if (nhdr == NULL)
         return;
@@ -214,7 +218,7 @@ VOID ProcessListHandleNotify(
         pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
         if (pDlgContext) {
             pDlgContext->bInverseSort = !pDlgContext->bInverseSort;
-            pDlgContext->lvColumnToSort = ((NMLISTVIEW *)nhdr)->iSubItem;
+            pDlgContext->lvColumnToSort = ((NMLISTVIEW*)nhdr)->iSubItem;
 
             ListView_SortItemsEx(
                 pDlgContext->ListView,
@@ -260,8 +264,8 @@ VOID ProcessListHandleNotify(
 */
 BOOL ProcessQueryInfo(
     _In_ ULONG_PTR ProcessId,
-    _Out_ HICON *pProcessIcon,
-    _Out_ BOOL *pbIs32
+    _Out_ HICON* pProcessIcon,
+    _Out_ BOOL* pbIs32
 )
 {
     BOOL               bResult = FALSE, bIconFound = FALSE;
@@ -319,7 +323,7 @@ BOOL ProcessQueryInfo(
 
         NtClose(hProcess);
     }
-    __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
+    __except (WOBJ_EXCEPTION_FILTER) {
         return FALSE;
     }
     bResult = (bIconFound);
@@ -372,10 +376,7 @@ VOID ProcessListAddItem(
         // Id exists, extract icon
         // Skip idle, system
         //
-        if (phti->UniqueProcessId <= 4) {
-            iImage = 0;
-        }
-        else {
+        if (phti->UniqueProcessId > 4) {
             hIcon = NULL;
             bIsWow64 = FALSE;
             if (ProcessQueryInfo(phti->UniqueProcessId, &hIcon, &bIsWow64)) {
@@ -390,13 +391,13 @@ VOID ProcessListAddItem(
         }
     }
 
+    RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
+
     //
     // Process Name.
     //
-    RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
     lvitem.mask = LVIF_TEXT | LVIF_IMAGE;
     lvitem.iImage = iImage;
-    lvitem.iSubItem = 0;
     lvitem.pszText = szBuffer;
     lvitem.iItem = MAXINT;
     nIndex = ListView_InsertItem(hwndListView, &lvitem);
@@ -404,36 +405,27 @@ VOID ProcessListAddItem(
     //
     // ProcessId.
     //
-    RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
     u64tostr(phti->UniqueProcessId, szBuffer);
     lvitem.mask = LVIF_TEXT;
     lvitem.iSubItem = 1;
-    lvitem.pszText = szBuffer;
     lvitem.iItem = nIndex;
     ListView_SetItem(hwndListView, &lvitem);
 
     //
     // Handle Value.
     //
-    RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
     _strcpy(szBuffer, L"0x");
     u64tohex(phti->HandleValue, _strend(szBuffer));
-    lvitem.mask = LVIF_TEXT;
     lvitem.iSubItem = 2;
-    lvitem.pszText = szBuffer;
-    lvitem.iItem = nIndex;
     ListView_SetItem(hwndListView, &lvitem);
 
     //
     // Handle GrantedAccess.
     //
-    RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
     _strcpy(szBuffer, L"0x");
     ultohex(phti->GrantedAccess, _strend(szBuffer));
-    lvitem.mask = LVIF_TEXT;
     lvitem.iSubItem = 3;
-    lvitem.pszText = szBuffer;
-    lvitem.iItem = nIndex;
     ListView_SetItem(hwndListView, &lvitem);
 }
 
@@ -448,8 +440,8 @@ VOID ProcessListAddItem(
 */
 VOID ProcessListSetInfo(
     _In_ HWND hwndDlg,
-    _In_ PROP_OBJECT_INFO *Context,
-    _In_ EXTRASCONTEXT *pDlgContext
+    _In_ PROP_OBJECT_INFO* Context,
+    _In_ EXTRASCONTEXT* pDlgContext
 )
 {
     USHORT                          ObjectTypeIndex = 0;
@@ -462,9 +454,7 @@ VOID ProcessListSetInfo(
     HICON                           hIcon;
     PSYSTEM_HANDLE_INFORMATION_EX   pHandles = NULL;
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     //empty process list images
     ImageList_RemoveAll(pDlgContext->ImageList);
@@ -499,9 +489,8 @@ VOID ProcessListSetInfo(
     do {
         //
         // When object address is unknown, open object and query it address.
-        // These DesiredAccess flag is used to open currently viewed object,
-        // here listed access rights for each object properties dialog 
-        // where "Process" tab included.
+        // This DesiredAccess flag is used to open currently viewed object,
+        // access rights for each object properties dialog where "Process" tab included.
         //
         if (ObjectAddress == 0) {
             switch (Context->TypeIndex) {
@@ -643,8 +632,6 @@ VOID ProcessListCreate(
     _In_ EXTRASCONTEXT* pDlgContext
 )
 {
-    LVCOLUMN col;
-
     pDlgContext->ListView = GetDlgItem(hwndDlg, ID_PROCESSLIST);
     if (pDlgContext->ListView == NULL)
         return;
@@ -660,34 +647,33 @@ VOID ProcessListCreate(
 
     SetWindowTheme(pDlgContext->ListView, TEXT("Explorer"), NULL);
 
-    RtlSecureZeroMemory(&col, sizeof(col));
-    col.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT | LVCF_WIDTH | LVCF_ORDER | LVCF_IMAGE;
-    col.iSubItem++;
-    col.pszText = TEXT("Process");
-    col.fmt = LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT;
-    col.iImage = 2;
-    col.cx = 160;
-    ListView_InsertColumn(pDlgContext->ListView, col.iSubItem, &col);
+    //
+    // Add listview columns.
+    //
 
-    col.iImage = I_IMAGENONE;
+    supAddListViewColumn(pDlgContext->ListView, 0, 0, 0,
+        2,
+        LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
+        TEXT("Process"),
+        160);
 
-    col.iSubItem++;
-    col.pszText = TEXT("ID");
-    col.iOrder++;
-    col.cx = 60;
-    ListView_InsertColumn(pDlgContext->ListView, col.iSubItem, &col);
+    supAddListViewColumn(pDlgContext->ListView, 1, 1, 1,
+        I_IMAGENONE,
+        LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
+        TEXT("ID"),
+        60);
 
-    col.iSubItem++;
-    col.pszText = TEXT("Handle");
-    col.iOrder++;
-    col.cx = 130;
-    ListView_InsertColumn(pDlgContext->ListView, col.iSubItem, &col);
+    supAddListViewColumn(pDlgContext->ListView, 2, 2, 2,
+        I_IMAGENONE,
+        LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
+        TEXT("Handle"),
+        130);
 
-    col.iSubItem++;
-    col.pszText = TEXT("Access");
-    col.iOrder++;
-    col.cx = 80;
-    ListView_InsertColumn(pDlgContext->ListView, col.iSubItem, &col);
+    supAddListViewColumn(pDlgContext->ListView, 3, 3, 3,
+        I_IMAGENONE,
+        LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
+        TEXT("Access"),
+        80);
 
     pDlgContext->lvColumnCount = PROCESSLIST_COLUMN_COUNT;
 }
@@ -773,7 +759,7 @@ VOID ProcessCopyText(
             }
         }
     }
-    __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
+    __except (WOBJ_EXCEPTION_FILTER) {
         return;
     }
 }
@@ -802,9 +788,10 @@ INT_PTR CALLBACK ProcessListDialogProc(
     _In_  LPARAM lParam
 )
 {
-    PROPSHEETPAGE    *pSheet = NULL;
-    PROP_OBJECT_INFO *Context = NULL;
-    EXTRASCONTEXT    *pDlgContext = NULL;
+    INT_PTR          Result = 0;
+    PROPSHEETPAGE* pSheet = NULL;
+    PROP_OBJECT_INFO* Context = NULL;
+    EXTRASCONTEXT* pDlgContext = NULL;
 
     switch (uMsg) {
 
@@ -824,7 +811,7 @@ INT_PTR CALLBACK ProcessListDialogProc(
 
     case WM_NOTIFY:
         ProcessListHandleNotify(hwndDlg, lParam);
-        return 1;
+        Result = 1;
         break;
 
     case WM_DESTROY:
@@ -841,9 +828,9 @@ INT_PTR CALLBACK ProcessListDialogProc(
 
     case WM_INITDIALOG:
 
-        pSheet = (PROPSHEETPAGE *)lParam;
+        pSheet = (PROPSHEETPAGE*)lParam;
         if (pSheet) {
-            Context = (PROP_OBJECT_INFO *)pSheet->lParam;
+            Context = (PROP_OBJECT_INFO*)pSheet->lParam;
             SetProp(hwndDlg, T_PROPCONTEXT, (HANDLE)Context);
 
             pDlgContext = (EXTRASCONTEXT*)supHeapAlloc(sizeof(EXTRASCONTEXT));
@@ -862,9 +849,9 @@ INT_PTR CALLBACK ProcessListDialogProc(
                 }
             }
         }
-        return 1;
+        Result = 1;
         break;
-
     }
-    return 0;
+
+    return Result;
 }

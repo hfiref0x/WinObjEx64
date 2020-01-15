@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.28307.645
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29613.14
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WinObjEx64", "WinObjEx64\WinObjEx64.vcxproj", "{A68B0947-9415-4ACA-BC0A-8558A4F4FBE3}"
 EndProject
@@ -16,6 +16,7 @@ EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
+		DebugWithDriver|x64 = DebugWithDriver|x64
 		Release|x64 = Release|x64
 		ReleaseNotSignedWithDriver|x64 = ReleaseNotSignedWithDriver|x64
 		ReleaseSigned|x64 = ReleaseSigned|x64
@@ -24,6 +25,8 @@ Global
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{A68B0947-9415-4ACA-BC0A-8558A4F4FBE3}.Debug|x64.ActiveCfg = Debug|x64
 		{A68B0947-9415-4ACA-BC0A-8558A4F4FBE3}.Debug|x64.Build.0 = Debug|x64
+		{A68B0947-9415-4ACA-BC0A-8558A4F4FBE3}.DebugWithDriver|x64.ActiveCfg = DebugWithDriver|x64
+		{A68B0947-9415-4ACA-BC0A-8558A4F4FBE3}.DebugWithDriver|x64.Build.0 = DebugWithDriver|x64
 		{A68B0947-9415-4ACA-BC0A-8558A4F4FBE3}.Release|x64.ActiveCfg = Release|x64
 		{A68B0947-9415-4ACA-BC0A-8558A4F4FBE3}.Release|x64.Build.0 = Release|x64
 		{A68B0947-9415-4ACA-BC0A-8558A4F4FBE3}.ReleaseNotSignedWithDriver|x64.ActiveCfg = ReleaseNotSignedWithDriver|x64
@@ -34,6 +37,8 @@ Global
 		{A68B0947-9415-4ACA-BC0A-8558A4F4FBE3}.ReleaseSignedWithDriver|x64.Build.0 = ReleaseSignedWithDriver|x64
 		{91A5250B-99D2-48F9-B649-82D66C9A6396}.Debug|x64.ActiveCfg = Debug|x64
 		{91A5250B-99D2-48F9-B649-82D66C9A6396}.Debug|x64.Build.0 = Debug|x64
+		{91A5250B-99D2-48F9-B649-82D66C9A6396}.DebugWithDriver|x64.ActiveCfg = DebugWithDriver|x64
+		{91A5250B-99D2-48F9-B649-82D66C9A6396}.DebugWithDriver|x64.Build.0 = DebugWithDriver|x64
 		{91A5250B-99D2-48F9-B649-82D66C9A6396}.Release|x64.ActiveCfg = Release|x64
 		{91A5250B-99D2-48F9-B649-82D66C9A6396}.Release|x64.Build.0 = Release|x64
 		{91A5250B-99D2-48F9-B649-82D66C9A6396}.ReleaseNotSignedWithDriver|x64.ActiveCfg = Release|x64
@@ -44,6 +49,8 @@ Global
 		{91A5250B-99D2-48F9-B649-82D66C9A6396}.ReleaseSignedWithDriver|x64.Build.0 = Release|x64
 		{7C10DDD2-E88A-4133-B140-80679BE8AFDD}.Debug|x64.ActiveCfg = Debug|x64
 		{7C10DDD2-E88A-4133-B140-80679BE8AFDD}.Debug|x64.Build.0 = Debug|x64
+		{7C10DDD2-E88A-4133-B140-80679BE8AFDD}.DebugWithDriver|x64.ActiveCfg = DebugWithDriver|x64
+		{7C10DDD2-E88A-4133-B140-80679BE8AFDD}.DebugWithDriver|x64.Build.0 = DebugWithDriver|x64
 		{7C10DDD2-E88A-4133-B140-80679BE8AFDD}.Release|x64.ActiveCfg = Release|x64
 		{7C10DDD2-E88A-4133-B140-80679BE8AFDD}.Release|x64.Build.0 = Release|x64
 		{7C10DDD2-E88A-4133-B140-80679BE8AFDD}.ReleaseNotSignedWithDriver|x64.ActiveCfg = Release|x64
@@ -54,6 +61,8 @@ Global
 		{7C10DDD2-E88A-4133-B140-80679BE8AFDD}.ReleaseSignedWithDriver|x64.Build.0 = Release|x64
 		{72BF2A8F-E7AE-467F-B00F-1C51F1C3D2C8}.Debug|x64.ActiveCfg = Debug|x64
 		{72BF2A8F-E7AE-467F-B00F-1C51F1C3D2C8}.Debug|x64.Build.0 = Debug|x64
+		{72BF2A8F-E7AE-467F-B00F-1C51F1C3D2C8}.DebugWithDriver|x64.ActiveCfg = DebugWithDriver|x64
+		{72BF2A8F-E7AE-467F-B00F-1C51F1C3D2C8}.DebugWithDriver|x64.Build.0 = DebugWithDriver|x64
 		{72BF2A8F-E7AE-467F-B00F-1C51F1C3D2C8}.Release|x64.ActiveCfg = Release|x64
 		{72BF2A8F-E7AE-467F-B00F-1C51F1C3D2C8}.Release|x64.Build.0 = Release|x64
 		{72BF2A8F-E7AE-467F-B00F-1C51F1C3D2C8}.ReleaseNotSignedWithDriver|x64.ActiveCfg = Release|x64

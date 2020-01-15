@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019
+*  (C) COPYRIGHT AUTHORS, 2019 - 2020
 *
 *  TITLE:       KLDBG_PATTERNS.H
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        19 Nov 2019
+*  DATE:        14 Dec 2019
 *
 *  Header with search patterns used by KLDBG.
 *
@@ -19,9 +19,31 @@
 
 #pragma once
 
+// lea rax, PspHostSiloGlobals
+#define IL_PspHostSiloGlobals                   7
+
+// Number of bytes to scan for table lookup var 1
+#define DA_ScanBytesPNSVariant1                 64
+
+// Number of bytes to scan for table lookup var 2
+#define DA_ScanBytesPNSVariant2                 128
+
+//  movzx   ecx, byte ptr cs:ObHeaderCookie
+#define IL_ObHeaderCookie                       7
+
+// Number of bytes to scan
+#define DA_ScanBytesObHeaderCookie              256
+
 //
 // Win32kApiSetTable signatures
 //
+
+// MOV pattern
+#define IL_Win32kApiSetMov                      3
+
+// lea reg, Win32kApiSetTable
+#define IL_Win32kApiSetTable                    7
+
 // 18995
 BYTE Win32kApiSetTableMovPattern[] = {
     0x49, 0x8B, 0xFE
@@ -29,6 +51,13 @@ BYTE Win32kApiSetTableMovPattern[] = {
 
 BYTE Win32kApiSetTableLeaPattern[] = {
     0x4C, 0x8D, 0x2D
+};
+
+//
+// ObHeaderCookie
+//
+BYTE ObHeaderCookiePattern[] = {
+    0x0F, 0xB6, 0x0D
 };
 
 //
@@ -87,3 +116,9 @@ BYTE LeaPattern_KeServiceDescriptorTable[] = {
 BYTE LeaPattern_KeServiceDescriptorTableShadow[] = {
     0x4c, 0x8d, 0x1d
 };
+
+// lea
+#define IL_KeServiceDescriptorTableShadow               7
+
+// Number of bytes to scan
+#define DA_ScanBytesKeServiceDescriptorTableShadow      128

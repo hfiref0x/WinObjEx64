@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019
+*  (C) COPYRIGHT AUTHORS, 2019 - 2020
 *
 *  TITLE:       EXTAPI.H
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        02 Nov 2019
+*  DATE:        05 Jan 2020
 *
 *  Windows SDK compatibility header.
 *
@@ -41,6 +41,10 @@ typedef enum _EXT_SID_NAME_USE {
 
 #ifndef SERVICE_USERSERVICE_INSTANCE
 #define SERVICE_USERSERVICE_INSTANCE                0x00000080
+#endif
+
+#ifndef SERVICE_PKG_SERVICE
+#define SERVICE_PKG_SERVICE                         0x00000200
 #endif
 
 #ifndef PF_RDTSCP_INSTRUCTION_AVAILABLE

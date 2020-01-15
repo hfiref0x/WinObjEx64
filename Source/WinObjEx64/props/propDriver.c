@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       PROPDRIVER.C
 *
-*  VERSION:     1.74
+*  VERSION:     1.83
 *
-*  DATE:        03 May 2019
+*  DATE:        05 Jan 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -141,17 +141,23 @@ VOID DriverSetInfo(
                     lpType = TEXT("Share Process (Interactive)");
                     SetDlgItemText(hwndDlg, ID_SERVICE_NAME, psci->lpServiceStartName);
                     break;
+                case SERVICE_PKG_SERVICE:
+                    lpType = TEXT("Package");
+                    break;
                 }
                 SetDlgItemText(hwndDlg, ID_SERVICE_TYPE, lpType);
 
                 //Start Type
                 lpType = T_UnknownType;
                 switch (psci->dwStartType) {
-                case SERVICE_AUTO_START:
-                    lpType = TEXT("Auto");
-                    break;
                 case SERVICE_BOOT_START:
                     lpType = TEXT("Boot");
+                    break;
+                case SERVICE_SYSTEM_START:
+                    lpType = TEXT("System");
+                    break;
+                case SERVICE_AUTO_START:
+                    lpType = TEXT("Auto");
                     break;
                 case SERVICE_DEMAND_START:
                     lpType = TEXT("On Demand");
@@ -159,18 +165,12 @@ VOID DriverSetInfo(
                 case SERVICE_DISABLED:
                     lpType = TEXT("Disabled");
                     break;
-                case SERVICE_SYSTEM_START:
-                    lpType = TEXT("System");
-                    break;
                 }
                 SetDlgItemText(hwndDlg, ID_SERVICE_START, lpType);
 
                 //Error Control
                 lpType = T_Unknown;
                 switch (psci->dwErrorControl) {
-                case SERVICE_ERROR_CRITICAL:
-                    lpType = TEXT("Critical");
-                    break;
                 case SERVICE_ERROR_IGNORE:
                     lpType = TEXT("Ignore");
                     break;
@@ -179,6 +179,9 @@ VOID DriverSetInfo(
                     break;
                 case SERVICE_ERROR_SEVERE:
                     lpType = TEXT("Severe");
+                    break;
+                case SERVICE_ERROR_CRITICAL:
+                    lpType = TEXT("Critical");
                     break;
                 }
                 SetDlgItemText(hwndDlg, ID_SERVICE_ERROR, lpType);
@@ -191,7 +194,7 @@ VOID DriverSetInfo(
                 }
                 else {
                     //not assigned tag
-                    SetDlgItemText(hwndDlg, ID_SERVICE_TAG, L"");
+                    SetDlgItemText(hwndDlg, ID_SERVICE_TAG, T_NotAssigned);
                 }
 
                 //State
@@ -231,7 +234,7 @@ VOID DriverSetInfo(
 
                 //Service Description
                 bRet = FALSE;
-                SetDlgItemText(hwndDlg, ID_SERVICE_DESCRIPTION, L"");
+                SetDlgItemText(hwndDlg, ID_SERVICE_DESCRIPTION, T_EmptyString);
                 bytesNeeded = 0x1000;
                 psd = (LPSERVICE_DESCRIPTION)supHeapAlloc(bytesNeeded);
                 if (psd) {
@@ -417,7 +420,7 @@ VOID DriverSetInfo(
         }
 
     }
-    __except (exceptFilter(GetExceptionCode(), GetExceptionInformation())) {
+    __except (WOBJ_EXCEPTION_FILTER) {
         EnumChildWindows(hwndDlg, DriverShowChildWindows, SW_HIDE);
         ShowWindow(GetDlgItem(hwndDlg, IDC_QUERYFAIL), SW_SHOW);
         return;

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019
+*  (C) COPYRIGHT AUTHORS, 2019 - 2020
 *
 *  TITLE:       QUERY.C
 *
-*  VERSION:     1.02
+*  VERSION:     1.03
 *
-*  DATE:        08 Oct 2019
+*  DATE:        13 Oct 2019
 *
 *  Query NDIS specific data.
 *
@@ -254,33 +254,33 @@ PVOID DumpProtocolBlockVersionAware(
     if (Version) *Version = 0;
 
     switch (g_ctx.ParamBlock.osver.dwBuildNumber) {
-    case 7600:
-    case 7601:
+    case NT_WIN7_RTM:
+    case NT_WIN7_SP1:
         ObjectSize = sizeof(NDIS_PROTOCOL_BLOCK_7601);
         ObjectVersion = 1;
         break;
 
-    case 9200:
+    case NT_WIN8_RTM:
         ObjectSize = sizeof(NDIS_PROTOCOL_BLOCK_9200);
         ObjectVersion = 2;
         break;
 
-    case 9600:
-    case 10240:
-    case 10586:
-    case 14393:
-    case 15063:
-    case 16299:
-    case 17134:
+    case NT_WIN8_BLUE:
+    case NT_WIN10_THRESHOLD1:
+    case NT_WIN10_THRESHOLD2:
+    case NT_WIN10_REDSTONE1:
+    case NT_WIN10_REDSTONE2:
+    case NT_WIN10_REDSTONE3:
+    case NT_WIN10_REDSTONE4:
         ObjectSize = sizeof(NDIS_PROTOCOL_BLOCK_9600_17134);
         ObjectVersion = 3;
         break;
-    case 17763:
+    case NT_WIN10_REDSTONE5:
         ObjectSize = sizeof(NDIS_PROTOCOL_BLOCK_17763);
         ObjectVersion = 4;
         break;
-    case 18362:
-    case 18363:
+    case NT_WIN10_19H1:
+    case NT_WIN10_19H2:
     default:
         ObjectSize = sizeof(NDIS_PROTOCOL_BLOCK_18362_18363);
         ObjectVersion = 5;
@@ -318,31 +318,31 @@ PVOID DumpOpenBlockVersionAware(
     if (Version) *Version = 0;
 
     switch (g_ctx.ParamBlock.osver.dwBuildNumber) {
-    case 7600:
-    case 7601:
+    case NT_WIN7_RTM:
+    case NT_WIN7_SP1:
         ObjectSize = sizeof(NDIS_OPEN_BLOCK_7601);
         ObjectVersion = 1;
         break;
-    case 9200:
+    case NT_WIN8_RTM:
         ObjectSize = sizeof(NDIS_OPEN_BLOCK_9200);
         ObjectVersion = 2;
         break;
-    case 9600:
-    case 10240:
-    case 10586:
+    case NT_WIN8_BLUE:
+    case NT_WIN10_THRESHOLD1:
+    case NT_WIN10_THRESHOLD2:
         ObjectSize = sizeof(NDIS_OPEN_BLOCK_9600_10586);
         ObjectVersion = 3;
         break;
-    case 14393:
-    case 15063:
-    case 16299:
-    case 17134:
+    case NT_WIN10_REDSTONE1:
+    case NT_WIN10_REDSTONE2:
+    case NT_WIN10_REDSTONE3:
+    case NT_WIN10_REDSTONE4:
         ObjectSize = sizeof(NDIS_OPEN_BLOCK_14393_17134);
         ObjectVersion = 4;
         break;
-    case 17763:
-    case 18362:
-    case 18363:
+    case NT_WIN10_REDSTONE5:
+    case NT_WIN10_19H1:
+    case NT_WIN10_19H2:
     default:
         ObjectSize = sizeof(NDIS_OPEN_BLOCK_17763_18363);
         ObjectVersion = 5;
@@ -439,27 +439,27 @@ ULONG GetNextProtocolOffset(
 
     switch (WindowsVersion) {
 
-    case 7600:
-    case 7601:
+    case NT_WIN7_RTM:
+    case NT_WIN7_SP1:
         Offset = FIELD_OFFSET(NDIS_PROTOCOL_BLOCK_7601, NextProtocol);
         break;
-    case 9200:
+    case NT_WIN8_RTM:
         Offset = FIELD_OFFSET(NDIS_PROTOCOL_BLOCK_9200, NextProtocol);
         break;
-    case 9600:
-    case 10240:
-    case 10586:
-    case 14393:
-    case 15063:
-    case 16299:
-    case 17134:
+    case NT_WIN8_BLUE:
+    case NT_WIN10_THRESHOLD1:
+    case NT_WIN10_THRESHOLD2:
+    case NT_WIN10_REDSTONE1:
+    case NT_WIN10_REDSTONE2:
+    case NT_WIN10_REDSTONE3:
+    case NT_WIN10_REDSTONE4:
         Offset = FIELD_OFFSET(NDIS_PROTOCOL_BLOCK_9600_17134, NextProtocol);
         break;
-    case 17763:
+    case NT_WIN10_REDSTONE5:
         Offset = FIELD_OFFSET(NDIS_PROTOCOL_BLOCK_17763, NextProtocol);
         break;
-    case 18362:
-    case 18363:
+    case NT_WIN10_19H1:
+    case NT_WIN10_19H2:
     default:
         Offset = FIELD_OFFSET(NDIS_PROTOCOL_BLOCK_18362_18363, NextProtocol);
         break;

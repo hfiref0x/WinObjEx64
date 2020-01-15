@@ -26,7 +26,7 @@ signed long long strtoi64_a(char *s)
 	while (*s != 0) {
 		c = *s;
 		if (_isdigit_a(c))
-			a = (a*10) + (c-'0');
+			a = (a*10) + ((signed long long)c-'0');
 		else
 			break;
 		s++;
@@ -60,7 +60,7 @@ signed long long strtoi64_w(wchar_t *s)
 	while (*s != 0) {
 		c = *s;
 		if (_isdigit_w(c))
-			a = (a*10)+(c-L'0');
+			a = (a*10)+((signed long long)c-L'0');
 		else
 			break;
 		s++;

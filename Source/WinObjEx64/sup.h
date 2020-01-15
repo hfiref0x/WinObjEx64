@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        11 Nov 2019
+*  DATE:        05 Jan 2020
 *
 *  Common header file for the program support routines.
 *
@@ -32,24 +32,24 @@
 typedef struct _SAPIDB {
     LIST_ENTRY ListHead;
     HANDLE     sapiHeap;
-} SAPIDB, *PSAPIDB;
+} SAPIDB, * PSAPIDB;
 
 typedef struct _SCMDB {
     ULONG NumberOfEntries;
     PVOID Entries;
-} SCMDB, *PSCMDB;
+} SCMDB, * PSCMDB;
 
 typedef struct _ENUMICONINFO {
     HICON hIcon;
     INT cx, cy;
-} ENUMICONINFO, *PENUMICONINFO;
+} ENUMICONINFO, * PENUMICONINFO;
 
 typedef	struct _PHL_ENTRY {
     LIST_ENTRY ListEntry;
     HANDLE ProcessHandle;
     HANDLE UniqueProcessId;
     PVOID DataPtr;
-} PHL_ENTRY, *PPHL_ENTRY;
+} PHL_ENTRY, * PPHL_ENTRY;
 
 typedef struct _OBEX_PROCESS_LOOKUP_ENTRY {
     HANDLE hProcess;
@@ -57,16 +57,16 @@ typedef struct _OBEX_PROCESS_LOOKUP_ENTRY {
         PUCHAR EntryPtr;
         PSYSTEM_PROCESSES_INFORMATION ProcessInformation;
     };
-} OBEX_PROCESS_LOOKUP_ENTRY, *POBEX_PROCESS_LOOKUP_ENTRY;
+} OBEX_PROCESS_LOOKUP_ENTRY, * POBEX_PROCESS_LOOKUP_ENTRY;
 
 typedef struct _OBEX_THREAD_LOOKUP_ENTRY {
     HANDLE hThread;
     PVOID EntryPtr;
-} OBEX_THREAD_LOOKUP_ENTRY, *POBEX_THREAD_LOOKUP_ENTRY;
+} OBEX_THREAD_LOOKUP_ENTRY, * POBEX_THREAD_LOOKUP_ENTRY;
 
 // return true to stop enumeration
-typedef BOOL(CALLBACK *PENUMERATE_SL_CACHE_VALUE_DESCRIPTORS_CALLBACK)(
-    _In_ SL_KMEM_CACHE_VALUE_DESCRIPTOR *CacheDescriptor,
+typedef BOOL(CALLBACK* PENUMERATE_SL_CACHE_VALUE_DESCRIPTORS_CALLBACK)(
+    _In_ SL_KMEM_CACHE_VALUE_DESCRIPTOR* CacheDescriptor,
     _In_opt_ PVOID Context
     );
 
@@ -91,12 +91,12 @@ typedef struct _PROCESS_MITIGATION_POLICIES_ALL {
     PROCESS_MITIGATION_PAYLOAD_RESTRICTION_POLICY_W10 PayloadRestrictionPolicy;
     PROCESS_MITIGATION_CHILD_PROCESS_POLICY_W10 ChildProcessPolicy;
     PROCESS_MITIGATION_SIDE_CHANNEL_ISOLATION_POLICY_W10 SideChannelIsolationPolicy;
-} PROCESS_MITIGATION_POLICIES_ALL, *PPROCESS_MITIGATION_POLICIES;
+} PROCESS_MITIGATION_POLICIES_ALL, * PPROCESS_MITIGATION_POLICIES;
 
 typedef struct _PROCESS_MITIGATION_POLICY_RAW_DATA {
     PROCESS_MITIGATION_POLICY Policy;
     ULONG Value;
-} PROCESS_MITIGATION_POLICY_RAW_DATA, *PPROCESS_MITIGATION_POLICY_RAW_DATA;
+} PROCESS_MITIGATION_POLICY_RAW_DATA, * PPROCESS_MITIGATION_POLICY_RAW_DATA;
 
 #define GET_BIT(Integer, Bit) (((Integer) >> (Bit)) & 0x1)
 #define SET_BIT(Integer, Bit) ((Integer) |= 1 << (Bit))
@@ -110,18 +110,18 @@ typedef struct _PROCESS_MITIGATION_POLICY_RAW_DATA {
 typedef struct _ENUMCHILDWNDDATA {
     RECT Rect;
     INT nCmdShow;
-} ENUMCHILDWNDDATA, *PENUMCHILDWNDDATA;
+} ENUMCHILDWNDDATA, * PENUMCHILDWNDDATA;
 
 typedef struct _LANGANDCODEPAGE {
     WORD wLanguage;
     WORD wCodePage;
-} LANGANDCODEPAGE, *LPTRANSLATE;
+} LANGANDCODEPAGE, * LPTRANSLATE;
 
 typedef struct _SAPIDBENTRY {
     LIST_ENTRY ListEntry;
     LPWSTR lpDeviceName;
     LPWSTR lpDeviceDesc;
-} SAPIDBENTRY, *PSAPIDBENTRY;
+} SAPIDBENTRY, * PSAPIDBENTRY;
 
 extern SAPIDB g_sapiDB;
 extern SCMDB g_scmDB;
@@ -129,8 +129,17 @@ extern POBJECT_TYPES_INFORMATION g_pObjectTypesInfo;
 
 #define PathFileExists(lpszPath) (GetFileAttributes(lpszPath) != (DWORD)-1)
 
-BOOL supInitNtdllCRT(
-    _In_ BOOL IsWine);
+HTREEITEM supTreeListAddItem(
+    _In_ HWND TreeList,
+    _In_opt_ HTREEITEM hParent,
+    _In_ UINT mask,
+    _In_ UINT state,
+    _In_ UINT stateMask,
+    _In_opt_ LPWSTR pszText,
+    _In_opt_ PVOID subitems);
+
+BOOL supInitMSVCRT(
+    VOID);
 
 #ifndef _DEBUG
 FORCEINLINE PVOID supHeapAlloc(
@@ -159,21 +168,15 @@ BOOL supVirtualFree(
 
 BOOL supInitTreeListForDump(
     _In_  HWND  hwndParent,
-    _Out_ HWND *pTreeListHwnd);
+    _Out_ HWND* pTreeListHwnd);
 
 VOID supShowHelp(
     _In_ HWND ParentWindow);
 
 BOOL supQueryObjectFromHandle(
     _In_ HANDLE Object,
-    _Out_ ULONG_PTR *Address,
-    _Out_opt_ USHORT *TypeIndex);
-
-BOOL supQueryObjectFromHandleDump(
-    _In_ HANDLE Object,
-    _In_ PSYSTEM_HANDLE_INFORMATION_EX HandleDump,
-    _Out_ ULONG_PTR *Address,
-    _Out_opt_ USHORT *TypeIndex);
+    _Out_ ULONG_PTR* Address,
+    _Out_opt_ USHORT* TypeIndex);
 
 HICON supGetMainIcon(
     _In_ LPWSTR lpFileName,
@@ -181,9 +184,9 @@ HICON supGetMainIcon(
     _In_ INT cy);
 
 void supCopyMemory(
-    _Inout_ void *dest,
+    _Inout_ void* dest,
     _In_ size_t ccdest,
-    _In_ const void *src,
+    _In_ const void* src,
     _In_ size_t ccsrc);
 
 BOOL supUserIsFullAdmin(
@@ -223,7 +226,7 @@ VOID supSetGotoLinkTargetToolButtonState(
     _In_ BOOL bForce,
     _In_ BOOL bForceEnable);
 
-BOOL supIsSymlink(
+BOOL supIsSymbolicLinkObject(
     _In_ HWND hwndList,
     _In_ INT iItem);
 
@@ -261,17 +264,17 @@ LPWSTR supGetItemText2(
     _In_ HWND ListView,
     _In_ INT nItem,
     _In_ INT nSubItem,
-    _In_ WCHAR *pszText,
+    _In_ WCHAR* pszText,
     _In_ UINT cchText);
 
 BOOL supQueryLinkTarget(
-    _In_opt_ HANDLE hRootDirectory,
+    _In_opt_ HANDLE RootDirectoryHandle,
     _In_ PUNICODE_STRING ObjectName,
     _Inout_	LPWSTR Buffer,
     _In_ DWORD cbBuffer);
 
 BOOL supQuerySectionFileInfo(
-    _In_opt_ HANDLE hRootDirectory,
+    _In_opt_ HANDLE RootDirectoryHandle,
     _In_ PUNICODE_STRING ObjectName,
     _Inout_	LPWSTR Buffer,
     _In_ DWORD ccBuffer);
@@ -342,7 +345,9 @@ PVOID supGetSystemInfoEx(
     _In_ PMEMFREEROUTINE MemFreeRoutine);
 
 HANDLE supOpenDirectory(
-    _In_ LPWSTR lpDirectory);
+    _In_opt_ HANDLE RootDirectoryHandle,
+    _In_ LPWSTR DirectoryName,
+    _In_ ACCESS_MASK DesiredAccess);
 
 HANDLE supOpenDirectoryForObject(
     _In_ LPWSTR lpObjectName,
@@ -351,14 +356,14 @@ HANDLE supOpenDirectoryForObject(
 BOOL supDumpSyscallTableConverted(
     _In_ ULONG_PTR ServiceTableAddress,
     _In_ ULONG ServiceLimit,
-    _Out_ PUTable *Table);
+    _Out_ PUTable* Table);
 
 BOOL supCreateSCMSnapshot(
     _In_ ULONG ServiceType,
-    _Out_opt_ SCMDB *Snapshot);
+    _Out_opt_ SCMDB* Snapshot);
 
 VOID supFreeSCMSnapshot(
-    _In_opt_ SCMDB *Snapshot);
+    _In_opt_ SCMDB* Snapshot);
 
 BOOL sapiCreateSetupDBSnapshot(
     VOID);
@@ -373,6 +378,10 @@ BOOL supSaveDialogExecute(
     _In_ HWND OwnerWindow,
     _Inout_ LPWSTR SaveFileName,
     _In_ LPWSTR lpDialogFilter);
+
+HICON supGetStockIcon(
+    _In_ SHSTOCKICONID siid,
+    _In_ UINT uFlags);
 
 ULONG_PTR supWriteBufferToFile(
     _In_ PWSTR lpFileName,
@@ -395,16 +404,21 @@ BOOL supGetWin32FileName(
 BOOLEAN supIsWine(
     VOID);
 
-BOOL supQuerySecureBootState(
-    _In_ PBOOLEAN pbSecureBoot);
+BOOLEAN supQuerySecureBootState(
+    _Out_ PBOOLEAN pbSecureBoot);
+
+BOOLEAN supQueryHVCIState(
+    _Out_ PBOOLEAN pbHVCIEnabled,
+    _Out_ PBOOLEAN pbHVCIStrictMode,
+    _Out_ PBOOLEAN pbHVCIIUMEnabled);
 
 HWINSTA supOpenWindowStationFromContext(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ BOOL fInherit,
     _In_ ACCESS_MASK dwDesiredAccess);
 
 HWINSTA supOpenWindowStationFromContextEx(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ BOOL fInherit,
     _In_ ACCESS_MASK dwDesiredAccess);
 
@@ -470,13 +484,13 @@ INT supGetMaxCompareTwoFixedStrings(
     _In_ BOOL Inverse);
 
 HANDLE supOpenObjectFromContext(
-    _In_ PROP_OBJECT_INFO *Context,
-    _In_ OBJECT_ATTRIBUTES *ObjectAttributes,
+    _In_ PROP_OBJECT_INFO* Context,
+    _In_ OBJECT_ATTRIBUTES* ObjectAttributes,
     _In_ ACCESS_MASK DesiredAccess,
-    _Out_ NTSTATUS *Status);
+    _Out_ NTSTATUS* Status);
 
 BOOL supCloseObjectFromContext(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HANDLE hObject);
 
 VOID supShowLastError(
@@ -485,10 +499,10 @@ VOID supShowLastError(
     _In_ DWORD LastError);
 
 PSID supQueryTokenUserSid(
-    _In_ HANDLE hProcessToken);
+    _In_ HANDLE ProcessToken);
 
 PSID supQueryProcessSid(
-    _In_ HANDLE hProcess);
+    _In_ HANDLE ProcessHandle);
 
 VOID supCopyTreeListSubItemValue(
     _In_ HWND TreeList,
@@ -543,13 +557,13 @@ NTSTATUS supOpenThread(
 
 BOOL supPrintTimeConverted(
     _In_ PLARGE_INTEGER Time,
-    _In_ WCHAR *lpszBuffer,
+    _In_ WCHAR * lpszBuffer,
     _In_ SIZE_T cchBuffer);
 
 BOOL supGetListViewItemParam(
     _In_ HWND hwndListView,
     _In_ INT itemIndex,
-    _Out_ PVOID *outParam);
+    _Out_ PVOID * outParam);
 
 BOOL WINAPI supCallbackShowChildWindow(
     _In_ HWND hwnd,
@@ -560,12 +574,12 @@ LPWSTR supIntegrityToString(
 
 BOOL supLookupSidUserAndDomain(
     _In_ PSID Sid,
-    _Out_ LPWSTR *lpSidUserAndDomain);
+    _Out_ LPWSTR * lpSidUserAndDomain);
 
 BOOL supQueryProcessEntryById(
     _In_ HANDLE UniqueProcessId,
     _In_ PVOID ProcessList,
-    _Out_ PSYSTEM_PROCESSES_INFORMATION *Entry);
+    _Out_ PSYSTEM_PROCESSES_INFORMATION * Entry);
 
 BOOL supHandlesQueryObjectAddress(
     _In_ PSYSTEM_HANDLE_INFORMATION_EX SortedHandleList,
@@ -604,9 +618,6 @@ BOOLEAN supSLCacheEnumerate(
     _In_opt_ PENUMERATE_SL_CACHE_VALUE_DESCRIPTORS_CALLBACK Callback,
     _In_opt_ PVOID Context);
 
-HFONT supCreateFontIndirect(
-    _In_ LPWSTR FaceName);
-
 HRESULT WINAPI supShellExecInExplorerProcess(
     _In_ PCWSTR pszFile);
 
@@ -625,16 +636,44 @@ UINT supGetDPIValue(
 
 BOOLEAN supLoadIconForObjectType(
     _In_ HWND hwndDlg,
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO * Context,
     _In_ HIMAGELIST ImageList,
     _In_ BOOLEAN IsShadow);
 
 VOID supDestroyIconForObjectType(
-    _In_ PROP_OBJECT_INFO *Context);
+    _In_ PROP_OBJECT_INFO * Context);
 
 NTSTATUS supOpenTokenByParam(
-    _In_ CLIENT_ID *ClientId,
-    _In_ OBJECT_ATTRIBUTES *ObjectAttributes,
+    _In_ CLIENT_ID * ClientId,
+    _In_ OBJECT_ATTRIBUTES * ObjectAttributes,
     _In_ ACCESS_MASK TokenDesiredAccess,
     _In_ BOOL IsThreadToken,
     _Out_ PHANDLE TokenHandle);
+
+BOOL supRegDeleteKeyRecursive(
+    _In_ HKEY hKeyRoot,
+    _In_ LPWSTR lpSubKey);
+
+INT supAddListViewColumn(
+    _In_ HWND ListViewHwnd,
+    _In_ INT ColumnIndex,
+    _In_ INT SubItemIndex,
+    _In_ INT OrderIndex,
+    _In_ INT ImageIndex,
+    _In_ INT Format,
+    _In_ LPWSTR Text,
+    _In_ INT Width);
+
+INT supListViewBaseComparer(
+    _In_ HWND ListViewHandle,
+    _In_ BOOL InverseSort,
+    _In_ LPARAM FirstItem,
+    _In_ LPARAM SecondItem,
+    _In_ LPARAM ColumnToSort);
+
+ULONG supHashString(
+    _In_ PCWSTR String,
+    _In_ ULONG Length);
+
+ULONG supHashUnicodeString(
+    _In_ CONST UNICODE_STRING* String);

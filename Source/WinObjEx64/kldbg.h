@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        19 Nov 2019
+*  DATE:        13 Jan 2019
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -28,9 +28,22 @@
 #define KLDBGDRVSYS             L"\\drivers\\kldbgdrv.sys"
 #endif
 
+#define NT_REG_PREP             L"\\Registry\\Machine"
+#define DRIVER_REGKEY           L"%wS\\System\\CurrentControlSet\\Services\\%wS"
+
 #define OBJECT_SHIFT 8
 
 #define KM_OBJECTS_ROOT_DIRECTORY  L"\\"
+
+#define MM_SYSTEM_RANGE_START_7 0xFFFF080000000000
+#define MM_SYSTEM_RANGE_START_8 0xFFFF800000000000
+
+#define TEXT_SECTION ".text"
+#define TEXT_SECTION_LEGNTH sizeof(TEXT_SECTION)
+
+#define PAGE_SECTION "PAGE"
+#define PAGE_SECTION_LEGNTH sizeof(PAGE_SECTION)
+
 
 typedef ULONG_PTR *PUTable;
 
@@ -70,7 +83,7 @@ typedef struct _KLDBGCONTEXT {
     ULONG_PTR DirectoryRootAddress;
 
     //kldbgdrv device handle
-    HANDLE hDevice;
+    HANDLE DeviceHandle;
 
     //address of invalid request handler
     PVOID IopInvalidDeviceRequest;
@@ -85,15 +98,21 @@ typedef struct _KLDBGCONTEXT {
     //ntoskrnl mapped image
     PVOID NtOsImageMap;
 
-    //win32 error value from SCM
-    ULONG drvOpenLoadStatus;
+    //driver loading/open status
+#ifdef _USE_OWN_DRIVER
+
+    NTSTATUS DriverOpenLoadStatus;
+
+#else
+
+    ULONG DriverOpenLoadStatus;
+
+#endif /* _USE_OWN_DRIVER */
 
     //syscall tables related info
-    ULONG KiServiceLimit;
-    ULONG W32pServiceLimit;
-    ULONG_PTR KiServiceTableAddress;
-    ULONG_PTR W32pServiceTableAddress;
-    ULONG_PTR KeServiceDescriptorTableShadow;
+    ULONG_PTR KeServiceDescriptorTableShadowPtr;
+    KSERVICE_TABLE_DESCRIPTOR KeServiceDescriptorTable;
+    KSERVICE_TABLE_DESCRIPTOR KeServiceDescriptorTableShadow;
 
     //system range start
     ULONG_PTR SystemRangeStart;
@@ -102,7 +121,7 @@ typedef struct _KLDBGCONTEXT {
     OBJECT_COLLECTION ObCollection;
 
     //object list lock
-    CRITICAL_SECTION ListLock;
+    CRITICAL_SECTION ObCollectionLock;
 
 } KLDBGCONTEXT, *PKLDBGCONTEXT;
 
@@ -138,6 +157,63 @@ typedef struct _OBJREF {
     UCHAR TypeIndex;
     OBJREFPNS PrivateNamespace;
 } OBJREF, *POBJREF;
+
+//
+// Defines for Major Windows NT release builds
+//
+
+// Windows 7 RTM
+#define NT_WIN7_RTM             7600
+
+// Windows 7 SP1
+#define NT_WIN7_SP1             7601
+
+// Windows 8 RTM
+#define NT_WIN8_RTM             9200
+
+// Windows 8.1
+#define NT_WIN8_BLUE            9600
+
+// Windows 10 TH1
+#define NT_WIN10_THRESHOLD1     10240
+
+// Windows 10 TH2
+#define NT_WIN10_THRESHOLD2     10586
+
+// Windows 10 RS1
+#define NT_WIN10_REDSTONE1      14393
+
+// Windows 10 RS2
+#define NT_WIN10_REDSTONE2      15063
+
+// Windows 10 RS3
+#define NT_WIN10_REDSTONE3      16299
+
+// Windows 10 RS4
+#define NT_WIN10_REDSTONE4      17134
+
+// Windows 10 RS5
+#define NT_WIN10_REDSTONE5      17763
+
+// Windows 10 19H1
+#define NT_WIN10_19H1           18362
+
+// Windows 10 19H2
+#define NT_WIN10_19H2           18363
+
+// Windows 10 20H1
+#define NTX_WIN10_20H1           19037
+
+// Windows 10 20H2
+#define NTX_WIN10_20H2           19536
+
+//
+// Defines for boundary descriptors
+//
+
+#define KNOWN_BOUNDARY_DESCRIPTOR_VERSION       1
+#define MAX_BOUNDARY_DESCRIPTOR_NAME_ENTRIES    1
+#define MAX_BOUNDARY_DESCRIPTOR_IL_ENTRIES      1
 
 //
 // Callbacks support.
@@ -197,20 +273,6 @@ typedef BOOL(CALLBACK *PENUMERATE_BOUNDARY_DESCRIPTOR_CALLBACK)(
     _In_opt_ PVOID Context
     );
 
-/*
-* ObGetObjectFastReference
-*
-* Purpose:
-*
-* Return unbiased pointer.
-*
-*/
-__forceinline PVOID ObGetObjectFastReference(
-    _In_ EX_FAST_REF FastRef)
-{
-    return (PVOID)(FastRef.Value & ~MAX_FAST_REFS);
-}
-
 NTSTATUS ObCopyBoundaryDescriptor(
     _In_ OBJECT_NAMESPACE_ENTRY *NamespaceLookupEntry,
     _Out_ POBJECT_BOUNDARY_DESCRIPTOR *BoundaryDescriptor,
@@ -251,10 +313,6 @@ BOOL ObDumpTypeInfo(
     _In_    ULONG_PTR ObjectAddress,
     _Inout_ POBJECT_TYPE_COMPATIBLE ObjectTypeInfo);
 
-LPWSTR ObQueryNameString(
-    _In_      ULONG_PTR NameInfoAddress,
-    _Out_opt_ PSIZE_T ReturnLength);
-
 BOOL ObHeaderToNameInfoAddress(
     _In_    UCHAR ObjectInfoMask,
     _In_    ULONG_PTR ObjectAddress,
@@ -294,14 +352,10 @@ BOOLEAN kdConnectDriver(
 PVOID kdQueryIopInvalidDeviceRequest(
     VOID);
 
-_Success_(return == TRUE)
-BOOL kdFindKiServiceTables(
+BOOL kdFindKiServiceTable(
     _In_ ULONG_PTR MappedImageBase,
     _In_ ULONG_PTR KernelImageBase,
-    _Out_opt_ ULONG_PTR *KiServiceTablePtr,
-    _Out_opt_ ULONG *KiServiceLimit,
-    _Out_opt_ ULONG_PTR *W32pServiceTable,
-    _Out_opt_ ULONG *W32pServiceLimit);
+    _Out_ KSERVICE_TABLE_DESCRIPTOR* ServiceTable);
 
 ULONG_PTR kdQueryWin32kApiSetTable(
     _In_ HMODULE hWin32k);
@@ -314,9 +368,6 @@ BOOL kdReadSystemMemoryEx(
 
 #define kdReadSystemMemory(Address, Buffer, BufferSize) \
     kdReadSystemMemoryEx(Address, Buffer, BufferSize, NULL)
-
-BOOL __forceinline kdAddressInNtOsImage(
-    _In_ PVOID Address);
 
 VOID kdInit(
     _In_ BOOL IsFullAdmin);
@@ -335,3 +386,33 @@ VOID kdShowError(
 UCHAR kdGetInstructionLength(
     _In_ PVOID ptrCode,
     _Out_ PULONG ptrFlags);
+
+/*
+* ObGetObjectFastReference
+*
+* Purpose:
+*
+* Return unbiased pointer.
+*
+*/
+__forceinline PVOID ObGetObjectFastReference(
+    _In_ EX_FAST_REF FastRef)
+{
+    return (PVOID)(FastRef.Value & ~MAX_FAST_REFS);
+}
+
+/*
+* kdAddressInNtOsImage
+*
+* Purpose:
+*
+* Test if given address in range of ntoskrnl.
+*
+*/
+__forceinline BOOL kdAddressInNtOsImage(
+    _In_ PVOID Address)
+{
+    return IN_REGION(Address,
+        g_kdctx.NtOsBase,
+        g_kdctx.NtOsSize);
+}

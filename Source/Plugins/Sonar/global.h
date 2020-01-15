@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019
+*  (C) COPYRIGHT AUTHORS, 2019 - 2020
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.00
+*  VERSION:     1.03
 *
-*  DATE:        10 Aug 2019
+*  DATE:        21 Dec 2019
 *
 *  Common header file for the Windows Object Explorer Sonar plugin.
 *
@@ -47,4 +47,6 @@
 #include "ndis.h"
 #include "query.h"
 
+//declared in main.c
 extern SONARCONTEXT g_ctx;
+extern ULONG g_CurrentDPI;

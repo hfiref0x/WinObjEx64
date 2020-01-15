@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017 - 2019
+*  (C) COPYRIGHT AUTHORS, 2017 - 2020
 *
 *  TITLE:       EXTAPI.C
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        02 Nov 2019
+*  DATE:        13 Dec 2019
 *
 *  Support unit for pre Windows 10 missing API and experimental features.
 *
@@ -98,7 +98,7 @@ NTSTATUS ExApiSetInit(
     //
     // Win32k Native API now available in win32u.dll (same as ntdll stubs) since Windows 10 RS1.
     //
-    if (g_WinObj.osver.dwBuildNumber >= 14393) {
+    if (g_WinObj.osver.dwBuildNumber >= NT_WIN10_REDSTONE1) {
 
         hWin32u = GetModuleHandle(TEXT("win32u.dll"));
         if (hWin32u == NULL) {
@@ -123,16 +123,16 @@ NTSTATUS ExApiSetInit(
         //
         switch (g_WinObj.osver.dwBuildNumber) {
 
-        case 7600:
-        case 7601:
-        case 9200:
+        case NT_WIN7_RTM:
+        case NT_WIN7_SP1:
+        case NT_WIN8_RTM:
             dwNtUserOpenWindowStation = 4256;
             break;
-        case 9600:
+        case NT_WIN8_BLUE:
             dwNtUserOpenWindowStation = 4257;
             break;
-        case 10240:
-        case 10586:
+        case NT_WIN10_THRESHOLD1:
+        case NT_WIN10_THRESHOLD2:
             dwNtUserOpenWindowStation = 4258;
             break;
         default:

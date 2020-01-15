@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     1.82
+*  VERSION:     1.83
 *
-*  DATE:        27 Nov 2019
+*  DATE:        05 Jan 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -485,7 +485,7 @@ VOID propSetProcessMitigationsInfo(
 *
 */
 VOID propSetProcessTrustLabelInfo(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg
 )
 {
@@ -556,7 +556,7 @@ VOID propSetProcessTrustLabelInfo(
 *
 */
 VOID propSetDefaultInfo(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg,
     _In_ HANDLE hObject
 )
@@ -570,9 +570,7 @@ VOID propSetDefaultInfo(
     OBJECT_BASIC_INFORMATION obi;
     POBJECT_TYPE_INFORMATION TypeInfo = NULL;
 
-    if ((hObject == NULL) || (Context == NULL)) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     //
     // Query object basic information.
@@ -665,15 +663,13 @@ VOID propSetDefaultInfo(
 *
 */
 VOID propBasicQueryDirectory(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg
 )
 {
     HANDLE hObject;
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     //
     // Open object directory and query info.
@@ -696,7 +692,7 @@ VOID propBasicQueryDirectory(
 *
 */
 VOID propBasicQuerySemaphore(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg,
     _In_ BOOL ExtendedInfoAvailable
 )
@@ -711,9 +707,7 @@ VOID propBasicQuerySemaphore(
     SetDlgItemText(hwndDlg, ID_SEMAPHORECURRENT, T_CannotQuery);
     SetDlgItemText(hwndDlg, ID_SEMAPHOREMAXCOUNT, T_CannotQuery);
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     //
     // Open semaphore object.
@@ -760,7 +754,7 @@ VOID propBasicQuerySemaphore(
 *
 */
 VOID propBasicQueryIoCompletion(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg,
     _In_ BOOL ExtendedInfoAvailable
 )
@@ -773,9 +767,7 @@ VOID propBasicQueryIoCompletion(
 
     SetDlgItemText(hwndDlg, ID_IOCOMPLETIONSTATE, T_CannotQuery);
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     //
     // Open IoCompletion object.
@@ -815,7 +807,7 @@ VOID propBasicQueryIoCompletion(
 *
 */
 VOID propBasicQueryTimer(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg,
     _In_ BOOL ExtendedInfoAvailable
 )
@@ -832,9 +824,7 @@ VOID propBasicQueryTimer(
     SetDlgItemText(hwndDlg, ID_TIMERSTATE, T_CannotQuery);
     SetDlgItemText(hwndDlg, ID_TIMERREMAINING, T_CannotQuery);
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     //
     // Open Timer object.
@@ -862,8 +852,13 @@ VOID propBasicQueryTimer(
 
             //Timer remaining
             RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-            rtl_swprintf_s(szBuffer, MAX_PATH, FORMATTED_TIME_VALUE,
-                Hours, Minutes, Seconds);
+
+            RtlStringCchPrintfSecure(szBuffer,
+                MAX_PATH,
+                FORMAT_TIME_VALUE,
+                Hours,
+                Minutes,
+                Seconds);
 
             SetDlgItemText(hwndDlg, ID_TIMERREMAINING, szBuffer);
         }
@@ -890,7 +885,7 @@ VOID propBasicQueryTimer(
 *
 */
 VOID propBasicQueryEvent(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg,
     _In_ BOOL ExtendedInfoAvailable
 )
@@ -904,9 +899,7 @@ VOID propBasicQueryEvent(
     SetDlgItemText(hwndDlg, ID_EVENTTYPE, T_CannotQuery);
     SetDlgItemText(hwndDlg, ID_EVENTSTATE, T_CannotQuery);
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     //
     // Open Event object.
@@ -972,7 +965,7 @@ VOID propBasicQueryEvent(
 *
 */
 VOID propBasicQuerySymlink(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg,
     _In_ BOOL ExtendedInfoAvailable
 )
@@ -988,9 +981,7 @@ VOID propBasicQuerySymlink(
     SetDlgItemText(hwndDlg, ID_OBJECT_SYMLINK_TARGET, T_CannotQuery);
     SetDlgItemText(hwndDlg, ID_OBJECT_SYMLINK_CREATION, T_CannotQuery);
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     //
     // Open SymbolicLink object.
@@ -1042,7 +1033,7 @@ VOID propBasicQuerySymlink(
 *
 */
 VOID propBasicQueryKey(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg,
     _In_ BOOL ExtendedInfoAvailable
 )
@@ -1058,9 +1049,7 @@ VOID propBasicQueryKey(
     SetDlgItemText(hwndDlg, ID_KEYVALUES, T_CannotQuery);
     SetDlgItemText(hwndDlg, ID_KEYLASTWRITE, T_CannotQuery);
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     //
     // Open Key object.
@@ -1078,12 +1067,12 @@ VOID propBasicQueryKey(
 
         //Subkeys count
         RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-        ultostr(kfi.SubKeys, _strend(szBuffer));
+        ultostr(kfi.SubKeys, szBuffer);
         SetDlgItemText(hwndDlg, ID_KEYSUBKEYS, szBuffer);
 
         //Values count
         RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-        ultostr(kfi.Values, _strend(szBuffer));
+        ultostr(kfi.Values, szBuffer);
         SetDlgItemText(hwndDlg, ID_KEYVALUES, szBuffer);
 
         //LastWrite time
@@ -1113,7 +1102,7 @@ VOID propBasicQueryKey(
 *
 */
 VOID propBasicQueryMutant(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg,
     _In_ BOOL ExtendedInfoAvailable
 )
@@ -1128,9 +1117,7 @@ VOID propBasicQueryMutant(
     SetDlgItemText(hwndDlg, ID_MUTANTABANDONED, T_CannotQuery);
     SetDlgItemText(hwndDlg, ID_MUTANTSTATE, T_CannotQuery);
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     //
     // Open Mutant object.
@@ -1146,13 +1133,22 @@ VOID propBasicQueryMutant(
         sizeof(MUTANT_BASIC_INFORMATION), &bytesNeeded);
     if (NT_SUCCESS(status)) {
 
-        //Abandoned
+        //
+        // Show Abandoned state.
+        //
         SetDlgItemText(hwndDlg, ID_MUTANTABANDONED, (mbi.AbandonedState) ? TEXT("Yes") : TEXT("No"));
 
-        //State
+        //
+        // Show state.
+        //
         RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
         if (mbi.OwnedByCaller) {
-            rtl_swprintf_s(szBuffer, MAX_PATH, TEXT("Held recursively %d times"), mbi.CurrentCount);
+
+            RtlStringCchPrintfSecure(szBuffer,
+                MAX_PATH,
+                TEXT("Held recursively %d times"),
+                mbi.CurrentCount);
+
         }
         else {
             _strcpy(szBuffer, TEXT("Not Held"));
@@ -1184,7 +1180,7 @@ VOID propBasicQueryMutant(
 *
 */
 VOID propBasicQuerySection(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg,
     _In_ BOOL ExtendedInfoAvailable
 )
@@ -1204,9 +1200,7 @@ VOID propBasicQuerySection(
     SetDlgItemText(hwndDlg, ID_SECTION_ATTR, T_CannotQuery);
     SetDlgItemText(hwndDlg, ID_SECTIONSIZE, T_CannotQuery);
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     //
     // Open Section object.
@@ -1274,8 +1268,12 @@ VOID propBasicQuerySection(
         SetDlgItemText(hwndDlg, ID_SECTION_ATTR, szBuffer);
 
         //Size
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-        rtl_swprintf_s(szBuffer, MAX_PATH, TEXT("0x%I64X"), sbi.MaximumSize.QuadPart);
+        szBuffer[0] = 0;
+        RtlStringCchPrintfSecure(szBuffer,
+            MAX_PATH,
+            TEXT("0x%I64X"),
+            sbi.MaximumSize.QuadPart);
+
         SetDlgItemText(hwndDlg, ID_SECTIONSIZE, szBuffer);
 
         //query image information
@@ -1294,26 +1292,37 @@ VOID propBasicQuerySection(
                 }
 
                 //Entry			
-                RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-                rtl_swprintf_s(szBuffer, MAX_PATH, TEXT("0x%I64X"), (ULONG_PTR)sii.TransferAddress);
+                szBuffer[0] = 0;
+                RtlStringCchPrintfSecure(szBuffer,
+                    MAX_PATH,
+                    TEXT("0x%I64X"),
+                    (ULONG_PTR)sii.TransferAddress);
+
                 SetDlgItemText(hwndDlg, ID_IMAGE_ENTRY, szBuffer);
 
                 //Stack Reserve
-                RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-                rtl_swprintf_s(szBuffer, MAX_PATH, TEXT("0x%I64X"), sii.MaximumStackSize);
+                szBuffer[0] = 0;
+                RtlStringCchPrintfSecure(szBuffer,
+                    MAX_PATH,
+                    TEXT("0x%I64X"),
+                    sii.MaximumStackSize);
+
                 SetDlgItemText(hwndDlg, ID_IMAGE_STACKRESERVE, szBuffer);
 
                 //Stack Commit
-                RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-                rtl_swprintf_s(szBuffer, MAX_PATH, TEXT("0x%I64X"), sii.CommittedStackSize);
+                szBuffer[0] = 0;
+                RtlStringCchPrintfSecure(szBuffer,
+                    MAX_PATH,
+                    TEXT("0x%I64X"),
+                    sii.CommittedStackSize);
+
                 SetDlgItemText(hwndDlg, ID_IMAGE_STACKCOMMIT, szBuffer);
 
                 //Executable			
                 SetDlgItemText(hwndDlg, ID_IMAGE_EXECUTABLE,
                     (sii.ImageContainsCode) ? TEXT("Yes") : TEXT("No"));
 
-                //Subsystem
-                lpType = TEXT("Unknown");
+                //Subsystem               
                 switch (sii.SubSystemType) {
                 case IMAGE_SUBSYSTEM_NATIVE:
                     lpType = TEXT("Native");
@@ -1348,17 +1357,20 @@ VOID propBasicQuerySection(
                 case IMAGE_SUBSYSTEM_XBOX_CODE_CATALOG:
                     lpType = TEXT("XBox Code Catalog");
                     break;
+                default:
+                    lpType = TEXT("Unknown");
+                    break;
                 }
                 SetDlgItemText(hwndDlg, ID_IMAGE_SUBSYSTEM, lpType);
 
                 //Major Version
-                RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-                ultostr(sii.SubSystemMajorVersion, _strend(szBuffer));
+                szBuffer[0] = 0;
+                ultostr(sii.SubSystemMajorVersion, szBuffer);
                 SetDlgItemText(hwndDlg, ID_IMAGE_MJV, szBuffer);
 
                 //Minor Version
-                RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-                ultostr(sii.SubSystemMinorVersion, _strend(szBuffer));
+                szBuffer[0] = 0;
+                ultostr(sii.SubSystemMinorVersion, szBuffer);
                 SetDlgItemText(hwndDlg, ID_IMAGE_MNV, szBuffer);
             }
         }
@@ -1384,7 +1396,7 @@ VOID propBasicQuerySection(
 *
 */
 VOID propBasicQueryWindowStation(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg,
     _In_ BOOL ExtendedInfoAvailable
 )
@@ -1395,9 +1407,7 @@ VOID propBasicQueryWindowStation(
 
     SetDlgItemText(hwndDlg, ID_WINSTATIONVISIBLE, T_CannotQuery);
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     //
     // Open Winstation object.
@@ -1436,16 +1446,14 @@ VOID propBasicQueryWindowStation(
 *
 */
 VOID propBasicQueryDriver(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg
 )
 {
     LPWSTR lpItemText;
     ENUMCHILDWNDDATA ChildWndData;
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     //
     // For performance reasons instead of query again
@@ -1471,16 +1479,14 @@ VOID propBasicQueryDriver(
 *
 */
 VOID propBasicQueryDevice(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg
 )
 {
     LPWSTR lpItemText;
     ENUMCHILDWNDDATA ChildWndData;
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     //
     // For performance reasons instead of query again
@@ -1506,15 +1512,13 @@ VOID propBasicQueryDevice(
 *
 */
 VOID propBasicQueryMemoryPartition(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg
 )
 {
     HANDLE hObject;
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     //
     // Open Memory Partition object.
@@ -1539,7 +1543,7 @@ VOID propBasicQueryMemoryPartition(
 *
 */
 VOID propBasicQueryProcess(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg,
     _In_ BOOL ExtendedInfoAvailable
 )
@@ -1566,9 +1570,7 @@ VOID propBasicQueryProcess(
     WCHAR szBuffer[100];
     KERNEL_USER_TIMES KernelUserTimes;
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     //
     // Open Process object.
@@ -1702,7 +1704,7 @@ VOID propBasicQueryProcess(
         // Process Command Line.
         //
         bSuccess = FALSE;
-        if (g_WinObj.osver.dwBuildNumber >= 9600) {
+        if (g_WinObj.osver.dwBuildNumber >= NT_WIN8_BLUE) {
             //
             // Use new NtQIP info class to get command line.
             //
@@ -1867,7 +1869,7 @@ VOID propBasicQueryProcess(
 *
 */
 VOID propBasicQueryThread(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg,
     _In_ BOOL ExtendedInfoAvailable
 )
@@ -1884,9 +1886,7 @@ VOID propBasicQueryThread(
 
     PROCESSOR_NUMBER IdealProcessor;
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     Thread = &Context->UnnamedObjectInfo.ThreadInformation;
 
@@ -1922,20 +1922,28 @@ VOID propBasicQueryThread(
         //
         RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
         RtlTimeToTimeFields(&Thread->KernelTime, &TimeFields);
-        rtl_swprintf_s(szBuffer, MAX_PATH, FORMATTED_TIME_VALUE_MS,
+
+        RtlStringCchPrintfSecure(szBuffer,
+            MAX_PATH,
+            FORMAT_TIME_VALUE_MS,
             TimeFields.Hour,
             TimeFields.Minute,
             TimeFields.Second,
             TimeFields.Milliseconds);
+
         SetDlgItemText(hwndDlg, IDC_THREAD_KERNELTIME, szBuffer);
 
         RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
         RtlTimeToTimeFields(&Thread->UserTime, &TimeFields);
-        rtl_swprintf_s(szBuffer, MAX_PATH, FORMATTED_TIME_VALUE_MS,
+
+        RtlStringCchPrintfSecure(szBuffer,
+            MAX_PATH,
+            FORMAT_TIME_VALUE_MS,
             TimeFields.Hour,
             TimeFields.Minute,
             TimeFields.Second,
             TimeFields.Milliseconds);
+
         SetDlgItemText(hwndDlg, IDC_THREAD_USERTIME, szBuffer);
 
         //
@@ -1996,7 +2004,7 @@ VOID propBasicQueryThread(
 *
 */
 VOID propBasicQueryAlpcPort(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg
 )
 {
@@ -2008,17 +2016,15 @@ VOID propBasicQueryAlpcPort(
 
     union {
         union {
-            ALPC_PORT_7600 *Port7600;
-            ALPC_PORT_9200 *Port9200;
-            ALPC_PORT_9600 *Port9600;
-            ALPC_PORT_10240 *Port10240;
+            ALPC_PORT_7600* Port7600;
+            ALPC_PORT_9200* Port9200;
+            ALPC_PORT_9600* Port9600;
+            ALPC_PORT_10240* Port10240;
         } u1;
         PBYTE Ref;
     } AlpcPort;
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     AlpcPort.Ref = (PBYTE)ObDumpAlpcPortObjectVersionAware(Context->ObjectInfo.ObjectAddress,
         &ObjectSize,
@@ -2076,7 +2082,7 @@ VOID propBasicQueryAlpcPort(
 *
 */
 VOID propBasicQueryJob(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg,
     _In_ BOOL ExtendedInfoAvailable
 )
@@ -2102,9 +2108,7 @@ VOID propBasicQueryJob(
     SetDlgItemText(hwndDlg, ID_JOBTOTALKMTIME, T_CannotQuery);
     SetDlgItemText(hwndDlg, ID_JOBTOTALPF, T_CannotQuery);
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     //
     // Open Job object.
@@ -2139,21 +2143,29 @@ VOID propBasicQueryJob(
         RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
         RtlSecureZeroMemory(&SystemTime, sizeof(SystemTime));
         RtlTimeToTimeFields(&jbai.TotalUserTime, &SystemTime);
-        rtl_swprintf_s(szBuffer, MAX_PATH, FORMATTED_TIME_VALUE_MS,
+
+        RtlStringCchPrintfSecure(szBuffer,
+            MAX_PATH,
+            FORMAT_TIME_VALUE_MS,
             SystemTime.Hour,
             SystemTime.Minute,
             SystemTime.Second,
             SystemTime.Milliseconds);
+
         SetDlgItemText(hwndDlg, ID_JOBTOTALUMTIME, szBuffer);
 
         //Total kernel time
         RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
         RtlTimeToTimeFields(&jbai.TotalKernelTime, &SystemTime);
-        rtl_swprintf_s(szBuffer, MAX_PATH, FORMATTED_TIME_VALUE_MS,
+
+        RtlStringCchPrintfSecure(szBuffer,
+            MAX_PATH,
+            FORMAT_TIME_VALUE_MS,
             SystemTime.Hour,
             SystemTime.Minute,
             SystemTime.Second,
             SystemTime.Milliseconds);
+
         SetDlgItemText(hwndDlg, ID_JOBTOTALKMTIME, szBuffer);
 
         //Page faults
@@ -2227,8 +2239,13 @@ VOID propBasicQueryJob(
                         // Build final string.
                         //
                         RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-                        rtl_swprintf_s(szBuffer, sizeof(szBuffer) / sizeof(szBuffer[0]),
-                            TEXT("[0x%I64X:%I64u] %wS"), ProcessId, ProcessId, szProcessName);
+
+                        RtlStringCchPrintfSecure(szBuffer,
+                            sizeof(szBuffer) / sizeof(szBuffer[0]),
+                            TEXT("[0x%I64X:%I64u] %wS"),
+                            ProcessId,
+                            ProcessId,
+                            szProcessName);
 
                         SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
                     }
@@ -2261,15 +2278,13 @@ VOID propBasicQueryJob(
 *
 */
 VOID propBasicQuerySession(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg
 )
 {
     HANDLE hObject;
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     //
     // Open Session object.
@@ -2301,11 +2316,12 @@ LPWSTR propFormatTokenAttribute(
 )
 {
     BOOLEAN IsSimpleConvert = FALSE;
-    LPWSTR Result = NULL, TempString = NULL;
-    PSID TempSid;
-    SIZE_T ResultLength;
-    UNICODE_STRING *TempUstringPtr;
-    TOKEN_SECURITY_ATTRIBUTE_FQBN_VALUE *TempFQBNPtr;
+    LPWSTR  Result = NULL, TempString = NULL;
+    PSID    TempSid;
+    SIZE_T  ResultLength;
+    
+    UNICODE_STRING* TempUstringPtr;
+    TOKEN_SECURITY_ATTRIBUTE_FQBN_VALUE* TempFQBNPtr;
     WCHAR szTemp[MAX_PATH + 1];
 
     SIZE_T MinimumResultLength = 100;
@@ -2347,8 +2363,12 @@ LPWSTR propFormatTokenAttribute(
 
             Result = (LPWSTR)supHeapAlloc(ResultLength + (MinimumResultLength * sizeof(WCHAR)));
             if (Result) {
-                rtl_swprintf_s(Result, MinimumResultLength,
-                    TEXT("[%lu] Version %I64u: "), ValueIndex, Attribute->Values.pFqbn[ValueIndex].Version);
+
+                RtlStringCchPrintfSecure(Result,
+                    MinimumResultLength,
+                    TEXT("[%lu] Version %I64u: "),
+                    ValueIndex,
+                    Attribute->Values.pFqbn[ValueIndex].Version);
 
                 RtlCopyMemory(_strend(Result),
                     TempFQBNPtr->Name.Buffer,
@@ -2363,8 +2383,13 @@ LPWSTR propFormatTokenAttribute(
                     ResultLength = _strlen(TempString);
                     Result = (LPWSTR)supHeapAlloc((MinimumResultLength + ResultLength) * sizeof(WCHAR));
                     if (Result) {
-                        rtl_swprintf_s(Result, MinimumResultLength + ResultLength,
-                            TEXT("[%lu] %s"), ValueIndex, TempString);
+
+                        RtlStringCchPrintfSecure(Result,
+                            MinimumResultLength + ResultLength,
+                            TEXT("[%lu] %s"),
+                            ValueIndex,
+                            TempString);
+
                     }
                     LocalFree(TempString);
                 }
@@ -2379,8 +2404,11 @@ LPWSTR propFormatTokenAttribute(
 
             Result = (LPWSTR)supHeapAlloc(ResultLength + (MinimumResultLength * sizeof(WCHAR)));
             if (Result) {
-                rtl_swprintf_s(Result, MinimumResultLength,
-                    TEXT("[%lu] "), ValueIndex);
+
+                RtlStringCchPrintfSecure(Result,
+                    MinimumResultLength,
+                    TEXT("[%lu] "),
+                    ValueIndex);
 
                 RtlCopyMemory(_strend(Result),
                     TempUstringPtr->Buffer,
@@ -2399,8 +2427,13 @@ LPWSTR propFormatTokenAttribute(
             ResultLength = _strlen(szTemp);
             Result = (LPWSTR)supHeapAlloc((MinimumResultLength + ResultLength) * sizeof(WCHAR));
             if (Result) {
-                rtl_swprintf_s(Result, MinimumResultLength + ResultLength,
-                    TEXT("[%lu] %s"), ValueIndex, szTemp);
+
+                RtlStringCchPrintfSecure(Result,
+                    MinimumResultLength + ResultLength,
+                    TEXT("[%lu] %s"),
+                    ValueIndex,
+                    szTemp);
+
             }
         }
     }
@@ -2419,7 +2452,7 @@ LPWSTR propFormatTokenAttribute(
 *
 */
 VOID propBasicQueryToken(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg,
     _In_ BOOL ExtendedInfoAvailable
 )
@@ -2429,9 +2462,11 @@ VOID propBasicQueryToken(
     PTOKEN_SECURITY_ATTRIBUTES_INFORMATION SecurityAttributes;
     PTOKEN_SECURITY_ATTRIBUTE_V1 Attribute;
     ULONG ReturnLength = 0, i, j;
+
     TVINSERTSTRUCT TVItem;
     HTREEITEM RootItem;
     LPWSTR lpType;
+
     WCHAR szBuffer[MAX_PATH + 1];
 
     HWND TreeView = GetDlgItem(hwndDlg, IDC_TOKEN_ATTRLIST);
@@ -2439,9 +2474,7 @@ VOID propBasicQueryToken(
     SetWindowTheme(TreeView, TEXT("Explorer"), NULL);
     TreeView_DeleteAllItems(TreeView);
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     //
     // Open Token object.
@@ -2626,18 +2659,16 @@ VOID propBasicQueryToken(
 *
 */
 VOID propBasicQueryDesktop(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg
 )
 {
     BOOL        bExtendedInfoAvailable;
     HANDLE      hDesktop;
-    ULONG_PTR   ObjectAddress, HeaderAddress, InfoHeaderAddress;
+    ULONG_PTR   ObjectAddress = 0, HeaderAddress = 0, InfoHeaderAddress = 0;
     OBJINFO     InfoObject;
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
 
     //
     // Open Desktop object.
@@ -2651,14 +2682,16 @@ VOID propBasicQueryDesktop(
     }
 
     bExtendedInfoAvailable = FALSE;
-    ObjectAddress = 0;
+
     if (supQueryObjectFromHandle(hDesktop, &ObjectAddress, NULL)) {
-        HeaderAddress = (ULONG_PTR)OBJECT_TO_OBJECT_HEADER(ObjectAddress);
+
+        if (ObjectAddress)
+            HeaderAddress = (ULONG_PTR)OBJECT_TO_OBJECT_HEADER(ObjectAddress);
 
         //
         // If we can use driver, query extended information.
         //
-        if (kdConnectDriver()) {
+        if (HeaderAddress && kdConnectDriver()) {
             RtlSecureZeroMemory(&InfoObject, sizeof(InfoObject));
             InfoObject.HeaderAddress = HeaderAddress;
             InfoObject.ObjectAddress = ObjectAddress;
@@ -2667,7 +2700,6 @@ VOID propBasicQueryDesktop(
                 &InfoObject.ObjectHeader, sizeof(OBJECT_HEADER));
             if (bExtendedInfoAvailable) {
                 //dump quota info
-                InfoHeaderAddress = 0;
                 if (ObHeaderToNameInfoAddress(InfoObject.ObjectHeader.InfoMask,
                     HeaderAddress, &InfoHeaderAddress, HeaderQuotaInfoFlag))
                 {
@@ -2687,6 +2719,7 @@ VOID propBasicQueryDesktop(
                 HeaderAddress);
 
         }
+
     }
 
     //
@@ -2726,22 +2759,19 @@ VOID propSetBasicInfoEx(
 
     //Reference Count
     RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-    i64tostr(InfoObject->ObjectHeader.PointerCount, _strend(szBuffer));
+    i64tostr(InfoObject->ObjectHeader.PointerCount, szBuffer);
     SetDlgItemText(hwndDlg, ID_OBJECT_REFC, szBuffer);
 
     //Handle Count
-    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-    i64tostr(InfoObject->ObjectHeader.HandleCount, _strend(szBuffer));
+    i64tostr(InfoObject->ObjectHeader.HandleCount, szBuffer);
     SetDlgItemText(hwndDlg, ID_OBJECT_HANDLES, szBuffer);
 
     //NonPagedPoolCharge
-    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
     ultostr(InfoObject->ObjectQuotaHeader.NonPagedPoolCharge, szBuffer);
     SetDlgItemText(hwndDlg, ID_OBJECT_NP_CHARGE, szBuffer);
 
     //PagedPoolCharge
-    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-    ultostr(InfoObject->ObjectQuotaHeader.PagedPoolCharge, _strend(szBuffer));
+    ultostr(InfoObject->ObjectQuotaHeader.PagedPoolCharge, szBuffer);
     SetDlgItemText(hwndDlg, ID_OBJECT_PP_CHARGE, szBuffer);
 
     //Attributes
@@ -2773,16 +2803,15 @@ VOID propSetBasicInfoEx(
 *
 */
 VOID propSetBasicInfo(
-    _In_ PROP_OBJECT_INFO *Context,
+    _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg
 )
 {
     BOOL     ExtendedInfoAvailable = FALSE;
     POBJINFO InfoObject = NULL;
 
-    if (Context == NULL) {
-        return;
-    }
+    VALIDATE_PROP_CONTEXT(Context);
+
     SetDlgItemText(hwndDlg, ID_OBJECT_NAME, Context->lpObjectName);
     SetDlgItemText(hwndDlg, ID_OBJECT_TYPE, Context->lpObjectType);
 
@@ -2967,9 +2996,9 @@ VOID BasicPropDialogOnInit(
     _In_  LPARAM lParam
 )
 {
-    PROPSHEETPAGE    *pSheet = NULL;
+    PROPSHEETPAGE* pSheet = NULL;
 
-    pSheet = (PROPSHEETPAGE *)lParam;
+    pSheet = (PROPSHEETPAGE*)lParam;
     if (pSheet) {
         SetProp(hwndDlg, T_PROPCONTEXT, (HANDLE)pSheet->lParam);
         supLoadIconForObjectType(hwndDlg,
@@ -2999,7 +3028,7 @@ INT_PTR CALLBACK BasicPropDialogProc(
     _In_  LPARAM lParam
 )
 {
-    PROP_OBJECT_INFO *Context = NULL;
+    PROP_OBJECT_INFO* Context = NULL;
 
     switch (uMsg) {
 

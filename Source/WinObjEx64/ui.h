@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.83
 *
-*  DATE:        05 Jan 2020
+*  DATE:        16 Jan 2020
 *
 *  Common header file for the user interface.
 *
@@ -291,12 +291,14 @@ static LPCWSTR g_szMonths[12] = {
 #define wobjInitNoTemp          -2
 #define wobjInitNoWinDir        -3
 #define wobjInitNoSys32Dir      -4
+#define wobjInitNoProgDir       -5
 
 #define T_WOBJINIT_NOCRT TEXT("Could not initialize CRT, abort")
 #define T_WOBJINIT_NOHEAP TEXT("Could not initialize WinObjEx64, could not allocate heap")
 #define T_WOBJINIT_NOTEMP TEXT("Could not initialize WinObjEx64, could not locate %temp%")
 #define T_WOBJINIT_NOWINDIR TEXT("Could not initialize WinObjEx64, could not locate Windows directory")
 #define T_WOBJINIT_NOSYS32DIR TEXT("Could not initialize WinObjEx64, could not locate System32 directory")
+#define T_WOBJINIT_NOPROGDIR TEXT("Could not initialize WinObjEx64, could not query program directory")
 #define T_WOBJINIT_NOCLASS TEXT("Could not register WinObjEx64 window class, abort")
 #define T_WOBJINIT_NOMAINWINDOW TEXT("Could not create WinObjEx64 main window, abort")
 #define T_WOBJINIT_NOICCX TEXT("Could not initialize commctrl classes, abort")

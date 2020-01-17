@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.83
 *
-*  DATE:        05 Jan 2020
+*  DATE:        16 Jan 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -601,6 +601,11 @@ VOID AboutDialogCollectGlobals(
     {
         AddParameterValue32Hex(hwndOutput, TEXT("SpeculationControl Flags"), SpeculationControl.Flags);
     }
+
+    AddParameterValue(hwndOutput, TEXT("TempDirectory"), g_WinObj.szTempDirectory);
+    AddParameterValue(hwndOutput, TEXT("WindowsDirectory"), g_WinObj.szWindowsDirectory);
+    AddParameterValue(hwndOutput, TEXT("SystemDirectory"), g_WinObj.szSystemDirectory);
+    AddParameterValue(hwndOutput, TEXT("ProgramDirectory"), g_WinObj.szProgramDirectory);
 
     //
     // End work with RichEdit.

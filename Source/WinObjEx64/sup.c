@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.83
 *
-*  DATE:        05 Jan 2020
+*  DATE:        16 Jan 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1204,13 +1204,15 @@ VOID supRunAsAdmin(
 )
 {
     SHELLEXECUTEINFO shinfo;
-    WCHAR szPath[MAX_PATH + 1];
+    WCHAR szPath[MAX_PATH + 1];  
+
     RtlSecureZeroMemory(&szPath, sizeof(szPath));
     if (GetModuleFileName(NULL, szPath, MAX_PATH)) {
         RtlSecureZeroMemory(&shinfo, sizeof(shinfo));
         shinfo.cbSize = sizeof(shinfo);
         shinfo.lpVerb = TEXT("runas");
         shinfo.lpFile = szPath;
+        shinfo.lpDirectory = g_WinObj.szProgramDirectory;
         shinfo.nShow = SW_SHOW;
         if (g_WinObj.UseExperimentalFeatures)
             shinfo.lpParameters = TEXT("-exp");
@@ -3485,6 +3487,7 @@ BOOLEAN supQueryHVCIState(
     _Out_ PBOOLEAN pbHVCIIUMEnabled
 )
 {
+    BOOLEAN hvciEnabled;
     ULONG ReturnLength;
     SYSTEM_CODEINTEGRITY_INFORMATION CodeIntegrity;
 
@@ -3499,11 +3502,13 @@ BOOLEAN supQueryHVCIState(
         sizeof(CodeIntegrity),
         &ReturnLength)))
     {
-        *pbHVCIEnabled = ((CodeIntegrity.CodeIntegrityOptions & CODEINTEGRITY_OPTION_ENABLED) &&
+        hvciEnabled = ((CodeIntegrity.CodeIntegrityOptions & CODEINTEGRITY_OPTION_ENABLED) &&
             ((CodeIntegrity.CodeIntegrityOptions & CODEINTEGRITY_OPTION_HVCI_KMCI_ENABLED)) ||
             (CodeIntegrity.CodeIntegrityOptions & CODEINTEGRITY_OPTION_HVCI_KMCI_AUDITMODE_ENABLED));
 
-        *pbHVCIStrictMode = *pbHVCIEnabled &&
+        *pbHVCIEnabled = hvciEnabled;
+
+        *pbHVCIStrictMode = hvciEnabled &&
             (CodeIntegrity.CodeIntegrityOptions & CODEINTEGRITY_OPTION_HVCI_KMCI_STRICTMODE_ENABLED);
 
         *pbHVCIIUMEnabled = (CodeIntegrity.CodeIntegrityOptions & CODEINTEGRITY_OPTION_HVCI_IUM_ENABLED) > 0;
@@ -4168,7 +4173,7 @@ BOOL supRunAsLocalSystem(
             FALSE,
             CREATE_DEFAULT_ERROR_MODE,
             NULL,
-            NULL,
+            g_WinObj.szProgramDirectory,
             &si,
             &pi);
 

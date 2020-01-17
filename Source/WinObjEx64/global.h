@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.83
 *
-*  DATE:        21 Dec 2019
+*  DATE:        16 Jan 2020
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -128,6 +128,7 @@ typedef struct _WINOBJ_GLOBALS {
     WCHAR szTempDirectory[MAX_PATH + 1]; //not including backslash
     WCHAR szWindowsDirectory[MAX_PATH + 1]; //not including backslash
     WCHAR szSystemDirectory[MAX_PATH + 1]; //not including backslash
+    WCHAR szProgramDirectory[MAX_PATH + 1]; //not including backslash
 } WINOBJ_GLOBALS, *PWINOBJ_GLOBALS;
 
 extern WINOBJ_GLOBALS g_WinObj;

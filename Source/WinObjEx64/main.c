@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.83
 *
-*  DATE:        05 Jan 2020
+*  DATE:        16 Jan 2020
 *
 *  Program entry point and main window handler.
 *
@@ -971,7 +971,9 @@ INT WinObjInitGlobals(
         //
         // Remember Windows directory.
         //
-        if (!GetWindowsDirectory(g_WinObj.szWindowsDirectory, MAX_PATH)) {
+
+        cch = GetWindowsDirectory(g_WinObj.szWindowsDirectory, MAX_PATH);
+        if ((cch == 0) || (cch > MAX_PATH)) {
             Result = wobjInitNoWinDir;
             break;
         }
@@ -979,8 +981,18 @@ INT WinObjInitGlobals(
         //
         // Remember System32 directory.
         //
-        if (!GetSystemDirectory(g_WinObj.szSystemDirectory, MAX_PATH)) {
+        cch = GetSystemDirectory(g_WinObj.szSystemDirectory, MAX_PATH);
+        if ((cch == 0) || (cch > MAX_PATH)) {
             Result = wobjInitNoSys32Dir;
+            break;
+        }
+
+        //
+        // Remember program current directory.
+        //
+        cch = GetCurrentDirectory(MAX_PATH, g_WinObj.szProgramDirectory);
+        if ((cch == 0) || (cch > MAX_PATH)) {
+            Result = wobjInitNoProgDir;
             break;
         }
 
@@ -1065,6 +1077,10 @@ UINT WinObjExMain()
 
     case wobjInitNoSys32Dir:
         MessageBox(hDesktopWnd, T_WOBJINIT_NOSYS32DIR, NULL, MB_ICONERROR);
+        return ERROR_APP_INIT_FAILURE;
+
+    case wobjInitNoProgDir:
+        MessageBox(hDesktopWnd, T_WOBJINIT_NOPROGDIR, NULL, MB_ICONERROR);
         return ERROR_APP_INIT_FAILURE;
 
     default:

@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.83
 *
-*  DATE:        13 Jan 2020
+*  DATE:        24 Jan 2020
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -1222,7 +1222,7 @@ BOOL ObGetDirectoryObjectAddress(
 }
 
 /*
-* ObQueryNameStringInternal
+* ObQueryNameString
 *
 * Purpose:
 *

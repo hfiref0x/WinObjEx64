@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.83
 *
-*  DATE:        16 Jan 2020
+*  DATE:        24 Jan 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -253,7 +253,6 @@ PVOID supVirtualAllocEx(
         Protect);
 
     if (NT_SUCCESS(Status)) {
-        RtlSecureZeroMemory(Buffer, size);
         return Buffer;
     }
 

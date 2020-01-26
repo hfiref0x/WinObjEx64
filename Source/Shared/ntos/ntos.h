@@ -5,9 +5,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.125
+*  VERSION:     1.126
 *
-*  DATE:        25 Dec 2019
+*  DATE:        22 Jan 2020
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -87,6 +87,7 @@ typedef short CSHORT;
 typedef ULONGLONG REGHANDLE, *PREGHANDLE;
 typedef PVOID *PDEVICE_MAP;
 typedef PVOID PHEAD;
+typedef struct _IO_TIMER* PIO_TIMER;
 
 #ifndef _WIN32_WINNT_WIN10
 #define _WIN32_WINNT_WIN10 0x0A00
@@ -3608,6 +3609,8 @@ enum _KOBJECTS {
 #define DO_POWER_NOOP                   0x00008000
 #define DO_LOW_PRIORITY_FILESYSTEM      0x00010000      // ntddk nthal ntifs
 #define DO_XIP                          0x00020000
+#define DO_DEVICE_TO_BE_RESET           0x04000000      
+#define DO_DAX_VOLUME                   0x10000000    
 
 #define FILE_REMOVABLE_MEDIA                        0x00000001
 #define FILE_READ_ONLY_DEVICE                       0x00000002
@@ -3701,6 +3704,15 @@ enum _KOBJECTS {
 #define FILE_DEVICE_SYSENV              0x00000052
 #define FILE_DEVICE_VIRTUAL_BLOCK       0x00000053
 #define FILE_DEVICE_POINT_OF_SERVICE    0x00000054
+#define FILE_DEVICE_STORAGE_REPLICATION 0x00000055
+#define FILE_DEVICE_TRUST_ENV           0x00000056
+#define FILE_DEVICE_UCM                 0x00000057
+#define FILE_DEVICE_UCMTCPCI            0x00000058
+#define FILE_DEVICE_PERSISTENT_MEMORY   0x00000059
+#define FILE_DEVICE_NVDIMM              0x0000005a
+#define FILE_DEVICE_HOLOGRAPHIC         0x0000005b
+#define FILE_DEVICE_SDFXHCI             0x0000005c
+#define FILE_DEVICE_UCMUCSI             0x0000005d
 
 #define FILE_BYTE_ALIGNMENT             0x00000000
 #define FILE_WORD_ALIGNMENT             0x00000001
@@ -3716,36 +3728,56 @@ enum _KOBJECTS {
 #define DPC_NORMAL 0
 #define DPC_THREADED 1
 
-typedef struct _DEVICE_OBJECT {
-    CSHORT                      Type;
-    USHORT                      Size;
-    LONG                        ReferenceCount;
-    struct _DRIVER_OBJECT  *DriverObject;
-    struct _DEVICE_OBJECT  *NextDevice;
-    struct _DEVICE_OBJECT  *AttachedDevice;
-    struct _IRP            *CurrentIrp;
-    PVOID		                Timer;
-    ULONG                       Flags;
-    ULONG                       Characteristics;
-    __volatile PVPB             Vpb;
-    PVOID                       DeviceExtension;
-    DEVICE_TYPE                 DeviceType;
-    CCHAR                       StackSize;
+#if _MSC_VER >= 1200
+#pragma warning(push)
+#pragma warning(disable:4324) // structure was padded due to __declspec(align())
+#endif
+
+typedef struct DECLSPEC_ALIGN(MEMORY_ALLOCATION_ALIGNMENT) _DEVICE_OBJECT {
+    CSHORT Type;
+    USHORT Size;
+    LONG ReferenceCount;
+    struct _DRIVER_OBJECT* DriverObject;
+    struct _DEVICE_OBJECT* NextDevice;
+    struct _DEVICE_OBJECT* AttachedDevice;
+    struct _IRP* CurrentIrp;
+    PIO_TIMER Timer;
+    ULONG Flags;                                // See above:  DO_...
+    ULONG Characteristics;                      // See ntioapi:  FILE_...
+    __volatile PVPB Vpb;
+    PVOID DeviceExtension;
+    DEVICE_TYPE DeviceType;
+    CCHAR StackSize;
     union {
-        LIST_ENTRY         ListEntry;
+        LIST_ENTRY ListEntry;
         WAIT_CONTEXT_BLOCK Wcb;
     } Queue;
-    ULONG                       AlignmentRequirement;
-    KDEVICE_QUEUE               DeviceQueue;
-    KDPC                        Dpc;
-    ULONG                       ActiveThreadCount;
-    PSECURITY_DESCRIPTOR        SecurityDescriptor;
-    KEVENT                      DeviceLock;
-    USHORT                      SectorSize;
-    USHORT                      Spare1;
-    struct _DEVOBJ_EXTENSION  *  DeviceObjectExtension;
-    PVOID                       Reserved;
-} DEVICE_OBJECT, *PDEVICE_OBJECT;
+    ULONG AlignmentRequirement;
+    KDEVICE_QUEUE DeviceQueue;
+    KDPC Dpc;
+
+    //
+    //  The following field is for exclusive use by the filesystem to keep
+    //  track of the number of Fsp threads currently using the device
+    //
+
+    ULONG ActiveThreadCount;
+    PSECURITY_DESCRIPTOR SecurityDescriptor;
+    KEVENT DeviceLock;
+
+    USHORT SectorSize;
+    USHORT Spare1;
+
+    struct _DEVOBJ_EXTENSION* DeviceObjectExtension;
+    PVOID  Reserved;
+
+} DEVICE_OBJECT;
+
+typedef struct _DEVICE_OBJECT* PDEVICE_OBJECT;
+
+#if _MSC_VER >= 1200
+#pragma warning(pop)
+#endif
 
 typedef struct _DEVOBJ_EXTENSION {
 
@@ -3999,6 +4031,61 @@ typedef struct _DRIVER_OBJECT {
 
 } DRIVER_OBJECT;
 typedef struct _DRIVER_OBJECT *PDRIVER_OBJECT;
+
+//
+// The following structure is pointed to by the SectionObject pointer field
+// of a file object, and is allocated by the various NT file systems.
+//
+
+typedef struct _SECTION_OBJECT_POINTERS {
+    PVOID DataSectionObject;
+    PVOID SharedCacheMap;
+    PVOID ImageSectionObject;
+} SECTION_OBJECT_POINTERS;
+typedef SECTION_OBJECT_POINTERS* PSECTION_OBJECT_POINTERS;
+
+//
+// Define the format of a completion message.
+//
+
+typedef struct _IO_COMPLETION_CONTEXT {
+    PVOID Port;
+    PVOID Key;
+} IO_COMPLETION_CONTEXT, * PIO_COMPLETION_CONTEXT;
+
+typedef struct _FILE_OBJECT {
+    CSHORT Type;
+    CSHORT Size;
+    PDEVICE_OBJECT DeviceObject;
+    PVPB Vpb;
+    PVOID FsContext;
+    PVOID FsContext2;
+    PSECTION_OBJECT_POINTERS SectionObjectPointer;
+    PVOID PrivateCacheMap;
+    NTSTATUS FinalStatus;
+    struct _FILE_OBJECT* RelatedFileObject;
+    BOOLEAN LockOperation;
+    BOOLEAN DeletePending;
+    BOOLEAN ReadAccess;
+    BOOLEAN WriteAccess;
+    BOOLEAN DeleteAccess;
+    BOOLEAN SharedRead;
+    BOOLEAN SharedWrite;
+    BOOLEAN SharedDelete;
+    ULONG Flags;
+    UNICODE_STRING FileName;
+    LARGE_INTEGER CurrentByteOffset;
+    __volatile ULONG Waiters;
+    __volatile ULONG Busy;
+    PVOID LastLock;
+    KEVENT Lock;
+    KEVENT Event;
+    __volatile PIO_COMPLETION_CONTEXT CompletionContext;
+    KSPIN_LOCK IrpListLock;
+    LIST_ENTRY IrpList;
+    __volatile PVOID FileObjectExtension;
+} FILE_OBJECT;
+typedef struct _FILE_OBJECT* PFILE_OBJECT;
 
 #define RESOURCE_TYPE_LEVEL     0
 #define RESOURCE_NAME_LEVEL     1

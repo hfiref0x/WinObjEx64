@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.83
 *
-*  DATE:        05 Jan 2020
+*  DATE:        24 Jan 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1659,7 +1659,19 @@ VOID propObDumpDeviceObject(
         propObDumpAddress(g_TreeList, h_tviRootItem, L"Vpb", lpType, devObject.Vpb, 0, 0);
 
         //DeviceExtension
-        propObDumpAddress(g_TreeList, h_tviRootItem, L"DeviceExtension", NULL, devObject.DeviceExtension, 0, 0);
+        BgColor = 0;
+        lpType = NULL;
+
+        //
+        // Check DeviceExtension to be valid as it size is a part of total DEVICE_OBJECT allocation size.
+        //
+        if (devObject.DeviceExtension != NULL) {
+            if (devObject.Size == sizeof(DEVICE_OBJECT)) {
+                BgColor = CLR_WARN;
+                lpType = L"! Must be NULL";
+            }
+        }
+        propObDumpAddress(g_TreeList, h_tviRootItem, L"DeviceExtension", lpType, devObject.DeviceExtension, BgColor, 0);
 
         //DeviceType
         lpType = NULL;

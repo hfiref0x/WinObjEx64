@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.83
 *
-*  DATE:        24 Jan 2020
+*  DATE:        26 Jan 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -3502,8 +3502,7 @@ BOOLEAN supQueryHVCIState(
         &ReturnLength)))
     {
         hvciEnabled = ((CodeIntegrity.CodeIntegrityOptions & CODEINTEGRITY_OPTION_ENABLED) &&
-            ((CodeIntegrity.CodeIntegrityOptions & CODEINTEGRITY_OPTION_HVCI_KMCI_ENABLED)) ||
-            (CodeIntegrity.CodeIntegrityOptions & CODEINTEGRITY_OPTION_HVCI_KMCI_AUDITMODE_ENABLED));
+            (CodeIntegrity.CodeIntegrityOptions & CODEINTEGRITY_OPTION_HVCI_KMCI_ENABLED));
 
         *pbHVCIEnabled = hvciEnabled;
 

@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.83
 *
-*  DATE:        24 Jan 2020
+*  DATE:        26 Jan 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1112,6 +1112,9 @@ VOID propObDumpDriverObject(
 
         //DriverStart
         propObDumpAddress(g_TreeList, h_tviRootItem, TEXT("DriverStart"), NULL, drvObject.DriverStart, 0, 0);
+
+        //DriverSize
+        propObDumpUlong(g_TreeList, h_tviRootItem, TEXT("DriverSize"), NULL, drvObject.DriverSize, TRUE, FALSE, 0, 0);
 
         //DriverSection
         propObDumpAddress(g_TreeList, h_tviRootItem, TEXT("DriverSection"), TEXT("PLDR_DATA_TABLE_ENTRY"), drvObject.DriverSection, 0, 0);

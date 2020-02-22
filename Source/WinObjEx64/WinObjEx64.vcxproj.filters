@@ -40,6 +40,9 @@
     <Filter Include="ntuser">
       <UniqueIdentifier>{4d7e372d-ac61-4fa4-bbce-43b2b3e1e125}</UniqueIdentifier>
     </Filter>
+    <Filter Include="tinyaes">
+      <UniqueIdentifier>{ae7f1c88-69d2-406e-a44a-9dddafd020c3}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="aboutDlg.c">
@@ -216,6 +219,12 @@
     <ClCompile Include="..\Shared\treelist\treelist.c">
       <Filter>treelist</Filter>
     </ClCompile>
+    <ClCompile Include="drvhelper.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tinyaes\aes.c">
+      <Filter>tinyaes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc">
@@ -384,6 +393,15 @@
     </ClInclude>
     <ClInclude Include="winedebug.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="drvhelper.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\ntos\halamd64.h">
+      <Filter>ntos</Filter>
+    </ClInclude>
+    <ClInclude Include="tinyaes\aes.h">
+      <Filter>tinyaes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

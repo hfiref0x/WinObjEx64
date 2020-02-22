@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.84
 *
-*  DATE:        26 Jan 2020
+*  DATE:        12 Feb 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -3050,8 +3050,8 @@ VOID propObxDumpAlpcPortCommunicationInfo(
 )
 {
     HTREEITEM h_tviSubItem;
-    PBYTE Buffer = NULL;
-    ULONG BufferSize = 0;
+    PBYTE dumpBuffer = NULL;
+    ULONG bufferSize = 0, readSize = 0;
 
     union {
         union {
@@ -3064,28 +3064,29 @@ VOID propObxDumpAlpcPortCommunicationInfo(
     if ((StructureVersion == 0) || (StructureVersion > 2)) return;
 
     if (StructureVersion == 1) {
-        BufferSize = sizeof(ALPC_COMMUNICATION_INFO_V1);
+        bufferSize = sizeof(ALPC_COMMUNICATION_INFO_V1);
     }
     else {
-        BufferSize = sizeof(ALPC_COMMUNICATION_INFO_V2);
+        bufferSize = sizeof(ALPC_COMMUNICATION_INFO_V2);
     }
 
-    BufferSize = ALIGN_UP_BY(BufferSize, PAGE_SIZE);
-    Buffer = (PBYTE)supVirtualAlloc(BufferSize);
-    if (Buffer == NULL)
+    readSize = bufferSize;
+    bufferSize = ALIGN_UP_BY(bufferSize, PAGE_SIZE);
+    dumpBuffer = (PBYTE)supVirtualAlloc(bufferSize);
+    if (dumpBuffer == NULL)
         return;
 
     if (!kdReadSystemMemoryEx(
         StructureAddress,
-        Buffer,
-        BufferSize,
+        dumpBuffer,
+        readSize,
         NULL))
     {
-        supVirtualFree(Buffer);
+        supVirtualFree(dumpBuffer);
         return;
     }
 
-    AlpcPortCommunicationInfo.Ref = Buffer;
+    AlpcPortCommunicationInfo.Ref = dumpBuffer;
 
     //
     // Dump version unaffected fields.
@@ -3186,7 +3187,7 @@ VOID propObxDumpAlpcPortCommunicationInfo(
             0,
             0);
     }
-    supVirtualFree(Buffer);
+    supVirtualFree(dumpBuffer);
 }
 
 /*

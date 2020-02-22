@@ -1,3 +1,7 @@
+v1.8.4
++ support of additional helper driver
++ fix Windows 7 regressions
+
 v1.8.3
 internal rearrange
 ported to msvc 2019 (with backward compatibility to 2017)

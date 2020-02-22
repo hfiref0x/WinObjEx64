@@ -291,6 +291,11 @@ DWORD WINAPI PluginManagerWorkerThread(
         FindClose(hFile);
     }
 
+    //
+    // Must be called after plugin manager startup as plugins are not signed by MS.
+    //
+    supSetProcessMitigationImagesPolicy();
+
     ExitThread(0);
 }
 

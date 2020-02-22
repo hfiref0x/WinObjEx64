@@ -1,6 +1,7 @@
 /************************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019, translated from Microsoft sources/symbols with help of pdbex
+*  (C) COPYRIGHT AUTHORS, 2019 - 2020 
+*  Translated from Microsoft sources/symbols with help of pdbex
 *
 *  TITLE:       NDIS.H
 *
@@ -162,29 +163,6 @@ typedef enum _NDIS_OPEN_UNBIND_REASON
     UnbindReasonPnPNotifyAllTransports = 6,
     UnbindReasonPnPNotifyBinding = 7,
 } NDIS_OPEN_UNBIND_REASON, *PNDIS_OPEN_UNBIND_REASON;
-
-typedef enum _INTERFACE_TYPE {
-    InterfaceTypeUndefined = -1,
-    Internal,
-    Isa,
-    Eisa,
-    MicroChannel,
-    TurboChannel,
-    PCIBus,
-    VMEBus,
-    NuBus,
-    PCMCIABus,
-    CBus,
-    MPIBus,
-    MPSABus,
-    ProcessorInternal,
-    InternalPowerBus,
-    PNPISABus,
-    PNPBus,
-    Vmcs,
-    ACPIBus,
-    MaximumInterfaceType
-} INTERFACE_TYPE, *PINTERFACE_TYPE;
 
 typedef enum _NDIS_INTERFACE_TYPE
 {

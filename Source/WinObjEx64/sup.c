@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.84
 *
-*  DATE:        26 Jan 2020
+*  DATE:        18 Feb 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -516,7 +516,6 @@ BOOL supDumpSyscallTableConverted(
     *Table = NULL;
 
     memIO = ServiceLimit * sizeof(ULONG);
-
     ServiceTableDumped = (PULONG)supHeapAlloc(memIO);
     if (ServiceTableDumped) {
         bytesRead = 0;
@@ -1203,7 +1202,7 @@ VOID supRunAsAdmin(
 )
 {
     SHELLEXECUTEINFO shinfo;
-    WCHAR szPath[MAX_PATH + 1];  
+    WCHAR szPath[MAX_PATH + 1];
 
     RtlSecureZeroMemory(&szPath, sizeof(szPath));
     if (GetModuleFileName(NULL, szPath, MAX_PATH)) {
@@ -1363,7 +1362,7 @@ BOOL supIsSymbolicLinkObject(
 )
 {
     LVITEM lvItem;
-    
+
     lvItem.mask = LVIF_PARAM;
     lvItem.iItem = iItem;
     lvItem.iSubItem = 0;
@@ -1538,6 +1537,105 @@ BOOL supxQueryKnownDllsLink(
 }
 
 /*
+* supSetProcessMitigationImagesPolicy
+*
+* Purpose:
+*
+* Enable images policy mitigation.
+*
+* N.B. Must be called after plugin manager initialization.
+*
+*/
+VOID supSetProcessMitigationImagesPolicy()
+{
+    PROCESS_MITIGATION_POLICY_INFORMATION policyInfo;
+
+    if (g_WinObj.EnableFullMitigations) {
+
+        policyInfo.Policy = (PROCESS_MITIGATION_POLICY)ProcessSignaturePolicy;
+        policyInfo.SignaturePolicy.Flags = 0;
+        policyInfo.SignaturePolicy.MicrosoftSignedOnly = TRUE;
+        policyInfo.SignaturePolicy.MitigationOptIn = TRUE;
+
+        NtSetInformationProcess(NtCurrentProcess(),
+            ProcessMitigationPolicy,
+            &policyInfo,
+            sizeof(PROCESS_MITIGATION_POLICY_INFORMATION));
+
+        policyInfo.Policy = (PROCESS_MITIGATION_POLICY)ProcessImageLoadPolicy;
+        policyInfo.ImageLoadPolicy.Flags = 0;
+        policyInfo.ImageLoadPolicy.PreferSystem32Images = TRUE;
+        policyInfo.ImageLoadPolicy.NoLowMandatoryLabelImages = TRUE;
+
+        NtSetInformationProcess(NtCurrentProcess(),
+            ProcessMitigationPolicy,
+            &policyInfo,
+            sizeof(PROCESS_MITIGATION_POLICY_INFORMATION));
+
+    }
+}
+
+/*
+* supxSetProcessMitigationPolicies
+*
+* Purpose:
+*
+* Enable mitigations.
+*
+*/
+VOID supxSetProcessMitigationPolicies()
+{
+    PROCESS_MITIGATION_POLICY_INFORMATION policyInfo;
+
+    if (g_WinObj.EnableFullMitigations) {
+
+        policyInfo.Policy = (PROCESS_MITIGATION_POLICY)ProcessExtensionPointDisablePolicy;
+        policyInfo.ExtensionPointDisablePolicy.Flags = 0;
+        policyInfo.ExtensionPointDisablePolicy.DisableExtensionPoints = TRUE;
+
+        NtSetInformationProcess(NtCurrentProcess(),
+            ProcessMitigationPolicy,
+            &policyInfo,
+            sizeof(PROCESS_MITIGATION_POLICY_INFORMATION));
+
+        policyInfo.Policy = (PROCESS_MITIGATION_POLICY)ProcessASLRPolicy;
+        policyInfo.ASLRPolicy.Flags = 0;
+        policyInfo.ASLRPolicy.EnableHighEntropy = TRUE;
+        policyInfo.ASLRPolicy.EnableBottomUpRandomization = TRUE;
+        policyInfo.ASLRPolicy.EnableForceRelocateImages = TRUE;
+
+        NtSetInformationProcess(NtCurrentProcess(),
+            ProcessMitigationPolicy,
+            &policyInfo,
+            sizeof(PROCESS_MITIGATION_POLICY_INFORMATION));
+
+        policyInfo.Policy = (PROCESS_MITIGATION_POLICY)ProcessDynamicCodePolicy;
+        policyInfo.DynamicCodePolicy.Flags = 0;
+        policyInfo.DynamicCodePolicy.ProhibitDynamicCode = TRUE;
+
+        NtSetInformationProcess(NtCurrentProcess(),
+            ProcessMitigationPolicy,
+            &policyInfo,
+            sizeof(PROCESS_MITIGATION_POLICY_INFORMATION));
+
+        /*
+
+        Enabled by settings for Release variants
+
+        policyInfo.Policy = (PROCESS_MITIGATION_POLICY)ProcessControlFlowGuardPolicy;
+        policyInfo.ControlFlowGuardPolicy.Flags = 0;
+        policyInfo.ControlFlowGuardPolicy.EnableControlFlowGuard = TRUE;
+
+        NtSetInformationProcess(NtCurrentProcess(),
+            ProcessMitigationPolicy,
+            &policyInfo,
+            sizeof(PROCESS_MITIGATION_POLICY_INFORMATION));
+        */
+
+    }
+}
+
+/*
 * supInit
 *
 * Purpose:
@@ -1552,6 +1650,8 @@ VOID supInit(
 )
 {
     NTSTATUS status;
+
+    supxSetProcessMitigationPolicies();
 
 #pragma warning(push)
 #pragma warning(disable: 6031)
@@ -1704,11 +1804,11 @@ BOOL supQueryLinkTarget(
         return bResult;
     }
 
-    InitializeObjectAttributes(&objectAttr, 
+    InitializeObjectAttributes(&objectAttr,
         ObjectName, OBJ_CASE_INSENSITIVE, RootDirectoryHandle, NULL);
-    
-    ntStatus = NtOpenSymbolicLinkObject(&linkHandle, 
-        SYMBOLIC_LINK_QUERY, 
+
+    ntStatus = NtOpenSymbolicLinkObject(&linkHandle,
+        SYMBOLIC_LINK_QUERY,
         &objectAttr);
 
     if (!NT_SUCCESS(ntStatus) || (linkHandle == NULL)) {
@@ -1724,8 +1824,8 @@ BOOL supQueryLinkTarget(
     infoUString.Length = (USHORT)cLength;
     infoUString.MaximumLength = (USHORT)(cLength + sizeof(UNICODE_NULL));
 
-    ntStatus = NtQuerySymbolicLinkObject(linkHandle, 
-        &infoUString, 
+    ntStatus = NtQuerySymbolicLinkObject(linkHandle,
+        &infoUString,
         NULL);
 
     bResult = (NT_SUCCESS(ntStatus));
@@ -1964,6 +2064,72 @@ BOOL supQueryProcessNameByEPROCESS(
 }
 
 /*
+* supxEnumServicesStatus
+*
+* Purpose:
+*
+* Enumerate services status to the buffer.
+*
+*/
+BOOL supxEnumServicesStatus(
+    _In_ SC_HANDLE schSCManager,
+    _In_ ULONG ServiceType,
+    _Out_ PBYTE *Services,
+    _Out_ DWORD *ServicesReturned
+)
+{
+    BOOL bResult = FALSE;
+    LPBYTE servicesBuffer = NULL;
+    DWORD dwSize = PAGE_SIZE, dwBytesNeeded = 0, dwServicesReturned = 0, c = 0;
+    DWORD dwLastError = ERROR_SUCCESS;
+
+    *Services = NULL;
+    *ServicesReturned = 0;
+
+    do {
+        servicesBuffer = (LPBYTE)supVirtualAlloc(dwSize);
+        if (servicesBuffer != NULL) {
+            
+            bResult = EnumServicesStatusEx(
+                schSCManager,
+                SC_ENUM_PROCESS_INFO,
+                ServiceType,
+                SERVICE_STATE_ALL,
+                servicesBuffer,
+                dwSize,
+                &dwBytesNeeded,
+                &dwServicesReturned,
+                NULL,
+                NULL);
+
+            dwLastError = GetLastError();
+
+        }
+        else {
+            return FALSE;
+        }
+    
+        if (dwLastError == ERROR_MORE_DATA) {
+            supVirtualFree(servicesBuffer);
+            servicesBuffer = NULL;
+            dwSize += dwBytesNeeded;
+            c++;
+            if (c >= 20) {
+                break;
+            }
+        }
+        else {
+            *ServicesReturned = dwServicesReturned;
+            *Services = servicesBuffer;
+            break;
+        }
+
+    } while (dwLastError == ERROR_MORE_DATA);
+
+    return bResult;
+}
+
+/*
 * supCreateSCMSnapshot
 *
 * Purpose:
@@ -1980,7 +2146,7 @@ BOOL supCreateSCMSnapshot(
 {
     BOOL      bResult = FALSE;
     SC_HANDLE schSCManager;
-    DWORD     dwBytesNeeded = 0, dwServicesReturned = 0, dwSize;
+    DWORD     dwServicesReturned = 0;
     PVOID     Services = NULL;
 
     do {
@@ -1991,58 +2157,14 @@ BOOL supCreateSCMSnapshot(
         if (schSCManager == NULL)
             break;
 
-        //
-        // Query required memory size for snapshot.
-        //
-        dwSize = PAGE_SIZE;
-        Services = supVirtualAlloc(dwSize);
-        if (Services == NULL)
-            break;
-
-        bResult = EnumServicesStatusEx(
-            schSCManager,
-            SC_ENUM_PROCESS_INFO,
+        bResult = supxEnumServicesStatus(schSCManager,
             ServiceType,
-            SERVICE_STATE_ALL,
-            (LPBYTE)Services,
-            dwSize,
-            &dwBytesNeeded,
-            &dwServicesReturned,
-            NULL,
-            NULL);
+            (PBYTE*)&Services,
+            &dwServicesReturned);
 
-        if (bResult == FALSE) {
-            if (GetLastError() == ERROR_MORE_DATA) {
-                //
-                // Allocate required buffer.
-                //
-                supVirtualFree(Services);
-                dwSize = (DWORD)ALIGN_UP_BY(dwBytesNeeded + sizeof(ENUM_SERVICE_STATUS_PROCESS), PAGE_SIZE);
-                Services = supVirtualAlloc(dwSize);
-                if (Services == NULL)
-                    break;
-
-                bResult = EnumServicesStatusEx(
-                    schSCManager,
-                    SC_ENUM_PROCESS_INFO,
-                    ServiceType,
-                    SERVICE_STATE_ALL,
-                    (LPBYTE)Services,
-                    dwSize,
-                    &dwBytesNeeded,
-                    &dwServicesReturned,
-                    NULL,
-                    NULL);
-
-                if (!bResult) {
-                    supVirtualFree(Services);
-                    Services = NULL;
-                    dwServicesReturned = 0;
-                    break;
-                }
-            } //ERROR_MORE_DATA
-        } //bResult == FALSE;
-
+        if (!bResult)
+            break;
+      
         CloseServiceHandle(schSCManager);
 
     } while (FALSE);
@@ -6538,7 +6660,159 @@ ULONG supHashString(
 *
 */
 ULONG supHashUnicodeString(
-    _In_ CONST UNICODE_STRING* String)
+    _In_ CONST UNICODE_STRING * String)
 {
     return supHashString(String->Buffer, String->Length / sizeof(WCHAR));
+}
+
+/*
+* supCreateSystemAdminAccessSD
+*
+* Purpose:
+*
+* Create security descriptor with Admin/System ACL set.
+*
+*/
+NTSTATUS supCreateSystemAdminAccessSD(
+    _Out_ PSECURITY_DESCRIPTOR* SecurityDescriptor,
+    _Out_opt_ PULONG Length
+)
+{
+    NTSTATUS ntStatus = STATUS_UNSUCCESSFUL;
+    PSID admSid = NULL;
+    PSID sysSid = NULL;
+    PACL sysAcl = NULL;
+    ULONG daclSize = 0;
+
+    PSECURITY_DESCRIPTOR securityDescriptor;
+
+    SID_IDENTIFIER_AUTHORITY sidAuthority = SECURITY_NT_AUTHORITY;
+
+    *SecurityDescriptor = NULL;
+
+    if (Length)
+        *Length = 0;
+
+    do {
+
+        securityDescriptor = (PSECURITY_DESCRIPTOR)supHeapAlloc(sizeof(SECURITY_DESCRIPTOR));
+        if (securityDescriptor == NULL) {
+            ntStatus = STATUS_MEMORY_NOT_ALLOCATED;
+            break;
+        }
+
+        admSid = (PSID)supHeapAlloc(RtlLengthRequiredSid(2));
+        if (admSid == NULL) {
+            ntStatus = STATUS_MEMORY_NOT_ALLOCATED;
+            break;
+        }
+
+        sysSid = (PSID)supHeapAlloc(RtlLengthRequiredSid(1));
+        if (sysSid == NULL) {
+            ntStatus = STATUS_MEMORY_NOT_ALLOCATED;
+            break;
+        }
+
+        ntStatus = RtlInitializeSid(admSid, &sidAuthority, 2);
+        if (NT_SUCCESS(ntStatus)) {
+            *RtlSubAuthoritySid(admSid, 0) = SECURITY_BUILTIN_DOMAIN_RID;
+            *RtlSubAuthoritySid(admSid, 1) = DOMAIN_ALIAS_RID_ADMINS;
+        }
+        else {
+            break;
+        }
+
+        ntStatus = RtlInitializeSid(sysSid, &sidAuthority, 1);
+        if (NT_SUCCESS(ntStatus)) {
+            *RtlSubAuthoritySid(sysSid, 0) = SECURITY_LOCAL_SYSTEM_RID;
+        }
+        else {
+            break;
+        }
+
+        daclSize = sizeof(ACL) +
+            (2 * sizeof(ACCESS_ALLOWED_ACE)) +
+            RtlLengthSid(admSid) + RtlLengthSid(sysSid) +
+            SECURITY_DESCRIPTOR_MIN_LENGTH;
+
+        sysAcl = (PACL)supHeapAlloc(daclSize);
+        if (sysAcl == NULL) {
+            ntStatus = STATUS_MEMORY_NOT_ALLOCATED;
+            break;
+        }
+
+        ntStatus = RtlCreateAcl(sysAcl, daclSize - SECURITY_DESCRIPTOR_MIN_LENGTH, (ULONG)ACL_REVISION);
+        if (!NT_SUCCESS(ntStatus))
+            break;
+
+        ntStatus = RtlAddAccessAllowedAce(sysAcl,
+            ACL_REVISION,
+            GENERIC_ALL,
+            sysSid);
+
+        if (!NT_SUCCESS(ntStatus))
+            break;
+
+        ntStatus = RtlAddAccessAllowedAce(sysAcl,
+            ACL_REVISION,
+            GENERIC_ALL,
+            admSid);
+
+        if (!NT_SUCCESS(ntStatus))
+            break;
+
+        ntStatus = RtlCreateSecurityDescriptor(securityDescriptor,
+            SECURITY_DESCRIPTOR_REVISION1);
+
+        if (!NT_SUCCESS(ntStatus))
+            break;
+
+        ntStatus = RtlSetDaclSecurityDescriptor(securityDescriptor,
+            TRUE,
+            sysAcl,
+            FALSE);
+
+        if (!NT_SUCCESS(ntStatus))
+            break;
+
+        if (!RtlValidSecurityDescriptor(securityDescriptor))
+            break;
+
+        *SecurityDescriptor = securityDescriptor;
+
+        if (Length)
+            *Length = RtlLengthSecurityDescriptor(securityDescriptor);
+
+    } while (FALSE);
+
+    if (admSid != NULL) supHeapFree(admSid);
+    if (sysSid != NULL) supHeapFree(sysSid);
+    if (sysAcl != NULL) supHeapFree(sysAcl);
+
+    if (!NT_SUCCESS(ntStatus)) {
+        if (securityDescriptor != NULL)
+            supHeapFree(securityDescriptor);
+    }
+
+    return ntStatus;
+}
+
+/*
+* supGetTimeAsSecondsSince1970
+*
+* Purpose:
+*
+* Return seconds since 1970.
+*
+*/
+ULONG supGetTimeAsSecondsSince1970(
+    VOID
+)
+{
+    LARGE_INTEGER fileTime;
+    ULONG seconds = 0;
+
+    GetSystemTimeAsFileTime((PFILETIME)&fileTime);
+    RtlTimeToSecondsSince1970(&fileTime, &seconds);
+    return seconds;
 }

@@ -4,9 +4,9 @@
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.83
+*  VERSION:     1.84
 *
-*  DATE:        16 Jan 2020
+*  DATE:        22 Feb 2020
 *
 *  Common header file for the user interface.
 *
@@ -26,7 +26,7 @@
 #define DefaultSystemDpi            96
 #define TreeListDumpObjWndPosX      12
 #define TreeListDumpObjWndPosY      20
-#define TreeListDumpObjWndScaleSub  4
+#define TreeListDumpObjWndScaleSub  3
 
 //
 // ListView column counts
@@ -56,8 +56,8 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 
 #define PROGRAM_MAJOR_VERSION       1
 #define PROGRAM_MINOR_VERSION       8
-#define PROGRAM_REVISION_NUMBER     3
-#define PROGRAM_BUILD_NUMBER        2001
+#define PROGRAM_REVISION_NUMBER     4
+#define PROGRAM_BUILD_NUMBER        2004
 
 #ifdef _USE_OWN_DRIVER
 #define PROGRAM_NAME            L"Windows Object Explorer 64-bit (Non-public version)"

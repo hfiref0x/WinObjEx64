@@ -77,7 +77,7 @@
     <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-    <SpectreMitigation>false</SpectreMitigation>
+    <SpectreMitigation>Spectre</SpectreMitigation>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -210,6 +210,10 @@
     <Bscmake>
       <SuppressStartupBanner>false</SuppressStartupBanner>
     </Bscmake>
+    <ResourceCompile />
+    <ResourceCompile>
+      <PreprocessorDefinitions>_UseOwnDriver;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -225,10 +229,10 @@
       <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <ControlFlowGuard>Guard</ControlFlowGuard>
       <AdditionalIncludeDirectories>$(SolutionDir)\Shared;$(ProjectDir);$(ProjectDir)\props;$(ProjectDir)\extras</AdditionalIncludeDirectories>
       <CompileAs>CompileAsC</CompileAs>
       <EnablePREfast>true</EnablePREfast>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -278,12 +282,12 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <ControlFlowGuard>Guard</ControlFlowGuard>
       <ExpandAttributedSource>true</ExpandAttributedSource>
       <AssemblerOutput>All</AssemblerOutput>
       <CompileAs>CompileAsC</CompileAs>
       <AdditionalIncludeDirectories>$(SolutionDir)\Shared;$(ProjectDir);$(ProjectDir)\props;$(ProjectDir)\extras</AdditionalIncludeDirectories>
       <EnablePREfast>true</EnablePREfast>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -329,12 +333,12 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <ControlFlowGuard>Guard</ControlFlowGuard>
       <ExpandAttributedSource>true</ExpandAttributedSource>
       <AssemblerOutput>All</AssemblerOutput>
       <CompileAs>CompileAsC</CompileAs>
       <AdditionalIncludeDirectories>$(SolutionDir)\Shared;$(ProjectDir);$(ProjectDir)\props;$(ProjectDir)\extras</AdditionalIncludeDirectories>
       <EnablePREfast>true</EnablePREfast>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -383,10 +387,10 @@
       <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <ControlFlowGuard>Guard</ControlFlowGuard>
       <CompileAs>CompileAsC</CompileAs>
       <AdditionalIncludeDirectories>$(SolutionDir)\Shared;$(ProjectDir);$(ProjectDir)\props;$(ProjectDir)\extras</AdditionalIncludeDirectories>
       <EnablePREfast>true</EnablePREfast>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -449,6 +453,7 @@
     <ClCompile Include="..\Shared\ntos\ntldr.c" />
     <ClCompile Include="..\Shared\treelist\treelist.c" />
     <ClCompile Include="aboutDlg.c" />
+    <ClCompile Include="drvhelper.c" />
     <ClCompile Include="excepth.c" />
     <ClCompile Include="extapi.c" />
     <ClCompile Include="extras\extras.c" />
@@ -479,6 +484,7 @@
     <ClCompile Include="props\propType.c" />
     <ClCompile Include="sup.c" />
     <ClCompile Include="tests\testunit.c" />
+    <ClCompile Include="tinyaes\aes.c" />
     <ClCompile Include="wine.c" />
   </ItemGroup>
   <ItemGroup>
@@ -490,11 +496,13 @@
     <ClInclude Include="..\Shared\minirtl\minirtl.h" />
     <ClInclude Include="..\Shared\minirtl\rtltypes.h" />
     <ClInclude Include="..\Shared\ntos\apisetx.h" />
+    <ClInclude Include="..\Shared\ntos\halamd64.h" />
     <ClInclude Include="..\Shared\ntos\ntalpc.h" />
     <ClInclude Include="..\Shared\ntos\ntldr.h" />
     <ClInclude Include="..\Shared\ntos\ntos.h" />
     <ClInclude Include="..\Shared\treelist\treelist.h" />
     <ClInclude Include="aboutDlg.h" />
+    <ClInclude Include="drvhelper.h" />
     <ClInclude Include="excepth.h" />
     <ClInclude Include="extapi.h" />
     <ClInclude Include="extdef.h" />
@@ -538,6 +546,7 @@
     <ClInclude Include="sup.h" />
     <ClInclude Include="supConsts.h" />
     <ClInclude Include="tests\testunit.h" />
+    <ClInclude Include="tinyaes\aes.h" />
     <ClInclude Include="ui.h" />
     <ClInclude Include="wine.h" />
     <ClInclude Include="winedebug.h" />

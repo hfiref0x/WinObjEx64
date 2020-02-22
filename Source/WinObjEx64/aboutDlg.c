@@ -4,9 +4,9 @@
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.84
 *
-*  DATE:        16 Jan 2020
+*  DATE:        12 Feb 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -536,6 +536,11 @@ VOID AboutDialogCollectGlobals(
     //
     AddParameterValueUlong(hwndOutput, TEXT("UseExperimentalFeatures"), g_WinObj.UseExperimentalFeatures);
     AddParameterValueUlong(hwndOutput, TEXT("IsWine"), g_WinObj.IsWine);
+
+    //
+    // For MMIO usage.
+    //
+    AddParameterValueUlong(hwndOutput, TEXT("EnableFullMitigations"), g_WinObj.EnableFullMitigations);
 
     //
     // List other data.

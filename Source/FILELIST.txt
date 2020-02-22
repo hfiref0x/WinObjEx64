@@ -3,6 +3,11 @@ winobjex64\aboutDlg.h
 
 * About dialog routines including window dialog procedure
 
+winobjex64\drvhelper.c
+winobjex64\drvhelper.h
+
+* Support for WinIo as additional memory read driver (mitigations enabled)
+
 winobjex64\excepth.c
 winobjex64\excepth.h
 
@@ -188,9 +193,8 @@ shared\treelist\treelist.h
 
 winobjex64\wine.h
 winobjex64\wine.c
-winobjex64\winedebug.h
 
-* Wine support files
+* Wine support header file
 
 winobjex64\global.h
 

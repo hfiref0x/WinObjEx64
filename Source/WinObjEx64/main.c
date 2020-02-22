@@ -930,6 +930,15 @@ INT WinObjInitGlobals(
     do {
         RtlSecureZeroMemory(&g_WinObj, sizeof(g_WinObj));
 
+#ifdef _USE_OWN_DRIVER
+        //
+        // The quality of MMIO driver is outstanding, try to reduce possible impact.
+        //
+        g_WinObj.EnableFullMitigations = TRUE;
+#else
+        g_WinObj.EnableFullMitigations = FALSE;
+#endif
+
         g_WinObj.IsWine = IsWine;
 
         //

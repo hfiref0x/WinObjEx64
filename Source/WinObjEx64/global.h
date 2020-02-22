@@ -4,9 +4,9 @@
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.83
+*  VERSION:     1.84
 *
-*  DATE:        16 Jan 2020
+*  DATE:        13 Feb 2020
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -79,6 +79,7 @@
 
 #include "objects.h"
 #include "kldbg.h"
+#include "drvhelper.h"
 #include "ui.h"
 #include "sup.h"
 #include "supConsts.h"
@@ -92,7 +93,6 @@
 #if defined(__cplusplus)
 #include <malloc.h>
 #endif
-
 
 typedef int(__cdecl *pswprintf_s)(
     wchar_t *buffer,
@@ -118,6 +118,7 @@ extern ULONG g_CurrentDPI;
 typedef struct _WINOBJ_GLOBALS {
     BOOLEAN UseExperimentalFeatures;
     BOOLEAN IsWine;
+    BOOLEAN EnableFullMitigations;
     HINSTANCE hInstance;
     HANDLE Heap;
     LPWSTR CurrentObjectPath;

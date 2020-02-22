@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.83
+*  VERSION:     1.84
 *
-*  DATE:        05 Jan 2020
+*  DATE:        15 Feb 2020
 *
 *  Common header file for the program support routines.
 *
@@ -677,3 +677,12 @@ ULONG supHashString(
 
 ULONG supHashUnicodeString(
     _In_ CONST UNICODE_STRING* String);
+
+NTSTATUS supCreateSystemAdminAccessSD(
+    _Out_ PSECURITY_DESCRIPTOR* SelfRelativeSD,
+    _Out_opt_ PULONG Length);
+
+VOID supSetProcessMitigationImagesPolicy();
+
+ULONG supGetTimeAsSecondsSince1970(
+    VOID);

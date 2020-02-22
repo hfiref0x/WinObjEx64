@@ -4,5 +4,9 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 #ifndef _UseOwnDriver
 IDR_KDBGDRV SYS "..\\drvstore\\kldbgdrv.sys"
 #else
+#ifdef _UseWinIo
+IDR_KDBGDRV SYS "..\\drvstore\\ene64drv.sys"
+#else
 IDR_KDBGDRV SYS "..\\drvstore\\wodbgdrv.sys"
+#endif
 #endif

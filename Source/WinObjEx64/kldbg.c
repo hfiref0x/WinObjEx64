@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.83
+*  VERSION:     1.84
 *
-*  DATE:        24 Jan 2020
+*  DATE:        15 Feb 2020
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -34,6 +34,11 @@ ULONG g_NtBuildNumber;
 NOTIFICATION_CALLBACKS g_SystemCallbacks;
 
 UCHAR ObpInfoMaskToOffset[0x100];
+
+NTSTATUS kdOpenDeviceDriver(
+    _In_ LPCWSTR DriverName,
+    _In_ ACCESS_MASK DesiredAccess,
+    _Out_ PHANDLE DeviceHandle);
 
 
 /*
@@ -2509,14 +2514,14 @@ VOID kdShowError(
 }
 
 /*
-* kdReadSystemMemoryEx
+* kdpReadSystemMemoryEx
 *
 * Purpose:
 *
 * Wrapper around SysDbgReadVirtual request to the KLDBGDRV
 *
 */
-BOOL kdReadSystemMemoryEx(
+BOOL kdpReadSystemMemoryEx(
     _In_ ULONG_PTR Address,
     _Inout_ PVOID Buffer,
     _In_ ULONG BufferSize,
@@ -2881,11 +2886,15 @@ NTSTATUS kdLoadDeviceDriver(
     _In_ LPCWSTR DriverPath
 )
 {
-    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    NTSTATUS status;
     DWORD dwData, dwResult;
     HKEY keyHandle = NULL;
     SIZE_T keyOffset;
     UNICODE_STRING driverServiceName, driverImagePath;
+
+    HANDLE deviceHandle = NULL;
+    ULONG sdLength = 0;
+    PSECURITY_DESCRIPTOR driverSD = NULL;
 
     WCHAR szBuffer[MAX_PATH + 1];
 
@@ -2894,12 +2903,17 @@ NTSTATUS kdLoadDeviceDriver(
     if (DriverPath == NULL)
         return STATUS_INVALID_PARAMETER_2;
 
+    status = supCreateSystemAdminAccessSD(&driverSD, &sdLength);
+    if (!NT_SUCCESS(status))
+        return status;
+
     RtlInitEmptyUnicodeString(&driverImagePath, NULL, 0);
     if (!RtlDosPathNameToNtPathName_U(DriverPath,
         &driverImagePath,
         NULL,
         NULL))
     {
+        supHeapFree(driverSD);
         return STATUS_INVALID_PARAMETER_2;
     }
 
@@ -2993,6 +3007,15 @@ NTSTATUS kdLoadDeviceDriver(
     if (supEnablePrivilege(SE_LOAD_DRIVER_PRIVILEGE, TRUE)) {
         RtlInitUnicodeString(&driverServiceName, szBuffer);
         status = NtLoadDriver(&driverServiceName);
+
+        status = kdOpenDeviceDriver(KLDBGDRV, WRITE_DAC, &deviceHandle);
+        if (NT_SUCCESS(status)) {
+            status = NtSetSecurityObject(deviceHandle,
+                DACL_SECURITY_INFORMATION,
+                driverSD);
+            NtClose(deviceHandle);
+        }
+
         supEnablePrivilege(SE_LOAD_DRIVER_PRIVILEGE, FALSE);
     }
     else {
@@ -3000,6 +3023,7 @@ NTSTATUS kdLoadDeviceDriver(
     }
 
 Cleanup:
+    supHeapFree(driverSD);
     RtlFreeUnicodeString(&driverImagePath);
     return status;
 }
@@ -3068,6 +3092,7 @@ NTSTATUS kdUnloadDeviceDriver(
 */
 NTSTATUS kdOpenDeviceDriver(
     _In_ LPCWSTR DriverName,
+    _In_ ACCESS_MASK DesiredAccess,
     _Out_ PHANDLE DeviceHandle
 )
 {
@@ -3101,7 +3126,7 @@ NTSTATUS kdOpenDeviceDriver(
         InitializeObjectAttributes(&obja, &usDeviceLink, OBJ_CASE_INSENSITIVE, NULL, NULL);
 
         status = NtCreateFile(DeviceHandle,
-            GENERIC_READ | GENERIC_WRITE,
+            DesiredAccess,
             &obja,
             &iost,
             NULL,
@@ -3206,7 +3231,7 @@ VOID kdInit(
 
 #else
 
-        if (!NT_SUCCESS(kdOpenDeviceDriver(KLDBGDRV, &g_kdctx.DeviceHandle))) {
+        if (!NT_SUCCESS(kdOpenDeviceDriver(KLDBGDRV, GENERIC_READ | GENERIC_WRITE, &g_kdctx.DeviceHandle))) {
 
 #endif /* _USE_OWN_DRIVER */ 
 
@@ -3240,11 +3265,15 @@ VOID kdInit(
 
             g_kdctx.IsOurLoad = NT_SUCCESS(kdLoadDeviceDriver(KLDBGDRV, szDrvPath));
             if (g_kdctx.IsOurLoad) {
-                g_kdctx.DriverOpenLoadStatus = kdOpenDeviceDriver(KLDBGDRV, &g_kdctx.DeviceHandle);
+                g_kdctx.DriverOpenLoadStatus = kdOpenDeviceDriver(KLDBGDRV,
+                    GENERIC_READ | GENERIC_WRITE, &g_kdctx.DeviceHandle);
             }
 
 #endif /* _USE_OWN_DRIVER */
 
+        }
+        else {
+            g_kdctx.DriverOpenLoadStatus = STATUS_SUCCESS;
         }
 
     }
@@ -3265,6 +3294,63 @@ VOID kdInit(
 }
 
 /*
+* kdpRemoveDriverFile
+*
+* Purpose:
+*
+* Delete driver file.
+*
+*/
+VOID kdpRemoveDriverFile()
+{
+    WCHAR szDrvPath[MAX_PATH * 2];
+
+    //
+    // Driver file is no longer needed - remove it from disk.
+    //
+    RtlSecureZeroMemory(&szDrvPath, sizeof(szDrvPath));
+    _strcpy(szDrvPath, g_WinObj.szSystemDirectory);
+    _strcat(szDrvPath, KLDBGDRVSYS);
+    DeleteFile(szDrvPath);
+}
+
+/*
+* kdpUnloadWindbgDriver
+*
+* Purpose:
+*
+* Unload driver, unregister and remove service and delete driver file.
+*
+*/
+VOID kdpUnloadWindbgDriver()
+{
+    //
+    // If we loaded Windbg driver - unload it, otherwise leave it as is.
+    //
+    if (g_kdctx.IsOurLoad) {
+        //
+        // Windbg recreates service and drops file everytime when kernel debug starts.
+        //
+        scmUnloadDeviceDriver(KLDBGDRV, NULL);
+        kdpRemoveDriverFile();
+    }
+}
+
+/*
+* kdpUnloadHelperDriver
+*
+* Purpose:
+*
+* Unload helper driver, delete registry entry and delete driver file.
+*
+*/
+VOID kdpUnloadHelperDriver()
+{
+    kdUnloadDeviceDriver(KLDBGDRV, TRUE);
+    kdpRemoveDriverFile();
+}
+
+/*
 * kdShutdown
 *
 * Purpose:
@@ -3278,39 +3364,25 @@ VOID kdShutdown(
     VOID
 )
 {
-    WCHAR szDrvPath[MAX_PATH * 2];
-
+    //
+    // Close device handle and make it invalid.
+    //
     if (g_kdctx.DeviceHandle) {
         CloseHandle(g_kdctx.DeviceHandle);
         g_kdctx.DeviceHandle = NULL;
     }
 
+    //
+    // Destroy collection if present.
+    //
     ObCollectionDestroy(&g_kdctx.ObCollection);
     RtlDeleteCriticalSection(&g_kdctx.ObCollectionLock);
 
-    //
-    // Driver was loaded, unload it.
-    // Windbg recreates service and drops file everytime when kernel debug starts.
-    //
-    if (g_kdctx.IsOurLoad) {
 #ifndef _USE_OWN_DRIVER
-
-        scmUnloadDeviceDriver(KLDBGDRV, NULL);
-
+    kdpUnloadWindbgDriver();
 #else
-
-        kdUnloadDeviceDriver(KLDBGDRV, TRUE);
-
-#endif /* _USE_OWN_DRIVER */ 
-
-        //
-        // Driver file is no longer needed - remove it from disk.
-        //
-        RtlSecureZeroMemory(&szDrvPath, sizeof(szDrvPath));
-        _strcpy(szDrvPath, g_WinObj.szSystemDirectory);
-        _strcat(szDrvPath, KLDBGDRVSYS);
-        DeleteFile(szDrvPath);
-    }
+    kdpUnloadHelperDriver();
+#endif
 
     if (g_kdctx.NtOsImageMap) {
         FreeLibrary((HMODULE)g_kdctx.NtOsImageMap);

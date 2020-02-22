@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPSLIST.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.84
 *
-*  DATE:        05 Jan 2020
+*  DATE:        20 Feb 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1010,17 +1010,32 @@ DWORD WINAPI CreateProcessListProc(
             if (bRefresh) {
                 RtlDestroyHeap(g_PsListHeap);
                 g_PsListHeap = RtlCreateHeap(HEAP_GROWABLE, NULL, 0, 0, NULL, NULL);
-                if (g_PsListHeap == NULL)
+                if (g_PsListHeap == NULL) {
+
+                    MessageBox(PsDlgContext.hwndDlg,
+                        TEXT("Could not allocate heap for process enumeration"),
+                        NULL,
+                        MB_ICONERROR);
+
                     __leave;
+                }
             }
 
             ServiceEnumType = SERVICE_WIN32 | SERVICE_INTERACTIVE_PROCESS;
 
-            if (g_NtBuildNumber >= NT_WIN10_THRESHOLD1)
+            if (g_NtBuildNumber >= NT_WIN10_THRESHOLD1) {
                 ServiceEnumType |= SERVICE_USER_SERVICE | SERVICE_USERSERVICE_INSTANCE;
+            }
 
-            if (!supCreateSCMSnapshot(ServiceEnumType, &ServicesList))
+            if (!supCreateSCMSnapshot(ServiceEnumType, &ServicesList)) {
+                
+                MessageBox(PsDlgContext.hwndDlg,
+                    TEXT("Error building services list"), 
+                    NULL, 
+                    MB_ICONERROR);
+
                 __leave;
+            }
 
             RtlQuickSort(ServicesList.Entries,
                 ServicesList.NumberOfEntries,
@@ -1028,10 +1043,27 @@ DWORD WINAPI CreateProcessListProc(
                 PsxSCMLookupCallback);
 
             InfoBuffer = supGetSystemInfo(SystemProcessInformation, NULL);
-            if (InfoBuffer == NULL)
-                __leave;
+            if (InfoBuffer == NULL) {
 
-            if (!supPHLCreate(&g_PsListHead, (PBYTE)InfoBuffer, &nProcesses, &nThreads)) {
+                MessageBox(PsDlgContext.hwndDlg,
+                    TEXT("Error query process list"),
+                    NULL,
+                    MB_ICONERROR);
+
+                __leave;
+            }
+
+            if (!supPHLCreate(&g_PsListHead, 
+                (PBYTE)InfoBuffer, 
+                &nProcesses, 
+                &nThreads)) 
+            {
+
+                MessageBox(PsDlgContext.hwndDlg,
+                    TEXT("Error building handle list"),
+                    NULL,
+                    MB_ICONERROR);
+
                 __leave;
             }
 

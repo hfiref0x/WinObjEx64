@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.84
 *
-*  DATE:        15 Feb 2020
+*  DATE:        22 Feb 2020
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -35,11 +35,380 @@ NOTIFICATION_CALLBACKS g_SystemCallbacks;
 
 UCHAR ObpInfoMaskToOffset[0x100];
 
-NTSTATUS kdOpenDeviceDriver(
+BOOL kdExtractDriver(
+    _In_ WCHAR* szDriverPath);
+
+VOID kdpRemoveDriverFile();
+
+
+#ifdef _USE_OWN_DRIVER
+
+
+VOID kdpShowNtStatus(
+    _In_ LPCWSTR lpFunction,
+    _In_ NTSTATUS ntStatus)
+{
+    WCHAR szBuffer[MAX_PATH + 1];
+
+    RtlStringCchPrintfSecure(szBuffer, MAX_PATH, TEXT("%ws 0x%lx"),
+        lpFunction,
+        ntStatus);
+
+    MessageBox(GetDesktopWindow(), szBuffer, NULL, MB_OK);
+}
+
+/*
+* kdOpenHelperDevice
+*
+* Purpose:
+*
+* Open handle for helper driver.
+*
+* N.B.
+* SE_DEBUG_PRIVILEGE is required to be assigned and enabled.
+* It is checked on driver side for all supported driver variants.
+*
+*/
+NTSTATUS kdOpenHelperDevice(
     _In_ LPCWSTR DriverName,
     _In_ ACCESS_MASK DesiredAccess,
-    _Out_ PHANDLE DeviceHandle);
+    _Out_ PHANDLE DeviceHandle
+)
+{
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
 
+    UNICODE_STRING usDeviceLink;
+    OBJECT_ATTRIBUTES obja;
+    IO_STATUS_BLOCK iost;
+
+    TCHAR szDeviceLink[MAX_PATH + 1];
+
+    // assume failure
+    if (DeviceHandle)
+        *DeviceHandle = NULL;
+    else
+        return STATUS_INVALID_PARAMETER_2;
+
+    if (DriverName) {
+
+        RtlSecureZeroMemory(szDeviceLink, sizeof(szDeviceLink));
+
+        if (RtlStringCchPrintfSecure(szDeviceLink,
+            MAX_PATH,
+            TEXT("\\DosDevices\\%wS"),
+            DriverName) == -1)
+        {
+            return STATUS_INVALID_PARAMETER_1;
+        }
+
+        RtlInitUnicodeString(&usDeviceLink, szDeviceLink);
+        InitializeObjectAttributes(&obja, &usDeviceLink, OBJ_CASE_INSENSITIVE, NULL, NULL);
+
+        status = NtCreateFile(DeviceHandle,
+            DesiredAccess,
+            &obja,
+            &iost,
+            NULL,
+            0,
+            0,
+            FILE_OPEN,
+            0,
+            NULL,
+            0);
+
+    }
+    else {
+        status = STATUS_INVALID_PARAMETER_1;
+    }
+
+    return status;
+}
+
+/*
+* kdLoadHelperDriver
+*
+* Purpose:
+*
+* Install helper driver and load it.
+*
+* N.B.
+* SE_LOAD_DRIVER_PRIVILEGE is required to be assigned and enabled.
+*
+*/
+NTSTATUS kdLoadHelperDriver(
+    _In_ LPCWSTR DriverName,
+    _In_ LPCWSTR DriverPath
+)
+{
+    NTSTATUS status;
+    DWORD dwData, dwResult;
+    HKEY keyHandle = NULL;
+    SIZE_T keyOffset;
+    UNICODE_STRING driverServiceName, driverImagePath;
+
+    HANDLE deviceHandle = NULL;
+    ULONG sdLength = 0;
+    PSECURITY_DESCRIPTOR driverSD = NULL;
+
+    WCHAR szBuffer[MAX_PATH + 1];
+
+    if (DriverName == NULL)
+        return STATUS_INVALID_PARAMETER_1;
+    if (DriverPath == NULL)
+        return STATUS_INVALID_PARAMETER_2;
+
+    status = supCreateSystemAdminAccessSD(&driverSD, &sdLength);
+    if (!NT_SUCCESS(status))
+        return status;
+
+    RtlInitEmptyUnicodeString(&driverImagePath, NULL, 0);
+    if (!RtlDosPathNameToNtPathName_U(DriverPath,
+        &driverImagePath,
+        NULL,
+        NULL))
+    {
+        supHeapFree(driverSD);
+        return STATUS_INVALID_PARAMETER_2;
+    }
+
+    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+
+    keyOffset = RTL_NUMBER_OF(NT_REG_PREP);
+
+    if (RtlStringCchPrintfSecure(szBuffer, MAX_PATH,
+        DRIVER_REGKEY,
+        NT_REG_PREP,
+        DriverName) == -1)
+    {
+        status = STATUS_INVALID_PARAMETER_1;
+        goto Cleanup;
+    }
+
+    if (ERROR_SUCCESS != RegCreateKeyEx(HKEY_LOCAL_MACHINE,
+        &szBuffer[keyOffset],
+        0,
+        NULL,
+        REG_OPTION_NON_VOLATILE,
+        KEY_ALL_ACCESS,
+        NULL,
+        &keyHandle,
+        NULL))
+    {
+        status = STATUS_ACCESS_DENIED;
+        goto Cleanup;
+    }
+
+    dwResult = ERROR_SUCCESS;
+
+    do {
+
+        dwData = SERVICE_ERROR_NORMAL;
+        dwResult = RegSetValueEx(keyHandle,
+            TEXT("ErrorControl"),
+            0,
+            REG_DWORD,
+            (BYTE*)&dwData,
+            sizeof(dwData));
+        if (dwResult != ERROR_SUCCESS)
+            break;
+
+        dwData = SERVICE_KERNEL_DRIVER;
+        dwResult = RegSetValueEx(keyHandle,
+            TEXT("Type"),
+            0,
+            REG_DWORD,
+            (BYTE*)&dwData,
+            sizeof(dwData));
+        if (dwResult != ERROR_SUCCESS)
+            break;
+
+        dwData = SERVICE_DEMAND_START;
+        dwResult = RegSetValueEx(keyHandle,
+            TEXT("Start"),
+            0,
+            REG_DWORD,
+            (BYTE*)&dwData,
+            sizeof(dwData));
+
+        if (dwResult != ERROR_SUCCESS)
+            break;
+
+        dwResult = RegSetValueEx(keyHandle,
+            TEXT("DisplayName"),
+            0,
+            REG_SZ,
+            (BYTE*)DriverName,
+            (DWORD)((1 + _strlen(DriverName)) * sizeof(WCHAR)));
+        if (dwResult != ERROR_SUCCESS)
+            break;
+
+        dwResult = RegSetValueEx(keyHandle,
+            TEXT("ImagePath"),
+            0,
+            REG_EXPAND_SZ,
+            (BYTE*)driverImagePath.Buffer,
+            (DWORD)driverImagePath.Length + sizeof(UNICODE_NULL));
+
+    } while (FALSE);
+
+    RegCloseKey(keyHandle);
+
+    if (dwResult != ERROR_SUCCESS) {
+        status = STATUS_ACCESS_DENIED;
+        goto Cleanup;
+    }
+
+    if (supEnablePrivilege(SE_LOAD_DRIVER_PRIVILEGE, TRUE)) {
+
+        RtlInitUnicodeString(&driverServiceName, szBuffer);
+        status = NtLoadDriver(&driverServiceName);
+
+        if (NT_SUCCESS(status)) {
+            status = kdOpenHelperDevice(KLDBGDRV, WRITE_DAC, &deviceHandle);
+
+            if (NT_SUCCESS(status)) {
+                status = NtSetSecurityObject(deviceHandle,
+                    DACL_SECURITY_INFORMATION,
+                    driverSD);
+                NtClose(deviceHandle);
+            }
+        }
+
+        supEnablePrivilege(SE_LOAD_DRIVER_PRIVILEGE, FALSE);
+    }
+    else {
+        status = STATUS_ACCESS_DENIED;
+    }
+
+Cleanup:
+    supHeapFree(driverSD);
+    RtlFreeUnicodeString(&driverImagePath);
+    return status;
+}
+
+/*
+* kdOpenLoadDriverPrivate
+*
+* Purpose:
+*
+* Open handle to helper driver device or load this driver.
+*
+*/
+BOOL kdOpenLoadDriverPrivate(
+    _In_ WCHAR* szDriverPath
+)
+{
+    NTSTATUS ntStatus;
+
+    //
+    // First, try to open existing device.
+    //
+    ntStatus = kdOpenHelperDevice(KLDBGDRV,
+        GENERIC_READ | GENERIC_WRITE,
+        &g_kdctx.DeviceHandle);
+
+    if (NT_SUCCESS(ntStatus)) {
+        g_kdctx.DriverOpenLoadStatus = STATUS_SUCCESS;
+        g_kdctx.IsOurLoad = FALSE;
+        return TRUE;
+    }
+
+    //
+    // Next, if device not opened, extract driver.
+    //
+    if (!kdExtractDriver(szDriverPath)) {
+        g_kdctx.DriverOpenLoadStatus = (ULONG)STATUS_FILE_INVALID;
+        return FALSE;
+    }
+
+    //
+    // Install and load helper driver.
+    //
+    ntStatus = kdLoadHelperDriver(KLDBGDRV, szDriverPath);
+    if (!NT_SUCCESS(ntStatus)) {
+        g_kdctx.DriverOpenLoadStatus = ntStatus;
+        return FALSE;
+    }
+
+    g_kdctx.IsOurLoad = TRUE;
+
+    //
+    // Finally, try to open drive device again.
+    //
+    ntStatus = kdOpenHelperDevice(KLDBGDRV,
+        GENERIC_READ | GENERIC_WRITE,
+        &g_kdctx.DeviceHandle);
+
+    g_kdctx.DriverOpenLoadStatus = ntStatus;
+
+    return NT_SUCCESS(ntStatus);
+}
+
+/*
+* kdUnloadHelperDriver
+*
+* Purpose:
+*
+* Call driver unload and remove corresponding registry key.
+*
+* N.B.
+* SE_LOAD_DRIVER_PRIVILEGE is required to be assigned and enabled.
+*
+*/
+NTSTATUS kdUnloadHelperDriver(
+    _In_ LPCWSTR DriverName,
+    _In_ BOOLEAN fRemove
+)
+{
+    NTSTATUS status;
+    SIZE_T keyOffset;
+    UNICODE_STRING driverServiceName;
+
+    WCHAR szBuffer[MAX_PATH + 1];
+
+    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+
+    if (RtlStringCchPrintfSecure(szBuffer, MAX_PATH,
+        DRIVER_REGKEY,
+        NT_REG_PREP,
+        DriverName) == -1)
+    {
+        return STATUS_INVALID_PARAMETER_1;
+    }
+
+    if (!supEnablePrivilege(SE_LOAD_DRIVER_PRIVILEGE, TRUE))
+        return STATUS_ACCESS_DENIED;
+
+    keyOffset = RTL_NUMBER_OF(NT_REG_PREP);
+
+    RtlInitUnicodeString(&driverServiceName, szBuffer);
+    status = NtUnloadDriver(&driverServiceName);
+
+    supEnablePrivilege(SE_LOAD_DRIVER_PRIVILEGE, FALSE);
+
+    if (NT_SUCCESS(status)) {
+        if (fRemove)
+            supRegDeleteKeyRecursive(HKEY_LOCAL_MACHINE, &szBuffer[keyOffset]);
+    }
+
+    return status;
+}
+
+/*
+* kdpUnloadHelperDriver
+*
+* Purpose:
+*
+* Unload helper driver, delete registry entry and delete driver file.
+*
+*/
+VOID kdpUnloadHelperDriver()
+{
+    kdUnloadHelperDriver(KLDBGDRV, TRUE);
+    kdpRemoveDriverFile();
+}
+
+#endif //_USE_OWN_DRIVER
 
 /*
 * ObFindAddress
@@ -2401,12 +2770,12 @@ BOOLEAN kdConnectDriver(
 
         if (NT_SUCCESS(status)) {
             g_kdctx.DeviceHandle = deviceHandle;
-            g_kdctx.DriverOpenLoadStatus = status;
+            g_kdctx.DriverOpenStatus = status;
             return TRUE;
         }
         else {
             supEnablePrivilege(SE_DEBUG_PRIVILEGE, FALSE);
-            g_kdctx.DriverOpenLoadStatus = status;
+            g_kdctx.DriverOpenStatus = status;
         }
     }
 
@@ -2609,14 +2978,14 @@ BOOL kdpReadSystemMemoryEx(
 }
 
 /*
-* kdExtractDriver
+* kdExtractDriverResource
 *
 * Purpose:
 *
 * Extract KLDBGDRV from application resource
 *
 */
-BOOL kdExtractDriver(
+BOOL kdExtractDriverResource(
     _In_ LPCWSTR lpExtractTo,
     _In_ LPCWSTR lpName,
     _In_ LPCWSTR lpType
@@ -2626,34 +2995,77 @@ BOOL kdExtractDriver(
     HGLOBAL hResData = NULL;
     PVOID   pData;
     BOOL    bResult = FALSE;
-    DWORD   dwSize = 0;
+    DWORD   dwSize = 0, dwLastError = ERROR_SUCCESS;
     HANDLE  hFile = INVALID_HANDLE_VALUE;
 
     hResInfo = FindResource(g_WinObj.hInstance, lpName, lpType);
-    if (hResInfo == NULL) return bResult;
+    if (hResInfo == NULL) {
+        SetLastError(ERROR_RESOURCE_NAME_NOT_FOUND);
+        return bResult;
+    }
 
     dwSize = SizeofResource(g_WinObj.hInstance, hResInfo);
-    if (dwSize == 0) return bResult;
+    if (dwSize == 0) {
+        return bResult;
+    }
 
     hResData = LoadResource(g_WinObj.hInstance, hResInfo);
-    if (hResData == NULL) return bResult;
+    if (hResData == NULL) {
+        return bResult;
+    }
 
     pData = LockResource(hResData);
-    if (pData) {
-
-        hFile = CreateFile(lpExtractTo,
-            GENERIC_WRITE,
-            0,
-            NULL,
-            CREATE_ALWAYS,
-            0,
-            NULL);
-
-        if (hFile != INVALID_HANDLE_VALUE) {
-            bResult = WriteFile(hFile, pData, dwSize, &dwSize, NULL);
-            CloseHandle(hFile);
-        }
+    if (pData == NULL) {
+        return bResult;
     }
+
+    hFile = CreateFile(lpExtractTo,
+        GENERIC_WRITE,
+        0,
+        NULL,
+        CREATE_ALWAYS,
+        0,
+        NULL);
+
+    if (hFile == INVALID_HANDLE_VALUE) {
+        return bResult;
+    }
+    else {
+        bResult = WriteFile(hFile, pData, dwSize, &dwSize, NULL);
+        if (!bResult) dwLastError = GetLastError();
+        CloseHandle(hFile);
+    }
+
+    SetLastError(dwLastError);
+    return bResult;
+}
+
+/*
+* kdExtractDriver
+*
+* Purpose:
+*
+* Save driver to system32\drivers from application resource.
+*
+* N.B. If driver already exist on disk function return TRUE.
+* This is required for WinDBG compatibility.
+*
+*/
+BOOL kdExtractDriver(
+    _In_ WCHAR * szDriverPath
+)
+{
+    BOOL bResult = FALSE;
+
+    //
+    // If no file exists, extract it to the drivers directory.
+    //
+    bResult = PathFileExists(szDriverPath);
+
+    if (!bResult) {
+        bResult = kdExtractDriverResource(szDriverPath, MAKEINTRESOURCE(IDR_KDBGDRV), L"SYS");
+    }
+
     return bResult;
 }
 
@@ -2871,278 +3283,49 @@ ULONG_PTR kdQueryWin32kApiSetTable(
 }
 
 /*
-* kdLoadDeviceDriver
+* kdOpenLoadDriverPublic
 *
 * Purpose:
 *
-* Install driver and load it.
-*
-* N.B.
-* SE_LOAD_DRIVER_PRIVILEGE is required to be assigned and enabled.
+* Open handle to WINDBG driver device or load this driver.
 *
 */
-NTSTATUS kdLoadDeviceDriver(
-    _In_ LPCWSTR DriverName,
-    _In_ LPCWSTR DriverPath
+BOOL kdOpenLoadDriverPublic(
+    _In_ WCHAR * szDriverPath
 )
 {
-    NTSTATUS status;
-    DWORD dwData, dwResult;
-    HKEY keyHandle = NULL;
-    SIZE_T keyOffset;
-    UNICODE_STRING driverServiceName, driverImagePath;
+    BOOL bResult;
 
-    HANDLE deviceHandle = NULL;
-    ULONG sdLength = 0;
-    PSECURITY_DESCRIPTOR driverSD = NULL;
+    //
+    // First, try to open existing device.
+    //
+    bResult = scmOpenDevice(KLDBGDRV,
+        &g_kdctx.DeviceHandle,
+        (PDWORD)&g_kdctx.DriverOpenLoadStatus);
 
-    WCHAR szBuffer[MAX_PATH + 1];
-
-    if (DriverName == NULL)
-        return STATUS_INVALID_PARAMETER_1;
-    if (DriverPath == NULL)
-        return STATUS_INVALID_PARAMETER_2;
-
-    status = supCreateSystemAdminAccessSD(&driverSD, &sdLength);
-    if (!NT_SUCCESS(status))
-        return status;
-
-    RtlInitEmptyUnicodeString(&driverImagePath, NULL, 0);
-    if (!RtlDosPathNameToNtPathName_U(DriverPath,
-        &driverImagePath,
-        NULL,
-        NULL))
-    {
-        supHeapFree(driverSD);
-        return STATUS_INVALID_PARAMETER_2;
+    if (bResult) {
+        return bResult;
     }
 
-    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-
-    keyOffset = RTL_NUMBER_OF(NT_REG_PREP);
-
-    if (RtlStringCchPrintfSecure(szBuffer, MAX_PATH,
-        DRIVER_REGKEY,
-        NT_REG_PREP,
-        DriverName) == -1)
-    {
-        status = STATUS_INVALID_PARAMETER_1;
-        goto Cleanup;
+    //
+    // Next, if device not opened, extract driver.
+    //
+    if (!kdExtractDriver(szDriverPath)) {
+        g_kdctx.DriverOpenLoadStatus = GetLastError();
+        return FALSE;
     }
 
-    if (ERROR_SUCCESS != RegCreateKeyEx(HKEY_LOCAL_MACHINE,
-        &szBuffer[keyOffset],
-        0,
-        NULL,
-        REG_OPTION_NON_VOLATILE,
-        KEY_ALL_ACCESS,
-        NULL,
-        &keyHandle,
-        NULL))
-    {
-        status = STATUS_ACCESS_DENIED;
-        goto Cleanup;
-    }
+    //
+    // Finally, try to load driver ourself.
+    //
+    bResult = scmLoadDeviceDriver(KLDBGDRV,
+        szDriverPath,
+        &g_kdctx.DeviceHandle,
+        (PDWORD)&g_kdctx.DriverOpenLoadStatus);
 
-    dwResult = ERROR_SUCCESS;
+    g_kdctx.IsOurLoad = bResult;
 
-    do {
-
-        dwData = SERVICE_ERROR_NORMAL;
-        dwResult = RegSetValueEx(keyHandle,
-            TEXT("ErrorControl"),
-            0,
-            REG_DWORD,
-            (BYTE*)&dwData,
-            sizeof(dwData));
-        if (dwResult != ERROR_SUCCESS)
-            break;
-
-        dwData = SERVICE_KERNEL_DRIVER;
-        dwResult = RegSetValueEx(keyHandle,
-            TEXT("Type"),
-            0,
-            REG_DWORD,
-            (BYTE*)&dwData,
-            sizeof(dwData));
-        if (dwResult != ERROR_SUCCESS)
-            break;
-
-        dwData = SERVICE_DEMAND_START;
-        dwResult = RegSetValueEx(keyHandle,
-            TEXT("Start"),
-            0,
-            REG_DWORD,
-            (BYTE*)&dwData,
-            sizeof(dwData));
-
-        if (dwResult != ERROR_SUCCESS)
-            break;
-
-        dwResult = RegSetValueEx(keyHandle,
-            TEXT("DisplayName"),
-            0,
-            REG_SZ,
-            (BYTE*)DriverName,
-            (DWORD)((1 + _strlen(DriverName)) * sizeof(WCHAR)));
-        if (dwResult != ERROR_SUCCESS)
-            break;
-
-        dwResult = RegSetValueEx(keyHandle,
-            TEXT("ImagePath"),
-            0,
-            REG_EXPAND_SZ,
-            (BYTE*)driverImagePath.Buffer,
-            (DWORD)driverImagePath.Length + sizeof(UNICODE_NULL));
-
-    } while (FALSE);
-
-    RegCloseKey(keyHandle);
-
-    if (dwResult != ERROR_SUCCESS) {
-        status = STATUS_ACCESS_DENIED;
-        goto Cleanup;
-    }
-
-    if (supEnablePrivilege(SE_LOAD_DRIVER_PRIVILEGE, TRUE)) {
-        RtlInitUnicodeString(&driverServiceName, szBuffer);
-        status = NtLoadDriver(&driverServiceName);
-
-        status = kdOpenDeviceDriver(KLDBGDRV, WRITE_DAC, &deviceHandle);
-        if (NT_SUCCESS(status)) {
-            status = NtSetSecurityObject(deviceHandle,
-                DACL_SECURITY_INFORMATION,
-                driverSD);
-            NtClose(deviceHandle);
-        }
-
-        supEnablePrivilege(SE_LOAD_DRIVER_PRIVILEGE, FALSE);
-    }
-    else {
-        status = STATUS_ACCESS_DENIED;
-    }
-
-Cleanup:
-    supHeapFree(driverSD);
-    RtlFreeUnicodeString(&driverImagePath);
-    return status;
-}
-
-/*
-* kdUnloadDeviceDriver
-*
-* Purpose:
-*
-* Call driver unload and remove corresponding registry key.
-*
-* N.B.
-* SE_LOAD_DRIVER_PRIVILEGE is required to be assigned and enabled.
-*
-*/
-NTSTATUS kdUnloadDeviceDriver(
-    _In_ LPCWSTR DriverName,
-    _In_ BOOLEAN fRemove
-)
-{
-    NTSTATUS status;
-    SIZE_T keyOffset;
-    UNICODE_STRING driverServiceName;
-
-    WCHAR szBuffer[MAX_PATH + 1];
-
-    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-
-    if (RtlStringCchPrintfSecure(szBuffer, MAX_PATH,
-        DRIVER_REGKEY,
-        NT_REG_PREP,
-        DriverName) == -1)
-    {
-        return STATUS_INVALID_PARAMETER_1;
-    }
-
-    if (!supEnablePrivilege(SE_LOAD_DRIVER_PRIVILEGE, TRUE))
-        return STATUS_ACCESS_DENIED;
-
-    keyOffset = RTL_NUMBER_OF(NT_REG_PREP);
-
-    RtlInitUnicodeString(&driverServiceName, szBuffer);
-    status = NtUnloadDriver(&driverServiceName);
-
-    supEnablePrivilege(SE_LOAD_DRIVER_PRIVILEGE, FALSE);
-
-    if (NT_SUCCESS(status)) {
-        if (fRemove)
-            supRegDeleteKeyRecursive(HKEY_LOCAL_MACHINE, &szBuffer[keyOffset]);
-    }
-
-    return status;
-}
-
-/*
-* kdOpenDeviceDriver
-*
-* Purpose:
-*
-* Open handle for debug helper driver.
-*
-* N.B.
-* SE_DEBUG_PRIVILEGE is required to be assigned and enabled.
-* It is checked on driver side for all supported driver variants.
-*
-*/
-NTSTATUS kdOpenDeviceDriver(
-    _In_ LPCWSTR DriverName,
-    _In_ ACCESS_MASK DesiredAccess,
-    _Out_ PHANDLE DeviceHandle
-)
-{
-    NTSTATUS status = STATUS_UNSUCCESSFUL;
-
-    UNICODE_STRING usDeviceLink;
-    OBJECT_ATTRIBUTES obja;
-    IO_STATUS_BLOCK iost;
-
-    TCHAR szDeviceLink[MAX_PATH + 1];
-
-    // assume failure
-    if (DeviceHandle)
-        *DeviceHandle = NULL;
-    else
-        return STATUS_INVALID_PARAMETER_2;
-
-    if (DriverName) {
-
-        RtlSecureZeroMemory(szDeviceLink, sizeof(szDeviceLink));
-
-        if (RtlStringCchPrintfSecure(szDeviceLink,
-            MAX_PATH,
-            TEXT("\\DosDevices\\%wS"),
-            DriverName) == -1)
-        {
-            return STATUS_INVALID_PARAMETER_1;
-        }
-
-        RtlInitUnicodeString(&usDeviceLink, szDeviceLink);
-        InitializeObjectAttributes(&obja, &usDeviceLink, OBJ_CASE_INSENSITIVE, NULL, NULL);
-
-        status = NtCreateFile(DeviceHandle,
-            DesiredAccess,
-            &obja,
-            &iost,
-            NULL,
-            0,
-            0,
-            FILE_OPEN,
-            0,
-            NULL,
-            0);
-
-    }
-    else {
-        status = STATUS_INVALID_PARAMETER_1;
-    }
-
-    return status;
+    return bResult;
 }
 
 /*
@@ -3157,7 +3340,8 @@ VOID kdInit(
     _In_ BOOL IsFullAdmin
 )
 {
-    WCHAR szDrvPath[MAX_PATH * 2];
+    BOOL bLoadState;
+    WCHAR szBuffer[MAX_PATH * 2];
 
     RtlSecureZeroMemory(&g_kdctx, sizeof(g_kdctx));
     RtlSecureZeroMemory(&g_SystemCallbacks, sizeof(g_SystemCallbacks));
@@ -3168,15 +3352,7 @@ VOID kdInit(
     //
     // Default driver load status.
     //
-#ifndef _USE_OWN_DRIVER
-
     g_kdctx.DriverOpenLoadStatus = ERROR_NOT_CAPABLE;
-
-#else
-
-    g_kdctx.DriverOpenLoadStatus = STATUS_NOT_CAPABLE;
-
-#endif /* _USE_OWN_DRIVER */
 
     InitializeListHead(&g_kdctx.ObCollection.ListHead);
     RtlInitializeCriticalSection(&g_kdctx.ObCollectionLock);
@@ -3205,7 +3381,7 @@ VOID kdInit(
         return;
 
     //
-    // wodbgdrv does not need DEBUG mode.
+    // Helper drivers does not need DEBUG mode.
     //
 
 #ifndef _USE_OWN_DRIVER
@@ -3218,66 +3394,43 @@ VOID kdInit(
 #endif /* _USE_OWN_DRIVER */
 
     //
+    // Build path to driver.
+    //
+    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+    _strcpy(szBuffer, g_WinObj.szSystemDirectory);
+    _strcat(szBuffer, KLDBGDRVSYS);
+
+    //
     // Test privilege assigned and continue to load/open kldbg driver.
     //
     if (supEnablePrivilege(SE_DEBUG_PRIVILEGE, TRUE)) {
 
-        //
-        // Try to open existing device.
-        //
-#ifndef _USE_OWN_DRIVER 
+#ifdef _USE_OWN_DRIVER
 
-        if (scmOpenDevice(KLDBGDRV, &g_kdctx.DeviceHandle, &g_kdctx.DriverOpenLoadStatus) == FALSE) {
+        bLoadState = kdOpenLoadDriverPrivate(szBuffer);
 
 #else
 
-        if (!NT_SUCCESS(kdOpenDeviceDriver(KLDBGDRV, GENERIC_READ | GENERIC_WRITE, &g_kdctx.DeviceHandle))) {
+        bLoadState = kdOpenLoadDriverPublic(szBuffer);
 
-#endif /* _USE_OWN_DRIVER */ 
+#endif
 
-            //
-            // No such device exist, construct filepath and check if driver already present.
-            //
-            RtlSecureZeroMemory(szDrvPath, sizeof(szDrvPath));
-            _strcpy(szDrvPath, g_WinObj.szSystemDirectory);
-            _strcat(szDrvPath, KLDBGDRVSYS);
+        if (bLoadState == FALSE) {
 
-            //
-            // If no file exists, extract it to the drivers directory.
-            //
-            if (!PathFileExists(szDrvPath)) {
-                kdExtractDriver(szDrvPath, MAKEINTRESOURCE(IDR_KDBGDRV), L"SYS");
-            }
+            RtlStringCchPrintfSecure(szBuffer,
+                MAX_PATH,
+                TEXT("Could not open/load helper driver.\r\nSome features maybe unavailable, error code 0x%lX"),
+                g_kdctx.DriverOpenLoadStatus);
 
-            //
-            // Load service driver and open handle for it.
-            //
-            g_kdctx.DriverOpenLoadStatus = STATUS_SUCCESS;
+            MessageBox(GetDesktopWindow(), szBuffer, TEXT("WinObjEx64"), MB_ICONINFORMATION);
 
-#ifndef _USE_OWN_DRIVER
-
-            g_kdctx.IsOurLoad = scmLoadDeviceDriver(KLDBGDRV,
-                szDrvPath,
-                &g_kdctx.DeviceHandle,
-                &g_kdctx.DriverOpenLoadStatus);
-
-#else
-
-            g_kdctx.IsOurLoad = NT_SUCCESS(kdLoadDeviceDriver(KLDBGDRV, szDrvPath));
-            if (g_kdctx.IsOurLoad) {
-                g_kdctx.DriverOpenLoadStatus = kdOpenDeviceDriver(KLDBGDRV,
-                    GENERIC_READ | GENERIC_WRITE, &g_kdctx.DeviceHandle);
-            }
-
-#endif /* _USE_OWN_DRIVER */
-
-        }
-        else {
-            g_kdctx.DriverOpenLoadStatus = STATUS_SUCCESS;
         }
 
     }
 
+    //
+    // Init driver relying variables.
+    //
     if (g_kdctx.DeviceHandle != NULL) {
         //
         // Query Ob specific offsets.
@@ -3337,20 +3490,6 @@ VOID kdpUnloadWindbgDriver()
 }
 
 /*
-* kdpUnloadHelperDriver
-*
-* Purpose:
-*
-* Unload helper driver, delete registry entry and delete driver file.
-*
-*/
-VOID kdpUnloadHelperDriver()
-{
-    kdUnloadDeviceDriver(KLDBGDRV, TRUE);
-    kdpRemoveDriverFile();
-}
-
-/*
 * kdShutdown
 *
 * Purpose:
@@ -3378,10 +3517,10 @@ VOID kdShutdown(
     ObCollectionDestroy(&g_kdctx.ObCollection);
     RtlDeleteCriticalSection(&g_kdctx.ObCollectionLock);
 
-#ifndef _USE_OWN_DRIVER
-    kdpUnloadWindbgDriver();
-#else
+#ifdef _USE_OWN_DRIVER
     kdpUnloadHelperDriver();
+#else
+    kdpUnloadWindbgDriver();
 #endif
 
     if (g_kdctx.NtOsImageMap) {

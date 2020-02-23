@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.84
 *
-*  DATE:        18 Feb 2019
+*  DATE:        22 Feb 2019
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -104,15 +104,8 @@ typedef struct _KLDBGCONTEXT {
     PVOID NtOsImageMap;
 
     //driver loading/open status
-#ifdef _USE_OWN_DRIVER
-
-    NTSTATUS DriverOpenLoadStatus;
-
-#else
-
     ULONG DriverOpenLoadStatus;
-
-#endif /* _USE_OWN_DRIVER */
+    ULONG DriverOpenStatus;
 
     //syscall tables related info
     ULONG_PTR KeServiceDescriptorTableShadowPtr;

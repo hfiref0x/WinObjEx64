@@ -87,6 +87,10 @@ winobjex64\kldbg_pattern.h
 
 * Signature patterns used to find undocumented stuff
 
+winobjex64\ksymbols.h
+
+* Header file for kernel symbol names
+
 winobjex64\list.c
 winobjex64\list.h
 

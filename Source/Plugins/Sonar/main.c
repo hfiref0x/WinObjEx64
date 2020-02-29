@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.03
 *
-*  DATE:        05 Jan 2020
+*  DATE:        24 Feb 2020
 *
 *  WinObjEx64 Sonar plugin.
 *
@@ -25,7 +25,7 @@ ULONG g_CurrentDPI;
 
 int  y_splitter_pos = 300, y_capture_pos = 0, y_splitter_max = 0;
 
-#define SONAR_MAX_TESTED_BUILD 19037
+#define SONAR_MAX_TESTED_BUILD 19569
 
 #define PROTOCOLLIST_COLUMN_COUNT 3
 

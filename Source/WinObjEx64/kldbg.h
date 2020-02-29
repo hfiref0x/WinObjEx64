@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.84
 *
-*  DATE:        22 Feb 2019
+*  DATE:        24 Feb 2019
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -110,7 +110,6 @@ typedef struct _KLDBGCONTEXT {
     //syscall tables related info
     ULONG_PTR KeServiceDescriptorTableShadowPtr;
     KSERVICE_TABLE_DESCRIPTOR KeServiceDescriptorTable;
-    KSERVICE_TABLE_DESCRIPTOR KeServiceDescriptorTableShadow;
 
     //system range start
     ULONG_PTR SystemRangeStart;
@@ -200,10 +199,10 @@ typedef struct _OBJREF {
 #define NT_WIN10_19H2           18363
 
 // Windows 10 20H1
-#define NTX_WIN10_20H1          19037
+#define NTX_WIN10_20H1          19041
 
 // Windows 10 20H2
-#define NTX_WIN10_20H2          19536
+#define NTX_WIN10_20H2          19569
 
 //
 // Defines for boundary descriptors

@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.03
 *
-*  DATE:        13 Oct 2019
+*  DATE:        24 Feb 2020
 *
 *  Query NDIS specific data.
 *
@@ -48,7 +48,8 @@ NdisDeregisterProtocol
 48 8B 3D A2 CE FA FF                                            mov     rdi, cs:ndisProtocolList
 18995
 48 8B 3D BA 92 FA FF                                            mov     rdi, cs:ndisProtocolList
-
+19569
+48 8B 3D C2 5A FA FF                                            mov     rdi, cs:ndisProtocolList
 */
 
 #define HDE_F_ERROR 0x00001000
@@ -282,7 +283,7 @@ PVOID DumpProtocolBlockVersionAware(
     case NT_WIN10_19H1:
     case NT_WIN10_19H2:
     default:
-        ObjectSize = sizeof(NDIS_PROTOCOL_BLOCK_18362_18363);
+        ObjectSize = sizeof(NDIS_PROTOCOL_BLOCK_18362_19569);
         ObjectVersion = 5;
         break;
 
@@ -344,7 +345,7 @@ PVOID DumpOpenBlockVersionAware(
     case NT_WIN10_19H1:
     case NT_WIN10_19H2:
     default:
-        ObjectSize = sizeof(NDIS_OPEN_BLOCK_17763_18363);
+        ObjectSize = sizeof(NDIS_OPEN_BLOCK_17763_19569);
         ObjectVersion = 5;
         break;
     }
@@ -461,7 +462,7 @@ ULONG GetNextProtocolOffset(
     case NT_WIN10_19H1:
     case NT_WIN10_19H2:
     default:
-        Offset = FIELD_OFFSET(NDIS_PROTOCOL_BLOCK_18362_18363, NextProtocol);
+        Offset = FIELD_OFFSET(NDIS_PROTOCOL_BLOCK_18362_19569, NextProtocol);
         break;
 
     }
@@ -1037,7 +1038,7 @@ BOOL CreateCompatibleOpenBlock(
         OpenBlock->Handlers.WTransferDataHandler = BlockRef->u1.Versions.u_v4.v4c->WTransferDataHandler;
         break;
 
-    case 5: //17763..18363
+    case 5: //17763..19569
         OpenBlock->ProtocolNextOpen = BlockRef->u1.Versions.u_v5.v5c->ProtocolNextOpen;
         OpenBlock->BindDeviceName = BlockRef->u1.Versions.u_v5.v5c->BindDeviceName;
         OpenBlock->RootDeviceName = BlockRef->u1.Versions.u_v5.v5c->RootDeviceName;

@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.03
 *
-*  DATE:        13 Dec 2019
+*  DATE:        24 Feb 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -61,7 +61,7 @@
 #define NT_WIN10_19H2           18363
 
 // Windows 10 20H1
-#define NTX_WIN10_20H1           19037
+#define NTX_WIN10_20H1           19041
 
 // Windows 10 20H2
 #define NTX_WIN10_20H2           19550
@@ -73,7 +73,7 @@ typedef struct _PROTOCOL_BLOCK_VERSIONS {
             NDIS_PROTOCOL_BLOCK_9200 *v2;
             NDIS_PROTOCOL_BLOCK_9600_17134 *v3;
             NDIS_PROTOCOL_BLOCK_17763 *v4;
-            NDIS_PROTOCOL_BLOCK_18362_18363 *v5;
+            NDIS_PROTOCOL_BLOCK_18362_19569 *v5;
         } Versions;
         PVOID Ref;
     } u1;
@@ -93,8 +93,8 @@ typedef struct _OPEN_BLOCK_VERSIONS {
                 NDIS_OPEN_BLOCK_14393_17134 *v4;
             } u_v4;
             union {
-                NDIS_COMMON_OPEN_BLOCK_17763_18363 *v5c;
-                NDIS_OPEN_BLOCK_17763_18363 *v5;
+                NDIS_COMMON_OPEN_BLOCK_17763_19569 *v5c;
+                NDIS_OPEN_BLOCK_17763_19569 *v5;
             } u_v5;
         } Versions;
         PVOID Ref;

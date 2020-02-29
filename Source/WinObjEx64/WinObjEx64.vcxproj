@@ -451,6 +451,7 @@
     <ClInclude Include="hde\table64.h" />
     <ClInclude Include="instdrv.h" />
     <ClInclude Include="kldbg.h" />
+    <ClInclude Include="ksymbols.h" />
     <ClInclude Include="list.h" />
     <ClInclude Include="msvcver.h" />
     <ClInclude Include="objects.h" />

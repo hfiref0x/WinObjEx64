@@ -403,6 +403,9 @@
     <ClInclude Include="tinyaes\aes.h">
       <Filter>tinyaes</Filter>
     </ClInclude>
+    <ClInclude Include="ksymbols.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="rsrc\pipe.ico">

@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSSDT.H
 *
-*  VERSION:     1.83
+*  VERSION:     1.84
 *
-*  DATE:        08 Dec 2019
+*  DATE:        25 Feb 2019
 *
 *  Common header file for Service Table dialog.
 *
@@ -25,8 +25,9 @@ typedef struct _SERVICETABLEENTRY {
 } SERVICETABLEENTRY, *PSERVICETABLEENTRY;
 
 typedef struct _SDT_TABLE {
-    ULONG Limit;
     BOOL Allocated;
+    ULONG Limit;
+    ULONG_PTR Base;
     PSERVICETABLEENTRY Table;
 } SDT_TABLE, *PSDT_TABLE;
 

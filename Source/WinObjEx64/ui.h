@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.84
 *
-*  DATE:        22 Feb 2020
+*  DATE:        29 Feb 2020
 *
 *  Common header file for the user interface.
 *
@@ -305,3 +305,25 @@ static LPCWSTR g_szMonths[12] = {
 #define T_WOBJINIT_NOLISTWND TEXT("Could not create tree window, abort")
 #define T_WOBJINIT_NOTREEWND TEXT("Could not create list window, abort")
 #define T_WOBJINIT_NOTLBARWND TEXT("Could not create toolbar window, abort")
+
+#define ErrShadowWin32kNotFound             1
+#define ErrShadowMemAllocFail               2
+#define ErrShadowWin32uLoadFail             3
+#define ErrShadowWin32kLoadFail             4
+#define ErrShadowApiSetNotFound             5
+#define ErrShadowW32pServiceLimitNotFound   6
+#define ErrShadowWin32uMismatch             7
+#define ErrShadowW32pServiceTableNotFound   8
+#define ErrShadowApiSetSchemaMapNotFound    9
+#define ErrShadowApiSetSchemaVerUnknown     10
+
+#define T_ERRSHADOW_WIN32K_NOT_FOUND TEXT("Could not find win32k module")
+#define T_ERRSHADOW_MEMORY_NOT_ALLOCATED TEXT("Could not create heap for table")
+#define T_ERRSHADOW_WIN32U_LOAD_FAILED TEXT("Could not load win32u.dll")
+#define T_ERRSHADOW_WIN32K_LOAD_FAILED TEXT("Could not load win32k.sys")
+#define T_ERRSHADOW_APISETTABLE_NOT_FOUND TEXT("Win32kApiSetTable was not found, win32k adapters targets will not be determinated")
+#define T_ERRSHADOW_WIN32KLIMIT_NOT_FOUND TEXT("W32pServiceLimit not found in win32k module")
+#define T_ERRSHADOW_WIN32U_MISMATCH TEXT("Not all services found in win32u")
+#define T_ERRSHADOW_TABLE_NOT_FOUND TEXT("W32pServiceTable not found in win32k module")
+#define T_ERRSHADOW_APISETMAP_NOT_FOUND TEXT("ApiSetSchema map not found")
+#define T_ERRSHADOW_APISET_VER_UNKNOWN TEXT("ApiSetSchema version is unknown")

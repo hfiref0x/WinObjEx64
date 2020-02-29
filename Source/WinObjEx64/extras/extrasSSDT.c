@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.84
 *
-*  DATE:        13 Jan 2020
+*  DATE:        28 Feb 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -369,18 +369,17 @@ INT_PTR CALLBACK SdtDialogProc(
 }
 
 /*
-* SdtOutputTable
+* SdtListOutputTable
 *
 * Purpose:
 *
 * Output dumped and converted syscall table to listview.
 *
 */
-VOID SdtOutputTable(
+VOID SdtListOutputTable(
     _In_ HWND hwndDlg,
     _In_ PRTL_PROCESS_MODULES Modules,
-    _In_ PSERVICETABLEENTRY Table,
-    _In_ ULONG Count
+    _In_ PSDT_TABLE SdtTableEntry
 )
 {
     INT lvIndex, moduleIndex;
@@ -390,30 +389,27 @@ VOID SdtOutputTable(
     LVITEM lvItem;
     WCHAR szBuffer[MAX_PATH + 1];
 
-    szBuffer[0] = 0;
+    LPWSTR lpBaseName, lpBaseLimit;
 
-    switch (Context->DialogMode) {
-    case SST_Ntos:
-        _strcpy(szBuffer, TEXT("KiServiceTable 0x"));
-        u64tohex(g_kdctx.KeServiceDescriptorTable.Base, _strend(szBuffer));
-        _strcat(szBuffer, TEXT(" / KiServiceLimit 0x"));
-        ultohex(g_kdctx.KeServiceDescriptorTable.Limit, _strend(szBuffer));
-        _strcat(szBuffer, TEXT(" ("));
-        ultostr(g_kdctx.KeServiceDescriptorTable.Limit, _strend(szBuffer));
-        _strcat(szBuffer, TEXT(")"));
-        break;
-    case SST_Win32k:
-        _strcpy(szBuffer, TEXT("W32pServiceTable 0x"));
-        u64tohex(g_kdctx.KeServiceDescriptorTableShadow.Base, _strend(szBuffer));
-        _strcat(szBuffer, TEXT(" / W32pServiceLimit 0x"));
-        ultohex(g_kdctx.KeServiceDescriptorTableShadow.Limit, _strend(szBuffer));
-        _strcat(szBuffer, TEXT(" ("));
-        ultostr(g_kdctx.KeServiceDescriptorTableShadow.Limit, _strend(szBuffer));
-        _strcat(szBuffer, TEXT(")"));
-        break;
-    default:
-        break;
+    if (Context->DialogMode == SST_Ntos) {
+        lpBaseName = KSW_KiServiceTable;
+        lpBaseLimit = KSW_KiServiceLimit;
     }
+    else if (Context->DialogMode == SST_Win32k) {
+        lpBaseName = KSW_W32pServiceTable;
+        lpBaseLimit = KSW_W32pServiceLimit;
+    }
+    else
+        return;
+
+    RtlStringCchPrintfSecure(szBuffer,
+        MAX_PATH,
+        TEXT("%ws 0x%p / %ws %lu (0x%lX)"),
+        lpBaseName,
+        (PVOID)SdtTableEntry->Base,
+        lpBaseLimit,
+        SdtTableEntry->Limit,
+        SdtTableEntry->Limit);
 
     SetWindowText(Context->StatusBar, szBuffer);
 
@@ -422,10 +418,10 @@ VOID SdtOutputTable(
     ListView_DeleteAllItems(Context->ListView);
 
     //list table
-    for (i = 0; i < Count; i++) {
+    for (i = 0; i < SdtTableEntry->Limit; i++) {
 
         RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-        ultostr(Table[i].ServiceId, szBuffer);
+        ultostr(SdtTableEntry->Table[i].ServiceId, szBuffer);
 
         //ServiceId
         RtlSecureZeroMemory(&lvItem, sizeof(lvItem));
@@ -438,7 +434,7 @@ VOID SdtOutputTable(
         //Name
         lvItem.mask = LVIF_TEXT;
         lvItem.iSubItem = 1;
-        lvItem.pszText = (LPWSTR)Table[i].Name;
+        lvItem.pszText = (LPWSTR)SdtTableEntry->Table[i].Name;
         lvItem.iItem = lvIndex;
         ListView_SetItem(Context->ListView, &lvItem);
 
@@ -446,7 +442,7 @@ VOID SdtOutputTable(
         RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
         szBuffer[0] = L'0';
         szBuffer[1] = L'x';
-        u64tohex(Table[i].Address, &szBuffer[2]);
+        u64tohex(SdtTableEntry->Table[i].Address, &szBuffer[2]);
 
         lvItem.iSubItem = 2;
         lvItem.pszText = szBuffer;
@@ -455,7 +451,7 @@ VOID SdtOutputTable(
         //Module
         RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
 
-        moduleIndex = supFindModuleEntryByAddress(Modules, (PVOID)Table[i].Address);
+        moduleIndex = supFindModuleEntryByAddress(Modules, (PVOID)SdtTableEntry->Table[i].Address);
         if (moduleIndex == (ULONG)-1) {
             _strcpy(szBuffer, TEXT("Unknown Module"));
         }
@@ -477,21 +473,21 @@ VOID SdtOutputTable(
 }
 
 /*
-* SdtListTable
+* SdtListCreateTable
 *
 * Purpose:
 *
-* KiServiceTable query and list routine.
+* KiServiceTable dump routine.
 *
 */
-VOID SdtListTable(
-    _In_ HWND hwndDlg
+BOOL SdtListCreateTable(
+    _In_ BOOLEAN bForceUnknown
 )
 {
+    BOOL                    bResult = FALSE;
     ULONG                   EntrySize = 0;
     SIZE_T                  memIO;
     PUTable                 TableDump = NULL;
-    PRTL_PROCESS_MODULES    pModules = NULL;
     PBYTE                   Module = NULL;
     PIMAGE_EXPORT_DIRECTORY ExportDirectory = NULL;
     PDWORD                  ExportNames, ExportFunctions;
@@ -502,13 +498,6 @@ VOID SdtListTable(
     CHAR* ServiceName;
     PVOID ServicePtr;
     ULONG ServiceId, i;
-
-#ifndef _DEBUG
-    HWND hwndBanner;
-
-    hwndBanner = supDisplayLoadBanner(hwndDlg,
-        TEXT("Loading service table dump, please wait"));
-#endif
 
     __try {
 
@@ -523,10 +512,6 @@ VOID SdtListTable(
                 __leave;
             }
         }
-
-        pModules = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation, NULL);
-        if (pModules == NULL)
-            __leave;
 
         //
         // If table empty, dump and prepare table
@@ -570,6 +555,8 @@ VOID SdtListTable(
                 __leave;
             }
 
+            KiServiceTable.Base = g_kdctx.KeServiceDescriptorTable.Base;
+
             //
             // Walk for Nt stubs.
             //
@@ -609,14 +596,16 @@ VOID SdtListTable(
             //  
             //  This will produce incorrect result if more like that services will be added.
             //
-            for (i = 0; i < g_kdctx.KeServiceDescriptorTable.Limit; i++) {
-                if (TableDump[i] != 0) {
-                    ServiceEntry = &KiServiceTable.Table[KiServiceTable.Limit];
-                    ServiceEntry->ServiceId = i;
-                    ServiceEntry->Address = TableDump[i];
-                    _strcpy(ServiceEntry->Name, L"NtQuerySystemTime");
-                    KiServiceTable.Limit += 1;
-                    break;
+            if (bForceUnknown) {
+                for (i = 0; i < g_kdctx.KeServiceDescriptorTable.Limit; i++) {
+                    if (TableDump[i] != 0) {
+                        ServiceEntry = &KiServiceTable.Table[KiServiceTable.Limit];
+                        ServiceEntry->ServiceId = i;
+                        ServiceEntry->Address = TableDump[i];
+                        _strcpy(ServiceEntry->Name, TEXT("NtQuerySystemTime"));
+                        KiServiceTable.Limit += 1;
+                        break;
+                    }
                 }
             }
 
@@ -624,27 +613,17 @@ VOID SdtListTable(
             TableDump = NULL;
         }
 
-        SdtOutputTable(
-            hwndDlg,
-            pModules,
-            KiServiceTable.Table,
-            KiServiceTable.Limit);
+        bResult = TRUE;
 
     }
     __finally {
-
-#ifndef _DEBUG
-        SendMessage(hwndBanner, WM_CLOSE, 0, 0);
-#endif
-
-        if (pModules) {
-            supHeapFree(pModules);
-        }
 
         if (TableDump) {
             supHeapFree(TableDump);
         }
     }
+
+    return bResult;
 }
 
 //
@@ -1016,29 +995,31 @@ NTSTATUS SdtResolveServiceEntryModule(
 }
 
 /*
-* SdtListTableShadow
+* SdtListCreateTableShadow
 *
 * Purpose:
 *
-* W32pServiceTable query and list routine.
+* W32pServiceTable create table routine.
 *
 * Note: This code only for Windows 10 RS1+
 *
 */
-VOID SdtListTableShadow(
-    _In_ HWND hwndDlg
+BOOL SdtListCreateTableShadow(
+    _In_ PRTL_PROCESS_MODULES pModules,
+    _Out_ PULONG Status
 )
 {
     BOOLEAN     NeedApiSetResolve = (g_NtBuildNumber > 18885);
     BOOLEAN     Win32kApiSetTableExpected = (g_NtBuildNumber > 18935);
-    NTSTATUS    Status;
+    NTSTATUS    ntStatus;
+    BOOL        bResult = FALSE;
     ULONG       w32u_limit, w32k_limit, c;
     HMODULE     w32u = NULL, w32k = NULL, DllModule, forwdll;
     PBYTE       fptr;
     PULONG      pServiceLimit, pServiceTable;
     LPCSTR	    ModuleName, FunctionName, ForwarderDot, ForwarderFunctionName;
     HANDLE      EnumerationHeap = NULL;
-    ULONG_PTR   Win32kBase = 0;
+    ULONG_PTR   Win32kBase = 0, kernelWin32kBase = 0;
 
     PSERVICETABLEENTRY  ServiceEntry;
     PWIN32_SHADOWTABLE  table, itable;
@@ -1050,7 +1031,6 @@ VOID SdtListTableShadow(
     ULONG                           ApiSetSchemaVersion = 0;
 
     PRTL_PROCESS_MODULE_INFORMATION Module, ForwardModule;
-    PRTL_PROCESS_MODULES            pModules = NULL;
 
     LOAD_MODULE_ENTRY               LoadedModulesHead;
     PLOAD_MODULE_ENTRY              ModuleEntry = NULL, PreviousEntry = NULL;
@@ -1060,27 +1040,13 @@ VOID SdtListTableShadow(
     WCHAR szBuffer[MAX_PATH * 2];
     CHAR szForwarderModuleName[MAX_PATH];
 
-
-#ifndef _DEBUG
-    HWND hwndBanner;
-
-    hwndBanner = supDisplayLoadBanner(hwndDlg,
-        TEXT("Loading service table dump, please wait"));
-#endif
-
     LoadedModulesHead.Next = NULL;
     LoadedModulesHead.hModule = NULL;
 
+    *Status = STATUS_SUCCESS;
+
     __try {
 
-        //
-        // Query modules list.
-        //
-        pModules = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation, NULL);
-        if (pModules == NULL) {
-            MessageBox(hwndDlg, TEXT("Could not allocate memory for Modules list"), NULL, MB_ICONERROR);
-            __leave;
-        }
 
         //
         // Check if table already built.
@@ -1095,7 +1061,7 @@ VOID SdtListTableShadow(
                 "win32k.sys");
 
             if (Module == NULL) {
-                MessageBox(hwndDlg, TEXT("Could not find win32k module"), NULL, MB_ICONERROR);
+                *Status = ErrShadowWin32kNotFound;
                 __leave;
             }
 
@@ -1106,7 +1072,7 @@ VOID SdtListTableShadow(
             //
             EnumerationHeap = RtlCreateHeap(HEAP_GROWABLE, NULL, 0, 0, NULL, NULL);
             if (EnumerationHeap == NULL) {
-                MessageBox(hwndDlg, TEXT("Could not allocate memory"), NULL, MB_ICONERROR);
+                *Status = ErrShadowMemAllocFail;
                 __leave;
             }
 
@@ -1115,7 +1081,7 @@ VOID SdtListTableShadow(
             //
             w32u = LoadLibraryEx(TEXT("win32u.dll"), NULL, 0);
             if (w32u == NULL) {
-                MessageBox(hwndDlg, TEXT("Could not load win32u.dll"), NULL, MB_ICONERROR);
+                *Status = ErrShadowWin32uLoadFail;
                 __leave;
             }
 
@@ -1128,7 +1094,7 @@ VOID SdtListTableShadow(
             _strcat(szBuffer, TEXT("\\win32k.sys"));
             w32k = LoadLibraryEx(szBuffer, NULL, DONT_RESOLVE_DLL_REFERENCES);
             if (w32k == NULL) {
-                MessageBox(hwndDlg, TEXT("Could not load win32k.sys"), NULL, MB_ICONERROR);
+                *Status = ErrShadowWin32kLoadFail;
                 __leave;
             }
 
@@ -1138,19 +1104,16 @@ VOID SdtListTableShadow(
                 //
                 Win32kApiSetTable = kdQueryWin32kApiSetTable(w32k);
                 if (Win32kApiSetTable == 0) {
-                    MessageBox(hwndDlg,
-                        TEXT("Win32kApiSetTable was not found, win32k adapters targets will not be determinated."),
-                        NULL,
-                        MB_ICONINFORMATION);
+                    *Status = ErrShadowApiSetNotFound;
                 }
             }
 
             //
             // Query win32k!W32pServiceLimit.
             //
-            pServiceLimit = (PULONG)GetProcAddress(w32k, "W32pServiceLimit");
+            pServiceLimit = (PULONG)GetProcAddress(w32k, KSA_W32pServiceLimit);
             if (pServiceLimit == NULL) {
-                MessageBox(hwndDlg, TEXT("W32pServiceLimit not found in win32k module"), NULL, MB_ICONERROR);
+                *Status = ErrShadowW32pServiceLimitNotFound;
                 __leave;
             }
 
@@ -1159,7 +1122,7 @@ VOID SdtListTableShadow(
             //
             w32k_limit = *pServiceLimit;
             if (w32k_limit != w32u_limit) {
-                MessageBox(hwndDlg, TEXT("Not all services found in win32u"), NULL, MB_ICONERROR);
+                *Status = ErrShadowWin32uMismatch;
                 __leave;
             }
 
@@ -1167,8 +1130,8 @@ VOID SdtListTableShadow(
             // Query win32k!W32pServiceTable.
             //
             RtlSecureZeroMemory(&rfn, sizeof(RESOLVE_INFO));
-            if (!NT_SUCCESS(NtRawGetProcAddress(w32k, "W32pServiceTable", &rfn))) {
-                MessageBox(hwndDlg, TEXT("W32pServiceTable not found in win32k module"), NULL, MB_ICONERROR);
+            if (!NT_SUCCESS(NtRawGetProcAddress(w32k, KSA_W32pServiceTable, &rfn))) {
+                *Status = ErrShadowW32pServiceTableNotFound;
                 __leave;
             }
 
@@ -1178,7 +1141,7 @@ VOID SdtListTableShadow(
             if (NeedApiSetResolve) {
 
                 if (!NtLdrApiSetLoadFromPeb(&ApiSetSchemaVersion, (PVOID*)&ApiSetMap)) {
-                    MessageBox(hwndDlg, TEXT("ApiSetSchema map not found"), NULL, MB_ICONERROR);
+                    *Status = ErrShadowApiSetSchemaMapNotFound;
                     __leave;
                 }
 
@@ -1186,7 +1149,7 @@ VOID SdtListTableShadow(
                 // Windows 10+ uses modern ApiSetSchema version, everything else not supported.
                 //
                 if (ApiSetSchemaVersion != 6) {
-                    MessageBox(hwndDlg, TEXT("ApiSetSchema version is unknown"), NULL, MB_ICONERROR);
+                    *Status = ErrShadowApiSetSchemaVerUnknown;
                     __leave;
                 }
             }
@@ -1194,8 +1157,7 @@ VOID SdtListTableShadow(
             //
             // Set global variables.
             //
-            g_kdctx.KeServiceDescriptorTableShadow.Limit = w32k_limit;
-            g_kdctx.KeServiceDescriptorTableShadow.Base = Win32kBase + (ULONG_PTR)rfn.Function - (ULONG_PTR)w32k;
+            kernelWin32kBase = Win32kBase + (ULONG_PTR)rfn.Function - (ULONG_PTR)w32k;
 
             //
             // Insert SystemRoot\System32\Drivers to the loader directories search list.
@@ -1223,7 +1185,7 @@ VOID SdtListTableShadow(
                         DllModule = NULL;
                         RtlSecureZeroMemory(&ResolvedModuleName, sizeof(ResolvedModuleName));
 
-                        Status = SdtResolveServiceEntryModule(fptr,
+                        ntStatus = SdtResolveServiceEntryModule(fptr,
                             w32k,
                             ApiSetMap,
                             Win32kApiSetTable,
@@ -1232,23 +1194,23 @@ VOID SdtListTableShadow(
                             &ResolvedModuleName,
                             &FunctionName);
 
-                        if (!NT_SUCCESS(Status)) {
+                        if (!NT_SUCCESS(ntStatus)) {
 
                             //
                             // Most of this errors are not critical and ok.
                             //
 
-                            switch (Status) {
+                            switch (ntStatus) {
 
                             case STATUS_INTERNAL_ERROR:
-                                DbgPrint("SdtListTableShadow, HDE Error\r\n");
+                                DbgPrint("SdtListCreateTableShadow, HDE Error\r\n");
                                 break;
 
                             case STATUS_APISET_NOT_HOSTED:
                                 //
                                 // Corresponding apiset not found.
                                 //
-                                DbgPrint("SdtListTableShadow not an apiset adapter for %s\r\n",
+                                DbgPrint("SdtListCreateTableShadow not an apiset adapter for %s\r\n",
                                     itable->Name);
                                 break;
 
@@ -1256,7 +1218,7 @@ VOID SdtListTableShadow(
                                 //
                                 // ApiSet extension present but empty.
                                 // 
-                                DbgPrint("SdtListTableShadow, extension contains a host for a non-existent apiset %s\r\n",
+                                DbgPrint("SdtListCreateTableShadow, extension contains a host for a non-existent apiset %s\r\n",
                                     itable->Name);
                                 break;
 
@@ -1264,13 +1226,13 @@ VOID SdtListTableShadow(
                                 //
                                 // Not a critical issue. This mean we cannot pass this service next to forwarder lookup code.
                                 //
-                                DbgPrint("SdtListTableShadow, could not resolve function name in module for service id %lu, service name %s\r\n",
+                                DbgPrint("SdtListCreateTableShadow, could not resolve function name in module for service id %lu, service name %s\r\n",
                                     itable->Index,
                                     itable->Name);
                                 break;
 
                             case STATUS_DRIVER_UNABLE_TO_LOAD:
-                                DbgPrint("SdtListTableShadow, could not load import dll %s\r\n", ResolvedModuleName.Buffer);
+                                DbgPrint("SdtListCreateTableShadow, could not load import dll %s\r\n", ResolvedModuleName.Buffer);
                                 break;
 
                             default:
@@ -1300,7 +1262,7 @@ VOID SdtListTableShadow(
                         }
 
                         if (!NT_SUCCESS(NtRawGetProcAddress(DllModule, FunctionName, &rfn))) {
-                            DbgPrint("SdtListTableShadow: Could not resolve function %s address\r\n", FunctionName);
+                            DbgPrint("SdtListCreateTableShadow: Could not resolve function %s address\r\n", FunctionName);
                             break;
                         }
 
@@ -1352,7 +1314,7 @@ VOID SdtListTableShadow(
 
                                     }
                                     else {
-                                        OutputDebugString(TEXT("SdtListTableShadow, could not load forwarded module\r\n"));
+                                        OutputDebugString(TEXT("SdtListCreateTableShadow, could not load forwarded module\r\n"));
                                     }
 
                                 } // if (ForwarderFunctionName)
@@ -1387,6 +1349,7 @@ VOID SdtListTableShadow(
             if (W32pServiceTable.Table) {
 
                 W32pServiceTable.Allocated = TRUE;
+                W32pServiceTable.Base = kernelWin32kBase;
 
                 //
                 // Convert table to output format.
@@ -1440,19 +1403,7 @@ VOID SdtListTableShadow(
 
         } // if (W32pServiceTable.Allocated == FALSE)
 
-
-        //
-        // Output shadow table if available.
-        //
-        if (W32pServiceTable.Allocated) {
-
-            SdtOutputTable(
-                hwndDlg,
-                pModules,
-                W32pServiceTable.Table,
-                W32pServiceTable.Limit);
-
-        }
+        bResult = W32pServiceTable.Allocated;
 
     }
     __finally {
@@ -1470,16 +1421,13 @@ VOID SdtListTableShadow(
         {
             FreeLibrary(ModuleEntry->hModule);
         }
-
-        if (pModules) supHeapFree(pModules);
         if (EnumerationHeap) RtlDestroyHeap(EnumerationHeap);
         if (w32u) FreeLibrary(w32u);
         if (w32k) FreeLibrary(w32k);
 
-#ifndef _DEBUG
-        SendMessage(hwndBanner, WM_CLOSE, 0, 0);
-#endif
     }
+
+    return bResult;
 }
 
 /*
@@ -1496,39 +1444,131 @@ VOID SdtListCreate(
     _In_ EXTRASCONTEXT * pDlgContext
 )
 {
+    BOOL bSuccess = FALSE;
+    ULONG returnStatus;
     EXTRASCALLBACK CallbackParam;
+    PRTL_PROCESS_MODULES pModules = NULL;
+    LPWSTR lpErrorMsg = TEXT("Unknown error");
 
-    switch (pDlgContext->DialogMode) {
+#ifndef _DEBUG
+    HWND hwndBanner;
 
-    case SST_Ntos:
-        if (fRescan) {
-            if (KiServiceTable.Allocated) {
-                KiServiceTable.Allocated = FALSE;
-                supHeapFree(KiServiceTable.Table);
-                KiServiceTable.Limit = 0;
+    hwndBanner = supDisplayLoadBanner(hwndDlg,
+        TEXT("Loading service table dump, please wait"));
+#endif
+
+    __try {
+
+        pModules = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation, NULL);
+        if (pModules == NULL) {
+            MessageBox(hwndDlg, TEXT("Could not allocate memory for kernel modules list"), NULL, MB_ICONERROR);
+            __leave;
+        }
+
+        if (pDlgContext->DialogMode == SST_Ntos) {
+
+            if (fRescan) {
+                if (KiServiceTable.Allocated) {
+                    KiServiceTable.Allocated = FALSE;
+                    supHeapFree(KiServiceTable.Table);
+                    KiServiceTable.Limit = 0;
+                }
+            }
+
+            bSuccess = SdtListCreateTable(TRUE);
+            if (bSuccess) {
+                SdtListOutputTable(hwndDlg, pModules, &KiServiceTable);
+            }
+
+        }
+        else if (pDlgContext->DialogMode == SST_Win32k) {
+
+            if (fRescan) {
+                if (W32pServiceTable.Allocated) {
+                    W32pServiceTable.Allocated = FALSE;
+                    supHeapFree(W32pServiceTable.Table);
+                    W32pServiceTable.Limit = 0;
+                }
+            }
+
+            bSuccess = SdtListCreateTableShadow(pModules, &returnStatus);
+            if (bSuccess) {
+
+                if (returnStatus == ErrShadowApiSetNotFound)
+                    MessageBox(hwndDlg, T_ERRSHADOW_APISETTABLE_NOT_FOUND, PROGRAM_NAME, MB_ICONINFORMATION);
+
+                SdtListOutputTable(hwndDlg, pModules, &W32pServiceTable);
+            }
+            else {
+
+#ifndef _DEBUG
+                SendMessage(hwndBanner, WM_CLOSE, 0, 0);
+#endif
+
+                switch (returnStatus) {
+
+                case ErrShadowWin32kNotFound:
+                    lpErrorMsg = T_ERRSHADOW_WIN32K_NOT_FOUND;
+                    break;
+
+                case ErrShadowMemAllocFail:
+                    lpErrorMsg = T_ERRSHADOW_MEMORY_NOT_ALLOCATED;
+                    break;
+
+                case ErrShadowWin32uLoadFail:
+                    lpErrorMsg = T_ERRSHADOW_WIN32U_LOAD_FAILED;
+                    break;
+
+                case ErrShadowWin32kLoadFail:
+                    lpErrorMsg = T_ERRSHADOW_WIN32K_LOAD_FAILED;
+                    break;
+
+                case ErrShadowW32pServiceLimitNotFound:
+                    lpErrorMsg = T_ERRSHADOW_WIN32KLIMIT_NOT_FOUND;
+                    break;
+
+                case ErrShadowWin32uMismatch:
+                    lpErrorMsg = T_ERRSHADOW_WIN32U_MISMATCH;
+                    break;
+
+                case ErrShadowW32pServiceTableNotFound:
+                    lpErrorMsg = T_ERRSHADOW_TABLE_NOT_FOUND;
+                    break;
+
+                case ErrShadowApiSetSchemaMapNotFound:
+                    lpErrorMsg = T_ERRSHADOW_APISETMAP_NOT_FOUND;
+                    break;
+
+                case ErrShadowApiSetSchemaVerUnknown:
+                    lpErrorMsg = T_ERRSHADOW_APISET_VER_UNKNOWN;
+                    break;
+
+                default:
+                    break;
+                }
+
+                MessageBox(hwndDlg, lpErrorMsg, NULL, MB_ICONERROR);
             }
         }
-        SdtListTable(hwndDlg);
-        break;
-    case SST_Win32k:
-        if (fRescan) {
-            if (W32pServiceTable.Allocated) {
-                W32pServiceTable.Allocated = FALSE;
-                supHeapFree(W32pServiceTable.Table);
-                W32pServiceTable.Limit = 0;
-            }
-        }
-        SdtListTableShadow(hwndDlg);
-        break;
 
-    default:
-        break;
+    }
+    __finally {
+
+        if (pModules)
+            supHeapFree(pModules);
+
+#ifndef _DEBUG
+        SendMessage(hwndBanner, WM_CLOSE, 0, 0);
+#endif
+
     }
 
-    CallbackParam.lParam = 0;
-    CallbackParam.Value = pDlgContext->DialogMode;
-    ListView_SortItemsEx(pDlgContext->ListView, &SdtDlgCompareFunc, (LPARAM)&CallbackParam);
-    SetFocus(pDlgContext->ListView);
+    if (bSuccess) {
+        CallbackParam.lParam = 0;
+        CallbackParam.Value = pDlgContext->DialogMode;
+        ListView_SortItemsEx(pDlgContext->ListView, &SdtDlgCompareFunc, (LPARAM)&CallbackParam);
+        SetFocus(pDlgContext->ListView);
+    }
 }
 
 /*

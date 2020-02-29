@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.84
 *
-*  DATE:        13 Feb 2020
+*  DATE:        29 Feb 2020
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -77,6 +77,7 @@
 #include <ntsecapi.h>
 #undef _NTDEF_
 
+#include "ksymbols.h"
 #include "objects.h"
 #include "kldbg.h"
 #include "drvhelper.h"

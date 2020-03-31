@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.84
 *
-*  DATE:        16 Jan 2020
+*  DATE:        05 Mar 2020
 *
 *  Program entry point and main window handler.
 *
@@ -386,6 +386,10 @@ LRESULT MainWindowHandleWMCommand(
 
     case ID_HELP_HELP:
         supShowHelp(hwnd);
+        break;
+
+    case ID_HELP_SHOWLOG:
+        LogViewerShowDialog(hwnd);
         break;
 
     default:
@@ -1056,6 +1060,7 @@ UINT WinObjExMain()
 
     WCHAR                   szWindowTitle[100];
 
+    logCreate();
     IsWine = supIsWine();
 
     if (!supInitMSVCRT()) {
@@ -1142,7 +1147,7 @@ UINT WinObjExMain()
             LR_SHARED);
 
         wndClass.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-        wndClass.lpszMenuName = MAKEINTRESOURCE(IDR_MENU1);
+        wndClass.lpszMenuName = MAKEINTRESOURCE(IDR_MAINMENU);
         wndClass.lpszClassName = MAINWINDOWCLASSNAME;
         wndClass.hIconSm = 0;
 
@@ -1547,6 +1552,7 @@ UINT WinObjExMain()
     //do not move anywhere
 
     supShutdown();
+    logFree();
 
 #ifdef _DEBUG
     TestStop();

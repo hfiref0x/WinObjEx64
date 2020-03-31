@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.84
+*  VERSION:     1.85
 *
-*  DATE:        18 Feb 2020
+*  DATE:        21 Mar 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,9 +17,6 @@
 #include "global.h"
 #include "treelist\treelist.h"
 #include "extras\extrasSSDT.h"
-#include <cfgmgr32.h>
-#include <setupapi.h>
-#include <shlwapi.h>
 
 //
 // Setup info database.
@@ -3305,7 +3302,7 @@ SIZE_T supWriteBufferToFile(
     }
     __finally {
         if (hFile != NULL) {
-            if (Flush != FALSE) NtFlushBuffersFile(hFile, &IoStatus);
+            if (Flush) NtFlushBuffersFile(hFile, &IoStatus);
             NtClose(hFile);
         }
         RtlFreeUnicodeString(&NtFileName);
@@ -5804,7 +5801,7 @@ PSYSTEM_HANDLE_INFORMATION_EX supHandlesCreateFilteredAndSortedList(
         } while (Status == STATUS_INFO_LENGTH_MISMATCH);
 
     }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
+    __except (WOBJ_EXCEPTION_FILTER_LOG) {
         Status = GetExceptionCode();
         RawBuffer = NULL;
     }
@@ -6083,7 +6080,7 @@ NTSTATUS supxEnumerateSLCacheValueDescriptors(
         MaxPosition = (ULONG_PTR)RtlOffsetToPointer(CacheDescriptor, Cache->SizeOfData);
 
     }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
+    __except (WOBJ_EXCEPTION_FILTER_LOG) {
         return GetExceptionCode();
     }
 
@@ -6095,10 +6092,9 @@ NTSTATUS supxEnumerateSLCacheValueDescriptors(
                 return STATUS_INTERNAL_ERROR;
             }
         }
-        __except (EXCEPTION_EXECUTE_HANDLER) {
+        __except (WOBJ_EXCEPTION_FILTER_LOG) {
             return GetExceptionCode();
         }
-
 
         if (Callback) {
             if (Callback(CacheDescriptor, Context))
@@ -6113,7 +6109,7 @@ NTSTATUS supxEnumerateSLCacheValueDescriptors(
 
             CacheDescriptor = (SL_KMEM_CACHE_VALUE_DESCRIPTOR*)RtlOffsetToPointer(CacheDescriptor, CacheDescriptor->Size);
         }
-        __except (EXCEPTION_EXECUTE_HANDLER) {
+        __except (WOBJ_EXCEPTION_FILTER_LOG) {
             return GetExceptionCode();
         }
 
@@ -6741,7 +6737,7 @@ NTSTATUS supCreateSystemAdminAccessSD(
             break;
         }
 
-        ntStatus = RtlCreateAcl(sysAcl, daclSize - SECURITY_DESCRIPTOR_MIN_LENGTH, (ULONG)ACL_REVISION);
+        ntStatus = RtlCreateAcl(sysAcl, (ULONG)(daclSize - SECURITY_DESCRIPTOR_MIN_LENGTH), (ULONG)ACL_REVISION);
         if (!NT_SUCCESS(ntStatus))
             break;
 
@@ -6815,4 +6811,90 @@ ULONG supGetTimeAsSecondsSince1970(
     GetSystemTimeAsFileTime((PFILETIME)&fileTime);
     RtlTimeToSecondsSince1970(&fileTime, &seconds);
     return seconds;
+}
+
+/*
+* supRichEdit32Load
+*
+* Purpose:
+*
+* Preload richedit32 library and classes.
+*
+*/
+BOOL supRichEdit32Load()
+{
+    WCHAR szBuffer[MAX_PATH * 2];
+
+    g_WinObj.RichEditHandle = GetModuleHandle(T_RICHEDIT_LIB);
+    if (g_WinObj.RichEditHandle == NULL) {
+
+        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+
+        RtlStringCchPrintfSecure(szBuffer,
+            sizeof(szBuffer) / sizeof(szBuffer[0]),
+            TEXT("%s\\%s"),
+            g_WinObj.szSystemDirectory,
+            T_RICHEDIT_LIB);
+
+        g_WinObj.RichEditHandle = LoadLibraryEx(szBuffer, NULL, 0);
+    }
+
+    return (g_WinObj.RichEditHandle != NULL);
+}
+
+/*
+* supReportAbnormalTermination
+*
+* Purpose:
+*
+* Log abnormal terminations from try/finally blocks.
+*
+*/
+VOID supReportAbnormalTermination(
+    _In_ LPWSTR FunctionName
+)
+{
+    WCHAR szBuffer[512];
+
+    _strcpy(szBuffer, TEXT("AbnormalTermination of "));
+    _strcat(szBuffer, FunctionName);
+
+    logAdd(WOBJ_LOG_ENTRY_ERROR,
+        szBuffer);
+}
+
+/*
+* supReportException
+*
+* Purpose:
+*
+* Log details about exception.
+*
+*/
+VOID supReportException(
+    _In_ ULONG ExceptionCode,
+    _In_opt_ PEXCEPTION_POINTERS ExceptionPointers
+)
+{
+    WCHAR szBuffer[512];
+
+    _strcpy(szBuffer, TEXT("Exception 0x"));
+    ultohex(ExceptionCode, _strend(szBuffer));
+
+    if (ExceptionPointers) {
+        if (ExceptionCode == STATUS_ACCESS_VIOLATION) {
+            switch (ExceptionPointers->ExceptionRecord->ExceptionInformation[0]) {
+            case 0:
+                _strcat(szBuffer, TEXT(", read at address: 0x"));
+                break;
+            case 1:
+                _strcat(szBuffer, TEXT(", write at address: 0x"));
+                break;
+            }
+            u64tohex(ExceptionPointers->ExceptionRecord->ExceptionInformation[1], _strend(szBuffer));
+        }
+    }
+
+    logAdd(WOBJ_LOG_ENTRY_ERROR,
+        szBuffer);
 }

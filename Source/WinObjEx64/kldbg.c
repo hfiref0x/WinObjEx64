@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.84
+*  VERSION:     1.85
 *
-*  DATE:        22 Feb 2020
+*  DATE:        21 Mar 2020
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -17,6 +17,7 @@
 *
 *******************************************************************************/
 #include "global.h"
+#include "ntos\ntldr.h"
 #include "hde\hde64.h"
 #include "kldbg_patterns.h"
 
@@ -817,7 +818,7 @@ NTSTATUS ObEnumerateBoundaryDescriptorEntries(
         BoundaryDescriptorItems = BoundaryDescriptor->Items;
 
     }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
+    __except (WOBJ_EXCEPTION_FILTER_LOG) {
         return GetExceptionCode();
     }
 
@@ -853,7 +854,7 @@ NTSTATUS ObEnumerateBoundaryDescriptorEntries(
                             return STATUS_DUPLICATE_OBJECTID;
                     }
         }
-        __except (EXCEPTION_EXECUTE_HANDLER) {
+        __except (WOBJ_EXCEPTION_FILTER_LOG) {
             return GetExceptionCode();
         }
 
@@ -1143,12 +1144,15 @@ UCHAR ObDecodeTypeIndex(
     UCHAR          TypeIndex;
     POBJECT_HEADER ObjectHeader;
 
-    if (g_kdctx.ObHeaderCookie == 0) {
+    //
+    // Cookie can be zero.
+    //
+    if (g_kdctx.ObHeaderCookie.Valid == FALSE) {
         return EncodedTypeIndex;
     }
 
     ObjectHeader = OBJECT_TO_OBJECT_HEADER(Object);
-    TypeIndex = (EncodedTypeIndex ^ (UCHAR)((ULONG_PTR)ObjectHeader >> OBJECT_SHIFT) ^ g_kdctx.ObHeaderCookie);
+    TypeIndex = (EncodedTypeIndex ^ (UCHAR)((ULONG_PTR)ObjectHeader >> OBJECT_SHIFT) ^ g_kdctx.ObHeaderCookie.Value);
     return TypeIndex;
 }
 
@@ -1164,11 +1168,12 @@ UCHAR ObDecodeTypeIndex(
 * Only for Win10+ use
 *
 */
-UCHAR ObpFindHeaderCookie(
+BOOLEAN ObpFindHeaderCookie(
     _In_ PKLDBGCONTEXT Context
 )
 {
-    UCHAR      ObHeaderCookie = 0;
+    BOOLEAN    bResult = FALSE;
+    UCHAR      cookieValue = 0;
     PBYTE      ptrCode;
     ULONG_PTR  Address;
 
@@ -1177,6 +1182,7 @@ UCHAR ObpFindHeaderCookie(
 
     __try {
 
+        Context->ObHeaderCookie.Valid = FALSE;
         NtOsBase = (ULONG_PTR)Context->NtOsBase;
         hNtOs = (HMODULE)Context->NtOsImageMap;
 
@@ -1199,21 +1205,25 @@ UCHAR ObpFindHeaderCookie(
 
             if (!kdReadSystemMemoryEx(
                 Address,
-                &ObHeaderCookie,
-                sizeof(ObHeaderCookie),
+                &cookieValue,
+                sizeof(cookieValue),
                 NULL))
             {
                 break;
             }
 
+            Context->ObHeaderCookie.Valid = TRUE;
+            Context->ObHeaderCookie.Value = cookieValue;
+            bResult = TRUE;
+
         } while (FALSE);
 
     }
-    __except (WOBJ_EXCEPTION_FILTER) {
-        return 0;
+    __except (WOBJ_EXCEPTION_FILTER_LOG) {
+        return FALSE;
     }
 
-    return ObHeaderCookie;
+    return bResult;
 }
 
 /*
@@ -1548,7 +1558,7 @@ BOOL kdFindKiServiceTable(
         } while (FALSE);
 
     }
-    __except (WOBJ_EXCEPTION_FILTER) {
+    __except (WOBJ_EXCEPTION_FILTER_LOG) {
         return FALSE;
     }
     return bResult;
@@ -2855,14 +2865,16 @@ BOOL kdIsDebugBoot(
 }
 
 /*
-* kdShowError
+* kdReportReadError
 *
 * Purpose:
 *
-* Display details about failed driver call.
+* Log details about failed driver call.
 *
 */
-VOID kdShowError(
+VOID kdReportReadError(
+    _In_ LPWSTR FunctionName,
+    _In_ ULONG_PTR KernelAddress,
     _In_ ULONG InputBufferLength,
     _In_ NTSTATUS Status,
     _In_ PIO_STATUS_BLOCK Iosb
@@ -2870,16 +2882,18 @@ VOID kdShowError(
 {
     WCHAR szBuffer[512];
 
-    _strcpy(szBuffer, TEXT("NtDeviceIoControlFile = 0x"));
-    ultohex(Status, _strend(szBuffer));
-    _strcat(szBuffer, TEXT("\r\nIoStatusBlock.Status = 0x"));
-    ultohex(Iosb->Status, _strend(szBuffer));
-    _strcat(szBuffer, TEXT("\r\nIoStatusBlock.Information = 0x"));
-    u64tohex(Iosb->Information, _strend(szBuffer));
-    _strcat(szBuffer, TEXT("\r\n\nInputBufferLength = 0x"));
-    ultohex(InputBufferLength, _strend(szBuffer));
+    RtlStringCchPrintfSecure(szBuffer,
+        512,
+        TEXT("%ws 0x%lX, read at 0x%llX, Iosb(0x%lX, 0x%lX), InputBufferLength 0x%lX"),
+        FunctionName,
+        Status,
+        KernelAddress,
+        Iosb->Status,
+        Iosb->Information,
+        InputBufferLength);
 
-    MessageBox(GetDesktopWindow(), szBuffer, NULL, MB_TOPMOST | MB_ICONERROR);
+    logAdd(WOBJ_LOG_ENTRY_ERROR,
+        szBuffer);
 }
 
 /*
@@ -2968,11 +2982,7 @@ BOOL kdpReadSystemMemoryEx(
                 *NumberOfBytesRead = (ULONG)iost.Information;
         }
 
-        if (g_kdctx.ShowKdError)
-            kdShowError(BufferSize, status, &iost);
-        else
-            SetLastError(RtlNtStatusToDosError(status));
-
+        kdReportReadError(__FUNCTIONW__, Address, BufferSize, status, &iost);
         return FALSE;
     }
 }
@@ -2996,7 +3006,7 @@ BOOL kdExtractDriverResource(
     PVOID   pData;
     BOOL    bResult = FALSE;
     DWORD   dwSize = 0, dwLastError = ERROR_SUCCESS;
-    HANDLE  hFile = INVALID_HANDLE_VALUE;
+    HANDLE  hFile;
 
     hResInfo = FindResource(g_WinObj.hInstance, lpName, lpType);
     if (hResInfo == NULL) {
@@ -3180,8 +3190,7 @@ UCHAR kdGetInstructionLength(
         *ptrFlags = hs.flags;
         return hs.len;
     }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
-        DbgPrint("GetInstructionLength exception %lx", GetExceptionCode());
+    __except (WOBJ_EXCEPTION_FILTER_LOG) {
         return 0;
     }
 }
@@ -3203,11 +3212,12 @@ ULONG_PTR kdQueryWin32kApiSetTable(
 {
     PBYTE	    ptrCode = (PBYTE)hWin32k;
 
-    PVOID       SectionBase, SearchPattern;
-    ULONG       SectionSize = 0, Index, SearchPatternSize = 0;
+    PVOID       SectionBase;
+    ULONG       SectionSize = 0, Index;
+    ULONG       instLength = 0, tempOffset;
 
-    ULONG_PTR   Address = 0;
-    LONG        Rel = 0;
+    ULONG_PTR   tableAddress = 0;
+    LONG        relativeValue = 0;
     hde64s      hs;
 
     __try {
@@ -3227,37 +3237,40 @@ ULONG_PTR kdQueryWin32kApiSetTable(
         ptrCode = (PBYTE)SectionBase;
 
         do {
+
             hde64_disasm((void*)(ptrCode + Index), &hs);
             if (hs.flags & F_ERROR)
                 break;
 
-            if (hs.len == IL_Win32kApiSetMov) {
+            instLength = hs.len;
 
-                SearchPatternSize = sizeof(Win32kApiSetTableMovPattern);
-                SearchPattern = Win32kApiSetTableMovPattern;
+            //
+            // Check if 3 byte length MOV.
+            //
+            if (instLength == IL_Win32kApiSetMov) {
 
-                if (SearchPatternSize == RtlCompareMemory(&ptrCode[Index],
-                    SearchPattern,
-                    SearchPatternSize))
-                {
-                    Index += hs.len;
-                    hde64_disasm((void*)(ptrCode + Index), &hs);
+                tempOffset = Index + 1; //+1 to skip rex prefix
+
+                if (ptrCode[tempOffset] == 0x8B) {
+
+                    tempOffset = Index + instLength;
+                    hde64_disasm((void*)(ptrCode + tempOffset), &hs);
                     if (hs.flags & F_ERROR)
                         break;
 
                     //
-                    // lea reg, Win32kApiSetTable
+                    // Check if next instruction is 7 bytes len LEA.
                     //
                     if (hs.len == IL_Win32kApiSetTable) {
+                        if (ptrCode[tempOffset + 1] == 0x8D) {
 
-                        SearchPatternSize = sizeof(Win32kApiSetTableLeaPattern);
-                        SearchPattern = Win32kApiSetTableLeaPattern;
+                            //
+                            // Update counters.
+                            //
+                            Index = tempOffset;
+                            instLength = hs.len;
 
-                        if (SearchPatternSize == RtlCompareMemory(&ptrCode[Index],
-                            SearchPattern,
-                            SearchPatternSize))
-                        {
-                            Rel = *(PLONG)(ptrCode + Index + (hs.len - 4));
+                            relativeValue = *(PLONG)(ptrCode + tempOffset + (hs.len - 4));
                             break;
                         }
                     }
@@ -3265,21 +3278,21 @@ ULONG_PTR kdQueryWin32kApiSetTable(
                 }
             }
 
-            Index += hs.len;
+            Index += instLength;
 
         } while (Index < SectionSize - 10);
 
-        if (Rel == 0)
+        if ((relativeValue == 0) || (instLength == 0))
             return 0;
 
-        Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
+        tableAddress = (ULONG_PTR)ptrCode + Index + instLength + relativeValue;
 
     }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
-        DbgPrint("kdQueryWin32kApiSetTable ex %lx", GetExceptionCode());
+    __except (WOBJ_EXCEPTION_FILTER_LOG) {
+        return 0;
     }
 
-    return Address;
+    return tableAddress;
 }
 
 /*
@@ -3346,8 +3359,9 @@ VOID kdInit(
     RtlSecureZeroMemory(&g_kdctx, sizeof(g_kdctx));
     RtlSecureZeroMemory(&g_SystemCallbacks, sizeof(g_SystemCallbacks));
 
-    g_kdctx.ShowKdError = TRUE;
     g_kdctx.IsFullAdmin = IsFullAdmin;
+
+    NtpLdrExceptionFilter = (PFNNTLDR_EXCEPT_FILTER)exceptFilterWithLog;
 
     //
     // Default driver load status.
@@ -3441,7 +3455,8 @@ VOID kdInit(
         // Locate and remember ObHeaderCookie, routine require driver usage, do not move.
         //
         if (g_WinObj.osver.dwMajorVersion >= 10) {
-            g_kdctx.ObHeaderCookie = ObpFindHeaderCookie(&g_kdctx);
+            if (!ObpFindHeaderCookie(&g_kdctx))
+                g_kdctx.ObHeaderCookie.Valid = FALSE;
         }
     }
 }

@@ -4,9 +4,9 @@
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     1.84
+*  VERSION:     1.85
 *
-*  DATE:        12 Feb 2020
+*  DATE:        06 Mar 2020
 *
 *  Test code used while debug.
 *
@@ -99,8 +99,8 @@ DWORD WINAPI LPCListener(LPVOID lpThreadParameter)
                     break;
 
             }
-            __except (EXCEPTION_EXECUTE_HANDLER) {
-                DbgPrint("ListenerException%lx", GetExceptionCode());
+            __except (WOBJ_EXCEPTION_FILTER_LOG) {
+                __nop();
             }
 
         }
@@ -440,7 +440,7 @@ VOID TestException(
         __try {
             *(PBYTE)(NULL) = 0;
         }
-        __except (WOBJ_EXCEPTION_FILTER)
+        __except (WOBJ_EXCEPTION_FILTER_LOG)
         {
             __nop();
         }
@@ -747,7 +747,7 @@ VOID TestStart(
     TestCall();
     //TestPsObjectSecurity();
     //TestLicenseCache();
-    //TestApiSetResolve();
+    TestApiSetResolve();
     TestDesktop();
     TestApiPort();
     TestDebugObject();

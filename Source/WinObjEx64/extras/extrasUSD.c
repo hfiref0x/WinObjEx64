@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASUSD.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.85
 *
-*  DATE:        05 Jan 2020
+*  DATE:        21 Mar 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -47,7 +47,6 @@ VOID UsdDumpSharedRegion(
     WCHAR               szValue[MAX_PATH + 1];
 
     PKUSER_SHARED_DATA  pUserSharedData;
-    HWND hwnd;
 
 
     do {
@@ -57,11 +56,8 @@ VOID UsdDumpSharedRegion(
         if (IsBadReadPtr(pUserSharedData, sizeof(KUSER_SHARED_DATA)))
             break;
 
-        hwnd = GetDlgItem(hwndParent, ID_USDDUMPGROUPBOX);
-
-        if (!supInitTreeListForDump(hwndParent, &UsdTreeList)) {
+        if (!supInitTreeListForDump(hwndParent, &UsdTreeList))
             break;
-        }
 
         //
         //KUSER_SHARED_DATA

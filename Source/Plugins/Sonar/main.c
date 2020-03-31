@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.03
 *
-*  DATE:        24 Feb 2020
+*  DATE:        26 Mar 2020
 *
 *  WinObjEx64 Sonar plugin.
 *
@@ -25,7 +25,7 @@ ULONG g_CurrentDPI;
 
 int  y_splitter_pos = 300, y_capture_pos = 0, y_splitter_max = 0;
 
-#define SONAR_MAX_TESTED_BUILD 19569
+#define SONAR_MAX_TESTED_BUILD 19592
 
 #define PROTOCOLLIST_COLUMN_COUNT 3
 
@@ -472,9 +472,10 @@ VOID xxxDumpProtocolBlock(
     LVITEM lvItem;
 
     RtlSecureZeroMemory(&lvItem, sizeof(lvItem));
-    lvItem.mask = LVIF_TEXT;
+    lvItem.mask = LVIF_TEXT | LVIF_IMAGE;
     lvItem.iItem = MAXINT;
     lvItem.pszText = lpszItem;
+    lvItem.iImage = I_IMAGENONE;
     lvItemIndex = ListView_InsertItem(g_ctx.ListView, &lvItem);
 
     lvItem.pszText = lpszValue;
@@ -1093,6 +1094,11 @@ VOID PluginFreeGlobalResources()
         g_ctx.PluginHeap = NULL;
     }
 
+    if (g_ClassAtom) {
+        UnregisterClass(MAKEINTATOM(g_ClassAtom), g_ThisDLL);
+        g_ClassAtom = 0;
+    }
+
     g_Plugin->StateChangeCallback(g_Plugin, PluginStopped, NULL);
 }
 
@@ -1230,6 +1236,7 @@ DWORD WINAPI PluginThread(
             ImageList_ReplaceIcon(g_ctx.ImageList, -1, hIcon);
             DestroyIcon(hIcon);
         }
+
         ListView_SetImageList(g_ctx.ListView, g_ctx.ImageList, LVSIL_SMALL);
 
         //
@@ -1490,12 +1497,6 @@ BOOL WINAPI DllMain(
     case DLL_PROCESS_ATTACH:
         g_ThisDLL = hinstDLL;
         DisableThreadLibraryCalls(hinstDLL);
-        break;
-    case DLL_PROCESS_DETACH:
-        if (g_ClassAtom) {
-            UnregisterClass(MAKEINTATOM(g_ClassAtom), g_ThisDLL);
-            g_ClassAtom = 0;
-        }
         break;
     }
 

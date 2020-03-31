@@ -398,6 +398,7 @@
     <ClCompile Include="instdrv.c" />
     <ClCompile Include="kldbg.c" />
     <ClCompile Include="list.c" />
+    <ClCompile Include="log\log.c" />
     <ClCompile Include="main.c" />
     <ClCompile Include="objects.c" />
     <ClCompile Include="plugmngr.c" />
@@ -453,6 +454,7 @@
     <ClInclude Include="kldbg.h" />
     <ClInclude Include="ksymbols.h" />
     <ClInclude Include="list.h" />
+    <ClInclude Include="log\log.h" />
     <ClInclude Include="msvcver.h" />
     <ClInclude Include="objects.h" />
     <ClInclude Include="kldbg_patterns.h" />

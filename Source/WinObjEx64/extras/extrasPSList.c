@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPSLIST.C
 *
-*  VERSION:     1.84
+*  VERSION:     1.85
 *
-*  DATE:        20 Feb 2020
+*  DATE:        13 Mar 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -944,6 +944,10 @@ DWORD WINAPI CreateThreadListProc(
         }
     }
     __finally {
+
+        if (AbnormalTermination())
+            supReportAbnormalTermination(__FUNCTIONW__);
+
         if (pModules) supHeapFree(pModules);
         if (stl) supHeapFree(stl);
 
@@ -1129,6 +1133,10 @@ DWORD WINAPI CreateProcessListProc(
         }
     }
     __finally {
+
+        if (AbnormalTermination())
+            supReportAbnormalTermination(__FUNCTIONW__);
+
         if (OurSid) supHeapFree(OurSid);
         supFreeSCMSnapshot(&ServicesList);
         if (InfoBuffer) supHeapFree(InfoBuffer);
@@ -1224,7 +1232,6 @@ INT_PTR PsListHandleNotify(
             }
 
             return 1;
-            break;
 
         case LVN_COLUMNCLICK:
             PsDlgContext.bInverseSort = !PsDlgContext.bInverseSort;
@@ -1245,7 +1252,6 @@ INT_PTR PsListHandleNotify(
                 nImageIndex);
 
             return 1;
-            break;
 
         default:
             break;
@@ -1262,7 +1268,6 @@ INT_PTR PsListHandleNotify(
             nhdr->code = NM_RETURN;
 #pragma warning(pop)
             return PostMessage(hwndDlg, WM_NOTIFY, wParam, lParam);
-            break;
 
         case NM_RETURN:
             GetCursorPos(&pt);
@@ -1277,7 +1282,6 @@ INT_PTR PsListHandleNotify(
                 }
             }
             return 1;
-            break;
 
         case TVN_SELCHANGED:
             ObjectEntry = PsListGetObjectEntry(TRUE, NULL);
@@ -1285,7 +1289,6 @@ INT_PTR PsListHandleNotify(
                 CreateObjectList(TRUE, ObjectEntry);
             }
             return 1;
-            break;
 
         default:
             break;
@@ -1368,7 +1371,6 @@ INT_PTR CALLBACK PsListDialogProc(
 
     case WM_NOTIFY:
         return PsListHandleNotify(hwndDlg, wParam, lParam);
-        break;
 
     case WM_COMMAND:
 

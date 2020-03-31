@@ -361,7 +361,7 @@ PPROP_OBJECT_INFO propContextCreate(
         }
 
     }
-    __except (WOBJ_EXCEPTION_FILTER) {
+    __except (WOBJ_EXCEPTION_FILTER_LOG) {
         return NULL;
     }
     return Context;

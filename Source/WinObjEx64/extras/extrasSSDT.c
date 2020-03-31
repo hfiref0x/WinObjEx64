@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     1.84
+*  VERSION:     1.85
 *
-*  DATE:        28 Feb 2020
+*  DATE:        13 Mar 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -205,64 +205,75 @@ VOID SdtSaveListToFile(
 * WM_NOTIFY processing for dialog listview.
 *
 */
-VOID SdtDlgHandleNotify(
-    _In_ LPARAM lParam,
-    _In_ EXTRASCONTEXT* pDlgContext
+BOOL SdtDlgHandleNotify(
+    _In_ HWND hwndDlg,
+    _In_ LPARAM lParam
 )
 {
-    LPNMHDR nhdr = (LPNMHDR)lParam;
-    INT     nImageIndex, mark;
-    LPWSTR  lpItem;
+    INT nImageIndex, iSelectionMark;
+    LPNMLISTVIEW pListView = (LPNMLISTVIEW)lParam;
+    LPWSTR lpItem;
+    HWND hwndListView;
+
+    EXTRASCONTEXT* pDlgContext;
 
     EXTRASCALLBACK CallbackParam;
     WCHAR szBuffer[MAX_PATH + 1];
 
-    if (nhdr == NULL)
-        return;
+    if (pListView == NULL)
+        return FALSE;
 
-    if (nhdr->hwndFrom != pDlgContext->ListView)
-        return;
+    if (pListView->hdr.idFrom != ID_EXTRASLIST)
+        return FALSE;
 
-    switch (nhdr->code) {
+    hwndListView = pListView->hdr.hwndFrom;
+
+    switch (pListView->hdr.code) {
 
     case LVN_COLUMNCLICK:
-        pDlgContext->bInverseSort = !pDlgContext->bInverseSort;
-        pDlgContext->lvColumnToSort = ((NMLISTVIEW*)lParam)->iSubItem;
-        CallbackParam.lParam = (LPARAM)pDlgContext->lvColumnToSort;
-        CallbackParam.Value = pDlgContext->DialogMode;
-        ListView_SortItemsEx(pDlgContext->ListView, &SdtDlgCompareFunc, (LPARAM)&CallbackParam);
 
-        nImageIndex = ImageList_GetImageCount(g_ListViewImages);
-        if (pDlgContext->bInverseSort)
-            nImageIndex -= 2;
-        else
-            nImageIndex -= 1;
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
 
-        supUpdateLvColumnHeaderImage(
-            pDlgContext->ListView,
-            pDlgContext->lvColumnCount,
-            pDlgContext->lvColumnToSort,
-            nImageIndex);
+            pDlgContext->bInverseSort = !pDlgContext->bInverseSort;
+            pDlgContext->lvColumnToSort = pListView->iSubItem;
+            CallbackParam.lParam = (LPARAM)pDlgContext->lvColumnToSort;
+            CallbackParam.Value = pDlgContext->DialogMode;
+            ListView_SortItemsEx(hwndListView, &SdtDlgCompareFunc, (LPARAM)&CallbackParam);
 
+            nImageIndex = ImageList_GetImageCount(g_ListViewImages);
+            if (pDlgContext->bInverseSort)
+                nImageIndex -= 2;
+            else
+                nImageIndex -= 1;
+
+            supUpdateLvColumnHeaderImage(
+                hwndListView,
+                pDlgContext->lvColumnCount,
+                pDlgContext->lvColumnToSort,
+                nImageIndex);
+        }
         break;
 
     case NM_DBLCLK:
-        mark = ListView_GetSelectionMark(pDlgContext->ListView);
-        if (mark >= 0) {
-            lpItem = supGetItemText(pDlgContext->ListView, mark, 3, NULL);
+
+        iSelectionMark = ListView_GetSelectionMark(hwndListView);
+        if (iSelectionMark >= 0) {
+            lpItem = supGetItemText(hwndListView, iSelectionMark, 3, NULL);
             if (lpItem) {
                 RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
                 if (supGetWin32FileName(lpItem, szBuffer, MAX_PATH))
-                    supShowProperties(pDlgContext->hwndDlg, szBuffer);
+                    supShowProperties(hwndDlg, szBuffer);
                 supHeapFree(lpItem);
             }
         }
         break;
 
     default:
-        break;
+        return FALSE;
     }
 
+    return TRUE;
 }
 
 /*
@@ -298,11 +309,7 @@ INT_PTR CALLBACK SdtDialogProc(
         break;
 
     case WM_NOTIFY:
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
-            SdtDlgHandleNotify(lParam, pDlgContext);
-        }
-        break;
+        return SdtDlgHandleNotify(hwndDlg, lParam);
 
     case WM_SIZE:
         pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
@@ -363,9 +370,12 @@ INT_PTR CALLBACK SdtDialogProc(
     case WM_CONTEXTMENU:
         SdtHandlePopupMenu(hwndDlg);
         break;
+
+    default:
+        return FALSE;
     }
 
-    return FALSE;
+    return TRUE;
 }
 
 /*
@@ -618,6 +628,9 @@ BOOL SdtListCreateTable(
     }
     __finally {
 
+        if (AbnormalTermination())
+            supReportAbnormalTermination(__FUNCTIONW__);
+
         if (TableDump) {
             supHeapFree(TableDump);
         }
@@ -638,7 +651,7 @@ BYTE Win32kApiSetAdapterPattern2[] = {
 
 #define W32K_API_SET_ADAPTERS_COUNT 2
 
-W32K_API_SET_ADAPTER_PATTERN W32kApiSetAdapters[W32K_API_SET_ADAPTERS_COUNT] = {
+W32K_API_SET_LOOKUP_PATTERN W32kApiSetAdapters[W32K_API_SET_ADAPTERS_COUNT] = {
     { sizeof(Win32kApiSetAdapterPattern1), Win32kApiSetAdapterPattern1 },
     { sizeof(Win32kApiSetAdapterPattern2), Win32kApiSetAdapterPattern2 }
 };
@@ -706,7 +719,7 @@ ULONG_PTR ApiSetExtractReferenceFromAdapter(
         Reference = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
 
     }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
+    __except (WOBJ_EXCEPTION_FILTER_LOG) {
         return 0;
     }
 
@@ -763,11 +776,10 @@ BOOLEAN ApiSetResolveWin32kTableEntry(
             Entry = (PW32K_API_SET_TABLE_ENTRY)RtlOffsetToPointer(Entry, sizeof(W32K_API_SET_TABLE_ENTRY));
         }
     }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
+    __except (WOBJ_EXCEPTION_FILTER_LOG) {
         //
         // Should never be here. Only in case if table structure changed or ApiSetTable address points to invalid data.
         //
-        DbgPrint("Win32kApiSet list exception %lx\r\n", GetExceptionCode());
         return FALSE;
     }
 
@@ -925,7 +937,7 @@ NTSTATUS SdtResolveServiceEntryModule(
                         return STATUS_SUCCESS;
                     }
                     else {
-                        return STATUS_DRIVER_UNABLE_TO_LOAD;
+                        return STATUS_DLL_NOT_FOUND;
                     }
                 }
                 else {
@@ -985,7 +997,7 @@ NTSTATUS SdtResolveServiceEntryModule(
             RtlFreeUnicodeString(&usModuleName);
 
             *ResolvedModule = DllModule;
-            resultStatus = (DllModule != NULL) ? STATUS_SUCCESS : STATUS_DRIVER_UNABLE_TO_LOAD;
+            resultStatus = (DllModule != NULL) ? STATUS_SUCCESS : STATUS_DLL_NOT_FOUND;
         }
 
 
@@ -993,6 +1005,25 @@ NTSTATUS SdtResolveServiceEntryModule(
 
     return resultStatus;
 }
+
+VOID SdtListReportEvent(
+    _In_ ULONG EventType,
+    _In_ LPWSTR FunctionName,
+    _In_ LPWSTR ErrorString
+)
+{
+    WCHAR szBuffer[512];
+
+    RtlStringCchPrintfSecure(szBuffer,
+        RTL_NUMBER_OF(szBuffer),
+        TEXT("%ws, %ws"),
+        FunctionName,
+        ErrorString);
+
+    logAdd(EventType,
+        szBuffer);
+}
+
 
 /*
 * SdtListCreateTableShadow
@@ -1038,6 +1069,7 @@ BOOL SdtListCreateTableShadow(
     ANSI_STRING                     ResolvedModuleName;
 
     WCHAR szBuffer[MAX_PATH * 2];
+    WCHAR szErrorBuffer[512];
     CHAR szForwarderModuleName[MAX_PATH];
 
     LoadedModulesHead.Next = NULL;
@@ -1196,6 +1228,8 @@ BOOL SdtListCreateTableShadow(
 
                         if (!NT_SUCCESS(ntStatus)) {
 
+                            RtlSecureZeroMemory(szErrorBuffer, sizeof(szErrorBuffer));
+
                             //
                             // Most of this errors are not critical and ok.
                             //
@@ -1203,36 +1237,50 @@ BOOL SdtListCreateTableShadow(
                             switch (ntStatus) {
 
                             case STATUS_INTERNAL_ERROR:
-                                DbgPrint("SdtListCreateTableShadow, HDE Error\r\n");
+                                SdtListReportEvent(WOBJ_LOG_ENTRY_ERROR, __FUNCTIONW__, TEXT("HDE Error"));
                                 break;
 
                             case STATUS_APISET_NOT_HOSTED:
                                 //
                                 // Corresponding apiset not found.
                                 //
-                                DbgPrint("SdtListCreateTableShadow not an apiset adapter for %s\r\n",
-                                    itable->Name);
+                                _strcpy(szErrorBuffer, TEXT("not an apiset adapter for "));
+                                MultiByteToWideChar(CP_ACP, 0, itable->Name, -1, _strend(szErrorBuffer), MAX_PATH);
+                                SdtListReportEvent(WOBJ_LOG_ENTRY_ERROR, __FUNCTIONW__, szErrorBuffer);
                                 break;
 
                             case STATUS_APISET_NOT_PRESENT:
                                 //
                                 // ApiSet extension present but empty.
                                 // 
-                                DbgPrint("SdtListCreateTableShadow, extension contains a host for a non-existent apiset %s\r\n",
-                                    itable->Name);
+                                _strcpy(szErrorBuffer, TEXT("extension contains a host for a non-existent apiset "));
+                                MultiByteToWideChar(CP_ACP, 0, itable->Name, -1, _strend(szErrorBuffer), MAX_PATH);
+                                SdtListReportEvent(WOBJ_LOG_ENTRY_INFORMATION, __FUNCTIONW__, szErrorBuffer);
                                 break;
 
                             case STATUS_PROCEDURE_NOT_FOUND:
                                 //
                                 // Not a critical issue. This mean we cannot pass this service next to forwarder lookup code.
                                 //
-                                DbgPrint("SdtListCreateTableShadow, could not resolve function name in module for service id %lu, service name %s\r\n",
-                                    itable->Index,
-                                    itable->Name);
+                                _strcpy(szErrorBuffer, TEXT("could not resolve function name in module for service id "));
+                                ultostr(itable->Index, _strend(szErrorBuffer));
+                                _strcat(szErrorBuffer, TEXT(", service name "));
+                                MultiByteToWideChar(CP_ACP, 0, itable->Name, -1, _strend(szErrorBuffer), MAX_PATH);
+                                SdtListReportEvent(WOBJ_LOG_ENTRY_INFORMATION, __FUNCTIONW__, szErrorBuffer);
                                 break;
 
-                            case STATUS_DRIVER_UNABLE_TO_LOAD:
-                                DbgPrint("SdtListCreateTableShadow, could not load import dll %s\r\n", ResolvedModuleName.Buffer);
+                            case STATUS_DLL_NOT_FOUND:
+
+                                _strcpy(szErrorBuffer, TEXT("could not load import dll "));
+
+                                MultiByteToWideChar(CP_ACP,
+                                    0,
+                                    ResolvedModuleName.Buffer,
+                                    ResolvedModuleName.Length,
+                                    _strend(szErrorBuffer),
+                                    MAX_PATH);
+
+                                SdtListReportEvent(WOBJ_LOG_ENTRY_ERROR, __FUNCTIONW__, szErrorBuffer);
                                 break;
 
                             default:
@@ -1262,7 +1310,13 @@ BOOL SdtListCreateTableShadow(
                         }
 
                         if (!NT_SUCCESS(NtRawGetProcAddress(DllModule, FunctionName, &rfn))) {
-                            DbgPrint("SdtListCreateTableShadow: Could not resolve function %s address\r\n", FunctionName);
+                            //
+                            // Log error.
+                            //
+                            _strcpy(szErrorBuffer, TEXT("could not resolve function "));
+                            MultiByteToWideChar(CP_ACP, 0, FunctionName, -1, _strend(szErrorBuffer), MAX_PATH);
+                            _strcat(szErrorBuffer, TEXT(" address"));
+                            SdtListReportEvent(WOBJ_LOG_ENTRY_ERROR, __FUNCTIONW__, szErrorBuffer);
                             break;
                         }
 
@@ -1314,7 +1368,10 @@ BOOL SdtListCreateTableShadow(
 
                                     }
                                     else {
-                                        OutputDebugString(TEXT("SdtListCreateTableShadow, could not load forwarded module\r\n"));
+                                        //
+                                        // Log error.
+                                        //
+                                        SdtListReportEvent(WOBJ_LOG_ENTRY_ERROR, __FUNCTIONW__, TEXT("could not load forwarded module"));
                                     }
 
                                 } // if (ForwarderFunctionName)
@@ -1407,6 +1464,10 @@ BOOL SdtListCreateTableShadow(
 
     }
     __finally {
+
+        if (AbnormalTermination())
+            supReportAbnormalTermination(__FUNCTIONW__);
+
         //
         // Restore default search order.
         //
@@ -1548,11 +1609,14 @@ VOID SdtListCreate(
                 }
 
                 MessageBox(hwndDlg, lpErrorMsg, NULL, MB_ICONERROR);
-            }
         }
-
     }
+
+}
     __finally {
+
+        if (AbnormalTermination())
+            supReportAbnormalTermination(__FUNCTIONW__);
 
         if (pModules)
             supHeapFree(pModules);

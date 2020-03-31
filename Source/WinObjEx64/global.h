@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.84
 *
-*  DATE:        29 Feb 2020
+*  DATE:        05 Mar 2020
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -65,6 +65,11 @@
 #include <ntstatus.h>
 #include <sddl.h>
 #include <slpublic.h>
+#include <cfgmgr32.h>
+#include <setupapi.h>
+#include <shlwapi.h>
+#include <Richedit.h>
+
 #include "resource.h"
 #include "extdef.h"
 #include "wine.h"
@@ -89,6 +94,7 @@
 #include "excepth.h"
 #include "extapi.h"
 #include "plugmngr.h"
+#include "log\log.h"
 #include "tests\testunit.h"
 
 #if defined(__cplusplus)
@@ -122,6 +128,7 @@ typedef struct _WINOBJ_GLOBALS {
     BOOLEAN EnableFullMitigations;
     HINSTANCE hInstance;
     HANDLE Heap;
+    HANDLE RichEditHandle;
     LPWSTR CurrentObjectPath;
     pfnHtmlHelpW HtmlHelpW;
     HWND AuxDialogs[wobjMaxDlgId];

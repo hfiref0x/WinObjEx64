@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRAS.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.85
 *
-*  DATE:        21 Dec 2019
+*  DATE:        13 Mar 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -64,7 +64,7 @@ VOID extrasSimpleListResize(
 * Common WM_NOTIFY processing for list only dialogs.
 *
 */
-VOID extrasDlgHandleNotify(
+BOOL extrasDlgHandleNotify(
     _In_ LPNMLISTVIEW nhdr,
     _In_ EXTRASCONTEXT* Context,
     _In_ DlgCompareFunction CompareFunc,
@@ -72,20 +72,21 @@ VOID extrasDlgHandleNotify(
     _In_opt_ PVOID CustomParameter
 )
 {
+    BOOL bResult = FALSE;
     INT nImageIndex;
 
     if ((nhdr == NULL) || (Context == NULL) || (CompareFunc == NULL))
-        return;
+        return bResult;
 
     if (nhdr->hdr.idFrom != ID_EXTRASLIST)
-        return;
+        return bResult;
 
     switch (nhdr->hdr.code) {
 
     case LVN_COLUMNCLICK:
 
-        Context->bInverseSort = !Context->bInverseSort;
-        Context->lvColumnToSort = ((NMLISTVIEW*)nhdr)->iSubItem;
+        Context->bInverseSort = !Context->bInverseSort;        
+        Context->lvColumnToSort = nhdr->iSubItem;
         ListView_SortItemsEx(Context->ListView, CompareFunc, Context->lvColumnToSort);
 
         nImageIndex = ImageList_GetImageCount(g_ListViewImages);
@@ -100,6 +101,7 @@ VOID extrasDlgHandleNotify(
             Context->lvColumnToSort,
             nImageIndex);
 
+        bResult = TRUE;
         break;
 
     default:
@@ -107,8 +109,10 @@ VOID extrasDlgHandleNotify(
     }
 
     if (CustomHandler) {
-        CustomHandler(nhdr, Context, CustomParameter);
+        bResult = CustomHandler(nhdr, Context, CustomParameter);
     }
+
+    return bResult;
 }
 
 /*

@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXCEPTH.H
 *
-*  VERSION:     1.83
+*  VERSION:     1.85
 *
-*  DATE:        05 Jan 2020
+*  DATE:        06 Mar 2020
 *
 *  Common header file for the exception handling routines.
 *
@@ -22,4 +22,9 @@ INT exceptFilter(
     _In_ UINT ExceptionCode,
     _In_ EXCEPTION_POINTERS *ExceptionPointers);
 
+INT exceptFilterWithLog(
+    _In_ UINT ExceptionCode,
+    _In_opt_ EXCEPTION_POINTERS* ExceptionPointers);
+
 #define WOBJ_EXCEPTION_FILTER exceptFilter(GetExceptionCode(), GetExceptionInformation())
+#define WOBJ_EXCEPTION_FILTER_LOG exceptFilterWithLog(GetExceptionCode(), GetExceptionInformation())

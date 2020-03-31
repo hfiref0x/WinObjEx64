@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPPROCESS.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.85
 *
-*  DATE:        05 Jan 2020
+*  DATE:        13 Mar 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -196,32 +196,34 @@ VOID ProcessShowProperties(
 * WM_NOTIFY processing for Process page listview.
 *
 */
-VOID ProcessListHandleNotify(
+BOOL ProcessListHandleNotify(
     _In_ HWND hwndDlg,
     _In_ LPARAM lParam
 )
 {
     INT     nImageIndex;
-    LPNMHDR nhdr = (LPNMHDR)lParam;
-
     EXTRASCONTEXT* pDlgContext;
+    NMLISTVIEW* pListView = (NMLISTVIEW*)lParam;
+    HWND hwndListView;
 
-    if (nhdr == NULL)
-        return;
+    if (pListView == NULL)
+        return FALSE;
 
-    if (nhdr->idFrom != ID_PROCESSLIST)
-        return;
+    if (pListView->hdr.idFrom != ID_PROCESSLIST)
+        return FALSE;
 
-    switch (nhdr->code) {
+    hwndListView = pListView->hdr.hwndFrom;
+
+    switch (pListView->hdr.code) {
 
     case LVN_COLUMNCLICK:
         pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
         if (pDlgContext) {
             pDlgContext->bInverseSort = !pDlgContext->bInverseSort;
-            pDlgContext->lvColumnToSort = ((NMLISTVIEW*)nhdr)->iSubItem;
+            pDlgContext->lvColumnToSort = pListView->iSubItem;
 
             ListView_SortItemsEx(
-                pDlgContext->ListView,
+                hwndListView,
                 &ProcessListCompareFunc,
                 pDlgContext);
 
@@ -231,7 +233,7 @@ VOID ProcessListHandleNotify(
                 nImageIndex = 2;
 
             supUpdateLvColumnHeaderImage(
-                pDlgContext->ListView,
+                hwndListView,
                 pDlgContext->lvColumnCount,
                 pDlgContext->lvColumnToSort,
                 nImageIndex);
@@ -239,19 +241,19 @@ VOID ProcessListHandleNotify(
         break;
 
     case NM_DBLCLK:
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
 
-            ProcessShowProperties(
-                hwndDlg,
-                pDlgContext->ListView,
-                ((LPNMITEMACTIVATE)lParam)->iItem);
-        }
+        ProcessShowProperties(
+            hwndDlg,
+            hwndListView,
+            pListView->iItem);
+
         break;
 
     default:
-        break;
+        return FALSE;
     }
+
+    return TRUE;
 }
 
 /*
@@ -788,7 +790,6 @@ INT_PTR CALLBACK ProcessListDialogProc(
     _In_  LPARAM lParam
 )
 {
-    INT_PTR          Result = 0;
     PROPSHEETPAGE* pSheet = NULL;
     PROP_OBJECT_INFO* Context = NULL;
     EXTRASCONTEXT* pDlgContext = NULL;
@@ -810,9 +811,7 @@ INT_PTR CALLBACK ProcessListDialogProc(
         break;
 
     case WM_NOTIFY:
-        ProcessListHandleNotify(hwndDlg, lParam);
-        Result = 1;
-        break;
+        return ProcessListHandleNotify(hwndDlg, lParam);
 
     case WM_DESTROY:
         pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
@@ -849,9 +848,11 @@ INT_PTR CALLBACK ProcessListDialogProc(
                 }
             }
         }
-        Result = 1;
         break;
+
+    default:
+        return FALSE;
     }
 
-    return Result;
+    return TRUE;
 }

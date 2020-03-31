@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.84
+*  VERSION:     1.85
 *
-*  DATE:        15 Feb 2020
+*  DATE:        06 Mar 2020
 *
 *  Common header file for the program support routines.
 *
@@ -686,3 +686,12 @@ VOID supSetProcessMitigationImagesPolicy();
 
 ULONG supGetTimeAsSecondsSince1970(
     VOID);
+
+BOOL supRichEdit32Load();
+
+VOID supReportAbnormalTermination(
+    _In_ LPWSTR FunctionName);
+
+VOID supReportException(
+    _In_ ULONG ExceptionCode,
+    _In_opt_ PEXCEPTION_POINTERS ExceptionPointers);

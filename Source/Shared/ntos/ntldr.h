@@ -1,12 +1,12 @@
 /************************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2014 - 2019
+*  (C) COPYRIGHT AUTHORS, 2014 - 2020
 *
 *  TITLE:       NTLDR.H
 *
-*  VERSION:     1.16
+*  VERSION:     1.17
 *
-*  DATE:        20 July 2019
+*  DATE:        06 Mar 2020
 *
 *  Common header file for the NTLDR definitions.
 *
@@ -18,6 +18,12 @@
 ************************************************************************************/
 
 #pragma once
+
+typedef INT(*PFNNTLDR_EXCEPT_FILTER)(
+    _In_ UINT ExceptionCode,
+    _In_ EXCEPTION_POINTERS* ExceptionPointers);
+
+extern PFNNTLDR_EXCEPT_FILTER NtpLdrExceptionFilter;
 
 /*
 *

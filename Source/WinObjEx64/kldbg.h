@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.84
+*  VERSION:     1.85
 *
-*  DATE:        24 Feb 2019
+*  DATE:        25 Mar 2020
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -49,7 +49,6 @@
 #define PAGE_SECTION "PAGE"
 #define PAGE_SECTION_LEGNTH sizeof(PAGE_SECTION)
 
-
 typedef ULONG_PTR *PUTable;
 
 //enum with information flags used by ObGetObjectHeaderOffset
@@ -66,10 +65,12 @@ typedef struct _OBJECT_COLLECTION {
     HANDLE Heap;
 } OBJECT_COLLECTION, *POBJECT_COLLECTION;
 
-typedef struct _KLDBGCONTEXT {
+typedef struct _OBHEADER_COOKIE {
+    UCHAR Value;
+    BOOLEAN Valid;
+} OBHEADER_COOKIE, * POBHEADER_COOKIE;
 
-    //Is debugging enabled
-    BOOL ShowKdError;
+typedef struct _KLDBGCONTEXT {
 
     //Is user full admin
     BOOL IsFullAdmin;
@@ -81,7 +82,7 @@ typedef struct _KLDBGCONTEXT {
     BOOL IsSecureBoot;
 
     //system object header cookie (win10+)
-    UCHAR ObHeaderCookie;
+    OBHEADER_COOKIE ObHeaderCookie;
 
     //index of directory type and root address
     USHORT DirectoryTypeIndex;
@@ -199,10 +200,10 @@ typedef struct _OBJREF {
 #define NT_WIN10_19H2           18363
 
 // Windows 10 20H1
-#define NTX_WIN10_20H1          19041
+#define NT_WIN10_20H1           19041
 
 // Windows 10 20H2
-#define NTX_WIN10_20H2          19569
+#define NTX_WIN10_20H2          19592
 
 //
 // Defines for boundary descriptors
@@ -253,10 +254,10 @@ typedef struct _NOTIFICATION_CALLBACKS {
 
 extern NOTIFICATION_CALLBACKS g_SystemCallbacks;
 
-typedef struct _W32K_API_SET_ADAPTER_PATTERN {
+typedef struct _W32K_API_SET_LOOKUP_PATTERN {
     ULONG Size;
     PVOID Data;
-} W32K_API_SET_ADAPTER_PATTERN, *PW32K_API_SET_ADAPTER_PATTERN;
+} W32K_API_SET_LOOKUP_PATTERN, *PW32K_API_SET_LOOKUP_PATTERN;
 
 // return true to stop enumeration
 typedef BOOL(CALLBACK *PENUMERATE_COLLECTION_CALLBACK)(
@@ -385,7 +386,9 @@ BOOL kdIsDebugBoot(
 VOID kdShutdown(
     VOID);
 
-VOID kdShowError(
+VOID kdReportReadError(
+    _In_ LPWSTR FunctionName,
+    _In_ ULONG_PTR KernelAddress,
     _In_ ULONG InputBufferLength,
     _In_ NTSTATUS Status,
     _In_ PIO_STATUS_BLOCK Iosb);

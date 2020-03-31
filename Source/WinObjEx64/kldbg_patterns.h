@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG_PATTERNS.H
 *
-*  VERSION:     1.83
+*  VERSION:     1.85
 *
-*  DATE:        14 Dec 2019
+*  DATE:        07 Mar 2020
 *
 *  Header with search patterns used by KLDBG.
 *
@@ -43,15 +43,6 @@
 
 // lea reg, Win32kApiSetTable
 #define IL_Win32kApiSetTable                    7
-
-// 18995
-BYTE Win32kApiSetTableMovPattern[] = {
-    0x49, 0x8B, 0xFE
-};
-
-BYTE Win32kApiSetTableLeaPattern[] = {
-    0x4C, 0x8D, 0x2D
-};
 
 //
 // ObHeaderCookie

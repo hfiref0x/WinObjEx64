@@ -4,9 +4,9 @@
 *
 *  TITLE:       DRVHELPER.C
 *
-*  VERSION:     1.84
+*  VERSION:     1.85
 *
-*  DATE:        18 Feb 2020
+*  DATE:        06 Mar 2020
 *
 *  WinIo based VM-through-PM reader, used only in private builds, WHQL.
 *
@@ -260,7 +260,7 @@ ULONG_PTR WinIoGetPML4FromLowStub1M(
         }
 
     }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
+    __except (WOBJ_EXCEPTION_FILTER_LOG) {
         return 0;
     }
 
@@ -362,7 +362,7 @@ NTSTATUS WINAPI WinIoReadPhysicalMemory(
             RtlCopyMemory(Buffer, mappedSection, NumberOfBytes);
 
         }
-        __except (EXCEPTION_EXECUTE_HANDLER)
+        __except (WOBJ_EXCEPTION_FILTER_LOG)
         {
             ntStatus = GetExceptionCode();
         }
@@ -462,6 +462,9 @@ BOOL WinIoReadSystemMemoryEx(
     if (NumberOfBytesRead)
         *NumberOfBytesRead = 0;
 
+    if (Address < g_kdctx.SystemRangeStart)
+        return FALSE;
+
     lockedBuffer = supVirtualAlloc(BufferSize);
     if (lockedBuffer) {
 
@@ -477,10 +480,7 @@ BOOL WinIoReadSystemMemoryEx(
                 iost.Status = ntStatus;
                 iost.Information = 0;
 
-                if (g_kdctx.ShowKdError)
-                    kdShowError(BufferSize, ntStatus, &iost);
-                else
-                    SetLastError(RtlNtStatusToDosError(ntStatus));
+                kdReportReadError(__FUNCTIONW__, Address, BufferSize, ntStatus, &iost);
             }
             else {
                 if (NumberOfBytesRead)

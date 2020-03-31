@@ -43,6 +43,9 @@
     <Filter Include="tinyaes">
       <UniqueIdentifier>{ae7f1c88-69d2-406e-a44a-9dddafd020c3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\log">
+      <UniqueIdentifier>{9201749a-5b24-4976-a330-f03440b3e27d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="aboutDlg.c">
@@ -225,6 +228,9 @@
     <ClCompile Include="tinyaes\aes.c">
       <Filter>tinyaes</Filter>
     </ClCompile>
+    <ClCompile Include="log\log.c">
+      <Filter>Source Files\log</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc">
@@ -405,6 +411,9 @@
     </ClInclude>
     <ClInclude Include="ksymbols.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="log\log.h">
+      <Filter>Source Files\log</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASCALLBACKS.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.85
 *
-*  DATE:        05 Jan 2020
+*  DATE:        26 Mar 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -209,7 +209,7 @@ OBEX_CALLBACK_DISPATCH_ENTRY g_CallbacksDispatchTable[] = {
 //
 // All available names for CiCallbacks. Unknown is expected to be XBOX callback.
 //
-#define CI_CALLBACK_NAMES_COUNT 27
+#define CI_CALLBACK_NAMES_COUNT 30
 static const WCHAR *CiCallbackNames[CI_CALLBACK_NAMES_COUNT] = {
     L"CiSetFileCache", //0
     L"CiGetFileCache", //1
@@ -224,7 +224,7 @@ static const WCHAR *CiCallbackNames[CI_CALLBACK_NAMES_COUNT] = {
     L"CiUnregisterSigningInformation",//10
     L"CiInitializePolicy",//11
     L"CiReleaseContext",//12
-    L"UnknownCallback",//13 XBOX
+    L"XciUnknownCallback",//13 XBOX
     L"CiGetStrongImageReference", //14
     L"CiHvciSetImageBaseAddress", //15
     L"CipQueryPolicyInformation", //16
@@ -237,7 +237,10 @@ static const WCHAR *CiCallbackNames[CI_CALLBACK_NAMES_COUNT] = {
     L"CiCheckProcessDebugAccessPolicy", //23
     L"SIPolicyQueryPolicyInformation",//24
     L"SIPolicyQuerySecurityPolicy",//25
-    L"CiSetUnlockInformation"//26
+    L"CiSetUnlockInformation",//26
+    L"CiGetCodeIntegrityOriginClaimForFileObject",//27
+    L"CiDeleteCodeIntegrityOriginClaimForFileObject",//28
+    L"CiHvciReportMmIncompatibility"//29
 };
 
 #define CI_CALLBACKS_NAMES_W7_COUNT 3
@@ -372,8 +375,8 @@ static const BYTE CiCallbackIndexes_Win10RS3[CI_CALLBACK_NAMES_W10RS3_COUNT] = {
     22  //CiGetBuildExpiryTime
 };
 
-#define CI_CALLBACK_NAMES_W10RS4_19H2_COUNT 24
-static const BYTE CiCallbackIndexes_Win10RS4_19H2[CI_CALLBACK_NAMES_W10RS4_19H2_COUNT] = { //Windows 10 RS4/RS5/19H1/19H2
+#define CI_CALLBACK_NAMES_W10RS4_20H1_COUNT 24
+static const BYTE CiCallbackIndexes_Win10RS4_20H1[CI_CALLBACK_NAMES_W10RS4_20H1_COUNT] = { //Windows 10 RS4/RS5/19H1/19H2/20H1
     0,  //CiSetFileCache
     1,  //CiGetFileCache
     2,  //CiQueryInformation
@@ -398,6 +401,37 @@ static const BYTE CiCallbackIndexes_Win10RS4_19H2[CI_CALLBACK_NAMES_W10RS4_19H2_
     21, //CiSetInformationProcess
     22, //CiGetBuildExpiryTime
     23  //CiCheckProcessDebugAccessPolicy
+};
+
+#define CI_CALLBACK_NAMES_W1020H2_COUNT 27
+static const BYTE CiCallbackIndexes_Win1020H2[CI_CALLBACK_NAMES_W1020H2_COUNT] = { //Windows 10 20H2
+    0,  //CiSetFileCache
+    1,  //CiGetFileCache
+    2,  //CiQueryInformation
+    3,  //CiValidateImageHeader
+    4,  //CiValidateImageData
+    5,  //CiHashMemory
+    6,  //KappxIsPackageFile
+    7,  //CiCompareSigningLevels
+    8,  //CiValidateFileAsImageType
+    9,  //CiRegisterSigningInformation
+    10, //CiUnregisterSigningInformation
+    11, //CiInitializePolicy
+    12, //CiReleaseContext
+    13, //Unknown XBOX
+    14, //CiGetStrongImageReference
+    15, //CiHvciSetImageBaseAddress
+    16, //CipQueryPolicyInformation
+    17, //CiValidateDynamicCodePages
+    18, //CiQuerySecurityPolicy
+    19, //CiRevalidateImage
+    20, //CiSetInformation
+    21, //CiSetInformationProcess
+    22, //CiGetBuildExpiryTime
+    23, //CiCheckProcessDebugAccessPolicy
+    27, //CiGetCodeIntegrityOriginClaimForFileObject
+    28, //CiDeleteCodeIntegrityOriginClaimForFileObject
+    29  //CiHvciReportMmIncompatibility
 };
 
 /*
@@ -457,9 +491,13 @@ LPWSTR GetCiRoutineNameFromIndex(
     case NT_WIN10_REDSTONE5:
     case NT_WIN10_19H1:
     case NT_WIN10_19H2:
+    case NT_WIN10_20H1:
+        Indexes = CiCallbackIndexes_Win10RS4_20H1;
+        ArrayCount = CI_CALLBACK_NAMES_W10RS4_20H1_COUNT;
+        break;
     default:
-        Indexes = CiCallbackIndexes_Win10RS4_19H2;
-        ArrayCount = CI_CALLBACK_NAMES_W10RS4_19H2_COUNT;
+        Indexes = CiCallbackIndexes_Win1020H2;
+        ArrayCount = CI_CALLBACK_NAMES_W1020H2_COUNT;
         break;
     }
 
@@ -557,12 +595,19 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
 
         case NT_WIN10_19H1:
         case NT_WIN10_19H2:
-        default:
+        case NT_WIN10_20H1:
             Signature = SeCiCallbacksPattern_19H1;
             SignatureSize = sizeof(SeCiCallbacksPattern_19H1);
-            InstructionMatchPattern = SeCiCallbacksMatchingPattern_19H1;
+            InstructionMatchPattern = SeCiCallbacksMatchingPattern_19H1_20H2;
             InstructionMatchLength = 10; //mov
-            InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern_19H1);
+            InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern_19H1_20H2);
+            break;
+        default:
+            Signature = SeCiCallbacksPattern_20H1;
+            SignatureSize = sizeof(SeCiCallbacksPattern_20H1);
+            InstructionMatchPattern = SeCiCallbacksMatchingPattern_19H1_20H2;
+            InstructionMatchLength = 10; //mov
+            InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern_19H1_20H2);
             break;
         }
 
@@ -601,7 +646,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
             //
             // mov cs:g_CiCallbacks, rax (for Windows 7)
             // lea rcx, SeCiCallbacks (for 8/10 TH/RS)
-            // mov cs:SeCiCallbacks (19H1)
+            // mov cs:SeCiCallbacks (19H1-20H2)
             //
             if (hs.len == InstructionMatchLength) {
 
@@ -631,6 +676,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
         Result = Address;
 
     } while (FALSE);
+
+    if (!Result)
+        logAdd(WOBJ_LOG_ENTRY_WARNING, TEXT("Could not locate CiCallbacks"));
 
     return Result;
 }
@@ -2809,6 +2857,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCallbacks)
 
     }
     __finally {
+
+        if (AbnormalTermination())
+            supReportAbnormalTermination(__FUNCTIONW__);
+
         if (Buffer) supHeapFree(Buffer);
     }
 }
@@ -3265,7 +3317,7 @@ OBEX_QUERYCALLBACK_ROUTINE(QueryIopFsListsCallbacks)
         }
 
     }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
+    __except (WOBJ_EXCEPTION_FILTER_LOG) {
         return GetExceptionCode();
     }
 
@@ -3301,7 +3353,7 @@ OBEX_QUERYCALLBACK_ROUTINE(QueryIopFsListsCallbacks)
         }
 
     }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
+    __except (WOBJ_EXCEPTION_FILTER_LOG) {
         return GetExceptionCode();
     }
 
@@ -3342,7 +3394,7 @@ OBEX_QUERYCALLBACK_ROUTINE(QueryCallbackGeneric)
 
 
     }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
+    __except (WOBJ_EXCEPTION_FILTER_LOG) {
         return GetExceptionCode();
     }
 
@@ -3357,7 +3409,7 @@ OBEX_QUERYCALLBACK_ROUTINE(QueryCallbackGeneric)
         else
             return STATUS_NOT_FOUND;
     }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
+    __except (WOBJ_EXCEPTION_FILTER_LOG) {
         return GetExceptionCode();
     }
 
@@ -3431,6 +3483,10 @@ VOID DisplayCallbacksList(
 
     }
     __finally {
+
+        if (AbnormalTermination())
+            supReportAbnormalTermination(__FUNCTIONW__);
+
         if (Modules) supHeapFree(Modules);
     }
 

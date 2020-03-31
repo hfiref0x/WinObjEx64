@@ -56,7 +56,7 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 
 #define PROGRAM_MAJOR_VERSION       1
 #define PROGRAM_MINOR_VERSION       8
-#define PROGRAM_REVISION_NUMBER     4
+#define PROGRAM_REVISION_NUMBER     5
 #define PROGRAM_BUILD_NUMBER        2004
 
 #ifdef _USE_OWN_DRIVER

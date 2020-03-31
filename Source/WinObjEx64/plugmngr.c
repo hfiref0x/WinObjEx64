@@ -4,9 +4,9 @@
 *
 *  TITLE:       PLUGMNGR.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.85
 *
-*  DATE:        05 Jan 2020
+*  DATE:        05 Mar 2020
 *
 *  Plugin manager.
 *
@@ -94,8 +94,8 @@ VOID CALLBACK PluginManagerStateChangeCallback(
     __try {
         PluginData->State = NewState;
     }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
-        DbgPrint("StateChangeCallback exception %lx", GetExceptionCode());
+    __except (WOBJ_EXCEPTION_FILTER_LOG) {
+        return;
     }
 }
 
@@ -213,7 +213,7 @@ DWORD WINAPI PluginManagerWorkerThread(
                         __try {
                             PluginInitialized = PluginInit(&PluginEntry->Plugin);
                         }
-                        __except (EXCEPTION_EXECUTE_HANDLER) {
+                        __except (WOBJ_EXCEPTION_FILTER_LOG) {
                             PluginManagerShowInitializationError(MainWindow, GetExceptionCode(), fdata.cFileName);
                             PluginInitialized = FALSE;
                         }

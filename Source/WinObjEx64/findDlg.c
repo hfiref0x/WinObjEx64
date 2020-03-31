@@ -4,9 +4,9 @@
 *
 *  TITLE:       FINDDLG.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.85
 *
-*  DATE:        05 Jan 2020
+*  DATE:        13 Mar 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -200,7 +200,7 @@ VOID FindDlgResize(
 * WM_NOTIFY processing for FindDlg listview.
 *
 */
-VOID FindDlgHandleNotify(
+BOOL FindDlgHandleNotify(
     _In_ LPNMLISTVIEW nhdr
 )
 {
@@ -208,7 +208,7 @@ VOID FindDlgHandleNotify(
     LPWSTR   lpItemText;
 
     if (nhdr->hdr.idFrom != ID_SEARCH_LIST)
-        return;
+        return FALSE;
 
     switch (nhdr->hdr.code) {
 
@@ -243,8 +243,10 @@ VOID FindDlgHandleNotify(
         break;
 
     default:
-        break;
+        return FALSE;
     }
+
+    return TRUE;
 }
 
 /*
@@ -270,8 +272,7 @@ INT_PTR CALLBACK FindDlgProc(
 
     switch (uMsg) {
     case WM_NOTIFY:
-        FindDlgHandleNotify(nhdr);
-        break;
+        return FindDlgHandleNotify(nhdr);
 
     case WM_GETMINMAXINFO:
         if (lParam) {
@@ -352,8 +353,13 @@ INT_PTR CALLBACK FindDlgProc(
         }
 
         break;
+
+    default:
+        return FALSE;
+
     }
-    return FALSE;
+
+    return TRUE;
 }
 
 /*

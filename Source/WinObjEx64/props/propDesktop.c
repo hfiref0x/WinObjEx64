@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDESKTOP.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.85
 *
-*  DATE:        05 Jan 2020
+*  DATE:        13 Mar 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -40,15 +40,15 @@ BOOL CALLBACK DesktopListEnumProc(
     _In_ LPARAM lParam
 )
 {
-    BOOL              bSucc;
-    INT	              nIndex;
-    DWORD             bytesNeeded, dwDesktopHeapSize;
-    LPWSTR            lpName, StringSid;
-    PSID              pSID;
-    SIZE_T            sz;
-    HDESK             hDesktop;
-    LVITEM            lvitem;
-    WCHAR             szBuffer[MAX_PATH];
+    BOOL   bSucc;
+    INT	   nIndex;
+    DWORD  bytesNeeded, dwDesktopHeapSize;
+    LPWSTR lpName, StringSid;
+    PSID   pSID;
+    SIZE_T sz;
+    HDESK  hDesktop;
+    LVITEM lvitem;
+    WCHAR  szBuffer[MAX_PATH];
 
     DLG_ENUM_CALLBACK_CONTEXT* enumParam = (DLG_ENUM_CALLBACK_CONTEXT*)lParam;
     if (enumParam == NULL) {
@@ -357,21 +357,21 @@ VOID DesktopListShowProperties(
 * WM_NOTIFY processing for Desktop page listview.
 *
 */
-VOID DesktopListHandleNotify(
-    _In_ HWND           hwndDlg,
-    _In_ LPNMLISTVIEW   nhdr
+BOOL DesktopListHandleNotify(
+    _In_ HWND hwndDlg,
+    _In_ LPARAM lParam
 )
 {
-    INT      nImageIndex;
-
+    INT nImageIndex;
+    LPNMLISTVIEW nhdr = (LPNMLISTVIEW)lParam;
     EXTRASCONTEXT* pDlgContext;
 
     if (nhdr == NULL) {
-        return;
+        return FALSE;
     }
 
     if (nhdr->hdr.idFrom != ID_DESKTOPSLIST) {
-        return;
+        return FALSE;
     }
 
     switch (nhdr->hdr.code) {
@@ -405,8 +405,10 @@ VOID DesktopListHandleNotify(
         break;
 
     default:
-        break;
+        return FALSE;
     }
+
+    return TRUE;
 }
 
 /*
@@ -429,7 +431,6 @@ INT_PTR CALLBACK DesktopListDialogProc(
     _In_ LPARAM lParam
 )
 {
-    LPNMLISTVIEW      nhdr = NULL;
     PROPSHEETPAGE* pSheet;
     PROP_OBJECT_INFO* Context = NULL;
     EXTRASCONTEXT* pDlgContext = NULL;
@@ -456,9 +457,7 @@ INT_PTR CALLBACK DesktopListDialogProc(
         break;
 
     case WM_NOTIFY:
-        nhdr = (LPNMLISTVIEW)lParam;
-        DesktopListHandleNotify(hwndDlg, nhdr);
-        return 1;
+        return DesktopListHandleNotify(hwndDlg, lParam);
 
     case WM_DESTROY:
         pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);

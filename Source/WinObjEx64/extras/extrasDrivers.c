@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.85
 *
-*  DATE:        05 Jan 2020
+*  DATE:        13 Mar 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -325,12 +325,13 @@ VOID DrvListDrivers(
 * Common WM_NOTIFY processing for Driver list dialogs.
 *
 */
-VOID CALLBACK DriversHandleNotify(
+BOOL CALLBACK DriversHandleNotify(
     _In_ LPNMLISTVIEW nhdr,
     _In_ EXTRASCONTEXT* Context,
     _In_opt_ PVOID CustomParameter
 )
 {
+    BOOL    bHandled = FALSE;
     LPWSTR  lpItem;
     INT     mark;
     WCHAR   szBuffer[MAX_PATH + 1];
@@ -338,10 +339,10 @@ VOID CALLBACK DriversHandleNotify(
     UNREFERENCED_PARAMETER(CustomParameter);
 
     if ((nhdr == NULL) || (Context == NULL))
-        return;
+        return FALSE;
 
     if (nhdr->hdr.idFrom != ID_EXTRASLIST)
-        return;
+        return FALSE;
 
 #pragma warning(push)
 #pragma warning(disable: 26454)
@@ -357,7 +358,11 @@ VOID CALLBACK DriversHandleNotify(
                 supHeapFree(lpItem);
             }
         }
+
+        bHandled = TRUE;
     }
+
+    return bHandled;
 }
 
 /*
@@ -391,8 +396,12 @@ INT_PTR CALLBACK DriversDialogProc(
         break;
 
     case WM_NOTIFY:
-        extrasDlgHandleNotify(nhdr, &DrvDlgContext, &DrvDlgCompareFunc, DriversHandleNotify, NULL);
-        break;
+
+        return (INT_PTR)extrasDlgHandleNotify(nhdr,
+            &DrvDlgContext,
+            &DrvDlgCompareFunc,
+            DriversHandleNotify,
+            NULL);
 
     case WM_SIZE:
         extrasSimpleListResize(hwndDlg);
@@ -401,7 +410,7 @@ INT_PTR CALLBACK DriversDialogProc(
     case WM_CLOSE:
         DestroyWindow(hwndDlg);
         g_WinObj.AuxDialogs[wobjDriversDlgId] = NULL;
-        return TRUE;
+        break;
 
     case WM_COMMAND:
 
@@ -423,9 +432,12 @@ INT_PTR CALLBACK DriversDialogProc(
     case WM_CONTEXTMENU:
         DrvHandlePopupMenu(hwndDlg);
         break;
+
+    default:
+        return FALSE;
     }
 
-    return FALSE;
+    return TRUE;
 }
 
 /*

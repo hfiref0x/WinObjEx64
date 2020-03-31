@@ -96,6 +96,11 @@ winobjex64\list.h
 
 * Treeview and listview handlers for main window
 
+winonjex64\log\log.c
+winonjex64\log\log.h
+
+* WinObjEx64 internal logviewer
+
 winobjex64\main.c
 
 * Program entry point and initialization routines, main window dialog procedure handler

@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXCEPTH.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.85
 *
-*  DATE:        05 Jan 2020
+*  DATE:        05 Mar 2020
 *
 *  Exception handler routines.
 *
@@ -147,4 +147,21 @@ INT exceptFilter(
     else {
         return EXCEPTION_CONTINUE_SEARCH;
     }
+}
+
+/*
+* exceptFilterWithLog
+*
+* Purpose:
+*
+* Exception filter with log.
+*
+*/
+INT exceptFilterWithLog(
+    _In_ UINT ExceptionCode,
+    _In_opt_ EXCEPTION_POINTERS* ExceptionPointers
+)
+{
+    supReportException(ExceptionCode, ExceptionPointers);
+    return EXCEPTION_EXECUTE_HANDLER;
 }

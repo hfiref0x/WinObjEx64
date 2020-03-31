@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSL.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.85
 *
-*  DATE:        05 Jan 2020
+*  DATE:        13 Mar 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -51,28 +51,17 @@ INT CALLBACK SLCacheListCompareFunc(
 *
 */
 SL_KMEM_CACHE_VALUE_DESCRIPTOR* xxxSLCacheGetSelectedDescriptor(
-    _In_ HWND hwndListView)
+    _In_ HWND hwndListView,
+    _In_ INT iItem)
 {
-    INT nSelected;
     SL_KMEM_CACHE_VALUE_DESCRIPTOR* CacheDescriptor = NULL;
-
-    //
-    // Leave if nothing selected.
-    //
-    if (ListView_GetSelectedCount(hwndListView) == 0) {
-        return NULL;
-    }
-    nSelected = ListView_GetSelectionMark(hwndListView);
-    if (nSelected == -1) {
-        return NULL;
-    }
 
     //
     // Query associated data.
     //
-    if (!supGetListViewItemParam(hwndListView, 
-        nSelected, 
-        (PVOID*)&CacheDescriptor)) 
+    if (!supGetListViewItemParam(hwndListView,
+        iItem,
+        (PVOID*)&CacheDescriptor))
     {
         return NULL;
     }
@@ -128,7 +117,8 @@ LPWSTR xxxSLCacheGetDescriptorDataType(
 */
 VOID SLCacheDialogDisplayDescriptorData(
     _In_ HWND hwndDlg,
-    _In_ HWND hwndListView
+    _In_ HWND hwndListView,
+    _In_ INT iItem
 )
 {
     SL_KMEM_CACHE_VALUE_DESCRIPTOR* CacheDescriptor;
@@ -146,10 +136,9 @@ VOID SLCacheDialogDisplayDescriptorData(
     SetDlgItemText(hwndDlg, ID_SLDESCRIPTOR_ATTRIBUTES, TEXT("0"));
     SetDlgItemText(hwndDlg, ID_SLDESCRIPTOR_TYPE, T_CannotQuery);
     SetDlgItemText(hwndDlg, IDC_SLVALUE_NAME, TEXT(""));
-
     EnableWindow(GetDlgItem(hwndDlg, IDC_SLVALUE_VIEWWITH), FALSE);
 
-    CacheDescriptor = xxxSLCacheGetSelectedDescriptor(hwndListView);
+    CacheDescriptor = xxxSLCacheGetSelectedDescriptor(hwndListView, iItem);
     if (CacheDescriptor == NULL)
         return;
 
@@ -239,7 +228,8 @@ VOID SLCacheDialogDisplayDescriptorData(
 *
 */
 VOID SLCacheDialogViewBinaryData(
-    _In_ HWND hwndListView
+    _In_ HWND hwndListView,
+    _In_ INT iSelectedItem
 )
 {
     SL_KMEM_CACHE_VALUE_DESCRIPTOR* CacheDescriptor;
@@ -247,7 +237,7 @@ VOID SLCacheDialogViewBinaryData(
 
     WCHAR szFileName[MAX_PATH * 2];
 
-    CacheDescriptor = xxxSLCacheGetSelectedDescriptor(hwndListView);
+    CacheDescriptor = xxxSLCacheGetSelectedDescriptor(hwndListView, iSelectedItem);
     if (CacheDescriptor == NULL)
         return;
 
@@ -284,20 +274,20 @@ VOID SLCacheDialogViewBinaryData(
 * WM_NOTIFY processing for listview.
 *
 */
-VOID SLCacheDialogHandleNotify(
+BOOL SLCacheDialogHandleNotify(
     _In_ HWND hwndDlg,
-    _In_ LPNMLISTVIEW nhdr
+    _In_ LPNMLISTVIEW pListView
 )
 {
     INT nImageIndex;
     EXTRASCONTEXT* pDlgContext;
 
-    if (nhdr == NULL)
-        return;
+    if (pListView == NULL)
+        return FALSE;
 
-    if (nhdr->hdr.idFrom == ID_SLCACHELIST) {
+    if (pListView->hdr.idFrom == ID_SLCACHELIST) {
 
-        switch (nhdr->hdr.code) {
+        switch (pListView->hdr.code) {
 
         case LVN_COLUMNCLICK:
 
@@ -305,7 +295,7 @@ VOID SLCacheDialogHandleNotify(
             if (pDlgContext) {
 
                 pDlgContext->bInverseSort = !pDlgContext->bInverseSort;
-                pDlgContext->lvColumnToSort = ((NMLISTVIEW*)nhdr)->iSubItem;
+                pDlgContext->lvColumnToSort = pListView->iSubItem;
                 ListView_SortItemsEx(pDlgContext->ListView, &SLCacheListCompareFunc, pDlgContext);
 
                 nImageIndex = ImageList_GetImageCount(g_ListViewImages);
@@ -321,21 +311,24 @@ VOID SLCacheDialogHandleNotify(
                     nImageIndex);
 
             }
-
             break;
 
         case LVN_ITEMCHANGED:
-        case NM_CLICK:
-            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-            if (pDlgContext) {
-                SLCacheDialogDisplayDescriptorData(pDlgContext->hwndDlg, pDlgContext->ListView);
+            if (pListView->uNewState & LVNI_FOCUSED &&
+                pListView->uNewState & LVNI_SELECTED)
+            {
+                SLCacheDialogDisplayDescriptorData(hwndDlg,
+                    pListView->hdr.hwndFrom,
+                    pListView->iItem);
             }
             break;
 
         default:
-            break;
+            return FALSE;
         }
     }
+
+    return TRUE;
 }
 
 /*
@@ -359,8 +352,7 @@ INT_PTR CALLBACK SLCacheDialogProc(
     switch (uMsg) {
 
     case WM_NOTIFY:
-        SLCacheDialogHandleNotify(hwndDlg, nhdr);
-        break;
+        return SLCacheDialogHandleNotify(hwndDlg, nhdr);
 
     case WM_INITDIALOG:
         SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)lParam);
@@ -395,15 +387,19 @@ INT_PTR CALLBACK SLCacheDialogProc(
         case IDC_SLVALUE_VIEWWITH:
             pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
             if (pDlgContext) {
-                SLCacheDialogViewBinaryData(pDlgContext->ListView);
+                SLCacheDialogViewBinaryData(pDlgContext->ListView,
+                    ListView_GetSelectionMark(pDlgContext->ListView));
             }
             return TRUE;
         }
         break;
 
+    default:
+        return FALSE;
+
     }
 
-    return FALSE;
+    return TRUE;
 }
 
 /*

@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASIPC.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.85
 *
-*  DATE:        05 Jan 2020
+*  DATE:        13 Mar 2020
 *
 *  IPC supported: Pipes, Mailslots
 *
@@ -646,6 +646,9 @@ VOID IpcDlgQueryInfo(
     }
     __finally {
 
+        if (AbnormalTermination())
+            supReportAbnormalTermination(__FUNCTIONW__);
+
         if (DirectoryInfo != NULL) {
             supHeapFree(DirectoryInfo);
         }
@@ -664,22 +667,27 @@ VOID IpcDlgQueryInfo(
 * WM_NOTIFY processing for dialog listview.
 *
 */
-VOID IpcDlgHandleNotify(
-    _In_ LPARAM lParam,
-    _In_ EXTRASCONTEXT* pDlgContext
+BOOL IpcDlgHandleNotify(
+    _In_ HWND hwndDlg,
+    _In_ LPARAM lParam    
 )
 {
     LVCOLUMN col;
     LPNMHDR  nhdr = (LPNMHDR)lParam;
     INT      item;
 
+    EXTRASCONTEXT* pDlgContext;
     EXTRASCALLBACK CallbackParam;
 
     if (nhdr == NULL)
-        return;
+        return FALSE;
 
     if (nhdr->idFrom != ID_IPCOBJECTSLIST)
-        return;
+        return FALSE;
+
+    pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_IPCDLGCONTEXT);
+    if (pDlgContext == NULL)
+        return FALSE;
 
     switch (nhdr->code) {
 
@@ -702,15 +710,17 @@ VOID IpcDlgHandleNotify(
         break;
 
     case NM_DBLCLK:
-        item = ((LPNMITEMACTIVATE)lParam)->iItem;
+        item = ((LPNMLISTVIEW)lParam)->iItem;
         if (item >= 0) {
             IpcDlgShowProperties(item, pDlgContext);
         }
         break;
 
     default:
-        break;
+        return FALSE;
     }
+
+    return TRUE;
 }
 
 /*
@@ -733,11 +743,7 @@ INT_PTR CALLBACK IpcDlgProc(
 
     switch (uMsg) {
     case WM_NOTIFY:
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_IPCDLGCONTEXT);
-        if (pDlgContext) {
-            IpcDlgHandleNotify(lParam, pDlgContext);
-        }
-        break;
+        return IpcDlgHandleNotify(hwndDlg, lParam);
 
     case WM_INITDIALOG:
         SetProp(hwndDlg, T_IPCDLGCONTEXT, (HANDLE)lParam);
@@ -776,8 +782,13 @@ INT_PTR CALLBACK IpcDlgProc(
             return TRUE;
         }
         break;
+
+    default:
+        return FALSE;
+        break;
     }
-    return FALSE;
+
+    return TRUE;
 }
 
 /*

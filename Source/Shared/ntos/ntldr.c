@@ -1,12 +1,12 @@
 /************************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2014 - 2019
+*  (C) COPYRIGHT AUTHORS, 2014 - 2020
 *
 *  TITLE:       NTLDR.C
 *
-*  VERSION:     1.16
+*  VERSION:     1.17
 *
-*  DATE:        20 July 2019
+*  DATE:        05 Mar 2020
 *
 *  NT loader related code.
 *
@@ -23,6 +23,33 @@
 #include "global.h"
 #include "ntldr.h"
 #include "apisetx.h"
+
+PFNNTLDR_EXCEPT_FILTER NtpLdrExceptionFilter = NULL;
+
+INT NtLdrExceptionFilter(
+    _In_ UINT ExceptionCode,
+    _In_ EXCEPTION_POINTERS* ExceptionPointers);
+
+#define NTLDR_EXCEPTION_FILTER NtLdrExceptionFilter(GetExceptionCode(), GetExceptionInformation())
+
+/*
+* NtLdrExceptionFilter
+*
+* Purpose:
+*
+* Default exception filter with optional custom callback.
+*
+*/
+INT NtLdrExceptionFilter(
+    _In_ UINT ExceptionCode,
+    _In_ EXCEPTION_POINTERS* ExceptionPointers
+)
+{
+    if (NtpLdrExceptionFilter)
+        return NtpLdrExceptionFilter(ExceptionCode, ExceptionPointers);
+
+    return EXCEPTION_EXECUTE_HANDLER;
+}
 
 /*
 * NtRawGetProcAddress
@@ -121,7 +148,7 @@ _Success_(return != 0)
 ULONG NtRawEnumW32kExports(
     _In_ HANDLE HeapHandle,
     _In_ LPVOID Module,
-    _Out_ PWIN32_SHADOWTABLE* Table
+    _Out_ PWIN32_SHADOWTABLE * Table
 )
 {
     PIMAGE_NT_HEADERS           NtHeaders;
@@ -197,13 +224,13 @@ _Success_(return != NULL)
 LPCSTR NtRawIATEntryToImport(
     _In_ LPVOID Module,
     _In_ LPVOID IATEntry,
-    _Out_opt_ LPCSTR *ImportModuleName
+    _Out_opt_ LPCSTR * ImportModuleName
 )
 {
     PIMAGE_NT_HEADERS           NtHeaders;
     PIMAGE_IMPORT_DESCRIPTOR    impd;
-    ULONG_PTR                   *rname, imprva;
-    LPVOID                      *raddr;
+    ULONG_PTR* rname, imprva;
+    LPVOID* raddr;
 
     if (ImportModuleName)
         *ImportModuleName = NULL;
@@ -219,11 +246,11 @@ LPCSTR NtRawIATEntryToImport(
     impd = (PIMAGE_IMPORT_DESCRIPTOR)((ULONG_PTR)Module + imprva);
 
     while (impd->Name != 0) {
-        raddr = (LPVOID *)((ULONG_PTR)Module + impd->FirstThunk);
+        raddr = (LPVOID*)((ULONG_PTR)Module + impd->FirstThunk);
         if (impd->OriginalFirstThunk == 0)
-            rname = (ULONG_PTR *)raddr;
+            rname = (ULONG_PTR*)raddr;
         else
-            rname = (ULONG_PTR *)((ULONG_PTR)Module + impd->OriginalFirstThunk);
+            rname = (ULONG_PTR*)((ULONG_PTR)Module + impd->OriginalFirstThunk);
 
         while (*rname != 0) {
             if (IATEntry == raddr)
@@ -233,7 +260,7 @@ LPCSTR NtRawIATEntryToImport(
                     if (ImportModuleName) {
                         *ImportModuleName = (LPCSTR)((ULONG_PTR)Module + impd->Name);
                     }
-                    return (LPCSTR)&((PIMAGE_IMPORT_BY_NAME)((ULONG_PTR)Module + *rname))->Name;
+                    return (LPCSTR) & ((PIMAGE_IMPORT_BY_NAME)((ULONG_PTR)Module + *rname))->Name;
                 }
             }
 
@@ -261,8 +288,8 @@ PAPI_SET_VALUE_ENTRY_V6 ApiSetpSearchForApiSetHost(
     _In_ USHORT ApiSetToResolveLength,
     _In_ PVOID Namespace)
 {
-    API_SET_VALUE_ENTRY_V6 *ValueEntry;
-    API_SET_VALUE_ENTRY_V6 *AliasValueEntry, *Result = NULL;
+    API_SET_VALUE_ENTRY_V6* ValueEntry;
+    API_SET_VALUE_ENTRY_V6* AliasValueEntry, * Result = NULL;
     ULONG AliasCount, i, AliasIndex;
     PWCHAR AliasName;
     LONG CompareResult;
@@ -327,7 +354,7 @@ PAPI_SET_NAMESPACE_ENTRY_V6 ApiSetpSearchForApiSet(
     WCHAR ch;
 
     PWCHAR NamespaceEntryName;
-    API_SET_HASH_ENTRY_V6 *LookupHashEntry;
+    API_SET_HASH_ENTRY_V6* LookupHashEntry;
     PAPI_SET_NAMESPACE_ENTRY_V6 NamespaceEntry = NULL;
     PAPI_SET_NAMESPACE_ARRAY_V6 ApiSetNamespace = (PAPI_SET_NAMESPACE_ARRAY_V6)Namespace;
 
@@ -417,10 +444,9 @@ NTSTATUS NtLdrApiSetResolveLibrary(
     NTSTATUS Status = STATUS_UNSUCCESSFUL;
     PWCHAR BufferPtr;
     USHORT Length;
-    ULONG Code;
     ULONG64 SchemaPrefix;
-    API_SET_NAMESPACE_ENTRY_V6 *ResolvedEntry;
-    API_SET_VALUE_ENTRY_V6 *HostLibraryEntry = NULL;
+    API_SET_NAMESPACE_ENTRY_V6* ResolvedEntry;
+    API_SET_VALUE_ENTRY_V6* HostLibraryEntry = NULL;
     PAPI_SET_NAMESPACE_ARRAY_V6 ApiSetNamespace = (PAPI_SET_NAMESPACE_ARRAY_V6)Namespace;
 
     __try {
@@ -521,10 +547,9 @@ NTSTATUS NtLdrApiSetResolveLibrary(
             }
         }
     }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
-        Code = GetExceptionCode();
-        DbgPrint("NtLdrApiSetResolveLibrary exception %lx\r\n", Code);
-        return Code;
+    __except (NTLDR_EXCEPTION_FILTER)
+    {
+        return GetExceptionCode();
     }
 
     *Resolved = IsResolved;
@@ -541,7 +566,7 @@ NTSTATUS NtLdrApiSetResolveLibrary(
 */
 BOOLEAN NtLdrApiSetLoadFromPeb(
     _Out_ PULONG SchemaVersion,
-    _Out_ PVOID* DataPointer)
+    _Out_ PVOID * DataPointer)
 {
     PBYTE DataPtr = NULL;
 
@@ -553,7 +578,7 @@ BOOLEAN NtLdrApiSetLoadFromPeb(
         *SchemaVersion = *(ULONG*)DataPtr;
         *DataPointer = DataPtr;
     }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
+    __except (NTLDR_EXCEPTION_FILTER) {
         return FALSE;
     }
     return TRUE;

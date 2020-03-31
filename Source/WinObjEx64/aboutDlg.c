@@ -4,9 +4,9 @@
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     1.84
+*  VERSION:     1.85
 *
-*  DATE:        22 Feb 2020
+*  DATE:        05 Mar 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -16,7 +16,6 @@
 *******************************************************************************/
 #include "global.h"
 #include "msvcver.h"
-#include <Richedit.h>
 #include "winedebug.h"
 
 VALUE_DESC CodeIntegrityValuesList[] = {
@@ -340,7 +339,6 @@ VOID AddParameterValueUlong(
     AddParameterValue(OutputWindow, Parameter, szBuffer);
 }
 
-
 /*
 * AboutDialogCollectGlobals
 *
@@ -499,7 +497,7 @@ VOID AboutDialogCollectGlobals(
     if (g_kdctx.DriverOpenLoadStatus == STATUS_SUCCESS) {
         _strcat(szBuffer, TEXT(" (reported as OK)"));
     }
-    AddParameterValue(hwndOutput, TEXT("DriverOpenLoadStatus"), szBuffer);    
+    AddParameterValue(hwndOutput, TEXT("DriverOpenLoadStatus"), szBuffer);
     
     AddParameterValue32Hex(hwndOutput, TEXT("DriverOpenStatus"), g_kdctx.DriverOpenStatus);
 
@@ -527,7 +525,9 @@ VOID AboutDialogCollectGlobals(
 
     AddParameterValue64Hex(hwndOutput, TEXT("NtOsImageMap"), (ULONG_PTR)g_kdctx.NtOsImageMap);
 
-    AddParameterValueUlong(hwndOutput, TEXT("ObHeaderCookie"), g_kdctx.ObHeaderCookie);
+    AddParameterValueUlong(hwndOutput, TEXT("ObHeaderCookie"), g_kdctx.ObHeaderCookie.Value);
+
+    AddParameterValueUlong(hwndOutput, TEXT("ObHeaderCookieValid"), g_kdctx.ObHeaderCookie.Valid);
 
     AddParameterValue64Hex(hwndOutput, TEXT("PrivateNamespaceLookupTable"), (ULONG_PTR)g_kdctx.PrivateNamespaceLookupTable);
 
@@ -728,25 +728,7 @@ VOID AboutDialogShowGlobals(
     _In_ HWND hwndParent
 )
 {
-    HANDLE RichEditHandle;
-
-    WCHAR szBuffer[MAX_PATH * 2];
-
-    RichEditHandle = GetModuleHandle(T_RICHEDIT_LIB);
-    if (RichEditHandle == NULL) {
-
-        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-
-        RtlStringCchPrintfSecure(szBuffer,
-            sizeof(szBuffer) / sizeof(szBuffer[0]),
-            TEXT("%s\\%s"),
-            g_WinObj.szSystemDirectory,
-            T_RICHEDIT_LIB);
-
-        RichEditHandle = LoadLibraryEx(szBuffer, NULL, 0);
-    }
-
-    if (RichEditHandle == NULL)
+    if (!supRichEdit32Load())
         return;
 
     DialogBoxParam(g_WinObj.hInstance,

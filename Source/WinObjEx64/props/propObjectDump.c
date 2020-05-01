@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     1.84
+*  VERSION:     1.85
 *
-*  DATE:        12 Feb 2020
+*  DATE:        01 May 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -114,6 +114,7 @@ VOID propObDumpAddress(
 *
 */
 VOID propObDumpAddressWithModule(
+    _In_ HWND TreeList,
     _In_ HTREEITEM hParent,
     _In_ LPWSTR lpszName,
     _In_opt_ PVOID Address,
@@ -158,7 +159,7 @@ VOID propObDumpAddressWithModule(
     }
 
     supTreeListAddItem(
-        g_TreeList,
+        TreeList,
         hParent,
         TVIF_TEXT | TVIF_STATE,
         0,
@@ -1187,7 +1188,7 @@ VOID propObDumpDriverObject(
             }
 
             //DRIVER_OBJECT->MajorFunction[i]
-            propObDumpAddressWithModule(h_tviSubItem, T_IRP_MJ_FUNCTION[i], drvObject.MajorFunction[i],
+            propObDumpAddressWithModule(g_TreeList, h_tviSubItem, T_IRP_MJ_FUNCTION[i], drvObject.MajorFunction[i],
                 pModules, ldrEntry.DllBase, ldrEntry.SizeOfImage);
         }
 
@@ -1313,7 +1314,7 @@ VOID propObDumpDriverObject(
                         if (pObj == NULL) {
                             continue;
                         }
-                        propObDumpAddressWithModule(h_tviRootItem, T_FAST_IO_DISPATCH[i], pObj,
+                        propObDumpAddressWithModule(g_TreeList, h_tviRootItem, T_FAST_IO_DISPATCH[i], pObj,
                             pModules, ldrEntry.DllBase, ldrEntry.SizeOfImage);
                     }
                 }
@@ -1383,7 +1384,7 @@ VOID propObDumpDriverObject(
                 }
 
                 //AddDevice
-                propObDumpAddressWithModule(h_tviRootItem, TEXT("AddDevice"), drvExtension.AddDevice,
+                propObDumpAddressWithModule(g_TreeList, h_tviRootItem, TEXT("AddDevice"), drvExtension.AddDevice,
                     pModules, ldrEntry.DllBase, ldrEntry.SizeOfImage);
 
                 //Count
@@ -2795,7 +2796,7 @@ VOID propObDumpObjectType(
 
         for (i = 0; i < MAX_KNOWN_OBJECT_TYPE_PROCEDURES; i++) {
             if (TypeProcs[i]) {
-                propObDumpAddressWithModule(h_tviSubItem, T_TYPEPROCEDURES[i], TypeProcs[i],
+                propObDumpAddressWithModule(g_TreeList, h_tviSubItem, T_TYPEPROCEDURES[i], TypeProcs[i],
                     ModulesList, SelfDriverBase, SelfDriverSize);
             }
             else {
@@ -3013,13 +3014,13 @@ VOID propObDumpFltServerPort(
 
         propObDumpListEntry(g_TreeList, h_tviRootItem, L"FilterLink", &FltServerPortObject.FilterLink);
 
-        propObDumpAddressWithModule(h_tviRootItem, L"ConnectNotify",
+        propObDumpAddressWithModule(g_TreeList, h_tviRootItem, L"ConnectNotify",
             FltServerPortObject.ConnectNotify, pModules, NULL, 0);
 
-        propObDumpAddressWithModule(h_tviRootItem, L"DisconnectNotify",
+        propObDumpAddressWithModule(g_TreeList, h_tviRootItem, L"DisconnectNotify",
             FltServerPortObject.DisconnectNotify, pModules, NULL, 0);
 
-        propObDumpAddressWithModule(h_tviRootItem, L"MessageNotify",
+        propObDumpAddressWithModule(g_TreeList, h_tviRootItem, L"MessageNotify",
             FltServerPortObject.MessageNotify, pModules, NULL, 0);
 
         propObDumpAddress(g_TreeList, h_tviRootItem, L"Filter", T_PFLT_FILTER, FltServerPortObject.Filter, 0, 0);
@@ -3638,7 +3639,7 @@ VOID propObDumpCallback(
         Count += 1;
         ListEntry.Flink = CallbackRegistration.Link.Flink;
 
-        propObDumpAddressWithModule(h_tviRootItem,
+        propObDumpAddressWithModule(g_TreeList, h_tviRootItem,
             Context->lpObjectName,
             CallbackRegistration.CallbackFunction,
             Modules,
@@ -3679,6 +3680,8 @@ VOID propObDumpSymbolicLink(
 
     TIME_FIELDS	SystemTime;
     TL_SUBITEMS_FIXED subitems;
+
+    PRTL_PROCESS_MODULES pModules;
 
     union {
         union {
@@ -3774,8 +3777,22 @@ VOID propObDumpSymbolicLink(
     }
 
     if (IsCallbackLink) {
-        propObDumpAddress(g_TreeList, h_tviRootItem, TEXT("Callback"), NULL,
-            SymbolicLink.u1.LinkV4->u1.Callback, 0, 0);
+
+        pModules = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation, NULL);
+        if (pModules) {
+
+            propObDumpAddressWithModule(g_TreeList, h_tviRootItem, TEXT("Callback"),
+                SymbolicLink.u1.LinkV4->u1.Callback, pModules, NULL, 0);
+
+            supHeapFree(pModules);
+        }
+        else {
+
+            propObDumpAddress(g_TreeList, h_tviRootItem, TEXT("Callback"), NULL,
+                SymbolicLink.u1.LinkV4->u1.Callback, 0, 0);
+
+        }
+
         propObDumpAddress(g_TreeList, h_tviRootItem, TEXT("CallbackContext"), NULL,
             SymbolicLink.u1.LinkV4->u1.CallbackContext, 0, 0);
     }

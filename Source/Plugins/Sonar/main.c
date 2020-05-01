@@ -25,7 +25,7 @@ ULONG g_CurrentDPI;
 
 int  y_splitter_pos = 300, y_capture_pos = 0, y_splitter_max = 0;
 
-#define SONAR_MAX_TESTED_BUILD 19592
+#define SONAR_MAX_TESTED_BUILD 19619
 
 #define PROTOCOLLIST_COLUMN_COUNT 3
 

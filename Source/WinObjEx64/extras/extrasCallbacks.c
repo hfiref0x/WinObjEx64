@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASCALLBACKS.C
 *
-*  VERSION:     1.85
+*  VERSION:     1.86
 *
-*  DATE:        26 Mar 2020
+*  DATE:        06 May 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -87,6 +87,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoFileSystemCallbacks);
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpDbgkLCallbacks);
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpPsAltSystemCallHandlers);
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks);
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpExHostCallbacks);
 
 OBEX_FINDCALLBACK_ROUTINE(FindPspCreateProcessNotifyRoutine);
 OBEX_FINDCALLBACK_ROUTINE(FindPspCreateThreadNotifyRoutine);
@@ -103,6 +104,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindRtlpDebugPrintCallbackList);
 OBEX_FINDCALLBACK_ROUTINE(FindDbgkLmdCallbacks);
 OBEX_FINDCALLBACK_ROUTINE(FindPsAltSystemCallHandlers);
 OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks);
+OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks);
 
 OBEX_CALLBACK_DISPATCH_ENTRY g_CallbacksDispatchTable[] = {
     {
@@ -203,6 +205,11 @@ OBEX_CALLBACK_DISPATCH_ENTRY g_CallbacksDispatchTable[] = {
         0, L"CiCallbacks",
         QueryCallbackGeneric, DumpCiCallbacks, FindCiCallbacks,
         &g_SystemCallbacks.CiCallbacks
+    },
+    {
+        0, L"ExHostCallback",
+        QueryCallbackGeneric, DumpExHostCallbacks, FindExHostCallbacks,
+        &g_SystemCallbacks.ExpHostListHead
     }
 };
 
@@ -1902,6 +1909,92 @@ OBEX_FINDCALLBACK_ROUTINE(FindPsAltSystemCallHandlers)
     return Result;
 }
 
+/*
+* FindExHostListCallbacks
+*
+* Purpose:
+*
+* Return address of list head for callbacks registered with:
+*
+*   ExRegisterExtension
+*
+*/
+OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
+{
+    HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
+
+    ULONG_PTR Result = 0;
+    PBYTE   ptrCode;
+    LONG    Rel = 0;
+    ULONG   Index, c;
+    hde64s  hs;
+
+    UNREFERENCED_PARAMETER(QueryFlags);
+
+    ptrCode = (PBYTE)GetProcAddress(hNtOs, "ExRegisterExtension");
+    if (ptrCode == NULL)
+        return 0;
+
+    c = 0;
+    Index = 0;
+
+    //
+    // Find ExpFindHost
+    //
+
+    do {
+
+        hde64_disasm(ptrCode + Index, &hs);
+        if (hs.flags & F_ERROR)
+            break;
+
+        //
+        // Find call instruction.
+        //
+        if (hs.len != 5) {
+            Index += hs.len;
+            continue;
+        }
+
+        if (ptrCode[Index] == 0xE8)
+            c++;
+
+        if (c > 1) {
+            Rel = *(PLONG)(ptrCode + Index + 1);
+            break;
+        }
+
+        Index += hs.len;
+
+    } while (Index < 256);
+
+    if (Rel == 0)
+        return 0;
+
+    //
+    // Examine ExpFindHost
+    //
+    ptrCode = ptrCode + Index + 5 + Rel;
+
+    hde64_disasm(ptrCode, &hs);
+    if (hs.flags & F_ERROR)
+        return 0;
+
+    if (hs.len == 7) {
+        //
+        // mov     rax, cs:ExpHostList
+        //
+        if (ptrCode[1] == 0x8B) {
+            Rel = *(PLONG)(ptrCode + 3);
+            Result = kdAdjustAddressToNtOsBase((ULONG_PTR)ptrCode,
+                0,
+                hs.len,
+                Rel);
+        }
+
+    }
+    return Result;
+}
 
 /*
 * AddRootEntryToList
@@ -3283,6 +3376,111 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks)
 }
 
 /*
+* DumpExHostCallbacks
+*
+* Purpose:
+*
+* Read ExHostList related callback data from kernel and send it to output window.
+*
+*/
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpExHostCallbacks)
+{
+    LIST_ENTRY ListEntry;
+
+    EX_HOST_ENTRY HostEntry;
+
+    ULONG_PTR ListHead = KernelVariableAddress;
+    ULONG_PTR* HostTableDump;
+    ULONG NumberOfCallbacks, i;
+
+    HTREEITEM RootItem;
+
+    //
+    // Add callback root entry to the treelist.
+    //
+    RootItem = AddRootEntryToList(TreeList, CallbackType);
+    if (RootItem == 0)
+        return;
+
+    ListEntry.Flink = ListEntry.Blink = NULL;
+
+    //
+    // Read head.
+    //
+    if (!kdReadSystemMemoryEx(
+        ListHead,
+        &ListEntry,
+        sizeof(LIST_ENTRY),
+        NULL))
+    {
+        return;
+    }
+
+    //
+    // Walk list entries.
+    //
+    while ((ULONG_PTR)ListEntry.Flink != ListHead) {
+
+        RtlSecureZeroMemory(&HostEntry, sizeof(HostEntry));
+
+        if (!kdReadSystemMemoryEx((ULONG_PTR)ListEntry.Flink,
+            &HostEntry,
+            sizeof(HostEntry),
+            NULL))
+        {
+            break;
+        }
+
+        //
+        // Find not an empty host table.
+        //
+        NumberOfCallbacks = HostEntry.HostParameters.HostInformation.FunctionCount;
+
+        if (NumberOfCallbacks) {
+
+            if (HostEntry.HostParameters.NotificationRoutine) {
+                AddEntryToList(TreeList,
+                    RootItem,
+                    (ULONG_PTR)HostEntry.HostParameters.NotificationRoutine,
+                    L"NotificationRoutine",
+                    Modules);
+
+            }
+
+            //
+            // Read table.
+            //
+            HostTableDump = (ULONG_PTR*)supHeapAlloc(NumberOfCallbacks * sizeof(PVOID));
+            if (HostTableDump) {
+
+                if (kdReadSystemMemoryEx(
+                    (ULONG_PTR)HostEntry.FunctionTable,
+                    HostTableDump,
+                    NumberOfCallbacks * sizeof(PVOID),
+                    NULL))
+                {
+
+                    for (i = 0; i < NumberOfCallbacks; i++) {
+                        if (HostTableDump[i]) {
+                            AddEntryToList(TreeList,
+                                RootItem,
+                                (ULONG_PTR)HostTableDump[i],
+                                L"Callback",
+                                Modules);
+                        }
+                    }
+
+                }
+
+                supHeapFree(HostTableDump);
+            }
+        }
+
+        ListEntry.Flink = HostEntry.ListEntry.Flink;
+    }
+}
+
+/*
 * QueryIopFsListsCallbacks
 *
 * Purpose:
@@ -3439,6 +3637,11 @@ VOID DisplayCallbacksList(
         Modules = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation, NULL);
         if (Modules == NULL) {
             MessageBox(hwndDlg, TEXT("Could not allocate memory for modules list."), NULL, MB_ICONERROR);
+            __leave;
+        }
+
+        if (g_kdctx.NtOsImageMap == NULL) {
+            MessageBox(hwndDlg, TEXT("Error, ntoskrnl image is not mapped."), NULL, MB_ICONERROR);
             __leave;
         }
 

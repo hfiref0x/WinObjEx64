@@ -1,11 +1,14 @@
+v1.8.6
+added callbacks registered with ExRegisterExtension
+
 v1.8.5
-+ fix object cookie
-+ add error log
-+ 20h1/20h2 compatibility improvements
+fix object cookie
+add error log
+20h1/20h2 compatibility improvements
 
 v1.8.4
-+ support of additional helper driver
-+ fix Windows 7 regressions
+support of additional helper driver
+fix Windows 7 regressions
 
 v1.8.3
 internal rearrange

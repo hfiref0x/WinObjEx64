@@ -5,9 +5,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.132
+*  VERSION:     1.133
 *
-*  DATE:        24 Feb 2020
+*  DATE:        01 May 2020
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -4240,6 +4240,41 @@ typedef enum _LDR_DLL_LOAD_REASON {
 /*
 ** Callbacks START
 */
+
+typedef VOID(NTAPI* PEX_HOST_NOTIFICATION) (
+    _In_ ULONG NotificationType,
+    _In_opt_ PVOID Context);
+
+typedef struct _EX_EXTENSION_INFORMATION {
+    USHORT Id;
+    USHORT Version;
+    USHORT FunctionCount;
+} EX_EXTENSION_INFORMATION, * PEX_EXTENSION_INFORMATION;
+
+typedef struct _EX_HOST_PARAMS {
+    EX_EXTENSION_INFORMATION HostInformation;
+    POOL_TYPE PoolType;
+    PVOID HostTable;
+    PVOID NotificationRoutine;
+    PVOID NotificationContext;
+} EX_HOST_PARAMS, * PEX_HOST_PARAMS;
+
+typedef struct _EX_HOST_ENTRY {
+    LIST_ENTRY ListEntry;
+    LONG RefCounter;
+    EX_HOST_PARAMS HostParameters;
+    EX_RUNDOWN_REF RundownProtection;
+    EX_PUSH_LOCK PushLock;
+    PVOID FunctionTable; //callbacks
+    ULONG Flags;
+} EX_HOST_ENTRY, * PEX_HOST_ENTRY;
+
+typedef struct _EX_EXTENSION_REGISTRATION {
+    EX_EXTENSION_INFORMATION Information;
+    PVOID FunctionTable;
+    PVOID* HostTable;
+    PDRIVER_OBJECT DriverObject;
+} EX_EXTENSION_REGISTRATION, * PEX_EXTENSION_REGISTRATION;
 
 typedef struct _EX_CALLBACK {
     EX_FAST_REF RoutineBlock;

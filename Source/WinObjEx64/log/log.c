@@ -4,9 +4,9 @@
 *
 *  TITLE:       LOG.C
 *
-*  VERSION:     1.85
+*  VERSION:     1.86
 *
-*  DATE:        26 Mar 2020
+*  DATE:        05 May 2020
 *
 *  Simplified log.
 *
@@ -378,8 +378,10 @@ VOID LogViewerShowDialog(
         return;
     }
 
-    if (!supRichEdit32Load())
+    if (!supRichEdit32Load()) {
+        MessageBox(hwndParent, TEXT("Could not load RichEdit library"), NULL, MB_ICONERROR);
         return;
+    }
 
     g_hwndLogViewer = CreateDialogParam(
         g_WinObj.hInstance,

@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.85
+*  VERSION:     1.86
 *
-*  DATE:        21 Mar 2020
+*  DATE:        06 May 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1606,14 +1606,18 @@ VOID supxSetProcessMitigationPolicies()
             &policyInfo,
             sizeof(PROCESS_MITIGATION_POLICY_INFORMATION));
 
-        policyInfo.Policy = (PROCESS_MITIGATION_POLICY)ProcessDynamicCodePolicy;
-        policyInfo.DynamicCodePolicy.Flags = 0;
-        policyInfo.DynamicCodePolicy.ProhibitDynamicCode = TRUE;
+        if (g_NtBuildNumber > 9600) {
 
-        NtSetInformationProcess(NtCurrentProcess(),
-            ProcessMitigationPolicy,
-            &policyInfo,
-            sizeof(PROCESS_MITIGATION_POLICY_INFORMATION));
+            policyInfo.Policy = (PROCESS_MITIGATION_POLICY)ProcessDynamicCodePolicy;
+            policyInfo.DynamicCodePolicy.Flags = 0;
+            policyInfo.DynamicCodePolicy.ProhibitDynamicCode = TRUE;
+
+            NtSetInformationProcess(NtCurrentProcess(),
+                ProcessMitigationPolicy,
+                &policyInfo,
+                sizeof(PROCESS_MITIGATION_POLICY_INFORMATION));
+
+        }
 
         /*
 

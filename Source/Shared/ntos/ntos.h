@@ -5,9 +5,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.133
+*  VERSION:     1.134
 *
-*  DATE:        01 May 2020
+*  DATE:        08 May 2020
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -205,15 +205,17 @@ char _RTL_CONSTANT_STRING_type_check(const void *s);
 //
 // Valid values for the OBJECT_ATTRIBUTES.Attributes field
 //
-#define OBJ_INHERIT             0x00000002L
-#define OBJ_PERMANENT           0x00000010L
-#define OBJ_EXCLUSIVE           0x00000020L
-#define OBJ_CASE_INSENSITIVE    0x00000040L
-#define OBJ_OPENIF              0x00000080L
-#define OBJ_OPENLINK            0x00000100L
-#define OBJ_KERNEL_HANDLE       0x00000200L
-#define OBJ_FORCE_ACCESS_CHECK  0x00000400L
-#define OBJ_VALID_ATTRIBUTES    0x000007F2L
+#define OBJ_INHERIT                         0x00000002L
+#define OBJ_PERMANENT                       0x00000010L
+#define OBJ_EXCLUSIVE                       0x00000020L
+#define OBJ_CASE_INSENSITIVE                0x00000040L
+#define OBJ_OPENIF                          0x00000080L
+#define OBJ_OPENLINK                        0x00000100L
+#define OBJ_KERNEL_HANDLE                   0x00000200L
+#define OBJ_FORCE_ACCESS_CHECK              0x00000400L
+#define OBJ_IGNORE_IMPERSONATED_DEVICEMAP   0x00000800L
+#define OBJ_DONT_REPARSE                    0x00001000L
+#define OBJ_VALID_ATTRIBUTES                0x00001FF2L
 
 //
 // Callback Object Rights
@@ -364,7 +366,8 @@ char _RTL_CONSTANT_STRING_type_check(const void *s);
 #define TRACELOG_CREATE_ONDISK        0x0040
 #define TRACELOG_GUID_ENABLE          0x0080
 #define TRACELOG_ACCESS_KERNEL_LOGGER 0x0100
-#define TRACELOG_CREATE_INPROC        0x0200
+#define TRACELOG_LOG_EVENT            0x0200 // used on Vista and greater
+#define TRACELOG_CREATE_INPROC        0x0200 // used pre-Vista
 #define TRACELOG_ACCESS_REALTIME      0x0400
 #define TRACELOG_REGISTER_GUIDS       0x0800
 #define TRACELOG_JOIN_GROUP           0x1000
@@ -1554,8 +1557,12 @@ typedef enum _SYSTEM_INFORMATION_CLASS {
     SystemFlags2Information = 207,
     SystemSecurityModelInformation = 208,
     SystemCodeIntegritySyntheticCacheInformation = 209,
+    SystemFeatureConfigurationInformation = 210,
+    SystemFeatureConfigurationSectionInformation = 211,
+    SystemFeatureUsageSubscriptionInformation = 212,
+    SystemSecureSpeculationControlInformation = 213,
     MaxSystemInfoClass
-} SYSTEM_INFORMATION_CLASS, *PSYSTEM_INFORMATION_CLASS;
+} SYSTEM_INFORMATION_CLASS, * PSYSTEM_INFORMATION_CLASS;
 
 //msdn.microsoft.com/en-us/library/windows/desktop/ms724509(v=vs.85).aspx
 typedef struct _SYSTEM_SPECULATION_CONTROL_INFORMATION {

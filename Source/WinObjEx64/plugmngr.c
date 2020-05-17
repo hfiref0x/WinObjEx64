@@ -4,9 +4,9 @@
 *
 *  TITLE:       PLUGMNGR.C
 *
-*  VERSION:     1.85
+*  VERSION:     1.86
 *
-*  DATE:        05 Mar 2020
+*  DATE:        10 May 2020
 *
 *  Plugin manager.
 *
@@ -21,6 +21,33 @@
 
 LIST_ENTRY g_PluginsListHead;
 UINT g_PluginCount = 0;
+
+/*
+* PluginManagerReportInvalidPlugin
+*
+* Purpose:
+*
+* Log invalid plugin load attempt.
+*
+*/
+VOID PluginManagerReportInvalidPlugin(
+    _In_ LPWSTR lpszPluginFileName
+)
+{
+    LPWSTR lpCombined;
+    SIZE_T cbSize;
+
+    cbSize = (MAX_PATH + _strlen(lpszPluginFileName)) * sizeof(WCHAR);
+
+    lpCombined = (LPWSTR)supHeapAlloc(cbSize);
+    if (lpCombined) {
+        _strcpy(lpCombined, TEXT("File "));
+        _strcat(lpCombined, lpszPluginFileName);
+        _strcat(lpCombined, TEXT(" is not a valid WinObjEx64 plugin"));
+        logAdd(WOBJ_LOG_ENTRY_INFORMATION, lpCombined);
+        supHeapFree(lpCombined);
+    }
+}
 
 /*
 * PluginManagerDllIsPlugin
@@ -192,7 +219,7 @@ DWORD WINAPI PluginManagerWorkerThread(
             // Validate plugin dll.
             //
             if (!PluginManagerDllIsPlugin(szPluginPath)) {
-                DbgPrint("Dll %ws is not a valid WinObjEx64 plugin\r\n", szPluginPath);
+                PluginManagerReportInvalidPlugin(szPluginPath);
                 continue;
             }
 

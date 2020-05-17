@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.85
+*  VERSION:     1.86
 *
-*  DATE:        01 May 2020
+*  DATE:        17 May 2020
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -203,7 +203,10 @@ typedef struct _OBJREF {
 #define NT_WIN10_20H1           19041
 
 // Windows 10 20H2
-#define NTX_WIN10_20H2          19619
+#define NT_WIN10_20H2           19042
+
+// Windows 10 Active Develepment Branch
+#define NTX_WIN10_ADB           19628
 
 //
 // Defines for boundary descriptors
@@ -250,6 +253,7 @@ typedef struct _NOTIFICATION_CALLBACKS {
     ULONG_PTR DbgkLmdCallbacks;
     ULONG_PTR PsAltSystemCallHandlers;
     ULONG_PTR CiCallbacks;
+    ULONG_PTR ExpHostListHead;
 } NOTIFICATION_CALLBACKS, *PNOTIFICATION_CALLBACKS;
 
 extern NOTIFICATION_CALLBACKS g_SystemCallbacks;
@@ -425,4 +429,27 @@ __forceinline BOOL kdAddressInNtOsImage(
     return IN_REGION(Address,
         g_kdctx.NtOsBase,
         g_kdctx.NtOsSize);
+}
+
+/*
+* kdAdjustAddressToNtOsBase
+*
+* Purpose:
+*
+* Adjust address to address in ntos kernel image.
+*
+*/
+__forceinline ULONG_PTR kdAdjustAddressToNtOsBase(
+    _In_ ULONG_PTR CodeBase,
+    _In_ ULONG_PTR Offset,
+    _In_ ULONG InstructionLength,
+    _In_ LONG Relative
+)
+{
+    ULONG_PTR Address;
+
+    Address = (ULONG_PTR)CodeBase + Offset + InstructionLength + Relative;
+    Address = (ULONG_PTR)g_kdctx.NtOsBase + Address - (ULONG_PTR)g_kdctx.NtOsImageMap;
+
+    return Address;
 }

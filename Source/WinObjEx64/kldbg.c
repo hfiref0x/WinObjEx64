@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.85
+*  VERSION:     1.86
 *
-*  DATE:        21 Mar 2020
+*  DATE:        17 May 2020
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -44,7 +44,14 @@ VOID kdpRemoveDriverFile();
 
 #ifdef _USE_OWN_DRIVER
 
-
+/*
+* kdpShowNtStatus
+*
+* Purpose:
+*
+* Output ntstatus message.
+*
+*/
 VOID kdpShowNtStatus(
     _In_ LPCWSTR lpFunction,
     _In_ NTSTATUS ntStatus)
@@ -3152,7 +3159,7 @@ BOOL kdQuerySystemInformation(
 
         if (MappedKernel == NULL)
             break;
-
+        
         Context->NtOsImageMap = MappedKernel;
 
         Result = TRUE;

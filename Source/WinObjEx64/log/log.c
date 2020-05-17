@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.86
 *
-*  DATE:        05 May 2020
+*  DATE:        17 May 2020
 *
 *  Simplified log.
 *
@@ -83,7 +83,7 @@ VOID logAdd(
 
         g_WinObjLog.Entries[Index].Type = Type;
         GetSystemTimeAsFileTime((PFILETIME)&g_WinObjLog.Entries[Index].LoggedTime);
-        _strncpy(g_WinObjLog.Entries[Index].MessageData, MAX_PATH, Message, MAX_PATH);
+        _strncpy(g_WinObjLog.Entries[Index].MessageData, WOBJ_MAX_MESSAGE, Message, WOBJ_MAX_MESSAGE);
 
         Index += 1;
         if (Index >= WOBJ_MAX_LOG_CAPACITY)

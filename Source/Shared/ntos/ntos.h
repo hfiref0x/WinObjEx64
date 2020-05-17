@@ -5,9 +5,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.134
+*  VERSION:     1.135
 *
-*  DATE:        08 May 2020
+*  DATE:        17 May 2020
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -4120,129 +4120,9 @@ typedef struct _FILE_OBJECT {
 } FILE_OBJECT;
 typedef struct _FILE_OBJECT* PFILE_OBJECT;
 
-#define RESOURCE_TYPE_LEVEL     0
-#define RESOURCE_NAME_LEVEL     1
-#define RESOURCE_LANGUAGE_LEVEL 2
-#define RESOURCE_DATA_LEVEL     3
-
-typedef struct _LDR_RESOURCE_INFO {
-    ULONG_PTR Type;
-    ULONG_PTR Name;
-    ULONG Lang;
-} LDR_RESOURCE_INFO, *PLDR_RESOURCE_INFO;
-
-typedef struct _LDR_DATA_TABLE_ENTRY_COMPATIBLE {
-    LIST_ENTRY InLoadOrderLinks;
-    LIST_ENTRY InMemoryOrderLinks;
-    union
-    {
-        LIST_ENTRY InInitializationOrderLinks;
-        LIST_ENTRY InProgressLinks;
-    } DUMMYUNION0;
-    PVOID DllBase;
-    PVOID EntryPoint;
-    ULONG SizeOfImage;
-    UNICODE_STRING FullDllName;
-    UNICODE_STRING BaseDllName;
-    union
-    {
-        ULONG Flags;
-        struct
-        {
-            ULONG PackagedBinary : 1; // Size=4 Offset=104 BitOffset=0 BitCount=1
-            ULONG MarkedForRemoval : 1; // Size=4 Offset=104 BitOffset=1 BitCount=1
-            ULONG ImageDll : 1; // Size=4 Offset=104 BitOffset=2 BitCount=1
-            ULONG LoadNotificationsSent : 1; // Size=4 Offset=104 BitOffset=3 BitCount=1
-            ULONG TelemetryEntryProcessed : 1; // Size=4 Offset=104 BitOffset=4 BitCount=1
-            ULONG ProcessStaticImport : 1; // Size=4 Offset=104 BitOffset=5 BitCount=1
-            ULONG InLegacyLists : 1; // Size=4 Offset=104 BitOffset=6 BitCount=1
-            ULONG InIndexes : 1; // Size=4 Offset=104 BitOffset=7 BitCount=1
-            ULONG ShimDll : 1; // Size=4 Offset=104 BitOffset=8 BitCount=1
-            ULONG InExceptionTable : 1; // Size=4 Offset=104 BitOffset=9 BitCount=1
-            ULONG ReservedFlags1 : 2; // Size=4 Offset=104 BitOffset=10 BitCount=2
-            ULONG LoadInProgress : 1; // Size=4 Offset=104 BitOffset=12 BitCount=1
-            ULONG LoadConfigProcessed : 1; // Size=4 Offset=104 BitOffset=13 BitCount=1
-            ULONG EntryProcessed : 1; // Size=4 Offset=104 BitOffset=14 BitCount=1
-            ULONG ProtectDelayLoad : 1; // Size=4 Offset=104 BitOffset=15 BitCount=1
-            ULONG ReservedFlags3 : 2; // Size=4 Offset=104 BitOffset=16 BitCount=2
-            ULONG DontCallForThreads : 1; // Size=4 Offset=104 BitOffset=18 BitCount=1
-            ULONG ProcessAttachCalled : 1; // Size=4 Offset=104 BitOffset=19 BitCount=1
-            ULONG ProcessAttachFailed : 1; // Size=4 Offset=104 BitOffset=20 BitCount=1
-            ULONG CorDeferredValidate : 1; // Size=4 Offset=104 BitOffset=21 BitCount=1
-            ULONG CorImage : 1; // Size=4 Offset=104 BitOffset=22 BitCount=1
-            ULONG DontRelocate : 1; // Size=4 Offset=104 BitOffset=23 BitCount=1
-            ULONG CorILOnly : 1; // Size=4 Offset=104 BitOffset=24 BitCount=1
-            ULONG ChpeImage : 1; // Size=4 Offset=104 BitOffset=25 BitCount=1
-            ULONG ReservedFlags5 : 2; // Size=4 Offset=104 BitOffset=26 BitCount=2
-            ULONG Redirected : 1; // Size=4 Offset=104 BitOffset=28 BitCount=1
-            ULONG ReservedFlags6 : 2; // Size=4 Offset=104 BitOffset=29 BitCount=2
-            ULONG CompatDatabaseProcessed : 1; // Size=4 Offset=104 BitOffset=31 BitCount=1
-        };
-    } ENTRYFLAGSUNION;
-    WORD ObsoleteLoadCount;
-    WORD TlsIndex;
-    union
-    {
-        LIST_ENTRY HashLinks;
-        struct
-        {
-            PVOID SectionPointer;
-            ULONG CheckSum;
-        };
-    } DUMMYUNION1;
-    union
-    {
-        ULONG TimeDateStamp;
-        PVOID LoadedImports;
-    } DUMMYUNION2;
-    //fields below removed for compatibility
-} LDR_DATA_TABLE_ENTRY_COMPATIBLE, *PLDR_DATA_TABLE_ENTRY_COMPATIBLE;
-typedef LDR_DATA_TABLE_ENTRY_COMPATIBLE LDR_DATA_TABLE_ENTRY;
-typedef LDR_DATA_TABLE_ENTRY_COMPATIBLE *PLDR_DATA_TABLE_ENTRY;
-typedef LDR_DATA_TABLE_ENTRY *PCLDR_DATA_TABLE_ENTRY;
-
-typedef struct _LDR_DLL_LOADED_NOTIFICATION_DATA {
-    ULONG Flags;                    //Reserved.
-    PCUNICODE_STRING FullDllName;   //The full path name of the DLL module.
-    PCUNICODE_STRING BaseDllName;   //The base file name of the DLL module.
-    PVOID DllBase;                  //A pointer to the base address for the DLL in memory.
-    ULONG SizeOfImage;              //The size of the DLL image, in bytes.
-} LDR_DLL_LOADED_NOTIFICATION_DATA, *PLDR_DLL_LOADED_NOTIFICATION_DATA;
-
-typedef struct _LDR_DLL_UNLOADED_NOTIFICATION_DATA {
-    ULONG Flags;                    //Reserved.
-    PCUNICODE_STRING FullDllName;   //The full path name of the DLL module.
-    PCUNICODE_STRING BaseDllName;   //The base file name of the DLL module.
-    PVOID DllBase;                  //A pointer to the base address for the DLL in memory.
-    ULONG SizeOfImage;              //The size of the DLL image, in bytes.
-} LDR_DLL_UNLOADED_NOTIFICATION_DATA, *PLDR_DLL_UNLOADED_NOTIFICATION_DATA;
-
-typedef union _LDR_DLL_NOTIFICATION_DATA {
-    LDR_DLL_LOADED_NOTIFICATION_DATA Loaded;
-    LDR_DLL_UNLOADED_NOTIFICATION_DATA Unloaded;
-} LDR_DLL_NOTIFICATION_DATA, *PLDR_DLL_NOTIFICATION_DATA;
-typedef const LDR_DLL_NOTIFICATION_DATA *PCLDR_DLL_NOTIFICATION_DATA;
-
-#define LDR_DLL_NOTIFICATION_REASON_LOADED   1
-#define LDR_DLL_NOTIFICATION_REASON_UNLOADED 2
-
-typedef enum _LDR_DLL_LOAD_REASON {
-    LoadReasonStaticDependency,
-    LoadReasonStaticForwarderDependency,
-    LoadReasonDynamicForwarderDependency,
-    LoadReasonDelayloadDependency,
-    LoadReasonDynamicLoad,
-    LoadReasonAsImageLoad,
-    LoadReasonAsDataLoad,
-    LoadReasonEnclavePrimary,
-    LoadReasonEnclaveDependency,
-    LoadReasonUnknown = -1
-} LDR_DLL_LOAD_REASON, *PLDR_DLL_LOAD_REASON;
-
 /*
 * WDM END
 */
-
 
 /*
 ** Callbacks START
@@ -5831,6 +5711,23 @@ typedef struct _SL_APPX_CACHE {
 /*
 **  LDR START
 */
+
+#define LDR_DLL_NOTIFICATION_REASON_LOADED   1
+#define LDR_DLL_NOTIFICATION_REASON_UNLOADED 2
+
+typedef enum _LDR_DLL_LOAD_REASON {
+    LoadReasonStaticDependency,
+    LoadReasonStaticForwarderDependency,
+    LoadReasonDynamicForwarderDependency,
+    LoadReasonDelayloadDependency,
+    LoadReasonDynamicLoad,
+    LoadReasonAsImageLoad,
+    LoadReasonAsDataLoad,
+    LoadReasonEnclavePrimary,
+    LoadReasonEnclaveDependency,
+    LoadReasonUnknown = -1
+} LDR_DLL_LOAD_REASON, * PLDR_DLL_LOAD_REASON;
+
 //
 // Dll Characteristics for LdrLoadDll
 //
@@ -5858,6 +5755,263 @@ typedef struct _SL_APPX_CACHE {
 #define LDR_GET_DLL_HANDLE_EX_UNCHANGED_REFCOUNT    0x00000001
 #define LDR_GET_DLL_HANDLE_EX_PIN                   0x00000002
 
+//
+// LdrGetProcedureAddressEx Flags
+//
+#define LDR_GET_PROCEDURE_ADDRESS_DONT_RECORD_FORWARDER 0x00000001
+
+#define RESOURCE_TYPE_LEVEL     0
+#define RESOURCE_NAME_LEVEL     1
+#define RESOURCE_LANGUAGE_LEVEL 2
+#define RESOURCE_DATA_LEVEL     3
+
+typedef struct _LDR_RESOURCE_INFO {
+    ULONG_PTR Type;
+    ULONG_PTR Name;
+    ULONG Lang;
+} LDR_RESOURCE_INFO, * PLDR_RESOURCE_INFO;
+
+typedef struct _LDR_DATA_TABLE_ENTRY_COMPATIBLE {
+    LIST_ENTRY InLoadOrderLinks;
+    LIST_ENTRY InMemoryOrderLinks;
+    union
+    {
+        LIST_ENTRY InInitializationOrderLinks;
+        LIST_ENTRY InProgressLinks;
+    } DUMMYUNION0;
+    PVOID DllBase;
+    PVOID EntryPoint;
+    ULONG SizeOfImage;
+    UNICODE_STRING FullDllName;
+    UNICODE_STRING BaseDllName;
+    union
+    {
+        ULONG Flags;
+        struct
+        {
+            ULONG PackagedBinary : 1; // Size=4 Offset=104 BitOffset=0 BitCount=1
+            ULONG MarkedForRemoval : 1; // Size=4 Offset=104 BitOffset=1 BitCount=1
+            ULONG ImageDll : 1; // Size=4 Offset=104 BitOffset=2 BitCount=1
+            ULONG LoadNotificationsSent : 1; // Size=4 Offset=104 BitOffset=3 BitCount=1
+            ULONG TelemetryEntryProcessed : 1; // Size=4 Offset=104 BitOffset=4 BitCount=1
+            ULONG ProcessStaticImport : 1; // Size=4 Offset=104 BitOffset=5 BitCount=1
+            ULONG InLegacyLists : 1; // Size=4 Offset=104 BitOffset=6 BitCount=1
+            ULONG InIndexes : 1; // Size=4 Offset=104 BitOffset=7 BitCount=1
+            ULONG ShimDll : 1; // Size=4 Offset=104 BitOffset=8 BitCount=1
+            ULONG InExceptionTable : 1; // Size=4 Offset=104 BitOffset=9 BitCount=1
+            ULONG ReservedFlags1 : 2; // Size=4 Offset=104 BitOffset=10 BitCount=2
+            ULONG LoadInProgress : 1; // Size=4 Offset=104 BitOffset=12 BitCount=1
+            ULONG LoadConfigProcessed : 1; // Size=4 Offset=104 BitOffset=13 BitCount=1
+            ULONG EntryProcessed : 1; // Size=4 Offset=104 BitOffset=14 BitCount=1
+            ULONG ProtectDelayLoad : 1; // Size=4 Offset=104 BitOffset=15 BitCount=1
+            ULONG ReservedFlags3 : 2; // Size=4 Offset=104 BitOffset=16 BitCount=2
+            ULONG DontCallForThreads : 1; // Size=4 Offset=104 BitOffset=18 BitCount=1
+            ULONG ProcessAttachCalled : 1; // Size=4 Offset=104 BitOffset=19 BitCount=1
+            ULONG ProcessAttachFailed : 1; // Size=4 Offset=104 BitOffset=20 BitCount=1
+            ULONG CorDeferredValidate : 1; // Size=4 Offset=104 BitOffset=21 BitCount=1
+            ULONG CorImage : 1; // Size=4 Offset=104 BitOffset=22 BitCount=1
+            ULONG DontRelocate : 1; // Size=4 Offset=104 BitOffset=23 BitCount=1
+            ULONG CorILOnly : 1; // Size=4 Offset=104 BitOffset=24 BitCount=1
+            ULONG ChpeImage : 1; // Size=4 Offset=104 BitOffset=25 BitCount=1
+            ULONG ReservedFlags5 : 2; // Size=4 Offset=104 BitOffset=26 BitCount=2
+            ULONG Redirected : 1; // Size=4 Offset=104 BitOffset=28 BitCount=1
+            ULONG ReservedFlags6 : 2; // Size=4 Offset=104 BitOffset=29 BitCount=2
+            ULONG CompatDatabaseProcessed : 1; // Size=4 Offset=104 BitOffset=31 BitCount=1
+        };
+    } ENTRYFLAGSUNION;
+    WORD ObsoleteLoadCount;
+    WORD TlsIndex;
+    union
+    {
+        LIST_ENTRY HashLinks;
+        struct
+        {
+            PVOID SectionPointer;
+            ULONG CheckSum;
+        };
+    } DUMMYUNION1;
+    union
+    {
+        ULONG TimeDateStamp;
+        PVOID LoadedImports;
+    } DUMMYUNION2;
+    //fields below removed for compatibility, if you need them use LDR_DATA_TABLE_ENTRY_FULL
+} LDR_DATA_TABLE_ENTRY_COMPATIBLE, * PLDR_DATA_TABLE_ENTRY_COMPATIBLE;
+typedef LDR_DATA_TABLE_ENTRY_COMPATIBLE LDR_DATA_TABLE_ENTRY;
+typedef LDR_DATA_TABLE_ENTRY_COMPATIBLE* PLDR_DATA_TABLE_ENTRY;
+typedef LDR_DATA_TABLE_ENTRY* PCLDR_DATA_TABLE_ENTRY;
+
+typedef struct _RTL_BALANCED_NODE
+{
+    union
+    {
+        struct _RTL_BALANCED_NODE* Children[2];
+        struct
+        {
+            struct _RTL_BALANCED_NODE* Left;
+            struct _RTL_BALANCED_NODE* Right;
+        };
+    };
+    union
+    {
+        UCHAR Red : 1;
+        UCHAR Balance : 2;
+        ULONG_PTR ParentValue;
+    };
+} RTL_BALANCED_NODE, * PRTL_BALANCED_NODE;
+
+typedef BOOLEAN(NTAPI* PLDR_INIT_ROUTINE)(
+    _In_ PVOID DllHandle,
+    _In_ ULONG Reason,
+    _In_opt_ PVOID Context
+    );
+
+typedef struct _LDR_SERVICE_TAG_RECORD
+{
+    struct _LDR_SERVICE_TAG_RECORD* Next;
+    ULONG ServiceTag;
+} LDR_SERVICE_TAG_RECORD, * PLDR_SERVICE_TAG_RECORD;
+
+typedef struct _LDRP_CSLIST
+{
+    PSINGLE_LIST_ENTRY Tail;
+} LDRP_CSLIST, * PLDRP_CSLIST;
+
+typedef enum _LDR_DDAG_STATE
+{
+    LdrModulesMerged = -5,
+    LdrModulesInitError = -4,
+    LdrModulesSnapError = -3,
+    LdrModulesUnloaded = -2,
+    LdrModulesUnloading = -1,
+    LdrModulesPlaceHolder = 0,
+    LdrModulesMapping = 1,
+    LdrModulesMapped = 2,
+    LdrModulesWaitingForDependencies = 3,
+    LdrModulesSnapping = 4,
+    LdrModulesSnapped = 5,
+    LdrModulesCondensed = 6,
+    LdrModulesReadyToInit = 7,
+    LdrModulesInitializing = 8,
+    LdrModulesReadyToRun = 9
+} LDR_DDAG_STATE;
+
+typedef struct _LDR_DDAG_NODE
+{
+    LIST_ENTRY Modules;
+    PLDR_SERVICE_TAG_RECORD ServiceTagList;
+    ULONG LoadCount;
+    ULONG LoadWhileUnloadingCount;
+    ULONG LowestLink;
+    union
+    {
+        LDRP_CSLIST Dependencies;
+        SINGLE_LIST_ENTRY RemovalLink;
+    };
+    LDRP_CSLIST IncomingDependencies;
+    LDR_DDAG_STATE State;
+    SINGLE_LIST_ENTRY CondenseLink;
+    ULONG PreorderNumber;
+} LDR_DDAG_NODE, * PLDR_DDAG_NODE;
+
+//
+// Full declaration of LDR_DATA_TABLE_ENTRY
+//
+typedef struct _LDR_DATA_TABLE_ENTRY_FULL
+{
+    LIST_ENTRY InLoadOrderLinks;
+    LIST_ENTRY InMemoryOrderLinks;
+    union
+    {
+        LIST_ENTRY InInitializationOrderLinks;
+        LIST_ENTRY InProgressLinks;
+    };
+    PVOID DllBase;
+    PLDR_INIT_ROUTINE EntryPoint;
+    ULONG SizeOfImage;
+    UNICODE_STRING FullDllName;
+    UNICODE_STRING BaseDllName;
+    union
+    {
+        UCHAR FlagGroup[4];
+        ULONG Flags;
+        struct
+        {
+            ULONG PackagedBinary : 1;
+            ULONG MarkedForRemoval : 1;
+            ULONG ImageDll : 1;
+            ULONG LoadNotificationsSent : 1;
+            ULONG TelemetryEntryProcessed : 1;
+            ULONG ProcessStaticImport : 1;
+            ULONG InLegacyLists : 1;
+            ULONG InIndexes : 1;
+            ULONG ShimDll : 1;
+            ULONG InExceptionTable : 1;
+            ULONG ReservedFlags1 : 2;
+            ULONG LoadInProgress : 1;
+            ULONG LoadConfigProcessed : 1;
+            ULONG EntryProcessed : 1;
+            ULONG ProtectDelayLoad : 1;
+            ULONG ReservedFlags3 : 2;
+            ULONG DontCallForThreads : 1;
+            ULONG ProcessAttachCalled : 1;
+            ULONG ProcessAttachFailed : 1;
+            ULONG CorDeferredValidate : 1;
+            ULONG CorImage : 1;
+            ULONG DontRelocate : 1;
+            ULONG CorILOnly : 1;
+            ULONG ChpeImage : 1;
+            ULONG ReservedFlags5 : 2;
+            ULONG Redirected : 1;
+            ULONG ReservedFlags6 : 2;
+            ULONG CompatDatabaseProcessed : 1;
+        };
+    };
+    USHORT ObsoleteLoadCount;
+    USHORT TlsIndex;
+    LIST_ENTRY HashLinks;
+    ULONG TimeDateStamp;
+    struct _ACTIVATION_CONTEXT* EntryPointActivationContext;
+    PVOID Lock;
+    PLDR_DDAG_NODE DdagNode;
+    LIST_ENTRY NodeModuleLink;
+    struct _LDRP_LOAD_CONTEXT* LoadContext;
+    PVOID ParentDllBase;
+    PVOID SwitchBackContext;
+    RTL_BALANCED_NODE BaseAddressIndexNode;
+    RTL_BALANCED_NODE MappingInfoIndexNode;
+    ULONG_PTR OriginalBase;
+    LARGE_INTEGER LoadTime;
+    ULONG BaseNameHashValue;
+    LDR_DLL_LOAD_REASON LoadReason;
+    ULONG ImplicitPathOptions;
+    ULONG ReferenceCount;
+    ULONG DependentLoadFlags;
+    UCHAR SigningLevel;
+} LDR_DATA_TABLE_ENTRY_FULL, * PLDR_DATA_TABLE_ENTRY_FULL;
+
+typedef struct _LDR_DLL_LOADED_NOTIFICATION_DATA {
+    ULONG Flags;                    //Reserved.
+    PCUNICODE_STRING FullDllName;   //The full path name of the DLL module.
+    PCUNICODE_STRING BaseDllName;   //The base file name of the DLL module.
+    PVOID DllBase;                  //A pointer to the base address for the DLL in memory.
+    ULONG SizeOfImage;              //The size of the DLL image, in bytes.
+} LDR_DLL_LOADED_NOTIFICATION_DATA, * PLDR_DLL_LOADED_NOTIFICATION_DATA;
+
+typedef struct _LDR_DLL_UNLOADED_NOTIFICATION_DATA {
+    ULONG Flags;                    //Reserved.
+    PCUNICODE_STRING FullDllName;   //The full path name of the DLL module.
+    PCUNICODE_STRING BaseDllName;   //The base file name of the DLL module.
+    PVOID DllBase;                  //A pointer to the base address for the DLL in memory.
+    ULONG SizeOfImage;              //The size of the DLL image, in bytes.
+} LDR_DLL_UNLOADED_NOTIFICATION_DATA, * PLDR_DLL_UNLOADED_NOTIFICATION_DATA;
+
+typedef union _LDR_DLL_NOTIFICATION_DATA {
+    LDR_DLL_LOADED_NOTIFICATION_DATA Loaded;
+    LDR_DLL_UNLOADED_NOTIFICATION_DATA Unloaded;
+} LDR_DLL_NOTIFICATION_DATA, * PLDR_DLL_NOTIFICATION_DATA;
+typedef const LDR_DLL_NOTIFICATION_DATA* PCLDR_DLL_NOTIFICATION_DATA;
+
 typedef VOID(NTAPI *PLDR_LOADED_MODULE_ENUMERATION_CALLBACK_FUNCTION)(
     _In_    PCLDR_DATA_TABLE_ENTRY DataTableEntry,
     _In_    PVOID Context,
@@ -5868,6 +6022,18 @@ typedef VOID(CALLBACK *PLDR_DLL_NOTIFICATION_FUNCTION)(
     _In_ ULONG NotificationReason,
     _In_ PCLDR_DLL_NOTIFICATION_DATA NotificationData,
     _In_opt_ PVOID Context);
+
+#ifndef LDR_IS_DATAFILE
+#define LDR_IS_DATAFILE(DllHandle) (((ULONG_PTR)(DllHandle)) & (ULONG_PTR)1)
+#endif
+
+#ifndef LDR_IS_IMAGEMAPPING
+#define LDR_IS_IMAGEMAPPING(DllHandle) (((ULONG_PTR)(DllHandle)) & (ULONG_PTR)2)
+#endif
+
+#ifndef LDR_IS_RESOURCE
+#define LDR_IS_RESOURCE(DllHandle) (LDR_IS_IMAGEMAPPING(DllHandle) || LDR_IS_DATAFILE(DllHandle))
+#endif
 
 NTSYSAPI
 NTSTATUS
@@ -5990,6 +6156,16 @@ LdrGetProcedureAddressForCaller(
     _Out_ PVOID *ProcedureAddress,
     _In_ ULONG Flags,
     _In_ PVOID *Callback);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+LdrGetProcedureAddressEx(
+    _In_ PVOID DllHandle,
+    _In_opt_ PANSI_STRING ProcedureName,
+    _In_opt_ ULONG ProcedureNumber,
+    _Out_ PVOID* ProcedureAddress,
+    _In_ ULONG Flags);
 
 NTSYSAPI
 NTSTATUS
@@ -6169,6 +6345,10 @@ LdrControlFlowGuardEnforced(
 **  LDR END
 */
 
+/*
+* WIN32K OBJECTS START
+*/
+
 typedef struct _HANDLEENTRY {
     PHEAD   phead;  // Pointer to the Object.
     PVOID   pOwner; // PTI or PPI
@@ -6199,6 +6379,11 @@ typedef struct _USERCONNECT {
     DWORD dwDispatchCount;
     SHAREDINFO siClient;
 } USERCONNECT, *PUSERCONNECT;
+
+/*
+* WIN32K OBJECTS END
+*/
+
 
 /*
 ** Runtime Library API START
@@ -10778,6 +10963,9 @@ NtOpenTransactionManager(
 *
 ************************************************************************************/
 
+#define QUEUE_USER_APC_FLAGS_NONE               0
+#define QUEUE_USER_APC_FLAGS_SPECIAL_USER_APC   1
+
 NTSYSAPI
 NTSTATUS
 NTAPI
@@ -10937,6 +11125,18 @@ NtQueueApcThreadEx(
     _In_opt_ PVOID ApcArgument1,
     _In_opt_ PVOID ApcArgument2,
     _In_opt_ PVOID ApcArgument3);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtQueueApcThreadEx2(
+    _In_ HANDLE ThreadHandle,
+    _In_ HANDLE UserApcReserveHandle,
+    _In_ ULONG QueueUserApcFlags, /*QUEUE_USER_APC_FLAGS*/
+    _In_ PPS_APC_ROUTINE ApcRoutine,
+    _In_opt_ PVOID SystemArgument1,
+    _In_opt_ PVOID SystemArgument2,
+    _In_opt_ PVOID SystemArgument3);
 
 NTSYSAPI
 NTSTATUS

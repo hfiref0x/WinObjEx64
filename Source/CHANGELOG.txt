@@ -1,5 +1,6 @@
 v1.8.6
 added callbacks registered with ExRegisterExtension
+fix for pipes (PR #17)
 
 v1.8.5
 fix object cookie

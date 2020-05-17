@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.86
 *
-*  DATE:        06 May 2020
+*  DATE:        17 May 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -912,7 +912,7 @@ PVOID supGetSystemInfoEx(
             Buffer = NULL;
             Size *= 2;
             c++;
-            if (c >= 20) {
+            if (c > 20) {
                 status = STATUS_SECRET_TOO_LONG;
                 break;
             }
@@ -1650,6 +1650,7 @@ VOID supInit(
     _In_ BOOL IsFullAdmin
 )
 {
+    WCHAR szError[200];
     NTSTATUS status;
 
     supxSetProcessMitigationPolicies();
@@ -1672,9 +1673,9 @@ VOID supInit(
     //Result ignored intentionally and used only in debug.
     status = ExApiSetInit();
     if (!NT_SUCCESS(status)) {
-#ifdef _DEBUG
-        DbgPrint("ExApiSetInit() %lx\r\n", status);
-#endif
+        _strcpy(szError, TEXT("ExApiSetInit() failed, 0x"));
+        ultohex(status, _strend(szError));
+        logAdd(WOBJ_LOG_ENTRY_ERROR, szError);
     }
 
     //
@@ -2115,14 +2116,9 @@ BOOL supxEnumServicesStatus(
             servicesBuffer = NULL;
             dwSize += dwBytesNeeded;
             c++;
-            if (c >= 20) {
+            if (c > 20) {
                 break;
             }
-        }
-        else {
-            *ServicesReturned = dwServicesReturned;
-            *Services = servicesBuffer;
-            break;
         }
 
     } while (dwLastError == ERROR_MORE_DATA);
@@ -3627,12 +3623,15 @@ BOOLEAN supQueryHVCIState(
         hvciEnabled = ((CodeIntegrity.CodeIntegrityOptions & CODEINTEGRITY_OPTION_ENABLED) &&
             (CodeIntegrity.CodeIntegrityOptions & CODEINTEGRITY_OPTION_HVCI_KMCI_ENABLED));
 
-        *pbHVCIEnabled = hvciEnabled;
+        if (pbHVCIEnabled)
+            *pbHVCIEnabled = hvciEnabled;
 
-        *pbHVCIStrictMode = hvciEnabled &&
+        if (pbHVCIStrictMode)
+            *pbHVCIStrictMode = hvciEnabled &&
             (CodeIntegrity.CodeIntegrityOptions & CODEINTEGRITY_OPTION_HVCI_KMCI_STRICTMODE_ENABLED);
 
-        *pbHVCIIUMEnabled = (CodeIntegrity.CodeIntegrityOptions & CODEINTEGRITY_OPTION_HVCI_IUM_ENABLED) > 0;
+        if (pbHVCIIUMEnabled)
+            *pbHVCIIUMEnabled = (CodeIntegrity.CodeIntegrityOptions & CODEINTEGRITY_OPTION_HVCI_IUM_ENABLED) > 0;
 
         return TRUE;
     }

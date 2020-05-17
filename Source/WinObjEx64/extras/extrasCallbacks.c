@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.86
 *
-*  DATE:        06 May 2020
+*  DATE:        17 May 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -207,7 +207,7 @@ OBEX_CALLBACK_DISPATCH_ENTRY g_CallbacksDispatchTable[] = {
         &g_SystemCallbacks.CiCallbacks
     },
     {
-        0, L"ExHostCallback",
+        0, L"ExHostCallbacks",
         QueryCallbackGeneric, DumpExHostCallbacks, FindExHostCallbacks,
         &g_SystemCallbacks.ExpHostListHead
     }
@@ -3663,8 +3663,12 @@ VOID DisplayCallbacksList(
 
                 if (QueryStatus == STATUS_NOT_FOUND) {
 #ifdef _DEBUG
-                    DbgPrint("Callback type %ws was not found\r\n",
+                    RtlStringCchPrintfSecure(szText, RTL_NUMBER_OF(szText),
+                        TEXT("Callback type %ws was not found"),
                         g_CallbacksDispatchTable[i].CallbackType);
+
+                    logAdd(WOBJ_LOG_ENTRY_WARNING, szText);
+
 #endif
                 }
                 else {

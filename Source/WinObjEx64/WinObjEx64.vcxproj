@@ -93,7 +93,7 @@
     <LinkIncremental>true</LinkIncremental>
     <OutDir>.\output\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>.\output\$(Platform)\$(Configuration)\</IntDir>
-    <CodeAnalysisRuleSet>NativeRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugWithDriver|x64'">
     <LinkIncremental>true</LinkIncremental>

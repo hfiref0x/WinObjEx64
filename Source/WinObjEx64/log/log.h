@@ -4,9 +4,9 @@
 *
 *  TITLE:       LOG.H
 *
-*  VERSION:     1.85
+*  VERSION:     1.86
 *
-*  DATE:        25 Mar 2020
+*  DATE:        17 May 2020
 *
 *  Header file for simplified log support.
 *
@@ -23,12 +23,21 @@
 #define WOBJ_LOG_ENTRY_INFORMATION 2
 #define WOBJ_LOG_ENTRY_WARNING 3
 
+//
+// Maximum messages in log.
+//
 #define WOBJ_MAX_LOG_CAPACITY 2048
+
+//
+// Maximum length of message in log.
+//
+#define WOBJ_MAX_MESSAGE 2000
 
 typedef struct _WOBJ_LOG_ENTRY {
     ULONG Type;
     LARGE_INTEGER LoggedTime;
-    WCHAR MessageData[512];
+    WCHAR MessageData[WOBJ_MAX_MESSAGE + 1];
+    BYTE Reserved[72];
 } WOBJ_LOG_ENTRY, * PWOBJ_LOG_ENTRY;
 
 typedef struct _WOBJ_LOG {

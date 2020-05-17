@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.86
 *
-*  DATE:        08 May 2020
+*  DATE:        17 May 2020
 *
 *  Consts header file for Type property sheet.
 *

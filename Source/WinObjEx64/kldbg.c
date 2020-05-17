@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.86
 *
-*  DATE:        05 May 2020
+*  DATE:        17 May 2020
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *

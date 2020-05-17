@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASIPC.C
 *
-*  VERSION:     1.85
+*  VERSION:     1.86
 *
-*  DATE:        13 Mar 2020
+*  DATE:        17 May 2020
 *
 *  IPC supported: Pipes, Mailslots
 *

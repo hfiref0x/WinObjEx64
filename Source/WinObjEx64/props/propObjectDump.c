@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     1.85
+*  VERSION:     1.86
 *
-*  DATE:        01 May 2020
+*  DATE:        26 May 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -23,6 +23,7 @@
 // Global variables for treelist used in properties window page.
 //
 HWND g_TreeList;
+
 
 /*
 * propObDumpShowError
@@ -93,6 +94,9 @@ VOID propObDumpAddress(
             subitems.FontColor = FontColor;
         }
         subitems.Text[1] = lpszDesc;
+    }
+    else {
+        subitems.Text[1] = T_EmptyString;
     }
 
     supTreeListAddItem(
@@ -189,6 +193,7 @@ VOID propObDumpPushLock(
 
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
     subitems.Count = 2;
+    subitems.Text[0] = T_EmptyString;
     subitems.Text[1] = T_EX_PUSH_LOCK;
 
     h_tviSubItem = supTreeListAddItem(
@@ -402,6 +407,72 @@ VOID propObDumpUlong(
 }
 
 /*
+* propObDumpLong
+*
+* Purpose:
+*
+* Dump LONG 4 bytes to the treelist.
+*
+*/
+VOID propObDumpLong(
+    _In_ HWND TreeList,
+    _In_ HTREEITEM hParent,
+    _In_ LPWSTR lpszName,
+    _In_opt_ LPWSTR lpszDesc, //additional text to be displayed
+    _In_ LONG Value,
+    _In_ BOOL HexDump,
+    _In_opt_ COLORREF BgColor,
+    _In_opt_ COLORREF FontColor
+)
+{
+    TL_SUBITEMS_FIXED   subitems;
+    WCHAR               szValue[DUMP_CONVERSION_LENGTH + 1];
+
+    RtlSecureZeroMemory(&szValue, sizeof(szValue));
+    RtlSecureZeroMemory(&subitems, sizeof(subitems));
+
+    if (lpszDesc != NULL) {
+        subitems.Count = 2;
+        subitems.Text[1] = lpszDesc;
+    }
+    else {
+        subitems.Count = 1;
+    }
+
+    if (HexDump) {
+        RtlStringCchPrintfSecure(szValue,
+            DUMP_CONVERSION_LENGTH,
+            FORMAT_HEXLONG, Value);
+    }
+    else {
+
+        RtlStringCchPrintfSecure(szValue,
+            DUMP_CONVERSION_LENGTH,
+            FORMAT_LONG, Value);
+
+    }
+    subitems.Text[0] = szValue;
+
+    if (BgColor != 0) {
+        subitems.ColorFlags |= TLF_BGCOLOR_SET;
+        subitems.BgColor = BgColor;
+    }
+    if (FontColor != 0) {
+        subitems.ColorFlags |= TLF_FONTCOLOR_SET;
+        subitems.FontColor = FontColor;
+    }
+
+    supTreeListAddItem(
+        TreeList,
+        hParent,
+        TVIF_TEXT | TVIF_STATE,
+        0,
+        0,
+        lpszName,
+        &subitems);
+}
+
+/*
 * propObDumpUlong64
 *
 * Purpose:
@@ -550,6 +621,11 @@ VOID propObDumpListEntry(
     TL_SUBITEMS_FIXED   subitems;
     WCHAR               szValue[DUMP_CONVERSION_LENGTH + 1];
 
+    RtlSecureZeroMemory(&subitems, sizeof(subitems));
+    subitems.Count = 2;
+    subitems.Text[0] = T_EmptyString;
+    subitems.Text[1] = T_PLIST_ENTRY;
+
     h_tviSubItem = supTreeListAddItem(
         TreeList,
         hParent,
@@ -557,7 +633,7 @@ VOID propObDumpListEntry(
         TVIS_EXPANDED,
         0,
         ListEntryName,
-        NULL);
+        &subitems);
 
     if (h_tviSubItem == NULL) {
         return;
@@ -644,6 +720,9 @@ VOID propObDumpUnicodeString(
     // If pString points to kernel mode address, dump it, otherwise simple copy.
     //
     if (NeedDump) {
+
+        subitems.Text[1] = T_PUNICODE_STRING;
+
         //
         // Check if NULL, add entry.
         //
@@ -659,11 +738,14 @@ VOID propObDumpUnicodeString(
             szValue[1] = TEXT('x');
             u64tohex((ULONG_PTR)pString, &szValue[2]);
             subitems.Text[0] = szValue;
-            subitems.Text[1] = T_PUNICODE_STRING;
             kdReadSystemMemoryEx((ULONG_PTR)pString, &uStr, sizeof(UNICODE_STRING), NULL);
         }
     }
     else {
+
+        subitems.Text[0] = T_EmptyString;
+        subitems.Text[1] = T_UNICODE_STRING;
+
         if (pString) {
             uStr.Buffer = pString->Buffer;
             uStr.Length = pString->Length;
@@ -683,7 +765,7 @@ VOID propObDumpUnicodeString(
         TVIS_EXPANDED,
         0,
         StringName,
-        NeedDump ? &subitems : NULL);
+        &subitems);
 
     //
     // String points to nowhere, only root entry added.
@@ -705,6 +787,7 @@ VOID propObDumpUnicodeString(
 
     subitems.Count = 2;
     subitems.Text[0] = szValue;
+    subitems.Text[1] = T_EmptyString;
 
     supTreeListAddItem(
         TreeList,
@@ -728,6 +811,7 @@ VOID propObDumpUnicodeString(
 
     subitems.Count = 2;
     subitems.Text[0] = szValue;
+    subitems.Text[1] = T_EmptyString;
 
     supTreeListAddItem(
         TreeList,
@@ -747,6 +831,7 @@ VOID propObDumpUnicodeString(
     lpObjectName = NULL;
     if (uStr.Buffer == NULL) {
         subitems.Text[0] = T_NULL;
+        subitems.Text[1] = T_EmptyString;
     }
     else {
         RtlSecureZeroMemory(&szValue, sizeof(szValue));
@@ -849,6 +934,7 @@ VOID propObDumpSqos(
 
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
     subitems.Count = 2;
+    subitems.Text[0] = T_EmptyString;
     subitems.Text[1] = TEXT("SECURITY_QUALITY_OF_SERVICE");
 
     h_tviSubItem = supTreeListAddItem(
@@ -1085,7 +1171,7 @@ VOID propObDumpDriverObject(
                     }
                     else {
                         //add subentry
-                        subitems.Text[0] = NULL;
+                        subitems.Text[0] = T_EmptyString;
                         subitems.Text[1] = lpType;
                     }
 
@@ -1584,7 +1670,7 @@ VOID propObDumpDeviceObject(
                     }
                     else {
                         //add subentry
-                        subitems.Text[0] = NULL;
+                        subitems.Text[0] = T_EmptyString;
                         subitems.Text[1] = lpType;
                     }
 
@@ -1632,7 +1718,7 @@ VOID propObDumpDeviceObject(
                     }
                     else {
                         //add subentry
-                        subitems.Text[0] = NULL;
+                        subitems.Text[0] = T_EmptyString;
                         subitems.Text[1] = lpType;
                     }
 
@@ -1992,12 +2078,523 @@ VOID propObDumpSessionIdVersionAware(
     propObDumpUlong(g_TreeList, h_tviRootItem, TEXT("SessionId"), lpType, SessionId, TRUE, FALSE, 0, 0);
 }
 
+LPWSTR propObGetDosDriveTypeDesc(
+    _In_ UCHAR DosDrive)
+{
+    ULONG i;
+
+    for (i = 0; i < MAX_KNOWN_DOS_DRIVE_TYPE; i++) {
+        if (dosDeviceDriveType[i].dwValue == DosDrive)
+            return dosDeviceDriveType[i].lpDescription;
+
+    }
+
+    return T_UnknownType;
+}
+
+/*
+* propObDumpDeviceMap
+*
+* Purpose:
+*
+* Dump DEVICE_MAP to the treelist.
+*
+*/
+VOID propObDumpDeviceMap(
+    _In_ HWND TreeList,
+    _In_ HTREEITEM hParent,
+    _In_ PDEVICE_MAP DeviceMapAddress
+)
+{
+    union {
+        union {
+            DEVICE_MAP_V1* DeviceMapV1;
+            DEVICE_MAP_V2* DeviceMapV2;
+            DEVICE_MAP_V2* DeviceMapCompat;
+        } Versions;
+        PVOID Ref;
+    } DeviceMapStruct;
+
+    HTREEITEM h_tviSubItem, h_tviDriveType;
+    TL_SUBITEMS_FIXED subitems;
+
+    LPWSTR lpType;
+    PVOID DeviceMapPtr;
+    ULONG ObjectSize = 0;
+    ULONG ObjectVersion = 0;
+    ULONG i;
+
+    WCHAR szBuffer[MAX_PATH + 1];
+
+    DeviceMapPtr = ObDumpDeviceMapVersionAware((ULONG_PTR)DeviceMapAddress,
+        &ObjectSize,
+        &ObjectVersion);
+
+    if (DeviceMapPtr) {
+
+        DeviceMapStruct.Ref = DeviceMapPtr;
+
+        RtlSecureZeroMemory(&subitems, sizeof(subitems));
+        subitems.Count = 2;
+
+        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+        szBuffer[0] = L'0';
+        szBuffer[1] = L'x';
+        u64tohex((ULONG_PTR)DeviceMapAddress, &szBuffer[2]);
+
+        subitems.Text[0] = szBuffer;
+        subitems.Text[1] = T_PDEVICE_MAP;
+
+        h_tviSubItem = supTreeListAddItem(g_TreeList,
+            hParent,
+            TVIF_TEXT | TVIF_STATE,
+            0,
+            0,
+            T_DEVICEMAP,
+            &subitems);
+
+        if (h_tviSubItem) {
+
+            if (DeviceMapStruct.Versions.DeviceMapCompat->DosDevicesDirectory)
+                lpType = T_POBJECT_DIRECTORY;
+            else
+                lpType = T_EMPTY;
+
+            propObDumpAddress(TreeList, h_tviSubItem, TEXT("DosDevicesDirectory"), lpType,
+                (PVOID)DeviceMapStruct.Versions.DeviceMapCompat->DosDevicesDirectory, 0, 0);
+
+            if (DeviceMapStruct.Versions.DeviceMapCompat->GlobalDosDevicesDirectory)
+                lpType = T_POBJECT_DIRECTORY;
+            else
+                lpType = T_EMPTY;
+
+            propObDumpAddress(TreeList, h_tviSubItem, TEXT("GlobalDosDevicesDirectory"), lpType,
+                (PVOID)DeviceMapStruct.Versions.DeviceMapCompat->GlobalDosDevicesDirectory, 0, 0);
+
+            propObDumpAddress(TreeList, h_tviSubItem, TEXT("DosDevicesDirectoryHandle"), NULL,
+                (PVOID)DeviceMapStruct.Versions.DeviceMapCompat->DosDevicesDirectoryHandle, 0, 0);
+
+            switch (ObjectVersion) {
+            case 1:
+                propObDumpUlong(TreeList, h_tviSubItem, TEXT("ReferenceCount"), NULL,
+                    DeviceMapStruct.Versions.DeviceMapV1->ReferenceCount, TRUE, FALSE, 0, 0);
+                break;
+            case 2:
+            default:
+                propObDumpLong(TreeList, h_tviSubItem, TEXT("ReferenceCount"), NULL,
+                    DeviceMapStruct.Versions.DeviceMapV2->ReferenceCount, TRUE, 0, 0);
+                break;
+
+            }
+
+            propObDumpUlong(TreeList, h_tviSubItem, TEXT("DriveMap"), NULL,
+                DeviceMapStruct.Versions.DeviceMapCompat->DriveMap, TRUE, FALSE, 0, 0);
+
+            //
+            // Display DriveType array.
+            //
+            RtlSecureZeroMemory(&subitems, sizeof(subitems));
+            subitems.Count = 2;
+            subitems.Text[0] = T_EmptyString;
+            subitems.Text[1] = T_EmptyString;
+            h_tviDriveType = supTreeListAddItem(g_TreeList,
+                h_tviSubItem,
+                TVIF_TEXT | TVIF_STATE,
+                0,
+                0,
+                TEXT("DriveType"),
+                &subitems);
+
+            RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+
+            for (i = 0; i < RTL_NUMBER_OF(DeviceMapStruct.Versions.DeviceMapCompat->DriveType); i++) {
+
+                RtlStringCchPrintfSecure(szBuffer,
+                    MAX_PATH,
+                    TEXT("[ %i ]"),
+                    i);
+
+                lpType = propObGetDosDriveTypeDesc(DeviceMapStruct.Versions.DeviceMapCompat->DriveType[i]);
+
+                propObDumpByte(TreeList, h_tviDriveType,
+                    szBuffer,
+                    lpType,
+                    DeviceMapStruct.Versions.DeviceMapCompat->DriveType[i],
+                    0,
+                    0,
+                    FALSE);
+
+            }
+
+            if (ObjectVersion != 1) {
+                propObDumpAddress(TreeList, h_tviSubItem, TEXT("ServerSilo"), T_PEJOB,
+                    (PVOID)DeviceMapStruct.Versions.DeviceMapCompat->ServerSilo, 0, 0);
+            }
+
+        }
+
+        supVirtualFree(DeviceMapPtr);
+    }
+    else {
+
+        //
+        // Output as is in case of error.
+        //
+
+        propObDumpAddress(TreeList, hParent, T_DEVICEMAP, T_PDEVICE_MAP,
+            (PVOID)DeviceMapAddress, 0, 0);
+
+    }
+}
+
+/*
+* propObDumpDirectoryObjectInternal
+*
+* Purpose:
+*
+* Dump OBJECT_DIRECTORY members (including ShadowDirectory) to the treelist.
+*
+*/
+VOID propObDumpDirectoryObjectInternal(
+    _In_ HTREEITEM RootItem,
+    _In_opt_ HWND ParentWindow,
+    _In_ ULONG_PTR ObjectAddress,
+    _In_ BOOLEAN DumpShadow,
+    _In_ BOOLEAN ShowErrors
+)
+{
+    INT                     i, j;
+    ULONG                   SessionId, ObjectFlags;
+    HTREEITEM               h_tviRootItem, h_tviSubItem, h_tviEntry;
+    LPWSTR                  lpType;
+    TL_SUBITEMS_FIXED       subitems;
+    WCHAR                   szId[MAX_PATH + 1], szValue[MAX_PATH + 1];
+
+    ULONG ObjectVersion = 0;
+    ULONG ObjectSize = 0;
+
+    PVOID DirectoryObjectPtr = NULL, NamespaceEntry;
+    OBJECT_DIRECTORY_ENTRY dirEntry;
+    LIST_ENTRY             ChainLink;
+
+    union {
+        union {
+            OBJECT_DIRECTORY* DirObjectV1;
+            OBJECT_DIRECTORY_V2* DirObjectV2;
+            OBJECT_DIRECTORY_V3* DirObjectV3;
+            OBJECT_DIRECTORY_V3* CompatDirObject;//has all field members
+        } Versions;
+        PVOID Ref;
+    } DirObject;
+
+
+    DirectoryObjectPtr = ObDumpDirectoryObjectVersionAware(ObjectAddress,
+        &ObjectSize,
+        &ObjectVersion);
+
+    if (DirectoryObjectPtr == NULL) {
+        if (ShowErrors)
+            propObDumpShowError(ParentWindow, NULL);
+        return;
+    }
+
+    DirObject.Ref = DirectoryObjectPtr;
+
+    //
+    //OBJECT_DIRECTORY
+    //
+    h_tviRootItem = RootItem;
+
+    RtlSecureZeroMemory(&subitems, sizeof(subitems));
+    subitems.Count = 1;
+    subitems.Text[0] = TEXT("{...}");
+
+    h_tviSubItem = supTreeListAddItem(g_TreeList,
+        h_tviRootItem,
+        TVIF_TEXT | TVIF_STATE,
+        0,
+        0,
+        TEXT("HashBuckets"),
+        &subitems);
+
+    for (i = 0; i < NUMBER_HASH_BUCKETS; i++) {
+        RtlSecureZeroMemory(&subitems, sizeof(subitems));
+        subitems.Count = 2;
+
+        RtlSecureZeroMemory(szId, sizeof(szId));
+
+        RtlStringCchPrintfSecure(szId,
+            MAX_PATH,
+            TEXT("[ %i ]"),
+            i);
+
+
+        if (DirObject.Versions.CompatDirObject->HashBuckets[i]) {
+            RtlSecureZeroMemory(szValue, sizeof(szValue));
+            szValue[0] = TEXT('0');
+            szValue[1] = TEXT('x');
+            u64tohex((ULONG_PTR)DirObject.Versions.CompatDirObject->HashBuckets[i], &szValue[2]);
+            subitems.Text[0] = szValue;
+            subitems.Text[1] = T_POBJECT_DIRECTORY_ENTRY;
+        }
+        else {
+            subitems.Text[0] = T_NULL;
+            subitems.Text[1] = T_EmptyString;
+        }
+
+        h_tviEntry = supTreeListAddItem(g_TreeList,
+            h_tviSubItem,
+            TVIF_TEXT | TVIF_STATE,
+            0,
+            0,
+            szId,
+            &subitems);
+
+        //dump entry if available
+        if (DirObject.Versions.CompatDirObject->HashBuckets[i]) {
+
+            RtlSecureZeroMemory(&dirEntry, sizeof(dirEntry));
+
+            if (kdReadSystemMemoryEx((ULONG_PTR)DirObject.Versions.CompatDirObject->HashBuckets[i],
+                &dirEntry,
+                sizeof(dirEntry),
+                NULL))
+            {
+
+                ChainLink.Blink = NULL;
+                ChainLink.Flink = NULL;
+                lpType = TEXT("ChainLink");
+                if (dirEntry.ChainLink == NULL) {
+                    propObDumpAddress(g_TreeList, h_tviEntry, lpType, T_EMPTY, NULL, 0, 0);
+                }
+                else {
+                    if (kdReadSystemMemoryEx(
+                        (ULONG_PTR)dirEntry.ChainLink,
+                        &ChainLink,
+                        sizeof(ChainLink),
+                        NULL))
+                    {
+                        propObDumpListEntry(g_TreeList, h_tviEntry, lpType, &ChainLink);
+                    }
+                    else {
+                        //
+                        // Failed to read listentry, display as is.
+                        //
+                        propObDumpAddress(g_TreeList, h_tviEntry, lpType, T_PLIST_ENTRY, dirEntry.ChainLink, 0, 0);
+                    }
+                }
+                propObDumpAddress(g_TreeList, h_tviEntry, TEXT("Object"), NULL, dirEntry.Object, 0, 0);
+                propObDumpUlong(g_TreeList, h_tviEntry, TEXT("HashValue"), NULL, dirEntry.HashValue, TRUE, FALSE, 0, 0);
+            }
+        }
+    }
+
+    //EX_PUSH_LOCK
+    propObDumpPushLock(g_TreeList, h_tviRootItem,
+        DirObject.Versions.CompatDirObject->Lock.Ptr, 0, 0);
+
+    //DeviceMap
+    if (DumpShadow) {
+        propObDumpDeviceMap(g_TreeList, h_tviRootItem,
+            DirObject.Versions.CompatDirObject->DeviceMap);
+    }
+    else {
+        propObDumpAddress(g_TreeList, h_tviRootItem, TEXT("DeviceMap"), NULL,
+            DirObject.Versions.CompatDirObject->DeviceMap, 0, 0);
+    }
+
+    //ShadowDirectory
+    if (ObjectVersion != 1) {
+
+
+        if (DirObject.Versions.CompatDirObject->ShadowDirectory) {
+            if (DumpShadow) {
+
+                RtlSecureZeroMemory(&subitems, sizeof(subitems));
+                subitems.Count = 2;
+
+                RtlSecureZeroMemory(&szValue, sizeof(szValue));
+                szValue[0] = L'0';
+                szValue[1] = L'x';
+                u64tohex((ULONG_PTR)DirObject.Versions.CompatDirObject->ShadowDirectory, &szValue[2]);
+
+                subitems.Text[0] = szValue;
+                subitems.Text[1] = T_POBJECT_DIRECTORY;
+
+                h_tviSubItem = supTreeListAddItem(g_TreeList,
+                    h_tviRootItem,
+                    TVIF_TEXT | TVIF_STATE,
+                    0,
+                    0,
+                    T_SHADOW_DIRECTORY,
+                    &subitems);
+
+                propObDumpDirectoryObjectInternal(h_tviSubItem,
+                    ParentWindow,
+                    (ULONG_PTR)DirObject.Versions.CompatDirObject->ShadowDirectory,
+                    FALSE, //do not allow recursion, only first level dir listed.
+                    FALSE);
+            }
+        }
+        else {
+            //
+            // No ShadowDirectory, display 0
+            //
+            propObDumpAddress(g_TreeList,
+                h_tviRootItem,
+                T_SHADOW_DIRECTORY,
+                T_POBJECT_DIRECTORY,
+                0,
+                0,
+                0);
+
+        }
+    }
+
+    //
+    // Handle different object versions fields order.
+    //
+
+    //
+    // SessionId
+    //
+    switch (ObjectVersion) {
+    case 1:
+        SessionId = DirObject.Versions.DirObjectV1->SessionId;
+        break;
+    case 2:
+        SessionId = DirObject.Versions.DirObjectV2->SessionId;
+        break;
+    case 3:
+    default:
+        SessionId = DirObject.Versions.DirObjectV3->SessionId;
+        break;
+
+    }
+
+    //
+    // SessionId is the last member of OBJECT_DIRECTORY_V3, so it will be listed in the end of routine.
+    //
+    //
+    if (ObjectVersion != 3) {
+        propObDumpSessionIdVersionAware(h_tviRootItem, SessionId);
+    }
+
+    //
+    // NamespaceEntry
+    //
+    switch (ObjectVersion) {
+    case 1:
+        NamespaceEntry = DirObject.Versions.DirObjectV1->NamespaceEntry;
+        break;
+    case 2:
+        NamespaceEntry = DirObject.Versions.DirObjectV2->NamespaceEntry;
+        break;
+    case 3:
+    default:
+        NamespaceEntry = DirObject.Versions.DirObjectV3->NamespaceEntry;
+        break;
+
+    }
+
+    propObDumpAddress(g_TreeList, h_tviRootItem, TEXT("NamespaceEntry"), NULL, NamespaceEntry, 0, 0);
+
+    //
+    // SessionObject
+    //
+    if (ObjectVersion == 3) {
+        propObDumpAddress(g_TreeList, h_tviRootItem, TEXT("SessionObject"), NULL,
+            DirObject.Versions.DirObjectV3->SessionObject, 0, 0);
+    }
+
+    //
+    // ObjectDirectory flags.
+    //       
+    switch (ObjectVersion) {
+    case 1:
+        ObjectFlags = DirObject.Versions.DirObjectV1->Flags;
+        break;
+    case 2:
+        ObjectFlags = DirObject.Versions.DirObjectV2->Flags;
+        break;
+    case 3:
+    default:
+        ObjectFlags = DirObject.Versions.DirObjectV3->Flags;
+        break;
+
+    }
+
+    if (ObjectFlags == 0) {
+        propObDumpUlong(g_TreeList, h_tviRootItem, TEXT("Flags"), NULL, 0, TRUE, FALSE, 0, 0);
+    }
+    else {
+
+        //
+        // List flags.
+        //
+        RtlSecureZeroMemory(&szValue, sizeof(szValue));
+        RtlSecureZeroMemory(&subitems, sizeof(subitems));
+        j = 0;
+        lpType = NULL;
+        for (i = 0; i < MAX_KNOWN_OBJ_DIR_FLAGS; i++) {
+            if (ObjectFlags & objDirFlags[i].dwValue) {
+                lpType = objDirFlags[i].lpDescription;
+                subitems.Count = 2;
+                //add first entry with name
+                if (j == 0) {
+                    szValue[0] = L'0';
+                    szValue[1] = L'x';
+                    ultohex(ObjectFlags, &szValue[2]);
+
+                    subitems.Text[0] = szValue;
+                    subitems.Text[1] = lpType;
+                }
+                else {
+                    //add subentry
+                    subitems.Text[0] = T_EmptyString;
+                    subitems.Text[1] = lpType;
+                }
+
+                supTreeListAddItem(
+                    g_TreeList,
+                    h_tviRootItem,
+                    TVIF_TEXT | TVIF_STATE,
+                    0,
+                    0,
+                    (j == 0) ? T_FLAGS : T_EmptyString,
+                    &subitems);
+
+                ObjectFlags &= ~objDirFlags[i].dwValue;
+                j++;
+
+            }
+            if (ObjectFlags == 0) {
+                break;
+            }
+        }
+
+    }
+
+    //
+    // SessionId is the last member of OBJECT_DIRECTORY_V3
+    //
+    if (ObjectVersion == 3) {
+
+        propObDumpSessionIdVersionAware(h_tviRootItem,
+            SessionId);
+    }
+
+    if (DirectoryObjectPtr)
+        supVirtualFree(DirectoryObjectPtr);
+
+}
+
 /*
 * propObDumpDirectoryObject
 *
 * Purpose:
 *
-* Dump OBJECT_DIRECTORY members to the treelist.
+* Initialize treelist for dump, creates root node and call actual dump function.
 *
 */
 VOID propObDumpDirectoryObject(
@@ -2005,115 +2602,16 @@ VOID propObDumpDirectoryObject(
     _In_ HWND hwndDlg
 )
 {
-    INT                     i;
-    HTREEITEM               h_tviRootItem, h_tviSubItem, h_tviEntry;
-    LPWSTR                  lpType;
-    OBJECT_DIRECTORY        dirObject;
-    OBJECT_DIRECTORY_V2     dirObjectV2;
-    OBJECT_DIRECTORY_V3     dirObjectV3;
-    OBJECT_DIRECTORY_ENTRY  dirEntry;
-    LIST_ENTRY              ChainLink;
-    TL_SUBITEMS_FIXED       subitems;
-    WCHAR                   szId[MAX_PATH + 1], szValue[MAX_PATH + 1];
-
-    ULONG ObjectVersion;
-    ULONG ObjectSize;
-    PVOID ObjectPtr;
-    OBJECT_DIRECTORY_V3* pCompatDirObject;
+    HTREEITEM rootItem;
 
     VALIDATE_PROP_CONTEXT(Context);
 
     __try {
 
-        switch (g_NtBuildNumber) {
-
-        case NT_WIN7_RTM:
-        case NT_WIN7_SP1:
-        case NT_WIN8_RTM:
-        case NT_WIN8_BLUE:
-            ObjectVersion = 1;
-            ObjectSize = sizeof(OBJECT_DIRECTORY);
-            ObjectPtr = &dirObject;
-            break;
-
-        case NT_WIN10_THRESHOLD1:
-        case NT_WIN10_THRESHOLD2:
-        case NT_WIN10_REDSTONE1:
-            ObjectVersion = 2;
-            ObjectSize = sizeof(OBJECT_DIRECTORY_V2);
-            ObjectPtr = &dirObjectV2;
-            break;
-
-        default:
-            ObjectVersion = 3;
-            ObjectSize = sizeof(OBJECT_DIRECTORY_V3);
-            ObjectPtr = &dirObjectV3;
-            break;
-        }
-
-        RtlSecureZeroMemory(&dirObject, sizeof(dirObject));
-        RtlSecureZeroMemory(&dirObjectV2, sizeof(dirObjectV2));
-        RtlSecureZeroMemory(&dirObjectV3, sizeof(dirObjectV3));
-        pCompatDirObject = &dirObjectV3;
-
-        //
-        // Dump DIRECTORY_OBJECT.
-        //
-        // Handle different object versions.
-        //
-        if (!kdReadSystemMemoryEx(
-            Context->ObjectInfo.ObjectAddress,
-            ObjectPtr,
-            ObjectSize,
-            NULL))
-        {
+        if (Context->ObjectInfo.ObjectAddress == 0) {
             propObDumpShowError(hwndDlg, NULL);
             return;
         }
-
-        //
-        // Build compatible object to work with based on newest OBJECT_DIRECTORY variant (since it has all fields).
-        //
-        switch (ObjectVersion) {
-        case 1:
-
-            RtlCopyMemory(pCompatDirObject->HashBuckets,
-                &dirObject.HashBuckets,
-                sizeof(dirObject.HashBuckets));
-
-            pCompatDirObject->Lock = dirObject.Lock;
-            pCompatDirObject->Flags = dirObject.Flags;
-            pCompatDirObject->NamespaceEntry = dirObject.NamespaceEntry;
-            pCompatDirObject->SessionId = dirObject.SessionId;
-            pCompatDirObject->DeviceMap = dirObject.DeviceMap;
-            pCompatDirObject->ShadowDirectory = NULL; //union with DeviceMap in 8.1 no sense to output differently
-
-            break;
-
-        case 2:
-
-            RtlCopyMemory(pCompatDirObject->HashBuckets,
-                &dirObjectV2.HashBuckets,
-                sizeof(dirObjectV2.HashBuckets));
-
-            pCompatDirObject->Lock = dirObjectV2.Lock;
-            pCompatDirObject->Flags = dirObjectV2.Flags;
-            pCompatDirObject->NamespaceEntry = dirObjectV2.NamespaceEntry;
-            pCompatDirObject->SessionId = dirObjectV2.SessionId;
-            pCompatDirObject->DeviceMap = dirObjectV2.DeviceMap;
-            pCompatDirObject->ShadowDirectory = dirObjectV2.ShadowDirectory;
-            pCompatDirObject->SessionObject = NULL;
-            break;
-
-        case 3:
-        default:
-
-            //
-            // Do nothing, everything read already.
-            //
-            break;
-        }
-
 
         g_TreeList = 0;
         if (!supInitTreeListForDump(hwndDlg, &g_TreeList)) {
@@ -2124,7 +2622,7 @@ VOID propObDumpDirectoryObject(
         //
         //OBJECT_DIRECTORY
         //
-        h_tviRootItem = supTreeListAddItem(g_TreeList,
+        rootItem = supTreeListAddItem(g_TreeList,
             NULL,
             TVIF_TEXT | TVIF_STATE,
             TVIS_EXPANDED,
@@ -2132,139 +2630,15 @@ VOID propObDumpDirectoryObject(
             T_OBJECT_DIRECTORY,
             NULL);
 
-        RtlSecureZeroMemory(&subitems, sizeof(subitems));
-        subitems.Count = 1;
-        subitems.Text[0] = TEXT("{...}");
+        if (rootItem) {
 
-        h_tviSubItem = supTreeListAddItem(g_TreeList,
-            h_tviRootItem,
-            TVIF_TEXT | TVIF_STATE,
-            0,
-            0,
-            TEXT("HashBuckets"),
-            &subitems);
-
-        for (i = 0; i < NUMBER_HASH_BUCKETS; i++) {
-            RtlSecureZeroMemory(&subitems, sizeof(subitems));
-            subitems.Count = 2;
-
-            RtlSecureZeroMemory(szId, sizeof(szId));
-
-            RtlStringCchPrintfSecure(szId,
-                MAX_PATH,
-                TEXT("[ %i ]"),
-                i);
-
-            if (pCompatDirObject->HashBuckets[i]) {
-                RtlSecureZeroMemory(szValue, sizeof(szValue));
-                szValue[0] = TEXT('0');
-                szValue[1] = TEXT('x');
-                u64tohex((ULONG_PTR)pCompatDirObject->HashBuckets[i], &szValue[2]);
-                subitems.Text[0] = szValue;
-                subitems.Text[1] = T_POBJECT_DIRECTORY_ENTRY;
-            }
-            else {
-                subitems.Text[0] = T_NULL;
-            }
-
-            h_tviEntry = supTreeListAddItem(g_TreeList,
-                h_tviSubItem,
-                TVIF_TEXT | TVIF_STATE,
-                0,
-                0,
-                szId,
-                &subitems);
-
-            //dump entry if available
-            if (pCompatDirObject->HashBuckets[i]) {
-
-                RtlSecureZeroMemory(&dirEntry, sizeof(dirEntry));
-
-                if (kdReadSystemMemoryEx((ULONG_PTR)pCompatDirObject->HashBuckets[i],
-                    &dirEntry,
-                    sizeof(dirEntry),
-                    NULL))
-                {
-
-                    ChainLink.Blink = NULL;
-                    ChainLink.Flink = NULL;
-                    lpType = TEXT("ChainLink");
-                    if (dirEntry.ChainLink == NULL) {
-                        propObDumpAddress(g_TreeList, h_tviEntry, lpType, T_PLIST_ENTRY, NULL, 0, 0);
-                    }
-                    else {
-                        if (kdReadSystemMemoryEx(
-                            (ULONG_PTR)dirEntry.ChainLink,
-                            &ChainLink,
-                            sizeof(ChainLink),
-                            NULL))
-                        {
-                            propObDumpListEntry(g_TreeList, h_tviEntry, lpType, &ChainLink);
-                        }
-                        else {
-                            propObDumpAddress(g_TreeList, h_tviEntry, lpType, T_PLIST_ENTRY, dirEntry.ChainLink, 0, 0);
-                        }
-                    }
-                    propObDumpAddress(g_TreeList, h_tviEntry, TEXT("Object"), NULL, dirEntry.Object, 0, 0);
-                    propObDumpUlong(g_TreeList, h_tviEntry, TEXT("HashValue"), NULL, dirEntry.HashValue, TRUE, FALSE, 0, 0);
-                }
-            }
-        }
-
-        //EX_PUSH_LOCK
-        RtlSecureZeroMemory(&subitems, sizeof(subitems));
-        subitems.Count = 2;
-        subitems.Text[1] = T_EX_PUSH_LOCK;
-
-        h_tviSubItem = supTreeListAddItem(g_TreeList,
-            h_tviRootItem,
-            TVIF_TEXT | TVIF_STATE,
-            0,
-            0,
-            TEXT("Lock"),
-            &subitems);
-
-        propObDumpAddress(g_TreeList, h_tviSubItem, TEXT("Ptr"), NULL, pCompatDirObject->Lock.Ptr, 0, 0);
-
-        //DeviceMap
-        propObDumpAddress(g_TreeList, h_tviRootItem, TEXT("DeviceMap"), T_PDEVICE_MAP, pCompatDirObject->DeviceMap, 0, 0);
-
-        //ShadowDirectory
-        if (ObjectVersion != 1) {
-            propObDumpAddress(g_TreeList, h_tviRootItem, TEXT("ShadowDirectory"), T_POBJECT_DIRECTORY, pCompatDirObject->ShadowDirectory, 0, 0);
-        }
-
-        //
-        // Handle different object versions fields order.
-        //
-
-        //
-        // SessionId
-        //
-        if (ObjectVersion != 3) {
-
-            propObDumpSessionIdVersionAware(h_tviRootItem,
-                pCompatDirObject->SessionId);
+            propObDumpDirectoryObjectInternal(rootItem,
+                hwndDlg,
+                (ULONG_PTR)Context->ObjectInfo.ObjectAddress,
+                TRUE,
+                TRUE);
 
         }
-
-        propObDumpAddress(g_TreeList, h_tviRootItem, TEXT("NamespaceEntry"), NULL, pCompatDirObject->NamespaceEntry, 0, 0);
-
-        if (ObjectVersion == 3) {
-            propObDumpAddress(g_TreeList, h_tviRootItem, TEXT("SessionObject"), NULL, pCompatDirObject->SessionObject, 0, 0);
-        }
-
-        propObDumpUlong(g_TreeList, h_tviRootItem, TEXT("Flags"), NULL, pCompatDirObject->Flags, TRUE, FALSE, 0, 0);
-
-        //
-        // SessionId is the last member of OBJECT_DIRECTORY_V3
-        //
-        if (ObjectVersion == 3) {
-
-            propObDumpSessionIdVersionAware(h_tviRootItem,
-                pCompatDirObject->SessionId);
-        }
-
     }
     __except (WOBJ_EXCEPTION_FILTER) {
         return;
@@ -2527,7 +2901,7 @@ VOID propObDumpObjectTypeFlags(
         for (i = 0; i < 8; i++) {
             if (GET_BIT(ObjectTypeFlags, i)) {
                 lpType = (LPWSTR)ObjectTypeFlagsText[i];
-                TreeListSubitems.Text[0] = NULL;
+                TreeListSubitems.Text[0] = T_EmptyString;
                 if (j == 0) {
 
                     RtlSecureZeroMemory(szValue, sizeof(szValue));
@@ -2576,7 +2950,7 @@ VOID propObDumpObjectType(
     POBJINFO                CurrentObject = NULL;
     PVOID                   ObjectTypeInformation = NULL;
     PRTL_PROCESS_MODULES    ModulesList = NULL;
-    TL_SUBITEMS_FIXED       TreeListSubitems;
+    TL_SUBITEMS_FIXED       TreeListSubItems;
     PVOID                   TypeProcs[MAX_KNOWN_OBJECT_TYPE_PROCEDURES];
     PVOID                   SelfDriverBase;
     ULONG                   SelfDriverSize;
@@ -2689,12 +3063,13 @@ VOID propObDumpObjectType(
         //
         // OBJECT_TYPE_INITIALIZER
         //
-        RtlSecureZeroMemory(&TreeListSubitems, sizeof(TreeListSubitems));
+        RtlSecureZeroMemory(&TreeListSubItems, sizeof(TreeListSubItems));
 
-        TreeListSubitems.Count = 2;
-        TreeListSubitems.Text[1] = T_OBJECT_TYPE_INITIALIZER;
+        TreeListSubItems.Count = 2;
+        TreeListSubItems.Text[0] = T_EmptyString;
+        TreeListSubItems.Text[1] = T_OBJECT_TYPE_INITIALIZER;
         h_tviSubItem = supTreeListAddItem(g_TreeList, h_tviRootItem, TVIF_TEXT | TVIF_STATE, 0,
-            0, TEXT("TypeInfo"), &TreeListSubitems);
+            0, TEXT("TypeInfo"), &TreeListSubItems);
 
         propObDumpUlong(g_TreeList, h_tviSubItem, T_LENGTH, NULL,
             ObjectType.Versions.ObjectTypeCompatible->TypeInfo.Length, TRUE, TRUE, 0, 0);
@@ -2736,11 +3111,12 @@ VOID propObDumpObjectType(
         propObDumpUlong(g_TreeList, h_tviSubItem, TEXT("InvalidAttributes"), NULL,
             ObjectType.Versions.ObjectTypeCompatible->TypeInfo.InvalidAttributes, TRUE, FALSE, 0, 0);
 
-        RtlSecureZeroMemory(&TreeListSubitems, sizeof(TreeListSubitems));
-        TreeListSubitems.Count = 2;
-        TreeListSubitems.Text[1] = T_GENERIC_MAPPING;
+        RtlSecureZeroMemory(&TreeListSubItems, sizeof(TreeListSubItems));
+        TreeListSubItems.Count = 2;
+        TreeListSubItems.Text[0] = T_EmptyString;
+        TreeListSubItems.Text[1] = T_GENERIC_MAPPING;
         h_tviGenericMapping = supTreeListAddItem(g_TreeList, h_tviSubItem, TVIF_TEXT | TVIF_STATE, 0,
-            0, TEXT("GenericMapping"), &TreeListSubitems);
+            0, TEXT("GenericMapping"), &TreeListSubItems);
 
         propObDumpUlong(g_TreeList, h_tviGenericMapping, TEXT("GenericRead"), NULL,
             ObjectType.Versions.ObjectTypeCompatible->TypeInfo.GenericMapping.GenericRead, TRUE, FALSE, 0, 0);
@@ -3364,7 +3740,7 @@ VOID propObDumpAlpcPort(
     //
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
     subitems.Count = 2;
-
+    subitems.Text[0] = T_EmptyString;
     subitems.Text[1] = TEXT("ALPC_PORT_ATTRIBUTES");
 
     h_tviSubItem = supTreeListAddItem(

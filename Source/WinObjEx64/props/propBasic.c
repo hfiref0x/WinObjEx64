@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     1.85
+*  VERSION:     1.86
 *
-*  DATE:        05 Mar 2020
+*  DATE:        29 May 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -65,8 +65,6 @@ VOID propSetObjectHeaderAddressInfo(
         SetDlgItemText(hwndDlg, ID_OBJECT_HEADER, TEXT(""));
     }
 }
-
-
 
 /*
 * propSetProcessMitigationsInfo
@@ -464,6 +462,22 @@ VOID propSetProcessMitigationsInfo(
                 SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
             }
 
+        }
+    }
+
+    //
+    // User shadow stack.
+    //
+    if (supGetProcessMitigationPolicy(hProcess,
+        (PROCESS_MITIGATION_POLICY)ProcessUserShadowStackPolicy,
+        sizeof(PROCESS_MITIGATION_USER_SHADOW_STACK_POLICY_W10),
+        &Policies.UserShadowStackPolicy))
+    {
+        if (Policies.UserShadowStackPolicy.Flags) {
+            if (Policies.UserShadowStackPolicy.EnableUserShadowStack) {
+                _strcpy(szBuffer, TEXT("UserShadowStack -> Enabled"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
         }
     }
 

@@ -1,6 +1,8 @@
 v1.8.6
+reimplemented directory object dump to output more data
 added callbacks registered with ExRegisterExtension
 fix for pipes (PR #17)
+internal rearrange
 
 v1.8.5
 fix object cookie

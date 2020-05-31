@@ -4,9 +4,9 @@
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     1.85
+*  VERSION:     1.86
 *
-*  DATE:        06 Mar 2020
+*  DATE:        29 May 2020
 *
 *  Test code used while debug.
 *
@@ -94,7 +94,7 @@ DWORD WINAPI LPCListener(LPVOID lpThreadParameter)
                 NtReplyWaitReceivePort(ConnectPort, NULL, NULL, &UserMessage.Header);
 
                 QueryRequest = (PQUERY_REQUEST)&UserMessage.Data;
-                DbgPrint("Data=%lx", QueryRequest->Data);
+                kdDebugPrint("Data=%lx", QueryRequest->Data);
                 if (QueryRequest->Data == 1)
                     break;
 
@@ -586,7 +586,7 @@ DWORD WINAPI TokenImpersonationThreadProc(PVOID Parameter)
 
     do {
         Sleep(1000);
-        OutputDebugString(TEXT("WinObjEx64 test thread\r\n"));
+        kdDebugPrint("WinObjEx64 test thread, %lu\r\n", GetCurrentThreadId());
         i += 1;
     } while (i < 1000);
 
@@ -642,15 +642,15 @@ VOID TestApiSetResolve()
 
         if (NT_SUCCESS(Status)) {
             if (Resolved) {
-                DbgPrint("%wZ\r\n", ResolvedHostLibrary);
+                kdDebugPrint("%wZ\r\n", ResolvedHostLibrary);
                 RtlFreeUnicodeString(&ResolvedHostLibrary);
             }
             else {
-                DbgPrint("Could not resolve apiset %wZ\r\n", ApiSetLibrary);
+                kdDebugPrint("Could not resolve apiset %wZ\r\n", ApiSetLibrary);
             }
         }
         else {
-            DbgPrint("NtLdrApiSetResolveLibrary failed 0x%lx\r\n", Status);
+            kdDebugPrint("NtLdrApiSetResolveLibrary failed 0x%lx\r\n", Status);
         }
     }
 
@@ -665,15 +665,15 @@ VOID TestApiSetResolve()
 
     if (NT_SUCCESS(Status)) {
         if (Resolved) {
-            DbgPrint("Resolved apiset %wZ\r\n", ResolvedHostLibrary);
+            kdDebugPrint("Resolved apiset %wZ\r\n", ResolvedHostLibrary);
             RtlFreeUnicodeString(&ResolvedHostLibrary);
         }
         else {
-            DbgPrint("Could not resolve apiset %wZ\r\n", ApiSetLibrary);
+            kdDebugPrint("Could not resolve apiset %wZ\r\n", ApiSetLibrary);
         }
     }
     else {
-        DbgPrint("NtLdrApiSetResolveLibrary failed 0x%lx\r\n", Status);
+        kdDebugPrint("NtLdrApiSetResolveLibrary failed 0x%lx\r\n", Status);
     }
 }
 
@@ -713,7 +713,7 @@ BOOL CALLBACK EnumerateSLValueDescriptorCallback(
             EntryType = "Unknown";
         }
 
-        DbgPrint("%ws, %s\r\n", EntryName, EntryType);
+        kdDebugPrint("%ws, %s\r\n", EntryName, EntryType);
         supHeapFree(EntryName);
 
     }
@@ -726,6 +726,142 @@ VOID TestLicenseCache()
     if (CacheData) {
         supSLCacheEnumerate(CacheData, EnumerateSLValueDescriptorCallback, NULL);
         supHeapFree(CacheData);
+    }
+}
+
+WCHAR* g_szMapDlls[] = {
+    L"\\systemroot\\system32\\winnsi.dll",
+    L"\\systemroot\\system32\\sxssrv.dll",
+    L"\\systemroot\\system32\\sppwinob.dll",
+    L"\\systemroot\\system32\\Microsoft.Bluetooth.Proxy.dll",
+    L"\\systemroot\\system32\\ddp_ps.dll",
+    L"\\systemroot\\system32\\BitsProxy.dll",
+    L"\\systemroot\\system32\\xboxgipsynthetic.dll" //does not have VERSION_INFO
+};
+
+wchar_t* Tstp_filename(const wchar_t* f)
+{
+    wchar_t* p = (wchar_t*)f;
+
+    if (f == 0)
+        return 0;
+
+    while (*f != (wchar_t)0) {
+        if (*f == (wchar_t)'\\')
+            p = (wchar_t*)f + 1;
+        f++;
+    }
+    return p;
+}
+
+VOID TestSectionImage()
+{
+    OBJECT_ATTRIBUTES obja, dirObja;
+    UNICODE_STRING ustr;
+    IO_STATUS_BLOCK iost;
+
+    NTSTATUS ntStatus;
+
+    LPWSTR lpFileName;
+    HANDLE sectionHandle = NULL, dirHandle = NULL, fileHandle = NULL;
+
+    RtlInitUnicodeString(&ustr, L"\\TestSectionImage");
+    InitializeObjectAttributes(&dirObja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
+    ntStatus = NtCreateDirectoryObject(&dirHandle, DIRECTORY_ALL_ACCESS, &dirObja);
+
+    if (NT_SUCCESS(ntStatus)) {
+
+        dirObja.RootDirectory = dirHandle;
+
+        for (ULONG i = 0; i < RTL_NUMBER_OF(g_szMapDlls); i++) {
+
+            RtlInitUnicodeString(&ustr, g_szMapDlls[i]);
+            InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
+
+            ntStatus = NtOpenFile(&fileHandle,
+                SYNCHRONIZE | FILE_EXECUTE,
+                &obja,
+                &iost,
+                FILE_SHARE_READ | FILE_SHARE_DELETE,
+                FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT);
+
+            if (NT_SUCCESS(ntStatus)) {
+
+                lpFileName = (LPWSTR)Tstp_filename(g_szMapDlls[i]);
+
+                RtlInitUnicodeString(&ustr, lpFileName);
+
+                ntStatus = NtCreateSection(&sectionHandle,
+                    SECTION_ALL_ACCESS,
+                    &dirObja,
+                    NULL,
+                    PAGE_EXECUTE,
+                    SEC_IMAGE,
+                    fileHandle);
+
+                if (NT_SUCCESS(ntStatus)) {
+                    kdDebugPrint("Mapped\r\n");
+                }
+
+            }
+
+        }
+    }
+}
+
+/*
+
+COMPATIBILITY WARNING:
+
+DOES NOT PRESENT IN WIN7
+
+*/
+
+VOID TestShadowDirectory()
+{
+    OBJECT_ATTRIBUTES dirObja, obja;
+    UNICODE_STRING ustr;
+    HANDLE dirHandle, shadowDirHandle, testHandle, testHandle2;
+    NTSTATUS ntStatus;
+
+    //
+    // Open BaseNamedObjects handle.
+    //
+
+    RtlInitUnicodeString(&ustr, L"\\BaseNamedObjects");
+    InitializeObjectAttributes(&dirObja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
+    ntStatus = NtOpenDirectoryObject(&shadowDirHandle, DIRECTORY_QUERY | DIRECTORY_TRAVERSE, &dirObja);
+    
+    if (NT_SUCCESS(ntStatus)) {
+
+        //
+        // Create test object (mutant) in \\BaseNamedObjects.
+        //
+        RtlInitUnicodeString(&ustr, L"TestObject");
+        InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, shadowDirHandle, NULL);
+        ntStatus = NtCreateMutant(&testHandle, MUTANT_ALL_ACCESS, &obja, FALSE);
+        if (NT_SUCCESS(ntStatus)) {
+
+            //
+            // Create BaseNamedObjects\\New directory with shadow set to \\BaseNamedObjects
+            //
+            RtlInitUnicodeString(&ustr, L"\\BaseNamedObjects\\New");
+            ntStatus = NtCreateDirectoryObjectEx(&dirHandle, DIRECTORY_ALL_ACCESS, &dirObja, shadowDirHandle, 0);
+            if (NT_SUCCESS(ntStatus)) {
+
+                //
+                // Open "TestObject" in \\BaseNamedObjects\\New, 
+                // since "New" has shadow set to \\BaseNamedObjects Windows will lookup this object first in shadow.
+                //
+                RtlInitUnicodeString(&ustr, L"\\BaseNamedObjects\\New\\TestObject");
+                obja.RootDirectory = NULL;
+                ntStatus = NtOpenMutant(&testHandle2, MUTANT_ALL_ACCESS, &obja);
+                if (NT_SUCCESS(ntStatus)) {
+                    Beep(0, 0);
+                }
+            }
+        }
+        NtClose(shadowDirHandle);
     }
 }
 
@@ -745,10 +881,12 @@ VOID TestStart(
 )
 {
     TestCall();
+    TestSectionImage();
+    TestShadowDirectory();
     //TestPsObjectSecurity();
     //TestLicenseCache();
     TestApiSetResolve();
-    TestDesktop();
+    //TestDesktop();
     TestApiPort();
     TestDebugObject();
     TestMailslot();
@@ -758,7 +896,7 @@ VOID TestStart(
     TestTimer();
     TestTransaction();
     TestWinsta();
-    TestThread();
+    //TestThread();
     //PreHashTypes();
     //TestJob();
 }

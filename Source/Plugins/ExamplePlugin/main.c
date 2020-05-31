@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019
+*  (C) COPYRIGHT AUTHORS, 2019 - 2020
 *
 *  TITLE:       MAIN.H
 *
 *  VERSION:     1.00
 *
-*  DATE:        02 Aug 2019
+*  DATE:        29 May 2020
 *
 *  WinObjEx64 example and test plugin.
 *
@@ -110,11 +110,11 @@ void CALLBACK StopPlugin(
     if (g_hThread) {
         InterlockedExchange((PLONG)&g_StopPlugin, 1);
         if (WaitForSingleObject(g_hThread, 1000) == WAIT_TIMEOUT) {
-            DbgPrint("Wait timeout, terminating plugin thread, g_hTread = %lx\r\n", g_hThread);
+            DbgPrint("Wait timeout, terminating plugin thread, g_hTread = %llx\r\n", g_hThread);
             TerminateThread(g_hThread, 0);
         }
         else {
-            DbgPrint("Wait success, plugin thread stoped, g_Thread = %lx\r\n", g_hThread);
+            DbgPrint("Wait success, plugin thread stoped, g_Thread = %llx\r\n", g_hThread);
         }
         CloseHandle(g_hThread);
         g_hThread = NULL;

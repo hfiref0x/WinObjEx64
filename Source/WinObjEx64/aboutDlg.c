@@ -4,9 +4,9 @@
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     1.85
+*  VERSION:     1.86
 *
-*  DATE:        05 Mar 2020
+*  DATE:        26 May 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -536,7 +536,6 @@ VOID AboutDialogCollectGlobals(
     //
     // List g_WinObj (UI specific).
     //
-    AddParameterValueUlong(hwndOutput, TEXT("UseExperimentalFeatures"), g_WinObj.UseExperimentalFeatures);
     AddParameterValueUlong(hwndOutput, TEXT("IsWine"), g_WinObj.IsWine);
 
     //

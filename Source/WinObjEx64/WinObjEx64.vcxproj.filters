@@ -37,9 +37,6 @@
     <Filter Include="treelist">
       <UniqueIdentifier>{34095c79-e50f-47a4-9daa-c1f74616bcfe}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ntuser">
-      <UniqueIdentifier>{4d7e372d-ac61-4fa4-bbce-43b2b3e1e125}</UniqueIdentifier>
-    </Filter>
     <Filter Include="tinyaes">
       <UniqueIdentifier>{ae7f1c88-69d2-406e-a44a-9dddafd020c3}</UniqueIdentifier>
     </Filter>
@@ -585,10 +582,5 @@
     <Image Include="rsrc\149.ico">
       <Filter>Resource Files</Filter>
     </Image>
-  </ItemGroup>
-  <ItemGroup>
-    <MASM Include="..\Shared\ntuser\StubNtUserOpenWindowStation.asm">
-      <Filter>ntuser</Filter>
-    </MASM>
   </ItemGroup>
 </Project>

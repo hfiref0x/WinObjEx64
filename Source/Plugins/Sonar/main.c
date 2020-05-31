@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.03
 *
-*  DATE:        17 May 2020
+*  DATE:        29 May 2020
 *
 *  WinObjEx64 Sonar plugin.
 *
@@ -25,7 +25,7 @@ ULONG g_CurrentDPI;
 
 int  y_splitter_pos = 300, y_capture_pos = 0, y_splitter_max = 0;
 
-#define SONAR_MAX_TESTED_BUILD 19628
+#define SONAR_MAX_TESTED_BUILD 19635
 
 #define PROTOCOLLIST_COLUMN_COUNT 3
 
@@ -1152,9 +1152,7 @@ DWORD WINAPI PluginThread(
             NULL);
 
         if (MainWindow == 0) {
-#ifdef _DEBUG
-            DbgPrint("Could not create main window, err = %lu\r\n", GetLastError());
-#endif
+            kdDebugPrint("Could not create main window, err = %lu\r\n", GetLastError());
             break;
         }
 
@@ -1178,9 +1176,7 @@ DWORD WINAPI PluginThread(
             NULL);
 
         if (g_ctx.StatusBar == 0) {
-#ifdef _DEBUG
-            DbgPrint("Could not create statusbar window, err = %lu\r\n", GetLastError());
-#endif
+            kdDebugPrint("Could not create statusbar window, err = %lu\r\n", GetLastError());
             break;
         }
 
@@ -1192,9 +1188,7 @@ DWORD WINAPI PluginThread(
             0, 0, 768, 256, MainWindow, NULL, NULL, NULL);
 
         if (g_ctx.TreeList == 0) {
-#ifdef _DEBUG
-            DbgPrint("Could not create treelist window, err = %lu\r\n", GetLastError());
-#endif
+            kdDebugPrint("Could not create treelist window, err = %lu\r\n", GetLastError());
             break;
         }
 
@@ -1207,9 +1201,7 @@ DWORD WINAPI PluginThread(
             0, 0, 0, 0, MainWindow, NULL, NULL, NULL);
 
         if (g_ctx.ListView == 0) {
-#ifdef _DEBUG
-            DbgPrint("Could not create listview window, err = %lu\r\n", GetLastError());
-#endif
+            kdDebugPrint("Could not create listview window, err = %lu\r\n", GetLastError());
             break;
         }
 
@@ -1425,7 +1417,7 @@ VOID GuiOnceInit()
 
     g_ClassAtom = RegisterClassEx(&wincls);
     if ((g_ClassAtom == 0) && (GetLastError() != ERROR_CLASS_ALREADY_EXISTS)) {
-        DbgPrint("Could not register window class, err = %lu\r\n", GetLastError());
+        kdDebugPrint("Could not register window class, err = %lu\r\n", GetLastError());
     }
 }
 
@@ -1471,7 +1463,7 @@ BOOLEAN CALLBACK PluginInit(
         return TRUE;
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {
-        DbgPrint("PluginInit exception thrown %lx", GetExceptionCode());
+        kdDebugPrint("PluginInit exception thrown %lx", GetExceptionCode());
         return FALSE;
     }
 }

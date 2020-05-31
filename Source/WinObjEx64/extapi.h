@@ -1,14 +1,14 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       EXTAPI.H
 *
-*  VERSION:     1.82
+*  VERSION:     1.86
 *
-*  DATE:        02 Nov 2019
+*  DATE:        26 May 2020
 *
-*  Header for pre Windows10 missing API and experimental features declaration.
+*  Header for pre Windows10 missing API.
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -36,11 +36,6 @@ typedef BOOL (WINAPI *pfnIsImmersiveProcess)(
     HANDLE hProcess
     );
 
-typedef HWINSTA(NTAPI* pfnNtUserOpenWindowStation)(
-    _In_ POBJECT_ATTRIBUTES ObjectAttributes,
-    _In_ ACCESS_MASK DesiredAccess
-    );
-
 typedef DPI_AWARENESS_CONTEXT (WINAPI *pfnGetThreadDpiAwarenessContext)(
     VOID);
 
@@ -53,12 +48,11 @@ typedef UINT (WINAPI *pfnGetDpiForWindow)(
 typedef UINT (WINAPI *pfnGetDpiForSystem)(
     VOID);
 
-#define EXTAPI_ALL_MAPPED 7
+#define EXTAPI_ALL_MAPPED 6
 
 typedef struct _EXTENDED_API_SET {
     ULONG NumberOfAPI;
     pfnNtOpenPartition NtOpenPartition;
-    pfnNtUserOpenWindowStation NtUserOpenWindowStation;
     pfnIsImmersiveProcess IsImmersiveProcess;
     pfnGetThreadDpiAwarenessContext GetThreadDpiAwarenessContext;
     pfnGetAwarenessFromDpiAwarenessContext GetAwarenessFromDpiAwarenessContext;

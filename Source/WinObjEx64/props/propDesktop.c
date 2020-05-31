@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDESKTOP.C
 *
-*  VERSION:     1.85
+*  VERSION:     1.86
 *
-*  DATE:        13 Mar 2020
+*  DATE:        26 May 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -128,13 +128,18 @@ BOOL CALLBACK DesktopListEnumProc(
             sizeof(dwDesktopHeapSize),
             &bytesNeeded))
         {
-            RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-            ultostr(dwDesktopHeapSize / 1024, szBuffer);
-            _strcat(szBuffer, TEXT(" Mb"));
+            if (dwDesktopHeapSize) {
+                RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+                ultostr(dwDesktopHeapSize / 1024, szBuffer);
+                _strcat(szBuffer, TEXT(" Mb"));
+                lvitem.pszText = szBuffer;
+            }
+            else {
+                lvitem.pszText = T_EmptyString;
+            }
 
             lvitem.mask = LVIF_TEXT;
             lvitem.iSubItem = 2;
-            lvitem.pszText = szBuffer;
             lvitem.iItem = nIndex;
             ListView_SetItem(enumParam->DialogContext->ListView, &lvitem);
         }
@@ -165,11 +170,7 @@ VOID DesktopListSetInfo(
 
     ListView_DeleteAllItems(pDlgContext->ListView);
 
-    if (g_WinObj.UseExperimentalFeatures)
-        hObject = supOpenWindowStationFromContextEx(Context, FALSE, WINSTA_ENUMDESKTOPS);
-    else
-        hObject = supOpenWindowStationFromContext(Context, FALSE, WINSTA_ENUMDESKTOPS);
-
+    hObject = supOpenWindowStationFromContext(Context, FALSE, WINSTA_ENUMDESKTOPS);
     if (hObject) {
 
         enumParam.ObjectContext = Context;
@@ -177,12 +178,7 @@ VOID DesktopListSetInfo(
 
         EnumDesktops(hObject, DesktopListEnumProc, (LPARAM)&enumParam);
 
-        if (g_WinObj.UseExperimentalFeatures) {
-            NtClose((HANDLE)hObject);
-        }
-        else {
-            CloseWindowStation(hObject);
-        }
+        CloseWindowStation(hObject);
         bResult = TRUE;
     }
     ShowWindow(GetDlgItem(hwndDlg, ID_DESKTOPSNOTALL), (bResult == FALSE) ? SW_SHOW : SW_HIDE);

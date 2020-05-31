@@ -4,9 +4,9 @@
 *
 *  TITLE:       OBJECTS.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.86
 *
-*  DATE:        05 Jan 2020
+*  DATE:        29 May 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -392,12 +392,12 @@ VOID ObManagerTest()
     UINT i;
 
     for (i = 0; i < g_ObjectTypesCount; i++)
-        DbgPrint("%ws\r\n", gpObjectTypes[i]->Name);
+        kdDebugPrint("%ws\r\n", gpObjectTypes[i]->Name);
 
     for (i = 0; i < g_ObjectTypesCount; i++) {
 
         hashValue = supHashString(gpObjectTypes[i]->Name, (ULONG)_strlen(gpObjectTypes[i]->Name));
-        DbgPrint("%ws = 0x%lx\r\n", gpObjectTypes[i]->Name, hashValue);
+        kdDebugPrint("%ws = 0x%lx\r\n", gpObjectTypes[i]->Name, hashValue);
         if (hashValue != gpObjectTypes[i]->NameHash)
             MessageBox(GetDesktopWindow(), L"Wrong type hash", gpObjectTypes[i]->Name, MB_OK);
 

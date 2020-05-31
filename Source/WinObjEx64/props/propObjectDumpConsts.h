@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMPCONSTS.H
 *
-*  VERSION:     1.83
+*  VERSION:     1.86
 *
-*  DATE:        24 Jan 2020
+*  DATE:        27 May 2020
 *
 *  Consts header file for Object Dump module.
 *
@@ -23,7 +23,9 @@
 #define FORMAT_HEXBYTE      L"0x%02X"
 #define FORMAT_HEXUSHORT    L"0x%04X"
 #define FORMAT_HEXDWORD     L"0x%08X"
+#define FORMAT_HEXLONG      L"0x%08lX"
 #define FORMAT_ULONG        L"%u"
+#define FORMAT_LONG         L"%l"
 #define FORMAT_USHORT       L"0x%04u"
 #define FORMAT_POINTER      L"0x%p"
 #define T_NULL              L"NULL"
@@ -41,6 +43,7 @@
 #define T_OBJECT_TYPE               L"OBJECT_TYPE"
 #define T_OBJECT_TYPE_INITIALIZER   L"OBJECT_TYPE_INITIALIZER"
 #define T_PUNICODE_STRING           L"PUNICODE_STRING"
+#define T_UNICODE_STRING            L"UNICODE_STRING"
 #define T_PKTHREAD                  L"PKTHREAD"
 #define T_KEVENT                    L"KEVENT"
 #define T_KMUTANT                   L"KMUTANT"
@@ -50,6 +53,7 @@
 #define T_PKDPC                     L"PKDPC"
 #define T_GENERIC_MAPPING           L"GENERIC_MAPPING"
 #define T_EX_RUNDOWN_REF            L"EX_RUNDOWN_REF"
+#define T_PEJOB                     L"PEJOB"
 
 #define T_FLT_SERVER_PORT_OBJECT    L"FLT_SERVER_PORT_OBJECT"
 #define T_PFLT_FILTER               L"PFLT_FILTER"
@@ -69,6 +73,9 @@
 #define T_OBJECT_TYPE_FLAGS         L"ObjectTypeFlags"
 #define T_OBJECT_TYPE_FLAGS2        L"ObjectTypeFlags2"
 
+#define T_SHADOW_DIRECTORY          L"ShadowDirectory"
+#define T_DEVICEMAP                 L"DeviceMap"
+
 #define T_TIMER_NOTIFICATION        L"NotificationTimer"
 #define T_TIMER_SYNC                L"SynchronizationTimer"
 #define T_CHARACTERISTICS           L"Characteristics"
@@ -77,7 +84,6 @@
 #define T_MAXIMUMLENGTH             L"MaximumLength"
 #define T_TYPEINDEX                 L"Index"
 #define T_REFNOTFOUND               L"! Reference not found"
-
 
 #define MAX_KNOWN_DRV_FLAGS 8
 static VALUE_DESC drvFlags[MAX_KNOWN_DRV_FLAGS] = {
@@ -314,6 +320,23 @@ static VALUE_DESC fileAlign[MAX_KNOWN_FILEALIGN] = {
     { L"FILE_128_BYTE_ALIGNMENT", FILE_128_BYTE_ALIGNMENT },
     { L"FILE_256_BYTE_ALIGNMENT", FILE_256_BYTE_ALIGNMENT },
     { L"FILE_512_BYTE_ALIGNMENT", FILE_512_BYTE_ALIGNMENT }
+};
+
+#define MAX_KNOWN_OBJ_DIR_FLAGS 2
+static VALUE_DESC objDirFlags[MAX_KNOWN_OBJ_DIR_FLAGS] = {
+    { L"OBJDIR_FLAG_SHADOW_PRESENT", OBJDIR_FLAG_SHADOW_PRESENT },
+    { L"OBJDIR_FLAG_SANDBOX", OBJDIR_FLAG_SANDBOX }
+};
+
+#define MAX_KNOWN_DOS_DRIVE_TYPE 7
+static VALUE_DESC dosDeviceDriveType[MAX_KNOWN_DOS_DRIVE_TYPE] = {
+    { L"DOSDEVICE_DRIVE_UNKNOWN", DOSDEVICE_DRIVE_UNKNOWN },
+    { L"DOSDEVICE_DRIVE_CALCULATE", DOSDEVICE_DRIVE_CALCULATE },
+    { L"DOSDEVICE_DRIVE_REMOVABLE", DOSDEVICE_DRIVE_REMOVABLE },
+    { L"DOSDEVICE_DRIVE_FIXED", DOSDEVICE_DRIVE_FIXED },
+    { L"DOSDEVICE_DRIVE_REMOTE", DOSDEVICE_DRIVE_REMOTE },
+    { L"DOSDEVICE_DRIVE_CDROM", DOSDEVICE_DRIVE_CDROM },
+    { L"DOSDEVICE_DRIVE_RAMDISK", DOSDEVICE_DRIVE_RAMDISK }
 };
 
 COLORREF CLR_HOOK = 0x80ff80; //light green

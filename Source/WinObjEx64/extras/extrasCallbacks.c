@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.86
 *
-*  DATE:        17 May 2020
+*  DATE:        29 May 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -3507,9 +3507,7 @@ OBEX_QUERYCALLBACK_ROUTINE(QueryIopFsListsCallbacks)
                 &g_SystemCallbacks.IopTapeFileSystemQueueHead,
                 &g_SystemCallbacks.IopNetworkFileSystemQueueHead))
             {
-#ifdef _DEBUG
-                OutputDebugString(TEXT("Could not locate all Iop listheads\r\n"));
-#endif
+                kdDebugPrint("Could not locate all Iop listheads\r\n");
                 return STATUS_NOT_FOUND;
             }
         }

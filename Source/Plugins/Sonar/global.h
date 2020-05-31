@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.03
 *
-*  DATE:        21 Dec 2019
+*  DATE:        29 May 2020
 *
 *  Common header file for the Windows Object Explorer Sonar plugin.
 *
@@ -50,3 +50,9 @@
 //declared in main.c
 extern SONARCONTEXT g_ctx;
 extern ULONG g_CurrentDPI;
+
+#ifdef _DEBUG
+#define kdDebugPrint(f, ...) DbgPrint(f, __VA_ARGS__)
+#else
+#define kdDebugPrint(f, ...) 
+#endif

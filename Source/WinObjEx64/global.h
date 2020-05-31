@@ -4,9 +4,9 @@
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.84
+*  VERSION:     1.86
 *
-*  DATE:        05 Mar 2020
+*  DATE:        26 May 2020
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -35,6 +35,15 @@
 #pragma warning(disable: 6320) // Exception-filter expression is the constant EXCEPTION_EXECUTE_HANDLER.
 #pragma warning(disable: 6258) // Using TerminateThread does not allow proper thread clean up.
 #pragma warning(disable: 26812) // Prefer 'enum class' over 'enum'
+#pragma warning(disable: 26493) // Don't use C style casts
+
+// C++ meaningless warnings
+#pragma warning(disable: 26446)
+#pragma warning(disable: 26481)
+#pragma warning(disable: 26482)
+#pragma warning(disable: 26485)
+#pragma warning(disable: 26489)
+#pragma warning(disable: 26494)
 
 //
 // Included lib files used by program.
@@ -123,7 +132,6 @@ extern ULONG g_CurrentDPI;
 #define RtlQuickSort rtl_qsort
 
 typedef struct _WINOBJ_GLOBALS {
-    BOOLEAN UseExperimentalFeatures;
     BOOLEAN IsWine;
     BOOLEAN EnableFullMitigations;
     HINSTANCE hInstance;

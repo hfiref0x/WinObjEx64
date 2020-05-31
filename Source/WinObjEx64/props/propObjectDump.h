@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       PROPOBJECTDUMP.H
 *
-*  VERSION:     1.72
+*  VERSION:     1.86
 *
-*  DATE:        04 Feb 2019
+*  DATE:        26 May 2020
 *
 *  Common header file for the object dump support.
 *

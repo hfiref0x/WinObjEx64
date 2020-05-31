@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDLG.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.86
 *
-*  DATE:        05 Jan 2020
+*  DATE:        26 May 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -100,12 +100,7 @@ BOOL propOpenCurrentObject(
     // Handle window station type.
     //
     if (Context->TypeIndex == ObjectTypeWinstation) {
-        if (g_WinObj.UseExperimentalFeatures) {
-            hObject = supOpenWindowStationFromContextEx(Context, FALSE, DesiredAccess); //WINSTA_READATTRIBUTES for query
-        }
-        else {
-            hObject = supOpenWindowStationFromContext(Context, FALSE, DesiredAccess); //WINSTA_READATTRIBUTES for query
-        }
+        hObject = supOpenWindowStationFromContext(Context, FALSE, DesiredAccess); //WINSTA_READATTRIBUTES for query
         bResult = (hObject != NULL);
         if (bResult) {
             *phObject = hObject;

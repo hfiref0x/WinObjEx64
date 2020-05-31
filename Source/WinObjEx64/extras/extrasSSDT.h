@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSSDT.H
 *
-*  VERSION:     1.84
+*  VERSION:     1.86
 *
-*  DATE:        25 Feb 2019
+*  DATE:        29 May 2020
 *
 *  Common header file for Service Table dialog.
 *
@@ -17,6 +17,8 @@
 *
 *******************************************************************************/
 #pragma once
+
+#define INVALID_SERVICE_ENTRY_ID 0xFFFFFFFF
 
 typedef struct _SERVICETABLEENTRY {
     ULONG ServiceId;

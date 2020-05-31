@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.86
 *
-*  DATE:        17 May 2020
+*  DATE:        29 May 2020
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -206,7 +206,7 @@ typedef struct _OBJREF {
 #define NT_WIN10_20H2           19042
 
 // Windows 10 Active Develepment Branch
-#define NTX_WIN10_ADB           19628
+#define NTX_WIN10_ADB           19635
 
 //
 // Defines for boundary descriptors
@@ -289,6 +289,11 @@ UCHAR ObDecodeTypeIndex(
     _In_ PVOID Object,
     _In_ UCHAR EncodedTypeIndex);
 
+PVOID ObDumpDirectoryObjectVersionAware(
+    _In_ ULONG_PTR ObjectAddress,
+    _Out_ PULONG Size,
+    _Out_ PULONG Version);
+
 PVOID ObDumpObjectTypeVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
@@ -300,6 +305,11 @@ PVOID ObDumpAlpcPortObjectVersionAware(
     _Out_ PULONG Version);
 
 PVOID ObDumpSymbolicLinkObjectVersionAware(
+    _In_ ULONG_PTR ObjectAddress,
+    _Out_ PULONG Size,
+    _Out_ PULONG Version);
+
+PVOID ObDumpDeviceMapVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
     _Out_ PULONG Version);
@@ -380,6 +390,12 @@ BOOL kdpReadSystemMemoryEx(
 
 #define kdReadSystemMemory(Address, Buffer, BufferSize) \
     kdReadSystemMemoryEx(Address, Buffer, BufferSize, NULL)
+
+#ifdef _DEBUG
+#define kdDebugPrint(f, ...) DbgPrint(f, __VA_ARGS__)
+#else
+#define kdDebugPrint(f, ...) 
+#endif
 
 VOID kdInit(
     _In_ BOOL IsFullAdmin);

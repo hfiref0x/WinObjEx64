@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     1.85
+*  VERSION:     1.86
 *
-*  DATE:        13 Mar 2020
+*  DATE:        29 May 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -491,7 +491,7 @@ VOID SdtListOutputTable(
 *
 */
 BOOL SdtListCreateTable(
-    _In_ BOOLEAN bForceUnknown
+    VOID
 )
 {
     BOOL                    bResult = FALSE;
@@ -506,8 +506,8 @@ BOOL SdtListCreateTable(
     PSERVICETABLEENTRY      ServiceEntry;
 
     CHAR* ServiceName;
-    PVOID ServicePtr;
-    ULONG ServiceId, i;
+    CHAR* FunctionAddress;
+    ULONG ServiceId, i, j;
 
     __try {
 
@@ -547,7 +547,7 @@ BOOL SdtListCreateTable(
             ExportFunctions = (PDWORD)((PBYTE)Module + ExportDirectory->AddressOfFunctions);
             NameOrdinals = (PWORD)((PBYTE)Module + ExportDirectory->AddressOfNameOrdinals);
 
-            memIO = sizeof(SERVICETABLEENTRY) * g_kdctx.KeServiceDescriptorTable.Limit;
+            memIO = sizeof(SERVICETABLEENTRY) * ExportDirectory->NumberOfNames;
 
             KiServiceTable.Table = (PSERVICETABLEENTRY)supHeapAlloc(memIO);
             if (KiServiceTable.Table == NULL)
@@ -568,53 +568,66 @@ BOOL SdtListCreateTable(
             KiServiceTable.Base = g_kdctx.KeServiceDescriptorTable.Base;
 
             //
-            // Walk for Nt stubs.
+            // Walk for syscall stubs.
             //
             KiServiceTable.Limit = 0;
             for (i = 0; i < ExportDirectory->NumberOfNames; i++) {
 
                 ServiceName = ((CHAR*)Module + ExportNames[i]);
-                ServicePtr = (PVOID*)((CHAR*)Module + ExportFunctions[NameOrdinals[i]]);
 
-                if (*(USHORT*)ServiceName == 'tN') {
+                //
+                // Use Zw alias to skip various Nt trash like NtdllDialogWndProc/NtGetTickCount.
+                //
 
-                    ServiceId = *(ULONG*)((UCHAR*)ServicePtr + 4);
+                if (*(USHORT*)ServiceName == 'wZ') {
 
-                    if (ServiceId < g_kdctx.KeServiceDescriptorTable.Limit) {
+                    MultiByteToWideChar(
+                        CP_ACP,
+                        0,
+                        ServiceName,
+                        (INT)_strlen_a(ServiceName),
+                        KiServiceTable.Table[KiServiceTable.Limit].Name,
+                        MAX_PATH);
 
-                        MultiByteToWideChar(
-                            CP_ACP,
-                            0,
-                            ServiceName,
-                            (INT)_strlen_a(ServiceName),
-                            KiServiceTable.Table[KiServiceTable.Limit].Name,
-                            MAX_PATH);
+                    //dirty hack
+                    KiServiceTable.Table[KiServiceTable.Limit].Name[0] = L'N';
+                    KiServiceTable.Table[KiServiceTable.Limit].Name[1] = L't';
 
-                        ServiceEntry = &KiServiceTable.Table[KiServiceTable.Limit];
-                        ServiceEntry->ServiceId = ServiceId;
-                        ServiceEntry->Address = TableDump[ServiceId];
-                        TableDump[ServiceId] = 0;
-                        KiServiceTable.Limit += 1;
+                    FunctionAddress = (CHAR*)((CHAR*)Module + ExportFunctions[NameOrdinals[i]]);
+                    ServiceEntry = &KiServiceTable.Table[KiServiceTable.Limit];
+
+                    if (*(UCHAR*)((UCHAR*)FunctionAddress + 3) == 0xB8) {
+                        ServiceId = *(ULONG*)((UCHAR*)FunctionAddress + 4);
+                        if (ServiceId < g_kdctx.KeServiceDescriptorTable.Limit) {
+                            ServiceEntry->ServiceId = ServiceId;
+                            ServiceEntry->Address = TableDump[ServiceId];
+                            TableDump[ServiceId] = 0;
+                        }
+                        else {
+                            kdDebugPrint(">>1 %s %lu\r\n", ServiceName, KiServiceTable.Limit);
+                            ServiceEntry->ServiceId = INVALID_SERVICE_ENTRY_ID;
+                        }
+                    }
+                    else {
+                        kdDebugPrint(">>2 %s %lu\r\n", ServiceName, KiServiceTable.Limit);
+                        ServiceEntry->ServiceId = INVALID_SERVICE_ENTRY_ID;
                     }
 
-                }//tN
+                    KiServiceTable.Limit += 1;
+
+                }//wZ
             }//for
 
-            //
-            // Temporary workaround for NtQuerySystemTime.
-            // (not implemented in user mode as syscall only as query to shared data, still exist in SSDT)
-            //  
-            //  This will produce incorrect result if more like that services will be added.
-            //
-            if (bForceUnknown) {
-                for (i = 0; i < g_kdctx.KeServiceDescriptorTable.Limit; i++) {
-                    if (TableDump[i] != 0) {
-                        ServiceEntry = &KiServiceTable.Table[KiServiceTable.Limit];
-                        ServiceEntry->ServiceId = i;
-                        ServiceEntry->Address = TableDump[i];
-                        _strcpy(ServiceEntry->Name, TEXT("NtQuerySystemTime"));
-                        KiServiceTable.Limit += 1;
-                        break;
+            for (i = 0; i < KiServiceTable.Limit; i++) {
+                ServiceEntry = &KiServiceTable.Table[i];
+                if (ServiceEntry->ServiceId == INVALID_SERVICE_ENTRY_ID) {
+                    for (j = 0; j < g_kdctx.KeServiceDescriptorTable.Limit; j++) {
+                        if (TableDump[j] != 0) {
+                            ServiceEntry->ServiceId = j;
+                            ServiceEntry->Address = TableDump[j];
+                            TableDump[j] = 0;
+                            break;
+                        }
                     }
                 }
             }
@@ -1536,7 +1549,7 @@ VOID SdtListCreate(
                 }
             }
 
-            bSuccess = SdtListCreateTable(TRUE);
+            bSuccess = SdtListCreateTable();
             if (bSuccess) {
                 SdtListOutputTable(hwndDlg, pModules, &KiServiceTable);
             }

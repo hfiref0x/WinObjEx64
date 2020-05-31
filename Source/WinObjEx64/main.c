@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.84
+*  VERSION:     1.86
 *
-*  DATE:        05 Mar 2020
+*  DATE:        26 May 2020
 *
 *  Program entry point and main window handler.
 *
@@ -927,8 +927,6 @@ INT WinObjInitGlobals(
 {
     SIZE_T cch;
     INT Result = wobjInitSuccess;
-    LPWSTR* szArglist;
-    INT nArgs = 0;
 
 
     do {
@@ -1007,17 +1005,6 @@ INT WinObjInitGlobals(
         if ((cch == 0) || (cch > MAX_PATH)) {
             Result = wobjInitNoProgDir;
             break;
-        }
-
-        //
-        // Check command line parameters.
-        //
-        szArglist = CommandLineToArgvW(GetCommandLineW(), &nArgs);
-        if (szArglist) {
-            if (nArgs > 1) {
-                g_WinObj.UseExperimentalFeatures = (_strcmpi(szArglist[1], L"-exp") == 0);
-            }
-            LocalFree(szArglist);
         }
 
         Result = wobjInitSuccess;

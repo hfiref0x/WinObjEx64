@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.86
 *
-*  DATE:        17 May 2020
+*  DATE:        29 May 2020
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -942,6 +942,8 @@ PVOID ObDumpObjectTypeVersionAware(
     //assume failure
     if (Size) *Size = 0;
     if (Version) *Version = 0;
+    if (ObjectAddress < g_kdctx.SystemRangeStart)
+        return NULL;
 
     switch (g_NtBuildNumber) {
     case NT_WIN7_RTM:
@@ -995,6 +997,8 @@ PVOID ObDumpAlpcPortObjectVersionAware(
     //assume failure
     if (Size) *Size = 0;
     if (Version) *Version = 0;
+    if (ObjectAddress < g_kdctx.SystemRangeStart)
+        return NULL;
 
     switch (g_NtBuildNumber) {
     case NT_WIN7_RTM:
@@ -1032,10 +1036,8 @@ PVOID ObDumpAlpcPortObjectVersionAware(
 *
 * Use supVirtualFree to free returned buffer.
 *
-* Note: Currently unused.
-*
 */
-PVOID ObxDumpDirectoryObjectVersionAware(
+PVOID ObDumpDirectoryObjectVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
     _Out_ PULONG Version
@@ -1047,6 +1049,8 @@ PVOID ObxDumpDirectoryObjectVersionAware(
     //assume failure
     if (Size) *Size = 0;
     if (Version) *Version = 0;
+    if (ObjectAddress < g_kdctx.SystemRangeStart)
+        return NULL;
 
     switch (g_NtBuildNumber) {
 
@@ -1100,6 +1104,8 @@ PVOID ObDumpSymbolicLinkObjectVersionAware(
     //assume failure
     if (Size) *Size = 0;
     if (Version) *Version = 0;
+    if (ObjectAddress < g_kdctx.SystemRangeStart)
+        return NULL;
 
     switch (g_NtBuildNumber) {
     case NT_WIN7_RTM:
@@ -1121,6 +1127,56 @@ PVOID ObDumpSymbolicLinkObjectVersionAware(
     default:
         ObjectSize = sizeof(OBJECT_SYMBOLIC_LINK_V4);
         ObjectVersion = 4;
+        break;
+    }
+
+    return ObpDumpObjectWithSpecifiedSize(ObjectAddress,
+        ObjectSize,
+        ObjectVersion,
+        Size,
+        Version);
+}
+
+/*
+* ObDumpDeviceMapVersionAware
+*
+* Purpose:
+*
+* Return dumped DEVICE_MAP structure version aware.
+*
+* Use supVirtualFree to free returned buffer.
+*
+*/
+PVOID ObDumpDeviceMapVersionAware(
+    _In_ ULONG_PTR ObjectAddress,
+    _Out_ PULONG Size,
+    _Out_ PULONG Version
+)
+{
+    ULONG ObjectSize = 0;
+    ULONG ObjectVersion = 0;
+
+    //assume failure
+    if (Size) *Size = 0;
+    if (Version) *Version = 0;
+
+    if (ObjectAddress < g_kdctx.SystemRangeStart)
+        return NULL;
+
+    switch (g_NtBuildNumber) {
+    case NT_WIN7_RTM:
+    case NT_WIN7_SP1:
+    case NT_WIN8_RTM:
+    case NT_WIN8_BLUE:
+    case NT_WIN10_THRESHOLD1:
+    case NT_WIN10_THRESHOLD2:
+        ObjectSize = sizeof(DEVICE_MAP_V1);
+        ObjectVersion = 1;
+        break;
+    case NT_WIN10_REDSTONE1:
+    default:
+        ObjectSize = sizeof(DEVICE_MAP_V2);
+        ObjectVersion = 2;
         break;
     }
 
@@ -1554,11 +1610,9 @@ BOOL kdFindKiServiceTable(
                 break;
             }
 
-            if (ServiceTable) {
-                RtlCopyMemory(ServiceTable,
-                    &ServiceTableDescriptor[0],
-                    sizeof(KSERVICE_TABLE_DESCRIPTOR));
-            }
+            RtlCopyMemory(ServiceTable,
+                &ServiceTableDescriptor[0],
+                sizeof(KSERVICE_TABLE_DESCRIPTOR));
 
             bResult = TRUE;
 
@@ -1743,10 +1797,7 @@ POBJINFO ObpCopyObjectBasicInfo(
             sizeof(OBJECT_HEADER),
             NULL))
         {
-#ifdef _DEBUG
-            DbgPrint("%s kdReadSystemMemoryEx(ObjectHeaderAddress) failed\r\n", __FUNCTION__);
-#endif
-
+            kdDebugPrint("%s kdReadSystemMemoryEx(ObjectHeaderAddress) failed\r\n", __FUNCTION__);
             return NULL;
         }
 
@@ -1834,10 +1885,7 @@ POBJINFO ObpWalkDirectory(
             sizeof(OBJECT_DIRECTORY),
             NULL))
         {
-
-#ifdef _DEBUG
-            DbgPrint("%s kdReadSystemMemoryEx(DirectoryAddress) failed\r\n", __FUNCTION__);
-#endif
+            kdDebugPrint("%s kdReadSystemMemoryEx(DirectoryAddress) failed\r\n", __FUNCTION__);
             return NULL;
         }
 
@@ -1874,9 +1922,7 @@ POBJINFO ObpWalkDirectory(
                         sizeof(OBJECT_DIRECTORY_ENTRY),
                         NULL))
                     {
-#ifdef _DEBUG
-                        DbgPrint("%s kdReadSystemMemoryEx(OBJECT_DIRECTORY_ENTRY(HashEntry)) failed\r\n", __FUNCTION__);
-#endif
+                        kdDebugPrint("%s kdReadSystemMemoryEx(OBJECT_DIRECTORY_ENTRY(HashEntry)) failed\r\n", __FUNCTION__);
                         break;
                     }
 
@@ -1891,9 +1937,7 @@ POBJINFO ObpWalkDirectory(
                         sizeof(OBJECT_HEADER),
                         NULL))
                     {
-#ifdef _DEBUG
-                        DbgPrint("%s kdReadSystemMemoryEx(ObjectHeaderAddress(Entry.Object)) failed\r\n", __FUNCTION__);
-#endif
+                        kdDebugPrint("%s kdReadSystemMemoryEx(ObjectHeaderAddress(Entry.Object)) failed\r\n", __FUNCTION__);
                         goto NextItem;
                     }
 
@@ -1983,9 +2027,7 @@ POBJINFO ObQueryObjectByAddress(
         sizeof(OBJECT_HEADER),
         NULL))
     {
-#ifdef _DEBUG
-        DbgPrint("%s kdReadSystemMemoryEx(ObjectHeaderAddress(ObjectAddress)) failed\r\n", __FUNCTION__);
-#endif
+        kdDebugPrint("%s kdReadSystemMemoryEx(ObjectHeaderAddress(ObjectAddress)) failed\r\n", __FUNCTION__);
         return NULL;
     }
 
@@ -2134,9 +2176,7 @@ VOID ObpWalkDirectoryRecursive(
         sizeof(OBJECT_DIRECTORY),
         NULL))
     {
-#ifdef _DEBUG
-        DbgPrint("%s kdReadSystemMemoryEx(DirectoryAddress) failed\r\n", __FUNCTION__);
-#endif
+        kdDebugPrint("%s kdReadSystemMemoryEx(DirectoryAddress) failed\r\n", __FUNCTION__);
         return;
     }
 

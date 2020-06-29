@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPSECURITY.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.86
 *
-*  DATE:        05 Jan 2020
+*  DATE:        28 June 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -367,7 +367,7 @@ HRESULT STDMETHODCALLTYPE GetSecurity(
         );
     }
 
-    hResult = HRESULT_FROM_NT(status);
+    hResult = HRESULT_FROM_WIN32(RtlNtStatusToDosError(status));
     *ppSecurityDescriptor = PSD;
 
 Done:
@@ -395,7 +395,7 @@ HRESULT STDMETHODCALLTYPE SetSecurity(
 
     //cleanup
     This->CloseObjectMethod(This->ObjectContext, hObject);
-    return HRESULT_FROM_NT(status);
+    return HRESULT_FROM_WIN32(RtlNtStatusToDosError(status));
 }
 
 HRESULT STDMETHODCALLTYPE MapGeneric(
@@ -498,7 +498,7 @@ HRESULT propSecurityConstructor(
         bytesNeeded = 0;
         status = NtQueryObject(hObject, ObjectTypeInformation, NULL, 0, &bytesNeeded);
         if (bytesNeeded == 0) {
-            hResult = HRESULT_FROM_NT(status);
+            hResult = HRESULT_FROM_WIN32(RtlNtStatusToDosError(status));
             break;
         }
 
@@ -511,7 +511,7 @@ HRESULT propSecurityConstructor(
         status = NtQueryObject(hObject, ObjectTypeInformation, TypeInfo,
             bytesNeeded, &bytesNeeded);
         if (!NT_SUCCESS(status)) {
-            hResult = HRESULT_FROM_NT(status);
+            hResult = HRESULT_FROM_WIN32(RtlNtStatusToDosError(status));
             break;
         }
 

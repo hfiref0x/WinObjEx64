@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.86
 *
-*  DATE:        26 May 2020
+*  DATE:        28 June 2020
 *
 *  Program entry point and main window handler.
 *
@@ -778,6 +778,7 @@ LRESULT CALLBACK MainWindowProc(
 )
 {
     INT                 mark;
+    LONG                NewSplitterPos;
     RECT                ToolBarRect, crc;
     LPDRAWITEMSTRUCT    pds;
     LPMEASUREITEMSTRUCT pms;
@@ -853,13 +854,16 @@ LRESULT CALLBACK MainWindowProc(
     case WM_MOUSEMOVE:
         if ((wParam & MK_LBUTTON) != 0) {
             GetClientRect(MainWindow, &ToolBarRect);
-            SplitterPos = (SHORT)LOWORD(lParam);
-            if (SplitterPos < SplitterMargin)
-                SplitterPos = SplitterMargin;
-            if (SplitterPos > ToolBarRect.right - SplitterMargin)
-                SplitterPos = ToolBarRect.right - SplitterMargin;
-            SendMessage(MainWindow, WM_SIZE, 0, 0);
-            UpdateWindow(MainWindow);
+            NewSplitterPos = (SHORT)LOWORD(lParam);
+            if (NewSplitterPos < SplitterMargin)
+                NewSplitterPos = SplitterMargin;
+            if (NewSplitterPos > ToolBarRect.right - SplitterMargin)
+                NewSplitterPos = ToolBarRect.right - SplitterMargin;
+            if (SplitterPos != NewSplitterPos) {
+                SplitterPos = NewSplitterPos;
+                SendMessage(MainWindow, WM_SIZE, 0, 0);
+                UpdateWindow(MainWindow);
+            }
         }
         break;
 

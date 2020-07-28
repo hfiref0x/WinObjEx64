@@ -4,9 +4,9 @@
 *
 *  TITLE:       LOG.C
 *
-*  VERSION:     1.86
+*  VERSION:     1.87
 *
-*  DATE:        17 May 2020
+*  DATE:        29 June 2020
 *
 *  Simplified log.
 *
@@ -344,7 +344,7 @@ INT_PTR CALLBACK LogViewerDialogProc(
 
     case WM_COMMAND:
 
-        switch (LOWORD(wParam)) {
+        switch (GET_WM_COMMAND_ID(wParam, lParam)) {
         case IDOK:
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
             return 1;

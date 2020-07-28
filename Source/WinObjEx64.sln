@@ -13,6 +13,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ExamplePlugin", "Plugins\Ex
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ApiSetView", "Plugins\ApiSetView\ApiSetView.vcxproj", "{72BF2A8F-E7AE-467F-B00F-1C51F1C3D2C8}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ImageScope", "Plugins\ImageScope\ImageScope.vcxproj", "{38D717F0-9152-4B74-8D32-5222373EAB3E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -62,6 +64,16 @@ Global
 		{72BF2A8F-E7AE-467F-B00F-1C51F1C3D2C8}.ReleasePrivateDriver|x64.Build.0 = Release|x64
 		{72BF2A8F-E7AE-467F-B00F-1C51F1C3D2C8}.ReleaseWinIoDriver|x64.ActiveCfg = Release|x64
 		{72BF2A8F-E7AE-467F-B00F-1C51F1C3D2C8}.ReleaseWinIoDriver|x64.Build.0 = Release|x64
+		{38D717F0-9152-4B74-8D32-5222373EAB3E}.Debug|x64.ActiveCfg = Debug|x64
+		{38D717F0-9152-4B74-8D32-5222373EAB3E}.Debug|x64.Build.0 = Debug|x64
+		{38D717F0-9152-4B74-8D32-5222373EAB3E}.DebugWithDriver|x64.ActiveCfg = Debug|x64
+		{38D717F0-9152-4B74-8D32-5222373EAB3E}.DebugWithDriver|x64.Build.0 = Debug|x64
+		{38D717F0-9152-4B74-8D32-5222373EAB3E}.Release|x64.ActiveCfg = Release|x64
+		{38D717F0-9152-4B74-8D32-5222373EAB3E}.Release|x64.Build.0 = Release|x64
+		{38D717F0-9152-4B74-8D32-5222373EAB3E}.ReleasePrivateDriver|x64.ActiveCfg = Release|x64
+		{38D717F0-9152-4B74-8D32-5222373EAB3E}.ReleasePrivateDriver|x64.Build.0 = Release|x64
+		{38D717F0-9152-4B74-8D32-5222373EAB3E}.ReleaseWinIoDriver|x64.ActiveCfg = Release|x64
+		{38D717F0-9152-4B74-8D32-5222373EAB3E}.ReleaseWinIoDriver|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -70,6 +82,7 @@ Global
 		{91A5250B-99D2-48F9-B649-82D66C9A6396} = {7C26FBEB-7B9D-4C48-8C27-E5563113C4D5}
 		{7C10DDD2-E88A-4133-B140-80679BE8AFDD} = {7C26FBEB-7B9D-4C48-8C27-E5563113C4D5}
 		{72BF2A8F-E7AE-467F-B00F-1C51F1C3D2C8} = {7C26FBEB-7B9D-4C48-8C27-E5563113C4D5}
+		{38D717F0-9152-4B74-8D32-5222373EAB3E} = {7C26FBEB-7B9D-4C48-8C27-E5563113C4D5}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {4FAAD6B8-C83A-4862-BD27-9C4030CBA89C}

@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     1.86
+*  VERSION:     1.87
 *
-*  DATE:        26 May 2020
+*  DATE:        13 July 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -151,7 +151,7 @@ VOID propObDumpAddressWithModule(
                 subitems.BgColor = CLR_HOOK;
             }
         }
-        if (supFindModuleNameByAddress(pModules, Address, _strend(szModuleName), MAX_PATH)) {
+        if (ntsupFindModuleNameByAddress(pModules, Address, _strend(szModuleName), MAX_PATH)) {
             subitems.Text[1] = szModuleName;
         }
         else {
@@ -855,7 +855,7 @@ VOID propObDumpUnicodeString(
         }
         subitems.Text[1] = lpObjectName;
     }
-
+    
     supTreeListAddItem(
         TreeList,
         h_tviSubItem,
@@ -1013,6 +1013,144 @@ VOID propObDumpSqos(
 }
 
 /*
+* propObDumpDriverExtension
+*
+* Purpose:
+*
+* Dump DRIVER_EXTENSION members to the treelist.
+*
+*/
+VOID propObDumpDriverExtension(
+    _In_ HWND TreeList,
+    _In_ PDRIVER_OBJECT DriverObject,
+    _In_ PDRIVER_EXTENSION DriverExtension,
+    _In_ PRTL_PROCESS_MODULES ModulesList,
+    _In_ PLDR_DATA_TABLE_ENTRY LoaderEntry
+)
+{
+    union {
+        union {
+            DRIVER_EXTENSION* DriverExtensionCompatible;
+            DRIVER_EXTENSION_V2* DriverExtensionV2;
+            DRIVER_EXTENSION_V3* DriverExtensionV3;
+            DRIVER_EXTENSION_V4* DriverExtensionV4;
+        } Versions;
+        PVOID Ref;
+    } DrvExt;
+
+    HTREEITEM h_tviRootItem;
+
+    COLORREF BgColor;
+    POBJREF LookupObject = NULL;
+    PDRIVER_OBJECT SelfDriverObject;
+    LPWSTR lpDesc;
+    PVOID DriverExtensionPtr;
+    ULONG ObjectSize = 0;
+    ULONG ObjectVersion = 0;
+
+    DriverExtensionPtr = ObDumpDriverExtensionVersionAware((ULONG_PTR)DriverExtension,
+        &ObjectSize,
+        &ObjectVersion);
+
+    if (DriverExtensionPtr) {
+
+        DrvExt.Ref = DriverExtensionPtr;
+
+        h_tviRootItem = supTreeListAddItem(
+            g_TreeList,
+            NULL,
+            TVIF_TEXT | TVIF_STATE,
+            TVIS_EXPANDED,
+            0,
+            TEXT("DRIVER_EXTENSION"),
+            NULL);
+
+        if (h_tviRootItem) {
+
+            //
+            // DRIVER_EXTENSION.DriverObject
+            //
+            BgColor = 0;
+            lpDesc = NULL;
+
+            //must be self-ref
+            SelfDriverObject = DrvExt.Versions.DriverExtensionCompatible->DriverObject;
+
+            if ((ULONG_PTR)SelfDriverObject != (ULONG_PTR)DriverObject) {
+                lpDesc = T_BADDRIVEROBJECT;
+                BgColor = CLR_WARN;
+            }
+            else {
+                //find ref
+                if (SelfDriverObject != NULL) {
+                    LookupObject = ObCollectionFindByAddress(
+                        &g_kdctx.ObCollection,
+                        (ULONG_PTR)SelfDriverObject,
+                        FALSE);
+
+                    if (LookupObject) {
+                        lpDesc = LookupObject->ObjectName;
+                    }
+                    else {
+                        //sef-ref not found, notify, could be object outside directory so we don't know it name etc
+                        lpDesc = T_REFNOTFOUND;
+                        BgColor = CLR_INVL;
+                    }
+                }
+            }
+
+            propObDumpAddress(TreeList, h_tviRootItem, T_FIELD_DRIVER_OBJECT,
+                lpDesc, SelfDriverObject, BgColor, 0);
+
+            if (LookupObject) {
+                supHeapFree(LookupObject->ObjectName);
+                supHeapFree(LookupObject);
+                LookupObject = NULL;
+            }
+
+            //AddDevice
+            propObDumpAddressWithModule(TreeList, h_tviRootItem, TEXT("AddDevice"),
+                DrvExt.Versions.DriverExtensionCompatible->AddDevice,
+                ModulesList,
+                LoaderEntry->DllBase,
+                LoaderEntry->SizeOfImage);
+
+            //Count
+            propObDumpUlong(TreeList, h_tviRootItem, TEXT("Count"), NULL,
+                DrvExt.Versions.DriverExtensionCompatible->Count, FALSE, FALSE, 0, 0);
+
+            //ServiceKeyName
+            propObDumpUnicodeString(TreeList, h_tviRootItem, T_FIELD_SERVICE_KEYNAME,
+                &DrvExt.Versions.DriverExtensionCompatible->ServiceKeyName, FALSE);
+
+            // All brand new private fields
+            if (ObjectVersion > 1) {
+
+                propObDumpAddress(TreeList, h_tviRootItem, TEXT("ClientDriverExtension"),
+                    TEXT("PIO_CLIENT_EXTENSION"), DrvExt.Versions.DriverExtensionV2->ClientDriverExtension, 0, 0);
+
+                propObDumpAddress(TreeList, h_tviRootItem, TEXT("FsFilterCallbacks"),
+                    TEXT("PFS_FILTER_CALLBACKS"), DrvExt.Versions.DriverExtensionV2->FsFilterCallbacks, 0, 0);
+            }
+
+            if (ObjectVersion > 2) {
+                propObDumpAddress(TreeList, h_tviRootItem, TEXT("KseCallbacks"),
+                    NULL, DrvExt.Versions.DriverExtensionV3->KseCallbacks, 0, 0);
+                propObDumpAddress(TreeList, h_tviRootItem, TEXT("DvCallbacks"),
+                    NULL, DrvExt.Versions.DriverExtensionV3->DvCallbacks, 0, 0);
+            }
+
+            if (ObjectVersion > 3) {
+                propObDumpAddress(TreeList, h_tviRootItem, TEXT("VerifierContext"),
+                    NULL, DrvExt.Versions.DriverExtensionV4->VerifierContext, 0, 0);
+            }
+        }
+
+        supVirtualFree(DriverExtensionPtr);
+    }
+}
+
+/*
 * propObDumpDriverObject
 *
 * Purpose:
@@ -1033,7 +1171,6 @@ VOID propObDumpDriverObject(
     POBJREF                 LookupObject = NULL;
     LPWSTR                  lpType;
     DRIVER_OBJECT           drvObject;
-    DRIVER_EXTENSION        drvExtension;
     FAST_IO_DISPATCH        fastIoDispatch;
     LDR_DATA_TABLE_ENTRY    ldrEntry, ntosEntry;
     TL_SUBITEMS_FIXED       subitems;
@@ -1207,7 +1344,7 @@ VOID propObDumpDriverObject(
         propObDumpAddress(g_TreeList, h_tviRootItem, TEXT("DriverSection"), TEXT("PLDR_DATA_TABLE_ENTRY"), drvObject.DriverSection, 0, 0);
 
         //DriverExtension
-        propObDumpAddress(g_TreeList, h_tviRootItem, TEXT("DriverExtension"), TEXT("PDRIVER_EXTENSION"), drvObject.DriverExtension, 0, 0);
+        propObDumpAddress(g_TreeList, h_tviRootItem, T_FIELD_DRIVER_EXTENSION, T_PDRIVER_EXTENSION, drvObject.DriverExtension, 0, 0);
 
         //DriverName
         propObDumpUnicodeString(g_TreeList, h_tviRootItem, TEXT("DriverName"), &drvObject.DriverName, FALSE);
@@ -1412,74 +1549,16 @@ VOID propObDumpDriverObject(
         //PDRIVER_EXTENSION
         //
         if (drvObject.DriverExtension != NULL) {
-            //dump drvObject->DriverExtension
 
-            RtlSecureZeroMemory(&drvExtension, sizeof(drvExtension));
+            propObDumpDriverExtension(g_TreeList,
+                (PDRIVER_OBJECT)Context->ObjectInfo.ObjectAddress,
+                drvObject.DriverExtension,
+                pModules,
+                &ldrEntry);
 
-            if (kdReadSystemMemoryEx(
-                (ULONG_PTR)drvObject.DriverExtension,
-                &drvExtension,
-                sizeof(drvExtension),
-                NULL))
-            {
-
-                h_tviRootItem = supTreeListAddItem(
-                    g_TreeList,
-                    NULL,
-                    TVIF_TEXT | TVIF_STATE,
-                    TVIS_EXPANDED,
-                    0,
-                    TEXT("DRIVER_EXTENSION"),
-                    NULL);
-
-                //DriverObject
-                BgColor = 0;
-                lpType = NULL;
-
-                //must be self-ref
-                if ((ULONG_PTR)drvExtension.DriverObject != (ULONG_PTR)Context->ObjectInfo.ObjectAddress) {
-                    lpType = TEXT("! Bad DRIVER_OBJECT");
-                    BgColor = CLR_WARN;
-                }
-                else {
-                    //find ref
-                    if (drvExtension.DriverObject != NULL) {
-                        LookupObject = ObCollectionFindByAddress(
-                            &g_kdctx.ObCollection,
-                            (ULONG_PTR)drvExtension.DriverObject,
-                            FALSE);
-
-                        if (LookupObject) {
-                            lpType = LookupObject->ObjectName;
-                        }
-                        else {
-                            //sef-ref not found, notify, could be object outside directory so we don't know it name etc
-                            lpType = T_REFNOTFOUND;
-                            BgColor = CLR_INVL;
-                        }
-                    }
-                }
-
-                propObDumpAddress(g_TreeList, h_tviRootItem, TEXT("DriverObject"),
-                    lpType, drvExtension.DriverObject, BgColor, 0);
-
-                if (LookupObject) {
-                    supHeapFree(LookupObject->ObjectName);
-                    supHeapFree(LookupObject);
-                    LookupObject = NULL;
-                }
-
-                //AddDevice
-                propObDumpAddressWithModule(g_TreeList, h_tviRootItem, TEXT("AddDevice"), drvExtension.AddDevice,
-                    pModules, ldrEntry.DllBase, ldrEntry.SizeOfImage);
-
-                //Count
-                propObDumpUlong(g_TreeList, h_tviRootItem, TEXT("Count"), NULL, drvExtension.Count, FALSE, FALSE, 0, 0);
-
-                //ServiceKeyName
-                propObDumpUnicodeString(g_TreeList, h_tviRootItem, TEXT("ServiceKeyName"), &drvExtension.ServiceKeyName, FALSE);
-            }
         }
+
+
         //
         //Cleanup
         //
@@ -2150,7 +2229,7 @@ VOID propObDumpDeviceMap(
             TVIF_TEXT | TVIF_STATE,
             0,
             0,
-            T_DEVICEMAP,
+            T_FIELD_DEVICE_MAP,
             &subitems);
 
         if (h_tviSubItem) {
@@ -2241,7 +2320,7 @@ VOID propObDumpDeviceMap(
         // Output as is in case of error.
         //
 
-        propObDumpAddress(TreeList, hParent, T_DEVICEMAP, T_PDEVICE_MAP,
+        propObDumpAddress(TreeList, hParent, T_FIELD_DEVICE_MAP, T_PDEVICE_MAP,
             (PVOID)DeviceMapAddress, 0, 0);
 
     }
@@ -2426,7 +2505,7 @@ VOID propObDumpDirectoryObjectInternal(
                     TVIF_TEXT | TVIF_STATE,
                     0,
                     0,
-                    T_SHADOW_DIRECTORY,
+                    T_FIELD_SHADOW_DIRECTORY,
                     &subitems);
 
                 propObDumpDirectoryObjectInternal(h_tviSubItem,
@@ -2442,7 +2521,7 @@ VOID propObDumpDirectoryObjectInternal(
             //
             propObDumpAddress(g_TreeList,
                 h_tviRootItem,
-                T_SHADOW_DIRECTORY,
+                T_FIELD_SHADOW_DIRECTORY,
                 T_POBJECT_DIRECTORY,
                 0,
                 0,
@@ -2584,9 +2663,7 @@ VOID propObDumpDirectoryObjectInternal(
             SessionId);
     }
 
-    if (DirectoryObjectPtr)
-        supVirtualFree(DirectoryObjectPtr);
-
+    supVirtualFree(DirectoryObjectPtr);
 }
 
 /*
@@ -4050,6 +4127,8 @@ VOID propObDumpSymbolicLink(
     BOOLEAN IsCallbackLink = FALSE;
     HTREEITEM h_tviRootItem;
 
+    LPWSTR IntegrityLevelString;
+
     PBYTE SymLinkDumpBuffer = NULL;
 
     ULONG BufferSize = 0, ObjectVersion = 0;
@@ -4065,6 +4144,7 @@ VOID propObDumpSymbolicLink(
             OBJECT_SYMBOLIC_LINK_V2* LinkV2;
             OBJECT_SYMBOLIC_LINK_V3* LinkV3;
             OBJECT_SYMBOLIC_LINK_V4* LinkV4;
+            OBJECT_SYMBOLIC_LINK_V5* LinkV5;
         } u1;
         PBYTE Ref;
     } SymbolicLink;
@@ -4182,9 +4262,19 @@ VOID propObDumpSymbolicLink(
     // Output new Windows 10 values.
     //
     if (ObjectVersion > 1)
-        propObDumpUlong(g_TreeList, h_tviRootItem, TEXT("Flags"), NULL, SymbolicLink.u1.LinkV2->Flags, TRUE, FALSE, 0, 0);
+        propObDumpUlong(g_TreeList, h_tviRootItem, TEXT("Flags"), NULL,
+            SymbolicLink.u1.LinkV2->Flags, TRUE, FALSE, 0, 0);
+
     if (ObjectVersion > 2)
-        propObDumpUlong(g_TreeList, h_tviRootItem, TEXT("AccessMask"), NULL, SymbolicLink.u1.LinkV3->AccessMask, TRUE, FALSE, 0, 0);
+        propObDumpUlong(g_TreeList, h_tviRootItem, TEXT("AccessMask"), NULL,
+            SymbolicLink.u1.LinkV3->AccessMask, TRUE, FALSE, 0, 0);
+
+    if (ObjectVersion > 4) {
+        IntegrityLevelString = supIntegrityToString(SymbolicLink.u1.LinkV5->IntegrityLevel);
+
+        propObDumpUlong(g_TreeList, h_tviRootItem, TEXT("IntegrityLevel"), IntegrityLevelString,
+            SymbolicLink.u1.LinkV5->IntegrityLevel, TRUE, FALSE, 0, 0);
+    }
 
     supVirtualFree(SymLinkDumpBuffer);
 }
@@ -4319,8 +4409,7 @@ INT_PTR CALLBACK ObjectDumpDialogProc(
         break;
 
     case WM_COMMAND:
-
-        switch (LOWORD(wParam)) {
+        switch (GET_WM_COMMAND_ID(wParam, lParam)) {
         case ID_OBJECT_COPY:
             supCopyTreeListSubItemValue(g_TreeList, 0);
             break;

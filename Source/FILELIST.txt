@@ -23,10 +23,6 @@ winobjex64\extapi.h
 
 * Windows 7/8/8.1 missing API support
 
-winobjex64\extdef.h
-
-* SDK 8.1 missing definitions support
-
 winobjex64\extas\extrasCallbacks.c
 winobjex64\extras\extrasCallbacks.h
 winobjex64\extras\extrasCallbacksPatterns.h
@@ -222,13 +218,18 @@ shared\ntos\ntldr.h
 
 * NT PE loader related declarations and routines
 
+shared\ntos\ntsup.c
+shared\ntos\ntsup.h
+
+* Native API shared rtl
+
 shared\ntos\apisetx.h
 
 * MS ApiSetSchema dedicated header file
 
-shared\ntuser\StubNtUserOpenWindowStation.asm
+shared\sdk\extdef.h
 
-* NtUserOpenWindowStation stub code
+* Windows SDK 8.1 missing definitions support
 
 winobjex64\resource.h
 

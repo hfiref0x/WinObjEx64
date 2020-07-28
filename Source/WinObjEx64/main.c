@@ -4,7 +4,7 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.86
+*  VERSION:     1.87
 *
 *  DATE:        28 June 2020
 *
@@ -30,7 +30,7 @@ pqsort rtl_qsort;
 
 static LONG	SplitterPos = 180;
 static LONG	SortColumn = 0;
-HTREEITEM	SelectedTreeItem = NULL;
+HTREEITEM	g_SelectedTreeItem = NULL;
 BOOL        bMainWndSortInverse = FALSE;
 HWND        hwndToolBar = NULL, hwndSplitter = NULL, hwndStatusBar = NULL, MainWindow = NULL;
 
@@ -43,7 +43,6 @@ HWND g_hwndObjectTree;
 HWND g_hwndObjectList;
 HIMAGELIST g_ListViewImages;
 HIMAGELIST g_ToolBarMenuImages;
-ULONG g_CurrentDPI;
 
 WINOBJ_GLOBALS g_WinObj;
 
@@ -145,7 +144,7 @@ VOID MainWindowHandleObjectTreeProp(
     //
     ENSURE_DIALOG_UNIQUE(g_PropWindow);
 
-    if (SelectedTreeItem == NULL)
+    if (g_SelectedTreeItem == NULL)
         return;
 
     RtlSecureZeroMemory(&tvi, sizeof(TV_ITEM));
@@ -155,7 +154,7 @@ VOID MainWindowHandleObjectTreeProp(
     tvi.pszText = szBuffer;
     tvi.cchTextMax = MAX_PATH;
     tvi.mask = TVIF_TEXT;
-    tvi.hItem = SelectedTreeItem;
+    tvi.hItem = g_SelectedTreeItem;
     if (TreeView_GetItem(g_hwndObjectTree, &tvi)) {
 
         RtlSecureZeroMemory(&propSettings, sizeof(propSettings));
@@ -285,6 +284,7 @@ LRESULT MainWindowHandleWMCommand(
 {
     LPWSTR lpItemText;
     HWND   hwndFocus;
+    DWORD  lvExStyle;
     WORD   ControlId = LOWORD(wParam);
 
     switch (ControlId) {
@@ -300,6 +300,10 @@ LRESULT MainWindowHandleWMCommand(
 
     case ID_FILE_EXIT:
         PostQuitMessage(0);
+        break;
+
+    case ID_FILE_VIEW_PLUGINS:
+        PmViewPlugins(hwnd);
         break;
 
     case ID_OBJECT_PROPERTIES:
@@ -346,6 +350,18 @@ LRESULT MainWindowHandleWMCommand(
 
     case ID_VIEW_REFRESH:
         MainWindowOnRefresh();
+        break;
+
+    case ID_VIEW_DISPLAYGRID:
+        g_WinObj.ListViewDisplayGrid = !g_WinObj.ListViewDisplayGrid;
+        lvExStyle = ListView_GetExtendedListViewStyle(g_hwndObjectList);
+        if (g_WinObj.ListViewDisplayGrid)
+            lvExStyle |= LVS_EX_GRIDLINES;
+        else
+            lvExStyle &= ~LVS_EX_GRIDLINES;
+
+        ListView_SetExtendedListViewStyle(g_hwndObjectList, lvExStyle);
+
         break;
 
     case ID_EXTRAS_PIPES:
@@ -397,8 +413,9 @@ LRESULT MainWindowHandleWMCommand(
     }
 
     if ((ControlId >= ID_MENU_PLUGINS) && (ControlId < ID_MENU_PLUGINS_MAX)) {
-        PluginManagerProcessEntry(hwnd, ControlId);
+        PmProcessEntry(GetFocus(), ControlId);
     }
+
     return FALSE;
 }
 
@@ -518,6 +535,8 @@ VOID MainWindowHandleTreePopupMenu(
         supSetMenuIcon(hMenu, ID_OBJECT_PROPERTIES,
             (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 0));
 
+        PmBuildPluginPopupMenuByObjectType(hMenu, ObjectTypeDirectory);
+
         TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, point->x, point->y, 0, hwnd, NULL);
         DestroyMenu(hMenu);
     }
@@ -538,8 +557,9 @@ VOID MainWindowHandleObjectPopupMenu(
     _In_ LPPOINT point
 )
 {
-    HMENU hMenu;
-    UINT  uEnable = MF_BYCOMMAND | MF_GRAYED;
+    HMENU   hMenu;
+    UINT    uEnable = MF_BYCOMMAND | MF_GRAYED;
+    LVITEM  lvItem;
 
     hMenu = CreatePopupMenu();
     if (hMenu == NULL) return;
@@ -561,6 +581,17 @@ VOID MainWindowHandleObjectPopupMenu(
         uEnable = MF_BYCOMMAND;
     }
     EnableMenuItem(GetSubMenu(GetMenu(hwnd), IDMM_OBJECT), ID_OBJECT_GOTOLINKTARGET, uEnable);
+
+    lvItem.mask = LVIF_PARAM;
+    lvItem.iItem = iItem;
+    lvItem.iSubItem = 0;
+    lvItem.lParam = 0;
+
+    if (ListView_GetItem(hwndlv, &lvItem)) {
+        PmBuildPluginPopupMenuByObjectType(
+            hMenu,
+            (UCHAR)lvItem.lParam);
+    }
 
     TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, point->x, point->y, 0, hwnd, NULL);
     DestroyMenu(hMenu);
@@ -612,7 +643,7 @@ LRESULT MainWindowHandleWMNotify(
 
                 lpnmTreeView = (LPNMTREEVIEW)lParam;
                 if (lpnmTreeView) {
-                    SelectedTreeItem = lpnmTreeView->itemNew.hItem;
+                    g_SelectedTreeItem = lpnmTreeView->itemNew.hItem;
                 }
                 break;
 
@@ -622,8 +653,8 @@ LRESULT MainWindowHandleWMNotify(
                 ScreenToClient(hdr->hwndFrom, &hti.pt);
                 if (TreeView_HitTest(hdr->hwndFrom, &hti) &&
                     (hti.flags & (TVHT_ONITEM | TVHT_ONITEMRIGHT))) {
-                    SelectedTreeItem = hti.hItem;
-                    TreeView_SelectItem(g_hwndObjectTree, SelectedTreeItem);
+                    g_SelectedTreeItem = hti.hItem;
+                    TreeView_SelectItem(g_hwndObjectTree, g_SelectedTreeItem);
                     SendMessage(hwndStatusBar, WM_SETTEXT, 0, (LPARAM)g_WinObj.CurrentObjectPath);
                     supSetGotoLinkTargetToolButtonState(hwnd, 0, 0, TRUE, FALSE);
                     MainWindowHandleTreePopupMenu(hwnd, &pt);
@@ -709,6 +740,7 @@ LRESULT MainWindowHandleWMNotify(
 
             case ID_OBJECT_PROPERTIES:
             case ID_VIEW_REFRESH:
+            case ID_VIEW_DISPLAYGRID:
             case ID_FIND_FINDOBJECT:
                 lpttt->hinst = g_WinObj.hInstance;
                 lpttt->lpszText = MAKEINTRESOURCE(lpttt->hdr.idFrom);
@@ -875,8 +907,8 @@ LRESULT CALLBACK MainWindowProc(
 
     case WM_GETMINMAXINFO:
         if (lParam) {
-            ((PMINMAXINFO)lParam)->ptMinTrackSize.x = SCALE_DPI_VALUE(400);
-            ((PMINMAXINFO)lParam)->ptMinTrackSize.y = SCALE_DPI_VALUE(256);
+            ((PMINMAXINFO)lParam)->ptMinTrackSize.x = SCALE_DPI_VALUE(400, g_WinObj.CurrentDPI);
+            ((PMINMAXINFO)lParam)->ptMinTrackSize.y = SCALE_DPI_VALUE(256, g_WinObj.CurrentDPI);
         }
         break;
     }
@@ -946,6 +978,8 @@ INT WinObjInitGlobals(
 #endif
 
         g_WinObj.IsWine = IsWine;
+
+        g_WinObj.ListViewDisplayGrid = TRUE;
 
         //
         // Query version info.
@@ -1051,6 +1085,9 @@ UINT WinObjExMain()
 
     WCHAR                   szWindowTitle[100];
 
+    INT                     initResult;
+    LPWSTR                  lpErrorMsg;
+
     logCreate();
     IsWine = supIsWine();
 
@@ -1066,30 +1103,37 @@ UINT WinObjExMain()
         RtlSetHeapInformation(NULL, HeapEnableTerminationOnCorruption, NULL, 0);
     }
 
-    switch (WinObjInitGlobals(IsWine)) {
+    initResult = WinObjInitGlobals(IsWine);
 
-    case wobjInitNoHeap:
-        MessageBox(hDesktopWnd, T_WOBJINIT_NOHEAP, NULL, MB_ICONERROR);
+    if (initResult != wobjInitSuccess) {
+        switch (initResult) {
+
+        case wobjInitNoHeap:
+            lpErrorMsg = T_WOBJINIT_NOHEAP;
+            break;
+
+        case wobjInitNoTemp:
+            lpErrorMsg = T_WOBJINIT_NOTEMP;
+            break;
+
+        case wobjInitNoWinDir:
+            lpErrorMsg = T_WOBJINIT_NOWINDIR;
+            break;
+
+        case wobjInitNoSys32Dir:
+            lpErrorMsg = T_WOBJINIT_NOSYS32DIR;
+            break;
+
+        case wobjInitNoProgDir:
+            lpErrorMsg = T_WOBJINIT_NOPROGDIR;
+            break;
+
+        default:
+            lpErrorMsg = TEXT("Unknown initialization error");
+            break;
+        }
+        MessageBox(hDesktopWnd, lpErrorMsg, NULL, MB_ICONERROR);
         return ERROR_APP_INIT_FAILURE;
-
-    case wobjInitNoTemp:
-        MessageBox(hDesktopWnd, T_WOBJINIT_NOTEMP, NULL, MB_ICONERROR);
-        return ERROR_APP_INIT_FAILURE;
-
-    case wobjInitNoWinDir:
-        MessageBox(hDesktopWnd, T_WOBJINIT_NOWINDIR, NULL, MB_ICONERROR);
-        return ERROR_APP_INIT_FAILURE;
-
-    case wobjInitNoSys32Dir:
-        MessageBox(hDesktopWnd, T_WOBJINIT_NOSYS32DIR, NULL, MB_ICONERROR);
-        return ERROR_APP_INIT_FAILURE;
-
-    case wobjInitNoProgDir:
-        MessageBox(hDesktopWnd, T_WOBJINIT_NOPROGDIR, NULL, MB_ICONERROR);
-        return ERROR_APP_INIT_FAILURE;
-
-    default:
-        break;
     }
 
     //
@@ -1139,7 +1183,7 @@ UINT WinObjExMain()
 
         wndClass.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
         wndClass.lpszMenuName = MAKEINTRESOURCE(IDR_MAINMENU);
-        wndClass.lpszClassName = MAINWINDOWCLASSNAME;
+        wndClass.lpszClassName = WINOBJEX64_WNDCLASS;
         wndClass.hIconSm = 0;
 
         classAtom = RegisterClassEx(&wndClass);
@@ -1168,8 +1212,8 @@ UINT WinObjExMain()
             WS_VISIBLE | WS_OVERLAPPEDWINDOW,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            SCALE_DPI_VALUE(800),
-            SCALE_DPI_VALUE(600),
+            SCALE_DPI_VALUE(800, g_WinObj.CurrentDPI),
+            SCALE_DPI_VALUE(600, g_WinObj.CurrentDPI),
             NULL,
             NULL,
             g_WinObj.hInstance,
@@ -1200,7 +1244,7 @@ UINT WinObjExMain()
             0,
             0,
             MainWindow,
-            NULL,
+            (HMENU)1001,
             g_WinObj.hInstance,
             NULL);
 
@@ -1273,6 +1317,8 @@ UINT WinObjExMain()
             break;
         }
 
+        SendMessage(hwndToolBar, TB_SETEXTENDEDSTYLE, 0, TBSTYLE_EX_DOUBLEBUFFER);
+
         //
         // Spliter window.
         //
@@ -1299,8 +1345,9 @@ UINT WinObjExMain()
         // Initialization of views.
         //
         SendMessage(MainWindow, WM_SIZE, 0, 0);
+
         ListView_SetExtendedListViewStyle(g_hwndObjectList,
-            LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_LABELTIP | LVS_EX_DOUBLEBUFFER);
+            LVS_EX_FULLROWSELECT | LVS_EX_LABELTIP | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES);
 
         //
         // Apply Window theme.
@@ -1407,7 +1454,7 @@ UINT WinObjExMain()
             g_WinObj.hInstance,
             MAKEINTRESOURCE(IDB_BITMAP1),
             16,
-            7,
+            8,
             CLR_DEFAULT,
             IMAGE_BITMAP,
             LR_CREATEDIBSECTION);
@@ -1421,6 +1468,8 @@ UINT WinObjExMain()
         if (hMenu && g_ToolBarMenuImages) {
             supSetMenuIcon(hMenu, ID_VIEW_REFRESH,
                 (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 1));
+            supSetMenuIcon(hMenu, ID_VIEW_DISPLAYGRID,
+                (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 7));
         }
         hMenu = GetSubMenu(GetMenu(MainWindow), IDMM_OBJECT);
         if (hMenu && g_ListViewImages) {
@@ -1485,7 +1534,7 @@ UINT WinObjExMain()
 
         hAccTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
 
-        PluginManagerCreate(MainWindow);
+        PmCreate(MainWindow);
 
         //
         // Create ObjectList columns.
@@ -1538,7 +1587,7 @@ UINT WinObjExMain()
     if (g_TreeListAtom != 0)
         UnregisterClass(MAKEINTATOM(g_TreeListAtom), g_WinObj.hInstance);
 
-    PluginManagerDestroy();
+    PmDestroy();
 
     //do not move anywhere
 

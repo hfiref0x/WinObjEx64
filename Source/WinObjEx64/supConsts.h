@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUPCONSTS.H
 *
-*  VERSION:     1.83
+*  VERSION:     1.87
 *
-*  DATE:        13 Dec 2019
+*  DATE:        25 July 2020
 *
 *  Consts header file for support unit.
 *
@@ -33,5 +33,18 @@
 
 #define HHCTRLOCX                   L"hhctrl.ocx"
 
+#define T_WINSTA_SYSTEM L"-0x0-3e7$"
+#define T_WINSTA_ANONYMOUS L"-0x0-3e6$"
+#define T_WINSTA_LOCALSERVICE L"-0x0-3e5$"
+#define T_WINSTA_NETWORK_SERVICE L"-0x0-3e4$"
+
 #define supServicesRegPath          L"System\\CurrentControlSet\\Services\\"
 #define supServicesRegPathSize      sizeof(supServicesRegPath) - sizeof(WCHAR)
+
+#define MAX_KNOWN_WINSTA_DESCRIPTIONS 4
+static WINSTA_DESC g_WinstaDescArray[MAX_KNOWN_WINSTA_DESCRIPTIONS] = {
+    { T_WINSTA_SYSTEM, L"System" },
+    { T_WINSTA_ANONYMOUS, L"Anonymous" },
+    { T_WINSTA_LOCALSERVICE, L"Local Service" },
+    { T_WINSTA_NETWORK_SERVICE, L"Network Service" }
+};

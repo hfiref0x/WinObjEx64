@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.02
 *
-*  DATE:        12 Dec 2019
+*  DATE:        29 June 2019
 *
 *  Common header file for the Windows Object Explorer ApiSetView plugin.
 *
@@ -27,6 +27,7 @@
 
 #define OEMRESOURCE
 #include <Windows.h>
+#include <windowsx.h>
 #include <strsafe.h>
 #include <commctrl.h>
 #include <commdlg.h>

@@ -19,6 +19,9 @@
     <Filter Include="minirtl">
       <UniqueIdentifier>{cf71df74-886f-4e59-9549-bb7a5f08bd19}</UniqueIdentifier>
     </Filter>
+    <Filter Include="ntos">
+      <UniqueIdentifier>{cdc2911e-e806-4308-b367-3e794c15d6a0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.c">
@@ -48,6 +51,15 @@
     <ClCompile Include="..\..\Shared\minirtl\hextou64.c">
       <Filter>minirtl</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Shared\ntos\ntsup.c">
+      <Filter>ntos</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Shared\minirtl\_strcmpi.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Shared\minirtl\_strncmp.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h">
@@ -73,6 +85,12 @@
     </ClInclude>
     <ClInclude Include="..\..\Shared\treelist\treelist.h">
       <Filter>treelist</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Shared\ntos\ntos.h">
+      <Filter>ntos</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Shared\ntos\ntsup.h">
+      <Filter>ntos</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

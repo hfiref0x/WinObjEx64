@@ -232,13 +232,13 @@ void ListApiSetV2(
     _In_ HTREEITEM RootItem
 )
 {
-    API_SET_NAMESPACE_ARRAY_V2 *Namespace = (API_SET_NAMESPACE_ARRAY_V2*)ApiSetMap;
+    API_SET_NAMESPACE_ARRAY_V2* Namespace = (API_SET_NAMESPACE_ARRAY_V2*)ApiSetMap;
 
     ULONG i, j;
 
-    API_SET_NAMESPACE_ENTRY_V2 *NsEntry;
-    API_SET_VALUE_ARRAY_V2 *ValuesArray;
-    API_SET_VALUE_ENTRY_V2 *ValueEntry;
+    API_SET_NAMESPACE_ENTRY_V2* NsEntry;
+    API_SET_VALUE_ARRAY_V2* ValuesArray;
+    API_SET_VALUE_ENTRY_V2* ValueEntry;
 
     HTREEITEM hSubItem;
 
@@ -288,13 +288,13 @@ void ListApiSetV4(
     _In_ HTREEITEM RootItem
 )
 {
-    API_SET_NAMESPACE_ARRAY_V4 *Namespace = (API_SET_NAMESPACE_ARRAY_V4*)ApiSetMap;
+    API_SET_NAMESPACE_ARRAY_V4* Namespace = (API_SET_NAMESPACE_ARRAY_V4*)ApiSetMap;
 
     ULONG i, j;
 
-    API_SET_NAMESPACE_ENTRY_V4 *NsEntry;
-    API_SET_VALUE_ARRAY_V4 *ValuesArray;
-    API_SET_VALUE_ENTRY_V4 *ValueEntry;
+    API_SET_NAMESPACE_ENTRY_V4* NsEntry;
+    API_SET_VALUE_ARRAY_V4* ValuesArray;
+    API_SET_VALUE_ENTRY_V4* ValueEntry;
 
     HTREEITEM hSubItem;
 
@@ -344,12 +344,12 @@ void ListApiSetV6(
     _In_ HTREEITEM RootItem
 )
 {
-    API_SET_NAMESPACE_ARRAY_V6 *Namespace = (API_SET_NAMESPACE_ARRAY_V6*)ApiSetMap;
+    API_SET_NAMESPACE_ARRAY_V6* Namespace = (API_SET_NAMESPACE_ARRAY_V6*)ApiSetMap;
 
     ULONG i, j;
 
-    API_SET_NAMESPACE_ENTRY_V6 *NsEntry;
-    API_SET_VALUE_ENTRY_V6 *ValueEntry;
+    API_SET_NAMESPACE_ENTRY_V6* NsEntry;
+    API_SET_VALUE_ENTRY_V6* ValueEntry;
 
     HTREEITEM hSubItem;
 
@@ -510,9 +510,9 @@ VOID ListApiSetFromFileWorker(
         // Check supported schema version.
         //
         SchemaVersion = *(ULONG*)DataPtr;
-        if (SchemaVersion != 2 && 
-            SchemaVersion != 4 
-            && SchemaVersion != 6) 
+        if (SchemaVersion != 2 &&
+            SchemaVersion != 4
+            && SchemaVersion != 6)
         {
             StringCchPrintf(szBuffer, MAX_PATH,
                 TEXT("ApiSetView: Unknown schema version %lu"), SchemaVersion);
@@ -575,7 +575,7 @@ VOID ListApiSetFromFileWorker(
                 RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
 
                 StringCchPrintf(
-                    szBuffer, 
+                    szBuffer,
                     MAX_PATH,
                     TEXT("ApiSetView: Exception %lu thrown while processing apiset, schema version %lu"),
                     GetExceptionCode(),
@@ -614,7 +614,7 @@ VOID ListApiSetFromFile(
     DWORD dwThreadId;
 
     hThread = CreateThread(
-        NULL, 
+        NULL,
         0,
         (LPTHREAD_START_ROUTINE)ListApiSetFromFileWorker,
         lpFileName,

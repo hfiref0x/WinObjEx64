@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019
+*  (C) COPYRIGHT AUTHORS, 2019 - 2020
 *
 *  TITLE:       UI.H
 *
 *  VERSION:     1.01
 *
-*  DATE:        02 Nov 2019
+*  DATE:        10 July 2020
 *
 *  WinObjEx64 ApiSetView UI constants, definitions and includes.
 *
@@ -44,4 +44,4 @@ typedef struct _TL_SUBITEMS_FIXED {
     PVOID       UserParam;
     ULONG       Count;
     LPTSTR      Text[2];
-} TL_SUBITEMS_FIXED, *PTL_SUBITEMS_FIXED;
+} TL_SUBITEMS_FIXED, * PTL_SUBITEMS_FIXED;

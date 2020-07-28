@@ -4,9 +4,9 @@
 *
 *  TITLE:       LIST.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.87
 *
-*  DATE:        05 Jan 2020
+*  DATE:        22 July 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -316,7 +316,7 @@ VOID AddListViewItem(
     
     case OBTYPE_HASH_SYMBOLIC_LINK:
         
-        bFound = supQueryLinkTarget(RootDirectoryHandle,
+        bFound = ntsupResolveSymbolicLink(RootDirectoryHandle,
             &DirectoryObjectEntry->Name,
             szBuffer,
             MAX_PATH * sizeof(WCHAR));

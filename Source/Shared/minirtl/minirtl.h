@@ -9,6 +9,8 @@ Date:
 	1 Dec 2018
 */
 
+#pragma once
+
 #ifndef _MINIRTL_
 #define _MINIRTL_
 

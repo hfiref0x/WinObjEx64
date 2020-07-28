@@ -4,9 +4,9 @@
 *
 *  TITLE:       OBJECTS.H
 *
-*  VERSION:     1.83
+*  VERSION:     1.87
 *
-*  DATE:        05 Jan 2020
+*  DATE:        04 July 2020
 *
 *  Header file for internal Windows object types handling.
 *
@@ -140,6 +140,12 @@ typedef struct _WOBJ_TYPE_DESC {
 #define OBTYPE_HASH_WINSTATION      0x1551ade4
 #define OBTYPE_HASH_TYPE            0x8041ee9a
 #define OBTYPE_HASH_DIRECTORY       0xa4531c4d
+
+//
+// For plugins support.
+//
+#define ObjectTypeAnyType 0xfe
+#define ObjectTypeNone 0xff
 
 //
 // Unused id's

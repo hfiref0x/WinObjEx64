@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.86
+*  VERSION:     1.87
 *
-*  DATE:        29 May 2020
+*  DATE:        23 July 2020
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -70,6 +70,12 @@ typedef struct _OBHEADER_COOKIE {
     BOOLEAN Valid;
 } OBHEADER_COOKIE, * POBHEADER_COOKIE;
 
+typedef struct _KSE_ENGINE_DUMP {
+    BOOLEAN Valid;
+    ULONG_PTR KseAddress;
+    LIST_ENTRY ShimmedDriversDumpListHead;
+} KSE_ENGINE_DUMP, * PKSE_ENGINE_DUMP;
+
 typedef struct _KLDBGCONTEXT {
 
     //Is user full admin
@@ -120,6 +126,9 @@ typedef struct _KLDBGCONTEXT {
 
     //object list lock
     CRITICAL_SECTION ObCollectionLock;
+
+    //kernel shim engine dump and auxl ptrs
+    KSE_ENGINE_DUMP KseEngineDump;
 
 } KLDBGCONTEXT, *PKLDBGCONTEXT;
 
@@ -205,8 +214,8 @@ typedef struct _OBJREF {
 // Windows 10 20H2
 #define NT_WIN10_20H2           19042
 
-// Windows 10 Active Develepment Branch
-#define NTX_WIN10_ADB           19635
+// Windows 10 Active Develepment Branch (21H1)
+#define NTX_WIN10_ADB           20170
 
 //
 // Defines for boundary descriptors
@@ -314,6 +323,11 @@ PVOID ObDumpDeviceMapVersionAware(
     _Out_ PULONG Size,
     _Out_ PULONG Version);
 
+PVOID ObDumpDriverExtensionVersionAware(
+    _In_ ULONG_PTR ObjectAddress,
+    _Out_ PULONG Size,
+    _Out_ PULONG Version);
+
 POBJINFO ObQueryObject(
     _In_ LPWSTR lpDirectory,
     _In_ LPWSTR lpObjectName);
@@ -400,9 +414,6 @@ BOOL kdpReadSystemMemoryEx(
 VOID kdInit(
     _In_ BOOL IsFullAdmin);
 
-BOOL kdIsDebugBoot(
-    VOID);
-
 VOID kdShutdown(
     VOID);
 
@@ -416,6 +427,10 @@ VOID kdReportReadError(
 UCHAR kdGetInstructionLength(
     _In_ PVOID ptrCode,
     _Out_ PULONG ptrFlags);
+
+BOOLEAN kdQueryKernelShims(
+    _In_ PKLDBGCONTEXT Context,
+    _In_ BOOLEAN RefreshList);
 
 /*
 * ObGetObjectFastReference

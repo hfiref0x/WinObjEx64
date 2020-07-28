@@ -4,9 +4,9 @@
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     1.86
+*  VERSION:     1.87
 *
-*  DATE:        26 May 2020
+*  DATE:        23 July 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -156,7 +156,7 @@ VOID AboutDialogInit(
         //
         // Query KD debugger enabled.
         //
-        if (kdIsDebugBoot()) {
+        if (ntsupIsKdEnabled(NULL, NULL)) {
             _strcpy(szBuffer, TEXT("Debug, "));
         }
 
@@ -203,15 +203,13 @@ VOID AboutDialogInit(
                 }
                 g_kdctx.IsSecureBoot = bSecureBoot;
 
-                if (bSecureBoot) {
-                    if (supQueryHVCIState(&bHVCIEnabled, &bHVCIStrict, &bHVCIIUMEnabled)) {
-                        if (bHVCIEnabled) {
-                            _strcat(szBuffer, TEXT(", HVCI"));
-                            if (bHVCIStrict)
-                                _strcat(szBuffer, TEXT(" (strict)"));
-                            if (bHVCIIUMEnabled)
-                                _strcat(szBuffer, TEXT(", IUM"));
-                        }
+                if (supQueryHVCIState(&bHVCIEnabled, &bHVCIStrict, &bHVCIIUMEnabled)) {
+                    if (bHVCIEnabled) {
+                        _strcat(szBuffer, TEXT(", HVCI"));
+                        if (bHVCIStrict)
+                            _strcat(szBuffer, TEXT(" (strict)"));
+                        if (bHVCIIUMEnabled)
+                            _strcat(szBuffer, TEXT(", IUM"));
                     }
                 }
             }
@@ -698,7 +696,7 @@ LRESULT CALLBACK GlobalsWindowProc(
         break;
 
     case WM_COMMAND:
-        switch (LOWORD(wParam)) {
+        switch (GET_WM_COMMAND_ID(wParam, lParam)) {
         case IDC_GLOBALS_COPY:
             GlobalsCopyToClipboard(hwnd);
             break;
@@ -765,7 +763,7 @@ INT_PTR CALLBACK AboutDialogProc(
 
     case WM_COMMAND:
 
-        switch (LOWORD(wParam)) {
+        switch (GET_WM_COMMAND_ID(wParam, lParam)) {
         case IDOK:
         case IDCANCEL:
             return EndDialog(hwndDlg, S_OK);

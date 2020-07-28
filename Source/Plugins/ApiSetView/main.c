@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.H
 *
-*  VERSION:     1.02
+*  VERSION:     1.03
 *
-*  DATE:        12 Dec 2019
+*  DATE:        29 June 2020
 *
 *  WinObjEx64 ApiSetView plugin.
 *
@@ -22,12 +22,12 @@
 //
 // Plugin entry.
 //
-WINOBJEX_PLUGIN *g_Plugin;
+WINOBJEX_PLUGIN* g_Plugin = NULL;
 
-HINSTANCE g_ThisDLL;
-BOOL g_PluginQuit = FALSE;
-
+HINSTANCE g_ThisDLL = NULL;
 GUI_CONTEXT g_ctx;
+
+volatile BOOL g_PluginQuit = FALSE;
 
 /*
 * OpenDialogExecute
@@ -135,20 +135,20 @@ VOID HandleSearchSchema(
 }
 
 /*
-* HandleWMNotify
+* PluginHandleWMNotify
 *
 * Purpose:
 *
 * Main window WM_NOTIFY handler.
 *
 */
-VOID HandleWMNotify(
+VOID PluginHandleWMNotify(
     _In_ HWND   hwndDlg,
     _In_ WPARAM wParam,
     _In_ LPARAM lParam
 )
 {
-    TL_SUBITEMS_FIXED *subitems;
+    TL_SUBITEMS_FIXED* subitems;
     LPNMHDR hdr = (LPNMHDR)lParam;
 
     UNREFERENCED_PARAMETER(wParam);
@@ -230,7 +230,7 @@ VOID CenterWindow(
 */
 BOOL InitTreeList(
     _In_ HWND hwndParent,
-    _Out_ HWND *pTreeListHwnd
+    _Out_ HWND* pTreeListHwnd
 )
 {
     HWND     TreeList;
@@ -244,7 +244,7 @@ BOOL InitTreeList(
         return FALSE;
     }
 
-    uDpi = g_ctx.ParamBlock.uiGetDPIValue(NULL);
+    uDpi = g_ctx.ParamBlock.CurrentDPI;
     dpiScaledX = MulDiv(10, uDpi, DefaultSystemDpi);
     dpiScaledY = dpiScaledX;
 
@@ -256,7 +256,7 @@ BOOL InitTreeList(
     iScaledHeight = (rc.bottom - rc.top) - dpiScaledY - iScaleSubY;
 
     TreeList = CreateWindowEx(WS_EX_CLIENTEDGE, WC_TREELIST, NULL,
-        WS_VISIBLE | WS_CHILD | WS_TABSTOP | TLSTYLE_COLAUTOEXPAND | TLSTYLE_LINKLINES, 
+        WS_VISIBLE | WS_CHILD | WS_TABSTOP | TLSTYLE_COLAUTOEXPAND | TLSTYLE_LINKLINES,
         dpiScaledX, dpiScaledY,
         iScaledWidth, iScaledHeight, hwndParent, NULL, NULL, NULL);
 
@@ -284,14 +284,14 @@ BOOL InitTreeList(
 }
 
 /*
-* AsWindowDialogProc
+* PluginDialogProc
 *
 * Purpose:
 *
 * Main plugin window procedure.
 *
 */
-INT_PTR CALLBACK AsWindowDialogProc(
+INT_PTR CALLBACK PluginDialogProc(
     _In_ HWND   hwndDlg,
     _In_ UINT   uMsg,
     _In_ WPARAM wParam,
@@ -309,7 +309,7 @@ INT_PTR CALLBACK AsWindowDialogProc(
         g_ctx.MainWindow = hwndDlg;
 
         hImage = LoadImage(
-            g_ctx.ParamBlock.hInstance,
+            g_ctx.ParamBlock.Instance,
             MAKEINTRESOURCE(WINOBJEX64_ICON_MAIN),
             IMAGE_ICON,
             0,
@@ -344,7 +344,7 @@ INT_PTR CALLBACK AsWindowDialogProc(
         break;
 
     case WM_NOTIFY:
-        HandleWMNotify(
+        PluginHandleWMNotify(
             hwndDlg,
             wParam,
             lParam);
@@ -352,7 +352,7 @@ INT_PTR CALLBACK AsWindowDialogProc(
 
     case WM_COMMAND:
 
-        switch (LOWORD(wParam)) {
+        switch (GET_WM_COMMAND_ID(wParam, lParam)) {
         case IDC_SEARCH_BUTTON:
             HandleSearchSchema(hwndDlg);
             break;
@@ -369,10 +369,10 @@ INT_PTR CALLBACK AsWindowDialogProc(
 
         case IDOK:
         case IDCANCEL:
-            g_PluginQuit = TRUE;
+            InterlockedExchange((LONG*)&g_PluginQuit, TRUE);
             PostQuitMessage(0);
             return EndDialog(hwndDlg, S_OK);
-            break;
+
         default:
             break;
         }
@@ -398,7 +398,8 @@ VOID PluginFreeGlobalResources()
         g_ctx.PluginHeap = NULL;
     }
 
-    g_Plugin->StateChangeCallback(g_Plugin, PluginStopped, NULL);
+    if (g_Plugin->StateChangeCallback)
+        g_Plugin->StateChangeCallback(g_Plugin, PluginStopped, NULL);
 }
 
 /*
@@ -428,7 +429,7 @@ DWORD WINAPI PluginThread(
         g_ThisDLL,
         MAKEINTRESOURCE(IDD_ASDIALOG),
         NULL,
-        AsWindowDialogProc,
+        PluginDialogProc,
         0);
 
     do {
@@ -440,7 +441,7 @@ DWORD WINAPI PluginThread(
         TranslateMessage(&msg1);
         DispatchMessage(&msg1);
 
-    } while ((rv != 0) || (g_PluginQuit == FALSE));
+    } while ((rv != 0) && (g_PluginQuit == FALSE));
 
     PluginFreeGlobalResources();
 
@@ -463,6 +464,8 @@ NTSTATUS CALLBACK StartPlugin(
     NTSTATUS Status;
     WINOBJEX_PLUGIN_STATE State = PluginInitialization;
 
+    InterlockedExchange((PLONG)&g_PluginQuit, FALSE);
+
     RtlSecureZeroMemory(&g_ctx, sizeof(g_ctx));
 
     g_ctx.PluginHeap = HeapCreate(0, 0, 0);
@@ -479,6 +482,8 @@ NTSTATUS CALLBACK StartPlugin(
     }
     else {
         Status = STATUS_UNSUCCESSFUL;
+        HeapDestroy(g_ctx.PluginHeap);
+        g_ctx.PluginHeap = NULL;
     }
 
     if (NT_SUCCESS(Status))
@@ -486,7 +491,8 @@ NTSTATUS CALLBACK StartPlugin(
     else
         State = PluginError;
 
-    g_Plugin->StateChangeCallback(g_Plugin, State, NULL);
+    if (g_Plugin->StateChangeCallback)
+        g_Plugin->StateChangeCallback(g_Plugin, State, NULL);
 
     return Status;
 }
@@ -504,13 +510,15 @@ void CALLBACK StopPlugin(
 )
 {
     if (g_ctx.WorkerThread) {
-        InterlockedExchange((PLONG)&g_PluginQuit, 1);
+        InterlockedExchange((PLONG)&g_PluginQuit, TRUE);//force stop
         if (WaitForSingleObject(g_ctx.WorkerThread, 1000) == WAIT_TIMEOUT) {
             TerminateThread(g_ctx.WorkerThread, 0);
         }
         CloseHandle(g_ctx.WorkerThread);
         g_ctx.WorkerThread = NULL;
-        g_Plugin->StateChangeCallback(g_Plugin, PluginStopped, NULL);
+
+        if (g_Plugin->StateChangeCallback)
+            g_Plugin->StateChangeCallback(g_Plugin, PluginStopped, NULL);
     }
 }
 
@@ -523,14 +531,33 @@ void CALLBACK StopPlugin(
 *
 */
 BOOLEAN CALLBACK PluginInit(
-    _Out_ PWINOBJEX_PLUGIN PluginData
+    _Inout_ PWINOBJEX_PLUGIN PluginData
 )
 {
+    if (g_Plugin)
+        return FALSE;
+
     __try {
         //
         // Set plugin name to be displayed in WinObjEx64 UI.
         //
-        StringCbCopy(PluginData->Description, sizeof(PluginData->Description), TEXT("ApiSetView"));
+        StringCbCopy(PluginData->Name, sizeof(PluginData->Name), TEXT("ApiSetSchema Viewer"));
+
+        //
+        // Set authors.
+        //
+        StringCbCopy(PluginData->Authors, sizeof(PluginData->Authors), TEXT("UG North"));
+
+        //
+        // Set plugin description.
+        //
+        StringCbCopy(PluginData->Description, sizeof(PluginData->Description), 
+            TEXT("A simple viewer for ApiSet schema."));
+
+        //
+        // Set required plugin system version.
+        //
+        PluginData->RequiredPluginSystemVersion = WOBJ_PLUGIN_SYSTEM_VERSION;
 
         //
         // Setup start/stop plugin callbacks.
@@ -546,7 +573,13 @@ BOOLEAN CALLBACK PluginInit(
         PluginData->NeedDriver = FALSE;
 
         PluginData->MajorVersion = 1;
-        PluginData->MinorVersion = 0;
+        PluginData->MinorVersion = 1;
+
+        //
+        // Set plugin type.
+        //
+        PluginData->Type = DefaultPlugin;
+
         g_Plugin = PluginData;
 
         return TRUE;

@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPN.C
 *
-*  VERSION:     1.85
+*  VERSION:     1.87
 *
-*  DATE:        13 Mar 2020
+*  DATE:        28 June 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -772,7 +772,7 @@ INT_PTR CALLBACK PNDialogProc(
 
     case WM_COMMAND:
 
-        switch (LOWORD(wParam)) {
+        switch (GET_WM_COMMAND_ID(wParam, lParam)) {
 
         case IDCANCEL:
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);

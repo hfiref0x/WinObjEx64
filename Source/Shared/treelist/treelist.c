@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       TREELIST.C
 *
-*  VERSION:     1.29
+*  VERSION:     1.30
 *
-*  DATE:        24 Nov 2019
+*  DATE:        22 July 2020
 *
 *  TreeList control.
 *
@@ -558,8 +558,8 @@ LRESULT CALLBACK TreeListHookProc(
         break;
 
     case WM_PAINT:
-
-        TreeListUpdateTooltips(BaseWindow);
+        if (!IsWindowVisible((HWND)GetWindowLongPtr(BaseWindow, TL_TOOLTIPS_SLOT)))
+            TreeListUpdateTooltips(BaseWindow);
         break;
     }
 

@@ -2,11 +2,11 @@
 *
 *  (C) COPYRIGHT AUTHORS, 2019 - 2020
 *
-*  TITLE:       MAIN.H
+*  TITLE:       MAIN.C
 *
-*  VERSION:     1.00
+*  VERSION:     1.01
 *
-*  DATE:        29 May 2020
+*  DATE:        27 June 2020
 *
 *  WinObjEx64 example and test plugin.
 *
@@ -27,10 +27,11 @@
 #include "ntos/ntos.h"
 #include "plugin_def.h"
 
-BOOL g_StopPlugin = FALSE;
+volatile BOOL g_StopPlugin = FALSE;
 HANDLE g_hThread = NULL;
 WINOBJEX_PARAM_BLOCK g_ParamBlock;
-WINOBJEX_PLUGIN *g_Plugin;
+WINOBJEX_PLUGIN* g_Plugin = NULL;
+HINSTANCE g_ThisDLL = NULL;
 
 /*
 * PluginThread
@@ -49,9 +50,11 @@ DWORD WINAPI PluginThread(
     MessageBox(GetDesktopWindow(), TEXT("This is message from example plugin, plugin will stop in 5 sec."), TEXT("ExamplePlugin"), MB_ICONINFORMATION);
 
     Sleep(5000);
-    g_StopPlugin = TRUE;
+    InterlockedExchange((PLONG)&g_StopPlugin, TRUE);
 
-    g_Plugin->StateChangeCallback(g_Plugin, PluginStopped, NULL);
+    if (g_Plugin->StateChangeCallback)
+        g_Plugin->StateChangeCallback(g_Plugin, PluginStopped, NULL);
+
     ExitThread(0);
 }
 
@@ -74,7 +77,7 @@ NTSTATUS CALLBACK StartPlugin(
     DbgPrint("StartPlugin called from thread 0x%lx\r\n", GetCurrentThreadId());
 
     RtlCopyMemory(&g_ParamBlock, ParamBlock, sizeof(WINOBJEX_PARAM_BLOCK));
-    g_StopPlugin = FALSE;
+    InterlockedExchange((PLONG)&g_StopPlugin, FALSE);
     g_hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)PluginThread, (PVOID)NULL, 0, &ThreadId);
     if (g_hThread) {
         Status = STATUS_SUCCESS;
@@ -88,7 +91,8 @@ NTSTATUS CALLBACK StartPlugin(
     else
         State = PluginError;
 
-    g_Plugin->StateChangeCallback(g_Plugin, State, NULL);
+    if (g_Plugin->StateChangeCallback)
+        g_Plugin->StateChangeCallback(g_Plugin, State, NULL);
 
     return Status;
 }
@@ -108,17 +112,19 @@ void CALLBACK StopPlugin(
     DbgPrint("StopPlugin called from thread 0x%lx\r\n", GetCurrentThreadId());
 
     if (g_hThread) {
-        InterlockedExchange((PLONG)&g_StopPlugin, 1);
+        InterlockedExchange((PLONG)&g_StopPlugin, TRUE);
         if (WaitForSingleObject(g_hThread, 1000) == WAIT_TIMEOUT) {
             DbgPrint("Wait timeout, terminating plugin thread, g_hTread = %llx\r\n", g_hThread);
             TerminateThread(g_hThread, 0);
         }
         else {
-            DbgPrint("Wait success, plugin thread stoped, g_Thread = %llx\r\n", g_hThread);
+            DbgPrint("Wait success, plugin thread stopped, g_Thread = %llx\r\n", g_hThread);
         }
         CloseHandle(g_hThread);
         g_hThread = NULL;
-        g_Plugin->StateChangeCallback(g_Plugin, PluginStopped, NULL);
+
+        if (g_Plugin->StateChangeCallback)
+            g_Plugin->StateChangeCallback(g_Plugin, PluginStopped, NULL);
     }
 }
 
@@ -131,14 +137,33 @@ void CALLBACK StopPlugin(
 *
 */
 BOOLEAN CALLBACK PluginInit(
-    _Out_ PWINOBJEX_PLUGIN PluginData
+    _Inout_ PWINOBJEX_PLUGIN PluginData
 )
 {
+    if (g_Plugin)
+        return FALSE;
+
     __try {
         //
         // Set plugin name to be displayed in WinObjEx64 UI.
         //
-        StringCbCopy(PluginData->Description, sizeof(PluginData->Description), TEXT("ExamplePlugin"));
+        StringCbCopy(PluginData->Name, sizeof(PluginData->Name), TEXT("Example Plugin"));
+
+        //
+        // Set authors.
+        //
+        StringCbCopy(PluginData->Authors, sizeof(PluginData->Authors), TEXT("UG North"));
+
+        //
+        // Set plugin description.
+        //
+        StringCbCopy(PluginData->Description, sizeof(PluginData->Description), 
+            TEXT("WinObjEx64 example plugin."));
+
+        //
+        // Set required plugin system version.
+        //
+        PluginData->RequiredPluginSystemVersion = WOBJ_PLUGIN_SYSTEM_VERSION;
 
         //
         // Setup start/stop plugin callbacks.
@@ -154,7 +179,13 @@ BOOLEAN CALLBACK PluginInit(
         PluginData->NeedDriver = FALSE;
 
         PluginData->MajorVersion = 1;
-        PluginData->MinorVersion = 0;
+        PluginData->MinorVersion = 1;
+
+        //
+        // Set plugin type.
+        //
+        PluginData->Type = DefaultPlugin;
+
         g_Plugin = PluginData;
 
         return TRUE;
@@ -182,6 +213,7 @@ BOOL WINAPI DllMain(
     UNREFERENCED_PARAMETER(lpvReserved);
 
     if (fdwReason == DLL_PROCESS_ATTACH) {
+        g_ThisDLL = hinstDLL;
         DisableThreadLibraryCalls(hinstDLL);
     }
     return TRUE;

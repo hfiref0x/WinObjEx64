@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
-*  VERSION:     1.85
+*  VERSION:     1.87
 *
-*  DATE:        13 Mar 2020
+*  DATE:        27 June 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -18,13 +18,52 @@
 #include "extras.h"
 
 EXTRASCONTEXT DrvDlgContext;
+BOOLEAN g_DrvDlgShimsEnabled = FALSE;
+
+#define ID_DRVLIST_DUMP     40001
+#define ID_DRVLIST_SAVE     40002
+#define ID_DRVLIST_PROP     ID_OBJECT_PROPERTIES
+#define ID_DRVLIST_REFRESH  ID_VIEW_REFRESH
+
+#define DRVLIST_FILENAME_COLUMN_INDEX 4
+
+
+/*
+* DrvUpdateStatusBar
+*
+* Purpose:
+*
+* Update status bar information.
+*
+*/
+VOID DrvUpdateStatusBar(
+    _In_ INT iItem)
+{
+    WCHAR szBuffer[MAX_PATH + 1];
+
+    _strcpy(szBuffer, TEXT("Total: "));
+    ultostr(ListView_GetItemCount(DrvDlgContext.ListView), _strend(szBuffer));
+    supStatusBarSetText(DrvDlgContext.StatusBar, 0, (LPWSTR)&szBuffer);
+
+    if (iItem >= 0) {
+
+        supGetItemText2(
+            DrvDlgContext.ListView,
+            iItem,
+            1,
+            szBuffer,
+            MAX_PATH);
+
+        supStatusBarSetText(DrvDlgContext.StatusBar, 1, (LPWSTR)&szBuffer);
+    }
+}
 
 /*
 * DrvHandlePopupMenu
 *
 * Purpose:
 *
-* Table list popup construction
+* Table list popup construction.
 *
 */
 VOID DrvHandlePopupMenu(
@@ -33,16 +72,52 @@ VOID DrvHandlePopupMenu(
 {
     POINT pt1;
     HMENU hMenu;
-
-    if (!kdConnectDriver())
-        return;
+    UINT iPos = 0;
 
     if (GetCursorPos(&pt1)) {
         hMenu = CreatePopupMenu();
         if (hMenu) {
-            InsertMenu(hMenu, 0, MF_BYCOMMAND, ID_OBJECT_COPY, T_DUMPDRIVER);
+            InsertMenu(hMenu, iPos++, MF_BYCOMMAND, ID_DRVLIST_PROP, T_PROPERTIES);
+            InsertMenu(hMenu, iPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+            if (kdConnectDriver()) {
+                InsertMenu(hMenu, iPos++, MF_BYCOMMAND, ID_DRVLIST_DUMP, T_DUMPDRIVER);
+            }
+            InsertMenu(hMenu, iPos++, MF_BYCOMMAND, ID_JUMPTOFILE, T_JUMPTOFILE);
+            InsertMenu(hMenu, iPos++, MF_BYCOMMAND, ID_DRVLIST_SAVE, T_EXPORTTOFILE);
+            InsertMenu(hMenu, iPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+            InsertMenu(hMenu, iPos++, MF_BYCOMMAND, ID_DRVLIST_REFRESH, T_VIEW_REFRESH);
             TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, hwndDlg, NULL);
             DestroyMenu(hMenu);
+        }
+    }
+}
+
+/*
+* DrvListViewProperties
+*
+* Purpose:
+*
+* View selected driver file properties.
+*
+*/
+VOID DrvListViewProperties(
+    VOID)
+{
+    LPWSTR  lpItem;
+    INT     mark;
+    WCHAR   szBuffer[MAX_PATH + 1];
+
+    mark = ListView_GetSelectionMark(DrvDlgContext.ListView);
+    if (mark >= 0) {
+
+        lpItem = supGetItemText(DrvDlgContext.ListView, mark,
+            DRVLIST_FILENAME_COLUMN_INDEX, NULL);
+
+        if (lpItem) {
+            RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+            if (supGetWin32FileName(lpItem, szBuffer, MAX_PATH))
+                supShowProperties(DrvDlgContext.hwndDlg, szBuffer);
+            supHeapFree(lpItem);
         }
     }
 }
@@ -153,14 +228,13 @@ VOID DrvDumpDriver(
             else
                 _strcat(szBuffer, TEXT("partially successful"));
 
-            MessageBox(DrvDlgContext.hwndDlg, szBuffer, PROGRAM_NAME, MB_ICONINFORMATION);
+            supStatusBarSetText(DrvDlgContext.StatusBar, 1, (LPWSTR)&szBuffer);
         }
 
     } while (FALSE);
 
     if (lpDriverName) supHeapFree(lpDriverName);
 }
-
 
 /*
 * DrvDlgCompareFunc
@@ -198,6 +272,7 @@ INT CALLBACK DrvDlgCompareFunc(
 
     case 1: //Name
     case 4: //Module
+    case 5: //Shimmed
         return supGetMaxCompareTwoFixedStrings(
             DrvDlgContext.ListView,
             lParam1,
@@ -229,8 +304,10 @@ VOID DrvListDrivers(
     RTL_PROCESS_MODULES* pModulesList = NULL;
     PRTL_PROCESS_MODULE_INFORMATION pModule;
 
-    if (bRefresh)
+    if (bRefresh) {
         ListView_DeleteAllItems(DrvDlgContext.ListView);
+        kdQueryKernelShims(&g_kdctx, TRUE);
+    }
 
     do {
         pModulesList = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation, NULL);
@@ -301,14 +378,23 @@ VOID DrvListDrivers(
 
             lvitem.iSubItem = 4;
             ListView_SetItem(DrvDlgContext.ListView, &lvitem);
+
+            //Shimmed
+            if (g_DrvDlgShimsEnabled) {
+
+                szBuffer[0] = 0;
+
+                if (supIsDriverShimmed(pModule->ImageBase)) {
+                    _strcpy(szBuffer, TEXT("Yes"));
+                }
+
+                lvitem.iSubItem = 5;
+                ListView_SetItem(DrvDlgContext.ListView, &lvitem);
+
+            }
         }
 
-        //
-        // Update status bar.
-        //
-        _strcpy(szBuffer, TEXT("Total: "));
-        ultostr(ListView_GetItemCount(DrvDlgContext.ListView), _strend(szBuffer));
-        SetWindowText(DrvDlgContext.StatusBar, szBuffer);
+        DrvUpdateStatusBar(-1);
 
     } while (FALSE);
 
@@ -331,10 +417,7 @@ BOOL CALLBACK DriversHandleNotify(
     _In_opt_ PVOID CustomParameter
 )
 {
-    BOOL    bHandled = FALSE;
-    LPWSTR  lpItem;
-    INT     mark;
-    WCHAR   szBuffer[MAX_PATH + 1];
+    BOOL    bHandled = TRUE;
 
     UNREFERENCED_PARAMETER(CustomParameter);
 
@@ -344,22 +427,17 @@ BOOL CALLBACK DriversHandleNotify(
     if (nhdr->hdr.idFrom != ID_EXTRASLIST)
         return FALSE;
 
-#pragma warning(push)
-#pragma warning(disable: 26454)
-    if (nhdr->hdr.code == NM_DBLCLK) {
-#pragma warning(pop)
-        mark = ListView_GetSelectionMark(Context->ListView);
-        if (mark >= 0) {
-            lpItem = supGetItemText(Context->ListView, mark, 4, NULL);
-            if (lpItem) {
-                RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-                if (supGetWin32FileName(lpItem, szBuffer, MAX_PATH))
-                    supShowProperties(Context->hwndDlg, szBuffer);
-                supHeapFree(lpItem);
-            }
-        }
-
-        bHandled = TRUE;
+    switch (nhdr->hdr.code) {
+    case NM_DBLCLK:
+        DrvListViewProperties();
+        break;
+    case NM_CLICK:       
+    case LVN_ITEMCHANGED:
+        DrvUpdateStatusBar(nhdr->iItem);
+        break;
+    default:
+        bHandled = FALSE;
+        break;
     }
 
     return bHandled;
@@ -410,18 +488,36 @@ INT_PTR CALLBACK DriversDialogProc(
     case WM_CLOSE:
         DestroyWindow(hwndDlg);
         g_WinObj.AuxDialogs[wobjDriversDlgId] = NULL;
+        supDestroyShimmedDriversList(&g_kdctx.KseEngineDump.ShimmedDriversDumpListHead);
         break;
 
     case WM_COMMAND:
 
-        switch (LOWORD(wParam)) {
+        switch (GET_WM_COMMAND_ID(wParam, lParam)) {
         case IDCANCEL:
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
             break;
-        case ID_OBJECT_COPY:
+        case ID_DRVLIST_DUMP:
             DrvDumpDriver();
             break;
-        case ID_VIEW_REFRESH:
+        case ID_JUMPTOFILE:
+            supJumpToFileListView(DrvDlgContext.ListView, 4);
+            break;
+        case ID_DRVLIST_SAVE:
+
+            if (supListViewExportToFile(
+                TEXT("Drivers.csv"),
+                hwndDlg,
+                DrvDlgContext.ListView))
+            {
+                supStatusBarSetText(DrvDlgContext.StatusBar, 1, T_LIST_EXPORT_SUCCESS);
+            }
+            break;
+
+        case ID_DRVLIST_PROP:
+            DrvListViewProperties();
+            break;
+        case ID_DRVLIST_REFRESH:
             DrvListDrivers(TRUE);
             break;
         default:
@@ -452,6 +548,8 @@ VOID extrasCreateDriversDialog(
     _In_ HWND hwndParent
 )
 {
+    INT SbParts[] = { 100, -1 };
+
     //
     // Allow only one dialog.
     //
@@ -469,6 +567,7 @@ VOID extrasCreateDriversDialog(
     SetWindowText(DrvDlgContext.hwndDlg, TEXT("Drivers"));
 
     DrvDlgContext.StatusBar = GetDlgItem(DrvDlgContext.hwndDlg, ID_EXTRASLIST_STATUSBAR);
+    SendMessage(DrvDlgContext.StatusBar, SB_SETPARTS, 2, (LPARAM)&SbParts);
 
     extrasSetDlgIcon(DrvDlgContext.hwndDlg);
 
@@ -517,6 +616,23 @@ VOID extrasCreateDriversDialog(
         // Remember columns count.
         //
         DrvDlgContext.lvColumnCount = DRVLIST_COLUMN_COUNT;
+
+        //
+        // Add "Shimmed" column on supported Windows version.
+        //
+        if (g_NtBuildNumber >= NT_WIN10_THRESHOLD1) {
+
+            if (kdQueryKernelShims(&g_kdctx, FALSE)) {
+
+                supAddListViewColumn(DrvDlgContext.ListView, 5, 5, 5,
+                    I_IMAGENONE,
+                    LVCFMT_CENTER | LVCFMT_BITMAP_ON_RIGHT,
+                    TEXT("Shimmed"), 100);
+
+                g_DrvDlgShimsEnabled = TRUE;
+                DrvDlgContext.lvColumnCount = DRVLIST_COLUMN_COUNT + 1;
+            }
+        }
 
         DrvListDrivers(FALSE);
         SendMessage(DrvDlgContext.hwndDlg, WM_SIZE, 0, 0);

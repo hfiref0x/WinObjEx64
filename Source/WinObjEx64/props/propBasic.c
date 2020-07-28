@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     1.86
+*  VERSION:     1.87
 *
-*  DATE:        29 May 2020
+*  DATE:        22 July 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -510,7 +510,7 @@ VOID propSetProcessTrustLabelInfo(
 
     LPWSTR lpType = T_EmptyString, lpLevel = T_EmptyString;
 
-    WCHAR szBuffer[0x100];
+    WCHAR szBuffer[100];
 
     //
     // Re-open current object as we need READ_CONTROL.
@@ -1007,7 +1007,7 @@ VOID propBasicQuerySymlink(
 
     //
     // Copy link target from main object list for performance reasons.
-    // So we don't need to query same data again.
+    // Because we don't need to query same data again.
     //
     lpLinkTarget = Context->lpDescription;
     if (lpLinkTarget) {
@@ -1179,10 +1179,6 @@ VOID propBasicQueryMutant(
     propCloseCurrentObject(Context, hObject);
 }
 
-#ifndef IMAGE_SUBSYSTEM_XBOX_CODE_CATALOG
-#define IMAGE_SUBSYSTEM_XBOX_CODE_CATALOG 17
-#endif
-
 /*
 * propBasicQuerySection
 *
@@ -1291,8 +1287,7 @@ VOID propBasicQuerySection(
         SetDlgItemText(hwndDlg, ID_SECTIONSIZE, szBuffer);
 
         //query image information
-        if ((sbi.AllocationAttributes & SEC_IMAGE) && (sbi.AllocationAttributes & SEC_FILE)) {
-
+        if (supIsFileImageSection(sbi.AllocationAttributes)) {
             RtlSecureZeroMemory(&sii, sizeof(SECTION_IMAGE_INFORMATION));
             status = NtQuerySection(hObject, SectionImageInformation, &sii,
                 sizeof(SECTION_IMAGE_INFORMATION), &bytesNeeded);
@@ -1718,7 +1713,7 @@ VOID propBasicQueryProcess(
         // Process Command Line.
         //
         bSuccess = FALSE;
-        if (g_WinObj.osver.dwBuildNumber >= NT_WIN8_BLUE) {
+        if (g_NtBuildNumber >= NT_WIN8_BLUE) {
             //
             // Use new NtQIP info class to get command line.
             //
@@ -2900,12 +2895,7 @@ VOID propSetBasicInfo(
         if (ExtendedInfoAvailable == FALSE) {
             propBasicQueryDirectory(Context, hwndDlg);
         }
-
-        //
-        // Set process trust label information.
-        //
         propSetProcessTrustLabelInfo(Context, hwndDlg);
-
         break;
     case ObjectTypeDriver:
         propBasicQueryDriver(Context, hwndDlg);
@@ -2933,6 +2923,7 @@ VOID propSetBasicInfo(
         break;
     case ObjectTypeSection:
         propBasicQuerySection(Context, hwndDlg, ExtendedInfoAvailable);
+        propSetProcessTrustLabelInfo(Context, hwndDlg);
         break;
     case ObjectTypeWinstation:
         propBasicQueryWindowStation(Context, hwndDlg, ExtendedInfoAvailable);

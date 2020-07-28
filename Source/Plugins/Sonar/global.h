@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.03
 *
-*  DATE:        29 May 2020
+*  DATE:        30 June 2020
 *
 *  Common header file for the Windows Object Explorer Sonar plugin.
 *
@@ -27,6 +27,7 @@
 
 #define OEMRESOURCE
 #include <Windows.h>
+#include <windowsx.h>
 #include <strsafe.h>
 #include <CommCtrl.h>
 #include <Uxtheme.h>
@@ -41,6 +42,7 @@
 #include "ntos/ntos.h"
 #include "treelist/treelist.h"
 #include "minirtl/minirtl.h"
+#include "ntos/ntsup.h"
 #include "plugin_def.h"
 #include "ui.h"
 #include "resource.h"
@@ -49,7 +51,6 @@
 
 //declared in main.c
 extern SONARCONTEXT g_ctx;
-extern ULONG g_CurrentDPI;
 
 #ifdef _DEBUG
 #define kdDebugPrint(f, ...) DbgPrint(f, __VA_ARGS__)

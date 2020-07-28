@@ -26,7 +26,7 @@
     <ProjectGuid>{A68B0947-9415-4ACA-BC0A-8558A4F4FBE3}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>WinObjEx64</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.19041.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -34,14 +34,12 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <SpectreMitigation>Spectre</SpectreMitigation>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugWithDriver|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <SpectreMitigation>Spectre</SpectreMitigation>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -49,7 +47,6 @@
     <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-    <SpectreMitigation>Spectre</SpectreMitigation>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleasePrivateDriver|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -57,7 +54,6 @@
     <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-    <SpectreMitigation>Spectre</SpectreMitigation>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWinIoDriver|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -65,7 +61,6 @@
     <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-    <SpectreMitigation>Spectre</SpectreMitigation>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -379,6 +374,7 @@
     <ClCompile Include="..\Shared\minirtl\_strstr.c" />
     <ClCompile Include="..\Shared\minirtl\_strstri.c" />
     <ClCompile Include="..\Shared\ntos\ntldr.c" />
+    <ClCompile Include="..\Shared\ntos\ntsup.c" />
     <ClCompile Include="..\Shared\treelist\treelist.c" />
     <ClCompile Include="aboutDlg.c" />
     <ClCompile Include="drvhelper.c" />
@@ -429,12 +425,13 @@
     <ClInclude Include="..\Shared\ntos\ntalpc.h" />
     <ClInclude Include="..\Shared\ntos\ntldr.h" />
     <ClInclude Include="..\Shared\ntos\ntos.h" />
+    <ClInclude Include="..\Shared\ntos\ntsup.h" />
+    <ClInclude Include="..\Shared\sdk\extdef.h" />
     <ClInclude Include="..\Shared\treelist\treelist.h" />
     <ClInclude Include="aboutDlg.h" />
     <ClInclude Include="drvhelper.h" />
     <ClInclude Include="excepth.h" />
     <ClInclude Include="extapi.h" />
-    <ClInclude Include="extdef.h" />
     <ClInclude Include="extras\extras.h" />
     <ClInclude Include="extras\extrasCallbacks.h" />
     <ClInclude Include="extras\extrasCallbacksPatterns.h" />

@@ -4,9 +4,9 @@
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     1.86
+*  VERSION:     1.87
 *
-*  DATE:        29 May 2020
+*  DATE:        10 July 2020
 *
 *  Test code used while debug.
 *
@@ -765,7 +765,7 @@ VOID TestSectionImage()
     LPWSTR lpFileName;
     HANDLE sectionHandle = NULL, dirHandle = NULL, fileHandle = NULL;
 
-    RtlInitUnicodeString(&ustr, L"\\TestSectionImage");
+    RtlInitUnicodeString(&ustr, L"\\RPC Control\\TestSectionImage");
     InitializeObjectAttributes(&dirObja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
     ntStatus = NtCreateDirectoryObject(&dirHandle, DIRECTORY_ALL_ACCESS, &dirObja);
 
@@ -873,7 +873,6 @@ VOID PreHashTypes()
 
 VOID TestCall()
 {
-
 }
 
 VOID TestStart(

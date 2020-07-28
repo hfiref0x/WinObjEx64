@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.03
 *
-*  DATE:        29 May 2020
+*  DATE:        22 July 2020
 *
 *  WinObjEx64 Sonar plugin.
 *
@@ -19,35 +19,53 @@
 
 #include "global.h"
 
-HINSTANCE g_ThisDLL;
-BOOL g_PluginQuit = FALSE;
-ULONG g_CurrentDPI;
+//
+// Maximum tested build Sonar is known to work.
+//
+#define SONAR_MAX_TESTED_BUILD 20170
 
-int  y_splitter_pos = 300, y_capture_pos = 0, y_splitter_max = 0;
+//
+// Dll instance.
+//
+HINSTANCE g_ThisDLL = NULL;
 
-#define SONAR_MAX_TESTED_BUILD 19635
+//
+// Quit flag.
+//
+volatile BOOL g_PluginQuit = FALSE;
 
+//
+// Number of listview columns.
+//
 #define PROTOCOLLIST_COLUMN_COUNT 3
 
 //
-// Sonar gui context.
+// GUI context.
 //
 SONARCONTEXT g_ctx;
 
 //
 // Plugin entry.
 //
-WINOBJEX_PLUGIN *g_Plugin;
-
-//
-// Sonar wnd class.
-//
-ATOM g_ClassAtom = 0;
-
-#define SHOW_ERROR(error) MessageBox(g_ctx.MainWindow, (error), SONAR_WNDTITLE, MB_ICONERROR);
+WINOBJEX_PLUGIN* g_Plugin = NULL;
 
 VOID ListProtocols(
     _In_ BOOL bRefresh);
+
+/*
+* StatusBarSetText
+*
+* Purpose:
+*
+* Display status in status bar part.
+*
+*/
+VOID StatusBarSetText(
+    _In_ LPWSTR lpText
+)
+{
+    SetWindowText(g_ctx.StatusBar, lpText);
+}
 
 /*
 * AddListViewColumn
@@ -75,7 +93,7 @@ INT AddListViewColumn(
     if (ImageIndex != I_IMAGENONE) column.mask |= LVCF_IMAGE;
 
     column.fmt = Format;
-    column.cx = SCALE_DPI_VALUE(Width);
+    column.cx = SCALE_DPI_VALUE(Width, g_ctx.CurrentDPI);
     column.pszText = Text;
     column.iSubItem = SubItemIndex;
     column.iOrder = OrderIndex;
@@ -128,6 +146,7 @@ BOOL ListOpenQueue(
     _In_ ULONG_PTR OpenQueueAddress
 )
 {
+    BOOL bResult = TRUE;
     ULONG_PTR ProtocolNextOpen = OpenQueueAddress;
 
     NDIS_OPEN_BLOCK_COMPATIBLE OpenBlock;
@@ -138,9 +157,14 @@ BOOL ListOpenQueue(
     do {
         RtlSecureZeroMemory(&OpenBlock, sizeof(OpenBlock));
         if (!ReadAndConvertOpenBlock(ProtocolNextOpen, &OpenBlock, NULL)) {
-            StringCchPrintf(szBuffer, 200, TEXT("Could not read NDIS_OPEN_BLOCK 0x%llX"), ProtocolNextOpen);
-            SHOW_ERROR(szBuffer);
-            return FALSE;
+
+            StringCchPrintf(szBuffer, RTL_NUMBER_OF(szBuffer),
+                TEXT("Error, read NDIS_OPEN_BLOCK at 0x%llX failed!"), ProtocolNextOpen);
+
+            StatusBarSetText(szBuffer);
+
+            bResult = FALSE;
+            break;
         }
 
         RtlSecureZeroMemory(&subitems, sizeof(subitems));
@@ -163,7 +187,7 @@ BOOL ListOpenQueue(
 
     } while (ProtocolNextOpen != 0);
 
-    return TRUE;
+    return bResult;
 }
 
 /*
@@ -174,13 +198,14 @@ BOOL ListOpenQueue(
 * Output NDIS_PROTOCOL_BLOCK to the treelist.
 *
 */
-VOID AddProtocolToTreeList(
-    _In_ NDIS_PROTOCOL_BLOCK_COMPATIBLE *ProtoBlock,
+BOOL AddProtocolToTreeList(
+    _In_ NDIS_PROTOCOL_BLOCK_COMPATIBLE* ProtoBlock,
     _In_ ULONG_PTR ProtocolAddress
 )
 {
+    BOOL bResult = TRUE;
     PWCHAR lpProtocolName = NULL, lpImageName = NULL;
-    UNICODE_STRING *usTemp;
+    UNICODE_STRING* usTemp;
 
     TL_SUBITEMS_FIXED subitems;
     HTREEITEM hTreeItem = NULL;
@@ -197,7 +222,7 @@ VOID AddProtocolToTreeList(
     if (lpProtocolName) {
         RtlSecureZeroMemory(&subitems, sizeof(subitems));
         subitems.UserParam = IntToPtr(NdisObjectTypeProtocolBlock);
-        StringCchPrintf(szBuffer, 32, TEXT("0x%llX"), ProtocolAddress);
+        StringCchPrintf(szBuffer, RTL_NUMBER_OF(szBuffer), TEXT("0x%llX"), ProtocolAddress);
         subitems.Count = 2;
         subitems.Text[0] = szBuffer;
 
@@ -234,12 +259,13 @@ VOID AddProtocolToTreeList(
 
 
         if ((ULONG_PTR)ProtoBlock->OpenQueue > g_ctx.ParamBlock.SystemRangeStart) {
-            ListOpenQueue(hTreeItem, (ULONG_PTR)ProtoBlock->OpenQueue);
+            bResult = ListOpenQueue(hTreeItem, (ULONG_PTR)ProtoBlock->OpenQueue);
         }
 
         HeapMemoryFree(lpProtocolName);
     }
 
+    return bResult;
 }
 
 /*
@@ -254,36 +280,43 @@ VOID ListProtocols(
     _In_ BOOL bRefresh
 )
 {
+    BOOLEAN bAnyErrors = FALSE;
     NDIS_PROTOCOL_BLOCK_COMPATIBLE ProtoBlock;
 
     ULONG_PTR ProtocolBlockAddress = 0;
 
     WCHAR szBuffer[200];
 
-    if (g_ctx.ndisProtocolList == 0)
-        g_ctx.ndisProtocolList = QueryProtocolList();
-
     if (bRefresh) {
         ListView_DeleteAllItems(g_ctx.ListView);
         TreeList_ClearTree(g_ctx.TreeList);
     }
 
+    if (g_ctx.ndisProtocolList == 0)
+        g_ctx.ndisProtocolList = QueryProtocolList();
+
     if (g_ctx.ndisProtocolList == 0) {
-        SHOW_ERROR(TEXT("Could not query ndisProtocolList variable address, abort."));
+
+        StatusBarSetText(TEXT("Error, ndisProtocolList variable query failed!"));
         return;
+
     }
 
     //
     // Read head and skip it.
     //
     if (g_ctx.ndisNextProtocolOffset == 0)
-        g_ctx.ndisNextProtocolOffset = GetNextProtocolOffset(g_ctx.ParamBlock.osver.dwBuildNumber);
+        g_ctx.ndisNextProtocolOffset = GetNextProtocolOffset(g_ctx.ParamBlock.Version.dwBuildNumber);
 
     ProtocolBlockAddress = (ULONG_PTR)g_ctx.ndisProtocolList - g_ctx.ndisNextProtocolOffset;
     RtlSecureZeroMemory(&ProtoBlock, sizeof(ProtoBlock));
     if (!ReadAndConvertProtocolBlock(ProtocolBlockAddress, &ProtoBlock, NULL)) {
-        StringCchPrintf(szBuffer, 200, TEXT("Could not read NDIS_PROTOCOL_BLOCK 0x%llX, aborting enumeration."), ProtocolBlockAddress);
-        SHOW_ERROR(szBuffer);
+
+        StringCchPrintf(szBuffer, RTL_NUMBER_OF(szBuffer),
+            TEXT("Error, read NDIS_PROTOCOL_BLOCK at 0x%llX failed!"), ProtocolBlockAddress);
+
+        StatusBarSetText(szBuffer);
+
         return;
     }
 
@@ -295,12 +328,18 @@ VOID ListProtocols(
     do {
         RtlSecureZeroMemory(&ProtoBlock, sizeof(ProtoBlock));
         if (!ReadAndConvertProtocolBlock(ProtocolBlockAddress, &ProtoBlock, NULL)) {
-            StringCchPrintf(szBuffer, 200, TEXT("Could not read NDIS_PROTOCOL_BLOCK 0x%llX, aborting enumeration."), ProtocolBlockAddress);
-            SHOW_ERROR(szBuffer);
-            return;
+
+            StringCchPrintf(szBuffer, RTL_NUMBER_OF(szBuffer),
+                TEXT("Error, read NDIS_PROTOCOL_BLOCK at 0x%llX failed!"), ProtocolBlockAddress);
+
+            StatusBarSetText(szBuffer);
+            bAnyErrors = TRUE;
+            break;
         }
 
-        AddProtocolToTreeList(&ProtoBlock, ProtocolBlockAddress);
+        if (!AddProtocolToTreeList(&ProtoBlock, ProtocolBlockAddress)) {
+            bAnyErrors = TRUE;
+        }
 
         ProtocolBlockAddress = (ULONG_PTR)ProtoBlock.NextProtocol;
 
@@ -308,6 +347,9 @@ VOID ListProtocols(
 
     TreeView_SelectItem(g_ctx.TreeList, TreeView_GetRoot(g_ctx.TreeList));
     SetFocus(g_ctx.TreeList);
+
+    if (bAnyErrors == FALSE)
+        StatusBarSetText(TEXT("List protocols - OK"));
 }
 
 /*
@@ -331,18 +373,18 @@ VOID OnResize(
 
     GetClientRect(hwndDlg, &r);
     GetClientRect(g_ctx.StatusBar, &szr);
-    y_splitter_max = r.bottom - Y_SPLITTER_MIN;
+    g_ctx.SplitterMaxY = r.bottom - Y_SPLITTER_MIN;
 
     SetWindowPos(g_ctx.TreeList, 0,
         0, 0,
         r.right,
-        y_splitter_pos,
+        g_ctx.SplitterPosY,
         SWP_NOOWNERZORDER);
 
     SetWindowPos(g_ctx.ListView, 0,
-        0, y_splitter_pos + Y_SPLITTER_SIZE,
+        0, g_ctx.SplitterPosY + Y_SPLITTER_SIZE,
         r.right,
-        r.bottom - y_splitter_pos - Y_SPLITTER_SIZE - szr.bottom,
+        r.bottom - g_ctx.SplitterPosY - Y_SPLITTER_SIZE - szr.bottom,
         SWP_NOOWNERZORDER);
 }
 
@@ -366,7 +408,8 @@ INT CALLBACK ListViewCompareFunc(
 
     case 0: //text value
 
-        nResult = g_ctx.ParamBlock.uiGetMaxCompareTwoFixedStrings(g_ctx.ListView,
+        nResult = GetMaxCompareTwoFixedStrings(
+            g_ctx.ListView,
             lParam1,
             lParam2,
             lParamSort,
@@ -376,7 +419,8 @@ INT CALLBACK ListViewCompareFunc(
 
     default: // address
 
-        nResult = g_ctx.ParamBlock.uiGetMaxOfTwoU64FromHex(g_ctx.ListView,
+        nResult = GetMaxOfTwoU64FromHex(
+            g_ctx.ListView,
             lParam1,
             lParam2,
             lParamSort,
@@ -398,13 +442,13 @@ INT CALLBACK ListViewCompareFunc(
 */
 BOOLEAN GetNdisObjectInformationFromList(
     _In_ HTREEITEM hTreeItem,
-    _Out_ NDIS_OBJECT_TYPE *NdisObjectType,
+    _Out_ NDIS_OBJECT_TYPE* NdisObjectType,
     _Out_ PULONG_PTR ObjectAddress
 )
 {
     TVITEMEX itemex;
     PWCHAR lpAddressField;
-    TL_SUBITEMS_FIXED *subitems = NULL;
+    TL_SUBITEMS_FIXED* subitems = NULL;
 
     *NdisObjectType = NdisObjectTypeInvalid;
     *ObjectAddress = 0ull;
@@ -428,30 +472,6 @@ BOOLEAN GetNdisObjectInformationFromList(
         }
 
     return FALSE;
-}
-
-/*
-* ConvertToUnicode
-*
-* Purpose:
-*
-* Convert module name to unicode.
-*
-* N.B.
-* If function succeeded - use RtlFreeUnicodeString to release allocated unicode string.
-*
-*/
-NTSTATUS ConvertToUnicode(
-    _In_ LPSTR AnsiString,
-    _Out_ PUNICODE_STRING UnicodeString)
-{
-    ANSI_STRING ansiString;
-
-#pragma warning(push)
-#pragma warning(disable: 6001)
-    RtlInitString(&ansiString, AnsiString);
-#pragma warning(pop)
-    return RtlAnsiStringToUnicodeString(UnicodeString, &ansiString, TRUE);
 }
 
 /*
@@ -502,14 +522,14 @@ VOID xxxDumpProtocolBlock(
 *
 */
 VOID DumpHandlers(
-    _In_ PVOID *Handlers,
+    _In_ PVOID* Handlers,
     _In_ UINT Count,
-    _In_ LPWSTR *Names,
-    RTL_PROCESS_MODULES *pModulesList
+    _In_ LPWSTR* Names,
+    RTL_PROCESS_MODULES* pModulesList
 )
 {
     BOOL ConvertNeedFree = FALSE;
-    ULONG moduleIndex;
+    ULONG moduleIndex = 0;
     PWSTR pAssociatedModule = NULL;
 
     WCHAR szBuffer[64];
@@ -523,21 +543,22 @@ VOID DumpHandlers(
 
             StringCchPrintf(szBuffer, 64, TEXT("0x%p"), Handlers[i]);
 
-            moduleIndex = g_ctx.ParamBlock.FindModuleEntryByAddress(pModulesList, Handlers[i]);
-            if ((moduleIndex != 0xFFFFFFFF) && (moduleIndex < pModulesList->NumberOfModules)) {
-
+            if (ntsupFindModuleEntryByAddress(
+                pModulesList,
+                Handlers[i],
+                &moduleIndex))
+            {
                 pModule = &pModulesList->Modules[moduleIndex];
-                if (NT_SUCCESS(ConvertToUnicode((LPSTR)&pModule->FullPathName, &usConvert))) {
+                if (NT_SUCCESS(ntsupConvertToUnicode((LPSTR)&pModule->FullPathName, &usConvert))) {
                     pAssociatedModule = usConvert.Buffer;
                     ConvertNeedFree = TRUE;
                 }
                 else {
                     pAssociatedModule = TEXT("Unknown Module");
                 }
-
             }
             else {
-                pAssociatedModule = TEXT(""); //could be any garbage pointer.
+                pAssociatedModule = TEXT("");//could be any garbage pointer.
             }
 
             xxxDumpProtocolBlock(Names[i], szBuffer, pAssociatedModule);
@@ -565,24 +586,38 @@ VOID DumpProtocolInfo(
 {
     PWCHAR DumpedString;
     NDIS_PROTOCOL_BLOCK_COMPATIBLE ProtoBlock;
-    WCHAR szBuffer[64];
+    WCHAR szBuffer[200];
 
-    RTL_PROCESS_MODULES *pModulesList = NULL;
+    RTL_PROCESS_MODULES* pModulesList = NULL;
 
     PVOID ProtocolHandlers[_countof(g_lpszProtocolBlockHandlers)];
 
     ListView_DeleteAllItems(g_ctx.ListView);
 
-    pModulesList = g_ctx.ParamBlock.GetSystemInfoEx(SystemModuleInformation, NULL, HeapMemoryAlloc, HeapMemoryFree);
-    if (pModulesList == NULL)
+    pModulesList = ntsupGetSystemInfoEx(
+        SystemModuleInformation, 
+        NULL, 
+        (PNTSUPMEMALLOC)HeapMemoryAlloc, 
+        (PNTSUPMEMFREE)HeapMemoryFree);
+
+    if (pModulesList == NULL) {
+        StatusBarSetText(TEXT("Error, cannot query system information!"));
         return;
+    }
 
     //
     // Dump protocol block from kernel.
     //
     RtlSecureZeroMemory(&ProtoBlock, sizeof(ProtoBlock));
     if (!ReadAndConvertProtocolBlock(ProtocolAddress, &ProtoBlock, NULL)) {
+
         HeapMemoryFree(pModulesList);
+
+        StringCchPrintf(szBuffer, RTL_NUMBER_OF(szBuffer),
+            TEXT("Error, read NDIS_PROTOCOL_BLOCK at 0x%llX failed!"), ProtocolAddress);
+
+        StatusBarSetText(szBuffer);
+
         return;
     }
 
@@ -636,6 +671,8 @@ VOID DumpProtocolInfo(
     DumpHandlers(ProtocolHandlers, _countof(ProtocolHandlers), g_lpszProtocolBlockHandlers, pModulesList);
 
     HeapMemoryFree(pModulesList);
+
+    StatusBarSetText(TEXT("List protocol information - OK"));
 }
 
 /*
@@ -652,9 +689,9 @@ VOID DumpOpenBlockInfo(
 {
     PWCHAR DumpedString;
     NDIS_OPEN_BLOCK_COMPATIBLE OpenBlock;
-    WCHAR szBuffer[64];
+    WCHAR szBuffer[200];
 
-    RTL_PROCESS_MODULES *pModulesList = NULL;
+    RTL_PROCESS_MODULES* pModulesList = NULL;
 
     PVOID OpenBlockHandlers[_countof(g_lpszOpenBlockHandlers)];
 
@@ -663,16 +700,30 @@ VOID DumpOpenBlockInfo(
     //
     // Allocate loaded modules list.
     //
-    pModulesList = g_ctx.ParamBlock.GetSystemInfoEx(SystemModuleInformation, NULL, HeapMemoryAlloc, HeapMemoryFree);
-    if (pModulesList == NULL)
+    pModulesList = ntsupGetSystemInfoEx(
+        SystemModuleInformation, 
+        NULL, 
+        (PNTSUPMEMALLOC)HeapMemoryAlloc, 
+        (PNTSUPMEMFREE)HeapMemoryFree);
+
+    if (pModulesList == NULL) {
+        StatusBarSetText(TEXT("Error, cannot query system information!"));
         return;
+    }
 
     //
     // Dump open block from kernel.
     //
     RtlSecureZeroMemory(&OpenBlock, sizeof(OpenBlock));
     if (!ReadAndConvertOpenBlock(OpenBlockAddress, &OpenBlock, NULL)) {
+
         HeapMemoryFree(pModulesList);
+
+        StringCchPrintf(szBuffer, RTL_NUMBER_OF(szBuffer),
+            TEXT("Error, read NDIS_OPEN_BLOCK at 0x%llX failed!"), OpenBlockAddress);
+
+        StatusBarSetText(szBuffer);
+
         return;
     }
 
@@ -703,6 +754,8 @@ VOID DumpOpenBlockInfo(
 
     DumpHandlers(OpenBlockHandlers, _countof(OpenBlockHandlers), g_lpszOpenBlockHandlers, pModulesList);
     HeapMemoryFree(pModulesList);
+
+    StatusBarSetText(TEXT("List open block information - OK"));
 }
 
 /*
@@ -743,11 +796,11 @@ VOID CopyValueHandler(
 )
 {
     if (idMenu == ID_MENU_COPY_VALUE) {
-        g_ctx.ParamBlock.uiCopyTreeListSubItemValue(g_ctx.TreeList, 0);
+        CopyTreeListSubItemValue(g_ctx.TreeList, 0);
 
     }
     else if (idMenu == ID_MENU_COPY_VALUE + 1) {
-        g_ctx.ParamBlock.uiCopyListViewSubItemValue(g_ctx.ListView, 1);
+        CopyListViewSubItemValue(g_ctx.ListView, 1);
     }
 }
 
@@ -788,6 +841,7 @@ VOID RefreshViewsHandler(
                 case NdisObjectTypeOpenBlock:
                     DumpOpenBlockInfo(ObjectAddress);
                     break;
+                case NdisObjectTypeMDriverBlock:
                 default:
                     break;
                 }
@@ -800,6 +854,35 @@ VOID RefreshViewsHandler(
             }
         }
     }
+}
+
+/*
+* ShowProperties
+*
+* Purpose:
+*
+* Show file properties Windows dialog.
+*
+*/
+VOID ShowProperties(
+    _In_ HWND hwndDlg,
+    _In_ LPWSTR lpFileName
+)
+{
+    SHELLEXECUTEINFO shinfo;
+
+    if (lpFileName == NULL) {
+        return;
+    }
+
+    RtlSecureZeroMemory(&shinfo, sizeof(shinfo));
+    shinfo.cbSize = sizeof(shinfo);
+    shinfo.fMask = SEE_MASK_INVOKEIDLIST | SEE_MASK_FLAG_NO_UI;
+    shinfo.hwnd = hwndDlg;
+    shinfo.lpVerb = TEXT("properties");
+    shinfo.lpFile = lpFileName;
+    shinfo.nShow = SW_SHOWNORMAL;
+    ShellExecuteEx(&shinfo);
 }
 
 /*
@@ -831,11 +914,13 @@ VOID ShowPropertiesHandler(
         SendMessage(g_ctx.ListView, LVM_GETITEMTEXT, (WPARAM)item.iItem, (LPARAM)&item);
 
         RtlSecureZeroMemory(szConvertedFileName, sizeof(szConvertedFileName));
-#pragma warning(push)
-#pragma warning(disable: 6054)
-        if (g_ctx.ParamBlock.GetWin32FileName(szBuffer, szConvertedFileName, MAX_PATH))
-            g_ctx.ParamBlock.uiShowFileProperties(g_ctx.MainWindow, szConvertedFileName);
-#pragma warning(pop)
+        if (GetWin32FileName(
+            szBuffer, 
+            szConvertedFileName, 
+            MAX_PATH)) 
+        {
+            ShowProperties(g_ctx.MainWindow, szConvertedFileName);
+        }
     }
 }
 
@@ -910,7 +995,7 @@ VOID OnNotify(
 
         case LVN_COLUMNCLICK:
             g_ctx.bInverseSort = !g_ctx.bInverseSort;
-            SortColumn = ((NMLISTVIEW *)lParam)->iSubItem;
+            SortColumn = ((NMLISTVIEW*)lParam)->iSubItem;
 
             ListView_SortItemsEx(g_ctx.ListView, &ListViewCompareFunc, SortColumn);
 
@@ -993,7 +1078,7 @@ LRESULT CALLBACK MainWindowProc(
 
     case WM_COMMAND:
 
-        switch (LOWORD(wParam)) {
+        switch (GET_WM_COMMAND_ID(wParam, lParam)) {
 
         case IDCANCEL:
             SendMessage(hwnd, WM_CLOSE, 0, 0);
@@ -1028,7 +1113,7 @@ LRESULT CALLBACK MainWindowProc(
 
     case WM_LBUTTONDOWN:
         SetCapture(hwnd);
-        y_capture_pos = (int)(short)HIWORD(lParam);
+        g_ctx.CapturePosY = (int)(short)HIWORD(lParam);
         break;
 
     case WM_GETMINMAXINFO:
@@ -1042,20 +1127,20 @@ LRESULT CALLBACK MainWindowProc(
     case WM_MOUSEMOVE:
 
         if (wParam & MK_LBUTTON) {
-            dy = (int)(short)HIWORD(lParam) - y_capture_pos;
+            dy = (int)(short)HIWORD(lParam) - g_ctx.CapturePosY;
             if (dy != 0) {
-                y_capture_pos = (int)(short)HIWORD(lParam);
-                y_splitter_pos += dy;
-                if (y_splitter_pos < Y_SPLITTER_MIN)
+                g_ctx.CapturePosY = (int)(short)HIWORD(lParam);
+                g_ctx.SplitterPosY += dy;
+                if (g_ctx.SplitterPosY < Y_SPLITTER_MIN)
                 {
-                    y_splitter_pos = Y_SPLITTER_MIN;
-                    y_capture_pos = Y_SPLITTER_MIN;
+                    g_ctx.SplitterPosY = Y_SPLITTER_MIN;
+                    g_ctx.CapturePosY = Y_SPLITTER_MIN;
                 }
 
-                if (y_splitter_pos > y_splitter_max)
+                if (g_ctx.SplitterPosY > g_ctx.SplitterMaxY)
                 {
-                    y_splitter_pos = y_splitter_max;
-                    y_capture_pos = y_splitter_max;
+                    g_ctx.SplitterPosY = g_ctx.SplitterMaxY;
+                    g_ctx.CapturePosY = g_ctx.SplitterMaxY;
                 }
                 SendMessage(hwnd, WM_SIZE, 0, 0);
             }
@@ -1063,7 +1148,7 @@ LRESULT CALLBACK MainWindowProc(
         break;
 
     case WM_CLOSE:
-        g_PluginQuit = TRUE;
+        InterlockedExchange((PLONG)&g_PluginQuit, TRUE);
         PostQuitMessage(0);
         break;
 
@@ -1082,24 +1167,25 @@ LRESULT CALLBACK MainWindowProc(
 * Plugin resources deallocation routine.
 *
 */
-VOID PluginFreeGlobalResources()
+VOID PluginFreeGlobalResources(
+    VOID
+)
 {
     if (g_ctx.ImageList) {
         ImageList_Destroy(g_ctx.ImageList);
         g_ctx.ImageList = 0;
     }
-
     if (g_ctx.PluginHeap) {
         HeapDestroy(g_ctx.PluginHeap);
         g_ctx.PluginHeap = NULL;
     }
 
-    if (g_ClassAtom) {
-        UnregisterClass(MAKEINTATOM(g_ClassAtom), g_ThisDLL);
-        g_ClassAtom = 0;
-    }
+    if (g_Plugin->StateChangeCallback)
+        g_Plugin->StateChangeCallback(g_Plugin, PluginStopped, NULL);
 
-    g_Plugin->StateChangeCallback(g_Plugin, PluginStopped, NULL);
+    if (g_Plugin->GuiShutdownCallback)
+        g_Plugin->GuiShutdownCallback(g_Plugin, g_ThisDLL, NULL);
+
 }
 
 /*
@@ -1123,29 +1209,53 @@ DWORD WINAPI PluginThread(
     BOOL rv;
     MSG msg1;
 
+    WCHAR szClassName[100];
+
     UNREFERENCED_PARAMETER(Parameter);
 
     do {
+
+        if (g_Plugin->GuiInitCallback == NULL) { // this is required callback
+            kdDebugPrint("Gui init callback required\r\n");
+            break;
+        }
+
+        if (!g_Plugin->GuiInitCallback(g_Plugin,
+            g_ThisDLL,
+            (WNDPROC)MainWindowProc,
+            NULL))
+        {
+            kdDebugPrint("Gui init callback failure\r\n");
+            break;
+        }
 
 #pragma warning(push)
 #pragma warning(disable: 6031)
         CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 #pragma warning(pop)
 
-        g_CurrentDPI = g_ctx.ParamBlock.uiGetDPIValue(NULL);
+        g_ctx.CurrentDPI = g_ctx.ParamBlock.CurrentDPI;
+
+        //
+        // Window class once.
+        //
+        StringCchPrintf(szClassName,
+            RTL_NUMBER_OF(szClassName),
+            TEXT("%wsWndClass"),
+            g_Plugin->Name);
 
         //
         // Create main window.
         //
         MainWindow = CreateWindowEx(
             0,
-            MAKEINTATOM(g_ClassAtom),
+            szClassName,
             SONAR_WNDTITLE,
             WS_VISIBLE | WS_OVERLAPPEDWINDOW,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            SCALE_DPI_VALUE(800),
-            SCALE_DPI_VALUE(600),
+            SCALE_DPI_VALUE(800, g_ctx.CurrentDPI),
+            SCALE_DPI_VALUE(600, g_ctx.CurrentDPI),
             NULL,
             NULL,
             g_ThisDLL,
@@ -1157,6 +1267,7 @@ DWORD WINAPI PluginThread(
         }
 
         g_ctx.MainWindow = MainWindow;
+        g_ctx.SplitterPosY = 300;
 
         //
         // Status Bar window.
@@ -1218,12 +1329,19 @@ DWORD WINAPI PluginThread(
             2,
             2);
 
-        hIcon = (HICON)LoadImage(g_ctx.ParamBlock.hInstance, MAKEINTRESOURCE(WINOBJEX64_ICON_SORT_UP), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+        hIcon = (HICON)LoadImage(g_ctx.ParamBlock.Instance,
+            MAKEINTRESOURCE(WINOBJEX64_ICON_SORT_UP), IMAGE_ICON, 0, 0,
+            LR_DEFAULTCOLOR);
+
         if (hIcon) {
             ImageList_ReplaceIcon(g_ctx.ImageList, -1, hIcon);
             DestroyIcon(hIcon);
         }
-        hIcon = (HICON)LoadImage(g_ctx.ParamBlock.hInstance, MAKEINTRESOURCE(WINOBJEX64_ICON_SORT_DOWN), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+
+        hIcon = (HICON)LoadImage(g_ctx.ParamBlock.Instance,
+            MAKEINTRESOURCE(WINOBJEX64_ICON_SORT_DOWN), IMAGE_ICON, 0, 0,
+            LR_DEFAULTCOLOR);
+
         if (hIcon) {
             ImageList_ReplaceIcon(g_ctx.ImageList, -1, hIcon);
             DestroyIcon(hIcon);
@@ -1261,15 +1379,15 @@ DWORD WINAPI PluginThread(
         RtlSecureZeroMemory(&hdritem, sizeof(hdritem));
         hdritem.mask = HDI_FORMAT | HDI_TEXT | HDI_WIDTH;
         hdritem.fmt = HDF_LEFT | HDF_BITMAP_ON_RIGHT | HDF_STRING;
-        hdritem.cxy = SCALE_DPI_VALUE(300);
+        hdritem.cxy = SCALE_DPI_VALUE(300, g_ctx.CurrentDPI);
         hdritem.pszText = TEXT("Protocol");
         TreeList_InsertHeaderItem(g_ctx.TreeList, 0, &hdritem);
 
-        hdritem.cxy = SCALE_DPI_VALUE(130);
+        hdritem.cxy = SCALE_DPI_VALUE(130, g_ctx.CurrentDPI);
         hdritem.pszText = TEXT("Object");
         TreeList_InsertHeaderItem(g_ctx.TreeList, 1, &hdritem);
 
-        hdritem.cxy = SCALE_DPI_VALUE(200);
+        hdritem.cxy = SCALE_DPI_VALUE(200, g_ctx.CurrentDPI);
         hdritem.pszText = TEXT("Additional Information");
         TreeList_InsertHeaderItem(g_ctx.TreeList, 2, &hdritem);
 
@@ -1279,14 +1397,14 @@ DWORD WINAPI PluginThread(
         SetWindowTheme(g_ctx.TreeList, TEXT("Explorer"), NULL);
         SetWindowTheme(g_ctx.ListView, TEXT("Explorer"), NULL);
 
-        g_ctx.AccTable = LoadAccelerators(g_ctx.ParamBlock.hInstance, MAKEINTRESOURCE(WINOBJEX64_ACC_TABLE));
+        g_ctx.AccTable = LoadAccelerators(g_ctx.ParamBlock.Instance, MAKEINTRESOURCE(WINOBJEX64_ACC_TABLE));
 
         OnResize(MainWindow);
 
-        if (g_ctx.ParamBlock.osver.dwBuildNumber > SONAR_MAX_TESTED_BUILD) {
-            MessageBox(MainWindow, 
-                TEXT("Current Windows build is untested, this plugin may output wrong data."),
-                TEXT("Sonar"), MB_ICONINFORMATION);
+        if (g_ctx.ParamBlock.Version.dwBuildNumber > SONAR_MAX_TESTED_BUILD) {
+            MessageBox(MainWindow,
+                TEXT("WARNING: Current Windows build is untested, this plugin may output wrong data."),
+                SONAR_WNDTITLE, MB_ICONINFORMATION);
         }
 
         ListProtocols(FALSE);
@@ -1305,9 +1423,11 @@ DWORD WINAPI PluginThread(
             TranslateMessage(&msg1);
             DispatchMessage(&msg1);
 
-        } while ((rv != 0) || (g_PluginQuit == FALSE));
+        } while ((rv != 0) && (g_PluginQuit == FALSE));
 
     } while (FALSE);
+
+    DestroyWindow(g_ctx.MainWindow);
 
     PluginFreeGlobalResources();
 
@@ -1330,6 +1450,8 @@ NTSTATUS CALLBACK StartPlugin(
     NTSTATUS Status;
     WINOBJEX_PLUGIN_STATE State = PluginInitialization;
 
+    InterlockedExchange((PLONG)&g_PluginQuit, FALSE);
+
     RtlSecureZeroMemory(&g_ctx, sizeof(g_ctx));
 
     g_ctx.PluginHeap = HeapCreate(0, 0, 0);
@@ -1346,6 +1468,8 @@ NTSTATUS CALLBACK StartPlugin(
     }
     else {
         Status = STATUS_UNSUCCESSFUL;
+        HeapDestroy(g_ctx.PluginHeap);
+        g_ctx.PluginHeap = NULL;
     }
 
     if (NT_SUCCESS(Status))
@@ -1353,7 +1477,8 @@ NTSTATUS CALLBACK StartPlugin(
     else
         State = PluginError;
 
-    g_Plugin->StateChangeCallback(g_Plugin, State, NULL);
+    if (g_Plugin->StateChangeCallback)
+        g_Plugin->StateChangeCallback(g_Plugin, State, NULL);
 
     return Status;
 }
@@ -1371,53 +1496,21 @@ void CALLBACK StopPlugin(
 )
 {
     if (g_ctx.WorkerThread) {
-        InterlockedExchange((PLONG)&g_PluginQuit, TRUE);
+        InterlockedExchange((PLONG)&g_PluginQuit, TRUE);//force stop
         if (WaitForSingleObject(g_ctx.WorkerThread, 1000) == WAIT_TIMEOUT) {
 #pragma warning(push)
 #pragma warning(disable: 6258)
             TerminateThread(g_ctx.WorkerThread, 0);
 #pragma warning(pop)
+
         }
         CloseHandle(g_ctx.WorkerThread);
         g_ctx.WorkerThread = NULL;
+
+        //
+        // Free global resources and set plugin state.
+        //
         PluginFreeGlobalResources();
-    }
-}
-
-/*
-* GuiOnceInit
-*
-* Purpose:
-*
-* Initialize wnd class once.
-*
-*/
-VOID GuiOnceInit()
-{
-    WNDCLASSEX  wincls;
-
-    //
-    // Register window class once.
-    //
-    RtlSecureZeroMemory(&wincls, sizeof(wincls));
-    wincls.cbSize = sizeof(WNDCLASSEX);
-    wincls.lpfnWndProc = &MainWindowProc;
-    wincls.hInstance = g_ThisDLL;
-    wincls.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-    wincls.lpszClassName = SONAR_WNDCLASS;
-    wincls.hCursor = (HCURSOR)LoadImage(NULL, MAKEINTRESOURCE(OCR_SIZENS), IMAGE_CURSOR, 0, 0, LR_SHARED);
-
-    wincls.hIcon = (HICON)LoadImage(
-        GetModuleHandle(NULL),
-        MAKEINTRESOURCE(WINOBJEX64_ICON_MAIN),
-        IMAGE_ICON,
-        0,
-        0,
-        LR_SHARED);
-
-    g_ClassAtom = RegisterClassEx(&wincls);
-    if ((g_ClassAtom == 0) && (GetLastError() != ERROR_CLASS_ALREADY_EXISTS)) {
-        kdDebugPrint("Could not register window class, err = %lu\r\n", GetLastError());
     }
 }
 
@@ -1430,15 +1523,34 @@ VOID GuiOnceInit()
 *
 */
 BOOLEAN CALLBACK PluginInit(
-    _Out_ PWINOBJEX_PLUGIN PluginData
+    _Inout_ PWINOBJEX_PLUGIN PluginData
 )
 {
+    if (g_Plugin)
+        return FALSE;
+
     __try {
 
         //
         // Set plugin name to be displayed in WinObjEx64 UI.
         //
-        StringCbCopy(PluginData->Description, sizeof(PluginData->Description), TEXT("NDIS Protocol List"));
+        StringCbCopy(PluginData->Name, sizeof(PluginData->Name), TEXT("NDIS Protocol List"));
+
+        //
+        // Set authors.
+        //
+        StringCbCopy(PluginData->Authors, sizeof(PluginData->Authors), TEXT("UG North"));
+
+        //
+        // Set plugin description.
+        //
+        StringCbCopy(PluginData->Description, sizeof(PluginData->Description), 
+            TEXT("Displays registered NDIS protocols and lists their key functions."));
+
+        //
+        // Set required plugin system version.
+        //
+        PluginData->RequiredPluginSystemVersion = WOBJ_PLUGIN_SYSTEM_VERSION;
 
         //
         // Setup start/stop plugin callbacks.
@@ -1454,11 +1566,14 @@ BOOLEAN CALLBACK PluginInit(
         PluginData->NeedDriver = TRUE;
 
         PluginData->MajorVersion = 1;
-        PluginData->MinorVersion = 0;
+        PluginData->MinorVersion = 1;
+
+        //
+        // Set plugin type.
+        //
+        PluginData->Type = DefaultPlugin;
 
         g_Plugin = PluginData;
-
-        GuiOnceInit();
 
         return TRUE;
     }

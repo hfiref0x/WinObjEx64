@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTLDR.H
 *
-*  VERSION:     1.17
+*  VERSION:     1.18
 *
-*  DATE:        06 Mar 2020
+*  DATE:        12 July 2020
 *
 *  Common header file for the NTLDR definitions.
 *
@@ -18,6 +18,23 @@
 ************************************************************************************/
 
 #pragma once
+
+#ifndef NTLDR_RTL
+#define NTLDR_RTL
+
+#pragma warning(disable: 4201) // nameless struct/union
+
+#include <Windows.h>
+
+#pragma warning(push)
+#pragma warning(disable: 4005) //macro redefinition
+#include <ntstatus.h>
+#pragma warning(pop)
+
+#include "ntos.h"
+#include "apisetx.h"
+#include "minirtl/minirtl.h"
+#include "minirtl/rtltypes.h"
 
 typedef INT(*PFNNTLDR_EXCEPT_FILTER)(
     _In_ UINT ExceptionCode,
@@ -86,3 +103,6 @@ NTSTATUS NtLdrApiSetResolveLibrary(
     _In_opt_ PUNICODE_STRING ApiSetParentName,
     _Out_ PBOOL Resolved,
     _Out_ PUNICODE_STRING ResolvedHostLibraryName);
+
+
+#endif NTLDR_RTL

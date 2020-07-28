@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.03
 *
-*  DATE:        21 Dec 2019
+*  DATE:        10 July 2020
 *
 *  WinObjEx64 Sonar UI constants, definitions and includes.
 *
@@ -22,8 +22,7 @@
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "uxtheme.lib")
 
-#define SONAR_WNDTITLE L"Sonar"
-#define SONAR_WNDCLASS L"SonarWndClass"
+#define SONAR_WNDTITLE TEXT("Sonar")
 
 #define WINOBJEX64_ACC_TABLE        166
 #define WINOBJEX64_ICON_MAIN        174
@@ -39,7 +38,16 @@
 
 #define DefaultSystemDpi            96
 
-#define SCALE_DPI_VALUE(Value) MulDiv(Value, g_CurrentDPI, DefaultSystemDpi)
+#define SCALE_DPI_VALUE(Value, CurrentDPI) MulDiv(Value, CurrentDPI, DefaultSystemDpi)
+
+typedef struct _TL_SUBITEMS_FIXED {
+    ULONG       ColorFlags;
+    COLORREF    BgColor;
+    COLORREF    FontColor;
+    PVOID       UserParam;
+    ULONG       Count;
+    LPTSTR      Text[2];
+} TL_SUBITEMS_FIXED, * PTL_SUBITEMS_FIXED;
 
 typedef struct _SONARCONTEXT {
     //
@@ -58,6 +66,11 @@ typedef struct _SONARCONTEXT {
     HANDLE PluginHeap;
     HANDLE WorkerThread;
 
+    INT SplitterPosY;
+    INT CapturePosY;
+    INT SplitterMaxY;
+    UINT CurrentDPI;
+
     //
     // NDIS related.
     //
@@ -69,12 +82,3 @@ typedef struct _SONARCONTEXT {
     //
     WINOBJEX_PARAM_BLOCK ParamBlock;
 } SONARCONTEXT, *PSONARCONTEXT;
-
-typedef struct _TL_SUBITEMS_FIXED {
-    ULONG       ColorFlags;
-    COLORREF    BgColor;
-    COLORREF    FontColor;
-    PVOID       UserParam;
-    ULONG       Count;
-    LPTSTR      Text[2];
-} TL_SUBITEMS_FIXED, *PTL_SUBITEMS_FIXED;

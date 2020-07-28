@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG_PATTERNS.H
 *
-*  VERSION:     1.85
+*  VERSION:     1.87
 *
-*  DATE:        07 Mar 2020
+*  DATE:        27 June 2020
 *
 *  Header with search patterns used by KLDBG.
 *
@@ -113,3 +113,14 @@ BYTE LeaPattern_KeServiceDescriptorTableShadow[] = {
 
 // Number of bytes to scan
 #define DA_ScanBytesKeServiceDescriptorTableShadow      128
+
+//
+// KSE
+//
+
+#define IL_KseEngine 6
+#define DA_ScanBytesKseEngine 64
+
+BYTE KseEnginePattern[] = {
+    0x8B, 0x05
+};

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2020
 *
 *  TITLE:       TREELIST.H
 *
-*  VERSION:     1.27
+*  VERSION:     1.30
 *
-*  DATE:        31 Mar 2019
+*  DATE:        22 July 2020
 *
 *  Tree-List custom control header file.
 *

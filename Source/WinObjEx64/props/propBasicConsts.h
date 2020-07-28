@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPBASICCONSTS.H
 *
-*  VERSION:     1.83
+*  VERSION:     1.87
 *
-*  DATE:        05 Jan 2020
+*  DATE:        25 July 2020
 *
 *  Consts header file for Basic property sheet.
 *
@@ -21,7 +21,7 @@
 #define T_COULD_NOT_QUERY TEXT("*Could not query requested information*")
 
 //OBJECT_HEADER Flags
-LPCWSTR T_ObjectFlags[8] = {
+static LPCWSTR T_ObjectFlags[8] = {
     L"NewObject",
     L"KernelObject",
     L"KernelOnlyAccess",
@@ -39,8 +39,8 @@ LPCWSTR T_ObjectFlags[8] = {
 #define MAX_KNOWN_TRUSTLABEL_PROTECTIONTYPE 3
 static VALUE_DESC TrustLabelProtectionType[MAX_KNOWN_TRUSTLABEL_PROTECTIONTYPE] = {
     { L"None",  0x0 },
-    { L"ProtectedLight", 0x200 },
-    { L"Protected", 0x400 }
+    { L"PPL", 0x200 },
+    { L"PP", 0x400 }
 };
 
 #define MAX_KNOWN_TRUSTLABEL_PROTECTIONLEVEL 6

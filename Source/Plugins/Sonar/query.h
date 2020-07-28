@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.03
 *
-*  DATE:        24 Feb 2020
+*  DATE:        17 July 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -61,10 +61,13 @@
 #define NT_WIN10_19H2           18363
 
 // Windows 10 20H1
-#define NTX_WIN10_20H1           19041
+#define NT_WIN10_20H1           19041
 
 // Windows 10 20H2
-#define NTX_WIN10_20H2           19550
+#define NT_WIN10_20H2           19042
+
+// Windows 10 Active Develepment Branch (21H1)
+#define NTX_WIN10_ADB           20161
 
 typedef struct _PROTOCOL_BLOCK_VERSIONS {
     union {
@@ -73,7 +76,7 @@ typedef struct _PROTOCOL_BLOCK_VERSIONS {
             NDIS_PROTOCOL_BLOCK_9200 *v2;
             NDIS_PROTOCOL_BLOCK_9600_17134 *v3;
             NDIS_PROTOCOL_BLOCK_17763 *v4;
-            NDIS_PROTOCOL_BLOCK_18362_19569 *v5;
+            NDIS_PROTOCOL_BLOCK_18362_20150 *v5;
         } Versions;
         PVOID Ref;
     } u1;
@@ -93,8 +96,8 @@ typedef struct _OPEN_BLOCK_VERSIONS {
                 NDIS_OPEN_BLOCK_14393_17134 *v4;
             } u_v4;
             union {
-                NDIS_COMMON_OPEN_BLOCK_17763_19569 *v5c;
-                NDIS_OPEN_BLOCK_17763_19569 *v5;
+                NDIS_COMMON_OPEN_BLOCK_17763_20150 *v5c;
+                NDIS_OPEN_BLOCK_17763_20150 *v5;
             } u_v5;
         } Versions;
         PVOID Ref;
@@ -105,6 +108,7 @@ typedef enum _NDIS_OBJECT_TYPE {
     NdisObjectTypeProtocolBlock = 1,
     NdisObjectTypeOpenBlock,
     NdisObjectTypeMDriverBlock,
+    NdisObjectTypeMiniportBlock,
     NdisObjectTypeInvalid
 } NDIS_OBJECT_TYPE;
 
@@ -387,7 +391,7 @@ static LPWSTR g_lpszProtocolBlockHandlers[] = {
     TEXT("FreeSharedMemoryHandler")
 };
 
-ULONG_PTR QueryProtocolList();
+ULONG_PTR QueryProtocolList(VOID);
 
 PVOID DumpUnicodeString(
     _In_ ULONG_PTR Address,
@@ -415,3 +419,30 @@ PVOID HeapMemoryAlloc(
 
 BOOL HeapMemoryFree(
     _In_ PVOID Memory);
+
+BOOL GetWin32FileName(
+    _In_ LPWSTR FileName,
+    _Inout_ LPWSTR Win32FileName,
+    _In_ SIZE_T ccWin32FileName);
+
+VOID CopyTreeListSubItemValue(
+    _In_ HWND TreeList,
+    _In_ UINT ValueIndex);
+
+VOID CopyListViewSubItemValue(
+    _In_ HWND ListView,
+    _In_ UINT ValueIndex);
+
+INT GetMaxCompareTwoFixedStrings(
+    _In_ HWND ListView,
+    _In_ LPARAM lParam1,
+    _In_ LPARAM lParam2,
+    _In_ LPARAM lParamSort,
+    _In_ BOOL Inverse);
+
+INT GetMaxOfTwoU64FromHex(
+    _In_ HWND ListView,
+    _In_ LPARAM lParam1,
+    _In_ LPARAM lParam2,
+    _In_ LPARAM lParamSort,
+    _In_ BOOL Inverse);

@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMPCONSTS.H
 *
-*  VERSION:     1.86
+*  VERSION:     1.87
 *
-*  DATE:        27 May 2020
+*  DATE:        27 June 2020
 *
 *  Consts header file for Object Dump module.
 *
@@ -54,6 +54,7 @@
 #define T_GENERIC_MAPPING           L"GENERIC_MAPPING"
 #define T_EX_RUNDOWN_REF            L"EX_RUNDOWN_REF"
 #define T_PEJOB                     L"PEJOB"
+#define T_PDRIVER_EXTENSION         L"PDRIVER_EXTENSION"
 
 #define T_FLT_SERVER_PORT_OBJECT    L"FLT_SERVER_PORT_OBJECT"
 #define T_PFLT_FILTER               L"PFLT_FILTER"
@@ -73,8 +74,12 @@
 #define T_OBJECT_TYPE_FLAGS         L"ObjectTypeFlags"
 #define T_OBJECT_TYPE_FLAGS2        L"ObjectTypeFlags2"
 
-#define T_SHADOW_DIRECTORY          L"ShadowDirectory"
-#define T_DEVICEMAP                 L"DeviceMap"
+#define T_FIELD_SHADOW_DIRECTORY    L"ShadowDirectory"
+#define T_FIELD_DEVICE_MAP          L"DeviceMap"
+#define T_FIELD_DRIVER_EXTENSION    L"DriverExtension"
+#define T_FIELD_DRIVER_OBJECT       L"DriverObject"
+
+#define T_FIELD_SERVICE_KEYNAME     L"ServiceKeyName"
 
 #define T_TIMER_NOTIFICATION        L"NotificationTimer"
 #define T_TIMER_SYNC                L"SynchronizationTimer"
@@ -84,6 +89,7 @@
 #define T_MAXIMUMLENGTH             L"MaximumLength"
 #define T_TYPEINDEX                 L"Index"
 #define T_REFNOTFOUND               L"! Reference not found"
+#define T_BADDRIVEROBJECT           L"! Bad DRIVER_OBJECT"
 
 #define MAX_KNOWN_DRV_FLAGS 8
 static VALUE_DESC drvFlags[MAX_KNOWN_DRV_FLAGS] = {

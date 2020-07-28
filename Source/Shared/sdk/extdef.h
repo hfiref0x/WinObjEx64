@@ -1,0 +1,111 @@
+/*******************************************************************************
+*
+*  (C) COPYRIGHT AUTHORS, 2019 - 2020
+*
+*  TITLE:       EXTAPI.H
+*
+*  VERSION:     1.01
+*
+*  DATE:        12 July 2020
+*
+*  Windows SDK compatibility header.
+*
+* THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
+* ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
+* TO THE IMPLIED WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A
+* PARTICULAR PURPOSE.
+*
+*******************************************************************************/
+#pragma once
+
+typedef enum _EXT_SID_NAME_USE {
+    ExtSidTypeUser = 1,
+    ExtSidTypeGroup,
+    ExtSidTypeDomain,
+    ExtSidTypeAlias,
+    ExtSidTypeWellKnownGroup,
+    ExtSidTypeDeletedAccount,
+    ExtSidTypeInvalid,
+    ExtSidTypeUnknown,
+    ExtSidTypeComputer,
+    ExtSidTypeLabel,
+    ExtSidTypeLogonSession
+} EXT_SID_NAME_USE, *PEXT_SID_NAME_USE;
+
+//
+// These constants are missing in Windows SDK 8.1
+//
+#ifndef IMAGE_SUBSYSTEM_XBOX_CODE_CATALOG
+#define IMAGE_SUBSYSTEM_XBOX_CODE_CATALOG 17
+#endif
+
+#ifndef SERVICE_USER_SERVICE
+#define SERVICE_USER_SERVICE                        0x00000040
+#endif
+
+#ifndef SERVICE_USERSERVICE_INSTANCE
+#define SERVICE_USERSERVICE_INSTANCE                0x00000080
+#endif
+
+#ifndef SERVICE_PKG_SERVICE
+#define SERVICE_PKG_SERVICE                         0x00000200
+#endif
+
+#ifndef PF_RDTSCP_INSTRUCTION_AVAILABLE
+#define PF_RDTSCP_INSTRUCTION_AVAILABLE             32
+#endif
+
+#ifndef PF_RDPID_INSTRUCTION_AVAILABLE
+#define PF_RDPID_INSTRUCTION_AVAILABLE              33
+#endif
+
+#ifndef PF_ARM_V81_ATOMIC_INSTRUCTIONS_AVAILABLE
+#define PF_ARM_V81_ATOMIC_INSTRUCTIONS_AVAILABLE    34
+#endif
+
+#ifndef PF_MONITORX_INSTRUCTION_AVAILABLE
+#define PF_MONITORX_INSTRUCTION_AVAILABLE           35   
+#endif
+
+#ifndef PF_SSSE3_INSTRUCTIONS_AVAILABLE
+#define PF_SSSE3_INSTRUCTIONS_AVAILABLE             36
+#endif
+
+#ifndef PF_SSE4_1_INSTRUCTIONS_AVAILABLE
+#define PF_SSE4_1_INSTRUCTIONS_AVAILABLE            37
+#endif
+
+#ifndef PF_SSE4_2_INSTRUCTIONS_AVAILABLE
+#define PF_SSE4_2_INSTRUCTIONS_AVAILABLE            38
+#endif
+
+#ifndef PF_AVX_INSTRUCTIONS_AVAILABLE
+#define PF_AVX_INSTRUCTIONS_AVAILABLE               39
+#endif
+
+#ifndef PF_AVX2_INSTRUCTIONS_AVAILABLE
+#define PF_AVX2_INSTRUCTIONS_AVAILABLE              40
+#endif
+
+#ifndef PF_AVX512F_INSTRUCTIONS_AVAILABLE
+#define PF_AVX512F_INSTRUCTIONS_AVAILABLE           41
+#endif
+
+#ifndef _WIN32_WINNT_WIN10
+
+DECLARE_HANDLE(DPI_AWARENESS_CONTEXT);
+
+typedef enum DPI_AWARENESS {
+    DPI_AWARENESS_INVALID = -1,
+    DPI_AWARENESS_UNAWARE = 0,
+    DPI_AWARENESS_SYSTEM_AWARE = 1,
+    DPI_AWARENESS_PER_MONITOR_AWARE = 2
+} DPI_AWARENESS;
+
+#define DPI_AWARENESS_CONTEXT_UNAWARE               ((DPI_AWARENESS_CONTEXT)-1)
+#define DPI_AWARENESS_CONTEXT_SYSTEM_AWARE          ((DPI_AWARENESS_CONTEXT)-2)
+#define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE     ((DPI_AWARENESS_CONTEXT)-3)
+#define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2  ((DPI_AWARENESS_CONTEXT)-4)
+#define DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED     ((DPI_AWARENESS_CONTEXT)-5)
+
+#endif //_WIN32_WINNT_WIN10

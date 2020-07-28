@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.86
+*  VERSION:     1.87
 *
-*  DATE:        29 May 2020
+*  DATE:        23 July 2020
 *
 *  Common header file for the program support routines.
 *
@@ -32,24 +32,24 @@
 typedef struct _SAPIDB {
     LIST_ENTRY ListHead;
     HANDLE     sapiHeap;
-} SAPIDB, * PSAPIDB;
+} SAPIDB, *PSAPIDB;
 
 typedef struct _SCMDB {
     ULONG NumberOfEntries;
     PVOID Entries;
-} SCMDB, * PSCMDB;
+} SCMDB, *PSCMDB;
 
 typedef struct _ENUMICONINFO {
     HICON hIcon;
     INT cx, cy;
-} ENUMICONINFO, * PENUMICONINFO;
+} ENUMICONINFO, *PENUMICONINFO;
 
 typedef	struct _PHL_ENTRY {
     LIST_ENTRY ListEntry;
     HANDLE ProcessHandle;
     HANDLE UniqueProcessId;
     PVOID DataPtr;
-} PHL_ENTRY, * PPHL_ENTRY;
+} PHL_ENTRY, *PPHL_ENTRY;
 
 typedef struct _OBEX_PROCESS_LOOKUP_ENTRY {
     HANDLE hProcess;
@@ -57,24 +57,18 @@ typedef struct _OBEX_PROCESS_LOOKUP_ENTRY {
         PUCHAR EntryPtr;
         PSYSTEM_PROCESSES_INFORMATION ProcessInformation;
     };
-} OBEX_PROCESS_LOOKUP_ENTRY, * POBEX_PROCESS_LOOKUP_ENTRY;
+} OBEX_PROCESS_LOOKUP_ENTRY, *POBEX_PROCESS_LOOKUP_ENTRY;
 
 typedef struct _OBEX_THREAD_LOOKUP_ENTRY {
     HANDLE hThread;
     PVOID EntryPtr;
-} OBEX_THREAD_LOOKUP_ENTRY, * POBEX_THREAD_LOOKUP_ENTRY;
+} OBEX_THREAD_LOOKUP_ENTRY, *POBEX_THREAD_LOOKUP_ENTRY;
 
 // return true to stop enumeration
 typedef BOOL(CALLBACK* PENUMERATE_SL_CACHE_VALUE_DESCRIPTORS_CALLBACK)(
     _In_ SL_KMEM_CACHE_VALUE_DESCRIPTOR* CacheDescriptor,
     _In_opt_ PVOID Context
     );
-
-typedef PVOID(*PMEMALLOCROUTINE)(
-    _In_ SIZE_T NumberOfBytes);
-
-typedef BOOL(*PMEMFREEROUTINE)(
-    _In_ PVOID Memory);
 
 typedef struct _PROCESS_MITIGATION_POLICIES_ALL {
     PROCESS_MITIGATION_DEP_POLICY DEPPolicy;
@@ -92,12 +86,12 @@ typedef struct _PROCESS_MITIGATION_POLICIES_ALL {
     PROCESS_MITIGATION_CHILD_PROCESS_POLICY_W10 ChildProcessPolicy;
     PROCESS_MITIGATION_SIDE_CHANNEL_ISOLATION_POLICY_W10 SideChannelIsolationPolicy;
     PROCESS_MITIGATION_USER_SHADOW_STACK_POLICY_W10 UserShadowStackPolicy;
-} PROCESS_MITIGATION_POLICIES_ALL, * PPROCESS_MITIGATION_POLICIES;
+} PROCESS_MITIGATION_POLICIES_ALL, *PPROCESS_MITIGATION_POLICIES;
 
 typedef struct _PROCESS_MITIGATION_POLICY_RAW_DATA {
     PROCESS_MITIGATION_POLICY Policy;
     ULONG Value;
-} PROCESS_MITIGATION_POLICY_RAW_DATA, * PPROCESS_MITIGATION_POLICY_RAW_DATA;
+} PROCESS_MITIGATION_POLICY_RAW_DATA, *PPROCESS_MITIGATION_POLICY_RAW_DATA;
 
 #define GET_BIT(Integer, Bit) (((Integer) >> (Bit)) & 0x1)
 #define SET_BIT(Integer, Bit) ((Integer) |= 1 << (Bit))
@@ -111,18 +105,18 @@ typedef struct _PROCESS_MITIGATION_POLICY_RAW_DATA {
 typedef struct _ENUMCHILDWNDDATA {
     RECT Rect;
     INT nCmdShow;
-} ENUMCHILDWNDDATA, * PENUMCHILDWNDDATA;
+} ENUMCHILDWNDDATA, *PENUMCHILDWNDDATA;
 
 typedef struct _LANGANDCODEPAGE {
     WORD wLanguage;
     WORD wCodePage;
-} LANGANDCODEPAGE, * LPTRANSLATE;
+} LANGANDCODEPAGE, *LPTRANSLATE;
 
 typedef struct _SAPIDBENTRY {
     LIST_ENTRY ListEntry;
     LPWSTR lpDeviceName;
     LPWSTR lpDeviceDesc;
-} SAPIDBENTRY, * PSAPIDBENTRY;
+} SAPIDBENTRY, *PSAPIDBENTRY;
 
 extern SAPIDB g_sapiDB;
 extern SCMDB g_scmDB;
@@ -149,6 +143,30 @@ typedef struct tagVERHEAD {
 
 #define DWORDUP(x) (((x)+3)&~3)
 
+//
+// Use shared NTSUP forward.
+//
+
+#define supVirtualAllocEx ntsupVirtualAllocEx
+#define supVirtualAlloc ntsupVirtualAlloc
+#define supVirtualFree ntsupVirtualFree
+#define supEnablePrivilege ntsupEnablePrivilege
+#define supGetCurrentProcessToken ntsupGetCurrentProcessToken
+#define supQuerySystemRangeStart ntsupQuerySystemRangeStart
+#define supIsProcess32bit ntsupIsProcess32bit
+#define supQueryThreadWin32StartAddress ntsupQueryThreadWin32StartAddress
+#define supOpenDirectory ntsupOpenDirectory
+#define supQueryProcessName ntsupQueryProcessName
+#define supQueryProcessEntryById ntsupQueryProcessEntryById
+#define supWriteBufferToFile ntsupWriteBufferToFile
+#define supQueryHVCIState ntsupQueryHVCIState
+#define supLookupImageSectionByName ntsupLookupImageSectionByName
+#define supFindPattern ntsupFindPattern
+#define supOpenProcess ntsupOpenProcess
+#define supOpenThread ntsupOpenThread
+#define supCICustomKernelSignersAllowed ntsupCICustomKernelSignersAllowed
+#define supPrivilegeEnabled ntsupPrivilegeEnabled
+
 HTREEITEM supTreeListAddItem(
     _In_ HWND TreeList,
     _In_opt_ HTREEITEM hParent,
@@ -174,17 +192,6 @@ PVOID supHeapAlloc(
 BOOL supHeapFree(
     _In_ PVOID Memory);
 #endif
-
-PVOID supVirtualAllocEx(
-    _In_ SIZE_T Size,
-    _In_ ULONG AllocationType,
-    _In_ ULONG Protect);
-
-PVOID supVirtualAlloc(
-    _In_ SIZE_T Size);
-
-BOOL supVirtualFree(
-    _In_ PVOID Memory);
 
 BOOL supInitTreeListForDump(
     _In_  HWND  hwndParent,
@@ -270,10 +277,6 @@ VOID supClipboardCopy(
     _In_ LPWSTR lpText,
     _In_ SIZE_T cbText);
 
-BOOL supEnablePrivilege(
-    _In_ DWORD PrivilegeName,
-    _In_ BOOL fEnable);
-
 LPWSTR supGetItemText(
     _In_ HWND ListView,
     _In_ INT nItem,
@@ -286,12 +289,6 @@ LPWSTR supGetItemText2(
     _In_ INT nSubItem,
     _In_ WCHAR* pszText,
     _In_ UINT cchText);
-
-BOOL supQueryLinkTarget(
-    _In_opt_ HANDLE RootDirectoryHandle,
-    _In_ PUNICODE_STRING ObjectName,
-    _Inout_	LPWSTR Buffer,
-    _In_ DWORD cbBuffer);
 
 BOOL supQuerySectionFileInfo(
     _In_opt_ HANDLE RootDirectoryHandle,
@@ -319,35 +316,11 @@ BOOL supQueryWinstationDescription(
     _Inout_	LPWSTR Buffer,
     _In_ DWORD ccBuffer);
 
-BOOL supQueryProcessName(
-    _In_ ULONG_PTR dwProcessId,
-    _In_ PVOID ProcessList,
-    _Inout_	LPWSTR Buffer,
-    _In_ DWORD ccBuffer);
-
-BOOL supQueryThreadWin32StartAddress(
-    _In_ HANDLE ThreadHandle,
-    _Out_ PULONG_PTR Win32StartAddress);
-
 BOOL supQueryProcessNameByEPROCESS(
     _In_ ULONG_PTR ValueOfEPROCESS,
     _In_ PVOID ProcessList,
     _Inout_ LPWSTR Buffer,
     _In_ DWORD ccBuffer);
-
-PVOID supFindModuleEntryByName(
-    _In_ PRTL_PROCESS_MODULES pModulesList,
-    _In_ LPCSTR ModuleName);
-
-BOOL supFindModuleNameByAddress(
-    _In_ PRTL_PROCESS_MODULES pModulesList,
-    _In_ PVOID Address,
-    _Inout_	LPWSTR Buffer,
-    _In_ DWORD ccBuffer);
-
-ULONG supFindModuleEntryByAddress(
-    _In_ PRTL_PROCESS_MODULES pModulesList,
-    _In_ PVOID Address);
 
 PVOID supGetTokenInfo(
     _In_ HANDLE TokenHandle,
@@ -357,17 +330,6 @@ PVOID supGetTokenInfo(
 PVOID supGetSystemInfo(
     _In_ SYSTEM_INFORMATION_CLASS SystemInformationClass,
     _Out_opt_ PULONG ReturnLength);
-
-PVOID supGetSystemInfoEx(
-    _In_ SYSTEM_INFORMATION_CLASS SystemInformationClass,
-    _Out_opt_ PULONG ReturnLength,
-    _In_ PMEMALLOCROUTINE MemAllocRoutine,
-    _In_ PMEMFREEROUTINE MemFreeRoutine);
-
-HANDLE supOpenDirectory(
-    _In_opt_ HANDLE RootDirectoryHandle,
-    _In_ LPWSTR DirectoryName,
-    _In_ ACCESS_MASK DesiredAccess);
 
 HANDLE supOpenDirectoryForObject(
     _In_ LPWSTR lpObjectName,
@@ -400,19 +362,6 @@ HICON supGetStockIcon(
     _In_ SHSTOCKICONID siid,
     _In_ UINT uFlags);
 
-ULONG_PTR supWriteBufferToFile(
-    _In_ PWSTR lpFileName,
-    _In_ PVOID Buffer,
-    _In_ SIZE_T Size,
-    _In_ BOOL Flush,
-    _In_ BOOL Append);
-
-BOOL supIsProcess32bit(
-    _In_ HANDLE hProcess);
-
-ULONG_PTR supQuerySystemRangeStart(
-    VOID);
-
 BOOL supGetWin32FileName(
     _In_ LPWSTR FileName,
     _Inout_ LPWSTR Win32FileName,
@@ -424,17 +373,7 @@ BOOLEAN supIsWine(
 BOOLEAN supQuerySecureBootState(
     _Out_ PBOOLEAN pbSecureBoot);
 
-BOOLEAN supQueryHVCIState(
-    _Out_ PBOOLEAN pbHVCIEnabled,
-    _Out_ PBOOLEAN pbHVCIStrictMode,
-    _Out_ PBOOLEAN pbHVCIIUMEnabled);
-
 HWINSTA supOpenWindowStationFromContext(
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ BOOL fInherit,
-    _In_ ACCESS_MASK dwDesiredAccess);
-
-HWINSTA supOpenWindowStationFromContextEx(
     _In_ PROP_OBJECT_INFO* Context,
     _In_ BOOL fInherit,
     _In_ ACCESS_MASK dwDesiredAccess);
@@ -450,21 +389,6 @@ NTSTATUS supIsLocalSystem(
 
 BOOL supRunAsLocalSystem(
     _In_ HWND hwndParent);
-
-HANDLE supGetCurrentProcessToken(
-    VOID);
-
-PVOID supLookupImageSectionByName(
-    _In_ CHAR* SectionName,
-    _In_ ULONG SectionNameLength,
-    _In_ PVOID DllBase,
-    _Out_ PULONG SectionSize);
-
-PVOID supFindPattern(
-    _In_ CONST PBYTE Buffer,
-    _In_ SIZE_T BufferSize,
-    _In_ CONST PBYTE Pattern,
-    _In_ SIZE_T PatternSize);
 
 VOID supUpdateLvColumnHeaderImage(
     _In_ HWND ListView,
@@ -499,6 +423,13 @@ INT supGetMaxCompareTwoFixedStrings(
     _In_ LPARAM lParam2,
     _In_ LPARAM lParamSort,
     _In_ BOOL Inverse);
+
+NTSTATUS supOpenNamedObjectByType(
+    _Out_ HANDLE* ObjectHandle,
+    _In_ ULONG TypeIndex,
+    _In_ LPWSTR ObjectDirectory,
+    _In_opt_ LPWSTR ObjectName,
+    _In_ ACCESS_MASK DesiredAccess);
 
 HANDLE supOpenObjectFromContext(
     _In_ PROP_OBJECT_INFO* Context,
@@ -554,11 +485,6 @@ BOOL supGetProcessMitigationPolicy(
     _In_ SIZE_T Size,
     _Out_writes_bytes_(Size) PVOID Buffer);
 
-NTSTATUS supOpenProcess(
-    _In_ HANDLE UniqueProcessId,
-    _In_ ACCESS_MASK DesiredAccess,
-    _Out_ PHANDLE ProcessHandle);
-
 NTSTATUS supOpenProcessEx(
     _In_ HANDLE UniqueProcessId,
     _Out_ PHANDLE ProcessHandle);
@@ -566,11 +492,6 @@ NTSTATUS supOpenProcessEx(
 NTSTATUS supOpenProcessTokenEx(
     _In_ HANDLE ProcessHandle,
     _Out_ PHANDLE TokenHandle);
-
-NTSTATUS supOpenThread(
-    _In_ PCLIENT_ID ClientId,
-    _In_ ACCESS_MASK DesiredAccess,
-    _Out_ PHANDLE ThreadHandle);
 
 BOOL supPrintTimeConverted(
     _In_ PLARGE_INTEGER Time,
@@ -593,11 +514,6 @@ BOOL supLookupSidUserAndDomain(
     _In_ PSID Sid,
     _Out_ LPWSTR * lpSidUserAndDomain);
 
-BOOL supQueryProcessEntryById(
-    _In_ HANDLE UniqueProcessId,
-    _In_ PVOID ProcessList,
-    _Out_ PSYSTEM_PROCESSES_INFORMATION * Entry);
-
 BOOL supHandlesQueryObjectAddress(
     _In_ PSYSTEM_HANDLE_INFORMATION_EX SortedHandleList,
     _In_ HANDLE ObjectHandle,
@@ -609,9 +525,6 @@ PSYSTEM_HANDLE_INFORMATION_EX supHandlesCreateFilteredAndSortedList(
 
 BOOL supHandlesFreeList(
     PSYSTEM_HANDLE_INFORMATION_EX SortedHandleList);
-
-NTSTATUS supCICustomKernelSignersAllowed(
-    _Out_ PBOOLEAN bAllowed);
 
 VOID supPHLFree(
     _In_ PLIST_ENTRY ListHead,
@@ -637,11 +550,6 @@ BOOLEAN supSLCacheEnumerate(
 
 HRESULT WINAPI supShellExecInExplorerProcess(
     _In_ PCWSTR pszFile);
-
-NTSTATUS supPrivilegeEnabled(
-    _In_ HANDLE ClientToken,
-    _In_ ULONG Privilege,
-    _Out_ LPBOOL pfResult);
 
 VOID supShowNtStatus(
     _In_ HWND hWnd,
@@ -693,10 +601,10 @@ ULONG supHashString(
     _In_ ULONG Length);
 
 ULONG supHashUnicodeString(
-    _In_ CONST UNICODE_STRING* String);
+    _In_ CONST UNICODE_STRING * String);
 
 NTSTATUS supCreateSystemAdminAccessSD(
-    _Out_ PSECURITY_DESCRIPTOR* SelfRelativeSD,
+    _Out_ PSECURITY_DESCRIPTOR * SelfRelativeSD,
     _Out_opt_ PULONG Length);
 
 VOID supSetProcessMitigationImagesPolicy();
@@ -716,8 +624,31 @@ VOID supReportException(
 BOOL supGetVersionInfoFromSection(
     _In_ HANDLE SectionHandle,
     _Out_opt_ PDWORD VersionInfoSize,
-    _Out_ LPVOID *VersionData);
+    _Out_ LPVOID * VersionData);
 
 VOID supReportAPIError(
     _In_ LPWSTR FunctionName,
     _In_ NTSTATUS NtStatus);
+
+BOOLEAN supIsFileImageSection(
+    _In_ ULONG AllocationAttributes);
+
+BOOLEAN supIsDriverShimmed(
+    _In_ PVOID DriverBaseAddress);
+
+VOID supDestroyShimmedDriversList(
+    _In_ PLIST_ENTRY ListHead);
+
+BOOL supListViewExportToFile(
+    _In_ LPWSTR FileName,
+    _In_ HWND WindowHandle,
+    _In_ HWND ListView);
+
+VOID supStatusBarSetText(
+    _In_ HWND hwndStatusBar,
+    _In_ WPARAM partIndex,
+    _In_ LPWSTR lpText);
+
+VOID supJumpToFileListView(
+    _In_ HWND hwndList,
+    _In_ INT iFileNameColumn);

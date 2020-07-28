@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASIPC.C
 *
-*  VERSION:     1.86
+*  VERSION:     1.87
 *
-*  DATE:        17 May 2020
+*  DATE:        28 July 2020
 *
 *  IPC supported: Pipes, Mailslots
 *
@@ -153,7 +153,7 @@ BOOL CALLBACK IpcOpenObjectMethod(
     hObject = NULL;
 
     status = NtOpenFile(&hObject, DesiredAccess, &obja, &iost,
-        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, FILE_NON_DIRECTORY_FILE);
+        FILE_SHARE_VALID_FLAGS, FILE_NON_DIRECTORY_FILE);
 
     if (NT_SUCCESS(status)) {
         *phObject = hObject;
@@ -515,7 +515,7 @@ VOID IpcDlgShowProperties(
             Context,
             (POPENOBJECTMETHOD)&IpcOpenObjectMethod,
             NULL, //use default close method
-            SI_EDIT_OWNER | SI_EDIT_PERMS |
+            SI_EDIT_AUDITS | SI_EDIT_OWNER | SI_EDIT_PERMS | //psiFlags
             SI_ADVANCED | SI_NO_ACL_PROTECT | SI_NO_TREE_APPLY |
             SI_PAGE_TITLE
         );
@@ -599,8 +599,15 @@ VOID IpcDlgQueryInfo(
 
         RtlInitUnicodeString(&uStr, lpObjectRoot);
         InitializeObjectAttributes(&obja, &uStr, OBJ_CASE_INSENSITIVE, NULL, NULL);
-        status = NtOpenFile(&hObject, FILE_LIST_DIRECTORY, &obja, &iost,
-            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, 0);
+        
+        status = NtOpenFile(
+            &hObject, 
+            FILE_LIST_DIRECTORY, 
+            &obja, 
+            &iost,
+            FILE_SHARE_VALID_FLAGS, 
+            0);
+        
         if (!NT_SUCCESS(status) || (hObject == NULL))
             __leave;
 
@@ -781,7 +788,7 @@ INT_PTR CALLBACK IpcDlgProc(
         return DestroyWindow(hwndDlg);
 
     case WM_COMMAND:
-        if (LOWORD(wParam) == IDCANCEL) {
+        if (GET_WM_COMMAND_ID(wParam, lParam) == IDCANCEL) {
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
             return TRUE;
         }

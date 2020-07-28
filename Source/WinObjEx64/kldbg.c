@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.86
+*  VERSION:     1.87
 *
-*  DATE:        29 May 2020
+*  DATE:        23 July 2020
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -1124,9 +1124,20 @@ PVOID ObDumpSymbolicLinkObjectVersionAware(
         ObjectSize = sizeof(OBJECT_SYMBOLIC_LINK_V3);
         ObjectVersion = 3;
         break;
-    default:
+    case NT_WIN10_REDSTONE2:
+    case NT_WIN10_REDSTONE3:
+    case NT_WIN10_REDSTONE4:
+    case NT_WIN10_REDSTONE5:
+    case NT_WIN10_19H1:
+    case NT_WIN10_19H2:
+    case NT_WIN10_20H1:
+    case NT_WIN10_20H2:
         ObjectSize = sizeof(OBJECT_SYMBOLIC_LINK_V4);
         ObjectVersion = 4;
+        break;
+    default:
+        ObjectSize = sizeof(OBJECT_SYMBOLIC_LINK_V5);
+        ObjectVersion = 5;
         break;
     }
 
@@ -1178,6 +1189,62 @@ PVOID ObDumpDeviceMapVersionAware(
         ObjectSize = sizeof(DEVICE_MAP_V2);
         ObjectVersion = 2;
         break;
+    }
+
+    return ObpDumpObjectWithSpecifiedSize(ObjectAddress,
+        ObjectSize,
+        ObjectVersion,
+        Size,
+        Version);
+}
+
+/*
+* ObDumpDriverExtensionVersionAware
+*
+* Purpose:
+*
+* Return dumped DRIVER_EXTENSION structure version aware.
+*
+* Use supVirtualFree to free returned buffer.
+*
+*/
+PVOID ObDumpDriverExtensionVersionAware(
+    _In_ ULONG_PTR ObjectAddress,
+    _Out_ PULONG Size,
+    _Out_ PULONG Version
+)
+{
+    ULONG ObjectSize = 0;
+    ULONG ObjectVersion = 0;
+
+    //assume failure
+    if (Size) *Size = 0;
+    if (Version) *Version = 0;
+
+    if (ObjectAddress < g_kdctx.SystemRangeStart)
+        return NULL;
+
+    if (g_NtBuildNumber >= NT_WIN8_BLUE) {
+        ObjectSize = sizeof(DRIVER_EXTENSION_V4);
+        ObjectVersion = 4;
+    }
+    else {
+
+        switch (g_NtBuildNumber) {
+        case NT_WIN7_RTM:
+        case NT_WIN7_SP1:
+            ObjectSize = sizeof(DRIVER_EXTENSION_V2);
+            ObjectVersion = 2;
+            break;
+        case NT_WIN8_RTM:
+            ObjectSize = sizeof(DRIVER_EXTENSION_V3);
+            ObjectVersion = 3;
+            break;
+        default:
+            ObjectSize = sizeof(DRIVER_EXTENSION);
+            ObjectVersion = 1;
+            break;
+        }
     }
 
     return ObpDumpObjectWithSpecifiedSize(ObjectAddress,
@@ -1630,8 +1697,9 @@ BOOL kdFindKiServiceTable(
 *
 * Purpose:
 *
-* Obtain directory object kernel address by opening directory by name
-* and quering resulted handle in NtQuerySystemInformation(SystemExtendedHandleInformation) handle dump
+* Obtain directory object kernel address by:
+* 1) opening directory by name
+* 2) quering resulted handle in NtQuerySystemInformation(SystemExtendedHandleInformation) handle dump
 *
 */
 BOOL ObGetDirectoryObjectAddress(
@@ -2887,31 +2955,6 @@ PVOID kdQueryIopInvalidDeviceRequest(
 }
 
 /*
-* kdIsDebugBoot
-*
-* Purpose:
-*
-* Perform check is the current OS booted with DEBUG flag.
-*
-*/
-BOOL kdIsDebugBoot(
-    VOID
-)
-{
-    ULONG rl = 0;
-    SYSTEM_KERNEL_DEBUGGER_INFORMATION kdInfo;
-
-    RtlSecureZeroMemory(&kdInfo, sizeof(kdInfo));
-    if (NT_SUCCESS(NtQuerySystemInformation(SystemKernelDebuggerInformation,
-        &kdInfo, sizeof(kdInfo), &rl)))
-    {
-        return kdInfo.KernelDebuggerEnabled;
-    }
-
-    return FALSE;
-}
-
-/*
 * kdReportReadError
 *
 * Purpose:
@@ -3193,7 +3236,8 @@ BOOL kdQuerySystemInformation(
         supHeapFree(SystemModules);
         SystemModules = NULL;
 
-        MappedKernel = LoadLibraryEx(KernelFullPathName,
+        MappedKernel = LoadLibraryEx(
+            KernelFullPathName,
             NULL,
             DONT_RESOLVE_DLL_REFERENCES);
 
@@ -3343,6 +3387,121 @@ ULONG_PTR kdQueryWin32kApiSetTable(
 }
 
 /*
+* kdQueryKernelShims
+*
+* Purpose:
+*
+* Dump kernel shims information.
+*
+*/
+BOOLEAN kdQueryKernelShims(
+    _In_ PKLDBGCONTEXT Context,
+    _In_ BOOLEAN RefreshList
+)
+{
+    PBYTE      ptrCode;
+    ULONG_PTR  Address;
+
+    BOOLEAN  KseEngineDumpValid = FALSE;
+
+    ULONG_PTR NtOsBase;
+    HMODULE hNtOs;
+
+    ULONG_PTR KseShimmedDriversListHead;
+    LIST_ENTRY ListEntry;
+    KSE_SHIMMED_DRIVER* ShimmedDriver;
+
+    if (!kdConnectDriver())
+        return FALSE;
+
+    __try {
+
+        if (Context->KseEngineDump.Valid == FALSE) {
+            NtOsBase = (ULONG_PTR)Context->NtOsBase;
+            hNtOs = (HMODULE)Context->NtOsImageMap;
+
+            ptrCode = (PBYTE)GetProcAddress(hNtOs, "KseSetDeviceFlags");
+            if (ptrCode == NULL) {
+                kdDebugPrint("Kse routine not found\r\n");
+                return FALSE;
+            }
+
+            Address = ObFindAddress(NtOsBase,
+                (ULONG_PTR)hNtOs,
+                IL_KseEngine,
+                ptrCode,
+                DA_ScanBytesKseEngine,
+                KseEnginePattern,
+                sizeof(KseEnginePattern));
+
+            if (Address == 0) {
+                kdDebugPrint("KseEngine address not found\r\n");
+                return FALSE;
+            }
+
+            Address -= FIELD_OFFSET(KSE_ENGINE, State);
+            if (!kdAddressInNtOsImage((PVOID)Address)) {
+                kdDebugPrint("KseEngine address is invalid\r\n");
+                return FALSE;
+            }
+
+            Context->KseEngineDump.KseAddress = Address;
+        }
+
+        if (RefreshList) {
+            supDestroyShimmedDriversList(&Context->KseEngineDump.ShimmedDriversDumpListHead);
+            InitializeListHead(&Context->KseEngineDump.ShimmedDriversDumpListHead);
+        }
+
+        KseShimmedDriversListHead = Context->KseEngineDump.KseAddress + FIELD_OFFSET(KSE_ENGINE, ShimmedDriversListHead);
+        KseEngineDumpValid = TRUE;   
+
+        ListEntry.Blink = ListEntry.Flink = NULL;
+
+        if (kdReadSystemMemoryEx(KseShimmedDriversListHead,
+            &ListEntry,
+            sizeof(LIST_ENTRY),
+            NULL))
+        {
+            while ((ULONG_PTR)ListEntry.Flink != KseShimmedDriversListHead) {
+
+                ShimmedDriver = (KSE_SHIMMED_DRIVER*)supHeapAlloc(sizeof(KSE_SHIMMED_DRIVER));
+                if (ShimmedDriver == NULL) {
+                    KseEngineDumpValid = FALSE;
+                    break;
+                }
+
+                if (!kdReadSystemMemoryEx((ULONG_PTR)ListEntry.Flink,
+                    ShimmedDriver,
+                    sizeof(KSE_SHIMMED_DRIVER),
+                    NULL))
+                {
+                    supHeapFree(ShimmedDriver);
+                    KseEngineDumpValid = FALSE;
+                    kdDebugPrint("KseEngine entry read error\r\n");
+                    break;
+                }
+
+                ListEntry.Flink = ShimmedDriver->ListEntry.Flink;
+                InsertHeadList(&Context->KseEngineDump.ShimmedDriversDumpListHead, &ShimmedDriver->ListEntry);
+            }
+        }
+        else {
+            kdDebugPrint("KseEngine->ShimmedDriversListHead read error\r\n");
+            KseEngineDumpValid = FALSE;
+        }
+
+        Context->KseEngineDump.Valid = KseEngineDumpValid;
+
+    }
+    __except (WOBJ_EXCEPTION_FILTER_LOG) {
+        return FALSE;
+    }
+
+    return KseEngineDumpValid;
+}
+
+/*
 * kdOpenLoadDriverPublic
 *
 * Purpose:
@@ -3415,6 +3574,7 @@ VOID kdInit(
     //
     g_kdctx.DriverOpenLoadStatus = ERROR_NOT_CAPABLE;
 
+    InitializeListHead(&g_kdctx.KseEngineDump.ShimmedDriversDumpListHead);
     InitializeListHead(&g_kdctx.ObCollection.ListHead);
     RtlInitializeCriticalSection(&g_kdctx.ObCollectionLock);
 
@@ -3449,7 +3609,7 @@ VOID kdInit(
     //
     // Check if system booted in the debug mode.
     //
-    if (kdIsDebugBoot() == FALSE)
+    if (ntsupIsKdEnabled(NULL, NULL) == FALSE)
         return;
 
 #endif /* _USE_OWN_DRIVER */
@@ -3505,7 +3665,9 @@ VOID kdInit(
             if (!ObpFindHeaderCookie(&g_kdctx))
                 g_kdctx.ObHeaderCookie.Valid = FALSE;
         }
+
     }
+
 }
 
 /*

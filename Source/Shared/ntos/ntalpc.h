@@ -1,12 +1,12 @@
 /************************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017 - 2018, translated from Microsoft sources/debugger
+*  (C) COPYRIGHT AUTHORS, 2017 - 2020, translated from Microsoft sources/debugger
 *
 *  TITLE:       NTALPC.H
 *
-*  VERSION:     1.88
+*  VERSION:     1.89
 *
-*  DATE:        30 Nov 2018
+*  DATE:        12 July 2020
 *
 *  Common header file for the ntos ALPC/CSR related functions and definitions.
 *
@@ -16,7 +16,10 @@
 * PARTICULAR PURPOSE.
 *
 ************************************************************************************/
+
+#if defined (_MSC_VER) && (_MSC_VER >= 1020)
 #pragma once
+#endif
 
 #ifndef NTALPC_RTL
 #define NTALPC_RTL
@@ -457,11 +460,10 @@ NtAlpcQueryInformation(
 // NTALPC_RTL HEADER END
 //
 
-#pragma warning(pop)
-
-
 #ifdef __cplusplus
 }
 #endif
+
+#pragma warning(pop)
 
 #endif NTALPC_RTL

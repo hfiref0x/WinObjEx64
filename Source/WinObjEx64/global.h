@@ -4,9 +4,9 @@
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.86
+*  VERSION:     1.87
 *
-*  DATE:        26 May 2020
+*  DATE:        12 July 2020
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -68,6 +68,7 @@
 #endif
 
 #include <Windows.h>
+#include <Windowsx.h>
 #include <commctrl.h>
 #include <Uxtheme.h>
 #include <ShlObj.h>
@@ -80,12 +81,13 @@
 #include <Richedit.h>
 
 #include "resource.h"
-#include "extdef.h"
+#include "sdk/extdef.h"
 #include "wine.h"
 #include "minirtl\minirtl.h"
 #include "minirtl\rtltypes.h"
 #include "ntos\ntos.h"
 #include "ntos\ntalpc.h"
+#include "ntos\ntsup.h"
 
 #define _NTDEF_
 #include <ntsecapi.h>
@@ -126,7 +128,6 @@ typedef void(__cdecl *pqsort)(
 //declared in main.c
 extern pswprintf_s rtl_swprintf_s;
 extern pqsort rtl_qsort;
-extern ULONG g_CurrentDPI;
 
 #define RtlStringCchPrintfSecure rtl_swprintf_s
 #define RtlQuickSort rtl_qsort
@@ -134,14 +135,15 @@ extern ULONG g_CurrentDPI;
 typedef struct _WINOBJ_GLOBALS {
     BOOLEAN IsWine;
     BOOLEAN EnableFullMitigations;
+    BOOLEAN ListViewDisplayGrid;
+    ULONG CurrentDPI;
     HINSTANCE hInstance;
     HANDLE Heap;
-    HANDLE RichEditHandle;
     LPWSTR CurrentObjectPath;
     pfnHtmlHelpW HtmlHelpW;
-    HWND AuxDialogs[wobjMaxDlgId];
     CRITICAL_SECTION Lock;
     RTL_OSVERSIONINFOW osver;
+    HWND AuxDialogs[wobjMaxDlgId];
     WCHAR szTempDirectory[MAX_PATH + 1]; //not including backslash
     WCHAR szWindowsDirectory[MAX_PATH + 1]; //not including backslash
     WCHAR szSystemDirectory[MAX_PATH + 1]; //not including backslash

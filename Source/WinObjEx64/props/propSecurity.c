@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPSECURITY.C
 *
-*  VERSION:     1.86
+*  VERSION:     1.87
 *
-*  DATE:        28 June 2020
+*  DATE:        11 July 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -28,7 +28,7 @@
 *
 */
 BOOL propSecurityObjectSupported(
-    _In_ INT nTypeIndex
+    _In_ UINT nTypeIndex
 )
 {
     if ((nTypeIndex != ObjectTypeFile) &&
@@ -36,6 +36,7 @@ BOOL propSecurityObjectSupported(
         (nTypeIndex != ObjectTypeDevice) &&
         (nTypeIndex != ObjectTypeSection) &&
         (nTypeIndex != ObjectTypeEvent) &&
+        (nTypeIndex != ObjectTypeEventPair) &&
         (nTypeIndex != ObjectTypeMutant) &&
         (nTypeIndex != ObjectTypeDesktop) &&
         (nTypeIndex != ObjectTypeKey) &&

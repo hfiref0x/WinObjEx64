@@ -4,9 +4,9 @@
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.86
+*  VERSION:     1.87
 *
-*  DATE:        17 May 2020
+*  DATE:        11 July 2020
 *
 *  Common header file for the user interface.
 *
@@ -18,15 +18,17 @@
 *******************************************************************************/
 #pragma once
 
-#define SCALE_DPI_VALUE(Value) MulDiv(Value, g_CurrentDPI, DefaultSystemDpi)
-
 #define SplitterSize                3
 #define SplitterMargin              80
 
 #define DefaultSystemDpi            96
+
+#define SCALE_DPI_VALUE(Value, CurrentDPI) MulDiv(Value, CurrentDPI, DefaultSystemDpi)
+
 #define TreeListDumpObjWndPosX      12
 #define TreeListDumpObjWndPosY      20
 #define TreeListDumpObjWndScaleSub  3
+
 
 //
 // ListView column counts
@@ -40,7 +42,6 @@
 #define PSLIST_COLUMN_COUNT 6
 #define SSDTLIST_COLUMN_COUNT 4
 #define SLLIST_COLUMN_COUNT 2
-
 
 typedef	struct _OE_LIST_ITEM {
     struct _OE_LIST_ITEM *Prev;
@@ -56,8 +57,8 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 
 #define PROGRAM_MAJOR_VERSION       1
 #define PROGRAM_MINOR_VERSION       8
-#define PROGRAM_REVISION_NUMBER     6
-#define PROGRAM_BUILD_NUMBER        2006
+#define PROGRAM_REVISION_NUMBER     7
+#define PROGRAM_BUILD_NUMBER        2007
 
 #ifdef _USE_OWN_DRIVER
 #define PROGRAM_NAME            L"Windows Object Explorer 64-bit (Non-public version)"
@@ -65,24 +66,29 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 #define PROGRAM_NAME            L"Windows Object Explorer 64-bit"
 #endif
 #define PROFRAM_NAME_AND_TITLE  L"Object Explorer for Windows 7/8/8.1/10"
-#define MAINWINDOWCLASSNAME     L"WinObjEx64Class"
-#define PSLISTCLASSNAME         L"winobjex64_pslistdialogclass"
+#define WINOBJEX64_WNDCLASS     L"WinObjEx64Class"
+#define WINOBJEX64_PSLISTCLASS  L"WinObjEx64PsListClass"
 
 #define T_PROPERTIES            L"Properties...\tEnter"
 #define T_GOTOLINKTARGET        L"Go To Link Target\tCtrl+->"
 #define T_RUNASADMIN            L"R&un as Administrator"
 #define T_RUNASSYSTEM           L"R&un as LocalSystem"
 #define T_COPYTEXTROW           L"Copy Row Selection"
-#define T_COPYEPROCESS          L"Copy EPROCESS value"
-#define T_COPYOBJECT            L"Copy Object value"
+#define T_COPYEPROCESS          L"Copy EPROCESS Value"
+#define T_COPYOBJECT            L"Copy Object Value"
 #define T_COPYVALUE             L"Copy Value Field Text"
 #define T_COPYADDRESS           L"Copy Address Field Text"
 #define T_COPYADDINFO           L"Copy Additional Info Field Text"
-#define T_SAVETOFILE            L"Save list to File"
+#define T_EXPORTTOFILE          L"Export List"
+#define T_JUMPTOFILE            L"Jump to File"
 #define T_DUMPDRIVER            L"Dump Driver"
 #define T_VIEW_REFRESH          L"Refresh\tF5"
 #define T_RESCAN                L"Rescan"
+#define T_VIEW_PLUGINS          L"View Plugins"
 #define T_EMPTY                 L" "
+
+#define T_CSV_FILE_FILTER       TEXT("CSV Files\0*.csv\0\0")
+#define T_LIST_EXPORT_SUCCESS   TEXT("List export - OK")
 
 #define T_DRIVER_REQUIRED       TEXT("Support from helper driver is required for this feature.\r\n\r\n\
 If you see this message it can be caused by:\r\n\
@@ -103,6 +109,7 @@ typedef enum _WOBJ_DIALOGS_ID {
     wobjDriversDlgId,
     wobjCallbacksDlgId,
     wobjSLCacheDlgId,
+    wobjPluginViewId,
     wobjMaxDlgId
 } WOBJ_DIALOGS_ID;
 
@@ -138,6 +145,7 @@ extern HWND g_hwndObjectList;
 extern HIMAGELIST g_ListViewImages;
 extern HIMAGELIST g_ToolBarMenuImages;
 extern ATOM g_TreeListAtom;
+extern HTREEITEM g_SelectedTreeItem;
 
 //
 // Declared in propObjectDump.c
@@ -184,7 +192,7 @@ typedef struct _PROP_UNNAMED_OBJECT_INFO {
 typedef struct _PROP_OBJECT_INFO {
     PROP_CONTEXT_TYPE ContextType;
     BOOL IsType; //TRUE if selected object is an object type
-    INT TypeIndex;
+    UINT TypeIndex;
     DWORD ObjectFlags;//object specific flags
     LPWSTR lpObjectName;
     LPWSTR lpObjectType;
@@ -236,6 +244,11 @@ typedef struct _VALUE_DESC {
     LPWSTR lpDescription;
     DWORD dwValue;
 } VALUE_DESC, *PVALUE_DESC;
+
+typedef struct _WINSTA_DESC {
+    LPWSTR lpszWinSta;
+    LPWSTR lpszDesc;
+} WINSTA_DESC, * PWINSTA_DESC;
 
 //Constants
 //Display simple "N/A" if no info available

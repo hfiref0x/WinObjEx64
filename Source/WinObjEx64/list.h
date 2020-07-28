@@ -4,9 +4,9 @@
 *
 *  TITLE:       LIST.H
 *
-*  VERSION:     1.83
+*  VERSION:     1.87
 *
-*  DATE:        22 Dec 2019
+*  DATE:        30 June 2020
 *
 *  Common header file main program logic.
 *
@@ -40,57 +40,4 @@ VOID FindObject(
     _In_ PFO_LIST_ITEM *List);
 
 VOID ListObjectsInDirectory(
-    _In_ LPWSTR lpObjectDirectory
-);
-
-VOID FORCEINLINE InitializeListHead(
-    _In_ PLIST_ENTRY ListHead
-)
-{
-    ListHead->Flink = ListHead->Blink = ListHead;
-}
-
-#define IsListEmpty(ListHead) \
-    ((ListHead)->Flink == (ListHead))
-
-BOOLEAN FORCEINLINE RemoveEntryList(
-    _In_ PLIST_ENTRY Entry
-)
-{
-    PLIST_ENTRY Blink;
-    PLIST_ENTRY Flink;
-
-    Flink = Entry->Flink;
-    Blink = Entry->Blink;
-    Blink->Flink = Flink;
-    Flink->Blink = Blink;
-    return (BOOLEAN)(Flink == Blink);
-}
-
-PLIST_ENTRY FORCEINLINE RemoveHeadList(
-    _Inout_ PLIST_ENTRY ListHead
-)
-{
-    PLIST_ENTRY Flink;
-    PLIST_ENTRY Entry;
-
-    Entry = ListHead->Flink;
-    Flink = Entry->Flink;
-    ListHead->Flink = Flink;
-    Flink->Blink = ListHead;
-    return Entry;
-}
-
-VOID FORCEINLINE InsertHeadList(
-    _Inout_ PLIST_ENTRY ListHead,
-    _Inout_ PLIST_ENTRY Entry
-)
-{
-    PLIST_ENTRY Flink;
-
-    Flink = ListHead->Flink;
-    Entry->Flink = Flink;
-    Entry->Blink = ListHead;
-    Flink->Blink = Entry;
-    ListHead->Flink = Entry;
-}
+    _In_ LPWSTR lpObjectDirectory);

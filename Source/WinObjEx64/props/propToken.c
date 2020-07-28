@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPTOKEN.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.87
 *
-*  DATE:        05 Jan 2020
+*  DATE:        28 June 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -543,12 +543,15 @@ VOID TokenPageHandlePopup(
 */
 INT_PTR TokenPageDialogOnCommand(
     _In_ HWND hwndDlg,
-    _In_ WPARAM wParam
+    _In_ WPARAM wParam,
+    _In_ LPARAM lParam
 )
 {
     INT_PTR Result = 0;
 
-    switch (LOWORD(wParam)) {
+    UNREFERENCED_PARAMETER(lParam);
+
+    switch (GET_WM_COMMAND_ID(wParam, lParam)) {
     case ID_OBJECT_COPY:
         supCopyListViewSubItemValue(g_hwndTokenPageList, 0);
         Result = 1;
@@ -651,7 +654,7 @@ INT_PTR CALLBACK TokenPageDialogProc(
         break;
 
     case WM_COMMAND:
-        return TokenPageDialogOnCommand(hwndDlg, wParam);
+        return TokenPageDialogOnCommand(hwndDlg, wParam, lParam);
 
     case WM_INITDIALOG:
         return TokenPageDialogOnInit(hwndDlg, lParam);

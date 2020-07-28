@@ -4,14 +4,15 @@
 *
 *  TITLE:       NTLDR.C
 *
-*  VERSION:     1.17
+*  VERSION:     1.18
 *
-*  DATE:        05 Mar 2020
+*  DATE:        15 July 2020
 *
 *  NT loader related code.
 *
 *  Depends on:    ntos.h
 *                 apisetx.h
+*                 minirtl
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -20,9 +21,7 @@
 *
 ************************************************************************************/
 
-#include "global.h"
 #include "ntldr.h"
-#include "apisetx.h"
 
 PFNNTLDR_EXCEPT_FILTER NtpLdrExceptionFilter = NULL;
 

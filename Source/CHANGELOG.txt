@@ -13,6 +13,8 @@ reimplemented directory object dump to output more data
 added callbacks registered with ExRegisterExtension
 fix for pipes (PR #17)
 internal rearrange
+fix high cpu usage for splitter drag (report/fix by RamMerlabs) 
+fix security dialog regression (reported by RamMerlabs) 
 
 v1.8.5
 fix object cookie

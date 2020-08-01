@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.03
 *
-*  DATE:        13 July 2020
+*  DATE:        29 July 2020
 *
 *  Query NDIS specific data.
 *
@@ -46,12 +46,10 @@ NdisDeregisterProtocol
 48 8B 3D C4 7F F8 FF                                            mov     rdi, cs:ndisProtocolList
 18362/18363
 48 8B 3D A2 CE FA FF                                            mov     rdi, cs:ndisProtocolList
-18995
+19041/19042
 48 8B 3D BA 92 FA FF                                            mov     rdi, cs:ndisProtocolList
-19569
-48 8B 3D C2 5A FA FF                                            mov     rdi, cs:ndisProtocolList
-20150
-48 8B 3D 52 50 FA FF                                            mov     rdi, cs:ndisProtocolList
+20175
+48 8B 3D C2 51 FA FF                                            mov     rdi, cs:ndisProtocolList
 */
 
 #define HDE_F_ERROR 0x00001000

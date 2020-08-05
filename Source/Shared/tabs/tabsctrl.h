@@ -77,8 +77,8 @@ PTABHDR TabCreateControl(
     _In_ HINSTANCE hInstance,
     _In_ HWND hParentWnd,
     _In_opt_ HIMAGELIST hImageList,
-    _In_ TABSELCHANGECALLBACK OnSelChangeTab,
-    _In_ TABRESIZECALLBACK OnResizeTab,
+    _In_opt_ TABSELCHANGECALLBACK OnSelChangeTab,
+    _In_opt_ TABRESIZECALLBACK OnResizeTab,
     _In_ TABCALLBACK_ALLOCMEM MemAlloc,
     _In_ TABCALLBACK_FREEMEM MemFree);
 

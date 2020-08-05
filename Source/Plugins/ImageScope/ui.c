@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.00
 *
-*  DATE:        01 Aug 2020
+*  DATE:        03 Aug 2020
 *
 *  WinObjEx64 ImageScope UI.
 *
@@ -194,7 +194,9 @@ VOID SectionDumpUnicodeString(
     _In_ HWND TreeList,
     _In_ HTREEITEM hParent,
     _In_ LPWSTR StringName,
-    _In_ PUNICODE_STRING pString
+    _In_ PUNICODE_STRING pString,
+    _In_ DWORD ItemState,
+    _In_ DWORD StateMask
 )
 {
     HTREEITEM           h_tviSubItem;
@@ -211,8 +213,8 @@ VOID SectionDumpUnicodeString(
         TreeList,
         hParent,
         TVIF_TEXT | TVIF_STATE,
-        TVIS_EXPANDED,
-        0,
+        ItemState,
+        StateMask,
         StringName,
         &subitems);
 
@@ -236,7 +238,7 @@ VOID SectionDumpUnicodeString(
     supTreeListAddItem(
         TreeList,
         h_tviSubItem,
-        TVIF_TEXT | TVIF_STATE,
+        TVIF_TEXT,
         0,
         0,
         TEXT("Length"),
@@ -261,7 +263,7 @@ VOID SectionDumpUnicodeString(
     supTreeListAddItem(
         TreeList,
         h_tviSubItem,
-        TVIF_TEXT | TVIF_STATE,
+        TVIF_TEXT,
         0,
         0,
         TEXT("MaximumLength"),
@@ -289,7 +291,7 @@ VOID SectionDumpUnicodeString(
     supTreeListAddItem(
         TreeList,
         h_tviSubItem,
-        TVIF_TEXT | TVIF_STATE,
+        TVIF_TEXT,
         0,
         0,
         TEXT("Buffer"),
@@ -355,7 +357,9 @@ VOID SectionDumpImageFileName(
                     Context->TreeList,
                     tviRoot,
                     TEXT("Name"),
-                    &ObjectNameInfo->Name);
+                    &ObjectNameInfo->Name,
+                    TVIS_EXPANDED,
+                    TVIS_EXPANDED);
 
             }
 
@@ -516,7 +520,7 @@ VOID SectionDumpStructs(
                 sii.SubSystemMinorVersion);
 
             SectionDumpUlong(Context->TreeList, tviRoot,
-                sii.SubSystemVersion, TEXT("SubSystemType"), szText, UlongDump);
+                sii.SubSystemVersion, TEXT("SubSystemVersion"), szText, UlongDump);
 
             StringCchPrintf(
                 szText,
@@ -751,10 +755,15 @@ VOID SectionTabOnInit(
     HDITEM hdritem;
 
     GetClientRect(hWndDlg, &rc);
+
+    TabCtrl_AdjustRect(Context->TabHeader->hwndTab, FALSE, &rc);
+
     hwndList = CreateWindowEx(WS_EX_STATICEDGE, WC_TREELIST, NULL,
         WS_VISIBLE | WS_CHILD | WS_TABSTOP | TLSTYLE_COLAUTOEXPAND | TLSTYLE_LINKLINES,
-        0, 0,
-        rc.right, rc.bottom,
+        rc.left,
+        rc.top,
+        rc.right,
+        rc.bottom,
         hWndDlg, NULL, NULL, NULL);
 
     if (hwndList) {
@@ -1065,6 +1074,7 @@ VOID TabOnInit(
     default:
         break;
     }
+
 }
 
 /*
@@ -1148,6 +1158,9 @@ VOID TabsDumpList(
     LPWSTR lpFileName;
     GUI_CONTEXT* Context = GetProp(hWndDlg, T_IMS_PROP);
     HWND hwndList = GetDlgItem(hWndDlg, IDC_LIST);
+
+    if (Context == NULL)
+        return;
 
     iSel = TabCtrl_GetCurSel(Context->TabHeader->hwndTab);
 
@@ -1236,16 +1249,17 @@ VOID CALLBACK OnTabResize(
     HWND hwndList = 0;
     GUI_CONTEXT* Context;
 
+    Context = (GUI_CONTEXT*)GetProp(TabHeader->hwndDisplay, T_IMS_PROP);
+    if (Context == NULL)
+        return;
+
     iSel = TabCtrl_GetCurSel(TabHeader->hwndTab);
     GetClientRect(TabHeader->hwndDisplay, &hwndRect);
 
     switch (iSel) {
 
     case TabIdSection:
-        Context = (GUI_CONTEXT*)GetProp(TabHeader->hwndDisplay, T_IMS_PROP);
-        if (Context) {
-            hwndList = Context->TreeList;
-        }
+        hwndList = Context->TreeList;
         break;
 
     case TabIdVSInfo:
@@ -1257,33 +1271,21 @@ VOID CALLBACK OnTabResize(
         return;
     }
 
-    if (hwndList) SetWindowPos(hwndList,
-        0,
+    if (hwndList == NULL)
+        return;
+
+    GetClientRect(TabHeader->hwndDisplay, &hwndRect);
+
+    TabCtrl_AdjustRect(TabHeader->hwndTab, FALSE, &hwndRect);
+
+    SetWindowPos(hwndList,
+        HWND_TOP,
         0,
         0,
         hwndRect.right,
         hwndRect.bottom,
         SWP_NOOWNERZORDER);
-}
 
-/*
-* OnTabSelChange
-*
-* Purpose:
-*
-* Tab window selection change callback.
-*
-*/
-VOID CALLBACK OnTabSelChange(
-    _In_ TABHDR* TabHeader,
-    _In_ INT SelectedTab
-)
-{
-    UNREFERENCED_PARAMETER(SelectedTab);
-
-    //destroy previous window
-    if (TabHeader->hwndDisplay != NULL)
-        DestroyWindow(TabHeader->hwndDisplay);
 }
 
 /*
@@ -1305,7 +1307,6 @@ VOID OnResize(
     if (Context) {
 
         SendMessage(Context->StatusBar, WM_SIZE, 0, 0);
-        RedrawWindow(Context->StatusBar, NULL, 0, RDW_ERASE | RDW_INVALIDATE | RDW_ERASENOW);
 
         GetClientRect(hWnd, &r);
         GetClientRect(Context->StatusBar, &szr);
@@ -1313,12 +1314,16 @@ VOID OnResize(
         //resize of the tab control
         if (Context->TabHeader != NULL) {
 
-            SetWindowPos(Context->TabHeader->hwndTab, HWND_TOP,
-                0, 0, r.right, r.bottom - szr.bottom, 0);
+            SetWindowPos(
+                Context->TabHeader->hwndTab,
+                HWND_TOP,
+                0,
+                0,
+                r.right,
+                r.bottom - szr.bottom,
+                0);
 
             TabResizeTabWindow(Context->TabHeader);
-
-            UpdateWindow(Context->TabHeader->hwndDisplay);
 
         }
     }
@@ -1514,7 +1519,7 @@ BOOL RunUI(
         g_ThisDLL,
         Context->MainWindow,
         NULL,
-        (TABSELCHANGECALLBACK)&OnTabSelChange,
+        NULL,
         (TABRESIZECALLBACK)&OnTabResize,
         (TABCALLBACK_ALLOCMEM)&supHeapAlloc,
         (TABCALLBACK_FREEMEM)&supHeapFree);
@@ -1551,6 +1556,7 @@ BOOL RunUI(
 
     } while ((rv != 0) && (g_PluginQuit == FALSE));
 
+    TabDestroyControl(Context->TabHeader);
     DestroyWindow(Context->MainWindow);
 
     return TRUE;

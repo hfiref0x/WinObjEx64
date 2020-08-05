@@ -11,7 +11,7 @@ Abstract:
     Set of functions used with tab component.
 
     VERSION 2.0 (01.02.2015)
-    
+
     WinObjEx64 version.
 
 --*/
@@ -125,9 +125,19 @@ VOID TabDestroyControl(
     _In_ PTABHDR hdr
 )
 {
+    PTABENTRY tabEntry;
+    PLIST_ENTRY Entry;
     TABCALLBACK_FREEMEM pFree;
+
     if (hdr) {
         pFree = hdr->FreeMem;
+        Entry = hdr->tabsHead.Flink;
+
+        while ((Entry != NULL) && (Entry != &hdr->tabsHead)) {
+            tabEntry = CONTAINING_RECORD(Entry, TABENTRY, ListEntry);
+            Entry = Entry->Flink;
+            pFree(tabEntry);
+        }
         pFree(hdr);
     }
 }
@@ -215,8 +225,8 @@ PTABHDR TabCreateControl(
     _In_ HINSTANCE hInstance,
     _In_ HWND hParentWnd,
     _In_opt_ HIMAGELIST hImageList,
-    _In_ TABSELCHANGECALLBACK OnSelChangeTab,
-    _In_ TABRESIZECALLBACK OnResizeTab,
+    _In_opt_ TABSELCHANGECALLBACK OnSelChangeTab,
+    _In_opt_ TABRESIZECALLBACK OnResizeTab,
     _In_ TABCALLBACK_ALLOCMEM MemAlloc,
     _In_ TABCALLBACK_FREEMEM MemFree
 )

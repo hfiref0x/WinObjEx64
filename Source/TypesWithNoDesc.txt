@@ -5,6 +5,8 @@ CoverageSampler - new RS4 object, ETW
 EtwSessionDemuxEntry - new Win10 object
 IoCompletionReserve - same as IoCompletion except using reserve process allocated memory
 NetworkNamespace - managed by NDIS.sys (renamed to NdisCmState in RS1)
+ProcessStateChange - new 21H1 object
+ThreadStateChange - new 21H1 object
 PsSiloContextNonPaged - new RS1 object
 PsSiloContextPaged - new RS1 object
 RawInputManager - win32k managed object

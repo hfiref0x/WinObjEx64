@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.87
 *
-*  DATE:        27 June 2020
+*  DATE:        19 Oct 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -194,7 +194,7 @@ VOID DrvDumpDriver(
             szDriverDumpInfo,
             MAX_TEXT_CONVERSION_ULONG64);
 
-        ImageSize = strtoul(szDriverDumpInfo);
+        ImageSize = _strtoul(szDriverDumpInfo);
         if (ImageSize == 0)
             break;
 

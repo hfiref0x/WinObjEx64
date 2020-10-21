@@ -4,9 +4,9 @@
 *
 *  TITLE:       OBJECTS.C
 *
-*  VERSION:     1.86
+*  VERSION:     1.87
 *
-*  DATE:        29 May 2020
+*  DATE:        04 Oct 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -66,6 +66,7 @@ WOBJ_TYPE_DESC g_TypePartition = { L"Partition", 0x5227054a, ObjectTypeMemoryPar
 WOBJ_TYPE_DESC g_TypePcwObject = { L"PcwObject", 0xe3f801c3, ObjectTypePcwObject, IDI_ICON_PCWOBJECT, IDS_DESC_PCWOBJECT };
 WOBJ_TYPE_DESC g_TypePowerRequest = { L"PowerRequest", 0xb5a1b3ea, ObjectTypePowerRequest, IDI_ICON_POWERREQUEST, IDS_DESC_POWERREQUEST };
 WOBJ_TYPE_DESC g_TypeProcess = { OBTYPE_NAME_PROCESS, 0x70fcfc4f, ObjectTypeProcess, IDI_ICON_PROCESS, IDS_DESC_PROCESS };
+WOBJ_TYPE_DESC g_TypeProcessStateChange = { L"ProcessStateChange", 0x6fd57b92, ObjectTypeProcessStateChange, IDI_ICON_PROCESSSTATECHANGE, IDS_DESC_PROCESSSTATECHANGE };
 WOBJ_TYPE_DESC g_TypeProfile = { L"Profile", 0xfe82aac9, ObjectTypeProfile, IDI_ICON_PROFILE, IDS_DESC_PROFILE };
 WOBJ_TYPE_DESC g_TypePsSiloContextNonPaged = { L"PsSiloContextNonPaged", 0xe2c391fb, ObjectTypePsSiloContextNonPaged, IDI_ICON_PSSILOCONTEXT, IDS_DESC_PSSILOCONTEXTNP };
 WOBJ_TYPE_DESC g_TypePsSiloContextPaged = { L"PsSiloContextPaged", 0x8f91f0a2, ObjectTypePsSiloContextPaged, IDI_ICON_PSSILOCONTEXT, IDS_DESC_PSSILOCONTEXT };
@@ -76,6 +77,7 @@ WOBJ_TYPE_DESC g_TypeSemaphore = { L"Semaphore", 0x33b553e4, ObjectTypeSemaphore
 WOBJ_TYPE_DESC g_TypeSession = { L"Session", 0xcd4f9c96, ObjectTypeSession, IDI_ICON_SESSION, IDS_DESC_SESSION };
 WOBJ_TYPE_DESC g_TypeSymbolicLink = { L"SymbolicLink", OBTYPE_HASH_SYMBOLIC_LINK, ObjectTypeSymbolicLink, IDI_ICON_SYMLINK, IDS_DESC_SYMLINK };
 WOBJ_TYPE_DESC g_TypeThread = { OBTYPE_NAME_THREAD, 0xc8bcac4a, ObjectTypeThread, IDI_ICON_THREAD, IDS_DESC_THREAD };
+WOBJ_TYPE_DESC g_TypeThreadStateChange = { L"ThreadStateChange", 0x88afedd7, ObjectTypeThreadStateChange, IDI_ICON_THREADSTATECHANGE, IDS_DESC_THREADSTATECHANGE };
 WOBJ_TYPE_DESC g_TypeTimer = { L"Timer", 0x94ec7de5, ObjectTypeTimer, IDI_ICON_TIMER, IDS_DESC_TIMER };
 WOBJ_TYPE_DESC g_TypeTmEn = { L"TmEn", 0x7a2e2a02, ObjectTypeTmEn, IDI_ICON_TMEN, IDS_DESC_TMEN };
 WOBJ_TYPE_DESC g_TypeTmRm = { L"TmRm", 0x7a3b2d34, ObjectTypeTmRm, IDI_ICON_TMRM, IDS_DESC_TMRM };
@@ -92,6 +94,9 @@ WOBJ_TYPE_DESC g_TypeWaitCompletionPacket = { L"WaitCompletionPacket", 0xdaa80e1
 WOBJ_TYPE_DESC g_TypeWinstation = { L"WindowStation", OBTYPE_HASH_WINSTATION, ObjectTypeWinstation, IDI_ICON_WINSTATION, IDS_DESC_WINSTATION };
 WOBJ_TYPE_DESC g_TypeWmiGuid = { L"WmiGuid", 0x36d9823c, ObjectTypeWMIGuid, IDI_ICON_WMIGUID, IDS_DESC_WMIGUID };
 
+//
+// Array items must be always sorted by object type name.
+//
 static WOBJ_TYPE_DESC* gpObjectTypes[] = {
     &g_TypeActivationObject,
     &g_TypeActivityReference,
@@ -140,6 +145,7 @@ static WOBJ_TYPE_DESC* gpObjectTypes[] = {
     &g_TypePcwObject,
     &g_TypePowerRequest,
     &g_TypeProcess,
+    &g_TypeProcessStateChange,
     &g_TypeProfile,
     &g_TypePsSiloContextNonPaged,
     &g_TypePsSiloContextPaged,
@@ -150,6 +156,7 @@ static WOBJ_TYPE_DESC* gpObjectTypes[] = {
     &g_TypeSession,
     &g_TypeSymbolicLink,
     &g_TypeThread,
+    &g_TypeThreadStateChange,
     &g_TypeTimer,
     &g_TypeTmEn,
     &g_TypeTmRm,

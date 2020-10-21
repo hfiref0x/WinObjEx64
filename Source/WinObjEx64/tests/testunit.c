@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.87
 *
-*  DATE:        10 July 2020
+*  DATE:        20 Oct 2020
 *
 *  Test code used while debug.
 *
@@ -730,6 +730,7 @@ VOID TestLicenseCache()
 }
 
 WCHAR* g_szMapDlls[] = {
+    L"\\??\\C:\\build\\temp\\win7pc\\test.dll",
     L"\\systemroot\\system32\\winnsi.dll",
     L"\\systemroot\\system32\\sxssrv.dll",
     L"\\systemroot\\system32\\sppwinob.dll",
@@ -870,7 +871,6 @@ VOID PreHashTypes()
     ObManagerTest();
 }
 
-
 VOID TestCall()
 {
 }
@@ -880,23 +880,23 @@ VOID TestStart(
 )
 {
     TestCall();
-    TestSectionImage();
-    TestShadowDirectory();
+    //TestSectionImage();
+    //TestShadowDirectory();
     //TestPsObjectSecurity();
     //TestLicenseCache();
-    TestApiSetResolve();
+    //TestApiSetResolve();
     //TestDesktop();
-    TestApiPort();
-    TestDebugObject();
-    TestMailslot();
-    TestPartition();
-    TestPrivateNamespace();
-    TestIoCompletion();
-    TestTimer();
-    TestTransaction();
-    TestWinsta();
+    //TestApiPort();
+    //TestDebugObject();
+    //TestMailslot();
+    //TestPartition();
+    //TestPrivateNamespace();
+    //TestIoCompletion();
+    //TestTimer();
+    //TestTransaction();
+    //TestWinsta();
     //TestThread();
-    //PreHashTypes();
+    PreHashTypes();
     //TestJob();
 }
 

@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.87
 *
-*  DATE:        15 July 2020
+*  DATE:        21 Oct 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -187,7 +187,7 @@ OBEX_CALLBACK_DISPATCH_ENTRY g_CallbacksDispatchTable[] = {
         &g_SystemCallbacks.IopFsNotifyChangeQueueHead
     },
     {
-        0, NULL,
+        0, L"IoFileSystemType",
         QueryIopFsListsCallbacks, DumpIoFileSystemCallbacks, NULL,
         NULL
     },
@@ -383,7 +383,7 @@ static const BYTE CiCallbackIndexes_Win10RS3[CI_CALLBACK_NAMES_W10RS3_COUNT] = {
 };
 
 #define CI_CALLBACK_NAMES_W10RS4_20H1_COUNT 24
-static const BYTE CiCallbackIndexes_Win10RS4_20H1[CI_CALLBACK_NAMES_W10RS4_20H1_COUNT] = { //Windows 10 RS4/RS5/19H1/19H2/20H1
+static const BYTE CiCallbackIndexes_Win10RS4_20H1[CI_CALLBACK_NAMES_W10RS4_20H1_COUNT] = { //Windows 10 RS4/RS5/19H1/19H2/20H1/20H2
     0,  //CiSetFileCache
     1,  //CiGetFileCache
     2,  //CiQueryInformation
@@ -602,17 +602,11 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
 
         case NT_WIN10_19H1:
         case NT_WIN10_19H2:
-            Signature = SeCiCallbacksPattern_19H1;
-            SignatureSize = sizeof(SeCiCallbacksPattern_19H1);
-            InstructionMatchPattern = SeCiCallbacksMatchingPattern_19H1_20H2;
-            InstructionMatchLength = 10; //mov
-            InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern_19H1_20H2);
-            break;
         case NT_WIN10_20H1:
         case NT_WIN10_20H2:
         default:
-            Signature = SeCiCallbacksPattern_20H1;
-            SignatureSize = sizeof(SeCiCallbacksPattern_20H1);
+            Signature = SeCiCallbacksPattern_19H1_20H2;
+            SignatureSize = sizeof(SeCiCallbacksPattern_19H1_20H2);
             InstructionMatchPattern = SeCiCallbacksMatchingPattern_19H1_20H2;
             InstructionMatchLength = 10; //mov
             InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern_19H1_20H2);

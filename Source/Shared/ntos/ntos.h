@@ -5,9 +5,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.154
+*  VERSION:     1.155
 *
-*  DATE:        23 July 2020
+*  DATE:        14 Sep 2020
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -9225,6 +9225,24 @@ NTAPI
 RtlAddIntegrityLabelToBoundaryDescriptor(
     _Inout_ PVOID *BoundaryDescriptor,
     _In_ PSID IntegrityLabel);
+
+/************************************************************************************
+*
+* RTL data exports.
+*
+************************************************************************************/
+
+#ifndef _M_X64
+#define RtlNtdllName L"ntdll.dll"
+#define RtlDosPathSeperatorsString ((UNICODE_STRING)RTL_CONSTANT_STRING(L"\\/"))
+#define RtlAlternateDosPathSeperatorString ((UNICODE_STRING)RTL_CONSTANT_STRING(L"/"))
+#define RtlNtPathSeperatorString ((UNICODE_STRING)RTL_CONSTANT_STRING(L"\\"))
+#else
+NTSYSAPI PWSTR RtlNtdllName;
+NTSYSAPI UNICODE_STRING RtlDosPathSeperatorsString;
+NTSYSAPI UNICODE_STRING RtlAlternateDosPathSeperatorString;
+NTSYSAPI UNICODE_STRING RtlNtPathSeperatorString;
+#endif
 
 /************************************************************************************
 *

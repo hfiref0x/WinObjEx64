@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPPROCESS.C
 *
-*  VERSION:     1.85
+*  VERSION:     1.87
 *
-*  DATE:        13 Mar 2020
+*  DATE:        19 Oct 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -144,7 +144,7 @@ VOID ProcessShowProperties(
         //query process id
         Buffer = supGetItemText(hwndListView, iItem, 1, NULL);
         if (Buffer) {
-            UniqueProcessId = UlongToHandle(strtoul(Buffer));
+            UniqueProcessId = UlongToHandle(_strtoul(Buffer));
             supHeapFree(Buffer);
 
             //query process win32 image path

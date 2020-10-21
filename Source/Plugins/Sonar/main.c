@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.03
 *
-*  DATE:        29 July 2020
+*  DATE:        20 Oct 2020
 *
 *  WinObjEx64 Sonar plugin.
 *
@@ -22,7 +22,7 @@
 //
 // Maximum tested build Sonar is known to work.
 //
-#define SONAR_MAX_TESTED_BUILD 20180
+#define SONAR_MAX_TESTED_BUILD 20231
 
 //
 // Dll instance.

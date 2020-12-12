@@ -475,7 +475,7 @@ ULONG_PTR ObFindAddress(
 *
 * Purpose:
 *
-* Initialize block offfsets table for working with OBJECT_HEADER data.
+* Initialize block offsets table for working with OBJECT_HEADER data.
 *
 * Note:
 *

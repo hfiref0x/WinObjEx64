@@ -108,6 +108,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Shared\minirtl\u64tohex.c" />
+    <ClCompile Include="..\..\Shared\minirtl\_strcat.c" />
     <ClCompile Include="..\..\Shared\minirtl\_strcmp.c" />
     <ClCompile Include="..\..\Shared\minirtl\_strcmpi.c" />
     <ClCompile Include="..\..\Shared\minirtl\_strcpy.c" />

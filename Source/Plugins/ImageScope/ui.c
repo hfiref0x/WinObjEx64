@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020
+*  (C) COPYRIGHT AUTHORS, 2020 - 2021
 *
 *  TITLE:       UI.C
 *
-*  VERSION:     1.00
+*  VERSION:     1.01
 *
-*  DATE:        03 Aug 2020
+*  DATE:        08 Jan 2021
 *
 *  WinObjEx64 ImageScope UI.
 *
@@ -1021,7 +1021,7 @@ VOID StringsTabOnInit(
             0,
             I_IMAGENONE,
             LVCFMT_LEFT,
-            TEXT("Printable strings"),
+            TEXT("Sring"),
             MAX_PATH,
             Context->CurrentDPI);
 
@@ -1124,6 +1124,7 @@ VOID TabsOnContextMenu(
 )
 {
     INT iSel;
+    UINT uPos = 0;
     POINT pt1;
     HMENU hMenu;
     GUI_CONTEXT* Context = GetProp(hWndDlg, T_IMS_PROP);
@@ -1139,7 +1140,23 @@ VOID TabsOnContextMenu(
         if (GetCursorPos(&pt1)) {
             hMenu = CreatePopupMenu();
             if (hMenu) {
-                InsertMenu(hMenu, 0, MF_BYCOMMAND, ID_MENU_LIST_DUMP, T_EXPORTTOFILE);
+
+                //
+                // Add "Copy %item%" menu item.
+                //
+                if (supListViewAddCopyValueItem(hMenu,
+                    GetDlgItem(hWndDlg, IDC_LIST),
+                    ID_MENU_LIST_COPY,
+                    uPos,
+                    &pt1,
+                    &Context->LvItemHit,
+                    &Context->LvColumnHit))
+                {
+                    uPos++;
+                    InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+                }
+
+                InsertMenu(hMenu, uPos, MF_BYCOMMAND, ID_MENU_LIST_DUMP, T_EXPORTTOFILE);
                 TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, hWndDlg, NULL);
                 DestroyMenu(hMenu);
             }
@@ -1180,6 +1197,21 @@ VOID TabsDumpList(
     supListViewExportToFile(lpFileName, hWndDlg, hwndList, iColumns);
 }
 
+VOID TabsListViewCopyItem(
+    _In_ HWND hWndDlg
+)
+{
+    GUI_CONTEXT* Context = GetProp(hWndDlg, T_IMS_PROP);
+
+    if (Context) {
+
+        supListViewCopyItemValueToClipboard(GetDlgItem(hWndDlg, IDC_LIST),
+            Context->LvItemHit,
+            Context->LvColumnHit);
+
+    }
+}
+
 /*
 * TabsWndProc
 *
@@ -1205,9 +1237,15 @@ INT_PTR CALLBACK TabsWndProc(
     case WM_COMMAND:
 
         switch (GET_WM_COMMAND_ID(wParam, lParam)) {
+
         case ID_MENU_LIST_DUMP:
             TabsDumpList(hWnd);
             break;
+
+        case ID_MENU_LIST_COPY:
+            TabsListViewCopyItem(hWnd);
+            break;
+
         default:
             break;
         }
@@ -1439,6 +1477,9 @@ BOOL RunUI(
 #pragma warning(pop)
 
     Context->CurrentDPI = Context->ParamBlock.CurrentDPI;
+
+    Context->LvColumnHit = -1;
+    Context->LvItemHit = -1;
 
     //
     // Window class once.

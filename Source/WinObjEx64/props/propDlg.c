@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDLG.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        22 July 2020
+*  DATE:        04 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -86,7 +86,6 @@ BOOL propOpenCurrentObject(
     //
     if (
         (Context->TypeIndex == ObjectTypeUnknown) ||
-        (Context->TypeIndex == ObjectTypePort) ||
         (Context->TypeIndex == ObjectTypeFltConnPort) ||
         (Context->TypeIndex == ObjectTypeFltComnPort) ||
         (Context->TypeIndex == ObjectTypeWaitablePort)
@@ -197,11 +196,11 @@ BOOL propOpenCurrentObject(
         //
         // If this is root, then root hDirectory = NULL.
         //
-        if (_strcmpi(Context->lpObjectName, L"\\") != 0) {
+        if (_strcmpi(Context->lpObjectName, KM_OBJECTS_ROOT_DIRECTORY) != 0) {
             //
             // Otherwise open directory that keep this object.
             //
-            hDirectory = supOpenDirectoryForObject(Context->lpObjectName, Context->lpCurrentObjectPath);
+            supOpenDirectoryForObject(&hDirectory, Context->lpObjectName, Context->lpCurrentObjectPath);
             if (hDirectory == NULL) {
                 SetLastError(ERROR_OBJECT_NOT_FOUND);
                 return bResult;
@@ -212,7 +211,14 @@ BOOL propOpenCurrentObject(
         // Open object in directory.
         //
 
-        hObject = supOpenDirectory(hDirectory, Context->lpObjectName, DesiredAccess);
+        status = supOpenDirectory(&hObject, hDirectory, 
+            Context->lpObjectName, 
+            DesiredAccess);
+
+        if (!NT_SUCCESS(status)) {
+            SetLastError(RtlNtStatusToDosError(status));
+        }
+
         bResult = (hObject != NULL);
 
         if (bResult) {
@@ -229,7 +235,7 @@ BOOL propOpenCurrentObject(
     //
     // Open directory which current object belongs.
     //
-    hDirectory = supOpenDirectoryForObject(Context->lpObjectName, Context->lpCurrentObjectPath);
+    supOpenDirectoryForObject(&hDirectory, Context->lpObjectName, Context->lpCurrentObjectPath);
     if (hDirectory == NULL) {
         SetLastError(ERROR_OBJECT_NOT_FOUND);
         return bResult;
@@ -407,6 +413,11 @@ VOID propContextDestroy(
                 supHeapFree(Context->UnnamedObjectInfo.ImageName.Buffer);
         }
 
+        if (Context->PortObjectInfo.IsAllocated) {
+            if (Context->PortObjectInfo.ReferenceHandle)
+                NtClose(Context->PortObjectInfo.ReferenceHandle);
+        }
+
         //free context itself
         supHeapFree(Context);
 
@@ -444,11 +455,10 @@ LRESULT WINAPI PropSheetCustomWndProc(
         break;
 
     case WM_DESTROY:
-        Context = (PROP_OBJECT_INFO*)GetProp(hwnd, T_PROPCONTEXT);
+        Context = (PROP_OBJECT_INFO*)RemoveProp(hwnd, T_PROPCONTEXT);
         if (Context) {
             propContextDestroy(Context);
         }
-        RemoveProp(hwnd, T_PROPCONTEXT);
         break;
 
     case WM_CLOSE:
@@ -882,9 +892,6 @@ VOID propCreateDialog(
     hwndDlg = (HWND)PropertySheet(&PropHeader);
 
     if (hwndDlg) {
-
-        //remove class icon if any
-        SetClassLongPtr(hwndDlg, GCLP_HICON, (LONG_PTR)NULL);
 
         if (propContext->ContextType == propPrivateNamespace) {
             g_NamespacePropWindow = hwndDlg;

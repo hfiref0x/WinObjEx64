@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        20 Oct 2020
+*  DATE:        11 Dec 2020
 *
 *  Test code used while debug.
 *
@@ -43,6 +43,11 @@ typedef struct _QUERY_REQUEST {
 } QUERY_REQUEST, *PQUERY_REQUEST;
 
 #define WOBJEX_TEST_PORT L"\\Rpc Control\\WinObjEx_ServiceTestPort48429"
+
+HANDLE TestGetPortHandle()
+{
+    return g_PortHandle;
+}
 
 DWORD WINAPI LPCListener(LPVOID lpThreadParameter)
 {
@@ -866,6 +871,25 @@ VOID TestShadowDirectory()
     }
 }
 
+VOID TestAlpcPortOpen()
+{
+    HANDLE hObject = NULL;
+    NTSTATUS ntStatus;
+
+    ntStatus = supOpenPortObjectByName(&hObject, 
+        PORT_ALL_ACCESS,
+        NULL, 
+        WOBJEX_TEST_PORT);
+
+    if (NT_SUCCESS(ntStatus)) {
+        Beep(0, 0);
+        NtClose(hObject);
+    }
+    else {
+        kdDebugPrint("supOpenPortObjectByName failed with NTSTATUS 0x%lX", (ULONG)ntStatus);
+    }
+}
+
 VOID PreHashTypes()
 {
     ObManagerTest();
@@ -886,9 +910,10 @@ VOID TestStart(
     //TestLicenseCache();
     //TestApiSetResolve();
     //TestDesktop();
-    //TestApiPort();
+    TestApiPort();
+    TestAlpcPortOpen();
     //TestDebugObject();
-    //TestMailslot();
+    TestMailslot();
     //TestPartition();
     //TestPrivateNamespace();
     //TestIoCompletion();

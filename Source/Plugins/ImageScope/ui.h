@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020
+*  (C) COPYRIGHT AUTHORS, 2020 - 2021
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.00
+*  VERSION:     1.01
 *
-*  DATE:        17 July 2020
+*  DATE:        08 Jan 2021
 *
 *  WinObjEx64 ImageScope UI constants, definitions and includes.
 *
@@ -37,9 +37,14 @@
 #define PRINTF_BUFFER_LENGTH 100
 
 #define ID_MENU_LIST_DUMP     49001
+#define ID_MENU_LIST_COPY     49002
 
 typedef struct _GUI_CONTEXT {
     UINT CurrentDPI;
+
+    INT LvItemHit;
+    INT LvColumnHit;
+
     HWND MainWindow;
     HWND StatusBar;
     HWND TreeList;

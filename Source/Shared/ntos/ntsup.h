@@ -1,12 +1,12 @@
 /************************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2011 - 2020 UGN/HE
+*  (C) COPYRIGHT AUTHORS, 2011 - 2021 UGN/HE
 *
 *  TITLE:       NTSUP.H
 *
-*  VERSION:     2.02
+*  VERSION:     2.05
 *
-*  DATE:        23 July 2020
+*  DATE:        14 Jan 2021
 *
 *  Common header file for the NT API support functions and definitions.
 *
@@ -32,6 +32,7 @@
 #pragma warning(push)
 #pragma warning(disable: 4201) // nameless struct/union
 #pragma warning(disable: 4214) // nonstandard extension used : bit field types other than int
+#pragma warning(disable: 26812) // enum type % is unscoped
 
 #ifndef _WINDOWS_
 #include <Windows.h>
@@ -56,6 +57,13 @@
 extern "C" {
 #endif
 #endif
+
+typedef NTSTATUS(NTAPI* PFN_NTQUERYROUTINE)(
+   _In_ HANDLE ObjectHandle,
+   _In_ DWORD InformationClass,
+   _Out_writes_bytes_(ObjectInformationLength) PVOID ObjectInformation,
+   _In_ ULONG ObjectInformationLength,
+   _Out_opt_ PULONG ReturnLength);
 
 typedef PVOID(CALLBACK* PNTSUPMEMALLOC)(
     _In_ SIZE_T NumberOfBytes);
@@ -147,7 +155,8 @@ BOOL ntsupQueryThreadWin32StartAddress(
     _In_ HANDLE ThreadHandle,
     _Out_ PULONG_PTR Win32StartAddress);
 
-HANDLE ntsupOpenDirectory(
+NTSTATUS ntsupOpenDirectory(
+    _Out_ PHANDLE DirectoryHandle,
     _In_opt_ HANDLE RootDirectoryHandle,
     _In_ LPWSTR DirectoryName,
     _In_ ACCESS_MASK DesiredAccess);
@@ -162,6 +171,39 @@ BOOL ntsupQueryProcessEntryById(
     _In_ HANDLE UniqueProcessId,
     _In_ PVOID ProcessList,
     _Out_ PSYSTEM_PROCESSES_INFORMATION* Entry);
+
+NTSTATUS ntsupQueryProcessInformation(
+    _In_ HANDLE ProcessHandle,
+    _In_ PROCESSINFOCLASS ProcessInformationClass,
+    _Out_ PVOID* Buffer,
+    _Out_opt_ PULONG ReturnLength,
+    _In_ PNTSUPMEMALLOC AllocMem,
+    _In_ PNTSUPMEMFREE FreeMem);
+
+NTSTATUS ntsupQueryObjectInformation(
+    _In_ HANDLE ObjectHandle,
+    _In_ OBJECT_INFORMATION_CLASS ObjectInformationClass,
+    _Out_ PVOID* Buffer,
+    _Out_opt_ PULONG ReturnLength,
+    _In_ PNTSUPMEMALLOC AllocMem,
+    _In_ PNTSUPMEMFREE FreeMem);
+
+NTSTATUS ntsupQuerySecurityInformation(
+    _In_ HANDLE ObjectHandle,
+    _In_ SECURITY_INFORMATION SecurityInformationClass,
+    _Out_ PVOID* Buffer,
+    _Out_opt_ PULONG ReturnLength,
+    _In_ PNTSUPMEMALLOC AllocMem,
+    _In_ PNTSUPMEMFREE FreeMem);
+
+NTSTATUS ntsupQuerySystemObjectInformationVariableSize(
+    _In_ PFN_NTQUERYROUTINE QueryRoutine,
+    _In_ HANDLE ObjectHandle,
+    _In_ DWORD InformationClass,
+    _Out_ PVOID* Buffer,
+    _Out_opt_ PULONG ReturnLength,
+    _In_ PNTSUPMEMALLOC AllocMem,
+    _In_ PNTSUPMEMFREE FreeMem);
 
 BOOLEAN ntsupQueryHVCIState(
     _Out_ PBOOLEAN pbHVCIEnabled,

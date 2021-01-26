@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020
+*  (C) COPYRIGHT AUTHORS, 2020 - 2021
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.87
+*  VERSION:     1.01
 *
-*  DATE:        18 July 2020
+*  DATE:        08 Jan 2021
 *
 *  Common header file for the plugin support routines.
 *
@@ -67,3 +67,33 @@ INT supAddListViewColumn(
     _In_ LPWSTR Text,
     _In_ INT Width,
     _In_ INT DpiValue);
+
+BOOL supListViewAddCopyValueItem(
+    _In_ HMENU hMenu,
+    _In_ HWND hwndLv,
+    _In_ UINT uId,
+    _In_opt_ UINT uPos,
+    _In_ POINT* lpPoint,
+    _Out_ INT* pItemHit,
+    _Out_ INT* pColumnHit);
+
+void supCopyMemory(
+    _Inout_ void* dest,
+    _In_ size_t cbdest,
+    _In_ const void* src,
+    _In_ size_t cbsrc);
+
+LPWSTR supGetItemText(
+    _In_ HWND ListView,
+    _In_ INT nItem,
+    _In_ INT nSubItem,
+    _Out_opt_ PSIZE_T lpSize);
+
+VOID supClipboardCopy(
+    _In_ LPWSTR lpText,
+    _In_ SIZE_T cbText);
+
+BOOL supListViewCopyItemValueToClipboard(
+    _In_ HWND hwndListView,
+    _In_ INT iItem,
+    _In_ INT iSubItem);

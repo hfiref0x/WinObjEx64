@@ -72,6 +72,9 @@
     <ClCompile Include="..\..\Shared\minirtl\u64tohex.c">
       <Filter>minirtl</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Shared\minirtl\_strcat.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h">

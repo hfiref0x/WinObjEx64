@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        12 July 2020
+*  DATE:        16 Jan 2021
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -29,13 +29,13 @@
 // Ignored warnings
 //
 #pragma warning(disable: 4005) // macro redefinition
+#pragma warning(disable: 4054) // 'type cast': from function pointer '%' to data pointer '%'
+#pragma warning(disable: 4055) // 'type cast': from data pointer '%' to function pointer '%'
 #pragma warning(disable: 4091) // 'typedef ': ignored on left of '%s' when no variable is declared
 #pragma warning(disable: 4201) // nameless struct/union
-#pragma warning(disable: 6255 6263) // alloca
+#pragma warning(disable: 4390) // empty controlled statement
 #pragma warning(disable: 6320) // Exception-filter expression is the constant EXCEPTION_EXECUTE_HANDLER.
 #pragma warning(disable: 6258) // Using TerminateThread does not allow proper thread clean up.
-#pragma warning(disable: 26812) // Prefer 'enum class' over 'enum'
-#pragma warning(disable: 26493) // Don't use C style casts
 
 // C++ meaningless warnings
 #pragma warning(disable: 26446)
@@ -43,7 +43,9 @@
 #pragma warning(disable: 26482)
 #pragma warning(disable: 26485)
 #pragma warning(disable: 26489)
+#pragma warning(disable: 26493) // Don't use C style casts
 #pragma warning(disable: 26494)
+#pragma warning(disable: 26812) // Prefer 'enum class' over 'enum'
 
 //
 // Included lib files used by program.
@@ -132,11 +134,18 @@ extern pqsort rtl_qsort;
 #define RtlStringCchPrintfSecure rtl_swprintf_s
 #define RtlQuickSort rtl_qsort
 
+typedef struct _WINOBJ_PORT_GLOBAL {
+    BOOLEAN Initialized;
+    USHORT AlpcPortTypeIndex;
+} WINOBJ_PORT_GLOBAL, * PWINOBJ_PORT_GLOBAL;
+
 typedef struct _WINOBJ_GLOBALS {
     BOOLEAN IsWine;
     BOOLEAN EnableFullMitigations;
     BOOLEAN ListViewDisplayGrid;
+    UINT SettingsChangeMessage;
     ULONG CurrentDPI;
+    WINOBJ_PORT_GLOBAL AlpcPortTypeInfo;
     HINSTANCE hInstance;
     HANDLE Heap;
     LPWSTR CurrentObjectPath;

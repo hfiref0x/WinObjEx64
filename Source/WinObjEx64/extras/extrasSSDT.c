@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        22 July 2020
+*  DATE:        14 Jan 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -21,6 +21,9 @@
 #include "ntos/ntldr.h"
 
 #define ID_SDTLIST_SAVE 40002
+
+#define SDTDLG_TRACKSIZE_MIN_X 640
+#define SDTDLG_TRACKSIZE_MIN_Y 480
 
 SDT_TABLE KiServiceTable;
 SDT_TABLE W32pServiceTable;
@@ -93,22 +96,43 @@ INT CALLBACK SdtDlgCompareFunc(
 *
 */
 VOID SdtHandlePopupMenu(
-    _In_ HWND hwndDlg
+    _In_ HWND hwndDlg,
+    _In_ LPPOINT lpPoint,
+    _In_ PVOID lpUserParam
 )
 {
-    POINT pt1;
     HMENU hMenu;
-
-    if (GetCursorPos(&pt1) == FALSE)
-        return;
+    UINT uPos = 0;
+    EXTRASCONTEXT* Context = (EXTRASCONTEXT*)lpUserParam;
 
     hMenu = CreatePopupMenu();
     if (hMenu) {
-        InsertMenu(hMenu, 0, MF_BYCOMMAND, ID_JUMPTOFILE, T_JUMPTOFILE);
-        InsertMenu(hMenu, 1, MF_BYCOMMAND, ID_SDTLIST_SAVE, T_EXPORTTOFILE);
-        InsertMenu(hMenu, 2, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-        InsertMenu(hMenu, 3, MF_BYCOMMAND, ID_VIEW_REFRESH, T_RESCAN);
-        TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, hwndDlg, NULL);
+
+        if (supListViewAddCopyValueItem(hMenu,
+            Context->ListView,
+            ID_OBJECT_COPY,
+            uPos,
+            lpPoint,
+            &Context->lvItemHit,
+            &Context->lvColumnHit))
+        {
+            uPos++;
+            InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+        }
+
+        InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_JUMPTOFILE, T_JUMPTOFILE);
+        InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_SDTLIST_SAVE, T_EXPORTTOFILE);
+        InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+        InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_VIEW_REFRESH, T_RESCAN);
+
+        TrackPopupMenu(hMenu,
+            TPM_RIGHTBUTTON | TPM_LEFTALIGN,
+            lpPoint->x,
+            lpPoint->y,
+            0,
+            hwndDlg,
+            NULL);
+
         DestroyMenu(hMenu);
     }
 }
@@ -230,6 +254,14 @@ INT_PTR CALLBACK SdtDialogProc(
     INT dlgIndex;
     EXTRASCONTEXT* pDlgContext;
 
+    if (uMsg == g_WinObj.SettingsChangeMessage) {
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+            extrasHandleSettingsChange(pDlgContext);
+        }
+        return TRUE;
+    }
+
     switch (uMsg) {
 
     case WM_INITDIALOG:
@@ -239,8 +271,10 @@ INT_PTR CALLBACK SdtDialogProc(
 
     case WM_GETMINMAXINFO:
         if (lParam) {
-            ((PMINMAXINFO)lParam)->ptMinTrackSize.x = 640;
-            ((PMINMAXINFO)lParam)->ptMinTrackSize.y = 480;
+            supSetMinMaxTrackSize((PMINMAXINFO)lParam,
+                SDTDLG_TRACKSIZE_MIN_X,
+                SDTDLG_TRACKSIZE_MIN_Y,
+                TRUE);
         }
         break;
 
@@ -255,8 +289,10 @@ INT_PTR CALLBACK SdtDialogProc(
         break;
 
     case WM_CLOSE:
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        pDlgContext = (EXTRASCONTEXT*)RemoveProp(hwndDlg, T_DLGCONTEXT);
         if (pDlgContext) {
+
+            extrasRemoveDlgIcon(pDlgContext);
 
             dlgIndex = 0;
 
@@ -265,8 +301,8 @@ INT_PTR CALLBACK SdtDialogProc(
             else if (pDlgContext->DialogMode == SST_Win32k)
                 dlgIndex = wobjW32SSTDlgId;
 
-            if ((dlgIndex == wobjKSSTDlgId)
-                || (dlgIndex == wobjW32SSTDlgId))
+            if ((dlgIndex == wobjKSSTDlgId) ||
+                (dlgIndex == wobjW32SSTDlgId))
             {
                 g_WinObj.AuxDialogs[dlgIndex] = NULL;
             }
@@ -280,7 +316,7 @@ INT_PTR CALLBACK SdtDialogProc(
 
         case IDCANCEL:
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
-            return TRUE;
+            break;
 
         case ID_SDTLIST_SAVE:
             pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
@@ -295,7 +331,7 @@ INT_PTR CALLBACK SdtDialogProc(
                 }
 
             }
-            return TRUE;
+            break;
 
         case ID_VIEW_REFRESH:
             pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
@@ -310,16 +346,32 @@ INT_PTR CALLBACK SdtDialogProc(
                 supJumpToFileListView(pDlgContext->ListView, 3);
             }
             break;
+
+        case ID_OBJECT_COPY:
+            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+            if (pDlgContext) {
+                supListViewCopyItemValueToClipboard(pDlgContext->ListView,
+                    pDlgContext->lvItemHit,
+                    pDlgContext->lvColumnHit);
+            }
+            break;
+
         }
 
         break;
 
-    case WM_DESTROY:
-        RemoveProp(hwndDlg, T_DLGCONTEXT);
-        break;
-
     case WM_CONTEXTMENU:
-        SdtHandlePopupMenu(hwndDlg);
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+
+            supHandleContextMenuMsgForListView(hwndDlg,
+                wParam,
+                lParam,
+                pDlgContext->ListView,
+                (pfnPopupMenuHandler)SdtHandlePopupMenu,
+                (PVOID)pDlgContext);
+
+        }
         break;
 
     default:
@@ -693,66 +745,6 @@ ULONG_PTR ApiSetExtractReferenceFromAdapter(
 }
 
 /*
-* ApiSetResolveWin32kTableEntry
-*
-* Purpose:
-*
-* Find entry in Win32kApiSetTable.
-*
-* Function return TRUE on success and sets ResolvedEntry parameter.
-*
-*/
-BOOLEAN ApiSetResolveWin32kTableEntry(
-    _In_ ULONG_PTR ApiSetTable,
-    _In_ ULONG_PTR LookupEntry,
-    _Out_ PW32K_API_SET_TABLE_ENTRY* ResolvedEntry
-)
-{
-    BOOLEAN bResult = FALSE;
-    PW32K_API_SET_TABLE_ENTRY Entry = (PW32K_API_SET_TABLE_ENTRY)ApiSetTable;
-    ULONG EntriesCount;
-    ULONG_PTR EntryValue;
-    PULONG_PTR ArrayPtr;
-
-    *ResolvedEntry = NULL;
-
-    //
-    // Lookup entry in table.
-    //
-    __try {
-        while (Entry->Host) {
-            EntriesCount = Entry->Host->HostEntriesCount;
-            ArrayPtr = (PULONG_PTR)Entry->HostEntriesArray;
-            //
-            // Search inside table host entry array.
-            //
-            while (EntriesCount) {
-
-                EntryValue = (ULONG_PTR)ArrayPtr;
-                ArrayPtr++;
-                EntriesCount--;
-
-                if (EntryValue == LookupEntry) {
-                    *ResolvedEntry = Entry;
-                    bResult = TRUE;
-                    break;
-                }
-
-            }
-            Entry = (PW32K_API_SET_TABLE_ENTRY)RtlOffsetToPointer(Entry, sizeof(W32K_API_SET_TABLE_ENTRY));
-        }
-    }
-    __except (WOBJ_EXCEPTION_FILTER_LOG) {
-        //
-        // Should never be here. Only in case if table structure changed or ApiSetTable address points to invalid data.
-        //
-        return FALSE;
-    }
-
-    return bResult;
-}
-
-/*
 * ApiSetLoadResolvedModule
 *
 * Purpose:
@@ -824,6 +816,70 @@ NTSTATUS ApiSetLoadResolvedModule(
 }
 
 /*
+* ApiSetResolveWin32kTableEntry
+*
+* Purpose:
+*
+* Find entry in Win32kApiSetTable.
+*
+* Function return STATUS_SUCCESS on success and sets ResolvedEntry parameter.
+*
+*/
+NTSTATUS ApiSetResolveWin32kTableEntry(
+    _In_ ULONG_PTR ApiSetTable,
+    _In_ ULONG_PTR LookupEntry,
+    _In_ ULONG EntrySize,
+    _Out_ PVOID* ResolvedEntry
+)
+{
+    NTSTATUS resolveStatus = STATUS_APISET_NOT_PRESENT;
+    PW32K_API_SET_TABLE_ENTRY pvTableEntry = (PW32K_API_SET_TABLE_ENTRY)ApiSetTable;
+    ULONG cEntries;
+    ULONG_PTR entryValue;
+    PULONG_PTR pvHostEntries;
+
+    *ResolvedEntry = NULL;
+
+    //
+    // Lookup entry in table.
+    //
+    __try {
+
+        while (pvTableEntry->Host) {
+
+            cEntries = pvTableEntry->Host->HostEntriesCount;
+            pvHostEntries = (PULONG_PTR)pvTableEntry->HostEntriesArray;
+
+            //
+            // Search inside table host entry array.
+            //
+            do {
+
+                entryValue = (ULONG_PTR)pvHostEntries;
+                pvHostEntries++;
+
+                if (entryValue == LookupEntry) {
+                    *ResolvedEntry = (PVOID)pvTableEntry;
+                    resolveStatus = STATUS_SUCCESS;
+                    break;
+                }
+
+            } while (--cEntries);
+
+            pvTableEntry = (PW32K_API_SET_TABLE_ENTRY)RtlOffsetToPointer(pvTableEntry, EntrySize);
+        }
+    }
+    __except (WOBJ_EXCEPTION_FILTER_LOG) {
+        //
+        // Should never be here. Only in case if table structure changed or ApiSetTable address points to invalid data.
+        //
+        return STATUS_ACCESS_VIOLATION;
+    }
+
+    return resolveStatus;
+}
+
+/*
 * SdtResolveServiceEntryModule
 *
 * Purpose:
@@ -848,6 +904,8 @@ NTSTATUS SdtResolveServiceEntryModule(
     BOOLEAN         NeedApiSetResolve = (g_NtBuildNumber > 18885);
     BOOLEAN         Win32kApiSetTableExpected = (g_NtBuildNumber > 18935);
 
+    ULONG           ApiSetTableEntrySize;
+
     NTSTATUS        resultStatus = STATUS_UNSUCCESSFUL, resolveStatus;
 
     HMODULE         DllModule = NULL;
@@ -856,11 +914,12 @@ NTSTATUS SdtResolveServiceEntryModule(
     ULONG_PTR       ApiSetReference;
 
     LPCSTR	        ModuleName;
+    PWCHAR          HostName;
+
+    W32K_API_SET_TABLE_ENTRY *pvApiSetEntry = NULL;
+
     UNICODE_STRING  usApiSetEntry, usModuleName;
-
     hde64s hs;
-
-    PW32K_API_SET_TABLE_ENTRY Win32kApiSetEntry;
 
 
     *ResolvedModule = NULL;
@@ -880,15 +939,26 @@ NTSTATUS SdtResolveServiceEntryModule(
             ApiSetReference = ApiSetExtractReferenceFromAdapter(FunctionPtr);
             if (ApiSetReference) {
 
-                if (!ApiSetResolveWin32kTableEntry(
+                if (g_NtBuildNumber <= NT_WIN10_21H1)
+                    ApiSetTableEntrySize = sizeof(W32K_API_SET_TABLE_ENTRY);
+                else
+                    ApiSetTableEntrySize = sizeof(W32K_API_SET_TABLE_ENTRY_V2);
+
+                resolveStatus = ApiSetResolveWin32kTableEntry(
                     Win32kApiSetTable,
                     ApiSetReference,
-                    &Win32kApiSetEntry))
-                {
-                    return STATUS_APISET_NOT_PRESENT;
-                }
+                    ApiSetTableEntrySize,
+                    (PVOID*)&pvApiSetEntry);
 
-                RtlInitUnicodeString(&usApiSetEntry, Win32kApiSetEntry->Host->HostName);
+                if (!NT_SUCCESS(resolveStatus))
+                    return resolveStatus;
+
+                //
+                // Host is on the same offset for both V1/V2 versions.
+                //
+                HostName = pvApiSetEntry->Host->HostName;
+
+                RtlInitUnicodeString(&usApiSetEntry, HostName);
 
                 resolveStatus = ApiSetLoadResolvedModule(
                     ApiSetMap,
@@ -972,10 +1042,18 @@ NTSTATUS SdtResolveServiceEntryModule(
     return resultStatus;
 }
 
+/*
+* SdtListReportEvent
+*
+* Purpose:
+*
+* Add entry to WinObjEx64 runtime log accessible through main menu.
+*
+*/
 VOID SdtListReportEvent(
     _In_ ULONG EventType,
-    _In_ LPWSTR FunctionName,
-    _In_ LPWSTR ErrorString
+    _In_ LPCWSTR FunctionName,
+    _In_ LPCWSTR ErrorString
 )
 {
     WCHAR szBuffer[1024];
@@ -990,6 +1068,110 @@ VOID SdtListReportEvent(
         szBuffer);
 }
 
+/*
+* SdtListReportFunctionResolveError
+*
+* Purpose:
+*
+* Report function name resolve error.
+*
+*/
+VOID SdtListReportFunctionResolveError(
+    _In_ LPCSTR FunctionName
+)
+{
+    WCHAR szErrorBuffer[512];
+
+    RtlSecureZeroMemory(szErrorBuffer, sizeof(szErrorBuffer));
+
+    _strcpy(szErrorBuffer, TEXT("could not resolve function "));
+    MultiByteToWideChar(CP_ACP, 0, FunctionName, -1, _strend(szErrorBuffer), MAX_PATH);
+    _strcat(szErrorBuffer, TEXT(" address"));
+    SdtListReportEvent(WOBJ_LOG_ENTRY_ERROR, __FUNCTIONW__, szErrorBuffer);
+}
+
+/*
+* SdtListReportResolveModuleError
+*
+* Purpose:
+*
+* Report module resolve error.
+*
+*/
+VOID SdtListReportResolveModuleError(
+    _In_ NTSTATUS Status,
+    _In_ PWIN32_SHADOWTABLE Table,
+    _In_ PSTRING ResolvedModuleName,
+    _In_ LPCWSTR ErrorSource
+)
+{
+    WCHAR szErrorBuffer[512];
+
+    RtlSecureZeroMemory(szErrorBuffer, sizeof(szErrorBuffer));
+
+    //
+    // Most of this errors are not critical and ok.
+    //
+
+    switch (Status) {
+
+    case STATUS_INTERNAL_ERROR:
+        SdtListReportEvent(WOBJ_LOG_ENTRY_ERROR, ErrorSource, TEXT("HDE Error"));
+        break;
+
+    case STATUS_APISET_NOT_HOSTED:
+        //
+        // Corresponding apiset not found.
+        //
+        _strcpy(szErrorBuffer, TEXT("not an apiset adapter for "));
+        MultiByteToWideChar(CP_ACP, 0, Table->Name, -1, _strend(szErrorBuffer), MAX_PATH);
+        SdtListReportEvent(WOBJ_LOG_ENTRY_ERROR, ErrorSource, szErrorBuffer);
+        break;
+
+    case STATUS_APISET_NOT_PRESENT:
+        //
+        // ApiSet extension present but empty.
+        // 
+        _strcpy(szErrorBuffer, TEXT("extension contains a host for a non-existent apiset "));
+        MultiByteToWideChar(CP_ACP, 0, Table->Name, -1, _strend(szErrorBuffer), MAX_PATH);
+        SdtListReportEvent(WOBJ_LOG_ENTRY_INFORMATION, ErrorSource, szErrorBuffer);
+        break;
+
+    case STATUS_PROCEDURE_NOT_FOUND:
+        //
+        // Not a critical issue. This mean we cannot pass this service next to forwarder lookup code.
+        //
+        _strcpy(szErrorBuffer, TEXT("could not resolve function name in module for service id "));
+        ultostr(Table->Index, _strend(szErrorBuffer));
+        _strcat(szErrorBuffer, TEXT(", service name "));
+        MultiByteToWideChar(CP_ACP, 0, Table->Name, -1, _strend(szErrorBuffer), MAX_PATH);
+        SdtListReportEvent(WOBJ_LOG_ENTRY_INFORMATION, ErrorSource, szErrorBuffer);
+        break;
+
+    case STATUS_DLL_NOT_FOUND:
+
+        _strcpy(szErrorBuffer, TEXT("could not load import dll "));
+
+        MultiByteToWideChar(CP_ACP,
+            0,
+            ResolvedModuleName->Buffer,
+            ResolvedModuleName->Length,
+            _strend(szErrorBuffer),
+            MAX_PATH);
+
+        SdtListReportEvent(WOBJ_LOG_ENTRY_ERROR, ErrorSource, szErrorBuffer);
+        break;
+
+    default:
+        //
+        // Unexpected error code.
+        //
+        _strcpy(szErrorBuffer, TEXT("unexpected error 0x"));
+        ultohex(Status, _strend(szErrorBuffer));
+        SdtListReportEvent(WOBJ_LOG_ENTRY_ERROR, ErrorSource, szErrorBuffer);
+        break;
+    }
+}
 
 /*
 * SdtListCreateTableShadow
@@ -1035,7 +1217,6 @@ BOOL SdtListCreateTableShadow(
     ANSI_STRING                     ResolvedModuleName;
 
     WCHAR szBuffer[MAX_PATH * 2];
-    WCHAR szErrorBuffer[512];
     CHAR szForwarderModuleName[MAX_PATH];
 
     LoadedModulesHead.Next = NULL;
@@ -1174,15 +1355,18 @@ BOOL SdtListCreateTableShadow(
                 itable = table;
                 while (itable != 0) {
 
-                    if (itable->Index == c + 0x1000) {
+                    if (itable->Index == c + WIN32K_START_INDEX) {
 
                         itable->KernelStubAddress = pServiceTable[c];
                         fptr = (PBYTE)w32k + itable->KernelStubAddress;
                         itable->KernelStubAddress += Win32kBase;
 
+                        //
+                        // Resolve module name for table entry and load this module to the memory.
+                        //
+
                         DllModule = NULL;
                         RtlSecureZeroMemory(&ResolvedModuleName, sizeof(ResolvedModuleName));
-
                         ntStatus = SdtResolveServiceEntryModule(fptr,
                             w32k,
                             ApiSetMap,
@@ -1194,76 +1378,18 @@ BOOL SdtListCreateTableShadow(
 
                         if (!NT_SUCCESS(ntStatus)) {
 
-                            RtlSecureZeroMemory(szErrorBuffer, sizeof(szErrorBuffer));
+                            SdtListReportResolveModuleError(ntStatus,
+                                itable,
+                                &ResolvedModuleName,
+                                __FUNCTIONW__);
 
-                            //
-                            // Most of this errors are not critical and ok.
-                            //
-
-                            switch (ntStatus) {
-
-                            case STATUS_INTERNAL_ERROR:
-                                SdtListReportEvent(WOBJ_LOG_ENTRY_ERROR, __FUNCTIONW__, TEXT("HDE Error"));
-                                break;
-
-                            case STATUS_APISET_NOT_HOSTED:
-                                //
-                                // Corresponding apiset not found.
-                                //
-                                _strcpy(szErrorBuffer, TEXT("not an apiset adapter for "));
-                                MultiByteToWideChar(CP_ACP, 0, itable->Name, -1, _strend(szErrorBuffer), MAX_PATH);
-                                SdtListReportEvent(WOBJ_LOG_ENTRY_ERROR, __FUNCTIONW__, szErrorBuffer);
-                                break;
-
-                            case STATUS_APISET_NOT_PRESENT:
-                                //
-                                // ApiSet extension present but empty.
-                                // 
-                                _strcpy(szErrorBuffer, TEXT("extension contains a host for a non-existent apiset "));
-                                MultiByteToWideChar(CP_ACP, 0, itable->Name, -1, _strend(szErrorBuffer), MAX_PATH);
-                                SdtListReportEvent(WOBJ_LOG_ENTRY_INFORMATION, __FUNCTIONW__, szErrorBuffer);
-                                break;
-
-                            case STATUS_PROCEDURE_NOT_FOUND:
-                                //
-                                // Not a critical issue. This mean we cannot pass this service next to forwarder lookup code.
-                                //
-                                _strcpy(szErrorBuffer, TEXT("could not resolve function name in module for service id "));
-                                ultostr(itable->Index, _strend(szErrorBuffer));
-                                _strcat(szErrorBuffer, TEXT(", service name "));
-                                MultiByteToWideChar(CP_ACP, 0, itable->Name, -1, _strend(szErrorBuffer), MAX_PATH);
-                                SdtListReportEvent(WOBJ_LOG_ENTRY_INFORMATION, __FUNCTIONW__, szErrorBuffer);
-                                break;
-
-                            case STATUS_DLL_NOT_FOUND:
-
-                                _strcpy(szErrorBuffer, TEXT("could not load import dll "));
-
-                                MultiByteToWideChar(CP_ACP,
-                                    0,
-                                    ResolvedModuleName.Buffer,
-                                    ResolvedModuleName.Length,
-                                    _strend(szErrorBuffer),
-                                    MAX_PATH);
-
-                                SdtListReportEvent(WOBJ_LOG_ENTRY_ERROR, __FUNCTIONW__, szErrorBuffer);
-                                break;
-
-                            default:
-                                break;
-                            }
-
-                            break;
-                        }
-
-                        if (DllModule == NULL) {
                             break;
                         }
 
                         ModuleName = ResolvedModuleName.Buffer;
 
                         //
-                        // Rememeber loaded module to the internal list.
+                        // Remember loaded module to the internal list.
                         //
                         ModuleEntry = (PLOAD_MODULE_ENTRY)RtlAllocateHeap(EnumerationHeap,
                             HEAP_ZERO_MEMORY,
@@ -1275,17 +1401,20 @@ BOOL SdtListCreateTableShadow(
                             LoadedModulesHead.Next = ModuleEntry;
                         }
 
+                        //
+                        // Check function forwarding.
+                        //
                         if (!NT_SUCCESS(NtRawGetProcAddress(DllModule, FunctionName, &rfn))) {
                             //
                             // Log error.
                             //
-                            _strcpy(szErrorBuffer, TEXT("could not resolve function "));
-                            MultiByteToWideChar(CP_ACP, 0, FunctionName, -1, _strend(szErrorBuffer), MAX_PATH);
-                            _strcat(szErrorBuffer, TEXT(" address"));
-                            SdtListReportEvent(WOBJ_LOG_ENTRY_ERROR, __FUNCTIONW__, szErrorBuffer);
+                            SdtListReportFunctionResolveError(FunctionName);
                             break;
                         }
 
+                        //
+                        // Function is forward, resolve again.
+                        //
                         if (rfn.ResultType == ForwarderString) {
 
                             ForwarderDot = _strchr_a(rfn.ForwarderName, '.');
@@ -1358,11 +1487,12 @@ BOOL SdtListCreateTableShadow(
                             RtlFreeAnsiString(&ResolvedModuleName);
 
                         }
-                        //break;
-                    //}
-                    }
+
+                    } // if (itable->Index == c + WIN32K_START_INDEX)
+
                     itable = itable->NextService;
-                }
+
+                } //while (itable != 0);
             }
 
             //
@@ -1636,6 +1766,15 @@ VOID extrasCreateSSDTDialog(
 
     WCHAR szText[100];
 
+    INT iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
+    LVCOLUMNS_DATA columnData[] =
+    {
+        { L"Id", 80, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  iImage },
+        { L"Service Name", 280, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE },
+        { L"Address", 130, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE },
+        { L"Module", 220, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE }
+    };
+
 
     switch (Mode) {
     case SST_Ntos:
@@ -1658,6 +1797,8 @@ VOID extrasCreateSSDTDialog(
 
     pDlgContext = &SSTDlgContext[Mode];
     pDlgContext->DialogMode = Mode;
+    pDlgContext->lvColumnHit = -1;
+    pDlgContext->lvItemHit = -1;
 
     hwndDlg = CreateDialogParam(
         g_WinObj.hInstance,
@@ -1683,7 +1824,7 @@ VOID extrasCreateSSDTDialog(
 
     SetWindowText(hwndDlg, szText);
 
-    extrasSetDlgIcon(hwndDlg);
+    extrasSetDlgIcon(pDlgContext);
 
     pDlgContext->ListView = GetDlgItem(hwndDlg, ID_EXTRASLIST);
     if (pDlgContext->ListView) {
@@ -1691,45 +1832,20 @@ VOID extrasCreateSSDTDialog(
         //
         // Set listview imagelist, style flags and theme.
         //
-        ListView_SetImageList(
-            pDlgContext->ListView,
+        supSetListViewSettings(pDlgContext->ListView,
+            LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
+            FALSE,
+            TRUE,
             g_ListViewImages,
             LVSIL_SMALL);
 
-        ListView_SetExtendedListViewStyle(
+        //
+        // And columns and remember their count.
+        //
+        pDlgContext->lvColumnCount = supAddLVColumnsFromArray(
             pDlgContext->ListView,
-            LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
-
-        SetWindowTheme(pDlgContext->ListView, TEXT("Explorer"), NULL);
-
-        //
-        // Insert columns.
-        //
-
-        supAddListViewColumn(pDlgContext->ListView, 0, 0, 0,
-            ImageList_GetImageCount(g_ListViewImages) - 1,
-            LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
-            TEXT("Id"), 80);
-
-        supAddListViewColumn(pDlgContext->ListView, 1, 1, 1,
-            I_IMAGENONE,
-            LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
-            TEXT("Service Name"), 220);
-
-        supAddListViewColumn(pDlgContext->ListView, 2, 2, 2,
-            I_IMAGENONE,
-            LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
-            TEXT("Address"), 130);
-
-        supAddListViewColumn(pDlgContext->ListView, 3, 3, 3,
-            I_IMAGENONE,
-            LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
-            TEXT("Module"), 220);
-
-        //
-        // Remember column count.
-        //
-        pDlgContext->lvColumnCount = SSDTLIST_COLUMN_COUNT;
+            columnData,
+            RTL_NUMBER_OF(columnData));
 
         SendMessage(hwndDlg, WM_SIZE, 0, 0);
 

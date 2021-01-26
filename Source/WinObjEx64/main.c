@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        28 June 2020
+*  DATE:        15 Dec 2020
 *
 *  Program entry point and main window handler.
 *
@@ -20,10 +20,13 @@
 #include "global.h"
 #include "aboutDlg.h"
 #include "findDlg.h"
+#include "sdviewDlg.h"
 #include "treelist/treelist.h"
 #include "props/propDlg.h"
 #include "extras/extras.h"
-#include "tests/testunit.h"
+
+#define MAINWND_TRACKSIZE_MIN_X 400
+#define MAINWND_TRACKSIZE_MIN_Y 256
 
 pswprintf_s rtl_swprintf_s;
 pqsort rtl_qsort;
@@ -167,6 +170,61 @@ VOID MainWindowHandleObjectTreeProp(
 }
 
 /*
+* MainWindowHandleObjectViewSD
+*
+* Purpose:
+*
+* Handler for View Security Descriptor menu.
+*
+*/
+VOID MainWindowHandleObjectViewSD(
+    _In_ HWND hwndParent,
+    _In_ BOOL fList
+)
+{
+    LVITEM lvi;
+    TV_ITEM tvi;
+    WOBJ_OBJECT_TYPE wobjType;
+    WCHAR szBuffer[MAX_PATH + 1];
+
+    szBuffer[0] = 0;
+
+    if (fList) {
+
+        RtlSecureZeroMemory(&lvi, sizeof(LVITEM));
+        lvi.mask = LVIF_PARAM | LVIF_TEXT;
+        lvi.iItem = ListView_GetSelectionMark(g_hwndObjectList);
+        lvi.pszText = szBuffer;
+        lvi.cchTextMax = MAX_PATH;
+
+        if (!ListView_GetItem(g_hwndObjectList, &lvi))
+            return;
+
+        wobjType = (WOBJ_OBJECT_TYPE)lvi.lParam;
+
+    }
+    else {
+
+        RtlSecureZeroMemory(&tvi, sizeof(TV_ITEM));
+        tvi.pszText = szBuffer;
+        tvi.cchTextMax = MAX_PATH;
+        tvi.mask = TVIF_TEXT;
+        tvi.hItem = g_SelectedTreeItem;
+
+        if (!TreeView_GetItem(g_hwndObjectTree, &tvi))
+            return;
+
+        wobjType = ObjectTypeDirectory;
+    }
+
+    SDViewDialogCreate(hwndParent,
+        g_WinObj.CurrentObjectPath,
+        szBuffer,
+        wobjType);
+
+}
+
+/*
 * MainWindowHandleObjectListProp
 *
 * Purpose:
@@ -187,12 +245,6 @@ VOID MainWindowHandleObjectListProp(
     // Only one object properties dialog allowed at same time.
     //
     if (g_PropWindow != NULL)
-        return;
-
-    //
-    // Query selection, leave on failure.
-    //
-    if (ListView_GetSelectedCount(g_hwndObjectList) == 0)
         return;
 
     //
@@ -270,6 +322,55 @@ VOID MainWindowOnRefresh(
 }
 
 /*
+* MainWindowEnumWndProc
+*
+* Purpose:
+*
+* Settings update enum callback.
+*
+*/
+BOOL CALLBACK MainWindowEnumWndProc(
+    _In_ HWND hwnd,
+    _In_ LPARAM lParam
+)
+{
+    DWORD dwProcessId;
+    DWORD dwCurrentProcessId = (DWORD)lParam;
+
+    if (GetWindowThreadProcessId(hwnd, &dwProcessId)) {
+        if (dwProcessId == dwCurrentProcessId)
+            PostMessage(hwnd, g_WinObj.SettingsChangeMessage, 0, 0);
+    }
+    return TRUE;
+}
+
+/*
+* MainWindowOnDisplayGridChange
+*
+* Purpose:
+*
+* Handle listview grid settings change and broadcast it to all WinObjEx64 sub dialogs.
+*
+*/
+VOID MainWindowOnDisplayGridChange(
+    VOID
+)
+{
+    DWORD lvExStyle;
+    DWORD dwProcessId = GetCurrentProcessId();
+    g_WinObj.ListViewDisplayGrid = !g_WinObj.ListViewDisplayGrid;
+    lvExStyle = ListView_GetExtendedListViewStyle(g_hwndObjectList);
+    if (g_WinObj.ListViewDisplayGrid)
+        lvExStyle |= LVS_EX_GRIDLINES;
+    else
+        lvExStyle &= ~LVS_EX_GRIDLINES;
+
+    ListView_SetExtendedListViewStyle(g_hwndObjectList, lvExStyle);
+
+    EnumWindows((WNDENUMPROC)MainWindowEnumWndProc, (LPARAM)dwProcessId);
+}
+
+/*
 * MainWindowHandleWMCommand
 *
 * Purpose:
@@ -283,8 +384,7 @@ LRESULT MainWindowHandleWMCommand(
 )
 {
     LPWSTR lpItemText;
-    HWND   hwndFocus;
-    DWORD  lvExStyle;
+    HWND   hwndFocus;   
     WORD   ControlId = LOWORD(wParam);
 
     switch (ControlId) {
@@ -344,6 +444,10 @@ LRESULT MainWindowHandleWMCommand(
         }
         break;
 
+    case ID_VIEW_SECURITYDESCRIPTOR:
+        MainWindowHandleObjectViewSD(hwnd, (GetFocus() == g_hwndObjectList));
+        break;
+
     case ID_FIND_FINDOBJECT:
         FindDlgCreate(hwnd);
         break;
@@ -353,15 +457,7 @@ LRESULT MainWindowHandleWMCommand(
         break;
 
     case ID_VIEW_DISPLAYGRID:
-        g_WinObj.ListViewDisplayGrid = !g_WinObj.ListViewDisplayGrid;
-        lvExStyle = ListView_GetExtendedListViewStyle(g_hwndObjectList);
-        if (g_WinObj.ListViewDisplayGrid)
-            lvExStyle |= LVS_EX_GRIDLINES;
-        else
-            lvExStyle &= ~LVS_EX_GRIDLINES;
-
-        ListView_SetExtendedListViewStyle(g_hwndObjectList, lvExStyle);
-
+        MainWindowOnDisplayGridChange();
         break;
 
     case ID_EXTRAS_PIPES:
@@ -514,6 +610,40 @@ VOID MainWindowTreeViewSelChanged(
 }
 
 /*
+* MainWindowPopupMenuInsertViewSD
+*
+* Purpose:
+*
+* Add "View Security Descriptor" menu item to the popup menu.
+*
+*/
+VOID MainWindowPopupMenuInsertViewSD(
+    _In_ HMENU hMenu,
+    _In_ UINT uPosition
+)
+{
+    HICON hIcon;
+
+    InsertMenu(hMenu, uPosition, MF_BYCOMMAND, ID_VIEW_SECURITYDESCRIPTOR, T_VIEWSD);
+
+    hIcon = (HICON)LoadImage(g_WinObj.hInstance,
+        MAKEINTRESOURCE(IDI_ICON_SECURITY),
+        IMAGE_ICON,
+        0,
+        0,
+        LR_SHARED);
+
+    if (hIcon) {
+
+        supSetMenuIcon(hMenu,
+            ID_VIEW_SECURITYDESCRIPTOR,
+            (ULONG_PTR)hIcon);
+
+        DestroyIcon(hIcon);
+    }
+}
+
+/*
 * MainWindowHandleTreePopupMenu
 *
 * Purpose:
@@ -534,6 +664,8 @@ VOID MainWindowHandleTreePopupMenu(
 
         supSetMenuIcon(hMenu, ID_OBJECT_PROPERTIES,
             (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 0));
+
+        MainWindowPopupMenuInsertViewSD(hMenu, 1);
 
         PmBuildPluginPopupMenuByObjectType(hMenu, ObjectTypeDirectory);
 
@@ -557,41 +689,72 @@ VOID MainWindowHandleObjectPopupMenu(
     _In_ LPPOINT point
 )
 {
-    HMENU   hMenu;
-    UINT    uEnable = MF_BYCOMMAND | MF_GRAYED;
-    LVITEM  lvItem;
+    HMENU hMenu;
+    UINT  uGotoSymLinkEnable = MF_BYCOMMAND | MF_GRAYED, uPosition = 0;
+
+    WOBJ_OBJECT_TYPE objType;
 
     hMenu = CreatePopupMenu();
     if (hMenu == NULL) return;
 
-    InsertMenu(hMenu, 0, MF_BYCOMMAND, ID_OBJECT_PROPERTIES, T_PROPERTIES);
+    InsertMenu(hMenu, uPosition++, MF_BYCOMMAND, ID_OBJECT_PROPERTIES, T_PROPERTIES);
 
     supSetMenuIcon(hMenu, ID_OBJECT_PROPERTIES,
         (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 0));
 
-    if (supIsSymbolicLinkObject(hwndlv, iItem)) {
+    objType = supObjectListGetObjectType(hwndlv, iItem);
 
-        InsertMenu(hMenu, 1, MF_BYCOMMAND, ID_OBJECT_GOTOLINKTARGET, T_GOTOLINKTARGET);
+    //
+    // Only supOpenNamedObjectByType supported types.
+    //
+    switch (objType) {
+
+        //
+        // Insert "Go To Link Target"
+        //
+    case ObjectTypeSymbolicLink:
+
+        InsertMenu(hMenu, uPosition++, MF_BYCOMMAND, ID_OBJECT_GOTOLINKTARGET, T_GOTOLINKTARGET);
 
         supSetMenuIcon(hMenu, ID_OBJECT_GOTOLINKTARGET,
             (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance,
                 g_ListViewImages,
                 g_TypeSymbolicLink.ImageIndex));
 
-        uEnable = MF_BYCOMMAND;
-    }
-    EnableMenuItem(GetSubMenu(GetMenu(hwnd), IDMM_OBJECT), ID_OBJECT_GOTOLINKTARGET, uEnable);
+        uGotoSymLinkEnable = MF_BYCOMMAND;
 
-    lvItem.mask = LVIF_PARAM;
-    lvItem.iItem = iItem;
-    lvItem.iSubItem = 0;
-    lvItem.lParam = 0;
+        //
+        // Intentionally do not 'break' here.
+        //
 
-    if (ListView_GetItem(hwndlv, &lvItem)) {
-        PmBuildPluginPopupMenuByObjectType(
-            hMenu,
-            (UCHAR)lvItem.lParam);
+    case ObjectTypeDirectory:
+    case ObjectTypeDevice:
+    case ObjectTypeEvent:
+    case ObjectTypeEventPair:
+    case ObjectTypeIoCompletion:
+    case ObjectTypeJob:
+    case ObjectTypeKey:
+    case ObjectTypeKeyedEvent:
+    case ObjectTypeMemoryPartition:
+    case ObjectTypeMutant:
+    case ObjectTypePort:
+    case ObjectTypeSection:
+    case ObjectTypeSemaphore:
+    case ObjectTypeSession:
+    case ObjectTypeTimer:
+
+        MainWindowPopupMenuInsertViewSD(hMenu, uPosition);
+        break;
+
+    default:
+        break;
     }
+
+    EnableMenuItem(GetSubMenu(GetMenu(hwnd), IDMM_OBJECT), ID_OBJECT_GOTOLINKTARGET, uGotoSymLinkEnable);
+
+    PmBuildPluginPopupMenuByObjectType(
+        hMenu,
+        (UCHAR)objType);
 
     TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, point->x, point->y, 0, hwnd, NULL);
     DestroyMenu(hMenu);
@@ -678,25 +841,30 @@ LRESULT MainWindowHandleWMNotify(
 
             case LVN_ITEMCHANGED:
                 lvn = (LPNMLISTVIEW)lParam;
-                RtlSecureZeroMemory(&szItemString, sizeof(szItemString));
-                ListView_GetItemText(g_hwndObjectList, lvn->iItem, 0, szItemString, MAX_PATH);
-                lcp = _strlen(g_WinObj.CurrentObjectPath);
-                if (lcp) {
-                    str = (LPWSTR)supHeapAlloc((lcp + sizeof(szItemString) + 4) * sizeof(WCHAR));
-                    if (str == NULL)
-                        break;
-                    _strcpy(str, g_WinObj.CurrentObjectPath);
+                if ((lvn->uNewState & LVIS_SELECTED) && 
+                    !(lvn->uOldState & LVIS_SELECTED)) 
+                {
+                    RtlSecureZeroMemory(&szItemString, sizeof(szItemString));
+                    ListView_GetItemText(g_hwndObjectList, lvn->iItem, 0, szItemString, MAX_PATH);
+                    lcp = _strlen(g_WinObj.CurrentObjectPath);
+                    if (lcp) {
+                        str = (LPWSTR)supHeapAlloc((lcp + sizeof(szItemString) + 4) * sizeof(WCHAR));
+                        if (str) {
 
-                    if ((str[0] == '\\') && (str[1] == 0)) {
-                        _strcpy(str + lcp, szItemString);
+                            _strcpy(str, g_WinObj.CurrentObjectPath);
+
+                            if ((str[0] == '\\') && (str[1] == 0)) {
+                                _strcpy(str + lcp, szItemString);
+                            }
+                            else {
+                                str[lcp] = '\\';
+                                _strcpy(str + lcp + 1, szItemString);
+                            }
+                            SendMessage(hwndStatusBar, WM_SETTEXT, 0, (LPARAM)str);
+                            supHeapFree(str);
+                        }
+                        supSetGotoLinkTargetToolButtonState(hwnd, g_hwndObjectList, lvn->iItem, FALSE, FALSE);
                     }
-                    else {
-                        str[lcp] = '\\';
-                        _strcpy(str + lcp + 1, szItemString);
-                    }
-                    SendMessage(hwndStatusBar, WM_SETTEXT, 0, (LPARAM)str);
-                    supHeapFree(str);
-                    supSetGotoLinkTargetToolButtonState(hwnd, g_hwndObjectList, lvn->iItem, FALSE, FALSE);
                 }
                 break;
 
@@ -907,8 +1075,10 @@ LRESULT CALLBACK MainWindowProc(
 
     case WM_GETMINMAXINFO:
         if (lParam) {
-            ((PMINMAXINFO)lParam)->ptMinTrackSize.x = SCALE_DPI_VALUE(400, g_WinObj.CurrentDPI);
-            ((PMINMAXINFO)lParam)->ptMinTrackSize.y = SCALE_DPI_VALUE(256, g_WinObj.CurrentDPI);
+            supSetMinMaxTrackSize((PMINMAXINFO)lParam,
+                MAINWND_TRACKSIZE_MIN_X,
+                MAINWND_TRACKSIZE_MIN_Y,
+                TRUE);
         }
         break;
     }
@@ -1224,6 +1394,8 @@ UINT WinObjExMain()
             break;
         }
 
+        g_WinObj.SettingsChangeMessage = RegisterWindowMessage(T_MSG_SETTINGS_CHANGE);
+
         iccx.dwSize = sizeof(iccx);
         iccx.dwICC = ICC_LISTVIEW_CLASSES | ICC_TREEVIEW_CLASSES | ICC_BAR_CLASSES | ICC_TAB_CLASSES;
         if (!InitCommonControlsEx(&iccx)) {
@@ -1423,7 +1595,6 @@ UINT WinObjExMain()
         //
         // Hide admin only stuff.
         //
-
         MainWindowExtrasDisableAdminFeatures(MainWindow);
 
         //
@@ -1534,6 +1705,9 @@ UINT WinObjExMain()
 
         hAccTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
 
+        //
+        // Init plugin manager.
+        //
         PmCreate(MainWindow);
 
         //
@@ -1555,7 +1729,7 @@ UINT WinObjExMain()
             LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
             TEXT("Additional Information"), 170);
 
-        ListObjectDirectoryTree(L"\\", NULL, NULL);
+        ListObjectDirectoryTree(KM_OBJECTS_ROOT_DIRECTORY, NULL, NULL);
 
         TreeView_SelectItem(g_hwndObjectTree, TreeView_GetRoot(g_hwndObjectTree));
         SetFocus(g_hwndObjectTree);
@@ -1587,9 +1761,14 @@ UINT WinObjExMain()
     if (g_TreeListAtom != 0)
         UnregisterClass(MAKEINTATOM(g_TreeListAtom), g_WinObj.hInstance);
 
+    //
+    // Destroy plugin manager.
+    //
     PmDestroy();
 
-    //do not move anywhere
+    //
+    // Do not move anywhere.
+    //
 
     supShutdown();
     logFree();

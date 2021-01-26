@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2011 - 2020 UGN/HE
+*  (C) COPYRIGHT AUTHORS, 2011 - 2021 UGN/HE
 *
 *  TITLE:       NTSUP.C
 *
-*  VERSION:     2.02
+*  VERSION:     2.05
 *
-*  DATE:        22 July 2020
+*  DATE:        14 Jan 2021
 *
 *  Native API support functions.
 *
@@ -20,6 +20,9 @@
 *******************************************************************************/
 
 #include "ntsup.h"
+
+#pragma warning(push)
+#pragma warning(disable: 26812) // Prefer 'enum class' over 'enum'
 
 /*
 * ntsupHeapAlloc
@@ -234,13 +237,9 @@ PVOID ntsupFindModuleEntryByName(
     _In_ LPCSTR ModuleName
 )
 {
-    ULONG i, modulesCount, fnameOffset;
+    ULONG i, modulesCount = pModulesList->NumberOfModules, fnameOffset;
     LPSTR entryName;
     PRTL_PROCESS_MODULE_INFORMATION moduleEntry;
-
-    modulesCount = pModulesList->NumberOfModules;
-    if (modulesCount == 0)
-        return NULL;
 
     for (i = 0; i < modulesCount; i++) {
 
@@ -271,13 +270,9 @@ BOOL ntsupFindModuleEntryByAddress(
     _Out_ PULONG ModuleIndex
 )
 {
-    ULONG i, modulesCount;
+    ULONG i, modulesCount = pModulesList->NumberOfModules;
 
     *ModuleIndex = 0;
-
-    modulesCount = pModulesList->NumberOfModules;
-    if (modulesCount == 0)
-        return FALSE;
 
     for (i = 0; i < modulesCount; i++) {
         if (IN_REGION(Address,
@@ -311,19 +306,13 @@ BOOL ntsupFindModuleNameByAddress(
     UNICODE_STRING usConvertedName;
     PRTL_PROCESS_MODULE_INFORMATION moduleEntry;
 
-    if ((pModulesList == NULL) ||
-        (Buffer == NULL) ||
+    if ((Buffer == NULL) ||
         (ccBuffer == 0))
     {
         return FALSE;
     }
 
     modulesCount = pModulesList->NumberOfModules;
-    if (modulesCount == 0) {
-        return FALSE;
-    }
-
-    RtlInitEmptyUnicodeString(&usConvertedName, NULL, 0);
 
     for (i = 0; i < modulesCount; i++) {
         if (IN_REGION(Address,
@@ -332,6 +321,7 @@ BOOL ntsupFindModuleNameByAddress(
         {
             moduleEntry = &pModulesList->Modules[i];
 
+            RtlInitEmptyUnicodeString(&usConvertedName, NULL, 0);
             ntStatus = ntsupConvertToUnicode(
                 (LPSTR)&moduleEntry->FullPathName[moduleEntry->OffsetToFileName],
                 &usConvertedName);
@@ -665,7 +655,7 @@ PVOID ntsupGetSystemInfoEx(
 *
 * Returns buffer with system information by given SystemInformationClass.
 *
-* Returned buffer must be freed with supHeapFree after usage.
+* Returned buffer must be freed with ntsupHeapFree after usage.
 *
 */
 PVOID ntsupGetSystemInfo(
@@ -778,7 +768,8 @@ BOOL ntsupQueryThreadWin32StartAddress(
 * Open directory handle with DIRECTORY_QUERY access, with root directory support.
 *
 */
-HANDLE ntsupOpenDirectory(
+NTSTATUS ntsupOpenDirectory(
+    _Out_ PHANDLE DirectoryHandle,
     _In_opt_ HANDLE RootDirectoryHandle,
     _In_ LPWSTR DirectoryName,
     _In_ ACCESS_MASK DesiredAccess
@@ -789,6 +780,8 @@ HANDLE ntsupOpenDirectory(
     UNICODE_STRING    usDirectory;
     OBJECT_ATTRIBUTES objectAttrbutes;
 
+    *DirectoryHandle = NULL;
+
     RtlInitUnicodeString(&usDirectory, DirectoryName);
     InitializeObjectAttributes(&objectAttrbutes,
         &usDirectory, OBJ_CASE_INSENSITIVE, RootDirectoryHandle, NULL);
@@ -797,14 +790,12 @@ HANDLE ntsupOpenDirectory(
         DesiredAccess,
         &objectAttrbutes);
 
-    if (!NT_SUCCESS(ntStatus)) {
-        RtlSetLastWin32Error(RtlNtStatusToDosError(ntStatus));
-        return NULL;
+    if (NT_SUCCESS(ntStatus)) {
+        *DirectoryHandle = directoryHandle;
     }
 
-    return directoryHandle;
+    return ntStatus;
 }
-
 
 /*
 * ntsupQueryProcessName
@@ -897,6 +888,156 @@ BOOL ntsupQueryProcessEntryById(
     return FALSE;
 }
 
+/*
+* ntsupQuerySystemObjectInformationVariableSize
+*
+* Purpose:
+*
+* Generic object information query routine.
+*
+* Use FreeMem to release allocated buffer.
+*
+*/
+NTSTATUS ntsupQuerySystemObjectInformationVariableSize(
+    _In_ PFN_NTQUERYROUTINE QueryRoutine,
+    _In_ HANDLE ObjectHandle,
+    _In_ DWORD InformationClass,
+    _Out_ PVOID* Buffer,
+    _Out_opt_ PULONG ReturnLength,
+    _In_ PNTSUPMEMALLOC AllocMem,
+    _In_ PNTSUPMEMFREE FreeMem
+)
+{
+    NTSTATUS ntStatus;
+    PVOID queryBuffer;
+    ULONG returnLength = 0;
+
+    *Buffer = NULL;
+    if (ReturnLength) *ReturnLength = 0;
+
+    ntStatus = QueryRoutine(ObjectHandle,
+        InformationClass,
+        NULL,
+        0,
+        &returnLength);
+
+    //
+    // Test all possible acceptable failures.
+    //
+    if (ntStatus != STATUS_BUFFER_OVERFLOW &&
+        ntStatus != STATUS_BUFFER_TOO_SMALL &&
+        ntStatus != STATUS_INFO_LENGTH_MISMATCH)
+    {
+        return ntStatus;
+    }
+
+    queryBuffer = AllocMem(returnLength);
+    if (queryBuffer == NULL)
+        return STATUS_INSUFFICIENT_RESOURCES;
+
+    ntStatus = QueryRoutine(ObjectHandle,
+        InformationClass,
+        queryBuffer,
+        returnLength,
+        &returnLength);
+
+    if (NT_SUCCESS(ntStatus)) {
+        *Buffer = queryBuffer;
+        if (ReturnLength) *ReturnLength = returnLength;
+    }
+    else {
+        FreeMem(queryBuffer);
+    }
+
+    return ntStatus;
+}
+
+/*
+* ntsupQueryProcessInformation
+*
+* Purpose:
+*
+* Query process information with variable size.
+* 
+* Returned buffer must be freed with FreeMem after usage.
+*
+*/
+NTSTATUS ntsupQueryProcessInformation(
+    _In_ HANDLE ProcessHandle,
+    _In_ PROCESSINFOCLASS ProcessInformationClass,
+    _Out_ PVOID* Buffer,
+    _Out_opt_ PULONG ReturnLength,
+    _In_ PNTSUPMEMALLOC AllocMem,
+    _In_ PNTSUPMEMFREE FreeMem
+)
+{
+    return ntsupQuerySystemObjectInformationVariableSize(
+        (PFN_NTQUERYROUTINE)NtQueryInformationProcess,
+        ProcessHandle,
+        (DWORD)ProcessInformationClass,
+        Buffer,
+        ReturnLength,
+        AllocMem,
+        FreeMem);
+}
+
+/*
+* ntsupQueryObjectInformation
+*
+* Purpose:
+*
+* Query object information with variable size.
+*
+* Returned buffer must be freed with FreeMem after usage.
+*
+*/
+NTSTATUS ntsupQueryObjectInformation(
+    _In_ HANDLE ObjectHandle,
+    _In_ OBJECT_INFORMATION_CLASS ObjectInformationClass,
+    _Out_ PVOID* Buffer,
+    _Out_opt_ PULONG ReturnLength,
+    _In_ PNTSUPMEMALLOC AllocMem,
+    _In_ PNTSUPMEMFREE FreeMem
+)
+{
+    return ntsupQuerySystemObjectInformationVariableSize(
+        (PFN_NTQUERYROUTINE)NtQueryObject,
+        ObjectHandle,
+        (DWORD)ObjectInformationClass,
+        Buffer,
+        ReturnLength,
+        AllocMem,
+        FreeMem);
+}
+
+/*
+* ntsupQuerySecurityInformation
+*
+* Purpose:
+*
+* Query object security information with variable size.
+*
+* Returned buffer must be freed with FreeMem after usage.
+*
+*/
+NTSTATUS ntsupQuerySecurityInformation(
+    _In_ HANDLE ObjectHandle,
+    _In_ SECURITY_INFORMATION SecurityInformationClass,
+    _Out_ PVOID* Buffer,
+    _Out_opt_ PULONG ReturnLength,
+    _In_ PNTSUPMEMALLOC AllocMem,
+    _In_ PNTSUPMEMFREE FreeMem
+)
+{
+    return ntsupQuerySystemObjectInformationVariableSize(
+        (PFN_NTQUERYROUTINE)NtQuerySecurityObject,
+        ObjectHandle,
+        (DWORD)SecurityInformationClass,
+        Buffer,
+        ReturnLength,
+        AllocMem,
+        FreeMem);
+}
 
 /*
 * ntsupQueryHVCIState
@@ -1749,3 +1890,5 @@ NTSTATUS ntsupEnableWow64Redirection(
     Value = IntToPtr(bEnable);
     return RtlWow64EnableFsRedirectionEx(Value, &OldValue);
 }
+
+#pragma warning(pop)

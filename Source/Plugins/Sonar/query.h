@@ -1,12 +1,14 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2020
+*  (C) COPYRIGHT AUTHORS, 2019 - 2021
 *
 *  TITLE:       QUERY.H
 *
 *  VERSION:     1.03
 *
-*  DATE:        17 July 2020
+*  DATE:        11 Jan 2021
+* 
+*  Sonar plugin query information definitions.
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -66,8 +68,11 @@
 // Windows 10 20H2
 #define NT_WIN10_20H2           19042
 
-// Windows 10 Active Develepment Branch (21H1)
-#define NTX_WIN10_ADB           20161
+// Windows 10 21H1
+#define NT_WIN10_21H1           19043
+
+// Windows 10 Active Develepment Branch (21XX)
+#define NTX_WIN10_ADB           21286
 
 typedef struct _PROTOCOL_BLOCK_VERSIONS {
     union {
@@ -76,7 +81,7 @@ typedef struct _PROTOCOL_BLOCK_VERSIONS {
             NDIS_PROTOCOL_BLOCK_9200 *v2;
             NDIS_PROTOCOL_BLOCK_9600_17134 *v3;
             NDIS_PROTOCOL_BLOCK_17763 *v4;
-            NDIS_PROTOCOL_BLOCK_18362_20150 *v5;
+            NDIS_PROTOCOL_BLOCK_18362_21286 *v5;
         } Versions;
         PVOID Ref;
     } u1;
@@ -96,8 +101,8 @@ typedef struct _OPEN_BLOCK_VERSIONS {
                 NDIS_OPEN_BLOCK_14393_17134 *v4;
             } u_v4;
             union {
-                NDIS_COMMON_OPEN_BLOCK_17763_20150 *v5c;
-                NDIS_OPEN_BLOCK_17763_20150 *v5;
+                NDIS_COMMON_OPEN_BLOCK_17763_21286 *v5c;
+                NDIS_OPEN_BLOCK_17763_21286 *v5;
             } u_v5;
         } Versions;
         PVOID Ref;
@@ -414,35 +419,3 @@ BOOL ReadAndConvertOpenBlock(
     _Inout_ NDIS_OPEN_BLOCK_COMPATIBLE *OpenBlock,
     _Out_opt_ PULONG ObjectVersion);
 
-PVOID HeapMemoryAlloc(
-    _In_ SIZE_T Size);
-
-BOOL HeapMemoryFree(
-    _In_ PVOID Memory);
-
-BOOL GetWin32FileName(
-    _In_ LPWSTR FileName,
-    _Inout_ LPWSTR Win32FileName,
-    _In_ SIZE_T ccWin32FileName);
-
-VOID CopyTreeListSubItemValue(
-    _In_ HWND TreeList,
-    _In_ UINT ValueIndex);
-
-VOID CopyListViewSubItemValue(
-    _In_ HWND ListView,
-    _In_ UINT ValueIndex);
-
-INT GetMaxCompareTwoFixedStrings(
-    _In_ HWND ListView,
-    _In_ LPARAM lParam1,
-    _In_ LPARAM lParam2,
-    _In_ LPARAM lParamSort,
-    _In_ BOOL Inverse);
-
-INT GetMaxOfTwoU64FromHex(
-    _In_ HWND ListView,
-    _In_ LPARAM lParam1,
-    _In_ LPARAM lParam2,
-    _In_ LPARAM lParamSort,
-    _In_ BOOL Inverse);

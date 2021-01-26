@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       EXTRAS.H
 *
-*  VERSION:     1.85
+*  VERSION:     1.88
 *
-*  DATE:        13 Mar 2020
+*  DATE:        11 Dec 2020
 *
 *  Common header file for Extras dialogs.
 *
@@ -24,14 +24,17 @@ typedef struct _EXTRASCONTEXT {
     HWND TreeList;
     HWND StatusBar;
     HIMAGELIST ImageList;
-    LONG lvColumnToSort;
-    LONG lvColumnCount;
+    INT lvColumnToSort;
+    INT lvColumnCount;
+    INT lvColumnHit;
+    INT lvItemHit;
     BOOL bInverseSort;
     union {
         ULONG_PTR Reserved;
         ULONG_PTR DialogMode;
     };
     HICON ObjectIcon;
+    HICON DialogIcon;
 } EXTRASCONTEXT, *PEXTRASCONTEXT;
 
 typedef struct _EXTRASCALLBACK {
@@ -62,8 +65,14 @@ VOID extrasSimpleListResize(
     _In_ HWND hwndDlg);
 
 VOID extrasSetDlgIcon(
-    _In_ HWND hwndDlg);
+    _In_ EXTRASCONTEXT* Context);
+
+VOID extrasRemoveDlgIcon(
+    _In_ EXTRASCONTEXT* Context);
 
 VOID extrasShowDialogById(
     _In_ HWND ParentWindow,
     _In_ WORD DialogId);
+
+VOID extrasHandleSettingsChange(
+    EXTRASCONTEXT* Context);

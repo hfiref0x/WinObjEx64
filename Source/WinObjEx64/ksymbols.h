@@ -4,9 +4,9 @@
 *
 *  TITLE:       KSYMBOLS.H
 *
-*  VERSION:     1.84
+*  VERSION:     1.88
 *
-*  DATE:        29 Feb 2020
+*  DATE:        29 Nov 2020
 *
 *  Header file for kernel symbol names.
 *
@@ -24,3 +24,4 @@
 #define KSW_W32pServiceLimit L"W32pServiceLimit"
 #define KSA_W32pServiceTable "W32pServiceTable"
 #define KSA_W32pServiceLimit "W32pServiceLimit"
+#define KSW_Win32ApiSetTable L"Win32kApiSetTable"

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       EXTRAS.C
 *
-*  VERSION:     1.85
+*  VERSION:     1.88
 *
-*  DATE:        13 Mar 2020
+*  DATE:        14 Jan 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -24,6 +24,29 @@
 #include "extrasPSList.h"
 #include "extrasCallbacks.h"
 #include "extrasSL.h"
+
+/*
+* extrasHandleSettingsChange
+*
+* Purpose:
+*
+* Handle global settings change.
+*
+*/
+VOID extrasHandleSettingsChange(
+    EXTRASCONTEXT* Context
+)
+{
+    DWORD lvExStyle;
+
+    lvExStyle = ListView_GetExtendedListViewStyle(Context->ListView);
+    if (g_WinObj.ListViewDisplayGrid)
+        lvExStyle |= LVS_EX_GRIDLINES;
+    else
+        lvExStyle &= ~LVS_EX_GRIDLINES;
+
+    ListView_SetExtendedListViewStyle(Context->ListView, lvExStyle);
+}
 
 /*
 * extrasSimpleListResize
@@ -120,19 +143,42 @@ BOOL extrasDlgHandleNotify(
 *
 * Purpose:
 *
-* Extras dialog icon.
+* Set dialog icon.
 *
 */
 VOID extrasSetDlgIcon(
-    _In_ HWND hwndDlg
+    _In_ EXTRASCONTEXT* Context
 )
 {
     HANDLE hIcon;
 
-    hIcon = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN), IMAGE_ICON, 0, 0, LR_SHARED);
+    hIcon = LoadImage(g_WinObj.hInstance,
+        MAKEINTRESOURCE(IDI_ICON_MAIN), IMAGE_ICON, 
+        32, 32, 
+        0);
+
     if (hIcon) {
-        SetClassLongPtr(hwndDlg, GCLP_HICON, (LONG_PTR)hIcon);
-        DestroyIcon((HICON)hIcon);
+        SendMessage(Context->hwndDlg, WM_SETICON, (WPARAM)ICON_SMALL, (LPARAM)hIcon);
+        SendMessage(Context->hwndDlg, WM_SETICON, (WPARAM)ICON_BIG, (LPARAM)hIcon);
+        Context->DialogIcon = (HICON)hIcon;
+    }
+}
+
+/*
+* extrasRemoveDlgIcon
+*
+* Purpose:
+*
+* Remove dialog icon.
+*
+*/
+VOID extrasRemoveDlgIcon(
+    _In_ EXTRASCONTEXT* Context
+)
+{
+    if (Context->DialogIcon) {
+        DestroyIcon(Context->DialogIcon);
+        Context->DialogIcon = NULL;
     }
 }
 

@@ -1,12 +1,12 @@
 /************************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2014 - 2020
+*  (C) COPYRIGHT AUTHORS, 2014 - 2021
 *
 *  TITLE:       NTLDR.C
 *
-*  VERSION:     1.18
+*  VERSION:     1.19
 *
-*  DATE:        15 July 2020
+*  DATE:        14 Jan 2021
 *
 *  NT loader related code.
 *
@@ -22,6 +22,9 @@
 ************************************************************************************/
 
 #include "ntldr.h"
+
+#pragma warning(push)
+#pragma warning(disable: 26812) // Prefer 'enum class' over 'enum'
 
 PFNNTLDR_EXCEPT_FILTER NtpLdrExceptionFilter = NULL;
 
@@ -583,3 +586,4 @@ BOOLEAN NtLdrApiSetLoadFromPeb(
     return TRUE;
 }
 
+#pragma warning(pop)

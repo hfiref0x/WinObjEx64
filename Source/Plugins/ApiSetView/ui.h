@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.01
 *
-*  DATE:        10 July 2020
+*  DATE:        30 Nov 2020
 *
 *  WinObjEx64 ApiSetView UI constants, definitions and includes.
 *
@@ -30,6 +30,7 @@ typedef struct _GUI_CONTEXT {
     HWND TreeList;
     HANDLE PluginHeap;
     HANDLE WorkerThread;
+    HICON WindowIcon;
 
     //
     // WinObjEx64 data and pointers.

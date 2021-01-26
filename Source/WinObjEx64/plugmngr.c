@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2020
+*  (C) COPYRIGHT AUTHORS, 2019 - 2021
 *
 *  TITLE:       PLUGMNGR.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        17 July 2020
+*  DATE:        14 Jan 2021
 *
 *  Plugin manager.
 *
@@ -182,6 +182,7 @@ BOOL CALLBACK PmGuiInitCallback(
 )
 {
     ATOM classAtom;
+    DWORD dwLastError;
     WNDCLASSEX  wincls;
     WCHAR szClassName[MAX_PLUGIN_NAME + sizeof(L"WndClass") + 1];
 
@@ -222,8 +223,10 @@ BOOL CALLBACK PmGuiInitCallback(
             LR_SHARED);
 
         classAtom = RegisterClassEx(&wincls);
-        if ((classAtom == 0) && (GetLastError() != ERROR_CLASS_ALREADY_EXISTS))
-            kdDebugPrint("Could not register window class, err = %lu\r\n", GetLastError());
+        dwLastError = GetLastError();
+
+        if ((classAtom == 0) && (dwLastError != ERROR_CLASS_ALREADY_EXISTS))
+            kdDebugPrint("Could not register window class, err = %lu\r\n", dwLastError);
 
     }
     __except (WOBJ_EXCEPTION_FILTER_LOG) {
@@ -600,12 +603,6 @@ BOOL PmpAllocateObjectData(
     if (ParentWindow == g_hwndObjectList) {
 
         //
-        // Query selection, leave on failure.
-        //
-        if (ListView_GetSelectedCount(g_hwndObjectList) == 0)
-            return FALSE;
-
-        //
         // Query selected index, leave on failure.
         //
         nSelected = ListView_GetSelectionMark(g_hwndObjectList);
@@ -903,30 +900,25 @@ VOID PmpEnumerateEntries(
     INT lvItemIndex;
     WCHAR szBuffer[100];
 
-    ListView_SetExtendedListViewStyle(ListView,
-        LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_LABELTIP | LVS_EX_DOUBLEBUFFER);
+    LVCOLUMNS_DATA columnData[] =
+    {
+        { L"Name", 200, LVCFMT_LEFT,  I_IMAGENONE },
+        { L"Authors", 80, LVCFMT_CENTER,  I_IMAGENONE },
+        { L"Type", 80, LVCFMT_CENTER,  I_IMAGENONE },
+        { L"Version", 80, LVCFMT_CENTER,  I_IMAGENONE }
+    };
 
-    SetWindowTheme(ListView, TEXT("Explorer"), NULL);
+    supSetListViewSettings(ListView,
+        LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
+        FALSE,
+        TRUE,
+        NULL,
+        0);
 
-    supAddListViewColumn(ListView, 0, 0, 0,
-        I_IMAGENONE,
-        LVCFMT_LEFT,
-        TEXT("Name"), 200);
-
-    supAddListViewColumn(ListView, 1, 1, 1,
-        I_IMAGENONE,
-        LVCFMT_CENTER,
-        TEXT("Authors"), 80);
-
-    supAddListViewColumn(ListView, 2, 2, 2,
-        I_IMAGENONE,
-        LVCFMT_CENTER,
-        TEXT("Type"), 80);
-
-    supAddListViewColumn(ListView, 3, 3, 3,
-        I_IMAGENONE,
-        LVCFMT_CENTER,
-        TEXT("Version"), 80);
+    supAddLVColumnsFromArray(
+        ListView,
+        columnData,
+        RTL_NUMBER_OF(columnData));
 
     Head = &g_PluginsListHead;
     Next = Head->Flink;
@@ -1009,40 +1001,28 @@ VOID PmpListSupportedObjectTypes(
 }
 
 /*
-* PmpHandleNotify
+* PmpShowPluginInfo
 *
 * Purpose:
 *
-* Plugin Manager dialog WM_NOTIFY handler.
+* Show selected plugin information.
 *
 */
-VOID PmpHandleNotify(
+VOID PmpShowPluginInfo(
     _In_ HWND hwndDlg,
-    _In_ LPARAM lParam
+    _In_ HWND hwndListView,
+    _In_ INT itemIndex
 )
 {
     PWINOBJEX_PLUGIN_INTERNAL PluginData = NULL;
     LPWSTR lpType;
-    LPNMLISTVIEW pListView = (LPNMLISTVIEW)lParam;
     HWND hwndCB;
     INT nCount;
 
     WCHAR szModuleName[MAX_PATH + 1];
 
-    if (pListView->hdr.idFrom != IDC_PLUGINLIST)
-        return;
-
-#pragma warning(push)
-#pragma warning(disable: 26454)
-    if ((pListView->hdr.code != NM_CLICK) &&
-        (pListView->hdr.code != LVN_ITEMCHANGED))
-    {
-        return;
-    }
-#pragma warning(pop)
-
-    if (!supGetListViewItemParam(pListView->hdr.hwndFrom,
-        pListView->iItem,
+    if (!supGetListViewItemParam(hwndListView,
+        itemIndex,
         (PVOID*)&PluginData))
     {
         return;
@@ -1095,11 +1075,82 @@ VOID PmpHandleNotify(
 }
 
 /*
+* PmpHandleNotify
+*
+* Purpose:
+*
+* Plugin Manager dialog WM_NOTIFY handler.
+*
+*/
+VOID PmpHandleNotify(
+    _In_ HWND hwndDlg,
+    _In_ LPARAM lParam
+)
+{
+    LPNMLISTVIEW pListView = (LPNMLISTVIEW)lParam;
+
+
+    if (pListView->hdr.idFrom != IDC_PLUGINLIST)
+        return;
+
+    switch (pListView->hdr.code) {
+
+    case NM_CLICK:
+
+        PmpShowPluginInfo(hwndDlg, 
+            pListView->hdr.hwndFrom,
+            pListView->iItem);
+
+        break;
+
+    case LVN_ITEMCHANGED:
+
+        if ((pListView->uNewState & LVIS_SELECTED) &&
+            !(pListView->uOldState & LVIS_SELECTED))
+        {
+            PmpShowPluginInfo(hwndDlg,
+                pListView->hdr.hwndFrom,
+                pListView->iItem);
+        }
+
+        break;
+
+    default:
+        break;
+    }
+
+}
+
+/*
+* PmpHandleSettingsChange
+*
+* Purpose:
+*
+* Handle global settings change.
+*
+*/
+VOID PmpHandleSettingsChange(
+    _In_ HWND hwndDlg
+)
+{
+    DWORD lvExStyle;
+    HWND hwndList = GetDlgItem(hwndDlg, IDC_PLUGINLIST);
+
+    lvExStyle = ListView_GetExtendedListViewStyle(hwndList);
+    if (g_WinObj.ListViewDisplayGrid)
+        lvExStyle |= LVS_EX_GRIDLINES;
+    else
+        lvExStyle &= ~LVS_EX_GRIDLINES;
+
+    ListView_SetExtendedListViewStyle(hwndList, lvExStyle);
+}
+
+/*
 * PmpDialogProc
 *
 * Purpose:
 *
-* Plugin Manager Window Dialog Procedure
+* Plugin Manager Window dialog procedure.
 *
 */
 INT_PTR CALLBACK PmpDialogProc(
@@ -1109,6 +1160,11 @@ INT_PTR CALLBACK PmpDialogProc(
     _In_ LPARAM lParam
 )
 {
+    if (uMsg == g_WinObj.SettingsChangeMessage) {
+        PmpHandleSettingsChange(hwndDlg);
+        return TRUE;
+    }
+
     switch (uMsg) {
 
     case WM_INITDIALOG:

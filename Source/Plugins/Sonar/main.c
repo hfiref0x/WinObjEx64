@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2020
+*  (C) COPYRIGHT AUTHORS, 2019 - 2021
 *
 *  TITLE:       MAIN.H
 *
 *  VERSION:     1.03
 *
-*  DATE:        20 Oct 2020
+*  DATE:        20 Jan 2021
 *
 *  WinObjEx64 Sonar plugin.
 *
@@ -22,7 +22,7 @@
 //
 // Maximum tested build Sonar is known to work.
 //
-#define SONAR_MAX_TESTED_BUILD 20231
+#define SONAR_MAX_TESTED_BUILD 21296
 
 //
 // Dll instance.
@@ -408,7 +408,7 @@ INT CALLBACK ListViewCompareFunc(
 
     case 0: //text value
 
-        nResult = GetMaxCompareTwoFixedStrings(
+        nResult = supGetMaxCompareTwoFixedStrings(
             g_ctx.ListView,
             lParam1,
             lParam2,
@@ -419,7 +419,7 @@ INT CALLBACK ListViewCompareFunc(
 
     default: // address
 
-        nResult = GetMaxOfTwoU64FromHex(
+        nResult = supGetMaxOfTwoU64FromHex(
             g_ctx.ListView,
             lParam1,
             lParam2,
@@ -538,6 +538,7 @@ VOID DumpHandlers(
     PRTL_PROCESS_MODULE_INFORMATION pModule;
 
     UINT i;
+
     for (i = 0; i < Count; i++) {
         if ((ULONG_PTR)Handlers[i] > g_ctx.ParamBlock.SystemRangeStart) {
 
@@ -548,6 +549,7 @@ VOID DumpHandlers(
                 Handlers[i],
                 &moduleIndex))
             {
+                RtlInitEmptyUnicodeString(&usConvert, NULL, 0);
                 pModule = &pModulesList->Modules[moduleIndex];
                 if (NT_SUCCESS(ntsupConvertToUnicode((LPSTR)&pModule->FullPathName, &usConvert))) {
                     pAssociatedModule = usConvert.Buffer;
@@ -595,9 +597,9 @@ VOID DumpProtocolInfo(
     ListView_DeleteAllItems(g_ctx.ListView);
 
     pModulesList = ntsupGetSystemInfoEx(
-        SystemModuleInformation, 
-        NULL, 
-        (PNTSUPMEMALLOC)HeapMemoryAlloc, 
+        SystemModuleInformation,
+        NULL,
+        (PNTSUPMEMALLOC)HeapMemoryAlloc,
         (PNTSUPMEMFREE)HeapMemoryFree);
 
     if (pModulesList == NULL) {
@@ -701,9 +703,9 @@ VOID DumpOpenBlockInfo(
     // Allocate loaded modules list.
     //
     pModulesList = ntsupGetSystemInfoEx(
-        SystemModuleInformation, 
-        NULL, 
-        (PNTSUPMEMALLOC)HeapMemoryAlloc, 
+        SystemModuleInformation,
+        NULL,
+        (PNTSUPMEMALLOC)HeapMemoryAlloc,
         (PNTSUPMEMFREE)HeapMemoryFree);
 
     if (pModulesList == NULL) {
@@ -769,38 +771,38 @@ VOID DumpOpenBlockInfo(
 VOID OnContextMenu(
     _In_ HWND hwnd,
     _In_ UINT idItem,
-    _In_ LPWSTR menuText,
-    _In_ LPPOINT point
+    _In_ LPPOINT lpPoint
 )
 {
     HMENU hMenu;
 
     hMenu = CreatePopupMenu();
     if (hMenu) {
-        InsertMenu(hMenu, 0, MF_BYCOMMAND, idItem, menuText);
-        TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, point->x, point->y, 0, hwnd, NULL);
+
+        if (idItem == ID_MENU_COPY_VALUE) {
+
+            //
+            // Add copy value text for treelist.
+            //
+            InsertMenu(hMenu, 0, MF_BYCOMMAND, idItem, TEXT("Copy Object Field"));
+        }
+        else {
+
+            //
+            // Add "Copy %item%" menu item.
+            //
+            supListViewAddCopyValueItem(hMenu,
+                g_ctx.ListView,
+                idItem,
+                0,
+                lpPoint,
+                &g_ctx.LvItemHit,
+                &g_ctx.LvColumnHit);
+
+        }
+
+        TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, lpPoint->x, lpPoint->y, 0, hwnd, NULL);
         DestroyMenu(hMenu);
-    }
-}
-
-/*
-* CopyValueHandler
-*
-* Purpose:
-*
-* TreeList/ListView clipboard copy handler.
-*
-*/
-VOID CopyValueHandler(
-    _In_ UINT idMenu
-)
-{
-    if (idMenu == ID_MENU_COPY_VALUE) {
-        CopyTreeListSubItemValue(g_ctx.TreeList, 0);
-
-    }
-    else if (idMenu == ID_MENU_COPY_VALUE + 1) {
-        CopyListViewSubItemValue(g_ctx.ListView, 1);
     }
 }
 
@@ -905,7 +907,7 @@ VOID ShowPropertiesHandler(
     if (hwndFocus == g_ctx.ListView) {
 
         RtlSecureZeroMemory(&item, sizeof(item));
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+        szBuffer[0] = 0;
 
         item.iItem = ListView_GetSelectionMark(g_ctx.ListView);
         item.iSubItem = 2;
@@ -913,11 +915,11 @@ VOID ShowPropertiesHandler(
         item.cchTextMax = (SIZE_T)MAX_PATH;
         SendMessage(g_ctx.ListView, LVM_GETITEMTEXT, (WPARAM)item.iItem, (LPARAM)&item);
 
-        RtlSecureZeroMemory(szConvertedFileName, sizeof(szConvertedFileName));
-        if (GetWin32FileName(
-            szBuffer, 
-            szConvertedFileName, 
-            MAX_PATH)) 
+        szConvertedFileName[0] = 0;
+        if (supGetWin32FileName(
+            szBuffer,
+            szConvertedFileName,
+            MAX_PATH))
         {
             ShowProperties(g_ctx.MainWindow, szConvertedFileName);
         }
@@ -1057,7 +1059,7 @@ LRESULT CALLBACK MainWindowProc(
 
         if ((HWND)wParam == TreeListControl) {
             GetCursorPos((LPPOINT)&crc);
-            OnContextMenu(hwnd, ID_MENU_COPY_VALUE, TEXT("Copy Object Field"), (LPPOINT)&crc);
+            OnContextMenu(hwnd, ID_MENU_COPY_VALUE, (LPPOINT)&crc);
         }
 
         if ((HWND)wParam == g_ctx.ListView) {
@@ -1072,7 +1074,7 @@ LRESULT CALLBACK MainWindowProc(
             else
                 GetCursorPos((LPPOINT)&crc);
 
-            OnContextMenu(hwnd, ID_MENU_COPY_VALUE + 1, TEXT("Copy Value Field"), (LPPOINT)&crc);
+            OnContextMenu(hwnd, ID_MENU_COPY_VALUE + 1, (LPPOINT)&crc);
         }
         break;
 
@@ -1085,8 +1087,15 @@ LRESULT CALLBACK MainWindowProc(
             break;
 
         case ID_MENU_COPY_VALUE:
+            supCopyTreeListSubItemValue(g_ctx.TreeList, 0);
+            break;
+
         case ID_MENU_COPY_VALUE + 1:
-            CopyValueHandler(LOWORD(wParam));
+
+            supListViewCopyItemValueToClipboard(g_ctx.ListView,
+                g_ctx.LvItemHit,
+                g_ctx.LvColumnHit);
+
             break;
 
         case WINOBJEX64_ACC_F5:
@@ -1544,7 +1553,7 @@ BOOLEAN CALLBACK PluginInit(
         //
         // Set plugin description.
         //
-        StringCbCopy(PluginData->Description, sizeof(PluginData->Description), 
+        StringCbCopy(PluginData->Description, sizeof(PluginData->Description),
             TEXT("Displays registered NDIS protocols and lists their key functions."));
 
         //

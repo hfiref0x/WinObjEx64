@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        23 July 2020
+*  DATE:        16 Dec 2020
 *
 *  Common header file for the program support routines.
 *
@@ -64,11 +64,35 @@ typedef struct _OBEX_THREAD_LOOKUP_ENTRY {
     PVOID EntryPtr;
 } OBEX_THREAD_LOOKUP_ENTRY, *POBEX_THREAD_LOOKUP_ENTRY;
 
+typedef struct _ALPCPORT_ENUM_CONTEXT {
+    _In_ LPCWSTR ObjectFullName;
+    _Out_ HANDLE ObjectHandle;
+} ALPCPORT_ENUM_CONTEXT, * PALPCPORT_ENUM_CONTEXT;
+
+typedef struct _PS_HANDLE_DUMP_ENUM_CONTEXT {
+    _In_ USHORT ObjectTypeIndex;
+    _In_ ULONG_PTR ObjectAddress;
+    _In_ HWND ListView;
+    _In_ HIMAGELIST ImageList;
+    _In_ PVOID ProcessList;
+} PS_HANDLE_DUMP_ENUM_CONTEXT, * PPS_HANDLE_DUMP_ENUM_CONTEXT;
+
 // return true to stop enumeration
 typedef BOOL(CALLBACK* PENUMERATE_SL_CACHE_VALUE_DESCRIPTORS_CALLBACK)(
     _In_ SL_KMEM_CACHE_VALUE_DESCRIPTOR* CacheDescriptor,
     _In_opt_ PVOID Context
     );
+
+// return true to stop enumeration
+typedef BOOL(CALLBACK* PENUMERATE_HANDLE_DUMP_CALLBACK)(
+    _In_ SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX *HandleEntry,
+    _In_opt_ PVOID UserContext
+    );
+
+typedef NTSTATUS(NTAPI *PNTOBJECTOPENPROCEDURE)(
+    _Out_ PHANDLE ObjectHandle,
+    _In_ ACCESS_MASK DesiredAccess,
+    _In_ POBJECT_ATTRIBUTES ObjectAttributes);
 
 typedef struct _PROCESS_MITIGATION_POLICIES_ALL {
     PROCESS_MITIGATION_DEP_POLICY DEPPolicy;
@@ -158,6 +182,8 @@ typedef struct tagVERHEAD {
 #define supOpenDirectory ntsupOpenDirectory
 #define supQueryProcessName ntsupQueryProcessName
 #define supQueryProcessEntryById ntsupQueryProcessEntryById
+#define supQueryProcessInformation ntsupQueryProcessInformation
+#define supQueryObjectInformation ntsupQueryObjectInformation
 #define supWriteBufferToFile ntsupWriteBufferToFile
 #define supQueryHVCIState ntsupQueryHVCIState
 #define supLookupImageSectionByName ntsupLookupImageSectionByName
@@ -200,6 +226,12 @@ BOOL supInitTreeListForDump(
 VOID supShowHelp(
     _In_ HWND ParentWindow);
 
+BOOL supQueryObjectFromHandleEx(
+    _In_ PSYSTEM_HANDLE_INFORMATION_EX HandlesDump,
+    _In_ HANDLE Object,
+    _Out_opt_ ULONG_PTR* Address,
+    _Out_opt_ USHORT* TypeIndex);
+
 BOOL supQueryObjectFromHandle(
     _In_ HANDLE Object,
     _Out_ ULONG_PTR* Address,
@@ -241,6 +273,20 @@ UINT supGetObjectNameIndexByTypeIndex(
 VOID supRunAsAdmin(
     VOID);
 
+BOOL supListViewCopyItemValueToClipboard(
+    _In_ HWND hwndListView,
+    _In_ INT iItem,
+    _In_ INT iSubItem);
+
+BOOL supListViewAddCopyValueItem(
+    _In_ HMENU hMenu,
+    _In_ HWND hwndLv,
+    _In_ UINT uId,
+    _In_opt_ UINT uPos,
+    _In_ POINT* lpPoint,
+    _Out_ INT* pItemHit,
+    _Out_ INT* pColumnHit);
+
 VOID supSetMenuIcon(
     _In_ HMENU hMenu,
     _In_ UINT Item,
@@ -253,7 +299,7 @@ VOID supSetGotoLinkTargetToolButtonState(
     _In_ BOOL bForce,
     _In_ BOOL bForceEnable);
 
-BOOL supIsSymbolicLinkObject(
+WOBJ_OBJECT_TYPE supObjectListGetObjectType(
     _In_ HWND hwndList,
     _In_ INT iItem);
 
@@ -331,7 +377,13 @@ PVOID supGetSystemInfo(
     _In_ SYSTEM_INFORMATION_CLASS SystemInformationClass,
     _Out_opt_ PULONG ReturnLength);
 
-HANDLE supOpenDirectoryForObject(
+NTSTATUS supOpenDeviceObject(
+    _Out_ PHANDLE ObjectHandle,
+    _In_ ACCESS_MASK DesiredAccess,
+    _In_ POBJECT_ATTRIBUTES ObjectAttributes);
+
+NTSTATUS supOpenDirectoryForObject(
+    _Out_ PHANDLE DirectoryHandle,
     _In_ LPWSTR lpObjectName,
     _In_ LPWSTR lpDirectory);
 
@@ -358,6 +410,14 @@ BOOL supSaveDialogExecute(
     _Inout_ LPWSTR SaveFileName,
     _In_ LPWSTR lpDialogFilter);
 
+VOID supSetListViewSettings(
+    _In_ HWND hwndLV,
+    _In_ DWORD dwExtendedStyle,
+    _In_ BOOL fIgnoreGlobalSettings,
+    _In_ BOOL fSetTheme,
+    _In_opt_ HIMAGELIST hImageList,
+    _In_ INT iImageList);
+
 HICON supGetStockIcon(
     _In_ SHSTOCKICONID siid,
     _In_ UINT uFlags);
@@ -378,7 +438,7 @@ HWINSTA supOpenWindowStationFromContext(
     _In_ BOOL fInherit,
     _In_ ACCESS_MASK dwDesiredAccess);
 
-BOOL supQueryObjectTrustLabel(
+NTSTATUS supQueryObjectTrustLabel(
     _In_ HANDLE hObject,
     _Out_ PULONG ProtectionType,
     _Out_ PULONG ProtectionLevel);
@@ -428,7 +488,7 @@ NTSTATUS supOpenNamedObjectByType(
     _Out_ HANDLE* ObjectHandle,
     _In_ ULONG TypeIndex,
     _In_ LPWSTR ObjectDirectory,
-    _In_opt_ LPWSTR ObjectName,
+    _In_ LPWSTR ObjectName,
     _In_ ACCESS_MASK DesiredAccess);
 
 HANDLE supOpenObjectFromContext(
@@ -446,6 +506,9 @@ VOID supShowLastError(
     _In_ LPWSTR Source,
     _In_ DWORD LastError);
 
+LPWSTR supFormatNtError(
+    _In_ NTSTATUS NtError);
+
 PSID supQueryTokenUserSid(
     _In_ HANDLE ProcessToken);
 
@@ -454,10 +517,6 @@ PSID supQueryProcessSid(
 
 VOID supCopyTreeListSubItemValue(
     _In_ HWND TreeList,
-    _In_ UINT ValueIndex);
-
-VOID supCopyListViewSubItemValue(
-    _In_ HWND ListView,
     _In_ UINT ValueIndex);
 
 VOID supJumpToFile(
@@ -487,6 +546,7 @@ BOOL supGetProcessMitigationPolicy(
 
 NTSTATUS supOpenProcessEx(
     _In_ HANDLE UniqueProcessId,
+    _In_ ACCESS_MASK DesiredAccess,
     _Out_ PHANDLE ProcessHandle);
 
 NTSTATUS supOpenProcessTokenEx(
@@ -503,28 +563,52 @@ BOOL supGetListViewItemParam(
     _In_ INT itemIndex,
     _Out_ PVOID * outParam);
 
+VOID supSetMinMaxTrackSize(
+    _In_ PMINMAXINFO MinMaxInfo,
+    _In_ INT MinX,
+    _In_ INT MinY,
+    _In_ BOOL Scaled);
+
 BOOL WINAPI supCallbackShowChildWindow(
     _In_ HWND hwnd,
     _In_ LPARAM lParam);
 
+LPWSTR supGetSidNameUse(
+    _In_ SID_NAME_USE SidNameUse);
+
 LPWSTR supIntegrityToString(
     _In_ DWORD IntegrityLevel);
+
+BOOL supLookupSidUserAndDomainEx(
+    _In_ PSID Sid,
+    _In_ LSA_HANDLE PolicyHandle,
+    _Out_ LPWSTR * lpSidUserAndDomain);
 
 BOOL supLookupSidUserAndDomain(
     _In_ PSID Sid,
     _Out_ LPWSTR * lpSidUserAndDomain);
+
+NTSTATUS supLsaOpenMachinePolicy(
+    _In_ ACCESS_MASK DesiredAccess,
+    _Out_ PLSA_HANDLE PolicyHandle);
+
+PSYSTEM_HANDLE_INFORMATION_EX supHandlesCreateFilteredAndSortedList(
+    _In_ ULONG_PTR FilterUniqueProcessId,
+    _In_ BOOLEAN fObject);
 
 BOOL supHandlesQueryObjectAddress(
     _In_ PSYSTEM_HANDLE_INFORMATION_EX SortedHandleList,
     _In_ HANDLE ObjectHandle,
     _Out_ PULONG_PTR ObjectAddress);
 
-PSYSTEM_HANDLE_INFORMATION_EX supHandlesCreateFilteredAndSortedList(
-    _In_ ULONG_PTR FilterUniqueProcessId,
-    _In_ BOOLEAN fObject);
-
 BOOL supHandlesFreeList(
     PSYSTEM_HANDLE_INFORMATION_EX SortedHandleList);
+
+BOOL supPHLCreate(
+    _Inout_ PLIST_ENTRY ListHead,
+    _In_ PBYTE ProcessList,
+    _Out_ PULONG NumberOfProcesses,
+    _Out_ PULONG NumberOfThreads);
 
 VOID supPHLFree(
     _In_ PLIST_ENTRY ListHead,
@@ -534,12 +618,6 @@ HANDLE supPHLGetEntry(
     _In_ PLIST_ENTRY ListHead,
     _In_ HANDLE UniqueProcessId);
 
-BOOL supPHLCreate(
-    _Inout_ PLIST_ENTRY ListHead,
-    _In_ PBYTE ProcessList,
-    _Out_ PULONG NumberOfProcesses,
-    _Out_ PULONG NumberOfThreads);
-
 PVOID supSLCacheRead(
     VOID);
 
@@ -547,6 +625,10 @@ BOOLEAN supSLCacheEnumerate(
     _In_ PVOID CacheData,
     _In_opt_ PENUMERATE_SL_CACHE_VALUE_DESCRIPTORS_CALLBACK Callback,
     _In_opt_ PVOID Context);
+
+HRESULT supShellExecInExplorerProcessEx(
+    _In_ PCWSTR pszFile,
+    _In_opt_ PCWSTR pszArguments);
 
 HRESULT WINAPI supShellExecInExplorerProcess(
     _In_ PCWSTR pszFile);
@@ -652,3 +734,54 @@ VOID supStatusBarSetText(
 VOID supJumpToFileListView(
     _In_ HWND hwndList,
     _In_ INT iFileNameColumn);
+
+VOID supQueryAlpcPortObjectTypeIndex(
+    _In_ PVOID PortGlobal);
+
+BOOL supEnumHandleDump(
+    _In_ PSYSTEM_HANDLE_INFORMATION_EX HandleDump,
+    _In_ PENUMERATE_HANDLE_DUMP_CALLBACK EnumCallback,
+    _In_ PVOID UserContext);
+
+NTSTATUS supOpenPortObjectByName(
+    _Out_ PHANDLE ObjectHandle,
+    _In_ ACCESS_MASK DesiredAccess,
+    _Out_opt_ PHANDLE ReferenceHandle,
+    _In_ LPCWSTR ObjectName);
+
+NTSTATUS supOpenPortObjectFromContext(
+    _Out_ PHANDLE ObjectHandle,
+    _In_ ACCESS_MASK DesiredAccess,
+    _In_ PROP_OBJECT_INFO* Context);
+
+NTSTATUS supQueryProcessImageFileNameWin32(
+    _In_ HANDLE UniqueProcessId,
+    _Out_ PUNICODE_STRING* ProcessImageFileName);
+
+PSID supGetSidFromAce(
+    _In_ PACE_HEADER AceHeader);
+
+NTSTATUS supQuerySecurityInformation(
+    _In_ HANDLE ObjectHandle,
+    _In_ SECURITY_INFORMATION SecurityInformationClass,
+    _Out_ PVOID* Buffer,
+    _Out_opt_ PULONG ReturnLength);
+
+typedef VOID(CALLBACK* pfnPopupMenuHandler)(
+    _In_ HWND hwndDlg,
+    _In_ LPPOINT lpPoint,
+    _In_opt_ PVOID lpUserParam
+    );
+
+VOID supHandleContextMenuMsgForListView(
+    _In_ HWND hwndDlg,
+    _In_ WPARAM wParam,
+    _In_ LPARAM lParam,
+    _In_ HWND hwndControl,
+    _In_ pfnPopupMenuHandler MenuHandler,
+    _In_opt_ PVOID lpUserParam);
+
+ULONG supAddLVColumnsFromArray(
+    _In_ HWND ListView,
+    _In_ PLVCOLUMNS_DATA ColumnsData,
+    _In_ ULONG NumberOfColumns);

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2020
+*  (C) COPYRIGHT AUTHORS, 2019 - 2021
 *
 *  TITLE:       EXTAPI.H
 *
-*  VERSION:     1.01
+*  VERSION:     1.02
 *
-*  DATE:        12 July 2020
+*  DATE:        16 Jan 2021
 *
 *  Windows SDK compatibility header.
 *
@@ -35,6 +35,10 @@ typedef enum _EXT_SID_NAME_USE {
 //
 // These constants are missing in Windows SDK 8.1
 //
+#ifndef SYSTEM_ACCESS_FILTER_ACE_TYPE
+#define SYSTEM_ACCESS_FILTER_ACE_TYPE           (0x15)
+#endif
+
 #ifndef IMAGE_SUBSYSTEM_XBOX_CODE_CATALOG
 #define IMAGE_SUBSYSTEM_XBOX_CODE_CATALOG 17
 #endif

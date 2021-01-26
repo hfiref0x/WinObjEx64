@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        23 July 2020
+*  DATE:        11 Dec 2020
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -475,7 +475,7 @@ ULONG_PTR ObFindAddress(
 *
 * Purpose:
 *
-* Initialize block offfsets table for working with OBJECT_HEADER data.
+* Initialize block offsets table for working with OBJECT_HEADER data.
 *
 * Note:
 *
@@ -1722,7 +1722,7 @@ BOOL ObGetDirectoryObjectAddress(
         lpTarget = lpDirectory;
     }
 
-    hDirectory = supOpenDirectory(NULL, lpTarget, DIRECTORY_QUERY);
+    supOpenDirectory(&hDirectory, NULL, lpTarget, DIRECTORY_QUERY);
     if (hDirectory) {
 
         bFound = supQueryObjectFromHandle(hDirectory,

@@ -60,6 +60,9 @@
     <ClCompile Include="..\..\Shared\minirtl\_strncmp.c">
       <Filter>minirtl</Filter>
     </ClCompile>
+    <ClCompile Include="sup.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h">
@@ -91,6 +94,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Shared\ntos\ntsup.h">
       <Filter>ntos</Filter>
+    </ClInclude>
+    <ClInclude Include="sup.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

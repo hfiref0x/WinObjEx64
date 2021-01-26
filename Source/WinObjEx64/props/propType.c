@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       PROPTYPE.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.88
 *
-*  DATE:        05 Jan 2020
+*  DATE:        05 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -497,10 +497,12 @@ VOID propSetTypeListView(
     if (hListRights == NULL)
         return;
 
-    ListView_SetExtendedListViewStyle(hListRights,
-        LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP);
-
-    SetWindowTheme(hListRights, TEXT("Explorer"), NULL);
+    supSetListViewSettings(hListRights,
+        LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
+        TRUE, //override global settings for this listview
+        TRUE,
+        NULL,
+        0);
 
     supAddListViewColumn(hListRights, 0, 0, 0,
         I_IMAGENONE,

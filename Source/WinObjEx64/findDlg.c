@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       FINDDLG.C
 *
-*  VERSION:     1.85
+*  VERSION:     1.88
 *
-*  DATE:        13 Mar 2020
+*  DATE:        15 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,18 +17,50 @@
 #include "global.h"
 #include "findDlg.h"
 
-HWND FindDlgList;
-HWND FindDlgStatusBar = 0;
-HWND FindDialog = 0;
+#define FINDDLG_TRACKSIZE_MIN_X 548
+#define FINDDLG_TRACKSIZE_MIN_Y 230
 
-static LONG sizes_init = 0, dx1, dx2, dx3, dx4, dx5, dx6, dx7, dx8, dx9, dx10, dx11, dx12, dx13;
+typedef struct _FINDDLG_CONTEXT {
+    //
+    // Dialog controls and resources.
+    //
+    HWND DialogWindow;
+    HWND StatusBar;
+    HWND SearchList;
+    HICON DialogIcon;
 
-//local FindDlg variable controlling sorting direction
-BOOL bFindDlgSortInverse = FALSE;
+    INT ColumnCount;
 
-// local FindDlg variable to hold selected column
-LONG FindDlgSortColumn = 0;
+    //
+    // ListView selection.
+    //
+    INT iSelectedItem;
+    INT iColumnHit;
 
+    // ListView settings.
+    INT SortColumn;
+    BOOL SortInverse;
+
+    //
+    // Resize.
+    //
+    LONG sizes_init;
+    LONG dx1;
+    LONG dx2;
+    LONG dx3;
+    LONG dx4;
+    LONG dx5;
+    LONG dx6;
+    LONG dx7;
+    LONG dx8;
+    LONG dx9;
+    LONG dx10;
+    LONG dx11;
+    LONG dx12;
+    LONG dx13;
+} FINDDLG_CONTEXT, * PFINDDLGCONTEXT;
+
+static FINDDLG_CONTEXT g_FindDlgContext;
 
 /*
 * FindDlgCompareFunc
@@ -44,8 +76,8 @@ INT CALLBACK FindDlgCompareFunc(
     _In_ LPARAM lParamSort
 )
 {
-    return supListViewBaseComparer(FindDlgList,
-        bFindDlgSortInverse,
+    return supListViewBaseComparer(g_FindDlgContext.SearchList,
+        g_FindDlgContext.SortInverse,
         lParam1,
         lParam2,
         lParamSort);
@@ -92,7 +124,8 @@ VOID FindDlgAddListItem(
 *
 */
 VOID FindDlgResize(
-    _In_ HWND hwndDlg
+    _In_ HWND hwndDlg,
+    _In_ FINDDLG_CONTEXT* Context
 )
 {
     RECT  r1, r2;
@@ -101,93 +134,112 @@ VOID FindDlgResize(
 
     GetClientRect(hwndDlg, &r2);
 
-    if (sizes_init == 0) {
-        sizes_init = 1;
+    if (Context->sizes_init == 0) {
+        Context->sizes_init = 1;
+
         RtlSecureZeroMemory(&r1, sizeof(r1));
         GetWindowRect(GetDlgItem(hwndDlg, ID_SEARCH_GROUPBOXOPTIONS), &r1);
-        dx1 = r2.right - (r1.right - r1.left);
-        dx2 = r1.bottom - r1.top;
+        Context->dx1 = r2.right - (r1.right - r1.left);
+        Context->dx2 = r1.bottom - r1.top;
+
         RtlSecureZeroMemory(&r1, sizeof(r1));
         GetWindowRect(GetDlgItem(hwndDlg, ID_SEARCH_GROUPBOX), &r1);
-        dx3 = r2.bottom - (r1.bottom - r1.top);
+        Context->dx3 = r2.bottom - (r1.bottom - r1.top);
 
         RtlSecureZeroMemory(&r1, sizeof(r1));
         GetWindowRect(GetDlgItem(hwndDlg, ID_SEARCH_LIST), &r1);
-        dx4 = r2.right - (r1.right - r1.left);
-        dx5 = r2.bottom - (r1.bottom - r1.top);
+        Context->dx4 = r2.right - (r1.right - r1.left);
+        Context->dx5 = r2.bottom - (r1.bottom - r1.top);
 
         RtlSecureZeroMemory(&r1, sizeof(r1));
         GetWindowRect(GetDlgItem(hwndDlg, ID_SEARCH_NAME), &r1);
-        dx6 = r2.right - (r1.right - r1.left);
-        dx7 = r1.bottom - r1.top;
+        Context->dx6 = r2.right - (r1.right - r1.left);
+        Context->dx7 = r1.bottom - r1.top;
 
         RtlSecureZeroMemory(&r1, sizeof(r1));
         GetWindowRect(GetDlgItem(hwndDlg, ID_SEARCH_TYPE), &r1);
         p0.x = r1.left;
         p0.y = r1.top;
         ScreenToClient(hwndDlg, &p0);
-        dx8 = r2.right - p0.x;
-        dx9 = p0.y;
+        Context->dx8 = r2.right - p0.x;
+        Context->dx9 = p0.y;
 
         RtlSecureZeroMemory(&r1, sizeof(r1));
         GetWindowRect(GetDlgItem(hwndDlg, ID_SEARCH_FIND), &r1);
         p0.x = r1.left;
         p0.y = r1.top;
         ScreenToClient(hwndDlg, &p0);
-        dx10 = r2.right - p0.x;
-        dx11 = p0.y;
+        Context->dx10 = r2.right - p0.x;
+        Context->dx11 = p0.y;
 
         RtlSecureZeroMemory(&r1, sizeof(r1));
         GetWindowRect(GetDlgItem(hwndDlg, ID_SEARCH_TYPELABEL), &r1);
         p0.x = r1.left;
         p0.y = r1.top;
         ScreenToClient(hwndDlg, &p0);
-        dx12 = r2.right - p0.x;
-        dx13 = p0.y;
+        Context->dx12 = r2.right - p0.x;
+        Context->dx13 = p0.y;
     }
 
     //resize groupbox search options
     hwnd = GetDlgItem(hwndDlg, ID_SEARCH_GROUPBOXOPTIONS);
     if (hwnd) {
-        SetWindowPos(hwnd, 0, 0, 0, r2.right - dx1, dx2, SWP_NOMOVE | SWP_NOZORDER);
+        SetWindowPos(hwnd, 0, 0, 0,
+            r2.right - Context->dx1, Context->dx2,
+            SWP_NOMOVE | SWP_NOZORDER);
     }
 
     //resize groupbox results
     hwnd = GetDlgItem(hwndDlg, ID_SEARCH_GROUPBOX);
     if (hwnd) {
-        SetWindowPos(hwnd, 0, 0, 0, r2.right - dx1, r2.bottom - dx3, SWP_NOMOVE | SWP_NOZORDER);
+        SetWindowPos(hwnd, 0, 0, 0,
+            r2.right - Context->dx1, r2.bottom - Context->dx3,
+            SWP_NOMOVE | SWP_NOZORDER);
     }
 
     //resize listview
     hwnd = GetDlgItem(hwndDlg, ID_SEARCH_LIST);
     if (hwnd) {
-        SetWindowPos(hwnd, 0, 0, 0, r2.right - dx4, r2.bottom - dx5, SWP_NOMOVE | SWP_NOZORDER);
+        SetWindowPos(hwnd, 0, 0, 0,
+            r2.right - Context->dx4, r2.bottom - Context->dx5,
+            SWP_NOMOVE | SWP_NOZORDER);
     }
 
     //resize edit
     hwnd = GetDlgItem(hwndDlg, ID_SEARCH_NAME);
     if (hwnd) {
-        SetWindowPos(hwnd, 0, 0, 0, r2.right - dx6, dx7, SWP_NOMOVE | SWP_NOZORDER);
+        SetWindowPos(hwnd, 0, 0, 0,
+            r2.right - Context->dx6, Context->dx7,
+            SWP_NOMOVE | SWP_NOZORDER);
     }
 
     //resize combobox
     hwnd = GetDlgItem(hwndDlg, ID_SEARCH_TYPE);
     if (hwnd) {
-        SetWindowPos(hwnd, 0, r2.right - dx8, dx9, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+        SetWindowPos(hwnd, 0,
+            r2.right - Context->dx8, Context->dx9,
+            0, 0,
+            SWP_NOSIZE | SWP_NOZORDER);
     }
 
     hwnd = GetDlgItem(hwndDlg, ID_SEARCH_FIND);
     if (hwnd) {
-        SetWindowPos(hwnd, 0, r2.right - dx10, dx11, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+        SetWindowPos(hwnd, 0,
+            r2.right - Context->dx10, Context->dx11,
+            0, 0,
+            SWP_NOSIZE | SWP_NOZORDER);
     }
 
     //resize Type label
     hwnd = GetDlgItem(hwndDlg, ID_SEARCH_TYPELABEL);
     if (hwnd) {
-        SetWindowPos(hwnd, 0, r2.right - dx12, dx13, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+        SetWindowPos(hwnd, 0,
+            r2.right - Context->dx12, Context->dx13,
+            0, 0,
+            SWP_NOSIZE | SWP_NOZORDER);
     }
 
-    SendMessage(FindDlgStatusBar, WM_SIZE, 0, 0);
+    SendMessage(Context->StatusBar, WM_SIZE, 0, 0);
 
     RedrawWindow(hwndDlg, NULL, 0, RDW_ERASE | RDW_INVALIDATE | RDW_ERASENOW);
 }
@@ -201,43 +253,51 @@ VOID FindDlgResize(
 *
 */
 BOOL FindDlgHandleNotify(
-    _In_ LPNMLISTVIEW nhdr
+    _In_ LPNMLISTVIEW pListView
 )
 {
     INT      nImageIndex;
     LPWSTR   lpItemText;
 
-    if (nhdr->hdr.idFrom != ID_SEARCH_LIST)
+    if (pListView->hdr.idFrom != ID_SEARCH_LIST)
         return FALSE;
 
-    switch (nhdr->hdr.code) {
+    switch (pListView->hdr.code) {
 
     case LVN_ITEMCHANGED:
-        if (!(nhdr->uNewState & LVIS_SELECTED))
-            break;
 
-        lpItemText = supGetItemText(nhdr->hdr.hwndFrom, nhdr->iItem, 0, NULL);
-        if (lpItemText) {
-            ListToObject(lpItemText);
-            supHeapFree(lpItemText);
+        if ((pListView->uNewState & LVIS_SELECTED) &&
+            !(pListView->uOldState & LVIS_SELECTED))
+        {
+
+            lpItemText = supGetItemText(pListView->hdr.hwndFrom,
+                pListView->iItem,
+                0,
+                NULL);
+
+            if (lpItemText) {
+                ListToObject(lpItemText);
+                supHeapFree(lpItemText);
+            }
         }
+
         break;
 
     case LVN_COLUMNCLICK:
-        bFindDlgSortInverse = !bFindDlgSortInverse;
-        FindDlgSortColumn = ((NMLISTVIEW*)nhdr)->iSubItem;
-        ListView_SortItemsEx(FindDlgList, &FindDlgCompareFunc, FindDlgSortColumn);
+        g_FindDlgContext.SortInverse = !g_FindDlgContext.SortInverse;
+        g_FindDlgContext.SortColumn = pListView->iSubItem;
+        ListView_SortItemsEx(g_FindDlgContext.SearchList, &FindDlgCompareFunc, g_FindDlgContext.SortColumn);
 
         nImageIndex = ImageList_GetImageCount(g_ListViewImages);
-        if (bFindDlgSortInverse)
+        if (g_FindDlgContext.SortInverse)
             nImageIndex -= 2;
         else
             nImageIndex -= 1;
 
         supUpdateLvColumnHeaderImage(
-            FindDlgList,
-            FINDLIST_COLUMN_COUNT,
-            FindDlgSortColumn,
+            g_FindDlgContext.SearchList,
+            g_FindDlgContext.ColumnCount,
+            g_FindDlgContext.SortColumn,
             nImageIndex);
 
         break;
@@ -247,6 +307,138 @@ BOOL FindDlgHandleNotify(
     }
 
     return TRUE;
+}
+
+/*
+* FindDlgHandleSettingsChange
+*
+* Purpose:
+*
+* Handle global settings change.
+*
+*/
+VOID FindDlgHandleSettingsChange(
+    _In_ FINDDLG_CONTEXT* Context
+)
+{
+    DWORD lvExStyle;
+
+    lvExStyle = ListView_GetExtendedListViewStyle(Context->SearchList);
+    if (g_WinObj.ListViewDisplayGrid)
+        lvExStyle |= LVS_EX_GRIDLINES;
+    else
+        lvExStyle &= ~LVS_EX_GRIDLINES;
+
+    ListView_SetExtendedListViewStyle(Context->SearchList, lvExStyle);
+}
+
+/*
+* FindDlgHandlePopupMenu
+*
+* Purpose:
+*
+* Search list popup construction.
+*
+*/
+VOID FindDlgHandlePopupMenu(
+    _In_ HWND hwndDlg,
+    _In_ LPPOINT lpPoint,
+    _In_ PVOID lpUserParam
+)
+{
+    HMENU hMenu;
+    UINT uPos = 0;
+    FINDDLG_CONTEXT* Context = (FINDDLG_CONTEXT*)lpUserParam;
+
+    hMenu = CreatePopupMenu();
+    if (hMenu) {
+
+        if (supListViewAddCopyValueItem(hMenu,
+            Context->SearchList,
+            ID_OBJECT_COPY,
+            uPos,
+            lpPoint,
+            &Context->iSelectedItem,
+            &Context->iColumnHit))
+        {
+            TrackPopupMenu(hMenu,
+                TPM_RIGHTBUTTON | TPM_LEFTALIGN,
+                lpPoint->x,
+                lpPoint->y,
+                0,
+                hwndDlg,
+                NULL);
+        }
+
+        DestroyMenu(hMenu);
+    }
+}
+
+/*
+* FindDlgHandleSearch
+*
+* Purpose:
+*
+* Search button click handler.
+*
+*/
+VOID FindDlgHandleSearch(
+    _In_ HWND hwndDlg
+)
+{
+    WCHAR           searchString[MAX_PATH + 1], typeName[MAX_PATH + 1];
+    LPWSTR          pnameStr = (LPWSTR)searchString, ptypeStr = (LPWSTR)typeName;
+    PFO_LIST_ITEM   flist, plist;
+    ULONG           cci;
+
+    supSetWaitCursor(TRUE);
+    EnableWindow(GetDlgItem(hwndDlg, ID_SEARCH_FIND), FALSE);
+
+    //
+    // Update status bar.
+    //
+    _strcpy(searchString, TEXT("Searching..."));
+    SetDlgItemText(hwndDlg, ID_SEARCH_STATUSBAR, searchString);
+
+    ListView_DeleteAllItems(g_FindDlgContext.SearchList);
+
+    RtlSecureZeroMemory(&searchString, sizeof(searchString));
+    RtlSecureZeroMemory(&typeName, sizeof(typeName));
+
+    GetDlgItemText(hwndDlg, ID_SEARCH_NAME, (LPWSTR)&searchString, MAX_PATH);
+    GetDlgItemText(hwndDlg, ID_SEARCH_TYPE, (LPWSTR)&typeName, MAX_PATH);
+
+    flist = NULL;
+
+    if (searchString[0] == 0)
+        pnameStr = NULL;
+    if (typeName[0] == L'*')
+        ptypeStr = 0;
+
+    FindObject(KM_OBJECTS_ROOT_DIRECTORY, pnameStr, ptypeStr, &flist);
+
+    cci = 0;
+    while (flist != NULL) {
+        FindDlgAddListItem(g_FindDlgContext.SearchList, flist->ObjectName, flist->ObjectType);
+        plist = flist->Prev;
+        supHeapFree(flist);
+        flist = plist;
+        cci++;
+    }
+
+    //
+    // Update status bar with results.
+    //
+    ultostr(cci, searchString);
+    _strcat(searchString, TEXT(" matching object(s)."));
+    SetDlgItemText(hwndDlg, ID_SEARCH_STATUSBAR, searchString);
+
+    ListView_SortItemsEx(g_FindDlgContext.SearchList,
+        &FindDlgCompareFunc, g_FindDlgContext.SortColumn);
+
+    supSetWaitCursor(FALSE);
+    EnableWindow(GetDlgItem(hwndDlg, ID_SEARCH_FIND), TRUE);
+
 }
 
 /*
@@ -264,93 +456,73 @@ INT_PTR CALLBACK FindDlgProc(
     _In_  LPARAM lParam
 )
 {
-    WCHAR           searchString[MAX_PATH + 1], typeName[MAX_PATH + 1];
-    LPWSTR          pnameStr = (LPWSTR)searchString, ptypeStr = (LPWSTR)typeName;
-    PFO_LIST_ITEM   flist, plist;
-    ULONG           cci;
-    LPNMLISTVIEW    nhdr = (LPNMLISTVIEW)lParam;
+    if (uMsg == g_WinObj.SettingsChangeMessage) {
+        FindDlgHandleSettingsChange(&g_FindDlgContext);
+        return TRUE;
+    }
 
     switch (uMsg) {
+
     case WM_NOTIFY:
-        return FindDlgHandleNotify(nhdr);
+        return FindDlgHandleNotify((LPNMLISTVIEW)lParam);
 
     case WM_GETMINMAXINFO:
         if (lParam) {
-            ((PMINMAXINFO)lParam)->ptMinTrackSize.x = 548;
-            ((PMINMAXINFO)lParam)->ptMinTrackSize.y = 230;
+            supSetMinMaxTrackSize((PMINMAXINFO)lParam,
+                FINDDLG_TRACKSIZE_MIN_X,
+                FINDDLG_TRACKSIZE_MIN_Y,
+                TRUE);
         }
         break;
 
     case WM_INITDIALOG:
         supCenterWindow(hwndDlg);
-        FindDlgResize(hwndDlg);
+        FindDlgResize(hwndDlg, &g_FindDlgContext);
         break;
 
     case WM_SIZE:
-        FindDlgResize(hwndDlg);
+        FindDlgResize(hwndDlg, &g_FindDlgContext);
         break;
 
     case WM_CLOSE:
+        if (g_FindDlgContext.DialogIcon)
+            DestroyIcon(g_FindDlgContext.DialogIcon);
+
         DestroyWindow(hwndDlg);
-        FindDialog = NULL;
         g_WinObj.AuxDialogs[wobjFindDlgId] = NULL;
-        return TRUE;
+        break;
 
     case WM_COMMAND:
-        if (LOWORD(wParam) == IDCANCEL) {
+
+        switch (GET_WM_COMMAND_ID(wParam, lParam)) {
+        case ID_OBJECT_COPY:
+
+            supListViewCopyItemValueToClipboard(g_FindDlgContext.SearchList,
+                g_FindDlgContext.iSelectedItem,
+                g_FindDlgContext.iColumnHit);
+
+            break;
+
+        case IDCANCEL:
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
-            return TRUE;
+            break;
+
+        case ID_SEARCH_FIND:
+            FindDlgHandleSearch(hwndDlg);
+            break;
+
+        default:
+            break;
         }
 
-        if (LOWORD(wParam) == ID_SEARCH_FIND) {
+    case WM_CONTEXTMENU:
 
-            supSetWaitCursor(TRUE);
-            EnableWindow(GetDlgItem(hwndDlg, ID_SEARCH_FIND), FALSE);
-
-            //
-            // Update status bar.
-            //
-            _strcpy(searchString, TEXT("Searching..."));
-            SetDlgItemText(hwndDlg, ID_SEARCH_STATUSBAR, searchString);
-
-            ListView_DeleteAllItems(FindDlgList);
-
-            RtlSecureZeroMemory(&searchString, sizeof(searchString));
-            RtlSecureZeroMemory(&typeName, sizeof(typeName));
-
-            GetDlgItemText(hwndDlg, ID_SEARCH_NAME, (LPWSTR)&searchString, MAX_PATH);
-            GetDlgItemText(hwndDlg, ID_SEARCH_TYPE, (LPWSTR)&typeName, MAX_PATH);
-
-            flist = NULL;
-
-            if (searchString[0] == 0)
-                pnameStr = NULL;
-            if (typeName[0] == L'*')
-                ptypeStr = 0;
-
-            FindObject(KM_OBJECTS_ROOT_DIRECTORY, pnameStr, ptypeStr, &flist);
-
-            cci = 0;
-            while (flist != NULL) {
-                FindDlgAddListItem(FindDlgList, flist->ObjectName, flist->ObjectType);
-                plist = flist->Prev;
-                supHeapFree(flist);
-                flist = plist;
-                cci++;
-            }
-
-            //
-            // Update status bar with results.
-            //
-            ultostr(cci, searchString);
-            _strcat(searchString, TEXT(" matching object(s)."));
-            SetDlgItemText(hwndDlg, ID_SEARCH_STATUSBAR, searchString);
-
-            ListView_SortItemsEx(FindDlgList, &FindDlgCompareFunc, FindDlgSortColumn);
-
-            supSetWaitCursor(FALSE);
-            EnableWindow(GetDlgItem(hwndDlg, ID_SEARCH_FIND), TRUE);
-        }
+        supHandleContextMenuMsgForListView(hwndDlg,
+            wParam,
+            lParam,
+            g_FindDlgContext.SearchList,
+            (pfnPopupMenuHandler)FindDlgHandlePopupMenu,
+            &g_FindDlgContext);
 
         break;
 
@@ -437,56 +609,69 @@ VOID FindDlgCreate(
     _In_ HWND hwndParent
 )
 {
-    HICON hIcon;
+    HWND hwndDlg;
+    INT iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
+    LVCOLUMNS_DATA columnData[] =
+    {
+        { L"Name", 300, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  iImage },
+        { L"Type", 100, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE }
+    };
+
 
     //
     // Allow only one search dialog per time.
     //
     ENSURE_DIALOG_UNIQUE(g_WinObj.AuxDialogs[wobjFindDlgId]);
 
-    FindDialog = CreateDialogParam(g_WinObj.hInstance, MAKEINTRESOURCE(IDD_DIALOG_SEARCH), hwndParent, &FindDlgProc, 0);
-    if (FindDialog == NULL)
+    RtlSecureZeroMemory(&g_FindDlgContext, sizeof(g_FindDlgContext));
+
+    hwndDlg = CreateDialogParam(g_WinObj.hInstance, 
+        MAKEINTRESOURCE(IDD_DIALOG_SEARCH), hwndParent, &FindDlgProc, 0);
+
+    if (hwndDlg == NULL)
         return;
 
-    g_WinObj.AuxDialogs[wobjFindDlgId] = FindDialog;
-
-    FindDlgStatusBar = GetDlgItem(FindDialog, ID_SEARCH_STATUSBAR);
+    g_WinObj.AuxDialogs[wobjFindDlgId] = hwndDlg;
+    g_FindDlgContext.DialogWindow = hwndDlg;
+    g_FindDlgContext.StatusBar = GetDlgItem(hwndDlg, ID_SEARCH_STATUSBAR);
+    g_FindDlgContext.iColumnHit = -1;
+    g_FindDlgContext.iSelectedItem = -1;
 
     //
-    // Set dialog icon, because we use shared dlg template this icon must be
-    // removed after use, see aboutDlg/propDlg.
+    // Set dialog icon.
     //
-    hIcon = (HICON)LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN), IMAGE_ICON, 0, 0, LR_SHARED);
-    if (hIcon) {
-        SetClassLongPtr(g_WinObj.AuxDialogs[wobjFindDlgId], GCLP_HICON, (LONG_PTR)hIcon);
-        DestroyIcon(hIcon);
+    g_FindDlgContext.DialogIcon = (HICON)LoadImage(g_WinObj.hInstance,
+        MAKEINTRESOURCE(IDI_ICON_MAIN),
+        IMAGE_ICON,
+        32, 32,
+        0);
+
+    if (g_FindDlgContext.DialogIcon) {
+        SendMessage(hwndDlg, WM_SETICON, (WPARAM)ICON_SMALL, (LPARAM)g_FindDlgContext.DialogIcon);
+        SendMessage(hwndDlg, WM_SETICON, (WPARAM)ICON_BIG, (LPARAM)g_FindDlgContext.DialogIcon);
     }
 
-    FindDlgList = GetDlgItem(FindDialog, ID_SEARCH_LIST);
-    if (FindDlgList) {
-        bFindDlgSortInverse = FALSE;
-        ListView_SetImageList(FindDlgList, g_ListViewImages, LVSIL_SMALL);
-
-        ListView_SetExtendedListViewStyle(
-            FindDlgList,
-            LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
-
-        SetWindowTheme(FindDlgList, TEXT("Explorer"), NULL);
+    g_FindDlgContext.SearchList = GetDlgItem(hwndDlg, ID_SEARCH_LIST);
+    if (g_FindDlgContext.SearchList) {
 
         //
-        // Add listview columns.
+        // Set listview imagelist, style flags and theme.
         //
+        supSetListViewSettings(g_FindDlgContext.SearchList,
+            LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
+            FALSE,
+            TRUE,
+            g_ListViewImages,
+            LVSIL_SMALL);
 
-        supAddListViewColumn(FindDlgList, 0, 0, 0,
-            ImageList_GetImageCount(g_ListViewImages) - 1,
-            LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
-            TEXT("Name"), 300);
-
-        supAddListViewColumn(FindDlgList, 1, 1, 1,
-            I_IMAGENONE,
-            LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
-            TEXT("Type"), 100);
+        //
+        // And columns and remember their count.
+        //
+        g_FindDlgContext.ColumnCount = supAddLVColumnsFromArray(
+            g_FindDlgContext.SearchList,
+            columnData,
+            RTL_NUMBER_OF(columnData));
 
     }
-    FindDlgAddTypes(FindDialog);
+    FindDlgAddTypes(hwndDlg);
 }

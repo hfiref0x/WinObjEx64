@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2020
+*  (C) COPYRIGHT AUTHORS, 2019 - 2021
 *
 *  TITLE:       EXTRASPSLIST.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        13 July 2020
+*  DATE:        11 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -24,6 +24,9 @@
 
 #define Y_SPLITTER_SIZE 4
 #define Y_SPLITTER_MIN  200
+
+#define PSLISTDLG_TRACKSIZE_MIN_X 640
+#define PSLISTDLG_TRACKSIZE_MIN_Y 480
 
 #define T_IDLE_PROCESS TEXT("Idle")
 #define T_IDLE_PROCESS_LENGTH sizeof(T_IDLE_PROCESS)
@@ -167,16 +170,37 @@ VOID PsListHandlePopupMenu(
     _In_ HWND hwndDlg,
     _In_ LPPOINT point,
     _In_ UINT itemCopy,
-    _In_ UINT itemRefresh
+    _In_ UINT itemRefresh,
+    _In_ BOOL fTreeList
 )
 {
     HMENU hMenu;
+    UINT uPos = 0;
 
     hMenu = CreatePopupMenu();
     if (hMenu) {
-        InsertMenu(hMenu, 0, MF_BYCOMMAND, itemCopy, T_COPYOBJECT);
-        InsertMenu(hMenu, 1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-        InsertMenu(hMenu, 2, MF_BYCOMMAND, itemRefresh, T_VIEW_REFRESH);
+
+        if (fTreeList) {
+            InsertMenu(hMenu, uPos++, MF_BYCOMMAND, itemCopy, T_COPYOBJECT);
+            InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+        }
+        else {
+
+            if (supListViewAddCopyValueItem(hMenu,
+                PsDlgContext.ListView,
+                itemCopy,
+                uPos,
+                point,
+                &PsDlgContext.lvItemHit,
+                &PsDlgContext.lvColumnHit))
+            {
+                uPos++;
+                InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+            }
+
+        }
+
+        InsertMenu(hMenu, uPos, MF_BYCOMMAND, itemRefresh, T_VIEW_REFRESH);
         TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, point->x, point->y, 0, hwndDlg, NULL);
         DestroyMenu(hMenu);
     }
@@ -410,7 +434,8 @@ HTREEITEM AddProcessEntryTreeList(
     _In_ PVOID Data,
     _In_ ULONG_PTR ObjectAddress,
     _In_opt_ SCMDB* ServicesList,
-    _In_opt_ PSID OurSid
+    _In_opt_ PSID OurSid,
+    _In_opt_ LSA_HANDLE PolicyHandle
 )
 {
     HTREEITEM hTreeItem = NULL;
@@ -483,6 +508,7 @@ HTREEITEM AddProcessEntryTreeList(
     subitems.UserParam = (PVOID)objectEntry;
     subitems.Count = 2;
     subitems.Text[0] = szEPROCESS;
+    subitems.Text[1] = T_EmptyString;
 
     //
     // Colors (set order is sensitive).
@@ -544,9 +570,9 @@ HTREEITEM AddProcessEntryTreeList(
     //
     // User.
     //
-    if (ProcessSid) {
+    if (ProcessSid && PolicyHandle) {
 
-        if (supLookupSidUserAndDomain(ProcessSid, &UserName)) {
+        if (supLookupSidUserAndDomainEx(ProcessSid, PolicyHandle, &UserName)) {
             subitems.Text[1] = UserName;
         }
         supHeapFree(ProcessSid);
@@ -682,8 +708,11 @@ LPWSTR PsListGetThreadStateAsString(
 
         _strcpy(StateBuffer, TEXT("Wait:"));
 
+#pragma warning(push)
+#pragma warning (disable: 33010) // No.
         if (WaitReason < MAX_KNOWN_WAITREASON)
             lpWaitReason = T_WAITREASON[WaitReason];
+#pragma warning(pop)
 
         _strcat(StateBuffer, lpWaitReason);
     }
@@ -990,6 +1019,8 @@ DWORD WINAPI CreateProcessListProc(
     PSID OurSid = NULL;
     PWSTR lpErrorMsg;
 
+    LSA_HANDLE lsaPolicyHandle = NULL;
+
     SCMDB ServicesList;
 
     WCHAR szBuffer[100];
@@ -1074,12 +1105,19 @@ DWORD WINAPI CreateProcessListProc(
 
             OurSid = supQueryProcessSid(NtCurrentProcess());
 
+            lsaPolicyHandle = NULL;
+            supLsaOpenMachinePolicy(POLICY_LOOKUP_NAMES, &lsaPolicyHandle);
+
             NextEntryDelta = 0;
             ViewRootHandle = NULL;
             List.ListRef = (PBYTE)InfoBuffer;
 
             do {
                 List.ListRef += NextEntryDelta;
+                NextEntryDelta = List.ProcessEntry->NextEntryDelta;
+
+                if (List.ProcessEntry->UniqueProcessId == 0)
+                    continue;
 
                 ViewRootHandle = FindParentItem(PsDlgContext.TreeList,
                     List.ProcessEntry->InheritedFromUniqueProcessId);
@@ -1099,7 +1137,8 @@ DWORD WINAPI CreateProcessListProc(
                         (PVOID)List.ProcessEntry,
                         ObjectAddress,
                         &ServicesList,
-                        OurSid);
+                        OurSid,
+                        lsaPolicyHandle);
                 }
                 else {
                     AddProcessEntryTreeList(ViewRootHandle,
@@ -1107,16 +1146,17 @@ DWORD WINAPI CreateProcessListProc(
                         (PVOID)List.ProcessEntry,
                         ObjectAddress,
                         &ServicesList,
-                        OurSid);
+                        OurSid,
+                        lsaPolicyHandle);
                 }
 
                 if (ProcessHandle) {
                     NtClose(ProcessHandle);
                 }
 
-                NextEntryDelta = List.ProcessEntry->NextEntryDelta;
-
             } while (NextEntryDelta);
+
+            if (lsaPolicyHandle) LsaClose(lsaPolicyHandle);
 
         }
     }
@@ -1328,6 +1368,11 @@ INT_PTR CALLBACK PsListDialogProc(
     INT mark;
     HWND TreeListControl, FocusWindow;
 
+    if (uMsg == g_WinObj.SettingsChangeMessage) {
+        extrasHandleSettingsChange(&PsDlgContext);
+        return TRUE;
+    }
+
     switch (uMsg) {
 
     case WM_CONTEXTMENU:
@@ -1338,7 +1383,7 @@ INT_PTR CALLBACK PsListDialogProc(
 
         if ((HWND)wParam == TreeListControl) {
             GetCursorPos((LPPOINT)&crc);
-            PsListHandlePopupMenu(hwndDlg, (LPPOINT)&crc, ID_OBJECT_COPY, ID_VIEW_REFRESH);
+            PsListHandlePopupMenu(hwndDlg, (LPPOINT)&crc, ID_OBJECT_COPY, ID_VIEW_REFRESH, TRUE);
         }
 
         if ((HWND)wParam == PsDlgContext.ListView) {
@@ -1353,7 +1398,7 @@ INT_PTR CALLBACK PsListDialogProc(
             else
                 GetCursorPos((LPPOINT)&crc);
 
-            PsListHandlePopupMenu(hwndDlg, (LPPOINT)&crc, ID_OBJECT_COPY + 1, ID_VIEW_REFRESH + 1);
+            PsListHandlePopupMenu(hwndDlg, (LPPOINT)&crc, ID_OBJECT_COPY + 1, ID_VIEW_REFRESH + 1, FALSE);
         }
 
         break;
@@ -1370,15 +1415,18 @@ INT_PTR CALLBACK PsListDialogProc(
         case IDCANCEL:
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
             return TRUE;
+        
         case ID_OBJECT_COPY:
-        case ID_OBJECT_COPY + 1:
-            if (uCommandId == ID_OBJECT_COPY) {
-                supCopyTreeListSubItemValue(PsDlgContext.TreeList, 0);
-            }
-            else {
-                supCopyListViewSubItemValue(PsDlgContext.ListView, 3);
-            }
+            supCopyTreeListSubItemValue(PsDlgContext.TreeList, 0);
             break;
+
+        case ID_OBJECT_COPY + 1:            
+            supListViewCopyItemValueToClipboard(PsDlgContext.ListView,
+                PsDlgContext.lvItemHit,
+                PsDlgContext.lvColumnHit);
+
+            break;
+
         case ID_VIEW_REFRESH:
         case ID_VIEW_REFRESH + 1:
 
@@ -1404,8 +1452,10 @@ INT_PTR CALLBACK PsListDialogProc(
 
     case WM_GETMINMAXINFO:
         if (lParam) {
-            ((PMINMAXINFO)lParam)->ptMinTrackSize.x = 640;
-            ((PMINMAXINFO)lParam)->ptMinTrackSize.y = 480;
+            supSetMinMaxTrackSize((PMINMAXINFO)lParam,
+                PSLISTDLG_TRACKSIZE_MIN_X,
+                PSLISTDLG_TRACKSIZE_MIN_Y,
+                TRUE);
         }
         break;
 
@@ -1483,6 +1533,17 @@ VOID extrasCreatePsListDialog(
 
     INT SbParts[] = { 160, 320, -1 };
 
+    INT iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
+    LVCOLUMNS_DATA columnData[] =
+    {
+        { L"TID", 60, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  iImage },
+        { L"Priority", 100, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE },
+        { L"State", 150, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE },
+        { L"Object", 150, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE },
+        { L"StartAddress", 140, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE },
+        { L"Module(System threads)", 200, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE }
+    };
+
     //
     // Allow only one dialog.
     //
@@ -1525,46 +1586,21 @@ VOID extrasCreatePsListDialog(
     SendMessage(PsDlgContext.StatusBar, SB_SETPARTS, 3, (LPARAM)&SbParts);
 
     if (PsDlgContext.ListView) {
-        ListView_SetImageList(PsDlgContext.ListView, g_ListViewImages, LVSIL_SMALL);
-        ListView_SetExtendedListViewStyle(PsDlgContext.ListView,
-            LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_LABELTIP | LVS_EX_DOUBLEBUFFER);
-        SetWindowTheme(PsDlgContext.ListView, TEXT("Explorer"), NULL);
+
+        supSetListViewSettings(PsDlgContext.ListView,
+            LVS_EX_FULLROWSELECT | LVS_EX_LABELTIP | LVS_EX_DOUBLEBUFFER,
+            FALSE,
+            TRUE,
+            g_ListViewImages,
+            LVSIL_SMALL);
 
         //
-        // Add listview columns.
+        // And columns and remember their count.
         //
-
-        supAddListViewColumn(PsDlgContext.ListView, 0, 0, 0,
-            ImageList_GetImageCount(g_ListViewImages) - 1,
-            LVCFMT_CENTER | LVCFMT_BITMAP_ON_RIGHT,
-            TEXT("TID"), 60);
-
-        supAddListViewColumn(PsDlgContext.ListView, 1, 1, 1,
-            I_IMAGENONE,
-            LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
-            TEXT("Priority"), 100);
-
-        supAddListViewColumn(PsDlgContext.ListView, 2, 2, 2,
-            I_IMAGENONE,
-            LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
-            TEXT("State"), 150);
-
-        supAddListViewColumn(PsDlgContext.ListView, 3, 3, 3,
-            I_IMAGENONE,
-            LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
-            TEXT("Object"), 150);
-
-        supAddListViewColumn(PsDlgContext.ListView, 4, 4, 4,
-            I_IMAGENONE,
-            LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
-            TEXT("StartAddress"), 140);
-
-        supAddListViewColumn(PsDlgContext.ListView, 5, 5, 5,
-            I_IMAGENONE,
-            LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
-            TEXT("Module (System threads)"), 200);
-
-        PsDlgContext.lvColumnCount = PSLIST_COLUMN_COUNT;
+        PsDlgContext.lvColumnCount = supAddLVColumnsFromArray(
+            PsDlgContext.ListView,
+            columnData,
+            RTL_NUMBER_OF(columnData));
     }
 
     if (PsDlgContext.TreeList) {

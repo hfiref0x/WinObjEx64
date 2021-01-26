@@ -4,9 +4,9 @@
 *
 *  TITLE:       LIST.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        22 July 2020
+*  DATE:        04 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -192,7 +192,7 @@ VOID ListObjectDirectoryTree(
 
     ViewRootHandle = AddTreeViewItem(SubDirName, ViewRootHandle);
 
-    directoryHandle = supOpenDirectory(RootHandle, SubDirName, DIRECTORY_QUERY);
+    supOpenDirectory(&directoryHandle, RootHandle, SubDirName, DIRECTORY_QUERY);
     if (directoryHandle == NULL)
         return;
 
@@ -400,7 +400,7 @@ VOID ListObjectsInDirectory(
 
     ListView_DeleteAllItems(g_hwndObjectList);
 
-    directoryHandle = supOpenDirectory(NULL, lpObjectDirectory, DIRECTORY_QUERY);
+    supOpenDirectory(&directoryHandle, NULL, lpObjectDirectory, DIRECTORY_QUERY);
     if (directoryHandle == NULL)
         return;
 
@@ -463,7 +463,7 @@ VOID FindObject(
 
     POBJECT_DIRECTORY_INFORMATION objinf;
 
-    directoryHandle = supOpenDirectory(NULL, DirName, DIRECTORY_QUERY);
+    supOpenDirectory(&directoryHandle, NULL, DirName, DIRECTORY_QUERY);
     if (directoryHandle == NULL)
         return;
 

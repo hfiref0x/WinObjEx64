@@ -230,6 +230,6 @@ In order to build from source you need Microsoft Visual Studio 2015/2017/2019 an
 # Authors
 
 
-(c) 2015 - 2020 WinObjEx64 Project
+(c) 2015 - 2021 WinObjEx64 Project
 
 Original WinObjEx (c) 2003 - 2005 Four-F

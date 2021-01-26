@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2018 - 2020
+*  (C) COPYRIGHT AUTHORS, 2018 - 2021
 *
 *  TITLE:       EXTRASCALLBACKS.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        21 Oct 2020
+*  DATE:        09 Jan 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -20,6 +20,9 @@
 #include "extras/extrasCallbacksPatterns.h"
 #include "treelist/treelist.h"
 #include "hde/hde64.h"
+
+#define CBDLG_TRACKSIZE_MIN_X 640
+#define CBDLG_TRACKSIZE_MIN_Y 480
 
 ULONG g_CallbacksCount;
 
@@ -216,7 +219,7 @@ OBEX_CALLBACK_DISPATCH_ENTRY g_CallbacksDispatchTable[] = {
 //
 // All available names for CiCallbacks. Unknown is expected to be XBOX callback.
 //
-#define CI_CALLBACK_NAMES_COUNT 30
+#define CI_CALLBACK_NAMES_COUNT 32
 static const WCHAR *CiCallbackNames[CI_CALLBACK_NAMES_COUNT] = {
     L"CiSetFileCache", //0
     L"CiGetFileCache", //1
@@ -246,8 +249,10 @@ static const WCHAR *CiCallbackNames[CI_CALLBACK_NAMES_COUNT] = {
     L"SIPolicyQuerySecurityPolicy",//25
     L"CiSetUnlockInformation",//26
     L"CiGetCodeIntegrityOriginClaimForFileObject",//27
-    L"CiDeleteCodeIntegrityOriginClaimForFileObject",//28
-    L"CiHvciReportMmIncompatibility"//29
+    L"CiDeleteCodeIntegrityOriginClaimMembers", //28
+    L"CiDeleteCodeIntegrityOriginClaimForFileObject",//29
+    L"CiHvciReportMmIncompatibility",//30
+    L"CiCompareExistingSePool"//31
 };
 
 #define CI_CALLBACKS_NAMES_W7_COUNT 3
@@ -382,8 +387,8 @@ static const BYTE CiCallbackIndexes_Win10RS3[CI_CALLBACK_NAMES_W10RS3_COUNT] = {
     22  //CiGetBuildExpiryTime
 };
 
-#define CI_CALLBACK_NAMES_W10RS4_20H1_COUNT 24
-static const BYTE CiCallbackIndexes_Win10RS4_20H1[CI_CALLBACK_NAMES_W10RS4_20H1_COUNT] = { //Windows 10 RS4/RS5/19H1/19H2/20H1/20H2
+#define CI_CALLBACK_NAMES_W10RS4_20H2_COUNT 24
+static const BYTE CiCallbackIndexes_Win10RS4_20H2[CI_CALLBACK_NAMES_W10RS4_20H2_COUNT] = { //Windows 10 RS4/RS5/19H1/19H2/20H1/20H2
     0,  //CiSetFileCache
     1,  //CiGetFileCache
     2,  //CiQueryInformation
@@ -410,8 +415,8 @@ static const BYTE CiCallbackIndexes_Win10RS4_20H1[CI_CALLBACK_NAMES_W10RS4_20H1_
     23  //CiCheckProcessDebugAccessPolicy
 };
 
-#define CI_CALLBACK_NAMES_W1020H2_COUNT 27
-static const BYTE CiCallbackIndexes_Win1020H2[CI_CALLBACK_NAMES_W1020H2_COUNT] = { //Windows 10 20H2
+#define CI_CALLBACK_NAMES_W1021H1_COUNT 29
+static const BYTE CiCallbackIndexes_Win1021H1[CI_CALLBACK_NAMES_W1021H1_COUNT] = { //Windows 10 21H1
     0,  //CiSetFileCache
     1,  //CiGetFileCache
     2,  //CiQueryInformation
@@ -437,8 +442,10 @@ static const BYTE CiCallbackIndexes_Win1020H2[CI_CALLBACK_NAMES_W1020H2_COUNT] =
     22, //CiGetBuildExpiryTime
     23, //CiCheckProcessDebugAccessPolicy
     27, //CiGetCodeIntegrityOriginClaimForFileObject
-    28, //CiDeleteCodeIntegrityOriginClaimForFileObject
-    29  //CiHvciReportMmIncompatibility
+    28, //CiDeleteCodeIntegrityOriginClaimMembers
+    29, //CiDeleteCodeIntegrityOriginClaimForFileObject
+    30, //CiHvciReportMmIncompatibility
+    31  //CiCompareExistingSePool
 };
 
 /*
@@ -499,12 +506,13 @@ LPWSTR GetCiRoutineNameFromIndex(
     case NT_WIN10_19H1:
     case NT_WIN10_19H2:
     case NT_WIN10_20H1:
-        Indexes = CiCallbackIndexes_Win10RS4_20H1;
-        ArrayCount = CI_CALLBACK_NAMES_W10RS4_20H1_COUNT;
+    case NT_WIN10_20H2:
+        Indexes = CiCallbackIndexes_Win10RS4_20H2;
+        ArrayCount = CI_CALLBACK_NAMES_W10RS4_20H2_COUNT;
         break;
     default:
-        Indexes = CiCallbackIndexes_Win1020H2;
-        ArrayCount = CI_CALLBACK_NAMES_W1020H2_COUNT;
+        Indexes = CiCallbackIndexes_Win1021H1;
+        ArrayCount = CI_CALLBACK_NAMES_W1021H1_COUNT;
         break;
     }
 
@@ -604,12 +612,18 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
         case NT_WIN10_19H2:
         case NT_WIN10_20H1:
         case NT_WIN10_20H2:
-        default:
             Signature = SeCiCallbacksPattern_19H1_20H2;
             SignatureSize = sizeof(SeCiCallbacksPattern_19H1_20H2);
-            InstructionMatchPattern = SeCiCallbacksMatchingPattern_19H1_20H2;
+            InstructionMatchPattern = SeCiCallbacksMatchingPattern_19H1_21H1;
             InstructionMatchLength = 10; //mov
-            InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern_19H1_20H2);
+            InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern_19H1_21H1);
+            break;
+        default:
+            Signature = SeCiCallbacksPattern_21H1;
+            SignatureSize = sizeof(SeCiCallbacksPattern_21H1);
+            InstructionMatchPattern = SeCiCallbacksMatchingPattern_19H1_21H1;
+            InstructionMatchLength = 10; //mov
+            InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern_19H1_21H1);
             break;
         }
 
@@ -648,7 +662,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
             //
             // mov cs:g_CiCallbacks, rax (for Windows 7)
             // lea rcx, SeCiCallbacks (for 8/10 TH/RS)
-            // mov cs:SeCiCallbacks (19H1-20H2)
+            // mov cs:SeCiCallbacks (19H1-21H1)
             //
             if (hs.len == InstructionMatchLength) {
 
@@ -2064,7 +2078,12 @@ VOID AddEntryToList(
     }
 
     TreeListSubItems.Text[0] = szBuffer;
-    TreeListSubItems.Text[1] = lpAdditionalInfo;
+    if (lpAdditionalInfo) {
+        TreeListSubItems.Text[1] = lpAdditionalInfo;
+    }
+    else {
+        TreeListSubItems.Text[1] = T_EmptyString;
+    }
 
     supTreeListAddItem(
         TreeList,
@@ -2114,7 +2133,12 @@ VOID AddZeroEntryToList(
         TreeListSubItems.Text[1] = T_CannotQuery;
     }
     else {
-        TreeListSubItems.Text[1] = lpAdditionalInfo;
+        if (lpAdditionalInfo) {
+            TreeListSubItems.Text[1] = lpAdditionalInfo;
+        }
+        else {
+            TreeListSubItems.Text[1] = T_EmptyString;
+        }
     }
 
     supTreeListAddItem(
@@ -3855,8 +3879,10 @@ INT_PTR CALLBACK CallbacksDialogProc(
 
     case WM_GETMINMAXINFO:
         if (lParam) {
-            ((PMINMAXINFO)lParam)->ptMinTrackSize.x = 640;
-            ((PMINMAXINFO)lParam)->ptMinTrackSize.y = 480;
+            supSetMinMaxTrackSize((PMINMAXINFO)lParam,
+                CBDLG_TRACKSIZE_MIN_X,
+                CBDLG_TRACKSIZE_MIN_Y,
+                TRUE);
         }
         break;
 
@@ -3868,8 +3894,9 @@ INT_PTR CALLBACK CallbacksDialogProc(
         break;
 
     case WM_CLOSE:
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        pDlgContext = (EXTRASCONTEXT*)RemoveProp(hwndDlg, T_DLGCONTEXT);
         if (pDlgContext) {
+            extrasRemoveDlgIcon(pDlgContext);
             g_WinObj.AuxDialogs[wobjCallbacksDlgId] = NULL;
             supHeapFree(pDlgContext);
         }
@@ -3896,10 +3923,6 @@ INT_PTR CALLBACK CallbacksDialogProc(
         default:
             break;
         }
-        break;
-
-    case WM_DESTROY:
-        RemoveProp(hwndDlg, T_DLGCONTEXT);
         break;
 
     case WM_CONTEXTMENU:
@@ -3956,7 +3979,7 @@ VOID extrasCreateCallbacksDialog(
     pDlgContext->StatusBar = GetDlgItem(hwndDlg, ID_EXTRASLIST_STATUSBAR);
     SendMessage(pDlgContext->StatusBar, SB_SETPARTS, 2, (LPARAM)&SbParts);
 
-    extrasSetDlgIcon(hwndDlg);
+    extrasSetDlgIcon(pDlgContext);
     SetWindowText(hwndDlg, TEXT("System Callbacks"));
 
     GetClientRect(hwndParent, &rc);

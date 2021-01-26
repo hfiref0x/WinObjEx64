@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020
+*  (C) COPYRIGHT AUTHORS, 2020 - 2021
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.00
+*  VERSION:     1.01
 *
-*  DATE:        11 July 2020
+*  DATE:        08 Jan 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -409,4 +409,217 @@ INT supAddListViewColumn(
     column.iImage = ImageIndex;
 
     return ListView_InsertColumn(ListViewHwnd, ColumnIndex, &column);
+}
+
+/*
+* supCopyMemory
+*
+* Purpose:
+*
+* Copies bytes between buffers.
+*
+* dest - Destination buffer
+* cbdest - Destination buffer size in bytes
+* src - Source buffer
+* cbsrc - Source buffer size in bytes
+*
+*/
+void supCopyMemory(
+    _Inout_ void* dest,
+    _In_ size_t cbdest,
+    _In_ const void* src,
+    _In_ size_t cbsrc
+)
+{
+    char* d = (char*)dest;
+    char* s = (char*)src;
+
+    if ((dest == 0) || (src == 0) || (cbdest == 0))
+        return;
+    if (cbdest < cbsrc)
+        cbsrc = cbdest;
+
+    while (cbsrc > 0) {
+        *d++ = *s++;
+        cbsrc--;
+    }
+}
+
+/*
+* supListViewAddCopyValueItem
+*
+* Purpose:
+*
+* Add copy to clipboard menu item depending on hit column.
+*
+*/
+BOOL supListViewAddCopyValueItem(
+    _In_ HMENU hMenu,
+    _In_ HWND hwndLv,
+    _In_ UINT uId,
+    _In_opt_ UINT uPos,
+    _In_ POINT* lpPoint,
+    _Out_ INT* pItemHit,
+    _Out_ INT* pColumnHit
+)
+{
+    LVHITTESTINFO lvht;
+    LVCOLUMN lvc;
+    WCHAR szItem[MAX_PATH * 2];
+    WCHAR szColumn[MAX_PATH + 1];
+
+    *pColumnHit = -1;
+    *pItemHit = -1;
+
+    RtlSecureZeroMemory(&lvht, sizeof(lvht));
+    lvht.pt.x = lpPoint->x;
+    lvht.pt.y = lpPoint->y;
+    ScreenToClient(hwndLv, &lvht.pt);
+    if (ListView_SubItemHitTest(hwndLv, &lvht) == -1)
+        return FALSE;
+
+    RtlSecureZeroMemory(&lvc, sizeof(lvc));
+    RtlSecureZeroMemory(&szColumn, sizeof(szColumn));
+
+    lvc.mask = LVCF_TEXT;
+    lvc.pszText = szColumn;
+    lvc.cchTextMax = MAX_PATH;
+    if (ListView_GetColumn(hwndLv, lvht.iSubItem, &lvc)) {
+        _strcpy(szItem, TEXT("Copy \""));
+        _strcat(szItem, szColumn);
+        _strcat(szItem, TEXT("\""));
+        if (InsertMenu(hMenu, uPos, MF_BYCOMMAND, uId, szItem)) {
+            *pColumnHit = lvht.iSubItem;
+            *pItemHit = lvht.iItem;
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+/*
+* supGetItemText
+*
+* Purpose:
+*
+* Returns buffer with text from the given listview item.
+*
+* Returned buffer must be freed with supHeapFree after usage.
+*
+*/
+LPWSTR supGetItemText(
+    _In_ HWND ListView,
+    _In_ INT nItem,
+    _In_ INT nSubItem,
+    _Out_opt_ PSIZE_T lpSize //length in bytes
+)
+{
+    INT     len;
+    LPARAM  sz = 0;
+    LV_ITEM item;
+
+    RtlSecureZeroMemory(&item, sizeof(item));
+
+    item.iItem = nItem;
+    item.iSubItem = nSubItem;
+    len = 128;
+    do {
+        len *= 2;
+        item.cchTextMax = len;
+        if (item.pszText) {
+            supHeapFree(item.pszText);
+            item.pszText = NULL;
+        }
+        item.pszText = (LPWSTR)supHeapAlloc(len * sizeof(WCHAR));
+        sz = SendMessage(ListView, LVM_GETITEMTEXT, (WPARAM)item.iItem, (LPARAM)&item);
+    } while (sz == (LPARAM)len - 1);
+
+    //empty string
+    if (sz == 0) {
+        if (item.pszText) {
+            supHeapFree(item.pszText);
+            item.pszText = NULL;
+        }
+    }
+
+    if (lpSize) {
+        *lpSize = sz * sizeof(WCHAR);
+    }
+    return item.pszText;
+}
+
+/*
+* supClipboardCopy
+*
+* Purpose:
+*
+* Copy text to the clipboard.
+*
+*/
+VOID supClipboardCopy(
+    _In_ LPWSTR lpText,
+    _In_ SIZE_T cbText
+)
+{
+    LPWSTR  lptstrCopy;
+    HGLOBAL hglbCopy;
+    SIZE_T  dwSize;
+
+    if (OpenClipboard(NULL)) {
+        EmptyClipboard();
+        dwSize = cbText + sizeof(UNICODE_NULL);
+        hglbCopy = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, dwSize);
+        if (hglbCopy != NULL) {
+            lptstrCopy = (LPWSTR)GlobalLock(hglbCopy);
+            if (lptstrCopy) {
+                supCopyMemory(lptstrCopy, dwSize, lpText, cbText);
+            }
+            GlobalUnlock(hglbCopy);
+            if (!SetClipboardData(CF_UNICODETEXT, hglbCopy))
+                GlobalFree(hglbCopy);
+        }
+        CloseClipboard();
+    }
+}
+
+/*
+* supListViewCopyItemValueToClipboard
+*
+* Purpose:
+*
+* Copy selected item text to the clipboard.
+*
+*/
+BOOL supListViewCopyItemValueToClipboard(
+    _In_ HWND hwndListView,
+    _In_ INT iItem,
+    _In_ INT iSubItem
+)
+{
+    SIZE_T cbText;
+    LPWSTR lpText;
+
+    if ((iSubItem < 0) || (iItem < 0))
+        return FALSE;
+
+    lpText = supGetItemText(hwndListView,
+        iItem,
+        iSubItem,
+        NULL);
+
+    if (lpText) {
+        cbText = _strlen(lpText) * sizeof(WCHAR);
+        supClipboardCopy(lpText, cbText);
+        supHeapFree(lpText);
+        return TRUE;
+    }
+    else {
+        if (OpenClipboard(NULL)) {
+            EmptyClipboard();
+            CloseClipboard();
+        }
+    }
+
+    return FALSE;
 }

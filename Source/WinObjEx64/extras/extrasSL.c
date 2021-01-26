@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2020
+*  (C) COPYRIGHT AUTHORS, 2019 - 2021
 *
 *  TITLE:       EXTRASSL.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        28 June 2020
+*  DATE:        11 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -314,8 +314,9 @@ BOOL SLCacheDialogHandleNotify(
             break;
 
         case LVN_ITEMCHANGED:
-            if (pListView->uNewState & LVNI_FOCUSED &&
-                pListView->uNewState & LVNI_SELECTED)
+
+            if ((pListView->uNewState & LVIS_SELECTED) &&
+                !(pListView->uOldState & LVIS_SELECTED))
             {
                 SLCacheDialogDisplayDescriptorData(hwndDlg,
                     pListView->hdr.hwndFrom,
@@ -329,6 +330,46 @@ BOOL SLCacheDialogHandleNotify(
     }
 
     return TRUE;
+}
+
+/*
+* SLCacheDialogHandlePopup
+*
+* Purpose:
+*
+* List popup construction.
+*
+*/
+VOID SLCacheDialogHandlePopup(
+    _In_ HWND hwndDlg,
+    _In_ LPPOINT lpPoint,
+    _In_ PVOID lpUserParam
+)
+{
+    HMENU hMenu;
+    EXTRASCONTEXT* Context = (EXTRASCONTEXT*)lpUserParam;
+
+    hMenu = CreatePopupMenu();
+    if (hMenu) {
+
+        if (supListViewAddCopyValueItem(hMenu,
+            Context->ListView,
+            ID_OBJECT_COPY,
+            0,
+            lpPoint,
+            &Context->lvItemHit,
+            &Context->lvColumnHit))
+        {
+            TrackPopupMenu(hMenu,
+                TPM_RIGHTBUTTON | TPM_LEFTALIGN,
+                lpPoint->x,
+                lpPoint->y,
+                0,
+                hwndDlg,
+                NULL);
+        }
+        DestroyMenu(hMenu);
+    }
 }
 
 /*
@@ -349,6 +390,14 @@ INT_PTR CALLBACK SLCacheDialogProc(
     EXTRASCONTEXT* pDlgContext;
     LPNMLISTVIEW nhdr = (LPNMLISTVIEW)lParam;
 
+    if (uMsg == g_WinObj.SettingsChangeMessage) {
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+            extrasHandleSettingsChange(pDlgContext);
+        }
+        return TRUE;
+    }
+
     switch (uMsg) {
 
     case WM_NOTIFY:
@@ -360,8 +409,11 @@ INT_PTR CALLBACK SLCacheDialogProc(
         break;
 
     case WM_CLOSE:
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        pDlgContext = (EXTRASCONTEXT*)RemoveProp(hwndDlg, T_DLGCONTEXT);
         if (pDlgContext) {
+
+            extrasRemoveDlgIcon(pDlgContext);
+
             g_WinObj.AuxDialogs[wobjSLCacheDlgId] = NULL;
 
             //
@@ -373,8 +425,19 @@ INT_PTR CALLBACK SLCacheDialogProc(
 
             supHeapFree(pDlgContext);
         }
-        RemoveProp(hwndDlg, T_DLGCONTEXT);
         return DestroyWindow(hwndDlg);
+
+    case WM_CONTEXTMENU:
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+            supHandleContextMenuMsgForListView(hwndDlg,
+                wParam,
+                lParam,
+                pDlgContext->ListView,
+                (pfnPopupMenuHandler)SLCacheDialogHandlePopup,
+                (PVOID)pDlgContext);
+        }
+        break;
 
     case WM_COMMAND:
 
@@ -382,7 +445,7 @@ INT_PTR CALLBACK SLCacheDialogProc(
 
         case IDCANCEL:
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
-            return TRUE;
+            break;
 
         case IDC_SLVALUE_VIEWWITH:
             pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
@@ -390,13 +453,23 @@ INT_PTR CALLBACK SLCacheDialogProc(
                 SLCacheDialogViewBinaryData(pDlgContext->ListView,
                     ListView_GetSelectionMark(pDlgContext->ListView));
             }
-            return TRUE;
+            break;
+
+        case ID_OBJECT_COPY:
+            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+            if (pDlgContext) {
+                supListViewCopyItemValueToClipboard(pDlgContext->ListView,
+                    pDlgContext->lvItemHit,
+                    pDlgContext->lvColumnHit);
+            }
+            break;
+
+        default:
+            break;
         }
-        break;
 
     default:
         return FALSE;
-
     }
 
     return TRUE;
@@ -471,7 +544,6 @@ VOID extrasCreateSLCacheDialog(
     _In_ HWND hwndParent
 )
 {
-    INT             nCount;
     PVOID           SLCacheData;
 
     HWND            hwndDlg;
@@ -479,6 +551,13 @@ VOID extrasCreateSLCacheDialog(
 
     ENUMCHILDWNDDATA ChildWndData;
     WCHAR szBuffer[100];
+
+    INT iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
+    LVCOLUMNS_DATA columnData[] =
+    {
+        { L"Name", 450, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  iImage },
+        { L"Type", 120, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE }
+    };
 
     //
     // Allow only one dialog, if it already open - activate it.
@@ -502,8 +581,10 @@ VOID extrasCreateSLCacheDialog(
 
     pDlgContext->hwndDlg = hwndDlg;
     g_WinObj.AuxDialogs[wobjSLCacheDlgId] = hwndDlg;
+    pDlgContext->lvItemHit = -1;
+    pDlgContext->lvColumnHit = -1;
 
-    extrasSetDlgIcon(hwndDlg);
+    extrasSetDlgIcon(pDlgContext);
 
     //
     // Read and enumerate cache.
@@ -520,31 +601,20 @@ VOID extrasCreateSLCacheDialog(
             //
             // Set listview imagelist, style flags and theme.
             //
-            ListView_SetImageList(pDlgContext->ListView, g_ListViewImages, LVSIL_SMALL);
-            ListView_SetExtendedListViewStyle(
+            supSetListViewSettings(pDlgContext->ListView,
+                LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
+                FALSE,
+                TRUE,
+                g_ListViewImages,
+                LVSIL_SMALL);
+
+            //
+            // And columns and remember their count.
+            //
+            pDlgContext->lvColumnCount = supAddLVColumnsFromArray(
                 pDlgContext->ListView,
-                LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
-
-            SetWindowTheme(pDlgContext->ListView, TEXT("Explorer"), NULL);
-
-            //
-            // Create ListView columns.
-            //
-
-            supAddListViewColumn(pDlgContext->ListView, 0, 0, 0,
-                ImageList_GetImageCount(g_ListViewImages) - 1,
-                LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
-                TEXT("Name"), 450);
-
-            supAddListViewColumn(pDlgContext->ListView, 1, 1, 1,
-                I_IMAGENONE,
-                LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
-                TEXT("Type"), 120);
-
-            //
-            // Remember columns count.
-            //
-            pDlgContext->lvColumnCount = SLLIST_COLUMN_COUNT;
+                columnData,
+                RTL_NUMBER_OF(columnData));
 
             //
             // Remember image index.
@@ -554,9 +624,8 @@ VOID extrasCreateSLCacheDialog(
             pDlgContext->Reserved = (ULONG_PTR)SLCacheData;
             supSLCacheEnumerate(SLCacheData, SLCacheEnumerateCallback, pDlgContext);
 
-            nCount = ListView_GetItemCount(pDlgContext->ListView);
             _strcpy(szBuffer, TEXT("SLCache, number of descriptors = "));
-            itostr(nCount, _strend(szBuffer));
+            itostr(ListView_GetItemCount(pDlgContext->ListView), _strend(szBuffer));
             SetWindowText(pDlgContext->hwndDlg, szBuffer);
         }
     }

@@ -1,14 +1,14 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2020 - 2021
 *
-*  TITLE:       TESTUNIT.H
+*  TITLE:       SDVIEWDLG.H
 *
 *  VERSION:     1.88
 *
-*  DATE:        26 Nov 2020
+*  DATE:        05 Dec 2020
 *
-*  Common header file for test code.
+*  Common header file for the SecurityDescriptor View Dialog.
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -18,7 +18,8 @@
 *******************************************************************************/
 #pragma once
 
-VOID TestStart(VOID);
-VOID TestStop(VOID);
-VOID TestException(_In_ BOOL bNaked);
-HANDLE TestGetPortHandle();
+VOID SDViewDialogCreate(
+    _In_ HWND ParentWindow,
+    _In_ LPWSTR ObjectDirectory,
+    _In_ LPWSTR ObjectName,
+    _In_ WOBJ_OBJECT_TYPE ObjectType);

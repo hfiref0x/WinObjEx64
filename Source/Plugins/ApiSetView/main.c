@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.03
 *
-*  DATE:        29 June 2020
+*  DATE:        30 Nov 2020
 *
 *  WinObjEx64 ApiSetView plugin.
 *
@@ -298,7 +298,7 @@ INT_PTR CALLBACK PluginDialogProc(
     _In_ LPARAM lParam
 )
 {
-    HANDLE hImage;
+    HANDLE hIcon;
     HTREEITEM hRoot;
     WCHAR szOpenFileName[MAX_PATH + 1];
 
@@ -308,17 +308,18 @@ INT_PTR CALLBACK PluginDialogProc(
 
         g_ctx.MainWindow = hwndDlg;
 
-        hImage = LoadImage(
+        hIcon = LoadImage(
             g_ctx.ParamBlock.Instance,
             MAKEINTRESOURCE(WINOBJEX64_ICON_MAIN),
             IMAGE_ICON,
-            0,
-            0,
-            LR_SHARED);
+            32, 32,
+            0);
 
-        if (hImage) {
-            SetClassLongPtr(hwndDlg, GCLP_HICON, (LONG_PTR)hImage);
-            DestroyIcon(hImage);
+        if (hIcon) {
+            SendMessage(hwndDlg, WM_SETICON, (WPARAM)ICON_SMALL, (LPARAM)hIcon);
+            SendMessage(hwndDlg, WM_SETICON, (WPARAM)ICON_BIG, (LPARAM)hIcon);
+            g_ctx.WindowIcon = hIcon;
+            
         }
 
         if (InitTreeList(hwndDlg, &g_ctx.TreeList)) {
@@ -393,6 +394,9 @@ INT_PTR CALLBACK PluginDialogProc(
 */
 VOID PluginFreeGlobalResources()
 {
+    if (g_ctx.WindowIcon)
+        DestroyIcon(g_ctx.WindowIcon);
+
     if (g_ctx.PluginHeap) {
         HeapDestroy(g_ctx.PluginHeap);
         g_ctx.PluginHeap = NULL;

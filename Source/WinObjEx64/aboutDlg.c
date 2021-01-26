@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        23 July 2020
+*  DATE:        14 Jan 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,6 +17,8 @@
 #include "global.h"
 #include "msvcver.h"
 #include "winedebug.h"
+
+#define T_ABOUTDLG_ICON_PROP TEXT("aboutDlgIcon")
 
 VALUE_DESC CodeIntegrityValuesList[] = {
     { L"CODEINTEGRITY_OPTION_ENABLED", CODEINTEGRITY_OPTION_ENABLED },
@@ -49,9 +51,9 @@ VOID AboutDialogInit(
 {
     BOOLEAN  bSecureBoot = FALSE;
     BOOLEAN  bHVCIEnabled = FALSE, bHVCIStrict = FALSE, bHVCIIUMEnabled = FALSE;
+    HANDLE   hImage;
     ULONG    returnLength;
     NTSTATUS status;
-    HANDLE   hImage;
     WCHAR    szBuffer[MAX_PATH];
 
     PCHAR    wine_ver, wine_str;
@@ -73,16 +75,19 @@ VOID AboutDialogInit(
     //
     // Set dialog icon.
     //
-    hImage = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN), IMAGE_ICON, 48, 48, LR_SHARED);
-    if (hImage) {
-        SendMessage(GetDlgItem(hwndDlg, ID_ABOUT_ICON), STM_SETIMAGE, IMAGE_ICON, (LPARAM)hImage);
-        DestroyIcon((HICON)hImage);
-    }
+    hImage = LoadImage(g_WinObj.hInstance,
+        MAKEINTRESOURCE(IDI_ICON_MAIN),
+        IMAGE_ICON,
+        48, 48,
+        0);
 
-    //
-    // Remove class icon if any.
-    //
-    SetClassLongPtr(hwndDlg, GCLP_HICON, (LONG_PTR)NULL);
+    if (hImage) {
+
+        SendMessage(GetDlgItem(hwndDlg, ID_ABOUT_ICON),
+            STM_SETIMAGE, IMAGE_ICON, (LPARAM)hImage);
+
+        SetProp(hwndDlg, T_ABOUTDLG_ICON_PROP, hImage);
+    }
 
     //
     // Set compiler version and name.
@@ -740,7 +745,7 @@ VOID AboutDialogShowGlobals(
 *
 * Purpose:
 *
-* About Dialog Window Dialog Procedure
+* About Dialog Window Procedure
 *
 * During WM_INITDIALOG centers window and initializes system info
 *
@@ -752,6 +757,8 @@ INT_PTR CALLBACK AboutDialogProc(
     _In_ LPARAM lParam
 )
 {
+    HANDLE hIcon;
+
     UNREFERENCED_PARAMETER(lParam);
 
     switch (uMsg) {
@@ -766,6 +773,10 @@ INT_PTR CALLBACK AboutDialogProc(
         switch (GET_WM_COMMAND_ID(wParam, lParam)) {
         case IDOK:
         case IDCANCEL:
+            hIcon = RemoveProp(hwndDlg, T_ABOUTDLG_ICON_PROP);
+            if (hIcon) {
+                DestroyIcon((HICON)hIcon);
+            }
             return EndDialog(hwndDlg, S_OK);
             break;
         case IDC_ABOUT_GLOBALS:

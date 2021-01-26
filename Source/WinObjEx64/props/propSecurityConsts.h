@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPSECURITYCONSTS.H
 *
-*  VERSION:     1.83
+*  VERSION:     1.87
 *
-*  DATE:        21 Dec 2019
+*  DATE:        26 Nov 2020
 *
 *  Consts header file for Security property sheet.
 *

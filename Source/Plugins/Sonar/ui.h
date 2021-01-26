@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2020
+*  (C) COPYRIGHT AUTHORS, 2019 - 2021
 *
 *  TITLE:       UI.H
 *
 *  VERSION:     1.03
 *
-*  DATE:        10 July 2020
+*  DATE:        11 Jan 2021
 *
 *  WinObjEx64 Sonar UI constants, definitions and includes.
 *
@@ -69,6 +69,10 @@ typedef struct _SONARCONTEXT {
     INT SplitterPosY;
     INT CapturePosY;
     INT SplitterMaxY;
+
+    INT LvItemHit;
+    INT LvColumnHit;
+
     UINT CurrentDPI;
 
     //

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        18 Oct 2020
+*  DATE:        15 Dec 2020
 *
 *  Common header file for the user interface.
 *
@@ -31,17 +31,9 @@
 
 
 //
-// ListView column counts
+// Main ListView column count
 //
-
 #define MAIN_OBJLIST_COLUMN_COUNT 3
-#define FINDLIST_COLUMN_COUNT 2
-#define DRVLIST_COLUMN_COUNT 5
-#define PROCESSLIST_COLUMN_COUNT 4
-#define PNLIST_COLUMN_COUNT 3
-#define PSLIST_COLUMN_COUNT 6
-#define SSDTLIST_COLUMN_COUNT 4
-#define SLLIST_COLUMN_COUNT 2
 
 typedef	struct _OE_LIST_ITEM {
     struct _OE_LIST_ITEM *Prev;
@@ -57,8 +49,8 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 
 #define PROGRAM_MAJOR_VERSION       1
 #define PROGRAM_MINOR_VERSION       8
-#define PROGRAM_REVISION_NUMBER     7
-#define PROGRAM_BUILD_NUMBER        2010
+#define PROGRAM_REVISION_NUMBER     8
+#define PROGRAM_BUILD_NUMBER        2101
 
 #ifdef _USE_OWN_DRIVER
 #define PROGRAM_NAME            L"Windows Object Explorer 64-bit (Non-public version)"
@@ -71,6 +63,7 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 
 #define T_PROPERTIES            L"Properties...\tEnter"
 #define T_GOTOLINKTARGET        L"Go To Link Target\tCtrl+->"
+#define T_VIEWSD                L"View Security Descriptor..."
 #define T_RUNASADMIN            L"R&un as Administrator"
 #define T_RUNASSYSTEM           L"R&un as LocalSystem"
 #define T_COPYTEXTROW           L"Copy Row Selection"
@@ -86,6 +79,7 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 #define T_RESCAN                L"Rescan"
 #define T_VIEW_PLUGINS          L"View Plugins"
 #define T_EMPTY                 L" "
+#define T_MSG_SETTINGS_CHANGE   L"wobjSettingsChange"
 
 #define T_CSV_FILE_FILTER       TEXT("CSV Files\0*.csv\0\0")
 #define T_LIST_EXPORT_SUCCESS   TEXT("List export - OK")
@@ -93,7 +87,7 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 #define T_DRIVER_REQUIRED       TEXT("Support from helper driver is required for this feature.\r\n\r\n\
 If you see this message it can be caused by:\r\n\
 1) Support driver is not loaded or cannot be opened due to insufficient security rights;\r\n\
-2) There is a internal error processing request to the heper driver.")
+2) There is an internal error processing request to the heper driver.")
 
 #define T_RICHEDIT_LIB          TEXT("RICHED32.DLL")
 
@@ -189,6 +183,11 @@ typedef struct _PROP_UNNAMED_OBJECT_INFO {
     BOOL IsThreadToken;
 } PROP_UNNAMED_OBJECT_INFO, *PPROP_UNNAMED_OBJECT_INFO;
 
+typedef struct _PROP_PORT_OBJECT {
+    BOOL IsAllocated;
+    HANDLE ReferenceHandle;
+} PROP_PORT_OBJECT, * PPROP_PORT_OBJECT;
+
 typedef struct _PROP_OBJECT_INFO {
     PROP_CONTEXT_TYPE ContextType;
     BOOL IsType; //TRUE if selected object is an object type
@@ -206,9 +205,11 @@ typedef struct _PROP_OBJECT_INFO {
     OBJINFO ObjectInfo; //object dump related structures
     PROP_NAMESPACE_INFO NamespaceInfo;
     PROP_UNNAMED_OBJECT_INFO UnnamedObjectInfo;
+    PROP_PORT_OBJECT PortObjectInfo;
 } PROP_OBJECT_INFO, *PPROP_OBJECT_INFO;
 
 #define VALIDATE_PROP_CONTEXT(Context) { if (Context == NULL) return; }
+#define VALIDATE_PROP_CONTEXT_WITH_RESULT(Context, Result) { if (Context == NULL) return Result; }
 
 //
 // If dialog already present - activate it window and return.
@@ -249,6 +250,13 @@ typedef struct _WINSTA_DESC {
     LPWSTR lpszWinSta;
     LPWSTR lpszDesc;
 } WINSTA_DESC, * PWINSTA_DESC;
+
+typedef struct _LVCOLUMNS_DATA {
+    LPWSTR Name;
+    INT Width;
+    INT Format;
+    INT ImageIndex;
+} LVCOLUMNS_DATA, *PLVCOLUMNS_DATA;
 
 //Constants
 //Display simple "N/A" if no info available
@@ -299,7 +307,7 @@ static LPCWSTR g_szMonths[12] = {
     L"Dec"
 };
 
-#define wobjInitSuccess         0
+#define wobjInitSuccess          0
 #define wobjInitNoHeap          -1
 #define wobjInitNoTemp          -2
 #define wobjInitNoWinDir        -3
@@ -335,8 +343,8 @@ static LPCWSTR g_szMonths[12] = {
 #define T_ERRSHADOW_WIN32U_LOAD_FAILED TEXT("Could not load win32u.dll")
 #define T_ERRSHADOW_WIN32K_LOAD_FAILED TEXT("Could not load win32k.sys")
 #define T_ERRSHADOW_APISETTABLE_NOT_FOUND TEXT("Win32kApiSetTable was not found, win32k adapters targets will not be determinated")
-#define T_ERRSHADOW_WIN32KLIMIT_NOT_FOUND TEXT("W32pServiceLimit not found in win32k module")
+#define T_ERRSHADOW_WIN32KLIMIT_NOT_FOUND TEXT("W32pServiceLimit was not found in win32k module")
 #define T_ERRSHADOW_WIN32U_MISMATCH TEXT("Not all services found in win32u")
-#define T_ERRSHADOW_TABLE_NOT_FOUND TEXT("W32pServiceTable not found in win32k module")
-#define T_ERRSHADOW_APISETMAP_NOT_FOUND TEXT("ApiSetSchema map not found")
+#define T_ERRSHADOW_TABLE_NOT_FOUND TEXT("W32pServiceTable was not found in win32k module")
+#define T_ERRSHADOW_APISETMAP_NOT_FOUND TEXT("ApiSetSchema map was not found")
 #define T_ERRSHADOW_APISET_VER_UNKNOWN TEXT("ApiSetSchema version is unknown")

@@ -103,13 +103,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>.\output\$(Platform)\$(Configuration)\bin\</OutDir>
     <IntDir>.\output\$(Platform)\$(Configuration)\</IntDir>
-    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet>NativeRecommendedRules.ruleset</CodeAnalysisRuleSet>
     <RunCodeAnalysis>true</RunCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleasePrivateDriver|x64'">
     <OutDir>.\output\$(Platform)\$(Configuration)\bin\</OutDir>
     <IntDir>.\output\$(Platform)\$(Configuration)\</IntDir>
-    <CodeAnalysisRuleSet>..\..\..\Program Files (x86)\Microsoft Visual Studio\2019\Professional\Team Tools\Static Analysis Tools\Rule Sets\SecurityRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet>NativeRecommendedRules.ruleset</CodeAnalysisRuleSet>
     <PostBuildEventUseInBuild>
     </PostBuildEventUseInBuild>
     <RunCodeAnalysis>true</RunCodeAnalysis>
@@ -118,7 +118,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWinIoDriver|x64'">
     <OutDir>.\output\$(Platform)\$(Configuration)\bin\</OutDir>
     <IntDir>.\output\$(Platform)\$(Configuration)\</IntDir>
-    <CodeAnalysisRuleSet>..\..\..\Program Files (x86)\Microsoft Visual Studio\2019\Professional\Team Tools\Static Analysis Tools\Rule Sets\SecurityRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet>NativeRecommendedRules.ruleset</CodeAnalysisRuleSet>
     <PostBuildEventUseInBuild />
     <RunCodeAnalysis>true</RunCodeAnalysis>
     <TargetName>$(ProjectName)_winio</TargetName>
@@ -410,6 +410,7 @@
     <ClCompile Include="props\propSecurity.c" />
     <ClCompile Include="props\propToken.c" />
     <ClCompile Include="props\propType.c" />
+    <ClCompile Include="sdviewDlg.c" />
     <ClCompile Include="sup.c" />
     <ClCompile Include="tests\testunit.c" />
     <ClCompile Include="tinyaes\aes.c" />
@@ -474,6 +475,7 @@
     <ClInclude Include="props\propType.h" />
     <ClInclude Include="props\propTypeConsts.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="sdviewDlg.h" />
     <ClInclude Include="sup.h" />
     <ClInclude Include="supConsts.h" />
     <ClInclude Include="tests\testunit.h" />
@@ -539,6 +541,7 @@
     <Image Include="rsrc\icon1.ico" />
     <Image Include="rsrc\mailslot.ico" />
     <Image Include="rsrc\pipe.ico" />
+    <Image Include="rsrc\security.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

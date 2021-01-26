@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       PROPSECURITY.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        11 July 2020
+*  DATE:        14 Jan 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -31,7 +31,8 @@ BOOL propSecurityObjectSupported(
     _In_ UINT nTypeIndex
 )
 {
-    if ((nTypeIndex != ObjectTypeFile) &&
+    if ((nTypeIndex != ObjectTypePort) &&
+        (nTypeIndex != ObjectTypeFile) &&
         (nTypeIndex != ObjectTypeDirectory) &&
         (nTypeIndex != ObjectTypeDevice) &&
         (nTypeIndex != ObjectTypeSection) &&
@@ -162,6 +163,11 @@ PSI_ACCESS propGetAccessTable(
     case ObjectTypeToken:
         This->dwAccessMax = MAX_KNOWN_TOKEN_ACCESS_VALUE;
         AccessTable = (PSI_ACCESS)&TokenAccessValues;
+        break;
+
+    case ObjectTypePort:
+        This->dwAccessMax = MAX_KNOWN_PORT_ACCESS_VALUE;
+        AccessTable = (PSI_ACCESS)&PortAccessValues;
         break;
     }
 
@@ -496,21 +502,13 @@ HRESULT propSecurityConstructor(
             break;
         }
 
-        bytesNeeded = 0;
-        status = NtQueryObject(hObject, ObjectTypeInformation, NULL, 0, &bytesNeeded);
-        if (bytesNeeded == 0) {
-            hResult = HRESULT_FROM_WIN32(RtlNtStatusToDosError(status));
-            break;
-        }
+        status = supQueryObjectInformation(hObject,
+            ObjectTypeInformation,
+            (PVOID*)&TypeInfo,
+            &bytesNeeded,
+            (PNTSUPMEMALLOC)supHeapAlloc,
+            (PNTSUPMEMFREE)supHeapFree);
 
-        TypeInfo = (POBJECT_TYPE_INFORMATION)supHeapAlloc(bytesNeeded);
-        if (TypeInfo == NULL) {
-            hResult = HRESULT_FROM_WIN32(GetLastError());
-            break;
-        }
-
-        status = NtQueryObject(hObject, ObjectTypeInformation, TypeInfo,
-            bytesNeeded, &bytesNeeded);
         if (!NT_SUCCESS(status)) {
             hResult = HRESULT_FROM_WIN32(RtlNtStatusToDosError(status));
             break;

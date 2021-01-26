@@ -1,12 +1,12 @@
 /************************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2014 - 2020
+*  (C) COPYRIGHT AUTHORS, 2014 - 2021
 *
 *  TITLE:       NTLDR.H
 *
-*  VERSION:     1.18
+*  VERSION:     1.19
 *
-*  DATE:        12 July 2020
+*  DATE:        14 Jan 2021
 *
 *  Common header file for the NTLDR definitions.
 *
@@ -17,11 +17,14 @@
 *
 ************************************************************************************/
 
+#if defined (_MSC_VER) && (_MSC_VER >= 1020)
 #pragma once
+#endif
 
 #ifndef NTLDR_RTL
 #define NTLDR_RTL
 
+#pragma warning(push)
 #pragma warning(disable: 4201) // nameless struct/union
 
 #include <Windows.h>
@@ -42,11 +45,11 @@ typedef INT(*PFNNTLDR_EXCEPT_FILTER)(
 
 extern PFNNTLDR_EXCEPT_FILTER NtpLdrExceptionFilter;
 
-/*
-*
-*  W32pServiceTable query related structures and definitions.
-*
-*/
+//
+// 
+//  W32pServiceTable query related structures and definitions.
+//
+//
 
 typedef enum _RESOLVE_POINTER_TYPE {
     ForwarderString = 0,
@@ -104,5 +107,7 @@ NTSTATUS NtLdrApiSetResolveLibrary(
     _Out_ PBOOL Resolved,
     _Out_ PUNICODE_STRING ResolvedHostLibraryName);
 
+
+#pragma warning(pop)
 
 #endif NTLDR_RTL

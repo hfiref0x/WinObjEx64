@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       EXTRASUSD.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        28 June 2020
+*  DATE:        13 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -20,9 +20,7 @@
 #include "extrasUSD.h"
 #include "treelist\treelist.h"
 
-EXTRASCONTEXT DlgContext;
-
-HWND UsdTreeList = NULL;
+EXTRASCONTEXT g_UsdDlgContext;
 
 /*
 * UsdDumpSharedRegion
@@ -51,12 +49,12 @@ VOID UsdDumpSharedRegion(
 
     do {
 
-        pUserSharedData = (KUSER_SHARED_DATA * const)MM_SHARED_USER_DATA_VA;
+        pUserSharedData = (KUSER_SHARED_DATA* const)MM_SHARED_USER_DATA_VA;
 
         if (IsBadReadPtr(pUserSharedData, sizeof(KUSER_SHARED_DATA)))
             break;
 
-        if (!supInitTreeListForDump(hwndParent, &UsdTreeList))
+        if (!supInitTreeListForDump(hwndParent, &g_UsdDlgContext.TreeList))
             break;
 
         //
@@ -64,7 +62,7 @@ VOID UsdDumpSharedRegion(
         //
 
         h_tviRootItem = supTreeListAddItem(
-            UsdTreeList,
+            g_UsdDlgContext.TreeList,
             (HTREEITEM)NULL,
             TVIF_TEXT | TVIF_STATE,
             TVIS_EXPANDED,
@@ -82,7 +80,7 @@ VOID UsdDumpSharedRegion(
         subitems.Count = 1;
 
         supTreeListAddItem(
-            UsdTreeList,
+            g_UsdDlgContext.TreeList,
             h_tviRootItem,
             TVIF_TEXT | TVIF_STATE,
             (UINT)0,
@@ -107,7 +105,7 @@ VOID UsdDumpSharedRegion(
         }
 
         propObDumpUlong(
-            UsdTreeList,
+            g_UsdDlgContext.TreeList,
             h_tviRootItem,
             TEXT("NtProductType"),
             lpType,
@@ -118,7 +116,7 @@ VOID UsdDumpSharedRegion(
             (COLORREF)0);
 
         propObDumpByte(
-            UsdTreeList,
+            g_UsdDlgContext.TreeList,
             h_tviRootItem,
             TEXT("ProductTypeIsValid"),
             (LPWSTR)NULL,
@@ -129,7 +127,7 @@ VOID UsdDumpSharedRegion(
 
         //Version
         propObDumpUlong(
-            UsdTreeList,
+            g_UsdDlgContext.TreeList,
             h_tviRootItem,
             TEXT("NtMajorVersion"),
             (LPWSTR)NULL,
@@ -140,7 +138,7 @@ VOID UsdDumpSharedRegion(
             (COLORREF)0);
 
         propObDumpUlong(
-            UsdTreeList,
+            g_UsdDlgContext.TreeList,
             h_tviRootItem,
             TEXT("NtMinorVersion"),
             (LPWSTR)NULL,
@@ -155,7 +153,7 @@ VOID UsdDumpSharedRegion(
         //
         if (g_WinObj.osver.dwMajorVersion >= 10) {
             propObDumpUlong(
-                UsdTreeList,
+                g_UsdDlgContext.TreeList,
                 h_tviRootItem,
                 TEXT("NtBuildNumber"),
                 (LPWSTR)NULL,
@@ -168,7 +166,7 @@ VOID UsdDumpSharedRegion(
 
         //ProcessorFeatures
         h_tviSubItem = supTreeListAddItem(
-            UsdTreeList,
+            g_UsdDlgContext.TreeList,
             h_tviRootItem,
             TVIF_TEXT | TVIF_STATE,
             (UINT)0,
@@ -193,7 +191,7 @@ VOID UsdDumpSharedRegion(
                     subitems.Text[1] = lpType;
                     subitems.Count = 2;
                     h_tviLast = supTreeListAddItem(
-                        UsdTreeList,
+                        g_UsdDlgContext.TreeList,
                         h_tviSubItem,
                         TVIF_TEXT | TVIF_STATE,
                         (UINT)0,
@@ -213,7 +211,7 @@ VOID UsdDumpSharedRegion(
                 itemex.mask = TVIF_TEXT | TVIF_HANDLE;
                 itemex.pszText = T_EMPTY;
 
-                TreeList_SetTreeItem(UsdTreeList, &itemex, NULL);
+                TreeList_SetTreeItem(g_UsdDlgContext.TreeList, &itemex, NULL);
             }
 
             if (bAny == FALSE) {
@@ -224,7 +222,7 @@ VOID UsdDumpSharedRegion(
                 subitems.Text[1] = lpType;
                 subitems.Count = 2;
                 supTreeListAddItem(
-                    UsdTreeList,
+                    g_UsdDlgContext.TreeList,
                     h_tviSubItem,
                     TVIF_TEXT | TVIF_STATE,
                     (UINT)0,
@@ -248,7 +246,7 @@ VOID UsdDumpSharedRegion(
         }
 
         propObDumpUlong(
-            UsdTreeList,
+            g_UsdDlgContext.TreeList,
             h_tviRootItem,
             TEXT("AlternativeArchitecture"),
             lpType,
@@ -268,7 +266,7 @@ VOID UsdDumpSharedRegion(
         subitems.Count = 1;
 
         h_tviSubItem = supTreeListAddItem(
-            UsdTreeList,
+            g_UsdDlgContext.TreeList,
             h_tviRootItem,
             TVIF_TEXT | TVIF_STATE,
             (UINT)0,
@@ -292,7 +290,7 @@ VOID UsdDumpSharedRegion(
                     subitems.Count = 2;
 
                     h_tviLast = supTreeListAddItem(
-                        UsdTreeList,
+                        g_UsdDlgContext.TreeList,
                         h_tviSubItem,
                         TVIF_TEXT | TVIF_STATE,
                         (UINT)0,
@@ -314,13 +312,13 @@ VOID UsdDumpSharedRegion(
                 itemex.mask = TVIF_TEXT | TVIF_HANDLE;
                 itemex.pszText = T_EMPTY;
 
-                TreeList_SetTreeItem(UsdTreeList, &itemex, NULL);
+                TreeList_SetTreeItem(g_UsdDlgContext.TreeList, &itemex, NULL);
             }
         }
 
         //KdDebuggerEnabled
         propObDumpByte(
-            UsdTreeList,
+            g_UsdDlgContext.TreeList,
             h_tviRootItem,
             TEXT("KdDebuggerEnabled"),
             (LPWSTR)NULL,
@@ -334,7 +332,7 @@ VOID UsdDumpSharedRegion(
         if (g_NtBuildNumber < NT_WIN8_RTM) {
 
             propObDumpByte(
-                UsdTreeList,
+                g_UsdDlgContext.TreeList,
                 h_tviRootItem,
                 TEXT("NXSupportPolicy"),
                 (LPWSTR)NULL,
@@ -353,16 +351,16 @@ VOID UsdDumpSharedRegion(
             RtlSecureZeroMemory(&subitems, sizeof(subitems));
             RtlSecureZeroMemory(szValue, sizeof(szValue));
 
-            RtlStringCchPrintfSecure(szValue, 
-                MAX_PATH, 
-                TEXT("0x%02X"), 
+            RtlStringCchPrintfSecure(szValue,
+                MAX_PATH,
+                TEXT("0x%02X"),
                 pUserSharedData->MitigationPolicies);
 
             subitems.Text[0] = szValue;
             subitems.Count = 1;
 
             h_tviSubItem = supTreeListAddItem(
-                UsdTreeList,
+                g_UsdDlgContext.TreeList,
                 h_tviRootItem,
                 TVIF_TEXT | TVIF_STATE,
                 (UINT)0,
@@ -373,7 +371,7 @@ VOID UsdDumpSharedRegion(
             if (h_tviSubItem) {
 
                 propObDumpByte(
-                    UsdTreeList,
+                    g_UsdDlgContext.TreeList,
                     h_tviSubItem,
                     TEXT("NXSupportPolicy"),
                     (LPWSTR)NULL,
@@ -383,7 +381,7 @@ VOID UsdDumpSharedRegion(
                     FALSE);
 
                 propObDumpByte(
-                    UsdTreeList,
+                    g_UsdDlgContext.TreeList,
                     h_tviSubItem,
                     TEXT("SEHValidationPolicy"),
                     (LPWSTR)NULL,
@@ -394,7 +392,7 @@ VOID UsdDumpSharedRegion(
 
 
                 propObDumpByte(
-                    UsdTreeList,
+                    g_UsdDlgContext.TreeList,
                     h_tviSubItem,
                     TEXT("CurDirDevicesSkippedForDlls"),
                     (LPWSTR)NULL,
@@ -407,7 +405,7 @@ VOID UsdDumpSharedRegion(
 
         //SafeBootMode
         propObDumpByte(
-            UsdTreeList,
+            g_UsdDlgContext.TreeList,
             h_tviRootItem,
             TEXT("SafeBootMode"),
             (LPWSTR)NULL,
@@ -426,7 +424,7 @@ VOID UsdDumpSharedRegion(
         subitems.Count = 1;
 
         h_tviSubItem = supTreeListAddItem(
-            UsdTreeList,
+            g_UsdDlgContext.TreeList,
             h_tviRootItem,
             TVIF_TEXT | TVIF_STATE,
             (UINT)0,
@@ -443,10 +441,10 @@ VOID UsdDumpSharedRegion(
                     _strcpy(szValue, TEXT("BitPos: "));
                     ultostr(i, _strend(szValue));
                     subitems.Text[0] = szValue;
-                    subitems.Text[1] = (LPTSTR)T_SharedDataFlags[i];
+                    subitems.Text[1] = (LPWSTR)T_SharedDataFlags[i];
                     subitems.Count = 2;
                     h_tviLast = supTreeListAddItem(
-                        UsdTreeList,
+                        g_UsdDlgContext.TreeList,
                         h_tviSubItem,
                         TVIF_TEXT | TVIF_STATE,
                         (UINT)0,
@@ -466,7 +464,7 @@ VOID UsdDumpSharedRegion(
                 itemex.mask = TVIF_TEXT | TVIF_HANDLE;
                 itemex.pszText = T_EMPTY;
 
-                TreeList_SetTreeItem(UsdTreeList, &itemex, NULL);
+                TreeList_SetTreeItem(g_UsdDlgContext.TreeList, &itemex, NULL);
             }
 
         }
@@ -498,19 +496,22 @@ INT_PTR CALLBACK UsdDialogProc(
         break;
 
     case WM_CLOSE:
-        DestroyWindow(UsdTreeList);
+        DestroyWindow(g_UsdDlgContext.TreeList);
         DestroyWindow(hwndDlg);
         g_WinObj.AuxDialogs[wobjUSDDlgId] = NULL;
-        return TRUE;
+        break;
 
     case WM_COMMAND:
         if (GET_WM_COMMAND_ID(wParam, lParam) == IDCANCEL) {
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
-            return TRUE;
         }
         break;
+
+    default:
+        return FALSE;
     }
-    return FALSE;
+
+    return TRUE;
 }
 
 /*
@@ -530,14 +531,14 @@ VOID extrasCreateUsdDialog(
     //
     ENSURE_DIALOG_UNIQUE(g_WinObj.AuxDialogs[wobjUSDDlgId]);
 
-    RtlSecureZeroMemory(&DlgContext, sizeof(DlgContext));
-    DlgContext.hwndDlg = CreateDialogParam(g_WinObj.hInstance, MAKEINTRESOURCE(IDD_DIALOG_USD),
+    RtlSecureZeroMemory(&g_UsdDlgContext, sizeof(g_UsdDlgContext));
+    g_UsdDlgContext.hwndDlg = CreateDialogParam(g_WinObj.hInstance, MAKEINTRESOURCE(IDD_DIALOG_USD),
         hwndParent, &UsdDialogProc, 0);
 
-    if (DlgContext.hwndDlg == NULL)
+    if (g_UsdDlgContext.hwndDlg == NULL)
         return;
 
-    g_WinObj.AuxDialogs[wobjUSDDlgId] = DlgContext.hwndDlg;
+    g_WinObj.AuxDialogs[wobjUSDDlgId] = g_UsdDlgContext.hwndDlg;
 
-    UsdDumpSharedRegion(DlgContext.hwndDlg);
+    UsdDumpSharedRegion(g_UsdDlgContext.hwndDlg);
 }

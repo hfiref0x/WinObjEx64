@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        22 July 2020
+*  DATE:        14 Jan 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -474,10 +474,44 @@ VOID propSetProcessMitigationsInfo(
         &Policies.UserShadowStackPolicy))
     {
         if (Policies.UserShadowStackPolicy.Flags) {
+
             if (Policies.UserShadowStackPolicy.EnableUserShadowStack) {
                 _strcpy(szBuffer, TEXT("UserShadowStack -> Enabled"));
                 SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
             }
+            if (Policies.UserShadowStackPolicy.AuditUserShadowStack) {
+                _strcpy(szBuffer, TEXT("AuditUserShadowStack -> Enabled"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.UserShadowStackPolicy.SetContextIpValidation) {
+                _strcpy(szBuffer, TEXT("SetContextIpValidation -> Enabled"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.UserShadowStackPolicy.AuditSetContextIpValidation) {
+                _strcpy(szBuffer, TEXT("AuditSetContextIpValidation -> Enabled"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.UserShadowStackPolicy.EnableUserShadowStackStrictMode) {
+                _strcpy(szBuffer, TEXT("EnableUserShadowStackStrictMode -> Enabled"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.UserShadowStackPolicy.BlockNonCetBinaries) {
+                _strcpy(szBuffer, TEXT("BlockNonCetBinaries -> Enabled"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.UserShadowStackPolicy.BlockNonCetBinariesNonEhcont) {
+                _strcpy(szBuffer, TEXT("BlockNonCetBinariesNonEhcont -> Enabled"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.UserShadowStackPolicy.AuditBlockNonCetBinaries) {
+                _strcpy(szBuffer, TEXT("AuditBlockNonCetBinaries -> Enabled"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+            if (Policies.UserShadowStackPolicy.CetDynamicApisOutOfProcOnly) {
+                _strcpy(szBuffer, TEXT("CetDynamicApisOutOfProcOnly -> Enabled"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+
         }
     }
 
@@ -520,9 +554,9 @@ VOID propSetProcessTrustLabelInfo(
         return;
     }
 
-    if (supQueryObjectTrustLabel(hObject,
+    if (NT_SUCCESS(supQueryObjectTrustLabel(hObject,
         &ProtectionType,
-        &ProtectionLevel))
+        &ProtectionLevel)))
     {
         szBuffer[0] = 0;
 
@@ -577,8 +611,8 @@ VOID propSetDefaultInfo(
 {
     INT      i;
     HWND     hwndCB;
-    NTSTATUS status;
-    ULONG    bytesNeeded;
+    NTSTATUS ntStatus;
+    ULONG    returnLength;
     WCHAR    szBuffer[100];
 
     OBJECT_BASIC_INFORMATION obi;
@@ -590,28 +624,29 @@ VOID propSetDefaultInfo(
     // Query object basic information.
     //
     RtlSecureZeroMemory(&obi, sizeof(obi));
-    status = NtQueryObject(hObject, ObjectBasicInformation, &obi,
-        sizeof(OBJECT_BASIC_INFORMATION), &bytesNeeded);
+    ntStatus = NtQueryObject(hObject, ObjectBasicInformation, &obi,
+        sizeof(OBJECT_BASIC_INFORMATION), &returnLength);
 
-    if (NT_SUCCESS(status)) {
+    if (NT_SUCCESS(ntStatus)) {
+
+        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
 
         //Reference Count
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
         u64tostr(obi.PointerCount, szBuffer);
         SetDlgItemText(hwndDlg, ID_OBJECT_REFC, szBuffer);
 
         //Handle Count
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+        szBuffer[0] = 0;
         u64tostr(obi.HandleCount, szBuffer);
         SetDlgItemText(hwndDlg, ID_OBJECT_HANDLES, szBuffer);
 
         //NonPagedPoolCharge
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+        szBuffer[0] = 0;
         u64tostr(obi.NonPagedPoolCharge, szBuffer);
         SetDlgItemText(hwndDlg, ID_OBJECT_NP_CHARGE, szBuffer);
 
         //PagedPoolCharge
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+        szBuffer[0] = 0;
         u64tostr(obi.PagedPoolCharge, szBuffer);
         SetDlgItemText(hwndDlg, ID_OBJECT_PP_CHARGE, szBuffer);
 
@@ -633,36 +668,26 @@ VOID propSetDefaultInfo(
     //
     // Set flag bit for next usage on Type page.
     //
-    do {
+    ntStatus = supQueryObjectInformation(hObject,
+        ObjectTypeInformation,
+        (PVOID*)&TypeInfo,
+        NULL,
+        (PNTSUPMEMALLOC)supHeapAlloc,
+        (PNTSUPMEMFREE)supHeapFree);
 
-        bytesNeeded = 0;
-        status = NtQueryObject(hObject, ObjectTypeInformation, NULL, 0, &bytesNeeded);
-        if (bytesNeeded == 0) {
-            SetLastError(RtlNtStatusToDosError(status));
-            break;
+    if (NT_SUCCESS(ntStatus)) {
+
+        if (TypeInfo->SecurityRequired) {
+            SET_BIT(Context->ObjectFlags, 3);
+        }
+        if (TypeInfo->MaintainHandleCount) {
+            SET_BIT(Context->ObjectFlags, 4);
         }
 
-        TypeInfo = (POBJECT_TYPE_INFORMATION)supHeapAlloc(bytesNeeded + sizeof(ULONG_PTR));
-        if (TypeInfo == NULL)
-            break;
-
-        status = NtQueryObject(hObject, ObjectTypeInformation, TypeInfo, bytesNeeded, &bytesNeeded);
-        if (NT_SUCCESS(status)) {
-            if (TypeInfo->SecurityRequired) {
-                SET_BIT(Context->ObjectFlags, 3);
-            }
-            if (TypeInfo->MaintainHandleCount) {
-                SET_BIT(Context->ObjectFlags, 4);
-            }
-        }
-        else {
-            SetLastError(RtlNtStatusToDosError(status));
-        }
-
-    } while (FALSE);
-
-    if (TypeInfo) {
         supHeapFree(TypeInfo);
+    }
+    else {
+        SetLastError(RtlNtStatusToDosError(ntStatus));
     }
 }
 
@@ -1561,13 +1586,13 @@ VOID propBasicQueryProcess(
     BOOL RemotePebRead = FALSE;
     BOOL bSuccess = FALSE;
 
-    ULONG i, BreakOnTermination = 0, memIO;
+    ULONG i, BreakOnTermination = 0;
     HANDLE hObject;
     PROCESS_EXTENDED_BASIC_INFORMATION exbi;
     RTL_USER_PROCESS_PARAMETERS UserProcessParameters;
     PEB RemotePeb;
 
-    PUNICODE_STRING dynUstr;
+    PUNICODE_STRING pusInformation = NULL;
     SIZE_T readBytes;
 
     PS_PROTECTION PsProtection;
@@ -1671,38 +1696,30 @@ VOID propBasicQueryProcess(
         // Process image file.
         //
         bSuccess = FALSE;
-        memIO = 0;
-        NtQueryInformationProcess(hObject, ProcessImageFileNameWin32, NULL, 0, &memIO);
-        if (memIO) {
 
-            Buffer = (PBYTE)supHeapAlloc((SIZE_T)memIO);
-            if (Buffer) {
+        if (NT_SUCCESS(supQueryProcessInformation(hObject,
+            ProcessImageFileNameWin32,
+            (PVOID*)&pusInformation,
+            NULL,
+            (PNTSUPMEMALLOC)supHeapAlloc,
+            (PNTSUPMEMFREE)supHeapFree)))
+        {
+            if ((pusInformation->Length) && (pusInformation->MaximumLength)) {
 
-                if (NT_SUCCESS(NtQueryInformationProcess(
-                    hObject,
-                    ProcessImageFileNameWin32,
-                    (PVOID)Buffer,
-                    memIO,
-                    &memIO)))
-                {
-                    dynUstr = (PUNICODE_STRING)Buffer;
-                    if ((dynUstr->Length) && (dynUstr->MaximumLength)) {
+                Name = (LPWSTR)supHeapAlloc(sizeof(UNICODE_NULL) + pusInformation->MaximumLength);
+                if (Name) {
 
-                        Name = (LPWSTR)supHeapAlloc(sizeof(UNICODE_NULL) + dynUstr->MaximumLength);
-                        if (Name) {
+                    RtlCopyMemory(Name, pusInformation->Buffer, pusInformation->Length);
+                    SetDlgItemText(hwndDlg, IDC_PROCESS_FILENAME, Name);
+                    EnableWindow(GetDlgItem(hwndDlg, IDC_PROCESS_BROWSE), TRUE);
+                    bSuccess = TRUE;
 
-                            RtlCopyMemory(Name, dynUstr->Buffer, dynUstr->Length);
-                            SetDlgItemText(hwndDlg, IDC_PROCESS_FILENAME, Name);
-                            EnableWindow(GetDlgItem(hwndDlg, IDC_PROCESS_BROWSE), TRUE);
-                            bSuccess = TRUE;
-
-                            supHeapFree(Name);
-                            Name = NULL;
-                        }
-                    }
+                    supHeapFree(Name);
+                    Name = NULL;
                 }
-                supHeapFree(Buffer);
             }
+
+            supHeapFree(pusInformation);
         }
 
         if (bSuccess == FALSE) {
@@ -1717,38 +1734,30 @@ VOID propBasicQueryProcess(
             //
             // Use new NtQIP info class to get command line.
             //
-            memIO = 0;
-            NtQueryInformationProcess(hObject, ProcessCommandLineInformation, NULL, 0, &memIO);
-            if (memIO) {
-                Buffer = (PBYTE)supHeapAlloc((SIZE_T)memIO);
-                if (Buffer) {
+            if (NT_SUCCESS(supQueryProcessInformation(hObject,
+                ProcessCommandLineInformation,
+                (PVOID*)&pusInformation,
+                NULL,
+                (PNTSUPMEMALLOC)supHeapAlloc,
+                (PNTSUPMEMFREE)supHeapFree)))
+            {
+                if ((pusInformation->Length) && (pusInformation->MaximumLength)) {
 
-                    if (NT_SUCCESS(NtQueryInformationProcess(
-                        hObject,
-                        ProcessCommandLineInformation,
-                        (PVOID)Buffer,
-                        memIO,
-                        &memIO)))
-                    {
-                        dynUstr = (PUNICODE_STRING)Buffer;
-                        if ((dynUstr->Length) && (dynUstr->MaximumLength)) {
+                    Name = (LPWSTR)supHeapAlloc((SIZE_T)pusInformation->MaximumLength + sizeof(UNICODE_NULL));
+                    if (Name) {
 
-                            Name = (LPWSTR)supHeapAlloc((SIZE_T)dynUstr->MaximumLength + sizeof(UNICODE_NULL));
-                            if (Name) {
+                        RtlCopyMemory(Name, pusInformation->Buffer, pusInformation->Length);
 
-                                RtlCopyMemory(Name, dynUstr->Buffer, dynUstr->Length);
+                        SetDlgItemText(hwndDlg, IDC_PROCESS_CMDLINE, Name);
+                        bSuccess = TRUE;
 
-                                SetDlgItemText(hwndDlg, IDC_PROCESS_CMDLINE, Name);
-                                bSuccess = TRUE;
-
-                                supHeapFree(Name);
-                                Name = NULL;
-                            }
-                        }
+                        supHeapFree(Name);
+                        Name = NULL;
                     }
-                    supHeapFree(Buffer);
                 }
+                supHeapFree(pusInformation);
             }
+
         }
         else {
             //
@@ -2039,8 +2048,10 @@ VOID propBasicQueryAlpcPort(
         &ObjectSize,
         &ObjectVersion);
 
-    if (AlpcPort.Ref == NULL)
+    if (AlpcPort.Ref == NULL) {
+        SetDlgItemText(hwndDlg, ID_ALPC_OWNERPROCESS, T_CannotQuery);
         return;
+    }
 
     //
     // Determine owner process.

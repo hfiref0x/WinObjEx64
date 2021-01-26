@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       EXTRASSSDT.H
 *
-*  VERSION:     1.86
+*  VERSION:     1.88
 *
-*  DATE:        29 May 2020
+*  DATE:        10 Jan 2021
 *
 *  Common header file for Service Table dialog.
 *
@@ -19,6 +19,7 @@
 #pragma once
 
 #define INVALID_SERVICE_ENTRY_ID 0xFFFFFFFF
+#define WIN32K_START_INDEX 0x1000
 
 typedef struct _SERVICETABLEENTRY {
     ULONG ServiceId;
@@ -48,8 +49,14 @@ typedef struct _W32K_API_SET_TABLE_HOST {
 
 typedef struct _W32K_API_SET_TABLE_ENTRY {
     PVOID HostEntriesArray;
+    W32K_API_SET_TABLE_HOST* Host;
+} W32K_API_SET_TABLE_ENTRY, * PW32K_API_SET_TABLE_ENTRY;
+
+typedef struct _W32K_API_SET_TABLE_ENTRY_V2 {
+    PVOID HostEntriesArray;
     W32K_API_SET_TABLE_HOST *Host;
-} W32K_API_SET_TABLE_ENTRY, *PW32K_API_SET_TABLE_ENTRY;
+    W32K_API_SET_TABLE_HOST *AliasHost;
+} W32K_API_SET_TABLE_ENTRY_V2, *PW32K_API_SET_TABLE_ENTRY_V2;
 
 VOID SdtFreeGlobals();
 

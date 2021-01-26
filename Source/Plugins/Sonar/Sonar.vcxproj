@@ -107,6 +107,7 @@
     <ClCompile Include="..\..\Shared\treelist\treelist.c" />
     <ClCompile Include="main.c" />
     <ClCompile Include="query.c" />
+    <ClCompile Include="sup.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Shared\minirtl\minirtl.h" />
@@ -118,6 +119,7 @@
     <ClInclude Include="ndis.h" />
     <ClInclude Include="query.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="sup.h" />
     <ClInclude Include="ui.h" />
   </ItemGroup>
   <ItemGroup>

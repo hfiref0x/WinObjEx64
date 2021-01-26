@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2020
+*  (C) COPYRIGHT AUTHORS, 2019 - 2021
 *
 *  TITLE:       PROPTOKEN.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        28 June 2020
+*  DATE:        05 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -18,6 +18,8 @@
 #include "propDlg.h"
 
 HWND g_hwndTokenPageList;
+INT g_lvTokenPageSelectedItem;
+INT g_lvTokenPageColumnHit;
 
 #define T_TOKEN_PROP_CID_PID    TEXT("propTokenPid")
 #define T_TOKEN_PROP_CID_TID    TEXT("propTokenTid")
@@ -66,13 +68,20 @@ VOID TokenPageInitControls(
     LVGROUP lvg;
 
     g_hwndTokenPageList = GetDlgItem(hwndDlg, IDC_TOKEN_PRIVLIST);
+    g_lvTokenPageSelectedItem = -1;
+    g_lvTokenPageColumnHit = -1;
 
-    ListView_SetExtendedListViewStyle(g_hwndTokenPageList,
-        LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP);
+    //
+    // Set listview style flags and theme.
+    //
+    supSetListViewSettings(g_hwndTokenPageList,
+        LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
+        FALSE,
+        TRUE,
+        NULL,
+        0);
 
     SendMessage(g_hwndTokenPageList, LVM_ENABLEGROUPVIEW, 1, 0);
-
-    SetWindowTheme(g_hwndTokenPageList, TEXT("Explorer"), NULL);
 
     supAddListViewColumn(g_hwndTokenPageList, 0, 0, 0,
         I_IMAGENONE,
@@ -520,15 +529,33 @@ VOID TokenPageShowAdvancedProperties(
 */
 VOID TokenPageHandlePopup(
     _In_ HWND hwndDlg,
-    _In_ LPPOINT point
+    _In_ LPPOINT lpPoint,
+    _In_ PVOID lpUserParam
 )
 {
     HMENU hMenu;
 
+    UNREFERENCED_PARAMETER(lpUserParam);
+
     hMenu = CreatePopupMenu();
     if (hMenu) {
-        InsertMenu(hMenu, 0, MF_BYCOMMAND, ID_OBJECT_COPY, TEXT("Copy"));
-        TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, point->x, point->y, 0, hwndDlg, NULL);
+
+        if (supListViewAddCopyValueItem(hMenu,
+            g_hwndTokenPageList,
+            ID_OBJECT_COPY,
+            0,
+            lpPoint,
+            &g_lvTokenPageSelectedItem,
+            &g_lvTokenPageColumnHit))
+        {
+            TrackPopupMenu(hMenu,
+                TPM_RIGHTBUTTON | TPM_LEFTALIGN,
+                lpPoint->x,
+                lpPoint->y,
+                0,
+                hwndDlg,
+                NULL);
+        }
         DestroyMenu(hMenu);
     }
 }
@@ -553,7 +580,11 @@ INT_PTR TokenPageDialogOnCommand(
 
     switch (GET_WM_COMMAND_ID(wParam, lParam)) {
     case ID_OBJECT_COPY:
-        supCopyListViewSubItemValue(g_hwndTokenPageList, 0);
+
+        supListViewCopyItemValueToClipboard(g_hwndTokenPageList,
+            g_lvTokenPageSelectedItem,
+            g_lvTokenPageColumnHit);
+        
         Result = 1;
         break;
     case IDC_TOKEN_ADVANCED:
@@ -628,29 +659,17 @@ INT_PTR CALLBACK TokenPageDialogProc(
     _In_  LPARAM lParam
 )
 {
-    RECT crc;
-    INT mark;
-
     switch (uMsg) {
 
     case WM_CONTEXTMENU:
-        RtlSecureZeroMemory(&crc, sizeof(crc));
 
-        if ((HWND)wParam == g_hwndTokenPageList) {
-            mark = ListView_GetSelectionMark(g_hwndTokenPageList);
+        supHandleContextMenuMsgForListView(hwndDlg,
+            wParam,
+            lParam,
+            g_hwndTokenPageList,
+            (pfnPopupMenuHandler)TokenPageHandlePopup,
+            NULL);
 
-            if (lParam == MAKELPARAM(-1, -1)) {
-                ListView_GetItemRect(g_hwndTokenPageList, mark, &crc, TRUE);
-                crc.top = crc.bottom;
-                ClientToScreen(g_hwndTokenPageList, (LPPOINT)&crc);
-            }
-            else
-                GetCursorPos((LPPOINT)&crc);
-
-            TokenPageHandlePopup(hwndDlg, (LPPOINT)&crc);
-
-            return 1;
-        }
         break;
 
     case WM_COMMAND:
@@ -666,7 +685,7 @@ INT_PTR CALLBACK TokenPageDialogProc(
         break;
 
     default:
-        break;
+        return 0;
     }
-    return 0;
+    return 1;
 }

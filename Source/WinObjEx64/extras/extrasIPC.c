@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017 - 2020
+*  (C) COPYRIGHT AUTHORS, 2017 - 2021
 *
 *  TITLE:       EXTRASIPC.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        28 July 2020
+*  DATE:        12 Dec 2020
 *
 *  IPC supported: Pipes, Mailslots
 *
@@ -292,7 +292,9 @@ VOID IpcPipeQueryInfo(
     hPipe = NULL;
     if (!IpcOpenObjectMethod(Context, &hPipe, GENERIC_READ)) {
 		
-		// for pipes created with PIPE_ACCESS_INBOUND open mode https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
+        // for pipes created with PIPE_ACCESS_INBOUND open mode 
+        // https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
+        
         if (!IpcOpenObjectMethod(Context, &hPipe, GENERIC_WRITE | FILE_READ_ATTRIBUTES)) {
             IpcDisplayError(hwndDlg, IpcModeNamedPipes);
             return;
@@ -434,7 +436,7 @@ INT_PTR CALLBACK IpcTypeDialogProc(
         break;
 
     case WM_DESTROY:
-        Context = (PROP_OBJECT_INFO*)GetProp(hwndDlg, T_PROPCONTEXT);
+        Context = (PROP_OBJECT_INFO*)RemoveProp(hwndDlg, T_PROPCONTEXT);
         if (Context) {
             pDlgContext = (EXTRASCONTEXT*)Context->Tag;
             if (pDlgContext) {
@@ -442,7 +444,6 @@ INT_PTR CALLBACK IpcTypeDialogProc(
                 pDlgContext->ObjectIcon = NULL;
             }
         }
-        RemoveProp(hwndDlg, T_PROPCONTEXT);
         break;
 
     }
@@ -631,11 +632,9 @@ VOID IpcDlgQueryInfo(
                 bRestartScan //RestartScan
             );
 
-            if (
-                (!NT_SUCCESS(status)) ||
+            if ( (!NT_SUCCESS(status)) ||
                 (!NT_SUCCESS(iost.Status)) ||
-                (iost.Information == 0)
-                )
+                (iost.Information == 0) )
             {
                 break;
             }
@@ -735,6 +734,50 @@ BOOL IpcDlgHandleNotify(
 }
 
 /*
+* IpcDlgHandlePopupMenu
+*
+* Purpose:
+*
+* Popup menu construction.
+*
+*/
+VOID IpcDlgHandlePopupMenu(
+    _In_ HWND hwndDlg,
+    _In_ LPPOINT lpPoint,
+    _In_ PVOID lpUserParam
+)
+{
+    HMENU hMenu;
+    UINT uPos = 0;
+    EXTRASCONTEXT* Context = (EXTRASCONTEXT*)lpUserParam;
+
+    hMenu = CreatePopupMenu();
+    if (hMenu) {
+
+        if (supListViewAddCopyValueItem(hMenu,
+            Context->ListView,
+            ID_OBJECT_COPY,
+            uPos,
+            lpPoint,
+            &Context->lvItemHit,
+            &Context->lvColumnHit))
+        {
+
+            TrackPopupMenu(hMenu,
+                TPM_RIGHTBUTTON | TPM_LEFTALIGN,
+                lpPoint->x,
+                lpPoint->y,
+                0,
+                hwndDlg,
+                NULL);
+
+        }
+
+        DestroyMenu(hMenu);
+    }
+}
+
+/*
 * IpcDlgProc
 *
 * Purpose:
@@ -752,6 +795,14 @@ INT_PTR CALLBACK IpcDlgProc(
     INT dlgIndex;
     EXTRASCONTEXT* pDlgContext;
 
+    if (uMsg == g_WinObj.SettingsChangeMessage) {
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_IPCDLGCONTEXT);
+        if (pDlgContext) {
+            extrasHandleSettingsChange(pDlgContext);
+        }
+        return TRUE;
+    }
+
     switch (uMsg) {
     case WM_NOTIFY:
         return IpcDlgHandleNotify(hwndDlg, lParam);
@@ -761,12 +812,8 @@ INT_PTR CALLBACK IpcDlgProc(
         supCenterWindow(hwndDlg);
         break;
 
-    case WM_DESTROY:
-        RemoveProp(hwndDlg, T_IPCDLGCONTEXT);
-        break;
-
     case WM_CLOSE:
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_IPCDLGCONTEXT);
+        pDlgContext = (EXTRASCONTEXT*)RemoveProp(hwndDlg, T_IPCDLGCONTEXT);
         if (pDlgContext) {
 
             ImageList_Destroy(pDlgContext->ImageList);
@@ -788,15 +835,43 @@ INT_PTR CALLBACK IpcDlgProc(
         return DestroyWindow(hwndDlg);
 
     case WM_COMMAND:
-        if (GET_WM_COMMAND_ID(wParam, lParam) == IDCANCEL) {
+
+        switch (GET_WM_COMMAND_ID(wParam, lParam)) {
+
+        case IDCANCEL:
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
-            return TRUE;
+            break;
+
+        case ID_OBJECT_COPY:
+            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_IPCDLGCONTEXT);
+            if (pDlgContext) {
+                supListViewCopyItemValueToClipboard(pDlgContext->ListView,
+                    pDlgContext->lvItemHit,
+                    pDlgContext->lvColumnHit);
+            }
+            break;
+
+        default:
+            break;
+        }
+
+        break;
+
+    case WM_CONTEXTMENU:
+
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_IPCDLGCONTEXT);
+        if (pDlgContext) {
+            supHandleContextMenuMsgForListView(hwndDlg,
+                wParam,
+                lParam,
+                pDlgContext->ListView,
+                (pfnPopupMenuHandler)IpcDlgHandlePopupMenu,
+                pDlgContext);
         }
         break;
 
     default:
         return FALSE;
-        break;
     }
 
     return TRUE;
@@ -853,6 +928,8 @@ VOID extrasCreateIpcDialog(
     if (hwndDlg == NULL)
         return;
 
+    pDlgContext->lvColumnHit = -1;
+    pDlgContext->lvItemHit = -1;
     pDlgContext->hwndDlg = hwndDlg;
     g_WinObj.AuxDialogs[dlgIndex] = hwndDlg;
 
@@ -911,13 +988,17 @@ VOID extrasCreateIpcDialog(
                 ImageList_ReplaceIcon(pDlgContext->ImageList, -1, hIcon);
                 DestroyIcon(hIcon);
             }
-            ListView_SetImageList(pDlgContext->ListView, pDlgContext->ImageList, LVSIL_SMALL);
         }
 
-        ListView_SetExtendedListViewStyle(pDlgContext->ListView,
-            LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
-
-        SetWindowTheme(pDlgContext->ListView, TEXT("Explorer"), NULL);
+        //
+        // Set listview imagelist, style flags and theme.
+        //
+        supSetListViewSettings(pDlgContext->ListView,
+            LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
+            FALSE,
+            TRUE,
+            pDlgContext->ImageList,
+            LVSIL_SMALL);
 
         supAddListViewColumn(pDlgContext->ListView, 0, 0, 0,
             2,

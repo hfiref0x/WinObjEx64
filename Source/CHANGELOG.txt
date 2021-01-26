@@ -1,3 +1,12 @@
+v1.8.8
+internal rearrange
+view security for alpc ports (most of them)
+security descriptor view dialog (object sid, dacl & sacl)
+fix scm services list query
+fix "jump to file may fail under certain conditions" bug
+various minor UI changes
+21h1 compatibility improvements
+
 v1.8.7
 20h1/20h2/21h1 compatibility improvements
 added recognizing of shimmed drivers for drivers list (win10+)
@@ -7,6 +16,8 @@ added imagescope plugin for section object types backed by imagefile
 added plugins viewer
 various minor changes
 treelist: fix tooltips flickering on Windows 7
+turn off Spectre nonsense
+rtls update
 
 v1.8.6
 reimplemented directory object dump to output more data

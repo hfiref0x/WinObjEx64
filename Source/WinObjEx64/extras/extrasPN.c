@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       EXTRASPN.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        28 June 2020
+*  DATE:        15 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -262,7 +262,7 @@ BOOL PNDlgQueryInfo(
     }
 
     return bResult;
-    }
+}
 
 #define MAX_LOOKUP_NAME 256
 
@@ -614,19 +614,16 @@ VOID PNDlgShowNamespaceInfo(
 * WM_NOTIFY processing for PNDialog listview.
 *
 */
-BOOL PNDlgHandleNotify(
+VOID PNDlgHandleNotify(
     _In_ HWND hwndDlg,
-    _In_ WPARAM wParam,
     _In_ LPARAM lParam
 )
 {
     INT nImageIndex;
     NM_LISTVIEW* pListView = (NM_LISTVIEW*)lParam;
 
-    UNREFERENCED_PARAMETER(wParam);
-
     if (pListView == NULL)
-        return FALSE;
+        return;
 
     if (pListView->hdr.idFrom == ID_NAMESPACELIST) {
 
@@ -652,8 +649,9 @@ BOOL PNDlgHandleNotify(
             break;
 
         case LVN_ITEMCHANGED:
-            if (pListView->uNewState & LVNI_FOCUSED &&
-                pListView->uNewState & LVNI_SELECTED)
+
+            if ((pListView->uNewState & LVIS_SELECTED) &&
+                !(pListView->uOldState & LVIS_SELECTED))
             {
                 PNDlgShowNamespaceInfo(hwndDlg, pListView->iItem);
             }
@@ -664,11 +662,10 @@ BOOL PNDlgHandleNotify(
             break;
 
         default:
-            return FALSE;
+            break;
         }
     }
 
-    return TRUE;
 }
 
 /*
@@ -742,6 +739,46 @@ VOID PNDialogShowInfo(
 }
 
 /*
+* PNDialogHandlePopup
+*
+* Purpose:
+*
+* List popup construction.
+*
+*/
+VOID PNDialogHandlePopup(
+    _In_ HWND hwndDlg,
+    _In_ LPPOINT lpPoint,
+    _In_ PVOID lpUserParam
+)
+{
+    HMENU hMenu;
+    EXTRASCONTEXT* Context = (EXTRASCONTEXT*)lpUserParam;
+
+    hMenu = CreatePopupMenu();
+    if (hMenu) {
+
+        if (supListViewAddCopyValueItem(hMenu,
+            Context->ListView,
+            ID_OBJECT_COPY,
+            0,
+            lpPoint,
+            &Context->lvItemHit,
+            &Context->lvColumnHit))
+        {
+            TrackPopupMenu(hMenu,
+                TPM_RIGHTBUTTON | TPM_LEFTALIGN,
+                lpPoint->x,
+                lpPoint->y,
+                0,
+                hwndDlg,
+                NULL);
+        }
+        DestroyMenu(hMenu);
+    }
+}
+
+/*
 * PNDialogProc
 *
 * Purpose:
@@ -756,19 +793,36 @@ INT_PTR CALLBACK PNDialogProc(
     _In_  LPARAM lParam
 )
 {
+    if (uMsg == g_WinObj.SettingsChangeMessage) {
+        extrasHandleSettingsChange(&PnDlgContext);
+        return TRUE;
+    }
+
     switch (uMsg) {
     case WM_NOTIFY:
-        return PNDlgHandleNotify(hwndDlg, wParam, lParam);
+        PNDlgHandleNotify(hwndDlg, lParam);
+        break;
 
     case WM_INITDIALOG:
         supCenterWindow(hwndDlg);
-        return TRUE;
+        break;
+
+    case WM_CONTEXTMENU:
+
+        supHandleContextMenuMsgForListView(hwndDlg,
+            wParam,
+            lParam,
+            PnDlgContext.ListView,
+            (pfnPopupMenuHandler)PNDialogHandlePopup,
+            (PVOID)&PnDlgContext);
+
+        break;
 
     case WM_CLOSE:
         DestroyWindow(hwndDlg);
         ObCollectionDestroy(&PNSCollection);
         g_WinObj.AuxDialogs[wobjPNSDlgId] = NULL;
-        return TRUE;
+        break;
 
     case WM_COMMAND:
 
@@ -776,30 +830,39 @@ INT_PTR CALLBACK PNDialogProc(
 
         case IDCANCEL:
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
-            return TRUE;
+            break;
 
         case ID_VIEW_REFRESH:
             PNDialogShowInfo(TRUE);
-            return TRUE;
+            break;
 
         case ID_BDESCRIPTOR_SID:
             if (HIWORD(wParam) == CBN_SELCHANGE) {
                 PNDlgOutputSelectedSidInformation(hwndDlg, NULL);
-                return TRUE;
             }
             break;
 
-        case ID_BDESCRIPTOR_SID_COPY: //copy selected sid value to clipboard
+            //copy selected sid value to clipboard
+        case ID_BDESCRIPTOR_SID_COPY: 
             PNDlgCopySelectedSid(hwndDlg);
-            return TRUE;
+            break;
+
+        case ID_OBJECT_COPY:
+            supListViewCopyItemValueToClipboard(PnDlgContext.ListView,
+                PnDlgContext.lvItemHit,
+                PnDlgContext.lvColumnHit);
+            break;
 
         default:
             break;
         }
 
         break;
+
+    default:
+        return FALSE;
     }
-    return FALSE;
+    return TRUE;
 }
 
 /*
@@ -814,6 +877,14 @@ VOID extrasCreatePNDialog(
     _In_ HWND hwndParent
 )
 {
+    INT iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
+    LVCOLUMNS_DATA columnData[] =
+    {
+        { L"Name", 280, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  iImage },
+        { L"Type", 100, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE },
+        { L"RootDirectory", 140, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE }
+    };
+
     //
     // Allow only one dialog.
     //
@@ -833,38 +904,26 @@ VOID extrasCreatePNDialog(
     PnDlgContext.ListView = GetDlgItem(PnDlgContext.hwndDlg, ID_NAMESPACELIST);
     if (PnDlgContext.ListView) {
 
+        PnDlgContext.lvColumnHit = -1;
+        PnDlgContext.lvItemHit = -1;
+
         //
         // Set listview imagelist, style flags and theme.
         //
-        ListView_SetImageList(PnDlgContext.ListView, g_ListViewImages, LVSIL_SMALL);
-        ListView_SetExtendedListViewStyle(PnDlgContext.ListView,
-            LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
-
-        SetWindowTheme(PnDlgContext.ListView, TEXT("Explorer"), NULL);
-
-        //
-        // Create ListView columns.
-        //
-
-        supAddListViewColumn(PnDlgContext.ListView, 0, 0, 0,
-            ImageList_GetImageCount(g_ListViewImages) - 1,
-            LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
-            TEXT("Name"), 280);
-
-        supAddListViewColumn(PnDlgContext.ListView, 1, 1, 1,
-            I_IMAGENONE,
-            LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
-            TEXT("Type"), 100);
-
-        supAddListViewColumn(PnDlgContext.ListView, 2, 2, 2,
-            I_IMAGENONE,
-            LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
-            TEXT("RootDirectory"), 140);
+        supSetListViewSettings(PnDlgContext.ListView,
+            LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
+            FALSE,
+            TRUE,
+            g_ListViewImages,
+            LVSIL_SMALL);
 
         //
-        // Remember columns count.
+        // And columns and remember their count.
         //
-        PnDlgContext.lvColumnCount = PNLIST_COLUMN_COUNT;
+        PnDlgContext.lvColumnCount = supAddLVColumnsFromArray(
+            PnDlgContext.ListView,
+            columnData,
+            RTL_NUMBER_OF(columnData));
 
         //
         // Initial call, nothing to refresh.

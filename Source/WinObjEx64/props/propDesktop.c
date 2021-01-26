@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       PROPDESKTOP.C
 *
-*  VERSION:     1.86
+*  VERSION:     1.88
 *
-*  DATE:        26 May 2020
+*  DATE:        15 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -18,9 +18,6 @@
 #include "global.h"
 #include "propDlg.h"
 #include "extras.h"
-
-//number of columns, revise this unit code after any change to this number
-#define DESKTOPLIST_COLUMN_COUNT 3
 
 typedef struct _DLG_ENUM_CALLBACK_CONTEXT {
     PROP_OBJECT_INFO* ObjectContext;
@@ -199,6 +196,12 @@ VOID DesktopListCreate(
 )
 {
     HICON hImage;
+    LVCOLUMNS_DATA columnData[] =
+    {
+        { L"Name", 200, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  2 },
+        { L"SID", 100, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE },
+        { L"Heap Size", 100, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE }
+    };
 
     pDlgContext->ListView = GetDlgItem(hwndDlg, ID_DESKTOPSLIST);
     if (pDlgContext->ListView == NULL)
@@ -232,34 +235,25 @@ VOID DesktopListCreate(
             DestroyIcon(hImage);
         }
 
-        ListView_SetImageList(pDlgContext->ListView, pDlgContext->ImageList, LVSIL_SMALL);
     }
 
-    ListView_SetExtendedListViewStyle(pDlgContext->ListView,
-        LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
-
-    SetWindowTheme(pDlgContext->ListView, TEXT("Explorer"), NULL);
+    //
+    // Set listview imagelist, style flags and theme.
+    //
+    supSetListViewSettings(pDlgContext->ListView,
+        LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
+        FALSE,
+        TRUE,
+        pDlgContext->ImageList,
+        LVSIL_SMALL);
 
     //
-    // Add listview columns.
+    // And columns and remember their count.
     //
-
-    supAddListViewColumn(pDlgContext->ListView, 0, 0, 0,
-        2,
-        LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
-        TEXT("Name"), 200);
-
-    supAddListViewColumn(pDlgContext->ListView, 1, 1, 1,
-        I_IMAGENONE,
-        LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
-        TEXT("SID"), 100);
-
-    supAddListViewColumn(pDlgContext->ListView, 2, 2, 2,
-        I_IMAGENONE,
-        LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
-        TEXT("Heap Size"), 100);
-
-    pDlgContext->lvColumnCount = DESKTOPLIST_COLUMN_COUNT;
+    pDlgContext->lvColumnCount = supAddLVColumnsFromArray(
+        pDlgContext->ListView,
+        columnData,
+        RTL_NUMBER_OF(columnData));
 }
 
 /*
@@ -437,7 +431,7 @@ INT_PTR CALLBACK DesktopListDialogProc(
         if (wParam) {
             Context = (PROP_OBJECT_INFO*)GetProp(hwndDlg, T_PROPCONTEXT);
             pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-            if ((Context) && (pDlgContext)) {
+            if (Context && pDlgContext) {
 
                 DesktopListSetInfo(hwndDlg, Context, pDlgContext);
                 if (pDlgContext->ListView) {
@@ -447,7 +441,7 @@ INT_PTR CALLBACK DesktopListDialogProc(
                         &DesktopListCompareFunc,
                         pDlgContext);
                 }
-                return 1;
+
             }
         }
         break;
@@ -456,14 +450,13 @@ INT_PTR CALLBACK DesktopListDialogProc(
         return DesktopListHandleNotify(hwndDlg, lParam);
 
     case WM_DESTROY:
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        pDlgContext = (EXTRASCONTEXT*)RemoveProp(hwndDlg, T_DLGCONTEXT);
         if (pDlgContext) {
             if (pDlgContext->ImageList) {
                 ImageList_Destroy(pDlgContext->ImageList);
             }
             supHeapFree(pDlgContext);
         }
-        RemoveProp(hwndDlg, T_DLGCONTEXT);
         RemoveProp(hwndDlg, T_PROPCONTEXT);
         break;
 
@@ -477,8 +470,10 @@ INT_PTR CALLBACK DesktopListDialogProc(
                 DesktopListCreate(hwndDlg, pDlgContext);
             }
         }
-        return 1;
+        break;
+    default:
+        return FALSE;
 
     }
-    return 0;
+    return TRUE;
 }

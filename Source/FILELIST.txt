@@ -180,6 +180,11 @@ winobjex64\props\propTypeConsts.h
 
 * Known object access rights converted to strings listed here
 
+winobjex64\sdviewDlg.c
+winobjex64\sdviewDlg.h
+
+* "View Security Descriptor" dialog routines including window procedure
+
 winobjex64\sup.c
 winobjex64\sup.h
 winobjex64\supConsts.h

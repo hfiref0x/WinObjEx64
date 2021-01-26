@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        13 July 2020
+*  DATE:        11 Dec 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -23,6 +23,10 @@
 // Global variables for treelist used in properties window page.
 //
 HWND g_TreeList;
+
+typedef VOID(NTAPI* pfnObDumpRoutine)(
+    _In_ PROP_OBJECT_INFO* Context,
+    _In_ HWND hwndDlg);
 
 
 /*
@@ -133,6 +137,8 @@ VOID propObDumpAddressWithModule(
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
     subitems.Count = 2;
     subitems.Text[0] = T_NULL;
+    subitems.Text[1] = T_EmptyString;
+
     if (Address != NULL) {
 
         RtlSecureZeroMemory(&szValue, sizeof(szValue));
@@ -519,6 +525,9 @@ VOID propObDumpUlong64(
             subitems.FontColor = FontColor;
         }
         subitems.Text[1] = lpszDesc;
+    }
+    else {
+        subitems.Text[1] = T_EmptyString;
     }
 
     supTreeListAddItem(
@@ -1369,7 +1378,7 @@ VOID propObDumpDriverObject(
         RtlSecureZeroMemory(&subitems, sizeof(subitems));
         subitems.Count = 2;
         subitems.Text[0] = TEXT("{...}");
-        subitems.Text[1] = NULL;
+        subitems.Text[1] = T_EmptyString;
 
         h_tviSubItem = supTreeListAddItem(
             g_TreeList,
@@ -2273,9 +2282,11 @@ VOID propObDumpDeviceMap(
             // Display DriveType array.
             //
             RtlSecureZeroMemory(&subitems, sizeof(subitems));
+
             subitems.Count = 2;
             subitems.Text[0] = T_EmptyString;
             subitems.Text[1] = T_EmptyString;
+
             h_tviDriveType = supTreeListAddItem(g_TreeList,
                 h_tviSubItem,
                 TVIF_TEXT | TVIF_STATE,
@@ -4321,6 +4332,7 @@ INT_PTR ObjectDumpInitDialog(
     _In_ LPARAM lParam
 )
 {
+    pfnObDumpRoutine ObDumpRoutine = NULL;
     PROP_OBJECT_INFO* Context = NULL;
     PROPSHEETPAGE* pSheet = (PROPSHEETPAGE*)lParam;
 #ifndef _DEBUG
@@ -4334,48 +4346,56 @@ INT_PTR ObjectDumpInitDialog(
             switch (Context->TypeIndex) {
 
             case ObjectTypeDirectory:
-                propObDumpDirectoryObject(Context, hwndDlg);
+                ObDumpRoutine = (pfnObDumpRoutine)propObDumpDirectoryObject;
                 break;
 
             case ObjectTypeDriver:
-                propObDumpDriverObject(Context, hwndDlg);
+                ObDumpRoutine = (pfnObDumpRoutine)propObDumpDriverObject;
                 break;
 
             case ObjectTypeDevice:
-                propObDumpDeviceObject(Context, hwndDlg);
+                ObDumpRoutine = (pfnObDumpRoutine)propObDumpDeviceObject;
                 break;
 
             case ObjectTypeEvent:
             case ObjectTypeMutant:
             case ObjectTypeSemaphore:
             case ObjectTypeTimer:
-                propObDumpSyncObject(Context, hwndDlg);
+                ObDumpRoutine = (pfnObDumpRoutine)propObDumpSyncObject;
                 break;
 
             case ObjectTypePort:
-                propObDumpAlpcPort(Context, hwndDlg);
+                ObDumpRoutine = (pfnObDumpRoutine)propObDumpAlpcPort;
                 break;
 
             case ObjectTypeIoCompletion:
-                propObDumpQueueObject(Context, hwndDlg);
+                ObDumpRoutine = (pfnObDumpRoutine)propObDumpQueueObject;
                 break;
 
             case ObjectTypeFltConnPort:
-                propObDumpFltServerPort(Context, hwndDlg);
+                ObDumpRoutine = (pfnObDumpRoutine)propObDumpFltServerPort;
                 break;
 
             case ObjectTypeCallback:
-                propObDumpCallback(Context, hwndDlg);
+                ObDumpRoutine = (pfnObDumpRoutine)propObDumpCallback;
                 break;
 
             case ObjectTypeSymbolicLink:
-                propObDumpSymbolicLink(Context, hwndDlg);
+                ObDumpRoutine = (pfnObDumpRoutine)propObDumpSymbolicLink;
                 break;
 
             case ObjectTypeType:
-                propObDumpObjectType(Context, hwndDlg);
+                ObDumpRoutine = (pfnObDumpRoutine)propObDumpObjectType;
+                break;
+
+            default:
+                ObDumpRoutine = NULL;
                 break;
             }
+
+            if (ObDumpRoutine)
+                ObDumpRoutine(Context, hwndDlg);
+
         }
     }
     __finally {

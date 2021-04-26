@@ -266,6 +266,7 @@ typedef struct _NOTIFICATION_CALLBACKS {
     ULONG_PTR PsAltSystemCallHandlers;
     ULONG_PTR CiCallbacks;
     ULONG_PTR ExpHostListHead;
+    ULONG_PTR ExpCallbackListHead;
 } NOTIFICATION_CALLBACKS, *PNOTIFICATION_CALLBACKS;
 
 extern NOTIFICATION_CALLBACKS g_SystemCallbacks;

@@ -4377,6 +4377,15 @@ typedef struct _CALLBACK_OBJECT {
     UCHAR reserved[3];
 } CALLBACK_OBJECT, *PCALLBACK_OBJECT;
 
+// Since 8.1
+typedef struct _CALLBACK_OBJECT_V2 {
+    ULONG Signature;
+    KSPIN_LOCK Lock;
+    LIST_ENTRY RegisteredCallbacks;
+    BOOLEAN AllowMultipleCallbacks;
+    LIST_ENTRY ExpCallbackList;
+} CALLBACK_OBJECT_V2, *PCALLBACK_OBJECT_V2;
+
 typedef struct _CALLBACK_REGISTRATION {
     LIST_ENTRY Link;
     PCALLBACK_OBJECT CallbackObject;

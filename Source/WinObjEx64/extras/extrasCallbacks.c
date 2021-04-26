@@ -91,6 +91,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpDbgkLCallbacks);
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpPsAltSystemCallHandlers);
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks);
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpExHostCallbacks);
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpExpCallbackListCallbacks);
 
 OBEX_FINDCALLBACK_ROUTINE(FindPspCreateProcessNotifyRoutine);
 OBEX_FINDCALLBACK_ROUTINE(FindPspCreateThreadNotifyRoutine);
@@ -108,6 +109,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindDbgkLmdCallbacks);
 OBEX_FINDCALLBACK_ROUTINE(FindPsAltSystemCallHandlers);
 OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks);
 OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks);
+OBEX_FINDCALLBACK_ROUTINE(FindExpCallbackListHead);
 
 OBEX_CALLBACK_DISPATCH_ENTRY g_CallbacksDispatchTable[] = {
     {
@@ -213,6 +215,11 @@ OBEX_CALLBACK_DISPATCH_ENTRY g_CallbacksDispatchTable[] = {
         0, L"ExHostCallbacks",
         QueryCallbackGeneric, DumpExHostCallbacks, FindExHostCallbacks,
         &g_SystemCallbacks.ExpHostListHead
+    },
+    {
+        0, L"ExpCallbackList",
+        QueryCallbackGeneric, DumpExpCallbackListCallbacks, FindExpCallbackListHead,
+        &g_SystemCallbacks.ExpCallbackListHead
     }
 };
 
@@ -2006,6 +2013,71 @@ OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
 }
 
 /*
+* FindExpCallbackListHead
+*
+* Purpose:
+*
+* Returns the address of ExpCallbackListHead for callbacks registered with:
+*
+*   ExCreateCallback
+*
+*/
+OBEX_FINDCALLBACK_ROUTINE(FindExpCallbackListHead)
+{
+    ULONG Index;
+    LONG Rel;
+    ULONG_PTR Address;
+    PBYTE ptrCode;
+    hde64s hs;
+
+    ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
+    HMODULE hNtOs = g_kdctx.NtOsImageMap;
+
+    UNREFERENCED_PARAMETER(QueryFlags);
+
+    if (g_NtBuildNumber < NT_WIN8_BLUE)
+        return 0;
+
+    ptrCode = (PBYTE)GetProcAddress(hNtOs, "ExCreateCallback");
+    if (ptrCode == NULL)
+        return 0;
+
+    Index = 0;
+    Rel = 0;
+
+    do {
+        hde64_disasm(ptrCode + Index, &hs);
+        if (hs.flags & F_ERROR)
+            break;
+
+        if (hs.len == 7) { //check if lea
+
+            if (((ptrCode[Index] == 0x48) || (ptrCode[Index] == 0x4C)) &&
+                (ptrCode[Index + 1] == 0x8D) &&
+                (ptrCode[Index + hs.len + 3] == 0x28)) // add/lea with +0x28 = offset of object's ExpCallbackList
+            {
+                Rel = *(PLONG)(ptrCode + Index + 3);
+                break;
+            }
+        }
+
+        Index += hs.len;
+
+    } while (Index < 512);
+
+    if (Rel == 0)
+        return 0;
+
+    Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
+    Address = NtOsBase + Address - (ULONG_PTR)hNtOs;
+
+    if (!kdAddressInNtOsImage((PVOID)Address))
+        return 0;
+
+    return Address;
+}
+
+/*
 * AddRootEntryToList
 *
 * Purpose:
@@ -2026,6 +2098,44 @@ HTREEITEM AddRootEntryToList(
         (UINT)0,
         lpCallbackType,
         NULL);
+}
+
+/*
+* AddParentEntryToList
+*
+* Purpose:
+*
+* Adds a parent entry for callbacks to the treelist.
+*
+*/
+HTREEITEM AddParentEntryToList(
+    _In_ HWND TreeList,
+    _In_ HTREEITEM RootItem,
+    _In_ ULONG_PTR CallbackObjectAddress,
+    _In_ LPWSTR lpCallbackObjectType
+)
+{
+    TL_SUBITEMS_FIXED TreeListSubItems;
+    WCHAR szAddress[32];
+
+    RtlSecureZeroMemory(&TreeListSubItems, sizeof(TreeListSubItems));
+    TreeListSubItems.Count = 2;
+
+    szAddress[0] = L'0';
+    szAddress[1] = L'x';
+    szAddress[2] = 0;
+    u64tohex(CallbackObjectAddress, &szAddress[2]);
+    TreeListSubItems.Text[0] = L'\0';
+    TreeListSubItems.Text[1] = lpCallbackObjectType;
+
+    return supTreeListAddItem(
+        TreeList,
+        RootItem,
+        TVIF_TEXT | TVIF_STATE,
+        (UINT)0,
+        (UINT)0,
+        szAddress,
+        &TreeListSubItems);
 }
 
 /*
@@ -3498,6 +3608,124 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExHostCallbacks)
         }
 
         ListEntry.Flink = HostEntry.ListEntry.Flink;
+    }
+}
+
+/*
+* DumpExpCallbackListCallbacks
+*
+* Purpose:
+*
+* Read ExCreateCallback created objects from kernel and send them to output window.
+*
+*/
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpExpCallbackListCallbacks)
+{
+    LIST_ENTRY ListEntry, NextEntry, RegistrationsListEntry;
+
+    CALLBACK_OBJECT_V2 CallbackObject;
+    CALLBACK_REGISTRATION CallbackRegistration;
+
+    ULONG_PTR ListHead = KernelVariableAddress, RegistrationsListHead;
+
+    ULONG_PTR CallbackObjectAddress;
+
+    HTREEITEM RootItem, SubItem;
+
+    //
+    // Add callback root entry to the treelist.
+    //
+    RootItem = AddRootEntryToList(TreeList, CallbackType);
+    if (RootItem == 0)
+        return;
+
+    ListEntry.Flink = ListEntry.Blink = NULL;
+
+    //
+    // Read head.
+    //
+    if (!kdReadSystemMemoryEx(
+        ListHead,
+        &ListEntry,
+        sizeof(LIST_ENTRY),
+        NULL))
+    {
+        return;
+    }
+
+    //
+    // Walk list entries.
+    //
+    while ((ULONG_PTR)ListEntry.Flink != ListHead) {
+
+        RtlSecureZeroMemory(&CallbackObject, sizeof(CallbackObject));
+
+        CallbackObjectAddress = (ULONG_PTR)ListEntry.Flink - FIELD_OFFSET(CALLBACK_OBJECT_V2, ExpCallbackList);
+
+        if (!kdReadSystemMemoryEx(CallbackObjectAddress,
+            &CallbackObject,
+            sizeof(CallbackObject),
+            NULL)
+            ||
+            CallbackObject.Signature != EX_CALLBACK_SIGNATURE) 
+        {
+            break;
+        }
+
+        SubItem = AddParentEntryToList(
+            TreeList,
+            RootItem,
+            CallbackObjectAddress,
+            TEXT("Callback object"));
+        if (SubItem == 0)
+            break;
+
+        //
+        // Walk RegisteredCallbacks list entry.
+        //
+        RegistrationsListHead = CallbackObjectAddress + FIELD_OFFSET(CALLBACK_OBJECT_V2, RegisteredCallbacks);
+        RegistrationsListEntry.Flink = CallbackObject.RegisteredCallbacks.Flink;
+        while ((ULONG_PTR)RegistrationsListEntry.Flink != RegistrationsListHead) {
+
+            //
+            // Read callback registration data.
+            //
+            RtlSecureZeroMemory(&CallbackRegistration, sizeof(CallbackRegistration));
+            if (!kdReadSystemMemoryEx((ULONG_PTR)RegistrationsListEntry.Flink,
+                (PVOID)&CallbackRegistration,
+                sizeof(CallbackRegistration),
+                NULL))
+            {
+                break;
+            }
+
+            RegistrationsListEntry.Flink = CallbackRegistration.Link.Flink;
+
+            AddEntryToList(TreeList,
+                        SubItem,
+                        (ULONG_PTR)CallbackRegistration.CallbackFunction,
+                        TEXT("Callback registration"),
+                        Modules);
+        }
+
+        //
+        // Next ListEntry.
+        //
+        NextEntry.Blink = NextEntry.Flink = NULL;
+
+        if (!kdReadSystemMemoryEx(
+            (ULONG_PTR)ListEntry.Flink,
+            &NextEntry,
+            sizeof(LIST_ENTRY),
+            NULL))
+        {
+            break;
+        }
+
+        if (NextEntry.Flink == NULL)
+            break;
+
+        ListEntry.Flink = NextEntry.Flink;
     }
 }
 

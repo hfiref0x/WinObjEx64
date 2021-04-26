@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        11 Dec 2020
+*  DATE:        15 Mar 2021
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -155,7 +155,7 @@ NTSTATUS kdLoadHelperDriver(
     UNICODE_STRING driverServiceName, driverImagePath;
 
     HANDLE deviceHandle = NULL;
-    ULONG sdLength = 0;
+    PACL pAcl = NULL;
     PSECURITY_DESCRIPTOR driverSD = NULL;
 
     WCHAR szBuffer[MAX_PATH + 1];
@@ -165,7 +165,7 @@ NTSTATUS kdLoadHelperDriver(
     if (DriverPath == NULL)
         return STATUS_INVALID_PARAMETER_2;
 
-    status = supCreateSystemAdminAccessSD(&driverSD, &sdLength);
+    status = supCreateSystemAdminAccessSD(&driverSD, &pAcl);
     if (!NT_SUCCESS(status))
         return status;
 
@@ -176,6 +176,7 @@ NTSTATUS kdLoadHelperDriver(
         NULL))
     {
         supHeapFree(driverSD);
+        if (pAcl) supHeapFree(pAcl);
         return STATUS_INVALID_PARAMETER_2;
     }
 
@@ -290,6 +291,7 @@ NTSTATUS kdLoadHelperDriver(
 
 Cleanup:
     supHeapFree(driverSD);
+    if (pAcl) supHeapFree(pAcl);
     RtlFreeUnicodeString(&driverImagePath);
     return status;
 }

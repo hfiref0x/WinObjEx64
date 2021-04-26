@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        09 Jan 2021
+*  DATE:        26 Apr 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -3667,7 +3667,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExpCallbackListCallbacks)
             sizeof(CallbackObject),
             NULL)
             ||
-            CallbackObject.Signature != EX_CALLBACK_SIGNATURE) 
+            CallbackObject.Signature != EX_CALLBACK_SIGNATURE)
         {
             break;
         }
@@ -3702,10 +3702,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExpCallbackListCallbacks)
             RegistrationsListEntry.Flink = CallbackRegistration.Link.Flink;
 
             AddEntryToList(TreeList,
-                        SubItem,
-                        (ULONG_PTR)CallbackRegistration.CallbackFunction,
-                        TEXT("Callback registration"),
-                        Modules);
+                SubItem,
+                (ULONG_PTR)CallbackRegistration.CallbackFunction,
+                TEXT("Callback registration"),
+                Modules);
         }
 
         //

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       OBJECTS.H
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        21 Oct 2020
+*  DATE:        16 Feb 2021
 *
 *  Header file for internal Windows object types handling.
 *
@@ -99,6 +99,7 @@ typedef enum _WOBJ_OBJECT_TYPE {
     ObjectTypeEnergyTracker = ObjectTypeUnknown,
     ObjectTypeProcessStateChange = ObjectTypeUnknown,
     ObjectTypeThreadStateChange = ObjectTypeUnknown,
+    ObjectTypeIoRing = ObjectTypeUnknown,
     ObjectTypeMax
 } WOBJ_OBJECT_TYPE;
 
@@ -203,6 +204,9 @@ typedef struct _WOBJ_TYPE_DESC {
 
 #define IDI_ICON_THREADSTATECHANGE UNUSED_IDI_ICON
 #define IDS_DESC_THREADSTATECHANGE UNUSED_IDS_DESC
+
+#define IDI_ICON_IORING UNUSED_IDI_ICON
+#define IDS_DESC_IORING UNUSED_IDS_DESC
 
 extern WOBJ_TYPE_DESC g_TypeUnknown;
 extern WOBJ_TYPE_DESC g_TypeSymbolicLink;

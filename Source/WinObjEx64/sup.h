@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        16 Dec 2020
+*  DATE:        15 Mar 2021
 *
 *  Common header file for the program support routines.
 *
@@ -686,8 +686,8 @@ ULONG supHashUnicodeString(
     _In_ CONST UNICODE_STRING * String);
 
 NTSTATUS supCreateSystemAdminAccessSD(
-    _Out_ PSECURITY_DESCRIPTOR * SelfRelativeSD,
-    _Out_opt_ PULONG Length);
+    _Out_ PSECURITY_DESCRIPTOR* SecurityDescriptor,
+    _Out_ PACL* DefaultAcl);
 
 VOID supSetProcessMitigationImagesPolicy();
 

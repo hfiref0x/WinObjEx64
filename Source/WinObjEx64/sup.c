@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.88
 *
-*  DATE:        16 Jan 2021
+*  DATE:        15 Mar 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -6519,124 +6519,89 @@ ULONG supHashUnicodeString(
 *
 */
 NTSTATUS supCreateSystemAdminAccessSD(
-    _Out_ PSECURITY_DESCRIPTOR * SecurityDescriptor,
-    _Out_opt_ PULONG Length
+    _Out_ PSECURITY_DESCRIPTOR* SecurityDescriptor,
+    _Out_ PACL* DefaultAcl
 )
 {
     NTSTATUS ntStatus = STATUS_UNSUCCESSFUL;
-    PSID admSid = NULL;
-    PSID sysSid = NULL;
-    PACL sysAcl = NULL;
-    ULONG daclSize = 0;
+    ULONG aclSize = 0;
+    SID_IDENTIFIER_AUTHORITY ntAuthority = SECURITY_NT_AUTHORITY;
+    PACL pAcl = NULL;
+    PSECURITY_DESCRIPTOR securityDescriptor = NULL;
 
-    PSECURITY_DESCRIPTOR securityDescriptor;
-
-    SID_IDENTIFIER_AUTHORITY sidAuthority = SECURITY_NT_AUTHORITY;
+    UCHAR sidBuffer[2 * sizeof(SID)];
 
     *SecurityDescriptor = NULL;
-
-    if (Length)
-        *Length = 0;
+    *DefaultAcl = NULL;
 
     do {
 
+        RtlSecureZeroMemory(sidBuffer, sizeof(sidBuffer));
+
         securityDescriptor = (PSECURITY_DESCRIPTOR)supHeapAlloc(sizeof(SECURITY_DESCRIPTOR));
         if (securityDescriptor == NULL) {
-            ntStatus = STATUS_MEMORY_NOT_ALLOCATED;
+            ntStatus = STATUS_INSUFFICIENT_RESOURCES;
             break;
         }
 
-        admSid = (PSID)supHeapAlloc(RtlLengthRequiredSid(2));
-        if (admSid == NULL) {
-            ntStatus = STATUS_MEMORY_NOT_ALLOCATED;
+        aclSize += RtlLengthRequiredSid(1); //LocalSystem sid
+        aclSize += RtlLengthRequiredSid(2); //Admin group sid
+        aclSize += sizeof(ACL);
+        aclSize += 2 * (sizeof(ACCESS_ALLOWED_ACE) - sizeof(ULONG));
+
+        pAcl = (PACL)supHeapAlloc(aclSize);
+        if (pAcl == NULL) {
+            ntStatus = STATUS_INSUFFICIENT_RESOURCES;
             break;
         }
 
-        sysSid = (PSID)supHeapAlloc(RtlLengthRequiredSid(1));
-        if (sysSid == NULL) {
-            ntStatus = STATUS_MEMORY_NOT_ALLOCATED;
-            break;
-        }
-
-        ntStatus = RtlInitializeSid(admSid, &sidAuthority, 2);
-        if (NT_SUCCESS(ntStatus)) {
-            *RtlSubAuthoritySid(admSid, 0) = SECURITY_BUILTIN_DOMAIN_RID;
-            *RtlSubAuthoritySid(admSid, 1) = DOMAIN_ALIAS_RID_ADMINS;
-        }
-        else {
-            break;
-        }
-
-        ntStatus = RtlInitializeSid(sysSid, &sidAuthority, 1);
-        if (NT_SUCCESS(ntStatus)) {
-            *RtlSubAuthoritySid(sysSid, 0) = SECURITY_LOCAL_SYSTEM_RID;
-        }
-        else {
-            break;
-        }
-
-        daclSize = sizeof(ACL) +
-            (2 * sizeof(ACCESS_ALLOWED_ACE)) +
-            RtlLengthSid(admSid) + RtlLengthSid(sysSid) +
-            SECURITY_DESCRIPTOR_MIN_LENGTH;
-
-        sysAcl = (PACL)supHeapAlloc(daclSize);
-        if (sysAcl == NULL) {
-            ntStatus = STATUS_MEMORY_NOT_ALLOCATED;
-            break;
-        }
-
-        ntStatus = RtlCreateAcl(sysAcl, (ULONG)(daclSize - SECURITY_DESCRIPTOR_MIN_LENGTH), (ULONG)ACL_REVISION);
+        ntStatus = RtlCreateAcl(pAcl, aclSize, ACL_REVISION);
         if (!NT_SUCCESS(ntStatus))
             break;
 
-        ntStatus = RtlAddAccessAllowedAce(sysAcl,
-            ACL_REVISION,
-            GENERIC_ALL,
-            sysSid);
+        //
+        // Local System - Generic All.
+        //
+        RtlInitializeSid(sidBuffer, &ntAuthority, 1);
+        *(RtlSubAuthoritySid(sidBuffer, 0)) = SECURITY_LOCAL_SYSTEM_RID;
+        RtlAddAccessAllowedAce(pAcl, ACL_REVISION, GENERIC_ALL, (PSID)sidBuffer);
 
-        if (!NT_SUCCESS(ntStatus))
-            break;
-
-        ntStatus = RtlAddAccessAllowedAce(sysAcl,
-            ACL_REVISION,
-            GENERIC_ALL,
-            admSid);
-
-        if (!NT_SUCCESS(ntStatus))
-            break;
+        //
+        // Admins - Generic All.
+        //
+        RtlInitializeSid(sidBuffer, &ntAuthority, 2);
+        *(RtlSubAuthoritySid(sidBuffer, 0)) = SECURITY_BUILTIN_DOMAIN_RID;
+        *(RtlSubAuthoritySid(sidBuffer, 1)) = DOMAIN_ALIAS_RID_ADMINS;
+        RtlAddAccessAllowedAce(pAcl, ACL_REVISION, GENERIC_ALL, (PSID)sidBuffer);
 
         ntStatus = RtlCreateSecurityDescriptor(securityDescriptor,
             SECURITY_DESCRIPTOR_REVISION1);
-
         if (!NT_SUCCESS(ntStatus))
             break;
 
         ntStatus = RtlSetDaclSecurityDescriptor(securityDescriptor,
             TRUE,
-            sysAcl,
+            pAcl,
             FALSE);
 
         if (!NT_SUCCESS(ntStatus))
             break;
 
-        if (!RtlValidSecurityDescriptor(securityDescriptor))
-            break;
-
         *SecurityDescriptor = securityDescriptor;
-
-        if (Length)
-            *Length = RtlLengthSecurityDescriptor(securityDescriptor);
+        *DefaultAcl = pAcl;
 
     } while (FALSE);
 
-    if (admSid != NULL) supHeapFree(admSid);
-    if (sysSid != NULL) supHeapFree(sysSid);
-    if (sysAcl != NULL) supHeapFree(sysAcl);
-
     if (!NT_SUCCESS(ntStatus)) {
-        if (securityDescriptor != NULL)
+
+        if (pAcl) supHeapFree(pAcl);
+
+        if (securityDescriptor) {
             supHeapFree(securityDescriptor);
+        }
+
+        *SecurityDescriptor = NULL;
+        *DefaultAcl = NULL;
     }
 
     return ntStatus;

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017 - 2020
+*  (C) COPYRIGHT AUTHORS, 2017 - 2021
 *
 *  TITLE:       OBJECTS.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.88
 *
-*  DATE:        04 Oct 2020
+*  DATE:        16 Feb 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -56,6 +56,7 @@ WOBJ_TYPE_DESC g_TypeFilterCommunicationPort = { L"FilterCommunicationPort", 0x7
 WOBJ_TYPE_DESC g_TypeFilterConnectionPort = { L"FilterConnectionPort", 0x4598bf7, ObjectTypeFltConnPort, IDI_ICON_FLTCONNPORT, IDS_DESC_FLT_CONN_PORT };
 WOBJ_TYPE_DESC g_TypeIoCompletion = { L"IoCompletion", 0xbc81c342, ObjectTypeIoCompletion, IDI_ICON_IOCOMPLETION, IDS_DESC_IOCOMPLETION };
 WOBJ_TYPE_DESC g_TypeIoCompletionReserve = { L"IoCompletionReserve", 0xca6e211a, ObjectTypeIoCompletionReserve, IDI_ICON_IOCOMPLETION_RESERVE, IDS_DESC_IOCOMPLETION_RESERVE };
+WOBJ_TYPE_DESC g_TypeIoRing = { L"IoRing", 0xe17640f6, ObjectTypeIoRing, IDI_ICON_IORING, IDS_DESC_IORING };
 WOBJ_TYPE_DESC g_TypeIRTimer = { L"IRTimer", 0xc161a6dc, ObjectTypeIRTimer, IDI_ICON_IRTIMER, IDS_DESC_IRTIMER };
 WOBJ_TYPE_DESC g_TypeJob = { L"Job", 0x24df96fd, ObjectTypeJob, IDI_ICON_JOB, IDS_DESC_JOB };
 WOBJ_TYPE_DESC g_TypeKey = { L"Key", 0x2553a41f, ObjectTypeKey, IDI_ICON_KEY, IDS_DESC_KEY };
@@ -135,6 +136,7 @@ static WOBJ_TYPE_DESC* gpObjectTypes[] = {
     &g_TypeFilterConnectionPort,
     &g_TypeIoCompletion,
     &g_TypeIoCompletionReserve,
+    & g_TypeIoRing,
     &g_TypeIRTimer,
     &g_TypeJob,
     &g_TypeKey,

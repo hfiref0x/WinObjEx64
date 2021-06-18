@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2020
+*  (C) COPYRIGHT AUTHORS, 2019 - 2021
 *
 *  TITLE:       MAIN.H
 *
-*  VERSION:     1.03
+*  VERSION:     1.11
 *
-*  DATE:        30 Nov 2020
+*  DATE:        11 June 2021
 *
 *  WinObjEx64 ApiSetView plugin.
 *
@@ -28,6 +28,39 @@ HINSTANCE g_ThisDLL = NULL;
 GUI_CONTEXT g_ctx;
 
 volatile BOOL g_PluginQuit = FALSE;
+
+/*
+* ContextMenuHandler
+*
+* Purpose:
+*
+* Main list context menu handler.
+*
+*/
+VOID ContextMenuHandler(
+    _In_ HWND hwndDlg,
+    _In_ LPARAM lParam,
+    _In_ WPARAM wParam
+)
+{
+    POINT pt1;
+    HMENU hMenu;
+
+    UNREFERENCED_PARAMETER(lParam);
+    UNREFERENCED_PARAMETER(wParam);
+
+    if (GetCursorPos(&pt1)) {
+        hMenu = CreatePopupMenu();
+        if (hMenu) {
+            InsertMenu(hMenu, 0, MF_BYCOMMAND, IDC_BROWSE_BUTTON, TEXT("Select Schema File"));
+            InsertMenu(hMenu, 1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+            InsertMenu(hMenu, 2, MF_BYCOMMAND, ID_USE_SYSTEM_SCHEMA_FILE, TEXT("Use System Schema"));
+            TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, hwndDlg, NULL);
+            DestroyMenu(hMenu);
+        }
+    }
+
+}
 
 /*
 * OpenDialogExecute
@@ -56,82 +89,6 @@ BOOL OpenDialogExecute(
     tag1.Flags = OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
 
     return GetOpenFileName(&tag1);
-}
-
-/*
-* TreeView_FindLabel
-*
-* Purpose:
-*
-* Find treelist entry by label.
-*
-*/
-HTREEITEM TreeView_FindLabel(
-    _In_ HWND hwnd,
-    _In_ HTREEITEM hItemParent,
-    _In_ LPCWSTR pszLabel)
-{
-    TVITEMEX tvi;
-    HTREEITEM hChildSearch;
-    WCHAR wchLabel[MAX_PATH];
-
-    for (tvi.hItem = TreeView_GetChild(hwnd, hItemParent);
-        tvi.hItem;
-        tvi.hItem = TreeView_GetNextSibling(hwnd, tvi.hItem))
-    {
-        tvi.mask = TVIF_TEXT | TVIF_CHILDREN;
-        tvi.pszText = wchLabel;
-        tvi.cchTextMax = MAX_PATH;
-        if (TreeList_GetTreeItem(hwnd, &tvi, NULL)) {
-            if (_strcmpi(tvi.pszText, pszLabel) == 0)
-                return tvi.hItem;
-
-            if (tvi.cChildren) {
-                hChildSearch = TreeView_FindLabel(hwnd, tvi.hItem, pszLabel);
-                if (hChildSearch)
-                    return hChildSearch;
-            }
-        }
-    }
-    return 0;
-}
-
-/*
-* HandleSearchSchema
-*
-* Purpose:
-*
-* Search in treelist.
-*
-*/
-VOID HandleSearchSchema(
-    _In_ HWND hwndDlg)
-{
-    HTREEITEM hItem;
-    WCHAR szSchemaName[MAX_PATH * 2];
-
-    RtlSecureZeroMemory(szSchemaName, sizeof(szSchemaName));
-
-    SendDlgItemMessage(
-        hwndDlg,
-        IDC_SEARCH_EDIT,
-        WM_GETTEXT,
-        (WPARAM)MAX_PATH,
-        (LPARAM)&szSchemaName);
-
-#pragma warning(push)
-#pragma warning(disable: 6054)
-    hItem = TreeView_FindLabel(
-        g_ctx.TreeList,
-        TreeView_GetRoot(g_ctx.TreeList),
-        szSchemaName);
-#pragma warning(pop)
-
-    if (hItem) {
-        TreeList_EnsureVisible(g_ctx.TreeList, hItem);
-        TreeList_Expand(g_ctx.TreeList, hItem, TVE_EXPAND);
-        SetFocus(g_ctx.TreeList);
-    }
 }
 
 /*
@@ -233,9 +190,9 @@ BOOL InitTreeList(
     _Out_ HWND* pTreeListHwnd
 )
 {
-    HWND     TreeList;
-    HDITEM   hdritem;
-    RECT     rc;
+    HWND TreeList;
+    HDITEM hdritem;
+    RECT rc;
 
     UINT uDpi;
     INT dpiScaledX, dpiScaledY, iScaledWidth, iScaledHeight, iScaleSubX, iScaleSubY;
@@ -251,7 +208,7 @@ BOOL InitTreeList(
     GetWindowRect(hwndParent, &rc);
 
     iScaleSubX = MulDiv(24, uDpi, DefaultSystemDpi);
-    iScaleSubY = MulDiv(200, uDpi, DefaultSystemDpi);
+    iScaleSubY = MulDiv(140, uDpi, DefaultSystemDpi);
     iScaledWidth = (rc.right - rc.left) - dpiScaledX - iScaleSubX;
     iScaledHeight = (rc.bottom - rc.top) - dpiScaledY - iScaleSubY;
 
@@ -270,14 +227,17 @@ BOOL InitTreeList(
     RtlSecureZeroMemory(&hdritem, sizeof(hdritem));
     hdritem.mask = HDI_FORMAT | HDI_TEXT | HDI_WIDTH;
     hdritem.fmt = HDF_LEFT | HDF_BITMAP_ON_RIGHT | HDF_STRING;
-    hdritem.cxy = 300;
+
+    hdritem.cxy = 340;
     hdritem.pszText = TEXT("Namespace");
     TreeList_InsertHeaderItem(TreeList, 0, &hdritem);
+
     hdritem.cxy = 130;
-    hdritem.pszText = TEXT("Alias");
-    TreeList_InsertHeaderItem(TreeList, 1, &hdritem);
-    hdritem.cxy = 200;
     hdritem.pszText = TEXT("Flags");
+    TreeList_InsertHeaderItem(TreeList, 1, &hdritem);
+
+    hdritem.cxy = 200;
+    hdritem.pszText = TEXT("Alias");
     TreeList_InsertHeaderItem(TreeList, 2, &hdritem);
 
     return TRUE;
@@ -300,13 +260,16 @@ INT_PTR CALLBACK PluginDialogProc(
 {
     HANDLE hIcon;
     HTREEITEM hRoot;
-    WCHAR szOpenFileName[MAX_PATH + 1];
+    LPWSTR lpFilter = NULL;
+    WCHAR szFileName[MAX_PATH + 1];
+    WCHAR szFilterOption[MAX_PATH + 1];
 
     switch (uMsg) {
 
     case WM_INITDIALOG:
 
         g_ctx.MainWindow = hwndDlg;
+        g_ctx.SearchEdit = GetDlgItem(hwndDlg, IDC_SEARCH_EDIT);
 
         hIcon = LoadImage(
             g_ctx.ParamBlock.Instance,
@@ -319,11 +282,11 @@ INT_PTR CALLBACK PluginDialogProc(
             SendMessage(hwndDlg, WM_SETICON, (WPARAM)ICON_SMALL, (LPARAM)hIcon);
             SendMessage(hwndDlg, WM_SETICON, (WPARAM)ICON_BIG, (LPARAM)hIcon);
             g_ctx.WindowIcon = hIcon;
-            
+
         }
 
         if (InitTreeList(hwndDlg, &g_ctx.TreeList)) {
-            ListApiSetFromFile(NULL);
+            ListApiSetFromFile(NULL, NULL);
         }
         else {
             MessageBox(g_ctx.MainWindow,
@@ -344,6 +307,10 @@ INT_PTR CALLBACK PluginDialogProc(
         }
         break;
 
+    case WM_CONTEXTMENU:
+        ContextMenuHandler(hwndDlg, lParam, wParam);
+        break;
+
     case WM_NOTIFY:
         PluginHandleWMNotify(
             hwndDlg,
@@ -354,17 +321,52 @@ INT_PTR CALLBACK PluginDialogProc(
     case WM_COMMAND:
 
         switch (GET_WM_COMMAND_ID(wParam, lParam)) {
-        case IDC_SEARCH_BUTTON:
-            HandleSearchSchema(hwndDlg);
+        case IDC_SEARCH_EDIT:
+            if (GET_WM_COMMAND_CMD(wParam, lParam) == EN_CHANGE) {
+
+                RtlSecureZeroMemory(szFilterOption, sizeof(szFilterOption));
+                if (GetWindowText(
+                    g_ctx.SearchEdit,
+                    szFilterOption,
+                    MAX_PATH))
+                {
+                    if (szFilterOption[0] != 0) {
+                        lpFilter = szFilterOption;
+                    }
+                }
+
+                ListApiSetFromFile(g_ctx.SchemaFileName, lpFilter);
+
+            }
+            break;
+
+        case ID_USE_SYSTEM_SCHEMA_FILE:
+            ListApiSetFromFile(NULL, NULL);
             break;
 
         case IDC_BROWSE_BUTTON:
-            RtlSecureZeroMemory(szOpenFileName, sizeof(szOpenFileName));
+
+            RtlSecureZeroMemory(szFileName, sizeof(szFileName));
             if (OpenDialogExecute(hwndDlg,
-                szOpenFileName,
+                szFileName,
                 TEXT("All files\0*.*\0\0")))
             {
-                ListApiSetFromFile(szOpenFileName);
+                SetWindowText(g_ctx.SearchEdit, TEXT(""));
+                _strcpy(g_ctx.SchemaFileName, szFileName);
+
+                /*
+                szFilterOption[0] = 0;
+                if (GetWindowText(
+                    g_ctx.SearchEdit,
+                    szFilterOption,
+                    MAX_PATH))
+                {
+                    if (szFilterOption[0] != 0) {
+                        lpFilter = szFilterOption;
+                    }
+                }
+                */
+                ListApiSetFromFile(g_ctx.SchemaFileName, NULL);
             }
             break;
 
@@ -445,7 +447,7 @@ DWORD WINAPI PluginThread(
         TranslateMessage(&msg1);
         DispatchMessage(&msg1);
 
-    } while ((rv != 0) && (g_PluginQuit == FALSE));
+    } while (rv != 0 && g_PluginQuit == FALSE);
 
     PluginFreeGlobalResources();
 
@@ -473,30 +475,34 @@ NTSTATUS CALLBACK StartPlugin(
     RtlSecureZeroMemory(&g_ctx, sizeof(g_ctx));
 
     g_ctx.PluginHeap = HeapCreate(0, 0, 0);
-    if (g_ctx.PluginHeap == NULL)
-        return STATUS_MEMORY_NOT_ALLOCATED;
+    if (g_ctx.PluginHeap) {
 
-    HeapSetInformation(g_ctx.PluginHeap, HeapEnableTerminationOnCorruption, NULL, 0);
+        HeapSetInformation(g_ctx.PluginHeap, HeapEnableTerminationOnCorruption, NULL, 0);
 
-    RtlCopyMemory(&g_ctx.ParamBlock, ParamBlock, sizeof(WINOBJEX_PARAM_BLOCK));
+        RtlCopyMemory(&g_ctx.ParamBlock, ParamBlock, sizeof(WINOBJEX_PARAM_BLOCK));
 
-    g_ctx.WorkerThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)PluginThread, (PVOID)NULL, 0, &ThreadId);
-    if (g_ctx.WorkerThread) {
-        Status = STATUS_SUCCESS;
+        g_ctx.WorkerThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)PluginThread, (PVOID)NULL, 0, &ThreadId);
+        if (g_ctx.WorkerThread) {
+            Status = STATUS_SUCCESS;
+        }
+        else {
+            Status = STATUS_UNSUCCESSFUL;
+            HeapDestroy(g_ctx.PluginHeap);
+            g_ctx.PluginHeap = NULL;
+        }
+
+        if (NT_SUCCESS(Status))
+            State = PluginRunning;
+        else
+            State = PluginError;
+
+        if (g_Plugin->StateChangeCallback)
+            g_Plugin->StateChangeCallback(g_Plugin, State, NULL);
+
     }
     else {
-        Status = STATUS_UNSUCCESSFUL;
-        HeapDestroy(g_ctx.PluginHeap);
-        g_ctx.PluginHeap = NULL;
+        Status = STATUS_MEMORY_NOT_ALLOCATED;
     }
-
-    if (NT_SUCCESS(Status))
-        State = PluginRunning;
-    else
-        State = PluginError;
-
-    if (g_Plugin->StateChangeCallback)
-        g_Plugin->StateChangeCallback(g_Plugin, State, NULL);
 
     return Status;
 }
@@ -555,7 +561,7 @@ BOOLEAN CALLBACK PluginInit(
         //
         // Set plugin description.
         //
-        StringCbCopy(PluginData->Description, sizeof(PluginData->Description), 
+        StringCbCopy(PluginData->Description, sizeof(PluginData->Description),
             TEXT("A simple viewer for ApiSet schema."));
 
         //

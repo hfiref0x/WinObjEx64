@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2020
+*  (C) COPYRIGHT AUTHORS, 2019 - 2021
 *
 *  TITLE:       QUERY.C
 *
-*  VERSION:     1.02
+*  VERSION:     1.11
 *
-*  DATE:        12 Dec 2019
+*  DATE:        11 June 2021
 *
 *  Query and output ApiSet specific data.
 *
@@ -19,8 +19,38 @@
 
 #include "global.h"
 
-VOID ApiSetViewShowError(
-    _In_ LPWSTR ErrorMsg);
+typedef VOID(CALLBACK* pfnApiSetQueryMap)(
+    _In_ PVOID ApiSetMap,
+    _In_ HTREEITEM RootItem,
+    _In_opt_ LPCWSTR FilterByName);
+
+#define APISET_QUERY_ROUTINE(n) VOID n(   \
+    _In_ PVOID ApiSetMap,                 \
+    _In_ HTREEITEM RootItem,              \
+    _In_opt_ LPCWSTR FilterByName)
+
+VALUE_DESC g_ApiSetEntryFlags[] = {
+    { API_SET_SCHEMA_ENTRY_FLAGS_SEALED, L"Sealed" },
+    { API_SET_SCHEMA_ENTRY_FLAGS_EXTENSION, L"Extension" }
+};
+
+/*
+* DiplayErrorText
+*
+* Purpose:
+*
+* In debug build send string to debugger else show message box.
+*
+*/
+VOID DiplayErrorText(
+    _In_ LPWSTR ErrorMsg)
+{
+#ifdef _DEBUG
+    OutputDebugString(ErrorMsg);
+#else
+    MessageBox(g_ctx.MainWindow, ErrorMsg, NULL, MB_ICONERROR);
+#endif
+}
 
 /*
 * TreeListAddItem
@@ -40,8 +70,8 @@ HTREEITEM TreeListAddItem(
     _In_opt_ PVOID subitems
 )
 {
-    TVINSERTSTRUCT  tvitem;
-    PTL_SUBITEMS    si = (PTL_SUBITEMS)subitems;
+    TVINSERTSTRUCT tvitem;
+    PTL_SUBITEMS si = (PTL_SUBITEMS)subitems;
 
     RtlSecureZeroMemory(&tvitem, sizeof(tvitem));
     tvitem.hParent = hParent;
@@ -54,157 +84,223 @@ HTREEITEM TreeListAddItem(
 }
 
 /*
-* OutNamespaceEntryEx
+* GetApiSetEntryName
+*
+* Purpose:
+*
+* Return apiset entry name, use HeapFree to release allocated memory.
+*
+*/
+LPWSTR GetApiSetEntryName(
+    _In_ PBYTE Namespace,
+    _In_ ULONG NameOffset,
+    _In_ ULONG NameLength
+)
+{
+    PWSTR lpEntryName, lpStr;
+
+    if (NameLength == 0)
+        return NULL;
+
+    lpEntryName = HeapAlloc(
+        g_ctx.PluginHeap,
+        HEAP_ZERO_MEMORY,
+        NameLength + sizeof(WCHAR));
+
+    if (lpEntryName) {
+
+        lpStr = lpEntryName;
+
+        //
+        // Copy namespace entry name.
+        //
+        RtlCopyMemory(
+            lpStr,
+            (PWSTR)RtlOffsetToPointer(Namespace, NameOffset),
+            NameLength);
+
+        //
+        // Add terminating null.
+        //
+        lpStr += (NameLength / sizeof(WCHAR));
+        *lpStr = 0;
+
+    }
+
+    return lpEntryName;
+}
+
+/*
+* OutNamespaceEntry
 *
 * Purpose:
 *
 * Namespace entry formatted output routine.
 *
 */
-HTREEITEM OutNamespaceEntryEx(
-    HTREEITEM RootItem,
-    PBYTE Namespace,
-    ULONG NameOffset,
-    ULONG NameLength,
-    ULONG Flags,
-    BOOL FlagsValid
+HTREEITEM OutNamespaceEntry(
+    _In_ HTREEITEM RootItem,
+    _In_ LPWSTR EntryName,
+    _In_opt_ ULONG Flags
 )
 {
-    TL_SUBITEMS_FIXED  subitems;
-    PWSTR Name, NameCopy, sptr;
-    HTREEITEM hSubItem;
+    ULONG i, flagsValue;
+    LPTSTR lpText = NULL;
+    HTREEITEM h_tviRootItem;
+
+    TL_SUBITEMS_FIXED tlSubItems;
+
     WCHAR szBuffer[20];
 
-    if (NameOffset == 0)
-        return 0;
+    RtlSecureZeroMemory(&tlSubItems, sizeof(tlSubItems));
 
-    Name = (PWSTR)RtlOffsetToPointer(Namespace, NameOffset);
+    flagsValue = Flags;
+    
+    //
+    // Output first flag from combination.
+    //
+    if (flagsValue) {
+        for (i = 0; i < RTL_NUMBER_OF(g_ApiSetEntryFlags); i++) {
+            if (flagsValue & g_ApiSetEntryFlags[i].Value) {
+                lpText = (LPTSTR)g_ApiSetEntryFlags[i].Desc;
+                flagsValue &= ~g_ApiSetEntryFlags[i].Value;
+                break;
+            }
+        }
 
-    NameCopy = HeapAlloc(g_ctx.PluginHeap, HEAP_ZERO_MEMORY, NameLength + sizeof(WCHAR));
-    if (NameCopy == NULL)
-        return 0;
+        //
+        // Unrecognized flags combination.
+        //
+        if (lpText == NULL) {
+            szBuffer[0] = 0;
+            ultostr(flagsValue, szBuffer);
+            lpText = szBuffer;
+            flagsValue = 0;
+        }
 
-    sptr = NameCopy;
-
-    RtlCopyMemory(
-        sptr,
-        Name,
-        NameLength);
-
-    sptr += (NameLength / sizeof(WCHAR));
-    *sptr = 0;
-
-    RtlSecureZeroMemory(&subitems, sizeof(subitems));
-
-    subitems.Text[0] = L"";
-
-    if (FlagsValid && Flags) {
-        szBuffer[0] = 0;
-        ultostr(Flags, szBuffer);
-        sptr = szBuffer;
     }
-    else {
-        sptr = L"";
-    }
-    subitems.Text[1] = sptr;
 
-    subitems.Count = 2;
+    if (lpText == NULL) lpText = T_EmptyString;
 
-    hSubItem = TreeListAddItem(
+    tlSubItems.Text[0] = lpText;
+    tlSubItems.Text[1] = T_EmptyString;
+    tlSubItems.Count = 2;
+
+    h_tviRootItem = TreeListAddItem(
         g_ctx.TreeList,
         RootItem,
         TVIF_TEXT | TVIF_STATE,
         (UINT)0,
         (UINT)0,
-        NameCopy,
-        &subitems);
+        EntryName,
+        &tlSubItems);
 
-    HeapFree(g_ctx.PluginHeap, 0, NameCopy);
-    return hSubItem;
+    //
+    // List rest of the flags.
+    //
+    if (h_tviRootItem && flagsValue) {
+        for (i = 0; i < RTL_NUMBER_OF(g_ApiSetEntryFlags); i++) {
+            if (flagsValue & g_ApiSetEntryFlags[i].Value) {
+
+                flagsValue &= ~g_ApiSetEntryFlags[i].Value;
+                tlSubItems.Text[0] = (LPTSTR)g_ApiSetEntryFlags[i].Desc;
+                tlSubItems.Text[1] = T_EmptyString;
+                tlSubItems.Count = 2;
+
+                TreeListAddItem(
+                    g_ctx.TreeList,
+                    h_tviRootItem,
+                    TVIF_TEXT | TVIF_STATE,
+                    (UINT)0,
+                    (UINT)0,
+                    T_EmptyString,
+                    &tlSubItems);
+
+            }
+        }
+
+        //
+        // Unrecognized flags.
+        //
+        if (flagsValue) {
+
+            szBuffer[0] = 0;
+            ultostr(flagsValue, szBuffer);
+            tlSubItems.Text[0] = szBuffer;
+            tlSubItems.Text[1] = T_EmptyString;
+            tlSubItems.Count = 2;
+            TreeListAddItem(
+                g_ctx.TreeList,
+                h_tviRootItem,
+                TVIF_TEXT | TVIF_STATE,
+                (UINT)0,
+                (UINT)0,
+                T_EmptyString,
+                &tlSubItems);
+
+        }
+    }
+
+    return h_tviRootItem;
 }
 
 /*
-* OutNamespaceValueEx
+* OutNamespaceValue
 *
 * Purpose:
 *
-* Namespace value formatted output routine.
+* Add entry to treelist with namespace value information.
 *
 */
-void OutNamespaceValueEx(
-    HTREEITEM RootItem,
-    PBYTE Namespace,
-    ULONG ValueOffset,
-    ULONG ValueLength,
-    ULONG NameOffset,
-    ULONG NameLength,
-    ULONG Flags,
-    BOOL FlagsValid
+void OutNamespaceValue(
+    _In_ HTREEITEM RootItem,
+    _In_ PBYTE Namespace,
+    _In_ ULONG ValueOffset,
+    _In_ ULONG ValueLength,
+    _In_ ULONG NameOffset,
+    _In_ ULONG NameLength,
+    _In_opt_ ULONG Flags
 )
 {
-    TL_SUBITEMS_FIXED  subitems;
-    PWSTR NamePtr, ValueName = NULL, AliasName = NULL, sptr = NULL;
+    TL_SUBITEMS_FIXED tlSubItems;
+    LPWSTR lpValueName = NULL, lpAliasName = NULL;
     WCHAR szBuffer[20];
 
-    RtlSecureZeroMemory(&subitems, sizeof(subitems));
+    //
+    // Get value name.
+    //
+    lpValueName = GetApiSetEntryName(
+        Namespace,
+        ValueOffset,
+        ValueLength);
 
-    // print value name
+    //
+    // Get value alias if present.
+    //
+    lpAliasName = GetApiSetEntryName(Namespace,
+        NameOffset,
+        NameLength);
 
-    if (ValueLength) {
+    RtlSecureZeroMemory(&tlSubItems, sizeof(tlSubItems));
 
-        NamePtr = (PWSTR)RtlOffsetToPointer(Namespace, ValueOffset);
+    tlSubItems.Count = 2;
 
-        ValueName = HeapAlloc(g_ctx.PluginHeap, HEAP_ZERO_MEMORY, ValueLength + sizeof(WCHAR));
-        if (ValueName) {
-            sptr = ValueName;
-
-            RtlCopyMemory(
-                sptr,
-                NamePtr,
-                ValueLength);
-
-            sptr += (ValueLength / sizeof(WCHAR));
-            *sptr = 0;
-
-        }
-    }
-
-    // print value alias
-    if (NameLength) {
-
-        NamePtr = (PWSTR)RtlOffsetToPointer(Namespace, NameOffset);
-
-        AliasName = HeapAlloc(g_ctx.PluginHeap, HEAP_ZERO_MEMORY, NameLength + sizeof(WCHAR));
-        if (AliasName) {
-            sptr = AliasName;
-
-            RtlCopyMemory(
-                sptr,
-                NamePtr,
-                NameLength);
-
-            sptr += (NameLength / sizeof(WCHAR));
-            *sptr = 0;
-
-            sptr = AliasName;
-
-        }
-    }
-    else {
-        sptr = L"";
-    }
-    subitems.Text[0] = sptr;
-
-    if (FlagsValid && Flags) {
+    if (Flags) {
         szBuffer[0] = 0;
         ultostr(Flags, szBuffer);
-        sptr = szBuffer;
+        tlSubItems.Text[0] = szBuffer;
     }
     else {
-        sptr = L"";
+        tlSubItems.Text[0] = T_EmptyString;
     }
-    subitems.Text[1] = sptr;
-    subitems.Count = 2;
+
+    if (lpAliasName) {
+        TreeList_Expand(g_ctx.TreeList, RootItem, TVE_EXPAND);
+        tlSubItems.Text[1] = lpAliasName;
+    }
+    else {
+        tlSubItems.Text[1] = T_EmptyString;
+    }
 
     TreeListAddItem(
         g_ctx.TreeList,
@@ -212,11 +308,11 @@ void OutNamespaceValueEx(
         TVIF_TEXT | TVIF_STATE,
         (UINT)0,
         (UINT)0,
-        ValueName,
-        &subitems);
+        lpValueName,
+        &tlSubItems);
 
-    if (ValueName) HeapFree(g_ctx.PluginHeap, 0, ValueName);
-    if (AliasName) HeapFree(g_ctx.PluginHeap, 0, AliasName);
+    if (lpValueName) HeapFree(g_ctx.PluginHeap, 0, lpValueName);
+    if (lpAliasName) HeapFree(g_ctx.PluginHeap, 0, lpAliasName);
 }
 
 /*
@@ -227,10 +323,7 @@ void OutNamespaceValueEx(
 * Parse and output ApiSet Version 2 (Windows 7).
 *
 */
-void ListApiSetV2(
-    _In_ PVOID ApiSetMap,
-    _In_ HTREEITEM RootItem
-)
+APISET_QUERY_ROUTINE(ListApiSetV2)
 {
     API_SET_NAMESPACE_ARRAY_V2* Namespace = (API_SET_NAMESPACE_ARRAY_V2*)ApiSetMap;
 
@@ -242,36 +335,60 @@ void ListApiSetV2(
 
     HTREEITEM hSubItem;
 
+    LPWSTR lpEntryName;
+
     for (i = 0; i < Namespace->Count; i++) {
 
         NsEntry = &Namespace->Array[i];
 
-        hSubItem = OutNamespaceEntryEx(
-            RootItem,
+        lpEntryName = GetApiSetEntryName(
             (PBYTE)Namespace,
             NsEntry->NameOffset,
-            NsEntry->NameLength,
-            0,
-            FALSE);
+            NsEntry->NameLength);
 
-        ValuesArray = (API_SET_VALUE_ARRAY_V2*)RtlOffsetToPointer(Namespace, NsEntry->DataOffset);
+        if (lpEntryName) {
 
-        for (j = 0; j < ValuesArray->Count; j++) {
+            if (FilterByName) {
 
-            ValueEntry = &ValuesArray->Array[j];
+                if (_strstri(lpEntryName, FilterByName) == NULL)
+                    continue;
 
-            if (!API_SET_EMPTY_NAMESPACE_VALUE(ValueEntry)) {
-                OutNamespaceValueEx(
-                    hSubItem,
-                    (PBYTE)Namespace,
-                    ValueEntry->ValueOffset,
-                    ValueEntry->ValueLength,
-                    ValueEntry->NameOffset,
-                    ValueEntry->NameLength,
-                    0,
-                    FALSE);
             }
-        }
+
+            hSubItem = OutNamespaceEntry(
+                RootItem,
+                lpEntryName,
+                0);
+
+            //
+            // Namespace entry name no longer needed.
+            //
+            HeapFree(g_ctx.PluginHeap, 0, lpEntryName);
+
+            //
+            // List values array.
+            //
+            ValuesArray = (API_SET_VALUE_ARRAY_V2*)RtlOffsetToPointer(
+                Namespace,
+                NsEntry->DataOffset);
+
+            for (j = 0; j < ValuesArray->Count; j++) {
+
+                ValueEntry = &ValuesArray->Array[j];
+
+                if (!API_SET_EMPTY_NAMESPACE_VALUE(ValueEntry)) {
+                    OutNamespaceValue(
+                        hSubItem,
+                        (PBYTE)Namespace,
+                        ValueEntry->ValueOffset,
+                        ValueEntry->ValueLength,
+                        ValueEntry->NameOffset,
+                        ValueEntry->NameLength,
+                        0);
+                }
+            }
+
+        } //if (lpEntryName)
     }
 }
 
@@ -283,10 +400,7 @@ void ListApiSetV2(
 * Parse and output ApiSet Version 4 (Windows 8.x).
 *
 */
-void ListApiSetV4(
-    _In_ PVOID ApiSetMap,
-    _In_ HTREEITEM RootItem
-)
+APISET_QUERY_ROUTINE(ListApiSetV4)
 {
     API_SET_NAMESPACE_ARRAY_V4* Namespace = (API_SET_NAMESPACE_ARRAY_V4*)ApiSetMap;
 
@@ -298,36 +412,60 @@ void ListApiSetV4(
 
     HTREEITEM hSubItem;
 
+    LPWSTR lpEntryName;
+
     for (i = 0; i < Namespace->Count; i++) {
 
         NsEntry = &Namespace->Array[i];
 
-        hSubItem = OutNamespaceEntryEx(
-            RootItem,
+        lpEntryName = GetApiSetEntryName(
             (PBYTE)Namespace,
             NsEntry->NameOffset,
-            NsEntry->NameLength,
-            NsEntry->Flags,
-            TRUE);
+            NsEntry->NameLength);
 
-        ValuesArray = (API_SET_VALUE_ARRAY_V4*)RtlOffsetToPointer(Namespace, NsEntry->DataOffset);
+        if (lpEntryName) {
 
-        for (j = 0; j < ValuesArray->Count; j++) {
+            if (FilterByName) {
 
-            ValueEntry = &ValuesArray->Array[j];
+                if (_strstri(lpEntryName, FilterByName) == NULL)
+                    continue;
 
-            if (!API_SET_EMPTY_NAMESPACE_VALUE(ValueEntry)) {
-                OutNamespaceValueEx(
-                    hSubItem,
-                    (PBYTE)Namespace,
-                    ValueEntry->ValueOffset,
-                    ValueEntry->ValueLength,
-                    ValueEntry->NameOffset,
-                    ValueEntry->NameLength,
-                    ValueEntry->Flags,
-                    TRUE);
             }
-        }
+
+            hSubItem = OutNamespaceEntry(
+                RootItem,
+                lpEntryName,
+                NsEntry->Flags);
+
+            //
+            // Namespace entry name no longer needed.
+            //
+            HeapFree(g_ctx.PluginHeap, 0, lpEntryName);
+
+            //
+            // List values array.
+            //
+            ValuesArray = (API_SET_VALUE_ARRAY_V4*)RtlOffsetToPointer(
+                Namespace,
+                NsEntry->DataOffset);
+
+            for (j = 0; j < ValuesArray->Count; j++) {
+
+                ValueEntry = &ValuesArray->Array[j];
+
+                if (!API_SET_EMPTY_NAMESPACE_VALUE(ValueEntry)) {
+                    OutNamespaceValue(
+                        hSubItem,
+                        (PBYTE)Namespace,
+                        ValueEntry->ValueOffset,
+                        ValueEntry->ValueLength,
+                        ValueEntry->NameOffset,
+                        ValueEntry->NameLength,
+                        ValueEntry->Flags);
+                }
+            }
+
+        } //if (lpEntryName)
     }
 }
 
@@ -339,10 +477,7 @@ void ListApiSetV4(
 * Parse and output ApiSet Version 6 (Windows 10).
 *
 */
-void ListApiSetV6(
-    _In_ PVOID ApiSetMap,
-    _In_ HTREEITEM RootItem
-)
+APISET_QUERY_ROUTINE(ListApiSetV6)
 {
     API_SET_NAMESPACE_ARRAY_V6* Namespace = (API_SET_NAMESPACE_ARRAY_V6*)ApiSetMap;
 
@@ -353,55 +488,134 @@ void ListApiSetV6(
 
     HTREEITEM hSubItem;
 
-    NsEntry = (API_SET_NAMESPACE_ENTRY_V6*)RtlOffsetToPointer(Namespace, Namespace->NamespaceEntryOffset);
+    LPWSTR lpEntryName;
+
+    NsEntry = (API_SET_NAMESPACE_ENTRY_V6*)RtlOffsetToPointer(
+        Namespace,
+        Namespace->NamespaceEntryOffset);
 
     for (i = 0; i < Namespace->Count; i++) {
 
-        hSubItem = OutNamespaceEntryEx(
-            RootItem,
+        lpEntryName = GetApiSetEntryName(
             (PBYTE)Namespace,
             NsEntry->NameOffset,
-            NsEntry->NameLength,
-            NsEntry->Flags,
-            TRUE);
+            NsEntry->NameLength);
 
-        ValueEntry = (API_SET_VALUE_ENTRY_V6*)RtlOffsetToPointer(Namespace, NsEntry->DataOffset);
+        if (lpEntryName) {
 
-        for (j = 0; j < NsEntry->Count; j++) {
+            if (FilterByName) {
 
-            if (!API_SET_EMPTY_NAMESPACE_VALUE(ValueEntry)) {
-                OutNamespaceValueEx(
-                    hSubItem,
-                    (PBYTE)Namespace,
-                    ValueEntry->ValueOffset,
-                    ValueEntry->ValueLength,
-                    ValueEntry->NameOffset,
-                    ValueEntry->NameLength,
-                    ValueEntry->Flags,
-                    TRUE);
+                if (_strstri(lpEntryName, FilterByName) == NULL) {
+                    goto NextEntry;
+                }
+
             }
-            ValueEntry = (API_SET_VALUE_ENTRY_V6*)RtlOffsetToPointer(ValueEntry, sizeof(API_SET_VALUE_ENTRY_V6));
-        }
-        NsEntry = (API_SET_NAMESPACE_ENTRY_V6*)RtlOffsetToPointer(NsEntry, sizeof(API_SET_NAMESPACE_ENTRY_V6));
+
+            hSubItem = OutNamespaceEntry(
+                RootItem,
+                lpEntryName,
+                NsEntry->Flags);
+
+            //
+            // List values array.
+            //
+            ValueEntry = (API_SET_VALUE_ENTRY_V6*)RtlOffsetToPointer(
+                Namespace,
+                NsEntry->DataOffset);
+
+            for (j = 0; j < NsEntry->Count; j++) {
+
+                if (!API_SET_EMPTY_NAMESPACE_VALUE(ValueEntry)) {
+                    OutNamespaceValue(
+                        hSubItem,
+                        (PBYTE)Namespace,
+                        ValueEntry->ValueOffset,
+                        ValueEntry->ValueLength,
+                        ValueEntry->NameOffset,
+                        ValueEntry->NameLength,
+                        ValueEntry->Flags);
+                }
+
+                ValueEntry = (API_SET_VALUE_ENTRY_V6*)RtlOffsetToPointer(
+                    ValueEntry,
+                    sizeof(API_SET_VALUE_ENTRY_V6));
+
+            }
+
+
+        NextEntry:
+            HeapFree(g_ctx.PluginHeap, 0, lpEntryName);
+
+        } //if (lpEntryName)
+
+        //
+        // Go to next entry.
+        //
+        NsEntry = (API_SET_NAMESPACE_ENTRY_V6*)RtlOffsetToPointer(
+            NsEntry,
+            sizeof(API_SET_NAMESPACE_ENTRY_V6));
     }
 }
 
 /*
-* ApiSetViewShowError
+* ResolveDllData
 *
 * Purpose:
 *
-* In debug build send string to debugger else show message box.
+* Process apiset file, locate apiset section and schema version.
 *
 */
-VOID ApiSetViewShowError(
-    _In_ LPWSTR ErrorMsg)
+BOOL ResolveDllData(
+    _In_ HMODULE DllHandle,
+    _Inout_ PVOID* ApiSetData,
+    _Out_ PULONG SchemaVersion
+)
 {
-#ifdef _DEBUG
-    OutputDebugString(ErrorMsg);
-#else
-    MessageBox(g_ctx.MainWindow, ErrorMsg, NULL, MB_ICONERROR);
-#endif
+    ULONG dataSize = 0;
+    UINT i;
+    ULONG schemaVersion = 0;
+
+    PIMAGE_NT_HEADERS ntHeaders;
+    IMAGE_SECTION_HEADER* sectionTableEntry;
+    PBYTE baseAddress;
+    PBYTE dataPtr = NULL;
+
+    *SchemaVersion = 0;
+
+    baseAddress = (PBYTE)(((ULONG_PTR)DllHandle) & ~3);
+
+    ntHeaders = RtlImageNtHeader(baseAddress);
+
+    sectionTableEntry = IMAGE_FIRST_SECTION(ntHeaders);
+
+    i = ntHeaders->FileHeader.NumberOfSections;
+    while (i > 0) {
+        if (_strncmpi_a((CHAR*)&sectionTableEntry->Name,
+            API_SET_SECTION_NAME,
+            sizeof(API_SET_SECTION_NAME)) == 0)
+        {
+            dataSize = sectionTableEntry->SizeOfRawData;
+
+            dataPtr = (PBYTE)RtlOffsetToPointer(
+                baseAddress,
+                sectionTableEntry->PointerToRawData);
+
+            break;
+        }
+        i -= 1;
+        sectionTableEntry += 1;
+    }
+
+    if (dataPtr == NULL || dataSize == 0) {
+        return FALSE;
+    }
+
+    schemaVersion = *(ULONG*)dataPtr;
+
+    *SchemaVersion = schemaVersion;
+    *ApiSetData = dataPtr;
+
+    return TRUE;
 }
 
 /*
@@ -409,170 +623,89 @@ VOID ApiSetViewShowError(
 *
 * Purpose:
 *
-* Worker thread.
+* Processing apiset file.
 *
 */
-VOID ListApiSetFromFileWorker(
-    _In_opt_ LPWSTR lpFileName)
+VOID WINAPI ListApiSetFromFileWorker(
+    _In_ LPCWSTR SchemaFileName,
+    _In_opt_ LPCWSTR FilterByName,
+    _In_ PVOID ApiSetData,
+    _In_ ULONG SchemaVersion
+)
 {
-    ULONG Result = ERROR_SUCCESS;
-    UINT i;
+    pfnApiSetQueryMap queryMapRoutine;
 
-    HMODULE MappedApiSetImage;
-    LPWSTR FileName;
+    WCHAR szBuffer[MAX_PATH * 2];
 
-    PBYTE BaseAddress;
-    PIMAGE_NT_HEADERS NtHeaders;
-    IMAGE_SECTION_HEADER* SectionTableEntry;
-    ULONG DataSize = 0;
-    PBYTE DataPtr = NULL;
-    ULONG SchemaVersion;
-
-    WCHAR szSystemDirectory[MAX_PATH + 1], szBuffer[MAX_PATH * 2];
-
-    HTREEITEM h_tviRootItem;
+    HTREEITEM h_tviRootItem, h_tviSubItem;
 
     //
     // Disable controls.
     //
     EnableWindow(GetDlgItem(g_ctx.MainWindow, IDC_BROWSE_BUTTON), FALSE);
-    EnableWindow(GetDlgItem(g_ctx.MainWindow, IDC_SEARCH_BUTTON), FALSE);
 
-    do {
+    //
+    // Reset output controls.
+    //
+    SetDlgItemText(g_ctx.MainWindow, IDC_ENTRY_EDIT, T_EmptyString);
+    TreeList_ClearTree(g_ctx.TreeList);
+    TreeList_RedrawDisable(g_ctx.TreeList);
 
-        //
-        // Select apiset dll name.
-        //
+    StringCchPrintf(szBuffer, MAX_PATH, TEXT("Schema Version %lu"), SchemaVersion);
 
-        if (lpFileName == NULL) {
-            RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-            RtlSecureZeroMemory(szSystemDirectory, sizeof(szSystemDirectory));
-            GetSystemDirectory(szSystemDirectory, MAX_PATH);
-            StringCchPrintf(szBuffer, MAX_PATH, TEXT("%s\\apisetschema.dll"), szSystemDirectory);
-            FileName = szBuffer;
-        }
-        else {
-            FileName = lpFileName;
-        }
+    //
+    // Parse and output apiset.
+    //
+    h_tviRootItem = TreeListAddItem(
+        g_ctx.TreeList,
+        (HTREEITEM)NULL,
+        TVIF_TEXT | TVIF_STATE,
+        TVIS_EXPANDED,
+        TVIS_EXPANDED,
+        (LPWSTR)SchemaFileName,
+        (PVOID)NULL);
 
-        //
-        // Reset output controls.
-        //
+    if (h_tviRootItem) {
 
-        TreeList_ClearTree(g_ctx.TreeList);
-        SetDlgItemText(g_ctx.MainWindow, IDC_SCHEMA_VERSION, TEXT(""));
-        SetDlgItemText(g_ctx.MainWindow, IDC_SCHEMA_FILE, TEXT(""));
-
-        //
-        // Load library and locate apiset section.
-        //
-
-        MappedApiSetImage = LoadLibraryEx(FileName, NULL, LOAD_LIBRARY_AS_DATAFILE);
-
-        if (MappedApiSetImage == NULL) {
-            ApiSetViewShowError(TEXT("ApiSetView: could not load apiset library"));
-            Result = GetLastError();
-            break;
-        }
-
-        SetDlgItemText(g_ctx.MainWindow, IDC_SCHEMA_FILE, FileName);
-
-        BaseAddress = (PBYTE)(((ULONG_PTR)MappedApiSetImage) & ~3);
-
-        NtHeaders = RtlImageNtHeader(BaseAddress);
-
-        SectionTableEntry = IMAGE_FIRST_SECTION(NtHeaders);
-
-        i = NtHeaders->FileHeader.NumberOfSections;
-        while (i > 0) {
-            if (_strncmpi_a((CHAR*)&SectionTableEntry->Name,
-                API_SET_SECTION_NAME,
-                sizeof(API_SET_SECTION_NAME)) == 0)
-            {
-                DataSize = SectionTableEntry->SizeOfRawData;
-                DataPtr = (PBYTE)BaseAddress + SectionTableEntry->PointerToRawData;
-                break;
-            }
-            i -= 1;
-            SectionTableEntry += 1;
-        }
-
-        //
-        // Warn user if apiset section was not found.
-        //
-        if ((DataPtr == NULL) || (DataSize == 0)) {
-            ApiSetViewShowError(TEXT("ApiSetView: could not locate \".apiset\" section in target dll"));
-            Result = ERROR_INVALID_DATA;
-            break;
-        }
-
-        //
-        // Check supported schema version.
-        //
-        SchemaVersion = *(ULONG*)DataPtr;
-        if (SchemaVersion != 2 &&
-            SchemaVersion != 4
-            && SchemaVersion != 6)
-        {
-            StringCchPrintf(szBuffer, MAX_PATH,
-                TEXT("ApiSetView: Unknown schema version %lu"), SchemaVersion);
-
-            ApiSetViewShowError(szBuffer);
-            Result = ERROR_INVALID_DATATYPE;
-            break;
-        }
-
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-        ultostr(SchemaVersion, szBuffer);
-        SetDlgItemText(g_ctx.MainWindow, IDC_SCHEMA_VERSION, szBuffer);
-
-        //
-        // Parse and output apiset.
-        //
-
-        h_tviRootItem = TreeListAddItem(
+        h_tviSubItem = TreeListAddItem(
             g_ctx.TreeList,
-            (HTREEITEM)NULL,
+            (HTREEITEM)h_tviRootItem,
             TVIF_TEXT | TVIF_STATE,
             TVIS_EXPANDED,
             TVIS_EXPANDED,
-            TEXT("ApiSetSchema"),
+            (LPWSTR)szBuffer,
             (PVOID)NULL);
 
-        if (h_tviRootItem) {
+        if (h_tviSubItem) {
+
+            switch (SchemaVersion) {
+
+            case API_SET_SCHEMA_VERSION_V2:
+                queryMapRoutine = (pfnApiSetQueryMap)ListApiSetV2;
+                break;
+
+            case API_SET_SCHEMA_VERSION_V4:
+                queryMapRoutine = (pfnApiSetQueryMap)ListApiSetV4;
+                break;
+
+            case API_SET_SCHEMA_VERSION_V6:
+                queryMapRoutine = (pfnApiSetQueryMap)ListApiSetV6;
+                break;
+
+            default:
+                queryMapRoutine = NULL;
+                break;
+            }
+
             __try {
-                switch (SchemaVersion) {
-                case API_SET_SCHEMA_VERSION_V2:
 
-                    ListApiSetV2(
-                        DataPtr,
-                        h_tviRootItem);
+                if (queryMapRoutine)
+                    queryMapRoutine(ApiSetData, h_tviSubItem, FilterByName);
 
-                    break;
-
-                case API_SET_SCHEMA_VERSION_V4:
-
-                    ListApiSetV4(
-                        DataPtr,
-                        h_tviRootItem);
-
-                    break;
-
-                case API_SET_SCHEMA_VERSION_V6:
-
-                    ListApiSetV6(
-                        DataPtr,
-                        h_tviRootItem);
-
-                    break;
-
-                default:
-                    break;
-                }
             }
             __except (EXCEPTION_EXECUTE_HANDLER) {
 
-                RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+                szBuffer[0] = 0;
 
                 StringCchPrintf(
                     szBuffer,
@@ -581,22 +714,19 @@ VOID ListApiSetFromFileWorker(
                     GetExceptionCode(),
                     SchemaVersion);
 
-                ApiSetViewShowError(szBuffer);
+                DiplayErrorText(szBuffer);
 
             }
+
+
         }
-
-    } while (FALSE);
-
-    if (MappedApiSetImage) FreeLibrary(MappedApiSetImage);
+    }
 
     //
     // Reenable controls.
     //
     EnableWindow(GetDlgItem(g_ctx.MainWindow, IDC_BROWSE_BUTTON), TRUE);
-    EnableWindow(GetDlgItem(g_ctx.MainWindow, IDC_SEARCH_BUTTON), TRUE);
-
-    ExitThread(Result);
+    TreeList_RedrawEnableAndUpdateNow(g_ctx.TreeList);
 }
 
 /*
@@ -608,18 +738,79 @@ VOID ListApiSetFromFileWorker(
 *
 */
 VOID ListApiSetFromFile(
-    _In_opt_ LPWSTR lpFileName)
+    _In_opt_ LPCWSTR FileName,
+    _In_opt_ LPCWSTR FilterByName
+)
 {
-    HANDLE hThread;
-    DWORD dwThreadId;
+    ULONG cch;
+    ULONG schemaVersion = 0;
+    HMODULE hApiSetDll;
+    LPWSTR lpFileName = NULL;
+    PVOID dataPtr = NULL;
+    WCHAR szErrorMsg[MAX_PATH + 1];
+    WCHAR szSystemDirectory[MAX_PATH + 1];
 
-    hThread = CreateThread(
-        NULL,
-        0,
-        (LPTHREAD_START_ROUTINE)ListApiSetFromFileWorker,
-        lpFileName,
-        0,
-        &dwThreadId);
+    //
+    // Select apiset dll name.
+    //
+    if (FileName) {
+        lpFileName = (LPWSTR)FileName;
+    }
+    else {
+        RtlSecureZeroMemory(&g_ctx.SchemaFileName, sizeof(g_ctx.SchemaFileName));
+        RtlSecureZeroMemory(szSystemDirectory, sizeof(szSystemDirectory));
+        cch = GetSystemDirectory(szSystemDirectory, MAX_PATH);
+        if (cch && cch < MAX_PATH) {
+            StringCchPrintf(g_ctx.SchemaFileName,
+                RTL_NUMBER_OF(g_ctx.SchemaFileName) - 1,
+                TEXT("%s\\apisetschema.dll"),
+                szSystemDirectory);
+            lpFileName = g_ctx.SchemaFileName;
+        }
+    }
 
-    if (hThread) CloseHandle(hThread);
+    if (lpFileName == NULL) {
+        DiplayErrorText(TEXT("ApiSet dll filename not specified"));
+        return;
+    }
+
+    //
+    // Load library and locate apiset section.
+    //
+
+    hApiSetDll = LoadLibraryEx(lpFileName, NULL, LOAD_LIBRARY_AS_DATAFILE);
+
+    if (hApiSetDll) {
+
+        if (ResolveDllData(hApiSetDll, &dataPtr, &schemaVersion)) {
+
+            if (schemaVersion != API_SET_SCHEMA_VERSION_V2 &&
+                schemaVersion != API_SET_SCHEMA_VERSION_V4 &&
+                schemaVersion != API_SET_SCHEMA_VERSION_V6)
+            {
+                StringCchPrintf(szErrorMsg,
+                    MAX_PATH,
+                    TEXT("ApiSetView: Unknown schema version %lu"), schemaVersion);
+
+                DiplayErrorText(szErrorMsg);
+            }
+            else {
+
+                ListApiSetFromFileWorker(
+                    lpFileName,
+                    FilterByName,
+                    dataPtr,
+                    schemaVersion);
+
+            }
+        }
+        else {
+            DiplayErrorText(TEXT("ApiSetView: could not resolve data, probably not apiset file or data corrupted"));
+        }
+
+        FreeLibrary(hApiSetDll);
+    }
+    else {
+        DiplayErrorText(TEXT("ApiSetView: could not load apiset library"));
+    }
 }

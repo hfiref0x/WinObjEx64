@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       PROPDRIVER.C
 *
-*  VERSION:     1.85
+*  VERSION:     1.90
 *
-*  DATE:        05 Mar 2020
+*  DATE:        16 May 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -16,8 +16,18 @@
 *******************************************************************************/
 #include "global.h"
 #include "supConsts.h"
-#include "propDriverConsts.h"
 #include "propObjectDump.h"
+
+#define REGEDITWNDCLASS           L"RegEdit_RegEdit"
+#define REGEDIT_EXE               L"regedit.exe"
+#define SHELL_OPEN_VERB           L"open"
+
+//
+// Path to navigate in the regedit window treeview.
+//
+#define PROPDRVREGSERVICESKEY     L"\\HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\"
+#define PROPDRVREGSERVICESKEYLEN  sizeof(PROPDRVREGSERVICESKEY) - sizeof(WCHAR)
+
 
 /*
 * DriverShowChildWindows

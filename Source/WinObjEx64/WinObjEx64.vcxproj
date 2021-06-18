@@ -128,11 +128,8 @@
       <PrecompiledHeader>
       </PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
-      <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <ExpandAttributedSource>true</ExpandAttributedSource>
       <AssemblerOutput>All</AssemblerOutput>
-      <BrowseInformation>true</BrowseInformation>
       <CompileAs>CompileAsC</CompileAs>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalIncludeDirectories>$(SolutionDir)\Shared;$(ProjectDir);$(ProjectDir)\props;$(ProjectDir)\extras</AdditionalIncludeDirectories>
@@ -162,20 +159,16 @@
       <PrecompiledHeader>
       </PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
-      <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <ExpandAttributedSource>true</ExpandAttributedSource>
-      <BrowseInformation>true</BrowseInformation>
-      <CompileAs>CompileAsCpp</CompileAs>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalIncludeDirectories>$(SolutionDir)\Shared;$(ProjectDir);$(ProjectDir)\props;$(ProjectDir)\extras</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;_USE_OWN_DRIVER;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <CompileAs>CompileAsCpp</CompileAs>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <Version>6.0</Version>
-      <SuppressStartupBanner>false</SuppressStartupBanner>
       <GenerateMapFile>true</GenerateMapFile>
       <MapExports>true</MapExports>
       <EntryPointSymbol>
@@ -264,7 +257,7 @@
       <AdditionalIncludeDirectories>$(SolutionDir)\Shared;$(ProjectDir);$(ProjectDir)\props;$(ProjectDir)\extras</AdditionalIncludeDirectories>
       <EnablePREfast>true</EnablePREfast>
       <ControlFlowGuard>Guard</ControlFlowGuard>
-      <CompileAs>CompileAsC</CompileAs>
+      <CompileAs>CompileAsCpp</CompileAs>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -396,17 +389,20 @@
     <ClCompile Include="hde\hde64.c" />
     <ClCompile Include="instdrv.c" />
     <ClCompile Include="kldbg.c" />
+    <ClCompile Include="symparser.c" />
     <ClCompile Include="list.c" />
     <ClCompile Include="log\log.c" />
     <ClCompile Include="main.c" />
     <ClCompile Include="objects.c" />
     <ClCompile Include="plugmngr.c" />
+    <ClCompile Include="props\propAlpcPort.c" />
     <ClCompile Include="props\propBasic.c" />
     <ClCompile Include="props\propDesktop.c" />
     <ClCompile Include="props\propDlg.c" />
     <ClCompile Include="props\propDriver.c" />
     <ClCompile Include="props\propObjectDump.c" />
     <ClCompile Include="props\propProcess.c" />
+    <ClCompile Include="props\propSection.c" />
     <ClCompile Include="props\propSecurity.c" />
     <ClCompile Include="props\propToken.c" />
     <ClCompile Include="props\propType.c" />
@@ -454,21 +450,23 @@
     <ClInclude Include="instdrv.h" />
     <ClInclude Include="kldbg.h" />
     <ClInclude Include="ksymbols.h" />
+    <ClInclude Include="symparser.h" />
     <ClInclude Include="list.h" />
     <ClInclude Include="log\log.h" />
     <ClInclude Include="msvcver.h" />
     <ClInclude Include="objects.h" />
     <ClInclude Include="kldbg_patterns.h" />
     <ClInclude Include="plugmngr.h" />
+    <ClInclude Include="props\propAlpcPort.h" />
     <ClInclude Include="props\propBasic.h" />
     <ClInclude Include="props\propBasicConsts.h" />
     <ClInclude Include="props\propDesktop.h" />
     <ClInclude Include="props\propDlg.h" />
     <ClInclude Include="props\propDriver.h" />
-    <ClInclude Include="props\propDriverConsts.h" />
     <ClInclude Include="props\propObjectDump.h" />
     <ClInclude Include="props\propObjectDumpConsts.h" />
     <ClInclude Include="props\propProcess.h" />
+    <ClInclude Include="props\propSection.h" />
     <ClInclude Include="props\propSecurity.h" />
     <ClInclude Include="props\propSecurityConsts.h" />
     <ClInclude Include="props\propToken.h" />

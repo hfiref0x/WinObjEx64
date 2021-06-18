@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDESKTOP.C
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        15 Dec 2020
+*  DATE:        11 May 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -261,7 +261,7 @@ VOID DesktopListCreate(
 *
 * Purpose:
 *
-* Desktop page listview comparer function.
+* Listview comparer function.
 *
 */
 INT CALLBACK DesktopListCompareFunc(
@@ -288,7 +288,7 @@ INT CALLBACK DesktopListCompareFunc(
 *
 * Purpose:
 *
-* Desktop properies double click handler.
+* Properies double click handler.
 *
 */
 VOID DesktopListShowProperties(
@@ -344,7 +344,7 @@ VOID DesktopListShowProperties(
 *
 * Purpose:
 *
-* WM_NOTIFY processing for Desktop page listview.
+* WM_NOTIFY processing for page listview.
 *
 */
 BOOL DesktopListHandleNotify(

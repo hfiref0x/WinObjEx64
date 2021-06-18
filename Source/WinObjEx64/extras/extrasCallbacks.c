@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASCALLBACKS.C
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        26 Apr 2021
+*  DATE:        31 May 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -2031,7 +2031,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindExpCallbackListHead)
     hde64s hs;
 
     ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
-    HMODULE hNtOs = g_kdctx.NtOsImageMap;
+    HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
 
     UNREFERENCED_PARAMETER(QueryFlags);
 
@@ -2125,7 +2125,7 @@ HTREEITEM AddParentEntryToList(
     szAddress[1] = L'x';
     szAddress[2] = 0;
     u64tohex(CallbackObjectAddress, &szAddress[2]);
-    TreeListSubItems.Text[0] = L'\0';
+    TreeListSubItems.Text[0] = T_EmptyString;
     TreeListSubItems.Text[1] = lpCallbackObjectType;
 
     return supTreeListAddItem(
@@ -3883,7 +3883,7 @@ VOID DisplayCallbacksList(
 
     __try {
 
-        Modules = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation, NULL);
+        Modules = (PRTL_PROCESS_MODULES)supGetLoadedModulesList(NULL);
         if (Modules == NULL) {
             lpStatusMsg = TEXT("Could not allocate memory for modules list!");
             supStatusBarSetText(StatusBar, 1, lpStatusMsg);
@@ -3914,7 +3914,8 @@ VOID DisplayCallbacksList(
 
                 if (QueryStatus == STATUS_NOT_FOUND) {
 #ifdef _DEBUG
-                    RtlStringCchPrintfSecure(szText, RTL_NUMBER_OF(szText),
+                    RtlStringCchPrintfSecure(szText, 
+                        RTL_NUMBER_OF(szText),
                         TEXT("Callback type %ws was not found"),
                         g_CallbacksDispatchTable[i].CallbackType);
 
@@ -3925,7 +3926,7 @@ VOID DisplayCallbacksList(
                 else {
 
                     RtlStringCchPrintfSecure(szText,
-                        200,
+                        RTL_NUMBER_OF(szText),
                         TEXT("Callback type %ws, error 0x%lX"),
                         g_CallbacksDispatchTable[i].CallbackType,
                         QueryStatus);
@@ -4058,25 +4059,32 @@ VOID CallbackDialogContentRefresh(
 )
 {
 #ifndef _DEBUG
-    HWND hwndBanner = supDisplayLoadBanner(hwndDlg,
-        TEXT("Processing callbacks list, please wait"));
+    HWND hwndBanner = supDisplayLoadBanner(
+        hwndDlg,
+        TEXT("Processing callbacks list, please wait"),
+        NULL,
+        FALSE);
+#else
+    UNREFERENCED_PARAMETER(hwndDlg);
 #endif
 
     __try {
-
-        SetCapture(hwndDlg);
 
         if (fResetContent) TreeList_ClearTree(pDlgContext->TreeList);
 
         g_CallbacksCount = 0;
 
+        supTreeListEnableRedraw(pDlgContext->TreeList, FALSE);
+
         DisplayCallbacksList(pDlgContext->TreeList, pDlgContext->StatusBar);
 
     }
     __finally {
-        ReleaseCapture();
+
+        supTreeListEnableRedraw(pDlgContext->TreeList, TRUE);
+
 #ifndef _DEBUG
-        SendMessage(hwndBanner, WM_CLOSE, 0, 0);
+        supCloseLoadBanner(hwndBanner);
 #endif
     }
 }
@@ -4199,8 +4207,10 @@ VOID extrasCreateCallbacksDialog(
         &CallbacksDialogProc,
         (LPARAM)pDlgContext);
 
-    if (hwndDlg == NULL)
+    if (hwndDlg == NULL) {
+        supHeapFree(pDlgContext);
         return;
+    }
 
     pDlgContext->hwndDlg = hwndDlg;
     g_WinObj.AuxDialogs[wobjCallbacksDlgId] = hwndDlg;

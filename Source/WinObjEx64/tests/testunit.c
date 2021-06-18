@@ -4,9 +4,9 @@
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        11 Dec 2020
+*  DATE:        29 May 2021
 *
 *  Test code used while debug.
 *
@@ -32,6 +32,8 @@ HDESK g_TestDesktop = NULL;
 HANDLE g_TestThread = NULL;
 HANDLE g_TestPortThread = NULL;
 HANDLE g_PortHandle;
+PVOID g_MappedSection = NULL;
+HANDLE g_SectionVaTest = NULL;
 
 typedef struct _LPC_USER_MESSAGE {
     PORT_MESSAGE	Header;
@@ -620,7 +622,7 @@ VOID TestApiSetResolve()
 
     NtLdrApiSetLoadFromPeb(&Version, &Data);
 
-    LPWSTR ToResolve[12] = {
+    LPWSTR ToResolve[] = {
         L"hui-ms-win-core-app-l1-2-3.dll",
         L"api-ms-win-nevedomaya-ebanaya-hyinua-l1-1-3.dll",
         L"api-ms-win-core-appinit-l1-1-0.dll",
@@ -632,11 +634,12 @@ VOID TestApiSetResolve()
         L"api-ms-win-core-psapi-l1-1-0.dll",
         L"api-ms-win-core-enclave-l1-1-1.dll",
         L"api-ms-onecoreuap-print-render-l1-1-0.dll",
-        L"api-ms-win-deprecated-apis-advapi-l1-1-0.dll"
+        L"api-ms-win-deprecated-apis-advapi-l1-1-0.dll",
+        L"api-ms-win-core-com-l2-1-1"
     };
 
 
-    for (i = 0; i < 12; i++) {
+    for (i = 0; i < RTL_NUMBER_OF(ToResolve); i++) {
         RtlInitUnicodeString(&ApiSetLibrary, ToResolve[i]);
 
         Status = NtLdrApiSetResolveLibrary(Data,
@@ -647,15 +650,15 @@ VOID TestApiSetResolve()
 
         if (NT_SUCCESS(Status)) {
             if (Resolved) {
-                kdDebugPrint("%wZ\r\n", ResolvedHostLibrary);
+                kdDebugPrint("APISET>> %wZ\r\n", &ResolvedHostLibrary);
                 RtlFreeUnicodeString(&ResolvedHostLibrary);
             }
             else {
-                kdDebugPrint("Could not resolve apiset %wZ\r\n", ApiSetLibrary);
+                kdDebugPrint("APISET>> Could not resolve apiset %wZ\r\n", &ApiSetLibrary);
             }
         }
         else {
-            kdDebugPrint("NtLdrApiSetResolveLibrary failed 0x%lx\r\n", Status);
+            kdDebugPrint("APISET>> NtLdrApiSetResolveLibrary failed 0x%lx for %wZ\r\n", Status, &ApiSetLibrary);
         }
     }
 
@@ -670,11 +673,11 @@ VOID TestApiSetResolve()
 
     if (NT_SUCCESS(Status)) {
         if (Resolved) {
-            kdDebugPrint("Resolved apiset %wZ\r\n", ResolvedHostLibrary);
+            kdDebugPrint("APISET>> Resolved apiset %wZ\r\n", &ResolvedHostLibrary);
             RtlFreeUnicodeString(&ResolvedHostLibrary);
         }
         else {
-            kdDebugPrint("Could not resolve apiset %wZ\r\n", ApiSetLibrary);
+            kdDebugPrint("APISET>> Could not resolve apiset %wZ\r\n", &ApiSetLibrary);
         }
     }
     else {
@@ -758,6 +761,56 @@ wchar_t* Tstp_filename(const wchar_t* f)
         f++;
     }
     return p;
+}
+
+VOID TestSectionControlArea()
+{
+    NTSTATUS ntStatus;
+
+    OBJECT_ATTRIBUTES obja;
+    UNICODE_STRING ustr;
+    HANDLE sectionHandle;
+    SIZE_T commitSize = PAGE_SIZE;
+    PVOID baseAddress = NULL;
+    LARGE_INTEGER liSectionSize;
+
+    WCHAR szText[] = TEXT("This is text in our VA space");
+
+    RtlInitUnicodeString(&ustr, L"\\BaseNamedObjects\\TestSectionVa");
+    InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
+
+    liSectionSize.QuadPart = commitSize;
+
+    ntStatus = NtCreateSection(&sectionHandle,
+        SECTION_ALL_ACCESS,
+        &obja,
+        &liSectionSize,
+        PAGE_READWRITE,
+        SEC_COMMIT,
+        NULL);
+
+    if (NT_SUCCESS(ntStatus)) {
+
+        if (NT_SUCCESS(NtMapViewOfSection(sectionHandle,
+            NtCurrentProcess(),
+            &baseAddress,
+            0,
+            commitSize,
+            NULL,
+            &commitSize,
+            ViewUnmap,
+            MEM_TOP_DOWN,
+            PAGE_READWRITE)))
+        {
+            RtlCopyMemory(baseAddress, szText, sizeof(szText));
+            g_MappedSection = baseAddress;
+            g_SectionVaTest = sectionHandle;
+        }
+        else {
+
+            NtClose(sectionHandle);
+        }
+    }
 }
 
 VOID TestSectionImage()
@@ -895,6 +948,149 @@ VOID PreHashTypes()
     ObManagerTest();
 }
 
+VOID TestSymbols()
+{
+    BOOL bStatus;
+    ULONG dummy, i, j;
+    ULONG64 var;
+    PSYM_ENTRY pSymEntry;
+    PSYMCONTEXT Context;
+    PSYMPARSER SymParser;
+
+    LPCWSTR testSymbols[] = {
+        L"_POOL_TYPE",
+        L"_RTL_USER_PROCESS_PARAMETERS",
+        L"_PEB",
+        L"INVALID_NOT_EXIST",
+        L"_UNICODE_STRING",
+        L"_STRING",
+        L"_GDI_TEB_BATCH",
+        L"_CONTROL_AREA",
+        L"_IO_STATUS_BLOCK"
+    };
+
+    SYM_CHILD* pSymChild;
+
+    WCHAR* pStrEnd;
+    WCHAR* pOutput; 
+
+    if (!kdIsSymAvailable(&g_kdctx))
+        return;
+
+    pOutput = (WCHAR*)supHeapAlloc(4 * MAX_SYM_NAME);
+    if (pOutput == NULL)
+        return;
+
+    Context = (PSYMCONTEXT)g_kdctx.NtOsSymContext;
+    if (Context) {
+
+        SymParser = &Context->Parser;
+
+        //
+        // Test parser 
+        // N.B. This is not fully functional dumper with fancy decorations.
+        //
+
+        for (i = 0; i < RTL_NUMBER_OF(testSymbols); i++) {
+            pSymEntry = SymParser->DumpSymbolInformation(Context,
+                testSymbols[i],
+                &bStatus);
+
+            if (pSymEntry == NULL) {
+                _strcpy(pOutput, L"\r\n->");
+                _strcat(pOutput, testSymbols[i]);
+                _strcat(pOutput, L"<- failed to dump\r\n");
+                OutputDebugStringW(pOutput);
+
+            }
+            else {
+
+                _strcpy(pOutput, TEXT("\r\n"));
+                _strcat(pOutput, pSymEntry->Name);
+                _strcat(pOutput, TEXT("\r\n"));
+
+                OutputDebugStringW(pOutput);
+
+                for (j = 0; j < pSymEntry->ChildCount; j++) {
+
+                    pOutput[0] = 0;
+
+                    pSymChild = &pSymEntry->ChildEntries[j];
+
+                    RtlStringCchPrintfSecure(&pOutput[0],
+                        (MAX_SYM_NAME + 32) * 2,
+                        TEXT("/* 0x%04lx: */\t%ws %ws"),
+                        pSymChild->Offset,
+                        pSymChild->TypeName,
+                        pSymChild->Name);
+
+                    pStrEnd = _strend(pOutput);
+
+                    if (pSymChild->ElementsCount > 1) {
+
+                        RtlStringCchPrintfSecure(pStrEnd,
+                            32,
+                            TEXT("[%llu]"),
+                            pSymChild->ElementsCount);
+
+                        pStrEnd = _strend(pOutput);
+
+                    }
+
+                    if (pSymChild->IsValuePresent) {
+
+                        RtlStringCchPrintfSecure(pStrEnd,
+                            32,
+                            TEXT(" = %llu"),
+                            pSymChild->Value);
+                        pStrEnd = _strend(pOutput);
+                    }
+
+                    _strcat(pStrEnd, TEXT(";"));
+
+                    if (pSymChild->IsBitField) {
+
+                        pStrEnd = _strcat(pStrEnd, TEXT(" /* bit position: "));
+                        ultostr(pSymChild->BitPosition, pStrEnd);
+                        _strcat(pStrEnd, TEXT(" */"));
+                        pStrEnd = _strend(pStrEnd);
+                    }
+
+                    _strcat(pStrEnd, TEXT("\r\n"));
+
+                    OutputDebugStringW(pOutput);
+
+                }
+
+                supHeapFree(pSymEntry);
+            }
+        }
+
+        dummy = SymParser->GetFieldOffset(Context,
+            L"_EPROCESS",
+            L"UniqueProcessId",
+            &bStatus);
+
+        if (bStatus) {
+
+            DbgPrint("sym offset %lx\r\n", dummy);
+
+        }
+
+        var = 0;
+        if (kdGetAddressFromSymbol(
+            &g_kdctx,
+            TEXT("ObHeaderCookie"),
+            &var))
+        {
+            DbgPrint("ObHeaderCookie %p\r\n", (PVOID)var);
+        }
+
+    }
+
+    supHeapFree(pOutput);
+}
+
 VOID TestCall()
 {
 }
@@ -904,24 +1100,26 @@ VOID TestStart(
 )
 {
     TestCall();
+    //TestSectionControlArea();
+    TestSymbols();
     //TestSectionImage();
     //TestShadowDirectory();
     //TestPsObjectSecurity();
     //TestLicenseCache();
-    //TestApiSetResolve();
+    TestApiSetResolve();
     //TestDesktop();
-    TestApiPort();
-    TestAlpcPortOpen();
+    //TestApiPort();
+    //TestAlpcPortOpen();
     //TestDebugObject();
-    TestMailslot();
+    //TestMailslot();
     //TestPartition();
-    //TestPrivateNamespace();
+    TestPrivateNamespace();
     //TestIoCompletion();
     //TestTimer();
     //TestTransaction();
     //TestWinsta();
     //TestThread();
-    PreHashTypes();
+    //PreHashTypes();
     //TestJob();
 }
 
@@ -957,4 +1155,9 @@ VOID TestStop(
         TerminateThread(g_TestPortThread, 0);
         CloseHandle(g_TestPortThread);
     }
+    if (g_MappedSection) {
+        NtUnmapViewOfSection(NtCurrentProcess(), g_MappedSection);
+    }
+    if (g_SectionVaTest)
+        NtClose(g_SectionVaTest);
 }

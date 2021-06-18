@@ -4,9 +4,9 @@
 *
 *  TITLE:       SDVIEWDLG.C
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        14 Jan 2021
+*  DATE:        11 May 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1138,7 +1138,7 @@ VOID SDViewSetCaption(
     l = 0;
     rdirLen = _strlen(ObjectDirectory);
     for (i = 0; i < rdirLen; i++) {
-        if (ObjectDirectory[i] == '\\')
+        if (ObjectDirectory[i] == L'\\')
             l = i + 1;
     }
 
@@ -1246,5 +1246,8 @@ VOID SDViewDialogCreate(
                 LocalFree((HLOCAL)lpText);
             }
         }
+    }
+    else {
+        supHeapFree(SDViewContext);
     }
 }

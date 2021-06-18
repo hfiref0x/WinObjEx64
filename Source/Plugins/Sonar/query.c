@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.03
 *
-*  DATE:        08 Jan 2021
+*  DATE:        15 May 2021
 *
 *  Query NDIS specific data.
 *
@@ -48,7 +48,7 @@ NdisDeregisterProtocol
 48 8B 3D A2 CE FA FF                                            mov     rdi, cs:ndisProtocolList
 19041/19042
 48 8B 3D BA 92 FA FF                                            mov     rdi, cs:ndisProtocolList
-21286
+21376
 48 8B 3D XX XX XX XX                                            mov     rdi, cs:ndisProtocolList
 */
 

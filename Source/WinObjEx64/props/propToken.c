@@ -47,7 +47,7 @@ VOID TokenPageShowError(
     }
 
     if (lpMessageText) {
-        SetWindowText(GetDlgItem(hwndDlg, IDC_TOKEN_ERROR), lpMessageText);
+        SetDlgItemText(hwndDlg, IDC_TOKEN_ERROR, lpMessageText);
     }
     ShowWindow(GetDlgItem(hwndDlg, IDC_TOKEN_ERROR), SW_SHOW);
 }

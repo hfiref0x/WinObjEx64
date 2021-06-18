@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASIPC.C
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        12 Dec 2020
+*  DATE:        27 May 2021
 *
 *  IPC supported: Pipes, Mailslots
 *
@@ -29,6 +29,8 @@
 //named pipes root
 #define DEVICE_NAMED_PIPE        L"\\Device\\NamedPipe\\"
 #define DEVICE_NAMED_PIPE_LENGTH sizeof(DEVICE_NAMED_PIPE) - sizeof(WCHAR)
+
+#define ID_IPCLIST_REFRESH  ID_VIEW_REFRESH
 
 EXTRASCONTEXT IpcDlgContext[IpcMaxMode];
 
@@ -403,7 +405,10 @@ INT_PTR CALLBACK IpcTypeDialogProc(
                         0,
                         ILD_NORMAL | ILD_TRANSPARENT);
                     if (hIcon) {
-                        SendMessage(GetDlgItem(hwndDlg, ID_OBJECT_ICON), STM_SETIMAGE, IMAGE_ICON, (LPARAM)hIcon);
+
+                        SendDlgItemMessage(hwndDlg, ID_OBJECT_ICON,
+                            STM_SETIMAGE, IMAGE_ICON, (LPARAM)hIcon);
+
                         pDlgContext->ObjectIcon = hIcon;
                     }
 
@@ -581,13 +586,15 @@ INT CALLBACK IpcDlgCompareFunc(
 *
 */
 VOID IpcDlgQueryInfo(
-    _In_ LPWSTR lpObjectRoot,
+    _In_ IPC_DIALOG_MODE Mode,
+    _In_ BOOL bRefresh,
     _In_ HWND ListView
 )
 {
     BOOLEAN                     bRestartScan;
     ULONG                       QuerySize;
     HANDLE                      hObject = NULL;
+    LPWSTR                      lpObjectRoot;
     FILE_DIRECTORY_INFORMATION* DirectoryInfo = NULL;
     NTSTATUS                    status;
     OBJECT_ATTRIBUTES           obja;
@@ -595,6 +602,16 @@ VOID IpcDlgQueryInfo(
     IO_STATUS_BLOCK             iost;
     LVITEM                      lvitem;
     INT                         c;
+
+    EXTRASCALLBACK callbackParam;
+
+    if (Mode == IpcModeMailSlots)
+        lpObjectRoot = DEVICE_MAILSLOT;
+    else
+        lpObjectRoot = DEVICE_NAMED_PIPE;
+
+    if (bRefresh)
+        ListView_DeleteAllItems(ListView);
 
     __try {
 
@@ -666,6 +683,11 @@ VOID IpcDlgQueryInfo(
         if (hObject) {
             NtClose(hObject);
         }
+
+        callbackParam.lParam = 0;
+        callbackParam.Value = Mode;
+        ListView_SortItemsEx(ListView, &IpcDlgCompareFunc, (LPARAM)&callbackParam);
+
     }
 }
 
@@ -762,16 +784,18 @@ VOID IpcDlgHandlePopupMenu(
             &Context->lvItemHit,
             &Context->lvColumnHit))
         {
-
-            TrackPopupMenu(hMenu,
-                TPM_RIGHTBUTTON | TPM_LEFTALIGN,
-                lpPoint->x,
-                lpPoint->y,
-                0,
-                hwndDlg,
-                NULL);
-
+            InsertMenu(hMenu, ++uPos, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
         }
+
+        InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_IPCLIST_REFRESH, T_VIEW_REFRESH);
+
+        TrackPopupMenu(hMenu,
+            TPM_RIGHTBUTTON | TPM_LEFTALIGN,
+            lpPoint->x,
+            lpPoint->y,
+            0,
+            hwndDlg,
+            NULL);
 
         DestroyMenu(hMenu);
     }
@@ -842,6 +866,19 @@ INT_PTR CALLBACK IpcDlgProc(
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
             break;
 
+        case ID_IPCLIST_REFRESH:
+            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_IPCDLGCONTEXT);
+            if (pDlgContext) {
+
+                supListViewEnableRedraw(pDlgContext->ListView, FALSE);
+
+                IpcDlgQueryInfo((IPC_DIALOG_MODE)pDlgContext->DialogMode, TRUE, pDlgContext->ListView);
+
+                supListViewEnableRedraw(pDlgContext->ListView, TRUE);
+
+            }
+            break;
+
         case ID_OBJECT_COPY:
             pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_IPCDLGCONTEXT);
             if (pDlgContext) {
@@ -897,8 +934,6 @@ VOID extrasCreateIpcDialog(
     LPWSTR   lpObjectsRoot = NULL, lpObjectRelativePath = NULL;
 
     EXTRASCONTEXT* pDlgContext;
-
-    EXTRASCALLBACK CallbackParam;
 
     switch (Mode) {
     case IpcModeMailSlots:
@@ -959,7 +994,7 @@ VOID extrasCreateIpcDialog(
         _strcpy(lpObjectRelativePath, TEXT("Relative Path ( "));
         _strcat(lpObjectRelativePath, lpObjectsRoot);
         _strcat(lpObjectRelativePath, TEXT(" )"));
-        SetWindowText(GetDlgItem(hwndDlg, ID_IPCROOT), lpObjectRelativePath);
+        SetDlgItemText(hwndDlg, ID_IPCROOT, lpObjectRelativePath);
         supHeapFree(lpObjectRelativePath);
     }
     else
@@ -1005,10 +1040,10 @@ VOID extrasCreateIpcDialog(
             LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
             TEXT("Name"), 500);
 
-        IpcDlgQueryInfo(lpObjectsRoot, pDlgContext->ListView);
+        supListViewEnableRedraw(pDlgContext->ListView, FALSE);
 
-        CallbackParam.lParam = 0;
-        CallbackParam.Value = Mode;
-        ListView_SortItemsEx(pDlgContext->ListView, &IpcDlgCompareFunc, (LPARAM)&CallbackParam);
+        IpcDlgQueryInfo((IPC_DIALOG_MODE)pDlgContext->DialogMode, FALSE, pDlgContext->ListView);
+
+        supListViewEnableRedraw(pDlgContext->ListView, TRUE);
     }
 }

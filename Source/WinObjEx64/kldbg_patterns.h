@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2020
+*  (C) COPYRIGHT AUTHORS, 2019 - 2021
 *
 *  TITLE:       KLDBG_PATTERNS.H
 *
-*  VERSION:     1.87
+*  VERSION:     1.90
 *
-*  DATE:        27 June 2020
+*  DATE:        11 May 2021
 *
 *  Header with search patterns used by KLDBG.
 *
@@ -16,7 +16,6 @@
 * PARTICULAR PURPOSE.
 *
 *******************************************************************************/
-
 #pragma once
 
 // lea rax, PspHostSiloGlobals
@@ -124,3 +123,15 @@ BYTE LeaPattern_KeServiceDescriptorTableShadow[] = {
 BYTE KseEnginePattern[] = {
     0x8B, 0x05
 };
+
+//
+// PAGE: MiRememberUnloadedDriver
+//
+// mov reg, 7D0h ;  -> NumberOfBytes = MI_UNLOADED_DRIVERS * sizeof (UNLOADED_DRIVERS);
+//
+BYTE MiRememberUnloadedDriverPattern[] = {
+    0xBB, 0xD0, 0x07, 0x00, 0x00
+};
+
+#define FIX_WIN10_THRESHOULD_REG 0xBF
+#define FIX_WIN10_20H1_REG       0xBA

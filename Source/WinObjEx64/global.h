@@ -4,9 +4,9 @@
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        16 Jan 2021
+*  DATE:        16 May 2021
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -85,8 +85,10 @@
 #include "resource.h"
 #include "sdk/extdef.h"
 #include "wine.h"
-#include "minirtl\minirtl.h"
-#include "minirtl\rtltypes.h"
+
+#include "minirtl/minirtl.h"
+#include "minirtl/rtltypes.h"
+
 #include "ntos\ntos.h"
 #include "ntos\ntalpc.h"
 #include "ntos\ntsup.h"
@@ -95,7 +97,7 @@
 #include <ntsecapi.h>
 #undef _NTDEF_
 
-#include "ksymbols.h"
+#include "symparser.h"
 #include "objects.h"
 #include "kldbg.h"
 #include "drvhelper.h"

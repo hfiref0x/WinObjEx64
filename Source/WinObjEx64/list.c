@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       LIST.C
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        04 Dec 2020
+*  DATE:        27 May 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -31,14 +31,14 @@ LPWSTR GetNextSub(
 {
     SIZE_T i;
 
-    for (i = 0; (*ObjectFullPathName != 0) && (*ObjectFullPathName != '\\')
+    for (i = 0; (*ObjectFullPathName != 0) && (*ObjectFullPathName != L'\\')
         && (i < MAX_PATH); i++, ObjectFullPathName++)
     {
         Sub[i] = *ObjectFullPathName;
     }
     Sub[i] = 0;
 
-    if (*ObjectFullPathName == '\\')
+    if (*ObjectFullPathName == L'\\')
         ObjectFullPathName++;
 
     return ObjectFullPathName;
@@ -66,7 +66,7 @@ VOID ListToObject(
     if (ObjectName == NULL)
         return;
 
-    if (*ObjectName != '\\')
+    if (*ObjectName != L'\\')
         return;
 
     ObjectName++;
@@ -396,13 +396,15 @@ VOID ListObjectsInDirectory(
     ULONG               queryContext = 0, rLength;
     HANDLE              directoryHandle = NULL;
 
-    POBJECT_DIRECTORY_INFORMATION objinf;
+    POBJECT_DIRECTORY_INFORMATION infoBuffer;
 
     ListView_DeleteAllItems(g_hwndObjectList);
 
     supOpenDirectory(&directoryHandle, NULL, lpObjectDirectory, DIRECTORY_QUERY);
     if (directoryHandle == NULL)
         return;
+
+    supListViewEnableRedraw(g_hwndObjectList, FALSE);
 
     do {
 
@@ -414,27 +416,52 @@ VOID ListObjectsInDirectory(
             rLength = 1024 * 64;
         }
         else {
+
             rLength = 0;
-            ntStatus = NtQueryDirectoryObject(directoryHandle, NULL, 0, TRUE, FALSE, &queryContext, &rLength);
+
+            ntStatus = NtQueryDirectoryObject(
+                directoryHandle,
+                NULL,
+                0,
+                TRUE,
+                FALSE,
+                &queryContext,
+                &rLength);
+
             if (ntStatus != STATUS_BUFFER_TOO_SMALL)
                 break;
         }
 
-        objinf = (POBJECT_DIRECTORY_INFORMATION)supHeapAlloc((SIZE_T)rLength);
-        if (objinf == NULL)
-            break;
+        infoBuffer = (POBJECT_DIRECTORY_INFORMATION)supHeapAlloc((SIZE_T)rLength);
+        if (infoBuffer) {
 
-        ntStatus = NtQueryDirectoryObject(directoryHandle, objinf, rLength, TRUE, FALSE, &queryContext, &rLength);
-        if (!NT_SUCCESS(ntStatus)) {
-            supHeapFree(objinf);
+            ntStatus = NtQueryDirectoryObject(
+                directoryHandle,
+                infoBuffer,
+                rLength,
+                TRUE,
+                FALSE,
+                &queryContext,
+                &rLength);
+
+            if (NT_SUCCESS(ntStatus)) {
+                AddListViewItem(directoryHandle, infoBuffer);
+            }
+            else {
+                supHeapFree(infoBuffer);
+                break;
+            }
+
+            supHeapFree(infoBuffer);
+
+        }
+        else {
             break;
         }
 
-        AddListViewItem(directoryHandle, objinf);
-
-        supHeapFree(objinf);
-
     } while (TRUE);
+
+    supListViewEnableRedraw(g_hwndObjectList, TRUE);
 
     NtClose(directoryHandle);
 }
@@ -511,12 +538,12 @@ VOID FindObject(
                 tmp->ObjectName = tmp->NameBuffer;
                 tmp->ObjectType = tmp->NameBuffer + sdlen + 2 + objinf->Name.Length / sizeof(WCHAR);
                 _strcpy(tmp->ObjectName, DirName);
-                if ((DirName[0] == '\\') && (DirName[1] == 0)) {
+                if ((DirName[0] == L'\\') && (DirName[1] == 0)) {
                     _strncpy(tmp->ObjectName + sdlen, 1 + objinf->Name.Length / sizeof(WCHAR),
                         objinf->Name.Buffer, objinf->Name.Length / sizeof(WCHAR));
                 }
                 else {
-                    tmp->ObjectName[sdlen] = '\\';
+                    tmp->ObjectName[sdlen] = L'\\';
                     _strncpy(tmp->ObjectName + sdlen + 1, 1 + objinf->Name.Length / sizeof(WCHAR),
                         objinf->Name.Buffer, objinf->Name.Length / sizeof(WCHAR));
                 }
@@ -530,12 +557,12 @@ VOID FindObject(
             newdir = (LPWSTR)supHeapAlloc((sdlen + 4) * sizeof(WCHAR) + objinf->Name.Length);
             if (newdir != NULL) {
                 _strcpy(newdir, DirName);
-                if ((DirName[0] == '\\') && (DirName[1] == 0)) {
+                if ((DirName[0] == L'\\') && (DirName[1] == 0)) {
                     _strncpy(newdir + sdlen, 1 + objinf->Name.Length / sizeof(WCHAR),
                         objinf->Name.Buffer, objinf->Name.Length / sizeof(WCHAR));
                 }
                 else {
-                    newdir[sdlen] = '\\';
+                    newdir[sdlen] = L'\\';
                     _strncpy(newdir + sdlen + 1, 1 + objinf->Name.Length / sizeof(WCHAR),
                         objinf->Name.Buffer, objinf->Name.Length / sizeof(WCHAR));
                 }

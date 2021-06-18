@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        15 Mar 2021
+*  DATE:        03 June 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -15,8 +15,8 @@
 *
 *******************************************************************************/
 #include "global.h"
-#include "treelist\treelist.h"
-#include "extras\extrasSSDT.h"
+#include "treelist/treelist.h"
+#include "extras/extrasSSDT.h"
 
 //
 // Setup info database.
@@ -33,6 +33,8 @@ SCMDB g_scmDB;
 //
 POBJECT_TYPES_INFORMATION g_pObjectTypesInfo = NULL;
 
+HWND g_hwndBanner = NULL;
+
 //#define _PROFILE_MEMORY_USAGE_
 
 
@@ -48,35 +50,63 @@ int __cdecl supxHandlesLookupCallback2(
     void const* first,
     void const* second);
 
+ULONG MmProtectToValue[32] = {
+    PAGE_NOACCESS,
+    PAGE_READONLY,
+    PAGE_EXECUTE,
+    PAGE_EXECUTE_READ,
+    PAGE_READWRITE,
+    PAGE_WRITECOPY,
+    PAGE_EXECUTE_READWRITE,
+    PAGE_EXECUTE_WRITECOPY,
+    PAGE_NOACCESS,
+    PAGE_NOCACHE | PAGE_READONLY,
+    PAGE_NOCACHE | PAGE_EXECUTE,
+    PAGE_NOCACHE | PAGE_EXECUTE_READ,
+    PAGE_NOCACHE | PAGE_READWRITE,
+    PAGE_NOCACHE | PAGE_WRITECOPY,
+    PAGE_NOCACHE | PAGE_EXECUTE_READWRITE,
+    PAGE_NOCACHE | PAGE_EXECUTE_WRITECOPY,
+    PAGE_NOACCESS,
+    PAGE_GUARD | PAGE_READONLY,
+    PAGE_GUARD | PAGE_EXECUTE,
+    PAGE_GUARD | PAGE_EXECUTE_READ,
+    PAGE_GUARD | PAGE_READWRITE,
+    PAGE_GUARD | PAGE_WRITECOPY,
+    PAGE_GUARD | PAGE_EXECUTE_READWRITE,
+    PAGE_GUARD | PAGE_EXECUTE_WRITECOPY,
+    PAGE_NOACCESS,
+    PAGE_WRITECOMBINE | PAGE_READONLY,
+    PAGE_WRITECOMBINE | PAGE_EXECUTE,
+    PAGE_WRITECOMBINE | PAGE_EXECUTE_READ,
+    PAGE_WRITECOMBINE | PAGE_READWRITE,
+    PAGE_WRITECOMBINE | PAGE_WRITECOPY,
+    PAGE_WRITECOMBINE | PAGE_EXECUTE_READWRITE,
+    PAGE_WRITECOMBINE | PAGE_EXECUTE_WRITECOPY
+};
+
 /*
-* supTreeListAddItem
+* supConvertFromPteProtectionMask
 *
 * Purpose:
 *
-* Insert new treelist item.
+* Converts protection from PTE mask.
 *
 */
-HTREEITEM supTreeListAddItem(
-    _In_ HWND TreeList,
-    _In_opt_ HTREEITEM hParent,
-    _In_ UINT mask,
-    _In_ UINT state,
-    _In_ UINT stateMask,
-    _In_opt_ LPWSTR pszText,
-    _In_opt_ PVOID subitems
+ULONG supConvertFromPteProtectionMask(
+    _In_ ULONG ProtectionMask
 )
 {
-    TVINSERTSTRUCT  tvitem;
-    PTL_SUBITEMS    si = (PTL_SUBITEMS)subitems;
+    SetLastError(ERROR_SUCCESS);
 
-    RtlSecureZeroMemory(&tvitem, sizeof(tvitem));
-    tvitem.hParent = hParent;
-    tvitem.item.mask = mask;
-    tvitem.item.state = state;
-    tvitem.item.stateMask = stateMask;
-    tvitem.item.pszText = pszText;
-    tvitem.hInsertAfter = TVI_LAST;
-    return TreeList_InsertTreeItem(TreeList, &tvitem, si);
+    if (ProtectionMask < RTL_NUMBER_OF_V2(MmProtectToValue)) {
+        return MmProtectToValue[ProtectionMask];
+    }
+    else {
+        SetLastError(ERROR_INVALID_PARAMETER);
+    }
+
+    return 0;
 }
 
 /*
@@ -261,6 +291,58 @@ UINT supGetDPIValue(
     }
 
     return uDpi;
+}
+
+/*
+* supTreeListEnableRedraw
+*
+* Purpose:
+*
+* Change treelist redraw state.
+*
+*/
+VOID supTreeListEnableRedraw(
+    _In_ HWND TreeList,
+    _In_ BOOL fEnable
+)
+{
+    if (fEnable) {
+        TreeList_RedrawEnableAndUpdateNow(TreeList);
+    }
+    else {
+        TreeList_RedrawDisable(TreeList);
+    }
+}
+
+/*
+* supTreeListAddItem
+*
+* Purpose:
+*
+* Insert new treelist item.
+*
+*/
+HTREEITEM supTreeListAddItem(
+    _In_ HWND TreeList,
+    _In_opt_ HTREEITEM hParent,
+    _In_ UINT mask,
+    _In_ UINT state,
+    _In_ UINT stateMask,
+    _In_opt_ LPWSTR pszText,
+    _In_opt_ PVOID subitems
+)
+{
+    TVINSERTSTRUCT  tvitem;
+    PTL_SUBITEMS    si = (PTL_SUBITEMS)subitems;
+
+    RtlSecureZeroMemory(&tvitem, sizeof(tvitem));
+    tvitem.hParent = hParent;
+    tvitem.item.mask = mask;
+    tvitem.item.state = state;
+    tvitem.item.stateMask = stateMask;
+    tvitem.item.pszText = pszText;
+    tvitem.hInsertAfter = TVI_LAST;
+    return TreeList_InsertTreeItem(TreeList, &tvitem, si);
 }
 
 /*
@@ -684,6 +766,12 @@ VOID supSetWaitCursor(
     SetCursor(LoadCursor(NULL, fSet ? IDC_WAIT : IDC_ARROW));
 }
 
+typedef struct _SUP_BANNER_DATA {
+    LPCWSTR lpText;
+    LPCWSTR lpCaption;
+    BOOL fList;
+} SUP_BANNER_DATA, * PSUP_BANNER_DATA;
+
 /*
 * supxLoadBannerDialog
 *
@@ -699,15 +787,27 @@ INT_PTR CALLBACK supxLoadBannerDialog(
     _In_ LPARAM lParam
 )
 {
+    SUP_BANNER_DATA *pvData;
     UNREFERENCED_PARAMETER(wParam);
 
     switch (uMsg) {
 
     case WM_INITDIALOG:
-        supCenterWindow(hwndDlg);
 
         if (lParam) {
-            SetDlgItemText(hwndDlg, IDC_LOADING_MSG, (LPWSTR)lParam);
+            pvData = (SUP_BANNER_DATA*)lParam;
+
+            if (pvData->fList) {
+                SendDlgItemMessage(hwndDlg, IDC_LOADING_MSG, EM_SETLIMITTEXT, 0, 0);
+                supCenterWindowPerScreen(hwndDlg);
+                if (pvData->lpCaption) SetWindowText(hwndDlg, pvData->lpCaption);
+                SendDlgItemMessage(hwndDlg, IDC_LOADING_MSG, EM_REPLACESEL, (WPARAM)0, (LPARAM)pvData->lpText);
+            }
+            else {
+                supCenterWindow(hwndDlg);
+                SetDlgItemText(hwndDlg, IDC_LOADING_MSG, (LPWSTR)pvData->lpText);
+            }
+
         }
         break;
 
@@ -722,6 +822,29 @@ INT_PTR CALLBACK supxLoadBannerDialog(
 }
 
 /*
+* supUpdateLoadBannerText
+*
+* Purpose:
+*
+* Set new text for banner window.
+*
+*/
+VOID supUpdateLoadBannerText(
+    _In_ HWND hwndBanner,
+    _In_ LPCWSTR lpText,
+    _In_ BOOL UseList
+)
+{
+    if (UseList) {
+        SendDlgItemMessage(hwndBanner, IDC_LOADING_MSG, EM_REPLACESEL, (WPARAM)0, (LPARAM)lpText);
+        SendDlgItemMessage(hwndBanner, IDC_LOADING_MSG, EM_REPLACESEL, (WPARAM)0, (LPARAM)(LPWSTR)L"\r\n");
+    }
+    else {
+        SetDlgItemText(hwndBanner, IDC_LOADING_MSG, lpText);
+    }
+}
+
+/*
 * supDisplayLoadBanner
 *
 * Purpose:
@@ -730,16 +853,51 @@ INT_PTR CALLBACK supxLoadBannerDialog(
 *
 */
 HWND supDisplayLoadBanner(
-    _In_ HWND hwndParent,
-    _In_ LPWSTR lpMessage
+    _In_opt_ HWND hwndParent,
+    _In_ LPCWSTR lpMessage,
+    _In_opt_ LPCWSTR lpCaption,
+    _In_ BOOL UseList
 )
 {
-    return CreateDialogParam(
+    SUP_BANNER_DATA bannerData;
+
+    bannerData.fList = UseList;
+    bannerData.lpText = lpMessage;
+    bannerData.lpCaption = lpCaption;
+
+    g_hwndBanner = CreateDialogParam(
         g_WinObj.hInstance,
-        MAKEINTRESOURCE(IDD_DIALOG_LOAD),
+        UseList ? MAKEINTRESOURCE(IDD_DIALOG_LOADLIST) : MAKEINTRESOURCE(IDD_DIALOG_LOAD),
         hwndParent,
         supxLoadBannerDialog,
-        (LPARAM)lpMessage);
+        (LPARAM)&bannerData);
+
+    if (g_hwndBanner) {
+        supSetWaitCursor(TRUE);
+        SetCapture(g_hwndBanner);
+    }
+
+    return g_hwndBanner;
+}
+
+/*
+* supCloseLoadBanner
+*
+* Purpose:
+*
+* End load banner display.
+*
+*/
+VOID supCloseLoadBanner(
+    _In_ HWND hwndBanner
+)
+{
+    if (hwndBanner) {
+        SendMessage(hwndBanner, WM_CLOSE, 0, 0);
+        g_hwndBanner = NULL;
+    }
+    supSetWaitCursor(FALSE);
+    ReleaseCapture();
 }
 
 /*
@@ -771,6 +929,37 @@ VOID supCenterWindow(
             rcOwner.top + (rc.bottom / 2),
             0, 0,
             SWP_NOSIZE);
+    }
+}
+
+/*
+* supCenterWindowPerScreen
+*
+* Purpose:
+*
+* Centers given window relative to screen.
+*
+*/
+VOID supCenterWindowPerScreen(
+    _In_ HWND hwnd
+)
+{
+    RECT rc;
+    INT posX = GetSystemMetrics(SM_CXSCREEN);
+    INT posY = GetSystemMetrics(SM_CYSCREEN);
+
+    if (GetWindowRect(hwnd, &rc)) {
+
+        posX = (posX - rc.right) / 2;
+        posY = (posY - rc.bottom) / 2;
+
+        SetWindowPos(hwnd,
+            NULL,
+            posX,
+            posY,
+            0,
+            0,
+            SWP_NOZORDER | SWP_NOSIZE);
     }
 }
 
@@ -825,6 +1014,46 @@ PVOID supGetTokenInfo(
 }
 
 /*
+* supGetLoadedModulesList
+*
+* Purpose:
+*
+* Read list of loaded kernel modules.
+*
+* Returned buffer must be freed with supHeapFree after usage.
+*
+*/
+PVOID supGetLoadedModulesList(
+    _Out_opt_ PULONG ReturnLength
+)
+{
+    return ntsupGetLoadedModulesListEx(FALSE,
+        ReturnLength,
+        supHeapAlloc,
+        supHeapFree);
+}
+
+/*
+* supGetLoadedModulesList2
+*
+* Purpose:
+*
+* Read list of loaded kernel modules.
+*
+* Returned buffer must be freed with supHeapFree after usage.
+*
+*/
+PVOID supGetLoadedModulesList2(
+    _Out_opt_ PULONG ReturnLength
+)
+{
+    return ntsupGetLoadedModulesListEx(TRUE,
+        ReturnLength,
+        supHeapAlloc,
+        supHeapFree);
+}
+
+/*
 * supGetSystemInfo
 *
 * Purpose:
@@ -861,7 +1090,7 @@ PVOID supGetObjectTypesInfo(
 )
 {
     PVOID       buffer = NULL;
-    ULONG       bufferSize = 1024*16;
+    ULONG       bufferSize = 1024 * 16;
     NTSTATUS    ntStatus;
     ULONG       returnedLength = 0;
 
@@ -929,6 +1158,10 @@ LPWSTR supGetItemText(
             item.pszText = NULL;
         }
         item.pszText = (LPWSTR)supHeapAlloc(len * sizeof(WCHAR));
+        if (item.pszText == NULL) {
+            sz = 0;
+            break;
+        }
         sz = SendMessage(ListView, LVM_GETITEMTEXT, (WPARAM)item.iItem, (LPARAM)&item);
     } while (sz == (LPARAM)len - 1);
 
@@ -1034,7 +1267,9 @@ UINT supGetObjectNameIndexByTypeIndex(
         PBYTE Ref;
     } ObjectTypeEntry;
 
-    if (Object == NULL) {
+    if (Object == NULL ||
+        g_pObjectTypesInfo == NULL)
+    {
         return ObjectTypeUnknown;
     }
 
@@ -1186,11 +1421,11 @@ VOID supJumpToFile(
 * Tests if the current user is admin with full access token.
 *
 */
-BOOL supUserIsFullAdmin(
+BOOLEAN supUserIsFullAdmin(
     VOID
 )
 {
-    BOOL     bResult = FALSE;
+    BOOLEAN  bResult = FALSE;
     HANDLE   hToken = NULL;
     NTSTATUS status;
     DWORD    i, Attributes;
@@ -1384,9 +1619,9 @@ BOOL supListViewCopyItemValueToClipboard(
 
     lpText = supGetItemText(hwndListView,
         iItem,
-        iSubItem, 
+        iSubItem,
         NULL);
-    
+
     if (lpText) {
         cbText = _strlen(lpText) * sizeof(WCHAR);
         supClipboardCopy(lpText, cbText);
@@ -1526,25 +1761,25 @@ VOID supxSetProcessMitigationPolicies()
             ProcessMitigationPolicy,
             &policyInfo,
             sizeof(PROCESS_MITIGATION_POLICY_INFORMATION));
-       /*
-       // 
-       // Disabled due to multiple incompatibilities, including their own HtmlHelp functions
-       // Fixes WOX2007-005.
-       //
+        /*
+        //
+        // Disabled due to multiple incompatibilities, including their own HtmlHelp functions
+        // Fixes WOX2007-005.
+        //
 
-        if (g_NtBuildNumber > 9600) {
+         if (g_NtBuildNumber > 9600) {
 
-            policyInfo.Policy = (PROCESS_MITIGATION_POLICY)ProcessDynamicCodePolicy;
-            policyInfo.DynamicCodePolicy.Flags = 0;
-            policyInfo.DynamicCodePolicy.ProhibitDynamicCode = TRUE;
+             policyInfo.Policy = (PROCESS_MITIGATION_POLICY)ProcessDynamicCodePolicy;
+             policyInfo.DynamicCodePolicy.Flags = 0;
+             policyInfo.DynamicCodePolicy.ProhibitDynamicCode = TRUE;
 
-            NtSetInformationProcess(NtCurrentProcess(),
-                ProcessMitigationPolicy,
-                &policyInfo,
-                sizeof(PROCESS_MITIGATION_POLICY_INFORMATION));
+             NtSetInformationProcess(NtCurrentProcess(),
+                 ProcessMitigationPolicy,
+                 &policyInfo,
+                 sizeof(PROCESS_MITIGATION_POLICY_INFORMATION));
 
-        }
-        */
+         }
+         */
     }
 }
 
@@ -1559,7 +1794,7 @@ VOID supxSetProcessMitigationPolicies()
 *
 */
 VOID supInit(
-    _In_ BOOL IsFullAdmin
+    _In_ BOOLEAN IsFullAdmin
 )
 {
     WCHAR szError[200];
@@ -1618,123 +1853,6 @@ VOID supShutdown(
     if (g_pObjectTypesInfo) supHeapFree(g_pObjectTypesInfo);
 
     SdtFreeGlobals();
-}
-
-/*
-* supQueryProcessNameByEPROCESS
-*
-* Purpose:
-*
-* Lookups process name by given process object address.
-*
-* If nothing found return FALSE.
-*
-*/
-BOOL supQueryProcessNameByEPROCESS(
-    _In_ ULONG_PTR ValueOfEPROCESS,
-    _In_ PVOID ProcessList,
-    _Inout_ LPWSTR Buffer,
-    _In_ DWORD ccBuffer //size of buffer in chars
-)
-{
-    BOOL bFound = FALSE;
-    DWORD  CurrentProcessId = GetCurrentProcessId();
-    ULONG NextEntryDelta = 0, NumberOfProcesses = 0, i, j, ProcessListCount = 0;
-    HANDLE hProcess = NULL;
-    OBEX_PROCESS_LOOKUP_ENTRY* SavedProcessList;
-    PSYSTEM_HANDLE_INFORMATION_EX pHandles;
-
-    union {
-        PSYSTEM_PROCESSES_INFORMATION Processes;
-        PBYTE ListRef;
-    } List;
-
-    List.ListRef = (PBYTE)ProcessList;
-
-    //
-    // Calculate process handle list size.
-    //
-    do {
-
-        List.ListRef += NextEntryDelta;
-
-        if (List.Processes->ThreadCount)
-            NumberOfProcesses += 1;
-
-        NextEntryDelta = List.Processes->NextEntryDelta;
-
-    } while (NextEntryDelta);
-
-    List.ListRef = (PBYTE)ProcessList;
-
-    ProcessListCount = 0;
-
-    //
-    // Build process handle list.
-    //
-    SavedProcessList = (OBEX_PROCESS_LOOKUP_ENTRY*)supHeapAlloc(NumberOfProcesses * sizeof(OBEX_PROCESS_LOOKUP_ENTRY));
-    if (SavedProcessList) {
-
-        NextEntryDelta = 0;
-
-        do {
-
-            List.ListRef += NextEntryDelta;
-
-            if (List.Processes->ThreadCount) {
-
-                if (NT_SUCCESS(supOpenProcess(List.Processes->UniqueProcessId,
-                    PROCESS_QUERY_LIMITED_INFORMATION,
-                    &hProcess)))
-                {
-                    SavedProcessList[ProcessListCount].hProcess = hProcess;
-                    SavedProcessList[ProcessListCount].EntryPtr = List.ListRef;
-                    ProcessListCount += 1;
-                }
-            }
-
-            NextEntryDelta = List.Processes->NextEntryDelta;
-
-        } while (NextEntryDelta);
-
-        //
-        // Lookup this handles in system handle list.
-        //
-        pHandles = (PSYSTEM_HANDLE_INFORMATION_EX)supGetSystemInfo(SystemExtendedHandleInformation, NULL);
-        if (pHandles) {
-            for (i = 0; i < pHandles->NumberOfHandles; i++)
-                if (pHandles->Handles[i].UniqueProcessId == (ULONG_PTR)CurrentProcessId) //current process id
-                    for (j = 0; j < ProcessListCount; j++)
-                        if (pHandles->Handles[i].HandleValue == (ULONG_PTR)SavedProcessList[j].hProcess) //same handle value
-                            if ((ULONG_PTR)pHandles->Handles[i].Object == ValueOfEPROCESS) { //save object value
-
-                                List.ListRef = SavedProcessList[j].EntryPtr;
-
-                                _strncpy(
-                                    Buffer,
-                                    ccBuffer,
-                                    List.Processes->ImageName.Buffer,
-                                    List.Processes->ImageName.Length / sizeof(WCHAR));
-
-                                bFound = TRUE;
-                                break;
-                            }
-
-            supHeapFree(pHandles);
-        }
-
-        //
-        // Destroy process handle list.
-        //
-        for (i = 0; i < ProcessListCount; i++) {
-            if (SavedProcessList[i].hProcess)
-                NtClose(SavedProcessList[i].hProcess);
-        }
-
-        supHeapFree(SavedProcessList);
-    }
-
-    return bFound;
 }
 
 /*
@@ -2703,7 +2821,7 @@ NTSTATUS supOpenDirectoryForObject(
     l = 0;
     rdirLen = _strlen(lpDirectory);
     for (i = 0; i < rdirLen; i++) {
-        if (lpDirectory[i] == '\\')
+        if (lpDirectory[i] == TEXT('\\'))
             l = i + 1;
     }
     SingleDirName = &lpDirectory[l];
@@ -2823,6 +2941,11 @@ HICON supGetStockIcon(
     return NULL;
 }
 
+//
+// Conversion buffer size
+//
+#define CONVERT_NTNAME_BUFFER_SIZE 512
+
 /*
 * supxConvertFileName
 *
@@ -2833,69 +2956,88 @@ HICON supGetStockIcon(
 */
 BOOL supxConvertFileName(
     _In_ LPWSTR NtFileName,
-    _In_ LPWSTR DosFileName,
+    _Inout_ LPWSTR DosFileName,
     _In_ SIZE_T ccDosFileName
 )
 {
-    BOOL    bSuccess = FALSE, bFound = FALSE;
-    WCHAR   szDrive[3];
-    WCHAR   szName[MAX_PATH + 1]; //for the device partition name
-    WCHAR   szTemp[DBUFFER_SIZE]; //for the disk array
-    UINT    uNameLen = 0;
-    WCHAR* p;
-    SIZE_T  l = 0, k = 0;
+    BOOL bFound = FALSE;
 
-    if ((NtFileName == NULL) || (DosFileName == NULL) || (ccDosFileName < MAX_PATH))
-        return bSuccess;
+    SIZE_T nLen;
 
+    WCHAR szDrive[3];
+    WCHAR szName[MAX_PATH];
+    WCHAR szTemp[CONVERT_NTNAME_BUFFER_SIZE];
+    WCHAR* pszTemp;
+
+    //
+    // All input parameters are validated by caller before.
+    //
+
+    //
+    // Drive template.
+    //
     szDrive[0] = L'X';
     szDrive[1] = L':';
     szDrive[2] = 0;
 
-    RtlSecureZeroMemory(szTemp, sizeof(szTemp));
+    //
+    // Query array of logical disk drive strings.
+    //
+    szTemp[0] = 0;
+    if (GetLogicalDriveStrings(CONVERT_NTNAME_BUFFER_SIZE - 1, szTemp) == 0)
+        return FALSE;
 
-    uNameLen = GetLogicalDriveStrings(DBUFFER_SIZE - 1, szTemp);
-    if (uNameLen == 0)
-        return bSuccess;
-
-    p = szTemp;
+    pszTemp = szTemp;
 
     do {
 
-        *szDrive = *p;
+        //
+        // Copy the drive letter to the template string.
+        //
+        *szDrive = *pszTemp;
+        szName[0] = 0;
 
-        RtlSecureZeroMemory(szName, sizeof(szName));
-
+        //
+        // Lookup each device name.
+        //
         if (QueryDosDevice(szDrive, szName, MAX_PATH)) {
 
-            uNameLen = (UINT)_strlen(szName);
+            nLen = _strlen(szName);
 
-            if (uNameLen < MAX_PATH) {
+            if (nLen < MAX_PATH) {
 
-                bFound = (_strncmp(NtFileName, szName, uNameLen) == 0);
+                //
+                // Match device name.
+                //
+                bFound = (_strncmpi(NtFileName, szName, nLen) == 0);
 
-                if (bFound && *(NtFileName + uNameLen) == TEXT('\\')) {
+                if (bFound) {
 
-                    _strcpy(DosFileName, szDrive);
-                    l = _strlen(DosFileName);
-                    k = _strlen(NtFileName);
+                    //
+                    // Build output name.
+                    //
 
-                    _strncpy(&DosFileName[l],
-                        ccDosFileName - l,
-                        NtFileName + uNameLen,
-                        k - uNameLen);
+                    RtlStringCchPrintfSecure(
+                        DosFileName,
+                        ccDosFileName,
+                        TEXT("%ws%ws"),
+                        szDrive,
+                        NtFileName + nLen);
 
-                    bSuccess = TRUE;
-                    break;
                 }
+
             }
 
         }
 
-        while (*p++);
+        //
+        // Go to the next NULL character, i.e. the next drive name.
+        //
+        while (*pszTemp++);
 
-    } while (!bFound && *p); // end of string
-    return bSuccess;
+    } while (!bFound && *pszTemp);
+
+    return bFound;
 }
 
 /*
@@ -4065,7 +4207,7 @@ NTSTATUS supOpenTokenByParam(
 *
 * Purpose:
 *
-* Open handle for device object.
+* Open handle for device object (NtOpenFile).
 *
 */
 NTSTATUS supOpenDeviceObject(
@@ -4076,11 +4218,40 @@ NTSTATUS supOpenDeviceObject(
 {
     IO_STATUS_BLOCK iost;
 
-    return NtOpenFile(ObjectHandle, 
-        DesiredAccess, 
-        ObjectAttributes, 
-        &iost, 
-        FILE_SHARE_VALID_FLAGS, 
+    return NtOpenFile(ObjectHandle,
+        DesiredAccess,
+        ObjectAttributes,
+        &iost,
+        FILE_SHARE_VALID_FLAGS,
+        0);
+}
+
+/*
+* supOpenDeviceObjectEx
+*
+* Purpose:
+*
+* Open handle for device object (NtCreateFile).
+*
+*/
+NTSTATUS supOpenDeviceObjectEx(
+    _Out_ PHANDLE ObjectHandle,
+    _In_ ACCESS_MASK DesiredAccess,
+    _In_ POBJECT_ATTRIBUTES ObjectAttributes
+)
+{
+    IO_STATUS_BLOCK iost;
+
+    return NtCreateFile(ObjectHandle,
+        DesiredAccess,
+        ObjectAttributes,
+        &iost,
+        NULL,
+        0,
+        FILE_SHARE_VALID_FLAGS,
+        FILE_OPEN,
+        0,
+        NULL,
         0);
 }
 
@@ -4205,8 +4376,9 @@ NTSTATUS supOpenNamedObjectByType(
             //       
             if (_strcmpi(ObjectName, KM_OBJECTS_ROOT_DIRECTORY) != 0) {
 
-                ntStatus = supOpenDirectoryForObject(&rootHandle, 
-                    ObjectName, 
+                ntStatus = supOpenDirectoryForObject(
+                    &rootHandle,
+                    ObjectName,
                     ObjectDirectory);
 
                 if (!NT_SUCCESS(ntStatus)) {
@@ -4234,7 +4406,7 @@ NTSTATUS supOpenNamedObjectByType(
         InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
 
         supOpenDirectoryForObject(&rootHandle, ObjectName, ObjectDirectory);
-        
+
         RtlInitUnicodeString(&ustr, ObjectName);
         obja.RootDirectory = rootHandle;
 
@@ -4311,7 +4483,13 @@ NTSTATUS supOpenNamedObjectByType(
         }
         else {
 
-            ntStatus = ObjectOpenProcedure(&objectHandle, DesiredAccess, &obja);
+            //
+            // Open object of the given type.
+            //
+            ntStatus = ObjectOpenProcedure(
+                &objectHandle,
+                DesiredAccess,
+                &obja);
 
             if (NT_SUCCESS(ntStatus))
                 *ObjectHandle = objectHandle;
@@ -4346,7 +4524,7 @@ BOOL supEnumHandleDump(
 
     for (i = 0; i < HandleDump->NumberOfHandles; i++) {
         if (EnumCallback(&HandleDump->Handles[i],
-            UserContext)) 
+            UserContext))
         {
             return TRUE;
         }
@@ -4372,7 +4550,7 @@ BOOL supxEnumAlpcPortsCallback(
     ULONG       returnedLength = 0;
     NTSTATUS    ntStatus;
     HANDLE      objectHandle = NULL, processHandle = NULL;
-    BYTE        buffer[4096], *pBuffer = (PBYTE)&buffer;
+    BYTE        buffer[4096], * pBuffer = (PBYTE)&buffer;
 
     PALPCPORT_ENUM_CONTEXT enumContext = (PALPCPORT_ENUM_CONTEXT)UserContext;
     PUNICODE_STRING pusObjectName;
@@ -4655,14 +4833,14 @@ NTSTATUS supOpenPortObjectFromContext(
                     Context->PortObjectInfo.ReferenceHandle = refHandle;
                     Context->PortObjectInfo.IsAllocated = TRUE;
                 }
-                
+
                 supHeapFree(objectFullName);
             }
             else {
                 ntStatus = STATUS_INSUFFICIENT_RESOURCES;
             }
 
-        } while (FALSE);  
+        } while (FALSE);
 
     }
 
@@ -4686,7 +4864,6 @@ HANDLE supOpenObjectFromContext(
 {
     HANDLE hObject = NULL, hPrivateNamespace = NULL;
     NTSTATUS ntStatus = STATUS_UNSUCCESSFUL;
-    IO_STATUS_BLOCK iost;
     OBJECT_ATTRIBUTES objaNamespace;
 
     if (Context->ContextType == propPrivateNamespace) {
@@ -4713,9 +4890,14 @@ HANDLE supOpenObjectFromContext(
         ObjectAttributes->RootDirectory = hPrivateNamespace;
     }
 
+    //
+    // Open object of common type.
+    //
+
     switch (Context->TypeIndex) {
 
     case ObjectTypeProcess:
+
         if (Context->ContextType == propUnnamed) {
 
             ntStatus = supOpenProcessEx(
@@ -4730,92 +4912,170 @@ HANDLE supOpenObjectFromContext(
         break;
 
     case ObjectTypeThread:
+
         if (Context->ContextType == propUnnamed) {
-            ntStatus = NtOpenThread(&hObject, DesiredAccess,
+
+            ntStatus = NtOpenThread(
+                &hObject,
+                DesiredAccess,
                 ObjectAttributes,
                 &Context->UnnamedObjectInfo.ClientId);
+
         }
         else
             ntStatus = STATUS_INVALID_PARAMETER;
+
         break;
 
     case ObjectTypeToken:
+
         if (Context->ContextType == propUnnamed) {
-            ntStatus = supOpenTokenByParam(&Context->UnnamedObjectInfo.ClientId,
+
+            ntStatus = supOpenTokenByParam(
+                &Context->UnnamedObjectInfo.ClientId,
                 ObjectAttributes,
                 DesiredAccess,
                 Context->UnnamedObjectInfo.IsThreadToken,
                 &hObject);
+
         }
         else
             ntStatus = STATUS_INVALID_PARAMETER;
+
         break;
 
-    case ObjectTypeDevice: //FILE_OBJECT
-        ntStatus = NtCreateFile(&hObject, DesiredAccess, ObjectAttributes, &iost, NULL, 0,
-            FILE_SHARE_VALID_FLAGS, FILE_OPEN, 0, NULL, 0);//generic access rights
+    case ObjectTypeDevice:
+
+        ntStatus = supOpenDeviceObjectEx(
+            &hObject,
+            DesiredAccess,
+            ObjectAttributes);
+
         break;
 
     case ObjectTypeMutant:
-        ntStatus = NtOpenMutant(&hObject, DesiredAccess, ObjectAttributes); //MUTANT_QUERY_STATE for query
+
+        ntStatus = NtOpenMutant(
+            &hObject,
+            DesiredAccess,
+            ObjectAttributes);
+
         break;
 
     case ObjectTypeKey:
-        ntStatus = NtOpenKey(&hObject, DesiredAccess, ObjectAttributes); //KEY_QUERY_VALUE for query
+
+        ntStatus = NtOpenKey(
+            &hObject,
+            DesiredAccess,
+            ObjectAttributes);
+
         break;
 
     case ObjectTypeSemaphore:
-        ntStatus = NtOpenSemaphore(&hObject, DesiredAccess, ObjectAttributes); //SEMAPHORE_QUERY_STATE for query
+
+        ntStatus = NtOpenSemaphore(
+            &hObject,
+            DesiredAccess,
+            ObjectAttributes);
+
         break;
 
     case ObjectTypeTimer:
-        ntStatus = NtOpenTimer(&hObject, DesiredAccess, ObjectAttributes); //TIMER_QUERY_STATE for query
+
+        ntStatus = NtOpenTimer(
+            &hObject,
+            DesiredAccess,
+            ObjectAttributes);
+
         break;
 
     case ObjectTypeEvent:
-        ntStatus = NtOpenEvent(&hObject, DesiredAccess, ObjectAttributes); //EVENT_QUERY_STATE for query
+
+        ntStatus = NtOpenEvent(
+            &hObject,
+            DesiredAccess,
+            ObjectAttributes);
+
         break;
 
     case ObjectTypeEventPair:
-        ntStatus = NtOpenEventPair(&hObject, DesiredAccess, ObjectAttributes); //generic access
+
+        ntStatus = NtOpenEventPair(
+            &hObject,
+            DesiredAccess,
+            ObjectAttributes);
+
         break;
 
     case ObjectTypeSymbolicLink:
-        ntStatus = NtOpenSymbolicLinkObject(&hObject, DesiredAccess, ObjectAttributes); //SYMBOLIC_LINK_QUERY for query
+
+        ntStatus = NtOpenSymbolicLinkObject(
+            &hObject,
+            DesiredAccess,
+            ObjectAttributes);
+
         break;
 
     case ObjectTypeIoCompletion:
-        ntStatus = NtOpenIoCompletion(&hObject, DesiredAccess, ObjectAttributes); //IO_COMPLETION_QUERY_STATE for query
+
+        ntStatus = NtOpenIoCompletion(
+            &hObject,
+            DesiredAccess,
+            ObjectAttributes);
+
         break;
 
     case ObjectTypeSection:
-        ntStatus = NtOpenSection(&hObject, DesiredAccess, ObjectAttributes); //SECTION_QUERY for query
+
+        ntStatus = NtOpenSection(
+            &hObject,
+            DesiredAccess,
+            ObjectAttributes);
+
         break;
 
     case ObjectTypeJob:
-        ntStatus = NtOpenJobObject(&hObject, DesiredAccess, ObjectAttributes); //JOB_OBJECT_QUERY for query
+
+        ntStatus = NtOpenJobObject(
+            &hObject,
+            DesiredAccess,
+            ObjectAttributes);
+
         break;
 
     case ObjectTypeSession:
-        ntStatus = NtOpenSession(&hObject, DesiredAccess, ObjectAttributes); //generic access
+
+        ntStatus = NtOpenSession(
+            &hObject,
+            DesiredAccess,
+            ObjectAttributes);
+
         break;
 
     case ObjectTypeMemoryPartition:
+
         if (g_ExtApiSet.NtOpenPartition) {
-            ntStatus = g_ExtApiSet.NtOpenPartition(&hObject, DesiredAccess, ObjectAttributes); //MEMORY_PARTITION_QUERY_ACCESS for query 
+
+            ntStatus = g_ExtApiSet.NtOpenPartition(
+                &hObject,
+                DesiredAccess,
+                ObjectAttributes);
+
         }
         else
             ntStatus = STATUS_PROCEDURE_NOT_FOUND;
+
         break;
 
     case ObjectTypePort:
 
-        ntStatus = supOpenPortObjectFromContext(&hObject,
-            DesiredAccess, //variable access
-            Context); 
+        ntStatus = supOpenPortObjectFromContext(
+            &hObject,
+            DesiredAccess,
+            Context);
 
         break;
-    
+
     default:
         ntStatus = STATUS_OBJECTID_NOT_FOUND;
         break;
@@ -4933,7 +5193,7 @@ VOID supShowNtStatus(
 * Purpose:
 *
 * Format details about NT error to be displayed later.
-* 
+*
 * Uppon success use LocalFree on returned buffer.
 *
 */
@@ -4944,8 +5204,8 @@ LPWSTR supFormatNtError(
     LPWSTR lpMessage = NULL;
 
     FormatMessage(
-        FORMAT_MESSAGE_FROM_HMODULE | 
-        FORMAT_MESSAGE_ALLOCATE_BUFFER | 
+        FORMAT_MESSAGE_FROM_HMODULE |
+        FORMAT_MESSAGE_ALLOCATE_BUFFER |
         FORMAT_MESSAGE_IGNORE_INSERTS,
         (LPCVOID)GetModuleHandle(L"ntdll.dll"),
         NtError,
@@ -5368,28 +5628,30 @@ LPWSTR supGetSidNameUse(
     _In_ SID_NAME_USE SidNameUse
 )
 {
-    switch (SidNameUse) {
-    case ExtSidTypeUser:
+    ULONG nameUse = (ULONG)SidNameUse;
+
+    switch (nameUse) {
+    case sidTypeUser:
         return L"User";
-    case ExtSidTypeGroup:
+    case sidTypeGroup:
         return L"Group";
-    case ExtSidTypeDomain:
+    case sidTypeDomain:
         return L"Domain";
-    case ExtSidTypeAlias:
+    case sidTypeAlias:
         return L"Alias";
-    case ExtSidTypeWellKnownGroup:
+    case sidTypeWellKnownGroup:
         return L"WellKnownGroup";
-    case ExtSidTypeDeletedAccount:
+    case sidTypeDeletedAccount:
         return L"DeletedAccount";
-    case ExtSidTypeInvalid:
+    case sidTypeInvalid:
         return L"Invalid";
-    case ExtSidTypeComputer:
+    case sidTypeComputer:
         return L"Computer";
-    case ExtSidTypeLogonSession:
+    case sidTypeLogonSession:
         return L"LogonSession";
-    case ExtSidTypeLabel:
+    case sidTypeLabel:
         return L"Label";
-    case ExtSidTypeUnknown:
+    case sidTypeUnknown:
     default:
         return T_Unknown;
     }
@@ -5516,7 +5778,7 @@ BOOL supLookupSidUserAndDomainEx(
 */
 BOOL supLookupSidUserAndDomain(
     _In_ PSID Sid,
-    _Out_ LPWSTR* lpSidUserAndDomain
+    _Out_ LPWSTR * lpSidUserAndDomain
 )
 {
     BOOL bResult = FALSE;
@@ -5703,7 +5965,7 @@ BOOL supHandlesFreeList(
 )
 {
     if (SortedHandleList) {
-        
+
         return supHeapFree(SortedHandleList);
     }
     return FALSE;
@@ -6215,7 +6477,7 @@ HRESULT supShellExecInExplorerProcessEx(
                             vtArgs.vt = VT_BSTR;
                             vtArgs.bstrVal = bstrArgs;
 
-                            hr = psd->ShellExecuteW(bstrFile, 
+                            hr = psd->ShellExecuteW(bstrFile,
                                 vtArgs, vtEmpty, vtEmpty, vtEmpty);
 
                             SysFreeString(bstrFile);
@@ -6223,11 +6485,11 @@ HRESULT supShellExecInExplorerProcessEx(
                     }
                     else {
 
-                        hr = psd->ShellExecuteW(bstrFile, 
+                        hr = psd->ShellExecuteW(bstrFile,
                             vtEmpty, vtEmpty, vtEmpty, vtEmpty);
 
-    }
-                   
+                    }
+
                 }
                 psd->Release();
             }
@@ -6256,7 +6518,7 @@ HRESULT supShellExecInExplorerProcessEx(
                             vtArgs.vt = VT_BSTR;
                             vtArgs.bstrVal = bstrArgs;
 
-                            hr = psd->lpVtbl->ShellExecuteW(psd, bstrFile, 
+                            hr = psd->lpVtbl->ShellExecuteW(psd, bstrFile,
                                 vtArgs, vtEmpty, vtEmpty, vtEmpty);
 
                             SysFreeString(bstrArgs);
@@ -6264,7 +6526,7 @@ HRESULT supShellExecInExplorerProcessEx(
                     }
                     else {
 
-                        hr = psd->lpVtbl->ShellExecuteW(psd, bstrFile, 
+                        hr = psd->lpVtbl->ShellExecuteW(psd, bstrFile,
                             vtEmpty, vtEmpty, vtEmpty, vtEmpty);
 
                     }
@@ -6326,7 +6588,8 @@ BOOLEAN supLoadIconForObjectType(
 
     if (hIcon) {
 
-        SendMessage(GetDlgItem(hwndDlg, ID_OBJECT_ICON), STM_SETIMAGE, IMAGE_ICON, (LPARAM)hIcon);
+        SendDlgItemMessage(hwndDlg, ID_OBJECT_ICON,
+            STM_SETIMAGE, IMAGE_ICON, (LPARAM)hIcon);
 
         if (IsShadow)
             Context->ObjectTypeIcon = hIcon;
@@ -6405,8 +6668,7 @@ BOOL supxDeleteKeyRecursive(
     //
     lpEnd = _strend(lpSubKey);
     if (*(lpEnd - 1) != TEXT('\\')) {
-        *lpEnd = TEXT('\\');
-        lpEnd++;
+        *lpEnd++ = TEXT('\\');
         *lpEnd = TEXT('\0');
     }
 
@@ -6487,6 +6749,29 @@ ULONG supHashString(
 {
     ULONG hashValue = 0, nChars = Length;
     PCWSTR stringBuffer = String;
+
+    while (nChars-- != 0)
+        hashValue = (hashValue * 65599) + *stringBuffer++;
+
+    return hashValue;
+}
+
+/*
+* supHashStringAnsi
+*
+* Purpose:
+*
+* Create sdbm hash for given string.
+*
+* N.B. Case sensitive.
+*
+*/
+ULONG supHashStringAnsi(
+    _In_ PCSTR String,
+    _In_ ULONG Length)
+{
+    ULONG hashValue = 0, nChars = Length;
+    PCSTR stringBuffer = String;
 
     while (nChars-- != 0)
         hashValue = (hashValue * 65599) + *stringBuffer++;
@@ -6762,14 +7047,17 @@ BOOLEAN supIsFileImageSection(
 *
 */
 BOOLEAN supIsDriverShimmed(
+    _In_ PKSE_ENGINE_DUMP KseEngineDump,
     _In_ PVOID DriverBaseAddress)
 {
-    PLIST_ENTRY Entry, NextEntry, ListHead = &g_kdctx.KseEngineDump.ShimmedDriversDumpListHead;
+    PLIST_ENTRY Entry, NextEntry, ListHead;
     KSE_SHIMMED_DRIVER* ShimmedDriver;
 
 
-    if (g_kdctx.KseEngineDump.Valid == FALSE)
+    if (KseEngineDump->Valid == FALSE)
         return FALSE;
+
+    ListHead = &KseEngineDump->ShimmedDriversDumpListHead;
 
     ASSERT_LIST_ENTRY_VALID_BOOLEAN(ListHead);
 
@@ -6786,35 +7074,6 @@ BOOLEAN supIsDriverShimmed(
     }
 
     return FALSE;
-}
-
-/*
-* supDestroyShimmedDriversList
-*
-* Purpose:
-*
-* Remove all items from shimmed drivers list and free memory.
-*
-*/
-VOID supDestroyShimmedDriversList(
-    _In_ PLIST_ENTRY ListHead)
-{
-    PLIST_ENTRY Entry, NextEntry;
-    KSE_SHIMMED_DRIVER* Item;
-
-    ASSERT_LIST_ENTRY_VALID(ListHead);
-
-    if (IsListEmpty(ListHead))
-        return;
-
-    for (Entry = ListHead->Flink, NextEntry = Entry->Flink;
-        Entry != ListHead;
-        Entry = NextEntry, NextEntry = Entry->Flink)
-    {
-        Item = CONTAINING_RECORD(Entry, KSE_SHIMMED_DRIVER, ListEntry);
-        RemoveEntryList(Entry);
-        supHeapFree(Item);
-    }
 }
 
 size_t supxEscStrlen(wchar_t* s)
@@ -6932,17 +7191,17 @@ BOOL supxListViewExportCSV(
         }
         else
         {
-            f = CreateFile(FileName, 
-                GENERIC_WRITE | SYNCHRONIZE, 
-                FILE_SHARE_READ, 
-                NULL, 
-                CREATE_ALWAYS, 
-                FILE_ATTRIBUTE_NORMAL, 
+            f = CreateFile(FileName,
+                GENERIC_WRITE | SYNCHRONIZE,
+                FILE_SHARE_READ,
+                NULL,
+                CREATE_ALWAYS,
+                FILE_ATTRIBUTE_NORMAL,
                 NULL);
 
             if (f != INVALID_HANDLE_VALUE) {
 
-                WriteFile(f, buffer0, 
+                WriteFile(f, buffer0,
                     (DWORD)(total_lenght * sizeof(WCHAR)),
                     &iobytes, NULL);
 
@@ -7034,7 +7293,7 @@ VOID supJumpToFileListView(
         if (iPos < 0)
             break;
 
-        lpConvertedName = (LPWSTR)supHeapAlloc(UNICODE_STRING_MAX_CHARS + 1);
+        lpConvertedName = (LPWSTR)supHeapAlloc(UNICODE_STRING_MAX_CHARS);
         if (lpConvertedName == NULL)
             break;
 
@@ -7119,7 +7378,7 @@ VOID supQueryAlpcPortObjectTypeIndex(
         if (!NT_SUCCESS(ntStatus))
             break;
 
-        ntStatus = RtlCreateAcl(pDacl, sdLength - SECURITY_DESCRIPTOR_MIN_LENGTH, ACL_REVISION2);
+        ntStatus = RtlCreateAcl(pDacl, (ULONG)(sdLength - SECURITY_DESCRIPTOR_MIN_LENGTH), ACL_REVISION2);
         if (!NT_SUCCESS(ntStatus))
             break;
 
@@ -7199,7 +7458,7 @@ VOID supQueryAlpcPortObjectTypeIndex(
 */
 NTSTATUS supQueryProcessImageFileNameWin32(
     _In_ HANDLE UniqueProcessId,
-    _Out_ PUNICODE_STRING *ProcessImageFileName
+    _Out_ PUNICODE_STRING* ProcessImageFileName
 )
 {
     NTSTATUS ntStatus;
@@ -7207,8 +7466,8 @@ NTSTATUS supQueryProcessImageFileNameWin32(
 
     *ProcessImageFileName = NULL;
 
-    ntStatus = supOpenProcess(UniqueProcessId, 
-        PROCESS_QUERY_LIMITED_INFORMATION, 
+    ntStatus = supOpenProcess(UniqueProcessId,
+        PROCESS_QUERY_LIMITED_INFORMATION,
         &hProcess);
 
     if (NT_SUCCESS(ntStatus)) {
@@ -7339,7 +7598,7 @@ ULONG supAddLVColumnsFromArray(
     ULONG iColumn;
 
     for (iColumn = 0; iColumn < NumberOfColumns; iColumn++) {
-        
+
         if (-1 == supAddListViewColumn(ListView,
             iColumn,
             iColumn,
@@ -7351,7 +7610,281 @@ ULONG supAddLVColumnsFromArray(
         {
             break;
         }
-    }   
+    }
 
     return iColumn;
+}
+
+/*
+* supShowInitError
+*
+* Purpose:
+*
+* Display initialization error depending on it type.
+*
+*/
+VOID supShowInitError(
+    _In_ DWORD ErrorType
+)
+{
+    WCHAR szErrorBuffer[MAX_PATH * 2];
+    LPWSTR lpError;
+
+    //
+    // CRT not initialized, no fancy swprinfs for you.
+    //
+    if (ErrorType == INIT_ERROR_NOCRT) {
+
+        MessageBox(GetDesktopWindow(),
+            (LPCWSTR)T_WOBJINIT_NOCRT,
+            (LPCWSTR)PROGRAM_NAME,
+            MB_ICONWARNING | MB_OK);
+
+        return;
+    }
+
+    switch (ErrorType) {
+
+    case INIT_ERROR_NOHEAP:
+        lpError = L"Heap not allocated";
+        break;
+
+    case INIT_ERROR_NOTEMP:
+        lpError = L"%temp% not resolved";
+        break;
+
+    case INIT_ERROR_NOWINDIR:
+        lpError = L"Windows directory not resolved";
+        break;
+
+    case INIT_ERROR_NOSYS32DIR:
+        lpError = L"System32 directory not resolved";
+        break;
+
+    case INIT_ERROR_NOPROGDIR:
+        lpError = L"Program directory not resolved";
+        break;
+
+    case INIT_ERROR_NOCLASS:
+        lpError = L"Main window class not registered";
+        break;
+
+    case INIT_ERROR_NOMAINWND:
+        lpError = L"Main window not created";
+        break;
+
+    case INIT_ERROR_NOICCX:
+        lpError = L"Common Controls Library";
+        break;
+
+    case INIT_ERROR_NOLISTWND:
+        lpError = L"Main list window not created";
+        break;
+
+    case INIT_ERROR_NOTREEWND:
+        lpError = L"Main tree window not created";
+        break;
+
+    case INIT_ERROR_NOTLBARWND:
+        lpError = L"Main toolbar window not created";
+        break;
+
+    default:
+        lpError = L"Unknown initialization error";
+        break;
+    }
+
+    RtlStringCchPrintfSecure(szErrorBuffer,
+        MAX_PATH * 2,
+        TEXT("WinObjEx64 failed to initialize: %ws, abort"),
+        lpError);
+
+    MessageBox(GetDesktopWindow(),
+        (LPWSTR)szErrorBuffer,
+        (LPCWSTR)PROGRAM_NAME,
+        MB_ICONWARNING | MB_OK);
+
+}
+
+/*
+* supExtractFileName
+*
+* Purpose:
+*
+* Return filename part from given path.
+*
+*/
+wchar_t* supExtractFileName(
+    _In_ const wchar_t* lpFullPath
+)
+{
+    wchar_t* p = (wchar_t*)lpFullPath;
+
+    if (lpFullPath == 0)
+        return 0;
+
+    while (*lpFullPath != (wchar_t)0) {
+        if (*lpFullPath == (wchar_t)'\\')
+            p = (wchar_t*)lpFullPath + 1;
+        lpFullPath++;
+    }
+    return p;
+}
+
+/*
+* supObjectDumpHandlePopupMenu
+*
+* Purpose:
+*
+* Object dump popup construction
+*
+*/
+VOID supObjectDumpHandlePopupMenu(
+    _In_ HWND hwndDlg
+)
+{
+    POINT pt1;
+    HMENU hMenu;
+
+    if (GetCursorPos(&pt1) == FALSE)
+        return;
+
+    hMenu = CreatePopupMenu();
+    if (hMenu) {
+        InsertMenu(hMenu, 0, MF_BYCOMMAND, ID_OBJECT_COPY, T_COPYVALUE);
+        InsertMenu(hMenu, 1, MF_BYCOMMAND, ID_ADDINFO_COPY, T_COPYADDINFO);
+        TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, hwndDlg, NULL);
+        DestroyMenu(hMenu);
+    }
+}
+
+/*
+* supObDumpShowError
+*
+* Purpose:
+*
+* Hide all windows for given hwnd and display error text with custom text if specified.
+*
+*/
+VOID supObDumpShowError(
+    _In_ HWND hwndDlg,
+    _In_opt_ LPWSTR lpMessageText
+)
+{
+    ENUMCHILDWNDDATA ChildWndData;
+
+    if (GetWindowRect(hwndDlg, &ChildWndData.Rect)) {
+        ChildWndData.nCmdShow = SW_HIDE;
+        EnumChildWindows(hwndDlg, supCallbackShowChildWindow, (LPARAM)&ChildWndData);
+    }
+
+    if (lpMessageText) {
+        SetDlgItemText(hwndDlg, ID_OBJECTDUMPERROR, lpMessageText);
+    }
+
+    ShowWindow(GetDlgItem(hwndDlg, ID_OBJECTDUMPERROR), SW_SHOW);
+}
+
+/*
+* supGetFirmwareType
+*
+* Purpose:
+*
+* Return firmware type.
+*
+*/
+NTSTATUS supGetFirmwareType(
+    _Out_ PFIRMWARE_TYPE FirmwareType
+)
+{
+    NTSTATUS ntStatus;
+    ULONG returnLength = 0;
+    SYSTEM_BOOT_ENVIRONMENT_INFORMATION sbei;
+
+    *FirmwareType = FirmwareTypeUnknown;
+
+    RtlSecureZeroMemory(&sbei, sizeof(sbei));
+
+    ntStatus = NtQuerySystemInformation(SystemBootEnvironmentInformation,
+        &sbei,
+        sizeof(sbei),
+        &returnLength);
+
+    if (NT_SUCCESS(ntStatus)) {
+        *FirmwareType = sbei.FirmwareType;
+
+    }
+
+    return ntStatus;
+}
+
+/*
+* supIsBootDriveVHD
+*
+* Purpose:
+*
+* Query if the current boot drive is VHD type.
+*
+*/
+NTSTATUS supIsBootDriveVHD(
+    _Out_ PBOOLEAN IsVHD
+)
+{
+    NTSTATUS ntStatus;
+    ULONG returnLength = 0;
+    SYSTEM_VHD_BOOT_INFORMATION* psvbi;
+
+    *IsVHD = FALSE;
+
+    psvbi = (SYSTEM_VHD_BOOT_INFORMATION*)supHeapAlloc(PAGE_SIZE);
+    if (psvbi) {
+        ntStatus = NtQuerySystemInformation(SystemVhdBootInformation, psvbi, PAGE_SIZE, &returnLength);
+        if (NT_SUCCESS(ntStatus)) {
+            *IsVHD = psvbi->OsDiskIsVhd;
+        }
+        supHeapFree(psvbi);
+    }
+    else {
+        ntStatus = STATUS_INSUFFICIENT_RESOURCES;
+    }
+
+    return ntStatus;
+}
+
+/*
+* supPathAddBackSlash
+*
+* Purpose:
+*
+* Add trailing backslash to the path if it doesn't have one.
+*
+*/
+LPWSTR supPathAddBackSlash(
+    _In_ LPWSTR lpszPath
+)
+{
+    SIZE_T nLength;
+    LPWSTR lpszEnd, lpszPrev, lpszResult = NULL;
+
+    nLength = _strlen(lpszPath);
+
+    if (nLength) {
+
+        lpszEnd = lpszPath + nLength;
+
+        if (lpszPath == lpszEnd)
+            lpszPrev = lpszPath;
+        else
+            lpszPrev = (LPWSTR)lpszEnd - 1;
+
+        if (*lpszPrev != TEXT('\\')) {
+            *lpszEnd++ = TEXT('\\');
+            *lpszEnd = TEXT('\0');
+        }
+
+        lpszResult = lpszEnd;
+
+    }
+
+    return lpszResult;
 }

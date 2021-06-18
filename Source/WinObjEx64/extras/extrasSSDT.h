@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSSDT.H
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        10 Jan 2021
+*  DATE:        11 May 2021
 *
 *  Common header file for Service Table dialog.
 *

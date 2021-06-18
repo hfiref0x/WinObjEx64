@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPSECURITY.C
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        14 Jan 2021
+*  DATE:        11 May 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -269,8 +269,7 @@ ULONG STDMETHODCALLTYPE AddRef(
     _In_ IObjectSecurity* This
 )
 {
-    This->RefCount++;
-    return This->RefCount;
+    return ++This->RefCount;
 }
 
 ULONG STDMETHODCALLTYPE Release(

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       PROPBASICCONSTS.H
 *
-*  VERSION:     1.87
+*  VERSION:     1.90
 *
-*  DATE:        25 July 2020
+*  DATE:        11 May 2021
 *
 *  Consts header file for Basic property sheet.
 *

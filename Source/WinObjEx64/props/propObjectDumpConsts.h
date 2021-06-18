@@ -1,14 +1,14 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       PROPOBJECTDUMPCONSTS.H
 *
-*  VERSION:     1.87
+*  VERSION:     1.90
 *
-*  DATE:        27 June 2020
+*  DATE:        11 May 2021
 *
-*  Consts header file for Object Dump module.
+*  Consts header file for structured object dumps.
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,6 +17,12 @@
 *
 *******************************************************************************/
 #pragma once
+
+
+#define CLR_HOOK 0x80ff80 //light green
+#define CLR_WARN 0x5050ff //red
+#define CLR_INVL 0xa9a9a9 //silver
+#define CLR_LGRY 0xd3d3d3 //light grey
 
 #define DUMP_CONVERSION_LENGTH 99
 
@@ -31,30 +37,54 @@
 #define T_NULL              L"NULL"
 #define T_UNNAMED           L"Unnamed"
 
-#define T_LDR_DATA_TABLE_ENTRY      L"LDR_DATA_TABLE_ENTRY"
 #define T_LIST_ENTRY                L"LIST_ENTRY"
 #define T_PLIST_ENTRY               L"PLIST_ENTRY"
+
+#define T_LDR_DATA_TABLE_ENTRY      L"LDR_DATA_TABLE_ENTRY"
+#define T_PLDR_DATA_TABLE_ENTRY     L"PLDR_DATA_TABLE_ENTRY"
+
 #define T_EX_PUSH_LOCK              L"EX_PUSH_LOCK"
-#define T_PDEVICE_MAP               L"PDEVICE_MAP"
+
 #define T_OBJ_INVALID_SESSION_ID    L"OBJ_INVALID_SESSION_ID"
+
 #define T_POBJECT_DIRECTORY_ENTRY   L"POBJECT_DIRECTORY_ENTRY"
 #define T_POBJECT_DIRECTORY         L"POBJECT_DIRECTORY"
 #define T_OBJECT_DIRECTORY          L"OBJECT_DIRECTORY"
+
 #define T_OBJECT_TYPE               L"OBJECT_TYPE"
 #define T_OBJECT_TYPE_INITIALIZER   L"OBJECT_TYPE_INITIALIZER"
+
+#define T_PFAST_IO_DISPATCH         L"PFAST_IO_DISPATCH"
+
+#define T_PDEVICE_MAP               L"PDEVICE_MAP"
+
 #define T_PUNICODE_STRING           L"PUNICODE_STRING"
 #define T_UNICODE_STRING            L"UNICODE_STRING"
+
 #define T_PKTHREAD                  L"PKTHREAD"
+#define T_PEPROCESS                 L"PEPROCESS"
+
 #define T_KEVENT                    L"KEVENT"
 #define T_KMUTANT                   L"KMUTANT"
 #define T_KSEMAPHORE                L"KSEMAPHORE"
 #define T_KTIMER                    L"KTIMER"
 #define T_KQUEUE                    L"KQUEUE"
 #define T_PKDPC                     L"PKDPC"
+
 #define T_GENERIC_MAPPING           L"GENERIC_MAPPING"
+
 #define T_EX_RUNDOWN_REF            L"EX_RUNDOWN_REF"
+
 #define T_PEJOB                     L"PEJOB"
+
 #define T_PDRIVER_EXTENSION         L"PDRIVER_EXTENSION"
+
+#define T_PCONTROL_AREA             L"PCONTROL_AREA"
+#define T_PSEGMENT                  L"PSEGMENT"
+#define T_PMI_REVERSE_VIEW_MAP      L"PMI_REVERSE_VIEW_MAP"
+#define T_SEGMENT_FLAGS             L"SEGMENT_FLAGS"
+
+#define T_PFILE_OBJECT              L"PFILE_OBJECT"
 
 #define T_FLT_SERVER_PORT_OBJECT    L"FLT_SERVER_PORT_OBJECT"
 #define T_PFLT_FILTER               L"PFLT_FILTER"
@@ -71,6 +101,7 @@
 #define T_EVENT_SYNC                L"SynchronizationEvent"
 #define T_SIGNALED                  L"Signaled"
 #define T_NONSIGNALED               L"Nonsignaled"
+
 #define T_OBJECT_TYPE_FLAGS         L"ObjectTypeFlags"
 #define T_OBJECT_TYPE_FLAGS2        L"ObjectTypeFlags2"
 
@@ -90,6 +121,9 @@
 #define T_TYPEINDEX                 L"Index"
 #define T_REFNOTFOUND               L"! Reference not found"
 #define T_BADDRIVEROBJECT           L"! Bad DRIVER_OBJECT"
+#define T_INVALID_REQUEST           L"nt!IopInvalidDeviceRequest"
+
+#define T_PMI_SECTION_IMAGE_INFORMATION L"PMI_SECTION_IMAGE_INFORMATION"
 
 #define MAX_KNOWN_DRV_FLAGS 8
 static VALUE_DESC drvFlags[MAX_KNOWN_DRV_FLAGS] = {
@@ -344,8 +378,3 @@ static VALUE_DESC dosDeviceDriveType[MAX_KNOWN_DOS_DRIVE_TYPE] = {
     { L"DOSDEVICE_DRIVE_CDROM", DOSDEVICE_DRIVE_CDROM },
     { L"DOSDEVICE_DRIVE_RAMDISK", DOSDEVICE_DRIVE_RAMDISK }
 };
-
-COLORREF CLR_HOOK = 0x80ff80; //light green
-COLORREF CLR_WARN = 0x5050ff; //red
-COLORREF CLR_INVL = 0xa9a9a9; //silver
-COLORREF CLR_LGRY = 0xd3d3d3; //light grey

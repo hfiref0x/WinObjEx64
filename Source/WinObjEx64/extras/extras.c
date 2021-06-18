@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRAS.C
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        14 Jan 2021
+*  DATE:        11 May 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -77,65 +77,6 @@ VOID extrasSimpleListResize(
         r.right,
         r.bottom - szr.bottom,
         SWP_NOZORDER);
-}
-
-/*
-* extrasDlgHandleNotify
-*
-* Purpose:
-*
-* Common WM_NOTIFY processing for list only dialogs.
-*
-*/
-BOOL extrasDlgHandleNotify(
-    _In_ LPNMLISTVIEW nhdr,
-    _In_ EXTRASCONTEXT* Context,
-    _In_ DlgCompareFunction CompareFunc,
-    _In_opt_ CustomNotifyFunction CustomHandler,
-    _In_opt_ PVOID CustomParameter
-)
-{
-    BOOL bResult = FALSE;
-    INT nImageIndex;
-
-    if ((nhdr == NULL) || (Context == NULL) || (CompareFunc == NULL))
-        return bResult;
-
-    if (nhdr->hdr.idFrom != ID_EXTRASLIST)
-        return bResult;
-
-    switch (nhdr->hdr.code) {
-
-    case LVN_COLUMNCLICK:
-
-        Context->bInverseSort = !Context->bInverseSort;        
-        Context->lvColumnToSort = nhdr->iSubItem;
-        ListView_SortItemsEx(Context->ListView, CompareFunc, Context->lvColumnToSort);
-
-        nImageIndex = ImageList_GetImageCount(g_ListViewImages);
-        if (Context->bInverseSort)
-            nImageIndex -= 2; //sort down/up images are always at the end of g_ListViewImages
-        else
-            nImageIndex -= 1;
-
-        supUpdateLvColumnHeaderImage(
-            Context->ListView,
-            Context->lvColumnCount,
-            Context->lvColumnToSort,
-            nImageIndex);
-
-        bResult = TRUE;
-        break;
-
-    default:
-        break;
-    }
-
-    if (CustomHandler) {
-        bResult = CustomHandler(nhdr, Context, CustomParameter);
-    }
-
-    return bResult;
 }
 
 /*
@@ -241,12 +182,16 @@ VOID extrasShowDialogById(
         break;
 
     case ID_EXTRAS_DRIVERS:
+    case ID_EXTRAS_UNLOADEDDRIVERS:
         //
         // Unsupported in Wine.
-        // The list is empty or contains user mode dlls/application itself.
+        // Drivers list is empty or contains user mode dlls/application itself.
         //
         if (g_WinObj.IsWine == FALSE) {
-            extrasCreateDriversDialog(ParentWindow);
+            if (DialogId == ID_EXTRAS_DRIVERS)
+                extrasCreateDriversDialog(ParentWindow, DDM_Normal);
+            else
+                extrasCreateDriversDialog(ParentWindow, DDM_Unloaded);
         }
         break;
 

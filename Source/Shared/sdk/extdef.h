@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTAPI.H
 *
-*  VERSION:     1.02
+*  VERSION:     1.03
 *
-*  DATE:        16 Jan 2021
+*  DATE:        15 May 2021
 *
 *  Windows SDK compatibility header.
 *
@@ -18,19 +18,17 @@
 *******************************************************************************/
 #pragma once
 
-typedef enum _EXT_SID_NAME_USE {
-    ExtSidTypeUser = 1,
-    ExtSidTypeGroup,
-    ExtSidTypeDomain,
-    ExtSidTypeAlias,
-    ExtSidTypeWellKnownGroup,
-    ExtSidTypeDeletedAccount,
-    ExtSidTypeInvalid,
-    ExtSidTypeUnknown,
-    ExtSidTypeComputer,
-    ExtSidTypeLabel,
-    ExtSidTypeLogonSession
-} EXT_SID_NAME_USE, *PEXT_SID_NAME_USE;
+#define sidTypeUser 1
+#define sidTypeGroup 2
+#define sidTypeDomain 3
+#define sidTypeAlias 4
+#define sidTypeWellKnownGroup 5 
+#define sidTypeDeletedAccount 6
+#define sidTypeInvalid 7
+#define sidTypeUnknown 8
+#define sidTypeComputer 9
+#define sidTypeLabel 10
+#define sidTypeLogonSession 11
 
 //
 // These constants are missing in Windows SDK 8.1

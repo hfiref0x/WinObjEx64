@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020
+*  (C) COPYRIGHT AUTHORS, 2020 - 2021
 *
 *  TITLE:       DRVHELPER.H
 *
-*  VERSION:     1.84
+*  VERSION:     1.90
 *
-*  DATE:        14 Feb 2019
+*  DATE:        11 May 2021
 *
 *  Common header file for the Kernel Driver Helper support.
 *
@@ -16,7 +16,6 @@
 * PARTICULAR PURPOSE.
 *
 *******************************************************************************/
-
 #pragma once
 
 #define FILE_DEVICE_WINIO       (DWORD)0x00008010

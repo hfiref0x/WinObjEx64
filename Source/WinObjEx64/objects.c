@@ -4,9 +4,9 @@
 *
 *  TITLE:       OBJECTS.C
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        16 Feb 2021
+*  DATE:        17 May 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -43,8 +43,8 @@ WOBJ_TYPE_DESC g_TypeDxgkSharedBundleObject = { L"DxgkSharedBundleObject", 0xf7e
 WOBJ_TYPE_DESC g_TypeDxgkSharedKeyedMutexObject = { L"DxgkSharedKeyedMutexObject", 0xd6c628fd, ObjectTypeDxgkSharedKeyedMutex, IDI_ICON_DXOBJECT, IDS_DESC_DXGK_SHARED_KEYED_MUTEX_OBJECT };
 WOBJ_TYPE_DESC g_TypeDxgkSharedProtectedSessionObject = { L"DxgkSharedProtectedSessionObject", 0xa9676f44, ObjectTypeDxgkSharedProtectedSession, IDI_ICON_DXOBJECT, IDS_DESC_DXGK_SHARED_PROTECTED_SESSION_OBJECT };
 WOBJ_TYPE_DESC g_TypeDxgkSharedResource = { L"DxgkSharedResource", 0x632e6c2b, ObjectTypeDxgkSharedResource, IDI_ICON_DXOBJECT, IDS_DESC_DXGKSHAREDRES };
-WOBJ_TYPE_DESC g_TypeDxgkSharedSwapChainObject = { L"DxgkSharedSwapChainObject", 0xf5053210, ObjectTypeDxgkSharedSwapChain, IDI_ICON_DXOBJECT, IDS_DESC_DXGKSHAREDSWAPCHAIN };
-WOBJ_TYPE_DESC g_TypeDxgkSharedSyncObject = { L"DxgkSharedSyncObject", 0xa29968d7, ObjectTypeDxgkSharedSyncObject, IDI_ICON_DXOBJECT, IDS_DESC_DXGKSHAREDSYNC };
+WOBJ_TYPE_DESC g_TypeDxgkSharedSwapChainObject = { L"DxgkSharedSwapChainObject", 0xf5053210, ObjectTypeDxgkSharedSwapChain, IDI_ICON_DXOBJECT, IDS_DESC_DXGK_SHARED_SWAPCHAIN };
+WOBJ_TYPE_DESC g_TypeDxgkSharedSyncObject = { L"DxgkSharedSyncObject", 0xa29968d7, ObjectTypeDxgkSharedSyncObject, IDI_ICON_DXOBJECT, IDS_DESC_DXGK_SHARED_SYNC };
 WOBJ_TYPE_DESC g_TypeEnergyTracker = { L"EnergyTracker", 0x4dcec6d0, ObjectTypeEnergyTracker, IDI_ICON_ENERGYTRACKER, IDS_DESC_ENERGYTRACKER };
 WOBJ_TYPE_DESC g_TypeEtwConsumer = { L"EtwConsumer", 0x31a53abe, ObjectTypeETWConsumer, IDI_ICON_ETWCONSUMER, IDS_DESC_ETWCONSUMER };
 WOBJ_TYPE_DESC g_TypeEtwRegistration = { L"EtwRegistration", 0x89b06481, ObjectTypeETWRegistration, IDI_ICON_ETWREGISTRATION, IDS_DESC_ETWREGISTRATION };
@@ -136,7 +136,7 @@ static WOBJ_TYPE_DESC* gpObjectTypes[] = {
     &g_TypeFilterConnectionPort,
     &g_TypeIoCompletion,
     &g_TypeIoCompletionReserve,
-    & g_TypeIoRing,
+    &g_TypeIoRing,
     &g_TypeIRTimer,
     &g_TypeJob,
     &g_TypeKey,

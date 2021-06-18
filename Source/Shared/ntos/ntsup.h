@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTSUP.H
 *
-*  VERSION:     2.05
+*  VERSION:     2.06
 *
-*  DATE:        14 Jan 2021
+*  DATE:        03 May 2021
 *
 *  Common header file for the NT API support functions and definitions.
 *
@@ -50,7 +50,6 @@
 #undef _NTDEF_
 
 #include "minirtl/minirtl.h"
-#include "minirtl/rtltypes.h"
 
 #ifdef ENABLE_C_EXTERN
 #if defined(__cplusplus)
@@ -132,8 +131,24 @@ HANDLE ntsupGetCurrentProcessToken(
 ULONG_PTR ntsupQuerySystemRangeStart(
     VOID);
 
+BOOLEAN ntsupQueryUserModeAccessibleRange(
+    _Out_ PULONG_PTR MinimumUserModeAddress,
+    _Out_ PULONG_PTR MaximumUserModeAddress);
+
 BOOL ntsupIsProcess32bit(
     _In_ HANDLE hProcess);
+
+PVOID ntsupGetLoadedModulesListEx(
+    _In_ BOOL ExtendedOutput,
+    _Out_opt_ PULONG ReturnLength,
+    _In_ PNTSUPMEMALLOC AllocMem,
+    _In_ PNTSUPMEMFREE FreeMem);
+
+PVOID ntsupGetLoadedModulesList(
+    _Out_opt_ PULONG ReturnLength);
+
+PVOID ntsupGetLoadedModulesList2(
+    _Out_opt_ PULONG ReturnLength);
 
 PVOID ntsupGetSystemInfoEx(
     _In_ SYSTEM_INFORMATION_CLASS SystemInformationClass,

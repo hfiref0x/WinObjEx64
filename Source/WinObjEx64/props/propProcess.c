@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPPROCESS.C
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        14 Jan 2021
+*  DATE:        27 May 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,6 +17,9 @@
 #include "global.h"
 #include "propDlg.h"
 #include "extras.h"
+
+#define COLUMN_PSLIST_HANDLE        2
+#define COLUMN_PSLIST_GRANTEDACCESS 3
 
 /*
 * ProcessListCompareFunc
@@ -49,7 +52,9 @@ INT CALLBACK ProcessListCompareFunc(
     //
     // Sort Handle/GrantedAccess value column.
     //
-    if ((lvColumnToSort == 2) || (lvColumnToSort == 3)) {
+    if ((lvColumnToSort == COLUMN_PSLIST_HANDLE) || 
+        (lvColumnToSort == COLUMN_PSLIST_GRANTEDACCESS)) 
+    {
         return supGetMaxOfTwoU64FromHex(
             pDlgContext->ListView,
             lParam1,
@@ -454,8 +459,6 @@ VOID ProcessListSetInfo(
 
     PS_HANDLE_DUMP_ENUM_CONTEXT     enumContext;
 
-    VALIDATE_PROP_CONTEXT(Context);
-
     //empty process list images
     ImageList_RemoveAll(pDlgContext->ImageList);
 
@@ -560,13 +563,18 @@ VOID ProcessListSetInfo(
             enumContext.ObjectAddress = ObjectAddress;
             enumContext.ObjectTypeIndex = ObjectTypeIndex;
 
+            supListViewEnableRedraw(pDlgContext->ListView, FALSE);
+
             supEnumHandleDump(pHandles,
                 (PENUMERATE_HANDLE_DUMP_CALLBACK)ProcessEnumHandlesCallback,
                 &enumContext);
 
+            supListViewEnableRedraw(pDlgContext->ListView, TRUE);
+
             supHeapFree(pHandles);
             pHandles = NULL;
         }
+
 
     } while (FALSE);
 
@@ -644,76 +652,34 @@ BOOL ProcessInitListView(
 *
 */
 VOID ProcessHandlePopupMenu(
-    _In_ HWND hwndDlg
+    _In_ HWND hwndDlg,
+    _In_ LPPOINT lpPoint,
+    _In_ PVOID lpUserParam
 )
 {
-    POINT pt1;
     HMENU hMenu;
-
-    if (GetCursorPos(&pt1) == FALSE)
-        return;
+    EXTRASCONTEXT* Context = (EXTRASCONTEXT*)lpUserParam;
 
     hMenu = CreatePopupMenu();
     if (hMenu) {
-        InsertMenu(hMenu, 0, MF_BYCOMMAND, ID_OBJECT_COPY, T_COPYTEXTROW);
-        TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, hwndDlg, NULL);
+
+        if (supListViewAddCopyValueItem(hMenu,
+            Context->ListView,
+            ID_OBJECT_COPY,
+            0,
+            lpPoint,
+            &Context->lvItemHit,
+            &Context->lvColumnHit))
+        {
+            TrackPopupMenu(hMenu,
+                TPM_RIGHTBUTTON | TPM_LEFTALIGN,
+                lpPoint->x,
+                lpPoint->y,
+                0,
+                hwndDlg,
+                NULL);
+        }
         DestroyMenu(hMenu);
-    }
-}
-
-/*
-* ProcessCopyText
-*
-* Purpose:
-*
-* Copy selected list view row to the clipboard.
-*
-*/
-VOID ProcessCopyText(
-    _In_ HWND hwndList,
-    _In_ INT lvComlumnCount
-)
-{
-    INT     nSelection, i;
-    SIZE_T  cbText, sz;
-    LPWSTR  lpText, lpItemText[4];
-
-    nSelection = ListView_GetSelectionMark(hwndList);
-    if (nSelection == -1) {
-        return;
-    }
-
-    __try {
-        cbText = 0;
-        for (i = 0; i < lvComlumnCount; i++) {
-            sz = 0;
-            lpItemText[i] = supGetItemText(hwndList, nSelection, i, &sz);
-            cbText += sz;
-        }
-
-        cbText += (lvComlumnCount * sizeof(WCHAR)) + sizeof(UNICODE_NULL);
-        lpText = (LPWSTR)supHeapAlloc(cbText);
-        if (lpText) {
-
-            for (i = 0; i < lvComlumnCount; i++) {
-                if (lpItemText[i]) {
-                    _strcat(lpText, lpItemText[i]);
-                    if (i != 3) {
-                        _strcat(lpText, L" ");
-                    }
-                }
-            }
-            supClipboardCopy(lpText, cbText);
-            supHeapFree(lpText);
-        }
-        for (i = 0; i < lvComlumnCount; i++) {
-            if (lpItemText[i] != NULL) {
-                supHeapFree(lpItemText[i]);
-            }
-        }
-    }
-    __except (WOBJ_EXCEPTION_FILTER) {
-        return;
     }
 }
 
@@ -748,7 +714,16 @@ INT_PTR CALLBACK ProcessListDialogProc(
     switch (uMsg) {
 
     case WM_CONTEXTMENU:
-        ProcessHandlePopupMenu(hwndDlg);
+
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+            supHandleContextMenuMsgForListView(hwndDlg,
+                wParam,
+                lParam,
+                pDlgContext->ListView,
+                (pfnPopupMenuHandler)ProcessHandlePopupMenu,
+                pDlgContext);
+        }
         break;
 
     case WM_COMMAND:
@@ -756,7 +731,11 @@ INT_PTR CALLBACK ProcessListDialogProc(
         if (GET_WM_COMMAND_ID(wParam, lParam) == ID_OBJECT_COPY) {
             pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
             if (pDlgContext) {
-                ProcessCopyText(pDlgContext->ListView, pDlgContext->lvColumnCount);
+
+                supListViewCopyItemValueToClipboard(pDlgContext->ListView,
+                    pDlgContext->lvItemHit,
+                    pDlgContext->lvColumnHit);
+
             }
         }
         break;
@@ -785,6 +764,10 @@ INT_PTR CALLBACK ProcessListDialogProc(
 
             pDlgContext = (EXTRASCONTEXT*)supHeapAlloc(sizeof(EXTRASCONTEXT));
             if (pDlgContext) {
+
+                pDlgContext->lvColumnHit = -1;
+                pDlgContext->lvItemHit = -1;
+
                 SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)pDlgContext);
 
                 if (ProcessInitListView(hwndDlg, pDlgContext)) {

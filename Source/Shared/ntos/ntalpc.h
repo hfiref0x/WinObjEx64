@@ -1,12 +1,12 @@
 /************************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017 - 2020, translated from Microsoft sources/debugger
+*  (C) COPYRIGHT AUTHORS, 2017 - 2021, translated from Microsoft sources/debugger
 *
 *  TITLE:       NTALPC.H
 *
-*  VERSION:     1.89
+*  VERSION:     1.90
 *
-*  DATE:        12 July 2020
+*  DATE:        02 May 2021
 *
 *  Common header file for the ntos ALPC/CSR related functions and definitions.
 *
@@ -131,6 +131,17 @@ typedef struct _ALPC_COMMUNICATION_INFO_V2 {
     struct _ALPC_HANDLE_TABLE HandleTable;
     struct _KALPC_MESSAGE *CloseMessage;
 } ALPC_COMMUNICATION_INFO_V2, *PALPC_COMMUNICATION_INFO_V2;
+
+//
+// Compatible fields only structure.
+//
+typedef struct _ALPC_COMMUNICATION_INFO_COMPAT {
+    struct _ALPC_PORT* ConnectionPort;
+    struct _ALPC_PORT* ServerCommunicationPort;
+    struct _ALPC_PORT* ClientCommunicationPort;
+    struct _LIST_ENTRY CommunicationList;
+    struct _ALPC_HANDLE_TABLE HandleTable;
+} ALPC_COMMUNICATION_INFO_COMPAT, * PALPC_COMMUNICATION_INFO_COMPAT;
 
 typedef union _ALPC_PORT_STATE {
     struct

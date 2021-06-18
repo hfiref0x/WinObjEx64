@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       PROPOBJECTDUMP.H
 *
-*  VERSION:     1.86
+*  VERSION:     1.90
 *
-*  DATE:        26 May 2020
+*  DATE:        11 May 2021
 *
 *  Common header file for the object dump support.
 *
@@ -24,16 +24,26 @@ INT_PTR CALLBACK ObjectDumpDialogProc(
     _In_  WPARAM wParam,
     _In_  LPARAM lParam);
 
-VOID propObDumpUlong(
+HTREEITEM propObDumpUlong(
     _In_ HWND TreeList,
     _In_ HTREEITEM hParent,
     _In_ LPWSTR lpszName,
-    _In_opt_ LPWSTR lpszDesc, //additional text to be displayed
+    _In_opt_ LPWSTR lpszDesc,
     _In_ ULONG Value,
     _In_ BOOL HexDump,
     _In_ BOOL IsUShort,
     _In_opt_ COLORREF BgColor,
     _In_opt_ COLORREF FontColor);
+
+VOID propObDumpUlong64(
+    _In_ HWND TreeList,
+    _In_ HTREEITEM hParent,
+    _In_ LPWSTR lpszName,
+    _In_opt_ LPWSTR lpszDesc,
+    _In_opt_ ULONG64 Value,
+    _In_ BOOL OutAsHex,
+    _In_ COLORREF BgColor,
+    _In_ COLORREF FontColor);
 
 VOID propObDumpByte(
     _In_ HWND TreeList,
@@ -44,3 +54,37 @@ VOID propObDumpByte(
     _In_opt_ COLORREF BgColor,
     _In_opt_ COLORREF FontColor,
     _In_ BOOL IsBool);
+
+HTREEITEM propObDumpAddress(
+    _In_ HWND TreeList,
+    _In_ HTREEITEM hParent,
+    _In_ LPWSTR lpszName,
+    _In_opt_ LPWSTR lpszDesc,
+    _In_opt_ PVOID Address,
+    _In_ COLORREF BgColor,
+    _In_ COLORREF FontColor);
+
+HTREEITEM propObDumpSetString(
+    _In_ HWND TreeList,
+    _In_ HTREEITEM hParent,
+    _In_ LPWSTR lpszName,
+    _In_opt_ LPWSTR lpszDesc,
+    _In_opt_ LPWSTR lpszValue,
+    _In_opt_ COLORREF BgColor,
+    _In_opt_ COLORREF FontColor);
+
+HTREEITEM propObDumpLong(
+    _In_ HWND TreeList,
+    _In_ HTREEITEM hParent,
+    _In_ LPWSTR lpszName,
+    _In_opt_ LPWSTR lpszDesc,
+    _In_ LONG Value,
+    _In_ BOOL HexDump,
+    _In_opt_ COLORREF BgColor,
+    _In_opt_ COLORREF FontColor);
+
+VOID propObDumpListEntry(
+    _In_ HWND TreeList,
+    _In_ HTREEITEM hParent,
+    _In_ LPWSTR ListEntryName,
+    _In_opt_ PLIST_ENTRY ListEntry);

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       PROPDLG.C
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        04 Dec 2020
+*  DATE:        11 May 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -15,14 +15,16 @@
 *
 *******************************************************************************/
 #include "global.h"
+#include "propAlpcPort.h"
 #include "propBasic.h"
-#include "propType.h"
-#include "propDriver.h"
-#include "propToken.h"
-#include "propProcess.h"
 #include "propDesktop.h"
-#include "propSecurity.h"
+#include "propDriver.h"
 #include "propObjectDump.h"
+#include "propProcess.h"
+#include "propSection.h"
+#include "propSecurity.h"
+#include "propToken.h"
+#include "propType.h"
 
 //previously focused window
 HWND hPrevFocus;
@@ -587,7 +589,7 @@ VOID propCreateDialog(
     _In_ PROP_DIALOG_CREATE_SETTINGS* Settings
 )
 {
-    BOOL              IsSimpleContext = FALSE;
+    BOOL              IsSimpleContext = FALSE, IsDriverAssisted = FALSE;
     INT               nPages;
     HWND              hwndDlg;
     PROP_OBJECT_INFO* propContext = NULL;
@@ -603,6 +605,7 @@ VOID propCreateDialog(
         return;
 
     IsSimpleContext = (Settings->NamespaceObject != NULL) || (Settings->UnnamedObject != NULL);
+    IsDriverAssisted = kdConnectDriver();
 
     //
     // Allocate context variable, copy name, type, object path.
@@ -615,6 +618,7 @@ VOID propCreateDialog(
 
     if (propContext == NULL)
         return;
+
 
     //
     // Remember namespace or unnamed object info.
@@ -721,7 +725,7 @@ VOID propCreateDialog(
     //
     // Create Objects page for supported types.
     //
-    if (g_kdctx.DeviceHandle != NULL) {
+    if (IsDriverAssisted) {
         switch (propContext->TypeIndex) {
         case ObjectTypeDirectory:
         case ObjectTypeDriver:
@@ -828,6 +832,42 @@ VOID propCreateDialog(
         Page.lParam = (LPARAM)propContext;
         psp[nPages++] = CreatePropertySheetPage(&Page);
         break;
+    }
+
+    //
+    // Add Section object specific page, driver assistance required.
+    //
+    // This feature implemented only for Windows 10 as structures are too variable.
+    //
+
+    if (g_NtBuildNumber >= NT_WIN10_THRESHOLD1 && 
+        propContext->TypeIndex == ObjectTypeSection 
+        && IsDriverAssisted) 
+    {
+        RtlSecureZeroMemory(&Page, sizeof(Page));
+        Page.dwSize = sizeof(PROPSHEETPAGE);
+        Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
+        Page.hInstance = g_WinObj.hInstance;
+        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_OBJECTDUMP);
+        Page.pfnDlgProc = SectionPropertiesDialogProc;
+        Page.pszTitle = TEXT("Object");
+        Page.lParam = (LPARAM)propContext;
+        psp[nPages++] = CreatePropertySheetPage(&Page);
+    }
+
+    //
+    // Add ALPC port specific page, driver assistance required.
+    //
+    if (propContext->TypeIndex == ObjectTypePort && IsDriverAssisted) {
+        RtlSecureZeroMemory(&Page, sizeof(Page));
+        Page.dwSize = sizeof(PROPSHEETPAGE);
+        Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
+        Page.hInstance = g_WinObj.hInstance;
+        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_ALPCPORTLIST);
+        Page.pfnDlgProc = AlpcPortListDialogProc;
+        Page.pszTitle = TEXT("Connections");
+        Page.lParam = (LPARAM)propContext;
+        psp[nPages++] = CreatePropertySheetPage(&Page);
     }
 
     //

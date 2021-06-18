@@ -4,9 +4,9 @@
 *
 *  TITLE:       FINDDLG.C
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        15 Dec 2020
+*  DATE:        27 May 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -417,6 +417,11 @@ VOID FindDlgHandleSearch(
 
     FindObject(KM_OBJECTS_ROOT_DIRECTORY, pnameStr, ptypeStr, &flist);
 
+    //
+    // Disable listview redraw
+    //
+    supListViewEnableRedraw(g_FindDlgContext.SearchList, FALSE);
+
     cci = 0;
     while (flist != NULL) {
         FindDlgAddListItem(g_FindDlgContext.SearchList, flist->ObjectName, flist->ObjectType);
@@ -435,6 +440,11 @@ VOID FindDlgHandleSearch(
 
     ListView_SortItemsEx(g_FindDlgContext.SearchList,
         &FindDlgCompareFunc, g_FindDlgContext.SortColumn);
+
+    //
+    // Enable listview redraw
+    //
+    supListViewEnableRedraw(g_FindDlgContext.SearchList, TRUE);
 
     supSetWaitCursor(FALSE);
     EnableWindow(GetDlgItem(hwndDlg, ID_SEARCH_FIND), TRUE);
@@ -514,6 +524,7 @@ INT_PTR CALLBACK FindDlgProc(
         default:
             break;
         }
+        break;
 
     case WM_CONTEXTMENU:
 

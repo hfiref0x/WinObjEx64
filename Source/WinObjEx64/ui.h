@@ -4,9 +4,9 @@
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        15 Dec 2020
+*  DATE:        31 May 2021
 *
 *  Common header file for the user interface.
 *
@@ -48,9 +48,9 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
     );
 
 #define PROGRAM_MAJOR_VERSION       1
-#define PROGRAM_MINOR_VERSION       8
-#define PROGRAM_REVISION_NUMBER     8
-#define PROGRAM_BUILD_NUMBER        2101
+#define PROGRAM_MINOR_VERSION       9
+#define PROGRAM_REVISION_NUMBER     0
+#define PROGRAM_BUILD_NUMBER        2106
 
 #ifdef _USE_OWN_DRIVER
 #define PROGRAM_NAME            L"Windows Object Explorer 64-bit (Non-public version)"
@@ -66,17 +66,15 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 #define T_VIEWSD                L"View Security Descriptor..."
 #define T_RUNASADMIN            L"R&un as Administrator"
 #define T_RUNASSYSTEM           L"R&un as LocalSystem"
-#define T_COPYTEXTROW           L"Copy Row Selection"
-#define T_COPYEPROCESS          L"Copy EPROCESS Value"
-#define T_COPYOBJECT            L"Copy Object Value"
-#define T_COPYVALUE             L"Copy Value Field Text"
-#define T_COPYADDRESS           L"Copy Address Field Text"
-#define T_COPYADDINFO           L"Copy Additional Info Field Text"
+#define T_COPYEPROCESS          L"Copy \"EPROCESS\""
+#define T_COPYOBJECT            L"Copy \"Object\""
+#define T_COPYVALUE             L"Copy \"Value\""
+#define T_COPYADDRESS           L"Copy \"Address\""
+#define T_COPYADDINFO           L"Copy \"Additional Information\""
 #define T_EXPORTTOFILE          L"Export List"
 #define T_JUMPTOFILE            L"Jump to File"
 #define T_DUMPDRIVER            L"Dump Driver"
 #define T_VIEW_REFRESH          L"Refresh\tF5"
-#define T_RESCAN                L"Rescan"
 #define T_VIEW_PLUGINS          L"View Plugins"
 #define T_EMPTY                 L" "
 #define T_MSG_SETTINGS_CHANGE   L"wobjSettingsChange"
@@ -101,6 +99,7 @@ typedef enum _WOBJ_DIALOGS_ID {
     wobjW32SSTDlgId,
     wobjPsListDlgId,
     wobjDriversDlgId,
+    wobjUnloadedDriversDlgId,
     wobjCallbacksDlgId,
     wobjSLCacheDlgId,
     wobjPluginViewId,
@@ -208,9 +207,6 @@ typedef struct _PROP_OBJECT_INFO {
     PROP_PORT_OBJECT PortObjectInfo;
 } PROP_OBJECT_INFO, *PPROP_OBJECT_INFO;
 
-#define VALIDATE_PROP_CONTEXT(Context) { if (Context == NULL) return; }
-#define VALIDATE_PROP_CONTEXT_WITH_RESULT(Context, Result) { if (Context == NULL) return Result; }
-
 //
 // If dialog already present - activate it window and return.
 //
@@ -221,7 +217,9 @@ typedef struct _PROP_OBJECT_INFO {
     }                                       \
 }
 
+//
 // If dialog already present - activate/restore it window and return.
+//
 #define ENSURE_DIALOG_UNIQUE_WITH_RESTORE(Dialog) {         \
     if (Dialog != NULL) {                                   \
         if (IsIconic(Dialog))                               \
@@ -258,38 +256,45 @@ typedef struct _LVCOLUMNS_DATA {
     INT ImageIndex;
 } LVCOLUMNS_DATA, *PLVCOLUMNS_DATA;
 
-//Constants
-//Display simple "N/A" if no info available
-#define T_CannotQuery	TEXT("N/A")
-#define T_NotAssigned   T_CannotQuery
+//
+// Constants
+//
+// 
+// Display simple "N/A" if no info available
+#define T_CannotQuery       TEXT("N/A")
+#define T_NotAssigned       T_CannotQuery
 
-//Value is not defined
-#define T_None          TEXT("None")
-#define T_NoneValue     TEXT("(None)")
+// Value is not defined
+#define T_None              TEXT("None")
+#define T_NoneValue         TEXT("(None)")
 
-//Value is invalid
-#define T_Invalid       TEXT("Invalid")
-#define T_InvalidValue  TEXT("(Invalid)")
+// Value is invalid
+#define T_Invalid           TEXT("Invalid")
+#define T_InvalidValue      TEXT("(Invalid)")
 
-//Display for unknown type value
-#define T_UnknownType	TEXT("Unknown Type")
-#define T_UnknownFlag	TEXT("Unknown Flag")
+// Display for unknown type value
+#define T_UnknownType       TEXT("Unknown Type")
 
-//Display for unknown value
-#define T_Unknown		TEXT("Unknown")
-#define T_UnknownValue  TEXT("(Unknown)")
+// Display for unknown flag value
+#define T_UnknownFlag       TEXT("Unknown Flag")
 
-//Empty string
-#define T_EmptyString   TEXT("")
+// Display for unknown process
+#define T_UnknownProcess    TEXT("Unknown Process")
 
-//prop used by sheets
-#define T_PROPCONTEXT	TEXT("propContext")
+// Display for unknown value
+#define T_Unknown           TEXT("Unknown")
 
-//prop used by prop dialog
-#define T_DLGCONTEXT	TEXT("dlgContext")
+// Empty string
+#define T_EmptyString       TEXT("")
 
-//props used by ipc dialogs
-#define T_IPCDLGCONTEXT TEXT("IpcDlgContext")
+// prop used by sheets
+#define T_PROPCONTEXT       TEXT("propContext")
+
+// prop used by prop dialog
+#define T_DLGCONTEXT        TEXT("dlgContext")
+
+// prop used by ipc dialogs
+#define T_IPCDLGCONTEXT     TEXT("IpcDlgContext")
 
 //Calendar
 static LPCWSTR g_szMonths[12] = {
@@ -307,25 +312,22 @@ static LPCWSTR g_szMonths[12] = {
     L"Dec"
 };
 
-#define wobjInitSuccess          0
-#define wobjInitNoHeap          -1
-#define wobjInitNoTemp          -2
-#define wobjInitNoWinDir        -3
-#define wobjInitNoSys32Dir      -4
-#define wobjInitNoProgDir       -5
+#define INIT_NO_ERROR               0
+#define INIT_ERROR_NOCRT            1
+#define INIT_ERROR_NOHEAP           2
+#define INIT_ERROR_NOTEMP           3
+#define INIT_ERROR_NOWINDIR         4
+#define INIT_ERROR_NOSYS32DIR       5
+#define INIT_ERROR_NOPROGDIR        6
+#define INIT_ERROR_NOCLASS          7
+#define INIT_ERROR_NOMAINWND        8
+#define INIT_ERROR_NOICCX           9
+#define INIT_ERROR_NOLISTWND        10
+#define INIT_ERROR_NOTREEWND        11
+#define INIT_ERROR_NOTLBARWND       12
+#define INIT_ERROR_UNSPECIFIED      13
 
 #define T_WOBJINIT_NOCRT TEXT("Could not initialize CRT, abort")
-#define T_WOBJINIT_NOHEAP TEXT("Could not initialize WinObjEx64, could not allocate heap")
-#define T_WOBJINIT_NOTEMP TEXT("Could not initialize WinObjEx64, could not locate %temp%")
-#define T_WOBJINIT_NOWINDIR TEXT("Could not initialize WinObjEx64, could not locate Windows directory")
-#define T_WOBJINIT_NOSYS32DIR TEXT("Could not initialize WinObjEx64, could not locate System32 directory")
-#define T_WOBJINIT_NOPROGDIR TEXT("Could not initialize WinObjEx64, could not query program directory")
-#define T_WOBJINIT_NOCLASS TEXT("Could not register WinObjEx64 window class, abort")
-#define T_WOBJINIT_NOMAINWINDOW TEXT("Could not create WinObjEx64 main window, abort")
-#define T_WOBJINIT_NOICCX TEXT("Could not initialize commctrl classes, abort")
-#define T_WOBJINIT_NOLISTWND TEXT("Could not create tree window, abort")
-#define T_WOBJINIT_NOTREEWND TEXT("Could not create list window, abort")
-#define T_WOBJINIT_NOTLBARWND TEXT("Could not create toolbar window, abort")
 
 #define ErrShadowWin32kNotFound             1
 #define ErrShadowMemAllocFail               2

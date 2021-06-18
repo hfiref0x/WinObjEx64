@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPSLIST.C
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        11 Dec 2020
+*  DATE:        31 May 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -39,6 +39,13 @@ ULONG g_DialogQuit = 0, g_DialogRefresh = 0;
 HANDLE g_PsListHeap = NULL;
 
 LIST_ENTRY g_PsListHead;
+
+#define COLUMN_THREADLIST_TID              0
+#define COLUMN_THREADLIST_PRIORITY         1
+#define COLUMN_THREADLIST_STATE            2
+#define COLUMN_THREADLIST_ETHREAD          3
+#define COLUMN_THREADLIST_STARTADDRESS     4
+#define COLUMN_THREADLIST_MODULE           5
 
 
 /*
@@ -194,8 +201,7 @@ VOID PsListHandlePopupMenu(
                 &PsDlgContext.lvItemHit,
                 &PsDlgContext.lvColumnHit))
             {
-                uPos++;
-                InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+                InsertMenu(hMenu, ++uPos, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
             }
 
         }
@@ -222,24 +228,24 @@ INT CALLBACK PsListCompareFunc(
 )
 {
     switch (lParamSort) {
-    case 0: //TID
-    case 1: //BasePriority
+    case COLUMN_THREADLIST_TID: //TID
+    case COLUMN_THREADLIST_PRIORITY: //BasePriority
         return supGetMaxOfTwoULongFromString(
             PsDlgContext.ListView,
             lParam1,
             lParam2,
             PsDlgContext.lvColumnToSort,
             PsDlgContext.bInverseSort);
-    case 2: //string (fixed size)
-    case 5: //string (fixed size)
+    case COLUMN_THREADLIST_STATE: //string (fixed size)
+    case COLUMN_THREADLIST_MODULE: //string (fixed size)
         return supGetMaxCompareTwoFixedStrings(
             PsDlgContext.ListView,
             lParam1,
             lParam2,
             PsDlgContext.lvColumnToSort,
             PsDlgContext.bInverseSort);
-    case 3: //ethread (hex)
-    case 4: //address (hex)
+    case COLUMN_THREADLIST_ETHREAD: //ethread (hex)
+    case COLUMN_THREADLIST_STARTADDRESS: //address (hex)
         return supGetMaxOfTwoU64FromHex(
             PsDlgContext.ListView,
             lParam1,
@@ -803,7 +809,7 @@ DWORD WINAPI CreateThreadListProc(
             if (!supQueryProcessEntryById(UniqueProcessId, ProcessList, &Process))
                 __leave;
 
-            pModules = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation, NULL);
+            pModules = (PRTL_PROCESS_MODULES)supGetLoadedModulesList(NULL);
 
             ThreadCount = Process->ThreadCount;
             stl = (OBEX_THREAD_LOOKUP_ENTRY*)supHeapAlloc(ThreadCount * sizeof(OBEX_THREAD_LOOKUP_ENTRY));
@@ -837,6 +843,8 @@ DWORD WINAPI CreateThreadListProc(
 
             SortedHandleList = supHandlesCreateFilteredAndSortedList(GetCurrentProcessId(), FALSE);
             stlptr = stl;
+
+            supListViewEnableRedraw(PsDlgContext.ListView, FALSE);
 
             for (i = 0; i < ThreadCount; i++, stlptr++) {
 
@@ -942,7 +950,7 @@ DWORD WINAPI CreateThreadListProc(
                 // Module (for system threads)
                 //
                 szBuffer[0] = 0;
-                if ((startAddress > g_kdctx.SystemRangeStart) && (pModules)) {
+                if (startAddress > g_kdctx.SystemRangeStart && pModules) {
                     if (!ntsupFindModuleNameByAddress(
                         pModules,
                         (PVOID)startAddress,
@@ -970,6 +978,8 @@ DWORD WINAPI CreateThreadListProc(
                 PsDlgContext.ListView,
                 PsListCompareFunc,
                 PsDlgContext.lvColumnToSort);
+
+            supListViewEnableRedraw(PsDlgContext.ListView, TRUE);
 
         }
     }
@@ -1033,12 +1043,11 @@ DWORD WINAPI CreateProcessListProc(
     ServicesList.Entries = NULL;
     ServicesList.NumberOfEntries = 0;
 
-    InitializeListHead(&g_PsListHead);
-
     __try {
         dwWaitResult = WaitForSingleObject(g_PsListWait, INFINITE);
         if (dwWaitResult == WAIT_OBJECT_0) {
 
+            InitializeListHead(&g_PsListHead);
             InterlockedIncrement((PLONG)&g_DialogRefresh);
 
             supSetWaitCursor(TRUE);
@@ -1628,8 +1637,10 @@ VOID extrasCreatePsListDialog(
     g_DialogQuit = 0;
     g_DialogRefresh = 0;
     g_PsListWait = CreateMutex(NULL, FALSE, NULL);
-    g_PsListHeap = RtlCreateHeap(HEAP_GROWABLE, NULL, 0, 0, NULL, NULL);
-    if (g_PsListHeap) {
-        CreateObjectList(FALSE, NULL);
+    if (g_PsListWait) {
+        g_PsListHeap = RtlCreateHeap(HEAP_GROWABLE, NULL, 0, 0, NULL, NULL);
+        if (g_PsListHeap) {
+            CreateObjectList(FALSE, NULL);
+        }
     }
 }

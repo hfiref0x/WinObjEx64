@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        14 Jan 2021
+*  DATE:        27 May 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -29,6 +29,18 @@ SDT_TABLE KiServiceTable;
 SDT_TABLE W32pServiceTable;
 
 EXTRASCONTEXT SSTDlgContext[SST_Max];
+
+#define COLUMN_SDTLIST_INDEX    0
+#define COLUMN_SDTLIST_NAME     1
+#define COLUMN_SDTLIST_ADDRESS  2
+#define COLUMN_SDTLIST_MODULE   3
+
+#define KSW_KiServiceTable L"KiServiceTable"
+#define KSW_KiServiceLimit L"KiServiceLimit"
+#define KSW_W32pServiceTable L"W32pServiceTable"
+#define KSW_W32pServiceLimit L"W32pServiceLimit"
+#define KSA_W32pServiceTable "W32pServiceTable"
+#define KSA_W32pServiceLimit "W32pServiceLimit"
 
 VOID SdtListCreate(
     _In_ HWND hwndDlg,
@@ -60,22 +72,22 @@ INT CALLBACK SdtDlgCompareFunc(
     pDlgContext = &SSTDlgContext[CallbackParam->Value];
 
     switch (pDlgContext->lvColumnToSort) {
-    case 0: //index
+    case COLUMN_SDTLIST_INDEX: //index
         return supGetMaxOfTwoULongFromString(
             pDlgContext->ListView,
             lParam1,
             lParam2,
             pDlgContext->lvColumnToSort,
             pDlgContext->bInverseSort);
-    case 2: //address (hex)
+    case COLUMN_SDTLIST_ADDRESS: //address (hex)
         return supGetMaxOfTwoU64FromHex(
             pDlgContext->ListView,
             lParam1,
             lParam2,
             pDlgContext->lvColumnToSort,
             pDlgContext->bInverseSort);
-    case 1: //string (fixed size)
-    case 3: //string (fixed size)
+    case COLUMN_SDTLIST_NAME: //string (fixed size)
+    case COLUMN_SDTLIST_MODULE: //string (fixed size)
         return supGetMaxCompareTwoFixedStrings(
             pDlgContext->ListView,
             lParam1,
@@ -116,14 +128,13 @@ VOID SdtHandlePopupMenu(
             &Context->lvItemHit,
             &Context->lvColumnHit))
         {
-            uPos++;
-            InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+            InsertMenu(hMenu, ++uPos, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
         }
 
         InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_JUMPTOFILE, T_JUMPTOFILE);
         InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_SDTLIST_SAVE, T_EXPORTTOFILE);
         InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-        InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_VIEW_REFRESH, T_RESCAN);
+        InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_VIEW_REFRESH, T_VIEW_REFRESH);
 
         TrackPopupMenu(hMenu,
             TPM_RIGHTBUTTON | TPM_LEFTALIGN,
@@ -336,7 +347,9 @@ INT_PTR CALLBACK SdtDialogProc(
         case ID_VIEW_REFRESH:
             pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
             if (pDlgContext) {
+                supListViewEnableRedraw(pDlgContext->ListView, FALSE);
                 SdtListCreate(hwndDlg, TRUE, pDlgContext);
+                supListViewEnableRedraw(pDlgContext->ListView, TRUE);
             }
             break;
 
@@ -516,13 +529,13 @@ BOOL SdtListCreateTable(
 
     __try {
 
-        if ((g_kdctx.KeServiceDescriptorTable.Base == 0) ||
-            (g_kdctx.KeServiceDescriptorTable.Limit == 0))
+        if ((g_kdctx.Data->KeServiceDescriptorTable.Base == 0) ||
+            (g_kdctx.Data->KeServiceDescriptorTable.Limit == 0))
         {
             if (!kdFindKiServiceTable(
                 (ULONG_PTR)g_kdctx.NtOsImageMap,
                 (ULONG_PTR)g_kdctx.NtOsBase,
-                &g_kdctx.KeServiceDescriptorTable))
+                &g_kdctx.Data->KeServiceDescriptorTable))
             {
                 __leave;
             }
@@ -561,8 +574,8 @@ BOOL SdtListCreateTable(
             KiServiceTable.Allocated = TRUE;
 
             if (!supDumpSyscallTableConverted(
-                g_kdctx.KeServiceDescriptorTable.Base,
-                g_kdctx.KeServiceDescriptorTable.Limit,
+                g_kdctx.Data->KeServiceDescriptorTable.Base,
+                g_kdctx.Data->KeServiceDescriptorTable.Limit,
                 &TableDump))
             {
                 supHeapFree(KiServiceTable.Table);
@@ -570,7 +583,7 @@ BOOL SdtListCreateTable(
                 __leave;
             }
 
-            KiServiceTable.Base = g_kdctx.KeServiceDescriptorTable.Base;
+            KiServiceTable.Base = g_kdctx.Data->KeServiceDescriptorTable.Base;
 
             //
             // Walk for syscall stubs.
@@ -603,7 +616,7 @@ BOOL SdtListCreateTable(
 
                     if (*(UCHAR*)((UCHAR*)FunctionAddress + 3) == 0xB8) {
                         ServiceId = *(ULONG*)((UCHAR*)FunctionAddress + 4);
-                        if (ServiceId < g_kdctx.KeServiceDescriptorTable.Limit) {
+                        if (ServiceId < g_kdctx.Data->KeServiceDescriptorTable.Limit) {
                             ServiceEntry->ServiceId = ServiceId;
                             ServiceEntry->Address = TableDump[ServiceId];
                             TableDump[ServiceId] = 0;
@@ -626,7 +639,7 @@ BOOL SdtListCreateTable(
             for (i = 0; i < KiServiceTable.Limit; i++) {
                 ServiceEntry = &KiServiceTable.Table[i];
                 if (ServiceEntry->ServiceId == INVALID_SERVICE_ENTRY_ID) {
-                    for (j = 0; j < g_kdctx.KeServiceDescriptorTable.Limit; j++) {
+                    for (j = 0; j < g_kdctx.Data->KeServiceDescriptorTable.Limit; j++) {
                         if (TableDump[j] != 0) {
                             ServiceEntry->ServiceId = j;
                             ServiceEntry->Address = TableDump[j];
@@ -1607,19 +1620,11 @@ VOID SdtListCreate(
     PRTL_PROCESS_MODULES pModules = NULL;
     LPWSTR lpStatusMsg;
 
-#ifndef _DEBUG
-    HWND hwndBanner;
-
-    hwndBanner = supDisplayLoadBanner(hwndDlg,
-        TEXT("Loading service table dump, please wait"));
-#endif
-
-    supStatusBarSetText(pDlgContext->StatusBar, 1, TEXT("Initializing table view"));
-
-
     __try {
 
-        pModules = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation, NULL);
+        supStatusBarSetText(pDlgContext->StatusBar, 1, TEXT("Initializing table view"));
+
+        pModules = (PRTL_PROCESS_MODULES)supGetLoadedModulesList(NULL);
         if (pModules == NULL) {
 
             supStatusBarSetText(pDlgContext->StatusBar, 1,
@@ -1668,10 +1673,6 @@ VOID SdtListCreate(
                 SdtListOutputTable(hwndDlg, pModules, &W32pServiceTable);
             }
             else {
-
-#ifndef _DEBUG
-                SendMessage(hwndBanner, WM_CLOSE, 0, 0);
-#endif
 
                 switch (returnStatus) {
 
@@ -1728,10 +1729,6 @@ VOID SdtListCreate(
 
         if (pModules)
             supHeapFree(pModules);
-
-#ifndef _DEBUG
-        SendMessage(hwndBanner, WM_CLOSE, 0, 0);
-#endif
 
     }
 
@@ -1849,6 +1846,8 @@ VOID extrasCreateSSDTDialog(
 
         SendMessage(hwndDlg, WM_SIZE, 0, 0);
 
+        supListViewEnableRedraw(pDlgContext->ListView, FALSE);
         SdtListCreate(pDlgContext->hwndDlg, FALSE, pDlgContext);
+        supListViewEnableRedraw(pDlgContext->ListView, TRUE);
     }
 }

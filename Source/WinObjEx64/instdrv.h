@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019, portions (C) Mark Russinovich, FileMon
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       INSTDRV.H
 *
-*  VERSION:     1.72
+*  VERSION:     1.90
 *
-*  DATE:        04 Feb 2019
+*  DATE:        16 May 2021
 *
 *  Common header file for the program SCM usage.
 *
@@ -18,37 +18,37 @@
 *******************************************************************************/
 #pragma once
 
-BOOL scmInstallDriver(
+BOOLEAN scmInstallDriver(
     _In_ SC_HANDLE SchSCManager,
     _In_ LPCTSTR DriverName,
     _In_opt_ LPCTSTR ServiceExe,
     _Out_opt_ PDWORD lpStatus);
 
-BOOL scmStartDriver(
+BOOLEAN scmStartDriver(
     _In_ SC_HANDLE SchSCManager,
     _In_ LPCTSTR DriverName,
     _Out_opt_ PDWORD lpStatus);
 
-BOOL scmOpenDevice(
+BOOLEAN scmOpenDevice(
     _In_ LPCTSTR DriverName,
     _Out_opt_ PHANDLE lphDevice,
     _Out_opt_ PDWORD lpStatus);
 
-BOOL scmStopDriver(
+BOOLEAN scmStopDriver(
     _In_ SC_HANDLE SchSCManager,
     _In_ LPCTSTR DriverName,
     _Out_opt_ PDWORD lpStatus);
 
-BOOL scmRemoveDriver(
+BOOLEAN scmRemoveDriver(
     _In_ SC_HANDLE SchSCManager,
     _In_ LPCTSTR DriverName,
     _Out_opt_ PDWORD lpStatus);
 
-BOOL scmUnloadDeviceDriver(
+BOOLEAN scmUnloadDeviceDriver(
     _In_ LPCTSTR Name,
     _Out_opt_ PDWORD lpStatus);
 
-BOOL scmLoadDeviceDriver(
+BOOLEAN scmLoadDeviceDriver(
     _In_ LPCTSTR Name,
     _In_opt_ LPCTSTR Path,
     _Out_opt_ PHANDLE lphDevice,

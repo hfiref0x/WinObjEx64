@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPTYPE.C
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        05 Dec 2020
+*  DATE:        11 May 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -428,8 +428,6 @@ VOID propSetTypeDecodedAttributes(
     DWORD           i, dwFlags, a_Count;
     PVALUE_DESC     a_Desc;
 
-    VALIDATE_PROP_CONTEXT(Context);
-
     hListRights = GetDlgItem(hwndDlg, ID_TYPE_ACL_LIST);
     if (hListRights == NULL) {
         return;
@@ -455,9 +453,14 @@ VOID propSetTypeDecodedAttributes(
     if (dwFlags == 0)
         return;
 
-    //Depending on selection, decode attributes to the list
+    //
+    // Depending on selection, decode attributes to the list.
+    //
     if (curSel == 0) {
-        //list all known attributes
+
+        //
+        // List all known attributes.
+        //
         a_Count = MAX_KNOWN_OBJECT_ATTRIBUTES;
         a_Desc = a_ObjProp;
 
@@ -467,7 +470,10 @@ VOID propSetTypeDecodedAttributes(
                 dwFlags &= ~a_Desc[i].dwValue;
             }
         }
-        //list any other left
+
+        //
+        // List any other.
+        //
         if (dwFlags != 0) {
             propSetTypeFlagValue(hListRights, T_Unknown, dwFlags);
         }
@@ -525,10 +531,9 @@ VOID propSetTypeListView(
 * Used if object dumped info not available (restricted user, no driver etc).
 *
 */
-_Success_(return == TRUE)
 BOOL propQueryTypeInfo(
     _In_ LPWSTR lpObjectType,
-    _Out_ POBJECT_TYPE_COMPATIBLE pObjectTypeDump
+    _Inout_ POBJECT_TYPE_COMPATIBLE pObjectTypeDump
 )
 {
     BOOL     bResult = FALSE;
@@ -539,13 +544,8 @@ BOOL propQueryTypeInfo(
     POBJECT_TYPES_INFORMATION pObjectTypes = NULL;
     POBJECT_TYPE_INFORMATION  pObject;
 
-    if (
-        (pObjectTypeDump == NULL) ||
-        (lpObjectType == NULL)
-        )
-    {
+    if (lpObjectType == NULL)
         return bResult;
-    }
 
     __try {
 
@@ -607,6 +607,7 @@ BOOL propQueryTypeInfo(
     __except (WOBJ_EXCEPTION_FILTER) {
         return FALSE;
     }
+
     return bResult;
 }
 
@@ -632,8 +633,6 @@ VOID propSetTypeInfo(
     OBJECT_TYPE_COMPATIBLE     ObjectTypeDump;
     WCHAR                      szConvertBuffer[64];
     WCHAR                      szType[MAX_PATH * 2];
-
-    VALIDATE_PROP_CONTEXT(Context);
 
     RealTypeIndex = Context->ShadowTypeDescription->Index;
     if ((RealTypeIndex > ObjectTypeUnknown)) {
@@ -849,7 +848,9 @@ INT_PTR CALLBACK TypePropDialogProc(
         if (LOWORD(wParam) == ID_TYPE_ATTRLIST) {
             if (HIWORD(wParam) == LBN_SELCHANGE) {
                 Context = (PROP_OBJECT_INFO*)GetProp(hwndDlg, T_PROPCONTEXT);
-                propSetTypeDecodedAttributes(Context, hwndDlg);
+                if (Context) {
+                    propSetTypeDecodedAttributes(Context, hwndDlg);
+                }
             }
         }
         return 1;

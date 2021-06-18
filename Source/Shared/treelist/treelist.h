@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       TREELIST.H
 *
-*  VERSION:     1.30
+*  VERSION:     1.32
 *
-*  DATE:        22 July 2020
+*  DATE:        01 June 2021
 *
 *  Tree-List custom control header file.
 *
@@ -17,6 +17,10 @@
 *
 *******************************************************************************/
 
+#if defined (_MSC_VER) && (_MSC_VER >= 1020)
+#pragma once
+#endif
+
 #define WC_TREELISTA            "CustomTreeList"
 #define WC_TREELISTW            L"CustomTreeList"
 
@@ -26,29 +30,29 @@
 #define WC_TREELIST             WC_TREELISTA
 #endif
 
-#define TL_TREECONTROL_SLOT		0
-#define TL_HEADERCONTROL_SLOT	sizeof(HANDLE)
-#define TL_TREEWNDPROC_SLOT		sizeof(HANDLE)*2
-#define TL_HEAP_SLOT			sizeof(HANDLE)*3
-#define TL_TOOLTIPS_SLOT		sizeof(HANDLE)*4
-#define TL_TOOLTIPSBUFFER_SLOT	sizeof(HANDLE)*5
-#define TL_HEADERWNDPROC_SLOT	sizeof(HANDLE)*6
+#define TL_TREECONTROL_SLOT     0
+#define TL_HEADERCONTROL_SLOT   sizeof(HANDLE)
+#define TL_TREEWNDPROC_SLOT     sizeof(HANDLE)*2
+#define TL_HEAP_SLOT            sizeof(HANDLE)*3
+#define TL_TOOLTIPS_SLOT        sizeof(HANDLE)*4
+#define TL_TOOLTIPSBUFFER_SLOT  sizeof(HANDLE)*5
+#define TL_HEADERWNDPROC_SLOT   sizeof(HANDLE)*6
 
-#define TL_SIZEOF_PRIVATEBUFFER	(sizeof(TCHAR) * (MAX_PATH + 1))
+#define TL_SIZEOF_PRIVATEBUFFER (sizeof(TCHAR) * (MAX_PATH + 1))
 
-#define TLF_BGCOLOR_SET			0x01
-#define TLF_FONTCOLOR_SET		0x02
+#define TLF_BGCOLOR_SET         0x01
+#define TLF_FONTCOLOR_SET       0x02
 
-#define TLSTYLE_COLAUTOEXPAND	0x01
+#define TLSTYLE_COLAUTOEXPAND   0x01
 #define TLSTYLE_LINKLINES       0x02
 
 typedef struct _TL_SUBITEMS {
-    ULONG		ColorFlags;
-    COLORREF	BgColor;
-    COLORREF	FontColor;
+    ULONG       ColorFlags;
+    COLORREF    BgColor;
+    COLORREF    FontColor;
     PVOID       UserParam;
-    ULONG		Count;
-    LPTSTR		Text[1];
+    ULONG       Count;
+    LPTSTR      Text[1];
 } TL_SUBITEMS, *PTL_SUBITEMS;
 
 ATOM InitializeTreeListControl();
@@ -88,6 +92,12 @@ ATOM InitializeTreeListControl();
 
 #define TreeList_SetImageList(hwnd, himl, iImage) \
     (HIMAGELIST)SNDMSG((hwnd), TVM_SETIMAGELIST, iImage, (LPARAM)(HIMAGELIST)(himl))
+
+#define TreeList_RedrawDisable(hwnd) \
+    SNDMSG(hwnd, WM_SETREDRAW, FALSE, 0)
+
+#define TreeList_RedrawEnableAndUpdateNow(hwnd) { SNDMSG(hwnd, WM_SETREDRAW, TRUE, 0); \
+    RedrawWindow(hwnd, NULL, NULL, RDW_ERASE | RDW_INVALIDATE); }
 
 #define TreeList_GetChild(hwnd, hitem)          TreeList_GetNextItem(hwnd, hitem, TVGN_CHILD)
 #define TreeList_GetNextSibling(hwnd, hitem)    TreeList_GetNextItem(hwnd, hitem, TVGN_NEXT)

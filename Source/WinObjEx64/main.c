@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        15 Dec 2020
+*  DATE:        11 May 2021
 *
 *  Program entry point and main window handler.
 *
@@ -77,6 +77,7 @@ VOID MainWindowExtrasDisableAdminFeatures(
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_PRIVATENAMESPACES, FALSE, &mii);
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_W32PSERVICETABLE, FALSE, &mii);
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_CALLBACKS, FALSE, &mii);
+        SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_UNLOADEDDRIVERS, FALSE, &mii);
     }
 
     //
@@ -99,6 +100,7 @@ VOID MainWindowExtrasDisableAdminFeatures(
     if (g_WinObj.IsWine) {
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_CALLBACKS, FALSE, &mii);
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_DRIVERS, FALSE, &mii);
+        SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_UNLOADEDDRIVERS, FALSE, &mii);
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_SOFTWARELICENSECACHE, FALSE, &mii);
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_SSDT, FALSE, &mii);
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_W32PSERVICETABLE, FALSE, &mii);
@@ -467,6 +469,7 @@ LRESULT MainWindowHandleWMCommand(
     case ID_EXTRAS_SSDT:
     case ID_EXTRAS_W32PSERVICETABLE:
     case ID_EXTRAS_DRIVERS:
+    case ID_EXTRAS_UNLOADEDDRIVERS:
     case ID_EXTRAS_PROCESSLIST:
     case ID_EXTRAS_CALLBACKS:
     case ID_EXTRAS_SOFTWARELICENSECACHE:
@@ -478,6 +481,7 @@ LRESULT MainWindowHandleWMCommand(
         //           KiServiceTable
         //           W32pServiceTable
         //           Drivers
+        //           Unloaded Drivers
         //           Process List
         //           Callbacks
         //           Software Licensing Cache
@@ -853,11 +857,11 @@ LRESULT MainWindowHandleWMNotify(
 
                             _strcpy(str, g_WinObj.CurrentObjectPath);
 
-                            if ((str[0] == '\\') && (str[1] == 0)) {
+                            if ((str[0] == L'\\') && (str[1] == 0)) {
                                 _strcpy(str + lcp, szItemString);
                             }
                             else {
-                                str[lcp] = '\\';
+                                str[lcp] = L'\\';
                                 _strcpy(str + lcp + 1, szItemString);
                             }
                             SendMessage(hwndStatusBar, WM_SETTEXT, 0, (LPARAM)str);
@@ -1128,11 +1132,11 @@ BOOL MainWindowDlgMsgHandler(
 * Initialize global variables.
 *
 */
-INT WinObjInitGlobals(
+DWORD WinObjInitGlobals(
     _In_ BOOLEAN IsWine)
 {
     SIZE_T cch;
-    INT Result = wobjInitSuccess;
+    DWORD dwResult = INIT_ERROR_UNSPECIFIED;
 
 
     do {
@@ -1169,7 +1173,7 @@ INT WinObjInitGlobals(
         //
         g_WinObj.Heap = RtlCreateHeap(HEAP_GROWABLE, NULL, 0, 0, NULL, NULL);
         if (g_WinObj.Heap == NULL) {
-            Result = wobjInitNoHeap;
+            dwResult = INIT_ERROR_NOHEAP;
             break;
         }
 
@@ -1183,7 +1187,7 @@ INT WinObjInitGlobals(
         //
         cch = ExpandEnvironmentStrings(L"%temp%", g_WinObj.szTempDirectory, MAX_PATH);
         if ((cch == 0) || (cch > MAX_PATH)) {
-            Result = wobjInitNoTemp;
+            dwResult = INIT_ERROR_NOTEMP;
             break;
         }
 
@@ -1193,7 +1197,7 @@ INT WinObjInitGlobals(
 
         cch = GetWindowsDirectory(g_WinObj.szWindowsDirectory, MAX_PATH);
         if ((cch == 0) || (cch > MAX_PATH)) {
-            Result = wobjInitNoWinDir;
+            dwResult = INIT_ERROR_NOWINDIR;
             break;
         }
 
@@ -1202,7 +1206,7 @@ INT WinObjInitGlobals(
         //
         cch = GetSystemDirectory(g_WinObj.szSystemDirectory, MAX_PATH);
         if ((cch == 0) || (cch > MAX_PATH)) {
-            Result = wobjInitNoSys32Dir;
+            dwResult = INIT_ERROR_NOSYS32DIR;
             break;
         }
 
@@ -1211,20 +1215,20 @@ INT WinObjInitGlobals(
         //
         cch = GetCurrentDirectory(MAX_PATH, g_WinObj.szProgramDirectory);
         if ((cch == 0) || (cch > MAX_PATH)) {
-            Result = wobjInitNoProgDir;
+            dwResult = INIT_ERROR_NOPROGDIR;
             break;
         }
 
-        Result = wobjInitSuccess;
+        dwResult = INIT_NO_ERROR;
 
     } while (FALSE);
 
-    if (Result != wobjInitSuccess) {
+    if (dwResult != INIT_NO_ERROR) {
         if (g_WinObj.Heap)
             RtlDestroyHeap(g_WinObj.Heap);
     }
 
-    return Result;
+    return dwResult;
 }
 
 /*
@@ -1237,12 +1241,11 @@ INT WinObjInitGlobals(
 */
 UINT WinObjExMain()
 {
-    BOOLEAN                 IsWine = FALSE;
+    BOOLEAN                 IsWine = FALSE, bIsFullAdmin = FALSE;
 
     ATOM                    classAtom = 0;
-    BOOL                    bIsFullAdmin = FALSE, bRet = TRUE, bLocalSystem = FALSE;
+    BOOL                    bRet = TRUE, bLocalSystem = FALSE;
 
-    HWND                    hDesktopWnd = GetDesktopWindow();
     HMENU                   hMenu;
     HACCEL                  hAccTable = 0;
     HICON                   hIcon;
@@ -1255,14 +1258,13 @@ UINT WinObjExMain()
 
     WCHAR                   szWindowTitle[100];
 
-    INT                     initResult;
-    LPWSTR                  lpErrorMsg;
+    DWORD                   dwInitResult;
 
     logCreate();
     IsWine = supIsWine();
 
     if (!supInitMSVCRT()) {
-        MessageBox(hDesktopWnd, T_WOBJINIT_NOCRT, NULL, MB_ICONERROR);
+        supShowInitError(INIT_ERROR_NOCRT);
         return ERROR_APP_INIT_FAILURE;
     }
 
@@ -1273,36 +1275,9 @@ UINT WinObjExMain()
         RtlSetHeapInformation(NULL, HeapEnableTerminationOnCorruption, NULL, 0);
     }
 
-    initResult = WinObjInitGlobals(IsWine);
-
-    if (initResult != wobjInitSuccess) {
-        switch (initResult) {
-
-        case wobjInitNoHeap:
-            lpErrorMsg = T_WOBJINIT_NOHEAP;
-            break;
-
-        case wobjInitNoTemp:
-            lpErrorMsg = T_WOBJINIT_NOTEMP;
-            break;
-
-        case wobjInitNoWinDir:
-            lpErrorMsg = T_WOBJINIT_NOWINDIR;
-            break;
-
-        case wobjInitNoSys32Dir:
-            lpErrorMsg = T_WOBJINIT_NOSYS32DIR;
-            break;
-
-        case wobjInitNoProgDir:
-            lpErrorMsg = T_WOBJINIT_NOPROGDIR;
-            break;
-
-        default:
-            lpErrorMsg = TEXT("Unknown initialization error");
-            break;
-        }
-        MessageBox(hDesktopWnd, lpErrorMsg, NULL, MB_ICONERROR);
+    dwInitResult = WinObjInitGlobals(IsWine);
+    if (dwInitResult != INIT_NO_ERROR) {
+        supShowInitError(dwInitResult);
         return ERROR_APP_INIT_FAILURE;
     }
 
@@ -1358,7 +1333,7 @@ UINT WinObjExMain()
 
         classAtom = RegisterClassEx(&wndClass);
         if (classAtom == 0) {
-            MessageBox(hDesktopWnd, T_WOBJINIT_NOCLASS, NULL, MB_ICONERROR);
+            supShowInitError(INIT_ERROR_NOCLASS);
             break;
         }
 
@@ -1390,7 +1365,7 @@ UINT WinObjExMain()
             NULL);
 
         if (MainWindow == NULL) {
-            MessageBox(hDesktopWnd, T_WOBJINIT_NOMAINWINDOW, NULL, MB_ICONERROR);
+            supShowInitError(INIT_ERROR_NOMAINWND);
             break;
         }
 
@@ -1399,7 +1374,7 @@ UINT WinObjExMain()
         iccx.dwSize = sizeof(iccx);
         iccx.dwICC = ICC_LISTVIEW_CLASSES | ICC_TREEVIEW_CLASSES | ICC_BAR_CLASSES | ICC_TAB_CLASSES;
         if (!InitCommonControlsEx(&iccx)) {
-            MessageBox(hDesktopWnd, T_WOBJINIT_NOICCX, NULL, MB_ICONERROR);
+            supShowInitError(INIT_ERROR_NOICCX);
             break;
         }
 
@@ -1439,7 +1414,7 @@ UINT WinObjExMain()
             NULL);
 
         if (g_hwndObjectTree == NULL) {
-            MessageBox(hDesktopWnd, T_WOBJINIT_NOTREEWND, NULL, MB_ICONERROR);
+            supShowInitError(INIT_ERROR_NOTREEWND);
             break;
         }
 
@@ -1462,7 +1437,7 @@ UINT WinObjExMain()
             NULL);
 
         if (g_hwndObjectList == NULL) {
-            MessageBox(hDesktopWnd, T_WOBJINIT_NOLISTWND, NULL, MB_ICONERROR);
+            supShowInitError(INIT_ERROR_NOLISTWND);
             break;
         }
 
@@ -1485,7 +1460,7 @@ UINT WinObjExMain()
             NULL);
 
         if (hwndToolBar == NULL) {
-            MessageBox(hDesktopWnd, T_WOBJINIT_NOTLBARWND, NULL, MB_ICONERROR);
+            supShowInitError(INIT_ERROR_NOTLBARWND);
             break;
         }
 

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020, portions (C) Mark Russinovich, FileMon
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       INSTDRV.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.90
 *
-*  DATE:        15 Dec 2019
+*  DATE:        16 May 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -24,7 +24,7 @@
 * Create SCM service entry describing kernel driver.
 *
 */
-BOOL scmInstallDriver(
+BOOLEAN scmInstallDriver(
     _In_ SC_HANDLE SchSCManager,
     _In_ LPCTSTR DriverName,
     _In_opt_ LPCTSTR ServiceExe,
@@ -58,7 +58,7 @@ BOOL scmInstallDriver(
     if (lpStatus)
         *lpStatus = resultStatus;
 
-    return TRUE;
+    return (resultStatus == ERROR_SUCCESS);
 }
 
 /*
@@ -69,13 +69,13 @@ BOOL scmInstallDriver(
 * Start service, resulting in SCM drvier load.
 *
 */
-BOOL scmStartDriver(
+BOOLEAN scmStartDriver(
     _In_ SC_HANDLE SchSCManager,
     _In_ LPCTSTR DriverName,
     _Out_opt_ PDWORD lpStatus
 )
 {
-    BOOL       ret = FALSE;
+    BOOL       bResult = FALSE;
     DWORD      resultStatus = ERROR_SUCCESS;
     SC_HANDLE  schService;
 
@@ -85,11 +85,11 @@ BOOL scmStartDriver(
 
     if (schService) {
 
-        ret = StartService(schService, 0, NULL);
+        bResult = StartService(schService, 0, NULL);
 
         resultStatus = GetLastError();
         if (resultStatus == ERROR_SERVICE_ALREADY_RUNNING) {
-            ret = TRUE;
+            bResult = TRUE;
             resultStatus = ERROR_SUCCESS;
         }
 
@@ -102,7 +102,7 @@ BOOL scmStartDriver(
     if (lpStatus)
         *lpStatus = resultStatus;
 
-    return ret;
+    return (bResult != FALSE);
 }
 
 /*
@@ -113,7 +113,7 @@ BOOL scmStartDriver(
 * Open driver device by symbolic link.
 *
 */
-BOOL scmOpenDevice(
+BOOLEAN scmOpenDevice(
     _In_ LPCTSTR DriverName,
     _Out_opt_ PHANDLE lphDevice,
     _Out_opt_ PDWORD lpStatus
@@ -128,12 +128,12 @@ BOOL scmOpenDevice(
         *lphDevice = NULL;
 
     if (DriverName) {
-        
+
         RtlSecureZeroMemory(completeDeviceName, sizeof(completeDeviceName));
-        
-        RtlStringCchPrintfSecure(completeDeviceName, 
-            MAX_PATH, 
-            TEXT("\\\\.\\%wS"), 
+
+        RtlStringCchPrintfSecure(completeDeviceName,
+            MAX_PATH,
+            TEXT("\\\\.\\%wS"),
             DriverName);
 
         hDevice = CreateFile(completeDeviceName,
@@ -165,7 +165,7 @@ BOOL scmOpenDevice(
             *lpStatus = ERROR_INVALID_PARAMETER;
     }
 
-    return bResult;
+    return (bResult != FALSE);
 }
 
 /*
@@ -176,38 +176,39 @@ BOOL scmOpenDevice(
 * Command SCM to stop service, resulting in driver unload.
 *
 */
-BOOL scmStopDriver(
+BOOLEAN scmStopDriver(
     _In_ SC_HANDLE SchSCManager,
     _In_ LPCTSTR DriverName,
     _Out_opt_ PDWORD lpStatus
 )
 {
-    BOOL            ret;
+    BOOL            bResult = FALSE;
     INT             iRetryCount;
     DWORD           resultStatus = ERROR_SUCCESS;
     SC_HANDLE       schService;
     SERVICE_STATUS  serviceStatus;
 
-    ret = FALSE;
     schService = OpenService(SchSCManager, DriverName, SERVICE_ALL_ACCESS);
     if (schService) {
 
         iRetryCount = 5;
         do {
+
             SetLastError(ERROR_SUCCESS);
 
-            ret = ControlService(schService, SERVICE_CONTROL_STOP, &serviceStatus);
-            if (ret != FALSE) {
-                resultStatus = GetLastError();
-                break;
-            }
+            bResult = ControlService(schService, SERVICE_CONTROL_STOP, &serviceStatus);
 
             resultStatus = GetLastError();
+
+            if (bResult != FALSE)
+                break;
+
             if (resultStatus != ERROR_DEPENDENT_SERVICES_RUNNING)
                 break;
 
             Sleep(1000);
             iRetryCount--;
+
         } while (iRetryCount);
 
         CloseServiceHandle(schService);
@@ -219,7 +220,7 @@ BOOL scmStopDriver(
     if (lpStatus)
         *lpStatus = resultStatus;
 
-    return ret;
+    return (bResult != FALSE);
 }
 
 /*
@@ -230,7 +231,7 @@ BOOL scmStopDriver(
 * Remove service entry from SCM database.
 *
 */
-BOOL scmRemoveDriver(
+BOOLEAN scmRemoveDriver(
     _In_ SC_HANDLE SchSCManager,
     _In_ LPCTSTR DriverName,
     _Out_opt_ PDWORD lpStatus
@@ -241,19 +242,18 @@ BOOL scmRemoveDriver(
     DWORD      resultStatus = ERROR_SUCCESS;
 
     schService = OpenService(SchSCManager, DriverName, SERVICE_ALL_ACCESS);
+
+    resultStatus = GetLastError();
+
     if (schService) {
         bResult = DeleteService(schService);
-        resultStatus = GetLastError();
         CloseServiceHandle(schService);
-    }
-    else {
-        resultStatus = GetLastError();
     }
 
     if (lpStatus)
         *lpStatus = resultStatus;
 
-    return bResult;
+    return (bResult != FALSE);
 }
 
 /*
@@ -264,12 +264,12 @@ BOOL scmRemoveDriver(
 * Combines scmStopDriver and scmRemoveDriver.
 *
 */
-BOOL scmUnloadDeviceDriver(
+BOOLEAN scmUnloadDeviceDriver(
     _In_ LPCTSTR Name,
     _Out_opt_ PDWORD lpStatus
 )
 {
-    BOOL      bResult = FALSE;
+    BOOLEAN   bResult = FALSE;
     SC_HANDLE schSCManager;
 
     DWORD resultStatus = ERROR_SUCCESS;
@@ -303,14 +303,14 @@ BOOL scmUnloadDeviceDriver(
 * Unload if already exists, Create, Load and Open driver instance.
 *
 */
-BOOL scmLoadDeviceDriver(
+BOOLEAN scmLoadDeviceDriver(
     _In_ LPCTSTR Name,
     _In_opt_ LPCTSTR Path,
     _Out_opt_ PHANDLE lphDevice,
     _Out_opt_ PDWORD lpStatus
 )
 {
-    BOOL      bResult = FALSE;
+    BOOLEAN   bResult = FALSE;
     SC_HANDLE schSCManager;
 
     DWORD statusResult = ERROR_SUCCESS;

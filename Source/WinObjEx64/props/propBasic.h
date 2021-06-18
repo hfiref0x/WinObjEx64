@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
-*  TITLE:       PROPTYPE.H
+*  TITLE:       PROPBASIC.H
 *
-*  VERSION:     1.83
+*  VERSION:     1.90
 *
-*  DATE:        05 Jan 2020
+*  DATE:        11 May 2021
 *
 *  Common header file for Basic property sheet.
 *

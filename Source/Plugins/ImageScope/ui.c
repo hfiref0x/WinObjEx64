@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.01
 *
-*  DATE:        08 Jan 2021
+*  DATE:        27 May 2021
 *
 *  WinObjEx64 ImageScope UI.
 *
@@ -716,6 +716,8 @@ VOID VsInfoTabOnInit(
 
     SetWindowTheme(hwndList, TEXT("Explorer"), NULL);
 
+    SendMessage(hwndList, WM_SETREDRAW, (WPARAM)FALSE, (LPARAM)0);
+
     if (PEImageEnumVersionFields(
         Context->SectionAddress,
         &VsInfoStringsEnumCallback,
@@ -730,6 +732,8 @@ VOID VsInfoTabOnInit(
             _countof(szText),
             TEXT("Query Error 0x%lx"), GetLastError());
     }
+
+    SendMessage(hwndList, WM_SETREDRAW, (WPARAM)TRUE, (LPARAM)0);
 
     supStatusBarSetText(
         Context->StatusBar,
@@ -972,11 +976,12 @@ VOID StringsTabOnShow(
 
     __try {
 
+        SendMessage(hwndList, WM_SETREDRAW, (WPARAM)FALSE, (LPARAM)0);
         supSetWaitCursor(TRUE);
-        ShowWindow(hwndList, SW_HIDE);
 
         heapHandle = HeapCreate(0, UNICODE_STRING_MAX_CHARS * sizeof(WCHAR), 0);
         if (heapHandle) {
+
 
             ScanRegions(
                 hWndDlg,
@@ -990,8 +995,8 @@ VOID StringsTabOnShow(
     }
     __finally {
 
+        SendMessage(hwndList, WM_SETREDRAW, (WPARAM)TRUE, (LPARAM)0);
         supSetWaitCursor(FALSE);
-        ShowWindow(hwndList, SW_SHOW);
         if (heapHandle)
             HeapDestroy(heapHandle);
 

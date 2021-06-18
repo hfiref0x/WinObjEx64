@@ -123,6 +123,16 @@ winobjex64\plugmngr.h
 
 * Plugin manager
 
+winobjex64\symparser.c
+winobjex64\symparser.h
+
+* Symbols support
+
+winobjex64\props\propAlpcPort.c
+winobjex64\props\propAlpcPort.h
+
+* Property sheet for ALPC Port information
+
 winobjex64\props\propBasic.c
 winobjex64\props\propBasic.h
 winobjex64\props\propBasicConsts.h
@@ -141,7 +151,6 @@ winobjex64\props\propDlg.h
 
 winobjex64\props\propDriver.c - property sheet "Driver" handlers, including window procedures
 winobjex64\props\propDriver.h
-winobjex64\props\propDriverConsts.h
 
 winobjex64\props\propObjectDump.c 
 winobjex64\props\propObjectDump.h
@@ -156,6 +165,11 @@ winobjex64\props\propProcess.c
 winobjex64\props\propProcess.h
 
 * Property sheet "Process" handler, window procedure
+
+winobjex64\props\propSection.c
+winobjex64\props\propSection.h
+
+* Property sheet for Section object dump information
 
 winobjex64\props\propSecurity.c
 winobjex64\props\propSecurity.h

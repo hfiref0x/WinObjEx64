@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        14 Jan 2021
+*  DATE:        16 May 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,6 +17,16 @@
 #include "global.h"
 #include "propDlg.h"
 #include "propBasicConsts.h"
+
+typedef VOID(CALLBACK* pfnPropQueryInfoRoutine)(
+    _In_ PROP_OBJECT_INFO* Context,
+    _In_ HWND hwndDlg,
+    _In_ BOOL ExtendedInfoAvailable);
+
+#define PROP_QUERY_INFORMATION_ROUTINE(n) VOID n(   \
+    _In_ PROP_OBJECT_INFO* Context,                 \
+    _In_ HWND hwndDlg,                              \
+    _In_ BOOL ExtendedInfoAvailable)
 
 //
 // Forward.
@@ -39,31 +49,40 @@ VOID propSetObjectHeaderAddressInfo(
     _In_ ULONG_PTR HeaderAddress
 )
 {
-    WCHAR szBuffer[100];
+    WCHAR szBuffer[64];
+    LPWSTR lpText;
 
-    //Object Address
+    //
+    // Object Address
+    //
     if (ObjectAddress) {
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
         szBuffer[0] = TEXT('0');
         szBuffer[1] = TEXT('x');
+        szBuffer[2] = 0;
         u64tohex(ObjectAddress, &szBuffer[2]);
-        SetDlgItemText(hwndDlg, ID_OBJECT_ADDR, szBuffer);
+        lpText = szBuffer;
     }
     else {
-        SetDlgItemText(hwndDlg, ID_OBJECT_ADDR, TEXT(""));
+        lpText = T_EmptyString;
     }
 
-    //Header Address
+    SetDlgItemText(hwndDlg, ID_OBJECT_ADDR, lpText);
+
+    //
+    // Header Address
+    //
     if (HeaderAddress) {
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
         szBuffer[0] = TEXT('0');
         szBuffer[1] = TEXT('x');
+        szBuffer[2] = 0;
         u64tohex(HeaderAddress, &szBuffer[2]);
-        SetDlgItemText(hwndDlg, ID_OBJECT_HEADER, szBuffer);
+        lpText = szBuffer;
     }
     else {
-        SetDlgItemText(hwndDlg, ID_OBJECT_HEADER, TEXT(""));
+        lpText = T_EmptyString;
     }
+
+    SetDlgItemText(hwndDlg, ID_OBJECT_HEADER, lpText);
 }
 
 /*
@@ -544,7 +563,7 @@ VOID propSetProcessTrustLabelInfo(
 
     LPWSTR lpType = T_EmptyString, lpLevel = T_EmptyString;
 
-    WCHAR szBuffer[100];
+    WCHAR szBuffer[128];
 
     //
     // Re-open current object as we need READ_CONTROL.
@@ -618,14 +637,16 @@ VOID propSetDefaultInfo(
     OBJECT_BASIC_INFORMATION obi;
     POBJECT_TYPE_INFORMATION TypeInfo = NULL;
 
-    VALIDATE_PROP_CONTEXT(Context);
-
     //
     // Query object basic information.
     //
     RtlSecureZeroMemory(&obi, sizeof(obi));
-    ntStatus = NtQueryObject(hObject, ObjectBasicInformation, &obi,
-        sizeof(OBJECT_BASIC_INFORMATION), &returnLength);
+
+    ntStatus = NtQueryObject(hObject, 
+        ObjectBasicInformation, 
+        &obi,
+        sizeof(OBJECT_BASIC_INFORMATION), 
+        &returnLength);
 
     if (NT_SUCCESS(ntStatus)) {
 
@@ -701,19 +722,15 @@ VOID propSetDefaultInfo(
 * No Additional info required
 *
 */
-VOID propBasicQueryDirectory(
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ HWND hwndDlg
-)
+PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryDirectory)
 {
-    HANDLE hObject;
+    HANDLE hObject = NULL;
 
-    VALIDATE_PROP_CONTEXT(Context);
+    UNREFERENCED_PARAMETER(ExtendedInfoAvailable);
 
     //
     // Open object directory and query info.
     //
-    hObject = NULL;
     if (propOpenCurrentObject(Context, &hObject, DIRECTORY_QUERY)) {
         propSetDefaultInfo(Context, hwndDlg, hObject);
         propCloseCurrentObject(Context, hObject);
@@ -730,45 +747,51 @@ VOID propBasicQueryDirectory(
 * If ExtendedInfoAvailable is FALSE then it calls propSetDefaultInfo to set Basic page properties
 *
 */
-VOID propBasicQuerySemaphore(
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ HWND hwndDlg,
-    _In_ BOOL ExtendedInfoAvailable
-)
+PROP_QUERY_INFORMATION_ROUTINE(propBasicQuerySemaphore)
 {
     NTSTATUS  status;
     ULONG     bytesNeeded;
-    HANDLE    hObject;
-    WCHAR	  szBuffer[MAX_PATH + 1];
+    HANDLE    hObject = NULL;
+    WCHAR	  szBuffer[64];
 
     SEMAPHORE_BASIC_INFORMATION sbi;
 
     SetDlgItemText(hwndDlg, ID_SEMAPHORECURRENT, T_CannotQuery);
     SetDlgItemText(hwndDlg, ID_SEMAPHOREMAXCOUNT, T_CannotQuery);
 
-    VALIDATE_PROP_CONTEXT(Context);
-
     //
     // Open semaphore object.
     //
-    hObject = NULL;
     if (!propOpenCurrentObject(Context, &hObject, SEMAPHORE_QUERY_STATE)) {
         return;
     }
 
     RtlSecureZeroMemory(&sbi, sizeof(SEMAPHORE_BASIC_INFORMATION));
-    status = NtQuerySemaphore(hObject, SemaphoreBasicInformation, &sbi,
-        sizeof(SEMAPHORE_BASIC_INFORMATION), &bytesNeeded);
+
+    status = NtQuerySemaphore(hObject, 
+        SemaphoreBasicInformation, 
+        &sbi,
+        sizeof(SEMAPHORE_BASIC_INFORMATION), 
+        &bytesNeeded);
+
     if (NT_SUCCESS(status)) {
 
         //Current count
-        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-        ultostr(sbi.CurrentCount, szBuffer);
+        szBuffer[0] = 0;
+        RtlStringCchPrintfSecure(szBuffer, 64, 
+            TEXT("0x%lX (%lu)"), 
+            sbi.CurrentCount,
+            sbi.CurrentCount);
+        
         SetDlgItemText(hwndDlg, ID_SEMAPHORECURRENT, szBuffer);
 
         //Maximum count
-        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-        ultostr(sbi.MaximumCount, szBuffer);
+        szBuffer[0] = 0;
+        RtlStringCchPrintfSecure(szBuffer, 64, 
+            TEXT("0x%lX (%lu)"), 
+            sbi.MaximumCount,
+            sbi.MaximumCount);
+
         SetDlgItemText(hwndDlg, ID_SEMAPHOREMAXCOUNT, szBuffer);
     }
 
@@ -792,33 +815,30 @@ VOID propBasicQuerySemaphore(
 * If ExtendedInfoAvailable is FALSE then it calls propSetDefaultInfo to set Basic page properties
 *
 */
-VOID propBasicQueryIoCompletion(
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ HWND hwndDlg,
-    _In_ BOOL ExtendedInfoAvailable
-)
+PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryIoCompletion)
 {
     NTSTATUS status;
     ULONG    bytesNeeded;
-    HANDLE   hObject;
+    HANDLE   hObject = NULL;
 
     IO_COMPLETION_BASIC_INFORMATION iobi;
 
     SetDlgItemText(hwndDlg, ID_IOCOMPLETIONSTATE, T_CannotQuery);
 
-    VALIDATE_PROP_CONTEXT(Context);
-
     //
     // Open IoCompletion object.
     //
-    hObject = NULL;
     if (!propOpenCurrentObject(Context, &hObject, IO_COMPLETION_QUERY_STATE)) {
         return;
     }
 
     RtlSecureZeroMemory(&iobi, sizeof(IO_COMPLETION_BASIC_INFORMATION));
-    status = NtQueryIoCompletion(hObject, IoCompletionBasicInformation, &iobi,
-        sizeof(iobi), &bytesNeeded);
+    
+    status = NtQueryIoCompletion(hObject, 
+        IoCompletionBasicInformation,
+        &iobi,
+        sizeof(iobi), 
+        &bytesNeeded);
 
     if (NT_SUCCESS(status)) {
         SetDlgItemText(hwndDlg, ID_IOCOMPLETIONSTATE,
@@ -845,15 +865,11 @@ VOID propBasicQueryIoCompletion(
 * If ExtendedInfoAvailable is FALSE then it calls propSetDefaultInfo to set Basic page properties
 *
 */
-VOID propBasicQueryTimer(
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ HWND hwndDlg,
-    _In_ BOOL ExtendedInfoAvailable
-)
+PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryTimer)
 {
     NTSTATUS    status;
     ULONG       bytesNeeded;
-    HANDLE      hObject;
+    HANDLE      hObject = NULL;
     ULONGLONG   ConvertedSeconds, Hours;
     CSHORT      Minutes, Seconds;
     WCHAR       szBuffer[MAX_PATH + 1];
@@ -863,19 +879,20 @@ VOID propBasicQueryTimer(
     SetDlgItemText(hwndDlg, ID_TIMERSTATE, T_CannotQuery);
     SetDlgItemText(hwndDlg, ID_TIMERREMAINING, T_CannotQuery);
 
-    VALIDATE_PROP_CONTEXT(Context);
-
     //
     // Open Timer object.
     //
-    hObject = NULL;
     if (!propOpenCurrentObject(Context, &hObject, TIMER_QUERY_STATE)) {
         return;
     }
 
     RtlSecureZeroMemory(&tbi, sizeof(TIMER_BASIC_INFORMATION));
-    status = NtQueryTimer(hObject, TimerBasicInformation, &tbi,
-        sizeof(TIMER_BASIC_INFORMATION), &bytesNeeded);
+    
+    status = NtQueryTimer(hObject, 
+        TimerBasicInformation, 
+        &tbi,
+        sizeof(TIMER_BASIC_INFORMATION), 
+        &bytesNeeded);
 
     if (NT_SUCCESS(status)) {
 
@@ -923,34 +940,31 @@ VOID propBasicQueryTimer(
 * If ExtendedInfoAvailable is FALSE then it calls propSetDefaultInfo to set Basic page properties
 *
 */
-VOID propBasicQueryEvent(
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ HWND hwndDlg,
-    _In_ BOOL ExtendedInfoAvailable
-)
+PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryEvent)
 {
     NTSTATUS status;
     ULONG    bytesNeeded;
-    HANDLE   hObject;
+    HANDLE   hObject = NULL;
     LPWSTR   lpInfo;
     EVENT_BASIC_INFORMATION	ebi;
 
     SetDlgItemText(hwndDlg, ID_EVENTTYPE, T_CannotQuery);
     SetDlgItemText(hwndDlg, ID_EVENTSTATE, T_CannotQuery);
 
-    VALIDATE_PROP_CONTEXT(Context);
-
     //
     // Open Event object.
     //
-    hObject = NULL;
     if (!propOpenCurrentObject(Context, &hObject, EVENT_QUERY_STATE)) {
         return;
     }
 
     RtlSecureZeroMemory(&ebi, sizeof(EVENT_BASIC_INFORMATION));
-    status = NtQueryEvent(hObject, EventBasicInformation, &ebi,
-        sizeof(EVENT_BASIC_INFORMATION), &bytesNeeded);
+    
+    status = NtQueryEvent(hObject, 
+        EventBasicInformation, 
+        &ebi,
+        sizeof(EVENT_BASIC_INFORMATION), 
+        &bytesNeeded);
 
     if (NT_SUCCESS(status)) {
 
@@ -1003,15 +1017,11 @@ VOID propBasicQueryEvent(
 * If ExtendedInfoAvailable is FALSE then it calls propSetDefaultInfo to set Basic page properties
 *
 */
-VOID propBasicQuerySymlink(
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ HWND hwndDlg,
-    _In_ BOOL ExtendedInfoAvailable
-)
+PROP_QUERY_INFORMATION_ROUTINE(propBasicQuerySymlink)
 {
     NTSTATUS    status;
     ULONG       bytesNeeded;
-    HANDLE      hObject;
+    HANDLE      hObject = NULL;
     LPWSTR      lpLinkTarget;
     WCHAR       szBuffer[MAX_PATH + 1];
 
@@ -1020,12 +1030,9 @@ VOID propBasicQuerySymlink(
     SetDlgItemText(hwndDlg, ID_OBJECT_SYMLINK_TARGET, T_CannotQuery);
     SetDlgItemText(hwndDlg, ID_OBJECT_SYMLINK_CREATION, T_CannotQuery);
 
-    VALIDATE_PROP_CONTEXT(Context);
-
     //
     // Open SymbolicLink object.
     //
-    hObject = NULL;
     if (!propOpenCurrentObject(Context, &hObject, SYMBOLIC_LINK_QUERY)) {
         return;
     }
@@ -1042,8 +1049,11 @@ VOID propBasicQuerySymlink(
     //Query Link Creation Time
     RtlSecureZeroMemory(&obi, sizeof(OBJECT_BASIC_INFORMATION));
 
-    status = NtQueryObject(hObject, ObjectBasicInformation, &obi,
-        sizeof(OBJECT_BASIC_INFORMATION), &bytesNeeded);
+    status = NtQueryObject(hObject, 
+        ObjectBasicInformation, 
+        &obi,
+        sizeof(OBJECT_BASIC_INFORMATION), 
+        &bytesNeeded);
 
     if (NT_SUCCESS(status)) {
         RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
@@ -1071,15 +1081,11 @@ VOID propBasicQuerySymlink(
 * If ExtendedInfoAvailable is FALSE then it calls propSetDefaultInfo to set Basic page properties
 *
 */
-VOID propBasicQueryKey(
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ HWND hwndDlg,
-    _In_ BOOL ExtendedInfoAvailable
-)
+PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryKey)
 {
     NTSTATUS    status;
     ULONG       bytesNeeded;
-    HANDLE      hObject;
+    HANDLE      hObject = NULL;
     WCHAR       szBuffer[MAX_PATH];
 
     KEY_FULL_INFORMATION  kfi;
@@ -1088,19 +1094,20 @@ VOID propBasicQueryKey(
     SetDlgItemText(hwndDlg, ID_KEYVALUES, T_CannotQuery);
     SetDlgItemText(hwndDlg, ID_KEYLASTWRITE, T_CannotQuery);
 
-    VALIDATE_PROP_CONTEXT(Context);
-
     //
     // Open Key object.
     //
-    hObject = NULL;
     if (!propOpenCurrentObject(Context, &hObject, KEY_QUERY_VALUE)) {
         return;
     }
 
     RtlSecureZeroMemory(&kfi, sizeof(KEY_FULL_INFORMATION));
-    status = NtQueryKey(hObject, KeyFullInformation, &kfi,
-        sizeof(KEY_FULL_INFORMATION), &bytesNeeded);
+    
+    status = NtQueryKey(hObject, 
+        KeyFullInformation, 
+        &kfi,
+        sizeof(KEY_FULL_INFORMATION), 
+        &bytesNeeded);
 
     if (NT_SUCCESS(status)) {
 
@@ -1140,15 +1147,11 @@ VOID propBasicQueryKey(
 * If ExtendedInfoAvailable is FALSE then it calls propSetDefaultInfo to set Basic page properties
 *
 */
-VOID propBasicQueryMutant(
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ HWND hwndDlg,
-    _In_ BOOL ExtendedInfoAvailable
-)
+PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryMutant)
 {
     NTSTATUS status;
     ULONG    bytesNeeded;
-    HANDLE   hObject;
+    HANDLE   hObject = NULL;
     WCHAR    szBuffer[MAX_PATH];
 
     MUTANT_BASIC_INFORMATION mbi;
@@ -1156,20 +1159,21 @@ VOID propBasicQueryMutant(
     SetDlgItemText(hwndDlg, ID_MUTANTABANDONED, T_CannotQuery);
     SetDlgItemText(hwndDlg, ID_MUTANTSTATE, T_CannotQuery);
 
-    VALIDATE_PROP_CONTEXT(Context);
-
     //
     // Open Mutant object.
     //
-    hObject = NULL;
     if (!propOpenCurrentObject(Context, &hObject, MUTANT_QUERY_STATE)) {
         return;
     }
 
     RtlSecureZeroMemory(&mbi, sizeof(MUTANT_BASIC_INFORMATION));
 
-    status = NtQueryMutant(hObject, MutantBasicInformation, &mbi,
-        sizeof(MUTANT_BASIC_INFORMATION), &bytesNeeded);
+    status = NtQueryMutant(hObject, 
+        MutantBasicInformation, 
+        &mbi,
+        sizeof(MUTANT_BASIC_INFORMATION), 
+        &bytesNeeded);
+
     if (NT_SUCCESS(status)) {
 
         //
@@ -1214,15 +1218,11 @@ VOID propBasicQueryMutant(
 * If ExtendedInfoAvailable is FALSE then it calls propSetDefaultInfo to set Basic page properties
 *
 */
-VOID propBasicQuerySection(
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ HWND hwndDlg,
-    _In_ BOOL ExtendedInfoAvailable
-)
+PROP_QUERY_INFORMATION_ROUTINE(propBasicQuerySection)
 {
     BOOL      bSet;
     NTSTATUS  status;
-    HANDLE    hObject;
+    HANDLE    hObject = NULL;
     SIZE_T    bytesNeeded;
     LPWSTR    lpType;
     WCHAR     szBuffer[MAX_PATH * 2];
@@ -1235,28 +1235,27 @@ VOID propBasicQuerySection(
     SetDlgItemText(hwndDlg, ID_SECTION_ATTR, T_CannotQuery);
     SetDlgItemText(hwndDlg, ID_SECTIONSIZE, T_CannotQuery);
 
-    VALIDATE_PROP_CONTEXT(Context);
-
     //
     // Open Section object.
     //
-    hObject = NULL;
     if (!propOpenCurrentObject(Context, &hObject, SECTION_QUERY)) {
         return;
     }
 
-    //this is for specific mars warning, mars doesn't recognize __stosb intrinsics
-    szBuffer[0] = 0;
-
     //query basic information
     RtlSecureZeroMemory(&sbi, sizeof(SECTION_BASIC_INFORMATION));
-    status = NtQuerySection(hObject, SectionBasicInformation, &sbi,
-        sizeof(SECTION_BASIC_INFORMATION), &bytesNeeded);
+
+    status = NtQuerySection(hObject, 
+        SectionBasicInformation,
+        &sbi,
+        sizeof(SECTION_BASIC_INFORMATION),
+        &bytesNeeded);
 
     if (NT_SUCCESS(status)) {
 
         bSet = FALSE;
-        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+        //RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+        szBuffer[0] = 0;
         if (sbi.AllocationAttributes & SEC_BASED) {
             _strcat(szBuffer, TEXT("Based"));
             bSet = TRUE;
@@ -1313,9 +1312,14 @@ VOID propBasicQuerySection(
 
         //query image information
         if (supIsFileImageSection(sbi.AllocationAttributes)) {
+            
             RtlSecureZeroMemory(&sii, sizeof(SECTION_IMAGE_INFORMATION));
-            status = NtQuerySection(hObject, SectionImageInformation, &sii,
-                sizeof(SECTION_IMAGE_INFORMATION), &bytesNeeded);
+            
+            status = NtQuerySection(hObject, 
+                SectionImageInformation, 
+                &sii,
+                sizeof(SECTION_IMAGE_INFORMATION), 
+                &bytesNeeded);
 
             if (NT_SUCCESS(status)) {
 
@@ -1392,7 +1396,7 @@ VOID propBasicQuerySection(
                     lpType = TEXT("XBox Code Catalog");
                     break;
                 default:
-                    lpType = TEXT("Unknown");
+                    lpType = T_Unknown;
                     break;
                 }
                 SetDlgItemText(hwndDlg, ID_IMAGE_SUBSYSTEM, lpType);
@@ -1429,31 +1433,28 @@ VOID propBasicQuerySection(
 * If ExtendedInfoAvailable is FALSE then it calls propSetDefaultInfo to set Basic page properties
 *
 */
-VOID propBasicQueryWindowStation(
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ HWND hwndDlg,
-    _In_ BOOL ExtendedInfoAvailable
-)
+PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryWindowStation)
 {
     DWORD           bytesNeeded;
-    HWINSTA         hObject;
+    HWINSTA         hObject = NULL;
     USEROBJECTFLAGS userFlags;
 
     SetDlgItemText(hwndDlg, ID_WINSTATIONVISIBLE, T_CannotQuery);
 
-    VALIDATE_PROP_CONTEXT(Context);
-
     //
     // Open Winstation object.
     //
-    hObject = NULL;
     if (!propOpenCurrentObject(Context, (PHANDLE)&hObject, WINSTA_READATTRIBUTES)) {
         return;
     }
 
     RtlSecureZeroMemory(&userFlags, sizeof(userFlags));
-    if (GetUserObjectInformation(hObject, UOI_FLAGS, &userFlags,
-        sizeof(USEROBJECTFLAGS), &bytesNeeded))
+
+    if (GetUserObjectInformation(hObject, 
+        UOI_FLAGS, 
+        &userFlags,
+        sizeof(USEROBJECTFLAGS), 
+        &bytesNeeded))
     {
         SetDlgItemText(hwndDlg, ID_WINSTATIONVISIBLE,
             (userFlags.dwFlags & WSF_VISIBLE) ? TEXT("Yes") : TEXT("No"));
@@ -1479,15 +1480,12 @@ VOID propBasicQueryWindowStation(
 * Viewing \Drivers subdirectory requires full access token
 *
 */
-VOID propBasicQueryDriver(
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ HWND hwndDlg
-)
+PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryDriver)
 {
     LPWSTR lpItemText;
     ENUMCHILDWNDDATA ChildWndData;
 
-    VALIDATE_PROP_CONTEXT(Context);
+    UNREFERENCED_PARAMETER(ExtendedInfoAvailable);
 
     //
     // For performance reasons instead of query again
@@ -1512,15 +1510,12 @@ VOID propBasicQueryDriver(
 * Set information values for Device object type
 *
 */
-VOID propBasicQueryDevice(
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ HWND hwndDlg
-)
+PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryDevice)
 {
     LPWSTR lpItemText;
     ENUMCHILDWNDDATA ChildWndData;
 
-    VALIDATE_PROP_CONTEXT(Context);
+    UNREFERENCED_PARAMETER(ExtendedInfoAvailable);
 
     //
     // For performance reasons instead of query again
@@ -1545,19 +1540,15 @@ VOID propBasicQueryDevice(
 * Set information values for Partition object type
 *
 */
-VOID propBasicQueryMemoryPartition(
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ HWND hwndDlg
-)
+PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryMemoryPartition)
 {
-    HANDLE hObject;
+    HANDLE hObject = NULL;
 
-    VALIDATE_PROP_CONTEXT(Context);
+    UNREFERENCED_PARAMETER(ExtendedInfoAvailable);
 
     //
     // Open Memory Partition object.
     //
-    hObject = NULL;
     if (!propOpenCurrentObject(Context, &hObject, MEMORY_PARTITION_QUERY_ACCESS))
         return;
 
@@ -1576,18 +1567,14 @@ VOID propBasicQueryMemoryPartition(
 * Set information values for Process object type
 *
 */
-VOID propBasicQueryProcess(
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ HWND hwndDlg,
-    _In_ BOOL ExtendedInfoAvailable
-)
+PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryProcess)
 {
     BOOL ProcessParametersRead = FALSE;
     BOOL RemotePebRead = FALSE;
     BOOL bSuccess = FALSE;
 
     ULONG i, BreakOnTermination = 0;
-    HANDLE hObject;
+    HANDLE hObject = NULL;
     PROCESS_EXTENDED_BASIC_INFORMATION exbi;
     RTL_USER_PROCESS_PARAMETERS UserProcessParameters;
     PEB RemotePeb;
@@ -1604,13 +1591,9 @@ VOID propBasicQueryProcess(
     WCHAR szBuffer[100];
     KERNEL_USER_TIMES KernelUserTimes;
 
-    VALIDATE_PROP_CONTEXT(Context);
-
     //
     // Open Process object.
     //
-    hObject = NULL;
-
     bSuccess = propOpenCurrentObject(Context, &hObject, MAXIMUM_ALLOWED);
     if (!bSuccess) {
         bSuccess = propOpenCurrentObject(Context, &hObject, PROCESS_QUERY_INFORMATION);
@@ -1644,7 +1627,7 @@ VOID propBasicQueryProcess(
             if (supPrintTimeConverted(
                 &KernelUserTimes.CreateTime,
                 szBuffer,
-                sizeof(szBuffer) / sizeof(szBuffer[0])))
+                RTL_NUMBER_OF(szBuffer)))
             {
                 SetDlgItemText(hwndDlg, IDC_PROCESS_STARTED, szBuffer);
             }
@@ -1886,15 +1869,11 @@ VOID propBasicQueryProcess(
 * Set information values for Thread object type
 *
 */
-VOID propBasicQueryThread(
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ HWND hwndDlg,
-    _In_ BOOL ExtendedInfoAvailable
-)
+PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryThread)
 {
     BOOL bSuccess;
-    ULONG i, dummy;
-    HANDLE hObject;
+    ULONG ulCriticalThread, dummy;
+    HANDLE hObject = NULL;
 
     TIME_FIELDS TimeFields;
 
@@ -1904,14 +1883,12 @@ VOID propBasicQueryThread(
 
     PROCESSOR_NUMBER IdealProcessor;
 
-    VALIDATE_PROP_CONTEXT(Context);
 
     Thread = &Context->UnnamedObjectInfo.ThreadInformation;
 
     //
     // Open Thread object.
     //
-    hObject = NULL;
     bSuccess = propOpenCurrentObject(Context, &hObject, MAXIMUM_ALLOWED);
     if (!bSuccess) {
         bSuccess = propOpenCurrentObject(Context, &hObject, THREAD_QUERY_INFORMATION);
@@ -1930,7 +1907,7 @@ VOID propBasicQueryThread(
         if (supPrintTimeConverted(
             &Thread->CreateTime,
             szBuffer,
-            sizeof(szBuffer) / sizeof(szBuffer[0])))
+            RTL_NUMBER_OF(szBuffer)))
         {
             SetDlgItemText(hwndDlg, IDC_THREAD_STARTED, szBuffer);
         }
@@ -1984,8 +1961,11 @@ VOID propBasicQueryThread(
         //
         // Ideal processor.
         //
-        if (NT_SUCCESS(NtQueryInformationThread(hObject, ThreadIdealProcessorEx,
-            (PVOID)&IdealProcessor, sizeof(PROCESSOR_NUMBER), &dummy)))
+        if (NT_SUCCESS(NtQueryInformationThread(hObject, 
+            ThreadIdealProcessorEx,
+            (PVOID)&IdealProcessor, 
+            sizeof(PROCESSOR_NUMBER), 
+            &dummy)))
         {
             szBuffer[0] = 0;
             ultostr(IdealProcessor.Number, szBuffer);
@@ -1995,13 +1975,16 @@ VOID propBasicQueryThread(
         //
         // Is thread critical.
         //
-        i = 0;
-        if (NT_SUCCESS(NtQueryInformationThread(hObject, ThreadBreakOnTermination,
-            (PVOID)&i, sizeof(ULONG), &dummy)))
+        ulCriticalThread = 0;
+        if (NT_SUCCESS(NtQueryInformationThread(hObject, 
+            ThreadBreakOnTermination,
+            (PVOID)&ulCriticalThread,
+            sizeof(ULONG), 
+            &dummy)))
         {
-            SetDlgItemText(hwndDlg, IDC_THREAD_CRITICAL, (i > 0) ? TEXT("Yes") : TEXT("No"));
+            SetDlgItemText(hwndDlg, IDC_THREAD_CRITICAL, 
+                (ulCriticalThread > 0) ? TEXT("Yes") : TEXT("No"));
         }
-
 
         //
         // Query object basic and type info if needed.
@@ -2021,16 +2004,18 @@ VOID propBasicQueryThread(
 * Set information values for AlpcPort object type
 *
 */
-VOID propBasicQueryAlpcPort(
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ HWND hwndDlg
-)
+PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryAlpcPort)
 {
-    ULONG_PTR OwnerProcess;
-    ULONG ObjectSize = 0, ObjectVersion = 0;
-    PVOID ProcessList;
+    BOOL bQueryResult;
+    ULONG_PTR ownerProcess;
+    HANDLE ownerProcessId = 0;
+    ULONG objectSize = 0, objectVersion = 0;
+    UNICODE_STRING usImageFileName;
+    PUNICODE_STRING pusFileName = NULL;
+    LPWSTR lpProcessName, pEnd;
+    SIZE_T cchBuffer;
 
-    WCHAR szBuffer[MAX_PATH * 2];
+    WCHAR szBuffer[MAX_PATH * 4];
 
     union {
         union {
@@ -2042,46 +2027,78 @@ VOID propBasicQueryAlpcPort(
         PBYTE Ref;
     } AlpcPort;
 
-    VALIDATE_PROP_CONTEXT(Context);
+    UNREFERENCED_PARAMETER(ExtendedInfoAvailable);
 
     AlpcPort.Ref = (PBYTE)ObDumpAlpcPortObjectVersionAware(Context->ObjectInfo.ObjectAddress,
-        &ObjectSize,
-        &ObjectVersion);
+        &objectSize,
+        &objectVersion);
 
     if (AlpcPort.Ref == NULL) {
         SetDlgItemText(hwndDlg, ID_ALPC_OWNERPROCESS, T_CannotQuery);
         return;
     }
 
+    RtlInitEmptyUnicodeString(&usImageFileName, NULL, 0);
+
     //
     // Determine owner process.
     //
-    OwnerProcess = (ULONG_PTR)AlpcPort.u1.Port7600->OwnerProcess;
-    if (OwnerProcess) {
+    ownerProcess = (ULONG_PTR)AlpcPort.u1.Port7600->OwnerProcess;
+    if (ownerProcess) {
         szBuffer[0] = L'0';
         szBuffer[1] = L'x';
         szBuffer[2] = 0;
-        u64tohex(OwnerProcess, &szBuffer[2]);
+        u64tohex(ownerProcess, &szBuffer[2]);
 
-        _strcat(szBuffer, TEXT(" ("));
+        pEnd = _strcat(szBuffer, TEXT(" ("));
 
-        ProcessList = supGetSystemInfo(SystemProcessInformation, NULL);
-        if (ProcessList) {
+        bQueryResult = FALSE;
+        lpProcessName = T_CannotQuery;
 
-            if (!supQueryProcessNameByEPROCESS(
-                OwnerProcess,
-                ProcessList,
-                _strend(szBuffer),
-                MAX_PATH))
-            {
-                _strcat(szBuffer, T_CannotQuery);
+        if (ObGetProcessId(ownerProcess, &ownerProcessId)) {
+
+            bQueryResult = NT_SUCCESS(supQueryProcessImageFileNameWin32(ownerProcessId,
+                &pusFileName));
+
+            if (bQueryResult) {
+
+                if (pusFileName->Buffer && pusFileName->Length) {
+
+                    lpProcessName = supExtractFileName(pusFileName->Buffer);
+
+                }
+                else {
+
+                    bQueryResult = FALSE;
+
+                }
+
             }
-            supHeapFree(ProcessList);
+
         }
-        else {
-            _strcat(szBuffer, T_CannotQuery);
+
+        if (bQueryResult == FALSE) {
+
+            if (ObGetProcessImageFileName(ownerProcess, &usImageFileName)) {
+
+                lpProcessName = usImageFileName.Buffer;
+
+            }
+
         }
+
+        cchBuffer = RTL_NUMBER_OF(szBuffer) - _strlen(szBuffer) - 4;
+
+        _strncpy(pEnd, cchBuffer, lpProcessName, _strlen(lpProcessName));
+
         _strcat(szBuffer, TEXT(")"));
+
+        if (pusFileName)
+            supHeapFree(pusFileName);
+
+        if (usImageFileName.Buffer)
+            RtlFreeUnicodeString(&usImageFileName);
+
     }
     else {
         _strcpy(szBuffer, T_CannotQuery);
@@ -2101,15 +2118,11 @@ VOID propBasicQueryAlpcPort(
 * If ExtendedInfoAvailable is FALSE then it calls propSetDefaultInfo to set Basic page properties
 *
 */
-VOID propBasicQueryJob(
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ HWND hwndDlg,
-    _In_ BOOL ExtendedInfoAvailable
-)
+PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryJob)
 {
     DWORD       i;
     HWND        hwndCB;
-    HANDLE      hObject;
+    HANDLE      hObject = NULL;
     NTSTATUS    status;
     ULONG       bytesNeeded;
     ULONG_PTR   ProcessId;
@@ -2128,20 +2141,22 @@ VOID propBasicQueryJob(
     SetDlgItemText(hwndDlg, ID_JOBTOTALKMTIME, T_CannotQuery);
     SetDlgItemText(hwndDlg, ID_JOBTOTALPF, T_CannotQuery);
 
-    VALIDATE_PROP_CONTEXT(Context);
-
     //
     // Open Job object.
     //
-    hObject = NULL;
     if (!propOpenCurrentObject(Context, &hObject, JOB_OBJECT_QUERY)) {
         return;
     }
 
     //query basic information
     RtlSecureZeroMemory(&jbai, sizeof(JOBOBJECT_BASIC_ACCOUNTING_INFORMATION));
-    status = NtQueryInformationJobObject(hObject, JobObjectBasicAccountingInformation,
-        &jbai, sizeof(JOBOBJECT_BASIC_ACCOUNTING_INFORMATION), &bytesNeeded);
+
+    status = NtQueryInformationJobObject(hObject, 
+        JobObjectBasicAccountingInformation,
+        &jbai, 
+        sizeof(JOBOBJECT_BASIC_ACCOUNTING_INFORMATION), 
+        &bytesNeeded);
+
     if (NT_SUCCESS(status)) {
 
         //Total processes
@@ -2252,7 +2267,7 @@ VOID propBasicQueryJob(
                             szProcessName,
                             MAX_PATH))
                         {
-                            _strcpy(szProcessName, TEXT("UnknownProcess"));
+                            _strcpy(szProcessName, T_UnknownProcess);
                         }
 
                         //
@@ -2297,19 +2312,15 @@ VOID propBasicQueryJob(
 * Set information values for Session object type
 *
 */
-VOID propBasicQuerySession(
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ HWND hwndDlg
-)
+PROP_QUERY_INFORMATION_ROUTINE(propBasicQuerySession)
 {
-    HANDLE hObject;
+    HANDLE hObject = NULL;
 
-    VALIDATE_PROP_CONTEXT(Context);
+    UNREFERENCED_PARAMETER(ExtendedInfoAvailable);
 
     //
     // Open Session object.
     //
-    hObject = NULL;
     if (!propOpenCurrentObject(Context, &hObject, SESSION_QUERY_ACCESS)) {
         return;
     }
@@ -2342,7 +2353,7 @@ LPWSTR propFormatTokenAttribute(
     
     UNICODE_STRING* TempUstringPtr;
     TOKEN_SECURITY_ATTRIBUTE_FQBN_VALUE* TempFQBNPtr;
-    WCHAR szTemp[MAX_PATH + 1];
+    WCHAR szTemp[MAX_PATH];
 
     SIZE_T MinimumResultLength = 100;
 
@@ -2437,7 +2448,13 @@ LPWSTR propFormatTokenAttribute(
             break;
 
         default:
-            _strcpy(szTemp, T_UnknownValue);
+
+            szTemp[0] = 0;
+            RtlStringCchPrintfSecure(szTemp,
+                MinimumResultLength,
+                TEXT("(Unknown: %lu)"),
+                Attribute->ValueType);
+
             IsSimpleConvert = TRUE;
             break;
 
@@ -2471,14 +2488,10 @@ LPWSTR propFormatTokenAttribute(
 * Set information values for Token object type
 *
 */
-VOID propBasicQueryToken(
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ HWND hwndDlg,
-    _In_ BOOL ExtendedInfoAvailable
-)
+PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryToken)
 {
     BOOLEAN bFlagSet = FALSE;
-    HANDLE hObject;
+    HANDLE hObject = NULL;
     PTOKEN_SECURITY_ATTRIBUTES_INFORMATION SecurityAttributes;
     PTOKEN_SECURITY_ATTRIBUTE_V1 Attribute;
     ULONG ReturnLength = 0, i, j;
@@ -2487,19 +2500,16 @@ VOID propBasicQueryToken(
     HTREEITEM RootItem;
     LPWSTR lpType;
 
-    WCHAR szBuffer[MAX_PATH + 1];
+    WCHAR szBuffer[MAX_PATH];
 
     HWND TreeView = GetDlgItem(hwndDlg, IDC_TOKEN_ATTRLIST);
 
     SetWindowTheme(TreeView, TEXT("Explorer"), NULL);
     TreeView_DeleteAllItems(TreeView);
 
-    VALIDATE_PROP_CONTEXT(Context);
-
     //
     // Open Token object.
     //
-    hObject = NULL;
     if (!propOpenCurrentObject(Context, &hObject, TOKEN_QUERY)) {
         return;
     }
@@ -2564,7 +2574,7 @@ VOID propBasicQueryToken(
                 lpType = TEXT("Octet string");
                 break;
             default:
-                lpType = T_UnknownValue;
+                lpType = T_Unknown;
                 break;
             }
             _strcpy(szBuffer, TEXT("Type: "));
@@ -2678,17 +2688,14 @@ VOID propBasicQueryToken(
 * Support is very limited because of win32k type origin.
 *
 */
-VOID propBasicQueryDesktop(
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ HWND hwndDlg
-)
+PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryDesktop)
 {
     BOOL        bExtendedInfoAvailable;
-    HANDLE      hDesktop;
+    HANDLE      hDesktop = NULL;
     ULONG_PTR   ObjectAddress = 0, HeaderAddress = 0, InfoHeaderAddress = 0;
     OBJINFO     InfoObject;
 
-    VALIDATE_PROP_CONTEXT(Context);
+    UNREFERENCED_PARAMETER(ExtendedInfoAvailable);
 
     //
     // Open Desktop object.
@@ -2696,7 +2703,6 @@ VOID propBasicQueryDesktop(
     // Restriction: 
     // This will open only current winsta desktops
     //
-    hDesktop = NULL;
     if (!propOpenCurrentObject(Context, &hDesktop, DESKTOP_READOBJECTS)) {
         return;
     }
@@ -2715,9 +2721,12 @@ VOID propBasicQueryDesktop(
             RtlSecureZeroMemory(&InfoObject, sizeof(InfoObject));
             InfoObject.HeaderAddress = HeaderAddress;
             InfoObject.ObjectAddress = ObjectAddress;
+
             //dump object header
             bExtendedInfoAvailable = kdReadSystemMemory(HeaderAddress,
-                &InfoObject.ObjectHeader, sizeof(OBJECT_HEADER));
+                &InfoObject.ObjectHeader, 
+                sizeof(OBJECT_HEADER));
+
             if (bExtendedInfoAvailable) {
                 //dump quota info
                 if (ObHeaderToNameInfoAddress(InfoObject.ObjectHeader.InfoMask,
@@ -2729,6 +2738,7 @@ VOID propBasicQueryDesktop(
                 propSetBasicInfoEx(hwndDlg, &InfoObject);
             }
         }
+
         //cannot query extended info, output what we have
         if (bExtendedInfoAvailable == FALSE) {
 
@@ -2768,8 +2778,6 @@ VOID propSetBasicInfoEx(
     HWND    hwndCB;
     WCHAR   szBuffer[MAX_PATH];
 
-    if (InfoObject == NULL)
-        return;
 
     //Object & Header Address
     propSetObjectHeaderAddressInfo(
@@ -2827,10 +2835,10 @@ VOID propSetBasicInfo(
     _In_ HWND hwndDlg
 )
 {
-    BOOL     ExtendedInfoAvailable = FALSE;
+    BOOL     ExtendedInfoAvailable = FALSE, bQueryTrustLabel = FALSE;
     POBJINFO InfoObject = NULL;
 
-    VALIDATE_PROP_CONTEXT(Context);
+    pfnPropQueryInfoRoutine propQueryInfoRoutine;
 
     SetDlgItemText(hwndDlg, ID_OBJECT_NAME, Context->lpObjectName);
     SetDlgItemText(hwndDlg, ID_OBJECT_TYPE, Context->lpObjectType);
@@ -2889,7 +2897,7 @@ VOID propSetBasicInfo(
             // The only information we can get is from driver here as we cannot open port directly.
             // 
             if (Context->TypeIndex == ObjectTypePort) {
-                propBasicQueryAlpcPort(Context, hwndDlg);
+                propBasicQueryAlpcPort(Context, hwndDlg, FALSE);
             }
 
             supHeapFree(InfoObject);
@@ -2900,70 +2908,84 @@ VOID propSetBasicInfo(
     // Query Basic Information extended fields per Type.
     // If extended info not available each routine should query basic info itself.
     //
+    propQueryInfoRoutine = NULL;
+
     switch (Context->TypeIndex) {
     case ObjectTypeDirectory:
+        bQueryTrustLabel = TRUE;
         //if TRUE skip this because directory is basic dialog and basic info already set
         if (ExtendedInfoAvailable == FALSE) {
-            propBasicQueryDirectory(Context, hwndDlg);
+            propQueryInfoRoutine = (pfnPropQueryInfoRoutine)propBasicQueryDirectory;
         }
-        propSetProcessTrustLabelInfo(Context, hwndDlg);
         break;
     case ObjectTypeDriver:
-        propBasicQueryDriver(Context, hwndDlg);
+        propQueryInfoRoutine = (pfnPropQueryInfoRoutine)propBasicQueryDriver;
         break;
     case ObjectTypeDevice:
-        propBasicQueryDevice(Context, hwndDlg);
+        propQueryInfoRoutine = (pfnPropQueryInfoRoutine)propBasicQueryDevice;
         break;
     case ObjectTypeSymbolicLink:
-        propBasicQuerySymlink(Context, hwndDlg, ExtendedInfoAvailable);
+        propQueryInfoRoutine = (pfnPropQueryInfoRoutine)propBasicQuerySymlink;
         break;
     case ObjectTypeKey:
-        propBasicQueryKey(Context, hwndDlg, ExtendedInfoAvailable);
+        propQueryInfoRoutine = (pfnPropQueryInfoRoutine)propBasicQueryKey;
         break;
     case ObjectTypeMutant:
-        propBasicQueryMutant(Context, hwndDlg, ExtendedInfoAvailable);
+        propQueryInfoRoutine = (pfnPropQueryInfoRoutine)propBasicQueryMutant;
         break;
     case ObjectTypeEvent:
-        propBasicQueryEvent(Context, hwndDlg, ExtendedInfoAvailable);
+        propQueryInfoRoutine = (pfnPropQueryInfoRoutine)propBasicQueryEvent;
         break;
     case ObjectTypeTimer:
-        propBasicQueryTimer(Context, hwndDlg, ExtendedInfoAvailable);
+        propQueryInfoRoutine = (pfnPropQueryInfoRoutine)propBasicQueryTimer;
         break;
     case ObjectTypeSemaphore:
-        propBasicQuerySemaphore(Context, hwndDlg, ExtendedInfoAvailable);
+        propQueryInfoRoutine = (pfnPropQueryInfoRoutine)propBasicQuerySemaphore;
         break;
     case ObjectTypeSection:
-        propBasicQuerySection(Context, hwndDlg, ExtendedInfoAvailable);
-        propSetProcessTrustLabelInfo(Context, hwndDlg);
+        bQueryTrustLabel = TRUE;
+        propQueryInfoRoutine = (pfnPropQueryInfoRoutine)propBasicQuerySection;
         break;
     case ObjectTypeWinstation:
-        propBasicQueryWindowStation(Context, hwndDlg, ExtendedInfoAvailable);
+        propQueryInfoRoutine = (pfnPropQueryInfoRoutine)propBasicQueryWindowStation;
         break;
     case ObjectTypeJob:
-        propBasicQueryJob(Context, hwndDlg, ExtendedInfoAvailable);
+        propQueryInfoRoutine = (pfnPropQueryInfoRoutine)propBasicQueryJob;
         break;
     case ObjectTypeSession:
-        propBasicQuerySession(Context, hwndDlg);
+        propQueryInfoRoutine = (pfnPropQueryInfoRoutine)propBasicQuerySession;
         break;
     case ObjectTypeDesktop:
-        propBasicQueryDesktop(Context, hwndDlg);
+        propQueryInfoRoutine = (pfnPropQueryInfoRoutine)propBasicQueryDesktop;
         break;
     case ObjectTypeIoCompletion:
-        propBasicQueryIoCompletion(Context, hwndDlg, ExtendedInfoAvailable);
+        propQueryInfoRoutine = (pfnPropQueryInfoRoutine)propBasicQueryIoCompletion;
         break;
     case ObjectTypeMemoryPartition:
-        propBasicQueryMemoryPartition(Context, hwndDlg);
+        propQueryInfoRoutine = (pfnPropQueryInfoRoutine)propBasicQueryMemoryPartition;
         break;
     case ObjectTypeProcess:
-        propBasicQueryProcess(Context, hwndDlg, ExtendedInfoAvailable);
+        propQueryInfoRoutine = (pfnPropQueryInfoRoutine)propBasicQueryProcess;
         break;
     case ObjectTypeThread:
-        propBasicQueryThread(Context, hwndDlg, ExtendedInfoAvailable);
+        propQueryInfoRoutine = (pfnPropQueryInfoRoutine)propBasicQueryThread;
         break;
     case ObjectTypeToken:
-        propBasicQueryToken(Context, hwndDlg, ExtendedInfoAvailable);
+        propQueryInfoRoutine = (pfnPropQueryInfoRoutine)propBasicQueryToken;
         break;
     }
+
+    //
+    // Query object information by type.
+    //
+    if (propQueryInfoRoutine)
+        propQueryInfoRoutine(Context, hwndDlg, ExtendedInfoAvailable);
+
+    //
+    // Set TrustLabel information for enabled object types.
+    //
+    if (bQueryTrustLabel)
+        propSetProcessTrustLabelInfo(Context, hwndDlg);
 
 }
 

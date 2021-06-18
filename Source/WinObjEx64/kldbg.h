@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        26 Apr 2021
+*  DATE:        07 June 2021
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -66,9 +66,14 @@ typedef struct _OBJECT_COLLECTION {
 } OBJECT_COLLECTION, *POBJECT_COLLECTION;
 
 typedef struct _OBHEADER_COOKIE {
-    UCHAR Value;
     BOOLEAN Valid;
+    UCHAR Value;
 } OBHEADER_COOKIE, * POBHEADER_COOKIE;
+
+typedef struct _EPROCESS_OFFSET {
+    BOOLEAN Valid;
+    ULONG OffsetValue;
+} EPROCESS_OFFSET, * PEPROCESS_OFFSET;
 
 typedef struct _KSE_ENGINE_DUMP {
     BOOLEAN Valid;
@@ -76,19 +81,56 @@ typedef struct _KSE_ENGINE_DUMP {
     LIST_ENTRY ShimmedDriversDumpListHead;
 } KSE_ENGINE_DUMP, * PKSE_ENGINE_DUMP;
 
-typedef struct _KLDBGCONTEXT {
+typedef struct _KLDBG_SYSTEM_ADDRESS {
+    BOOLEAN Valid;
+    ULONG_PTR Address;
+} KLDBG_SYSTEM_ADDRESS, * PKLDBG_SYSTEM_ADDRESS;
 
-    //Is user full admin
-    BOOL IsFullAdmin;
+//
+// KLDBG private data.
+//
+typedef struct _KLDBGPDATA {
 
-    //we loaded driver?
-    BOOL IsOurLoad;
-
-    //secureboot enabled?
-    BOOL IsSecureBoot;
+    FIRMWARE_TYPE FirmwareType;
 
     //system object header cookie (win10+)
     OBHEADER_COOKIE ObHeaderCookie;
+
+    //address of invalid request handler
+    PVOID IopInvalidDeviceRequest;
+
+    //address of ObpPrivateNamespaceLookupTable
+    PVOID PrivateNamespaceLookupTable;
+
+    //syscall tables related info
+    ULONG_PTR KeServiceDescriptorTableShadowPtr;
+    KSERVICE_TABLE_DESCRIPTOR KeServiceDescriptorTable;
+
+    //kernel shim engine dump and auxl ptrs
+    KSE_ENGINE_DUMP KseEngineDump;
+
+    //unloaded drivers array address
+    KLDBG_SYSTEM_ADDRESS MmUnloadedDrivers; 
+
+    //EPROCESS specific offsets
+    EPROCESS_OFFSET PsUniqueProcessId;  
+    EPROCESS_OFFSET PsProcessImageName; 
+
+} KLDBGPDATA, * PKLDBGPDATA;
+
+typedef struct _KLDBGCONTEXT {
+
+    //Is user full admin
+    BOOLEAN IsFullAdmin;
+
+    //we loaded driver?
+    BOOLEAN IsOurLoad;
+
+    //secureboot enabled?
+    BOOLEAN IsSecureBoot;
+
+    //VHD boot?
+    BOOLEAN IsOsDiskVhd;
 
     //index of directory type and root address
     USHORT DirectoryTypeIndex;
@@ -96,12 +138,6 @@ typedef struct _KLDBGCONTEXT {
 
     //kldbgdrv device handle
     HANDLE DeviceHandle;
-
-    //address of invalid request handler
-    PVOID IopInvalidDeviceRequest;
-
-    //address of ObpPrivateNamespaceLookupTable
-    PVOID PrivateNamespaceLookupTable;
 
     //ntoskrnl base and size
     PVOID NtOsBase;
@@ -112,14 +148,14 @@ typedef struct _KLDBGCONTEXT {
 
     //driver loading/open status
     ULONG DriverOpenLoadStatus;
-    ULONG DriverOpenStatus;
-
-    //syscall tables related info
-    ULONG_PTR KeServiceDescriptorTableShadowPtr;
-    KSERVICE_TABLE_DESCRIPTOR KeServiceDescriptorTable;
+    ULONG DriverConnectStatus;
 
     //system range start
     ULONG_PTR SystemRangeStart;
+
+    //min/max user address
+    ULONG_PTR MinimumUserModeAddress;
+    ULONG_PTR MaximumUserModeAddress;
 
     //objects collection
     OBJECT_COLLECTION ObCollection;
@@ -127,8 +163,9 @@ typedef struct _KLDBGCONTEXT {
     //object list lock
     CRITICAL_SECTION ObCollectionLock;
 
-    //kernel shim engine dump and auxl ptrs
-    KSE_ENGINE_DUMP KseEngineDump;
+    PVOID NtOsSymContext;
+
+    PKLDBGPDATA Data;
 
 } KLDBGCONTEXT, *PKLDBGCONTEXT;
 
@@ -218,7 +255,7 @@ typedef struct _OBJREF {
 #define NT_WIN10_21H1           19043
 
 // Windows 10 Active Develepment Branch (21XX)
-#define NTX_WIN10_ADB           21286
+#define NTX_WIN10_ADB           21382
 
 //
 // Defines for boundary descriptors
@@ -269,6 +306,10 @@ typedef struct _NOTIFICATION_CALLBACKS {
     ULONG_PTR ExpCallbackListHead;
 } NOTIFICATION_CALLBACKS, *PNOTIFICATION_CALLBACKS;
 
+//
+// Callbacks global.
+// (defined in kldbg.c)
+//
 extern NOTIFICATION_CALLBACKS g_SystemCallbacks;
 
 typedef struct _W32K_API_SET_LOOKUP_PATTERN {
@@ -287,6 +328,13 @@ typedef BOOL(CALLBACK *PENUMERATE_BOUNDARY_DESCRIPTOR_CALLBACK)(
     _In_ OBJECT_BOUNDARY_ENTRY *Entry,
     _In_opt_ PVOID Context
     );
+
+NTSTATUS ObIsValidUnicodeString(
+    _In_ PCUNICODE_STRING SourceString);
+
+NTSTATUS ObIsValidUnicodeStringEx(
+    _In_ PCUNICODE_STRING SourceString,
+    _In_ DWORD dwFlags);
 
 NTSTATUS ObCopyBoundaryDescriptor(
     _In_ OBJECT_NAMESPACE_ENTRY *NamespaceLookupEntry,
@@ -343,6 +391,14 @@ BOOL ObDumpTypeInfo(
     _In_    ULONG_PTR ObjectAddress,
     _Inout_ POBJECT_TYPE_COMPATIBLE ObjectTypeInfo);
 
+BOOL ObGetProcessImageFileName(
+    _In_ ULONG_PTR ProcessObject,
+    _Inout_ PUNICODE_STRING ImageFileName);
+
+BOOL ObGetProcessId(
+    _In_ ULONG_PTR ProcessObject,
+    _Out_ PHANDLE UniqueProcessId);
+
 BOOL ObHeaderToNameInfoAddress(
     _In_    UCHAR ObjectInfoMask,
     _In_    ULONG_PTR ObjectAddress,
@@ -385,7 +441,7 @@ PVOID kdQueryIopInvalidDeviceRequest(
 BOOL kdFindKiServiceTable(
     _In_ ULONG_PTR MappedImageBase,
     _In_ ULONG_PTR KernelImageBase,
-    _Out_ KSERVICE_TABLE_DESCRIPTOR* ServiceTable);
+    _Inout_ KSERVICE_TABLE_DESCRIPTOR* ServiceTable);
 
 ULONG_PTR kdQueryWin32kApiSetTable(
     _In_ HMODULE hWin32k);
@@ -395,6 +451,10 @@ BOOL kdpReadSystemMemoryEx(
     _Inout_ PVOID Buffer,
     _In_ ULONG BufferSize,
     _Out_opt_ PULONG NumberOfBytesRead);
+
+BOOL kdLoadSymbolsForNtKernelImage(
+    _In_ PSYMCONTEXT SymContext,
+    _In_ LPCWSTR ImageFileName);
 
 #ifdef _USE_OWN_DRIVER
 #ifdef _USE_WINIO
@@ -416,7 +476,7 @@ BOOL kdpReadSystemMemoryEx(
 #endif
 
 VOID kdInit(
-    _In_ BOOL IsFullAdmin);
+    _In_ BOOLEAN IsFullAdmin);
 
 VOID kdShutdown(
     VOID);
@@ -432,9 +492,30 @@ UCHAR kdGetInstructionLength(
     _In_ PVOID ptrCode,
     _Out_ PULONG ptrFlags);
 
+VOID kdDestroyShimmedDriversList(
+    _In_ PKSE_ENGINE_DUMP KseEngineDump);
+
 BOOLEAN kdQueryKernelShims(
     _In_ PKLDBGCONTEXT Context,
     _In_ BOOLEAN RefreshList);
+
+BOOLEAN kdQueryMmUnloadedDrivers(
+    _In_ PKLDBGCONTEXT Context,
+    _Out_ PVOID* UnloadedDrivers);
+
+BOOLEAN kdIsSymAvailable(
+    _In_ KLDBGCONTEXT* Context);
+
+BOOL kdGetFieldOffsetFromSymbol(
+    _In_ KLDBGCONTEXT* Context,
+    _In_ LPCWSTR SymbolName,
+    _In_ LPCWSTR FieldName,
+    _Out_ ULONG* Offset);
+
+BOOL kdGetAddressFromSymbol(
+    _In_ KLDBGCONTEXT* Context,
+    _In_ LPCWSTR SymbolName,
+    _Inout_ ULONG_PTR* Address);
 
 /*
 * ObGetObjectFastReference
@@ -459,11 +540,26 @@ __forceinline PVOID ObGetObjectFastReference(
 *
 */
 __forceinline BOOL kdAddressInNtOsImage(
-    _In_ PVOID Address)
+    _In_opt_ PVOID Address)
 {
     return IN_REGION(Address,
         g_kdctx.NtOsBase,
         g_kdctx.NtOsSize);
+}
+
+/*
+* kdAddressInUserModeRange
+*
+* Purpose:
+*
+* Test if given address in user mode accessible range.
+*
+*/
+__forceinline BOOL kdAddressInUserModeRange(
+    _In_opt_ PVOID Address)
+{
+    return ((ULONG_PTR)Address >= g_kdctx.MinimumUserModeAddress &&
+        (ULONG_PTR)Address < g_kdctx.MaximumUserModeAddress);
 }
 
 /*

@@ -4,9 +4,9 @@
 *
 *  TITLE:       PLUGMNGR.C
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        14 Jan 2021
+*  DATE:        27 May 2021
 *
 *  Plugin manager.
 *
@@ -1036,30 +1036,30 @@ VOID PmpShowPluginInfo(
     else
         lpType = TEXT("No");
 
-    SetWindowText(GetDlgItem(hwndDlg, IDC_PLUGIN_ADMIN), lpType);
+    SetDlgItemText(hwndDlg, IDC_PLUGIN_ADMIN, lpType);
 
     if (PluginData->Plugin.NeedDriver)
         lpType = TEXT("Yes");
     else
         lpType = TEXT("No");
 
-    SetWindowText(GetDlgItem(hwndDlg, IDC_PLUGIN_DRIVER), lpType);
+    SetDlgItemText(hwndDlg, IDC_PLUGIN_DRIVER, lpType);
 
     if (PluginData->Plugin.SupportWine)
         lpType = TEXT("Yes");
     else
         lpType = TEXT("No");
 
-    SetWindowText(GetDlgItem(hwndDlg, IDC_PLUGIN_WINE), lpType);
+    SetDlgItemText(hwndDlg, IDC_PLUGIN_WINE, lpType);
 
     if (PluginData->Plugin.SupportMultipleInstances)
         lpType = TEXT("Yes");
     else
         lpType = TEXT("No");
 
-    SetWindowText(GetDlgItem(hwndDlg, IDC_PLUGIN_MINSTANCES), lpType);
+    SetDlgItemText(hwndDlg, IDC_PLUGIN_MINSTANCES, lpType);
 
-    SetWindowText(GetDlgItem(hwndDlg, IDC_PLUGIN_DESC), PluginData->Plugin.Description);
+    SetDlgItemText(hwndDlg, IDC_PLUGIN_DESC, PluginData->Plugin.Description);
 
     if (PluginData->Plugin.Type == ContextPlugin) {
         PmpListSupportedObjectTypes(hwndCB, &PluginData->Plugin);
@@ -1071,7 +1071,7 @@ VOID PmpShowPluginInfo(
 
     RtlSecureZeroMemory(szModuleName, sizeof(szModuleName));
     GetModuleFileName(PluginData->Module, (LPWSTR)&szModuleName, MAX_PATH);
-    SetWindowText(GetDlgItem(hwndDlg, IDC_PLUGIN_FILENAME), szModuleName);
+    SetDlgItemText(hwndDlg, IDC_PLUGIN_FILENAME, szModuleName);
 }
 
 /*

@@ -4,9 +4,9 @@
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     1.88
+*  VERSION:     1.90
 *
-*  DATE:        14 Jan 2021
+*  DATE:        05 June 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -52,14 +52,11 @@ VOID AboutDialogInit(
     BOOLEAN  bSecureBoot = FALSE;
     BOOLEAN  bHVCIEnabled = FALSE, bHVCIStrict = FALSE, bHVCIIUMEnabled = FALSE;
     HANDLE   hImage;
-    ULONG    returnLength;
-    NTSTATUS status;
     WCHAR    szBuffer[MAX_PATH];
 
     PCHAR    wine_ver, wine_str;
 
-    SYSTEM_BOOT_ENVIRONMENT_INFORMATION sbei;
-    SYSTEM_VHD_BOOT_INFORMATION* psvbi;
+    FIRMWARE_TYPE firmwareType;
 
     SetDlgItemText(hwndDlg, ID_ABOUT_PROGRAM, PROFRAM_NAME_AND_TITLE);
 
@@ -83,7 +80,7 @@ VOID AboutDialogInit(
 
     if (hImage) {
 
-        SendMessage(GetDlgItem(hwndDlg, ID_ABOUT_ICON),
+        SendDlgItemMessage(hwndDlg, ID_ABOUT_ICON,
             STM_SETIMAGE, IMAGE_ICON, (LPARAM)hImage);
 
         SetProp(hwndDlg, T_ABOUTDLG_ICON_PROP, hImage);
@@ -155,7 +152,6 @@ VOID AboutDialogInit(
     else {
         SetDlgItemText(hwndDlg, ID_ABOUT_OSNAME, szBuffer);
 
-        RtlSecureZeroMemory(&sbei, sizeof(sbei));
         RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
 
         //
@@ -168,28 +164,27 @@ VOID AboutDialogInit(
         //
         // Query VHD boot state if possible.
         //
-        psvbi = (SYSTEM_VHD_BOOT_INFORMATION*)supHeapAlloc(PAGE_SIZE);
-        if (psvbi) {
-            status = NtQuerySystemInformation(SystemVhdBootInformation, psvbi, PAGE_SIZE, &returnLength);
-            if (NT_SUCCESS(status)) {
-                if (psvbi->OsDiskIsVhd) {
-                    _strcat(szBuffer, TEXT("VHD, "));
-                }
-            }
-            supHeapFree(psvbi);
+        if (g_kdctx.IsOsDiskVhd) {
+            _strcat(szBuffer, TEXT("VHD, "));
         }
 
         //
         // Query firmware mode and SecureBoot state for UEFI.
         //
-        status = NtQuerySystemInformation(SystemBootEnvironmentInformation, &sbei, sizeof(sbei), &returnLength);
-        if (NT_SUCCESS(status)) {
+        firmwareType = g_kdctx.Data->FirmwareType;
 
-            if (sbei.FirmwareType == FirmwareTypeUefi) {
+        if (firmwareType == FirmwareTypeUnknown) {
+
+            _strcpy(szBuffer, T_Unknown);
+
+        }
+        else {
+
+            if (firmwareType == FirmwareTypeUefi) {
                 _strcat(szBuffer, TEXT("UEFI"));
             }
             else {
-                if (sbei.FirmwareType == FirmwareTypeBios) {
+                if (firmwareType == FirmwareTypeBios) {
                     _strcat(szBuffer, TEXT("BIOS"));
                 }
                 else {
@@ -197,7 +192,7 @@ VOID AboutDialogInit(
                 }
             }
 
-            if (sbei.FirmwareType == FirmwareTypeUefi) {
+            if (firmwareType == FirmwareTypeUefi) {
                 bSecureBoot = FALSE;
                 if (supQuerySecureBootState(&bSecureBoot)) {
                     _strcat(szBuffer, TEXT(" with"));
@@ -219,9 +214,7 @@ VOID AboutDialogInit(
                 }
             }
         }
-        else {
-            _strcpy(szBuffer, TEXT("Unknown"));
-        }
+
         SetDlgItemText(hwndDlg, ID_ABOUT_ADVINFO, szBuffer);
     }
 
@@ -266,7 +259,7 @@ VOID AddParameterValue(
     }
 
     SendMessage(OutputWindow, EM_REPLACESEL, (WPARAM)0, (LPARAM)Parameter);
-    SendMessage(OutputWindow, EM_REPLACESEL, (WPARAM)0, (LPARAM)L":\t");
+    SendMessage(OutputWindow, EM_REPLACESEL, (WPARAM)0, (LPARAM)L"\t");
     SendMessage(OutputWindow, EM_REPLACESEL, (WPARAM)0, (LPARAM)Value);
 
     CharFormat.dwEffects = CFE_BOLD;
@@ -340,6 +333,29 @@ VOID AddParameterValueUlong(
     szBuffer[0] = 0;
     ultostr(Value, szBuffer);
     AddParameterValue(OutputWindow, Parameter, szBuffer);
+}
+
+/*
+* AddParameterValueBool
+*
+* Purpose:
+*
+* Add text to the multiline richedit tabbed control (bool value).
+*
+*/
+VOID AddParameterValueBool(
+    _In_ HWND OutputWindow,
+    _In_ LPWSTR Parameter,
+    _In_ BOOL Value)
+{
+    LPWSTR lpValue;
+
+    if (Value == FALSE)
+        lpValue = TEXT("FALSE");
+    else
+        lpValue = TEXT("TRUE");
+
+    AddParameterValue(OutputWindow, Parameter, lpValue);
 }
 
 /*
@@ -500,58 +516,59 @@ VOID AboutDialogCollectGlobals(
     if (g_kdctx.DriverOpenLoadStatus == STATUS_SUCCESS) {
         _strcat(szBuffer, TEXT(" (reported as OK)"));
     }
+
     AddParameterValue(hwndOutput, TEXT("DriverOpenLoadStatus"), szBuffer);
-    
-    AddParameterValue32Hex(hwndOutput, TEXT("DriverOpenStatus"), g_kdctx.DriverOpenStatus);
-
-    AddParameterValueUlong(hwndOutput, TEXT("IsSecureBoot"), g_kdctx.IsSecureBoot);
-
-    AddParameterValueUlong(hwndOutput, TEXT("IsFullAdmin"), g_kdctx.IsFullAdmin);
-
-    AddParameterValueUlong(hwndOutput, TEXT("IsOurLoad"), g_kdctx.IsOurLoad);
-
-    AddParameterValue64Hex(hwndOutput, TEXT("DirectoryRootAddress"), g_kdctx.DirectoryRootAddress);
-
-    AddParameterValueUlong(hwndOutput, TEXT("DirectoryTypeIndex"), g_kdctx.DirectoryTypeIndex);
-
+    AddParameterValue32Hex(hwndOutput, TEXT("DriverConnectStatus"), g_kdctx.DriverConnectStatus); //kdConnectDriver status
     AddParameterValue64Hex(hwndOutput, TEXT("KLDBG DeviceHandle"), (ULONG_PTR)g_kdctx.DeviceHandle);
 
-    AddParameterValue64Hex(hwndOutput, TEXT("IopInvalidDeviceRequest"), (ULONG_PTR)g_kdctx.IopInvalidDeviceRequest);
+    AddParameterValueBool(hwndOutput, TEXT("IsFullAdmin"), g_kdctx.IsFullAdmin); //admin privileges available
+    AddParameterValueBool(hwndOutput, TEXT("IsSecureBoot"), g_kdctx.IsSecureBoot); //secure boot enabled
+    AddParameterValueBool(hwndOutput, TEXT("IsOurLoad"), g_kdctx.IsOurLoad); //driver was loaded by our program instance
 
-    AddParameterValueUlong(hwndOutput, TEXT("KiServiceLimit"), g_kdctx.KeServiceDescriptorTable.Limit);
-
-    AddParameterValue64Hex(hwndOutput, TEXT("KiServiceTableAddress"), (ULONG_PTR)g_kdctx.KeServiceDescriptorTable.Base);
+    AddParameterValue64Hex(hwndOutput, TEXT("DirectoryRootAddress"), g_kdctx.DirectoryRootAddress); //address of object root directory
+    AddParameterValueUlong(hwndOutput, TEXT("DirectoryTypeIndex"), g_kdctx.DirectoryTypeIndex);
 
     AddParameterValue64Hex(hwndOutput, TEXT("NtOsBase"), (ULONG_PTR)g_kdctx.NtOsBase);
+    AddParameterValue64Hex(hwndOutput, TEXT("NtOsImageMap"), (ULONG_PTR)g_kdctx.NtOsImageMap);//mapped image address
+    AddParameterValue32Hex(hwndOutput, TEXT("NtOsSize"), g_kdctx.NtOsSize);//mapped image size
 
-    AddParameterValueUlong(hwndOutput, TEXT("NtOsSize"), g_kdctx.NtOsSize);
-
-    AddParameterValue64Hex(hwndOutput, TEXT("NtOsImageMap"), (ULONG_PTR)g_kdctx.NtOsImageMap);
-
-    AddParameterValueUlong(hwndOutput, TEXT("ObHeaderCookie"), g_kdctx.ObHeaderCookie.Value);
-
-    AddParameterValueUlong(hwndOutput, TEXT("ObHeaderCookieValid"), g_kdctx.ObHeaderCookie.Valid);
-
-    AddParameterValue64Hex(hwndOutput, TEXT("PrivateNamespaceLookupTable"), (ULONG_PTR)g_kdctx.PrivateNamespaceLookupTable);
+    AddParameterValue64Hex(hwndOutput, TEXT("NtOsSymContext"), (ULONG_PTR)g_kdctx.NtOsSymContext);
+    if (g_kdctx.NtOsSymContext) {
+        AddParameterValue64Hex(hwndOutput, TEXT("NtOsSymContext->ModuleBase"), ((PSYMCONTEXT)g_kdctx.NtOsSymContext)->ModuleBase);
+    }
 
     AddParameterValue64Hex(hwndOutput, TEXT("SystemRangeStart"), (ULONG_PTR)g_kdctx.SystemRangeStart);
+    AddParameterValue64Hex(hwndOutput, TEXT("MinimumUserModeAddress"), (ULONG_PTR)g_kdctx.MinimumUserModeAddress);
+    AddParameterValue64Hex(hwndOutput, TEXT("MaximumUserModeAddress"), (ULONG_PTR)g_kdctx.MaximumUserModeAddress);
+
+    //
+    // List kldbg data.
+    //
+    AddParameterValueBool(hwndOutput, TEXT("ObHeaderCookieValid"), g_kdctx.Data->ObHeaderCookie.Valid);
+    AddParameterValue32Hex(hwndOutput, TEXT("ObHeaderCookie"), g_kdctx.Data->ObHeaderCookie.Value);
+
+    AddParameterValueUlong(hwndOutput, TEXT("KiServiceLimit"), g_kdctx.Data->KeServiceDescriptorTable.Limit);
+    AddParameterValue64Hex(hwndOutput, TEXT("KiServiceTableAddress"), (ULONG_PTR)g_kdctx.Data->KeServiceDescriptorTable.Base);
+    AddParameterValue64Hex(hwndOutput, TEXT("IopInvalidDeviceRequest"), (ULONG_PTR)g_kdctx.Data->IopInvalidDeviceRequest);
+    AddParameterValue64Hex(hwndOutput, TEXT("PrivateNamespaceLookupTable"), (ULONG_PTR)g_kdctx.Data->PrivateNamespaceLookupTable);
 
     //
     // List g_WinObj (UI specific).
     //
-    AddParameterValueUlong(hwndOutput, TEXT("IsWine"), g_WinObj.IsWine);
+    AddParameterValueBool(hwndOutput, TEXT("IsWine"), g_WinObj.IsWine);
 
     //
     // For MMIO usage.
     //
-    AddParameterValueUlong(hwndOutput, TEXT("EnableFullMitigations"), g_WinObj.EnableFullMitigations);
+    AddParameterValueBool(hwndOutput, TEXT("EnableFullMitigations"), g_WinObj.EnableFullMitigations);
 
     //
     // List other data.
     //
     if (NT_SUCCESS(supCICustomKernelSignersAllowed(&bCustomSignersAllowed))) {
-        AddParameterValueUlong(hwndOutput, TEXT("CICustomKernelSignersAllowed"), (ULONG)bCustomSignersAllowed);
+        AddParameterValueBool(hwndOutput, TEXT("CICustomKernelSignersAllowed"), bCustomSignersAllowed);
     }
+
     AddParameterValueUlong(hwndOutput, TEXT("DPI Value"), (ULONG)supGetDPIValue(NULL));
 
     CodeIntegrity.Length = sizeof(CodeIntegrity);

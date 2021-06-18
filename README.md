@@ -223,7 +223,7 @@ In order to build from source you need Microsoft Visual Studio 2015/2017/2019 an
  
 # What is new
 
-[Whats New in 1.8.7](https://github.com/hfiref0x/WinObjEx64/blob/master/Compiled/WHATSNEW_187.md)
+[Whats New in 1.9.0](https://github.com/hfiref0x/WinObjEx64/blob/master/Compiled/WHATSNEW_190.md)
 
 [Complete changelog](https://github.com/hfiref0x/WinObjEx64/blob/master/Source/CHANGELOG.txt)
 

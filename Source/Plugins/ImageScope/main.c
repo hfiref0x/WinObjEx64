@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020
+*  (C) COPYRIGHT AUTHORS, 2020 - 2021
 *
 *  TITLE:       MAIN.C
 *
 *  VERSION:     1.00
 *
-*  DATE:        11 July 2020
+*  DATE:        27 July 2021
 *
 *  WinObjEx64 ImageScope plugin.
 *
@@ -18,7 +18,6 @@
 *******************************************************************************/
 
 #include "global.h"
-#include <intrin.h>
 
 //
 // Dll instance.

@@ -4,9 +4,9 @@
 *
 *  TITLE:       SYMPARSER.H
 *
-*  VERSION:     1.15
+*  VERSION:     1.16
 *
-*  DATE:        18 May 2021
+*  DATE:        29 June 2021
 *
 *  Header file of DbgHelp wrapper for symbols parser support.
 *
@@ -56,6 +56,7 @@ typedef enum _SymBasicType {
     btHresult = 31,
     btChar16 = 32,
     btChar32 = 33,
+    btChar8 = 34,
     btMaxType = 0xffff
 } SymBasicType;
 
@@ -250,7 +251,7 @@ typedef ULONG(WINAPI* SPGetCount)(
     _In_ ULONG TypeIndex,
     _Out_opt_ PBOOL Status);
 
-typedef ULONG(WINAPI* SPGetCallingConvertion)(
+typedef ULONG(WINAPI* SPGetCallingConvention)(
     _In_ PSYMCONTEXT Context,
     _In_ ULONG TypeIndex,
     _Out_opt_ PBOOL Status);
@@ -303,7 +304,7 @@ typedef struct _SYMPARSER {
     SPGetArrayTypeId GetArrayTypeId;
     SPGetAddressOffset GetAddressOffset;
     SPGetChildrenCount GetChildrenCount;
-    SPGetCallingConvertion GetCallingConvertion;
+    SPGetCallingConvention GetCallingConvention;
     SPDumpSymbolInformation DumpSymbolInformation;
     SPLookupAddressBySymbol LookupAddressBySymbol;
     SPLookupSymbolByAddress LookupSymbolByAddress;

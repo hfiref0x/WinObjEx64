@@ -524,7 +524,7 @@ VOID xxxDumpProtocolBlock(
 VOID DumpHandlers(
     _In_ PVOID* Handlers,
     _In_ UINT Count,
-    _In_ LPWSTR* Names,
+    _In_ LPCWSTR* Names,
     RTL_PROCESS_MODULES* pModulesList
 )
 {
@@ -563,7 +563,7 @@ VOID DumpHandlers(
                 pAssociatedModule = TEXT("");//could be any garbage pointer.
             }
 
-            xxxDumpProtocolBlock(Names[i], szBuffer, pAssociatedModule);
+            xxxDumpProtocolBlock((LPWSTR)Names[i], szBuffer, pAssociatedModule);
 
             if (ConvertNeedFree) {
                 RtlFreeUnicodeString(&usConvert);

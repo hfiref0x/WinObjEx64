@@ -442,6 +442,9 @@
     <ClInclude Include="ksymbols.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\Shared\ntos\ntbuilds.h">
+      <Filter>ntos</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="rsrc\pipe.ico">

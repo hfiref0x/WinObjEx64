@@ -34,16 +34,6 @@
 #define DA_ScanBytesObHeaderCookie              256
 
 //
-// Win32kApiSetTable signatures
-//
-
-// MOV pattern
-#define IL_Win32kApiSetMov                      3
-
-// lea reg, Win32kApiSetTable
-#define IL_Win32kApiSetTable                    7
-
-//
 // ObHeaderCookie
 //
 BYTE ObHeaderCookiePattern[] = {
@@ -133,5 +123,15 @@ BYTE MiRememberUnloadedDriverPattern[] = {
     0xBB, 0xD0, 0x07, 0x00, 0x00
 };
 
+//
+// PAGE: MiRememberUnloadedDriver
+//
+// mov reg, 7D0h ;  -> NumberOfBytes = MI_UNLOADED_DRIVERS * sizeof (UNLOADED_DRIVERS);
+// mov ecx, 40h  ;
+//
+BYTE MiRememberUnloadedDriverPattern2[] = {
+   0xBA, 0xD0, 0x07, 0x00, 0x00,  // mov     edx, 7D0h
+   0xB9, 0x40, 0x00, 0x00, 0x00   // mov     ecx, 40h
+};
+
 #define FIX_WIN10_THRESHOULD_REG 0xBF
-#define FIX_WIN10_20H1_REG       0xBA

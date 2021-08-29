@@ -5,9 +5,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.172
+*  VERSION:     1.175
 *
-*  DATE:        03 June 2021
+*  DATE:        26 Aug 2021
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -4621,11 +4621,16 @@ typedef struct _MMVAD_SHORT {
 typedef struct _MI_VAD_SEQUENTIAL_INFO {
 
     struct {
+#if defined(_AMD64_)
         ULONG_PTR Length : 12; /* bit position: 0 */
         ULONG_PTR Vpn : 52; /* bit position: 12 */
+#else
+        ULONG Length : 11; /* bit position: 0 */
+        ULONG Vpn : 21; /* bit position: 11 */
+#endif
     };
 
-} MI_VAD_SEQUENTIAL_INFO, * PMI_VAD_SEQUENTIAL_INFO; /* size: 0x0008 */
+} MI_VAD_SEQUENTIAL_INFO, * PMI_VAD_SEQUENTIAL_INFO;
 
 //
 // N.B. 
@@ -7385,14 +7390,16 @@ LdrProcessRelocationBlock(
     _In_ PUSHORT NextOffset,
     _In_ LONG_PTR Diff);
 
+DECLSPEC_NORETURN
 NTSYSAPI
-NTSTATUS
+VOID
 NTAPI
 LdrShutdownProcess(
     VOID);
 
+DECLSPEC_NORETURN
 NTSYSAPI
-NTSTATUS
+VOID
 NTAPI
 LdrShutdownThread(
     VOID);
@@ -7522,7 +7529,7 @@ NTSTATUS
 NTAPI
 RtlInitUnicodeStringEx(
     _Out_ PUNICODE_STRING DestinationString,
-    _In_opt_ PWSTR SourceString);
+    _In_opt_ PCWSTR SourceString);
 
 NTSYSAPI
 BOOLEAN
@@ -9315,6 +9322,26 @@ NTAPI
 RtlGetSystemTimePrecise(
     VOID);
 
+NTSYSAPI
+LARGE_INTEGER
+NTAPI
+RtlGetInterruptTimePrecise(
+    _Out_ PLARGE_INTEGER PerformanceCounter);
+
+NTSYSAPI
+BOOLEAN
+NTAPI
+RtlQueryUnbiasedInterruptTime(
+    _Out_ PLARGE_INTEGER InterruptTime);
+
+NTSYSAPI
+KSYSTEM_TIME
+NTAPI
+RtlGetSystemTimeAndBias(
+    _Out_ KSYSTEM_TIME TimeZoneBias,
+    _Out_opt_ PLARGE_INTEGER TimeZoneBiasEffectiveStart,
+    _Out_opt_ PLARGE_INTEGER TimeZoneBiasEffectiveEnd);
+
 /************************************************************************************
 *
 * RTL Debug Support API.
@@ -9808,15 +9835,13 @@ NTSYSAPI UNICODE_STRING RtlNtPathSeperatorString;
 *
 ************************************************************************************/
 
-struct _EVENT_FILTER_DESCRIPTOR;
-
-typedef VOID(NTAPI *PENABLECALLBACK)(
+typedef VOID(NTAPI *PETWENABLECALLBACK)(
     _In_ LPCGUID SourceId,
     _In_ ULONG IsEnabled,
     _In_ UCHAR Level,
     _In_ ULONGLONG MatchAnyKeyword,
     _In_ ULONGLONG MatchAllKeyword,
-    _In_opt_ struct _EVENT_FILTER_DESCRIPTOR *FilterData,
+    _In_opt_ /*EVENT_FILTER_DESCRIPTOR*/ PVOID FilterData,
     _Inout_opt_ PVOID CallbackContext
     );
 
@@ -9825,9 +9850,19 @@ NTSTATUS
 NTAPI
 EtwEventRegister(
     _In_ LPCGUID ProviderId,
-    _In_opt_ PENABLECALLBACK EnableCallback,
+    _In_opt_ PETWENABLECALLBACK EnableCallback,
     _In_opt_ PVOID CallbackContext,
     _Out_ PREGHANDLE RegHandle);
+
+NTSYSAPI
+ULONG
+NTAPI
+EtwEventWriteNoRegistration(
+    _In_ LPCGUID ProviderId,
+    _In_ /*PCEVENT_DESCRIPTOR*/ PVOID EventDescriptor,
+    _In_ ULONG UserDataCount,
+    _In_reads_opt_(UserDataCount) /*PEVENT_DATA_DESCRIPTOR*/PVOID UserData);
+
 
 /*
 ** Runtime Library API END
@@ -10804,7 +10839,7 @@ NtQueryDirectoryFile(
     _In_opt_ PUNICODE_STRING FileName,
     _In_ BOOLEAN RestartScan);
 
-NTSYSCALLAPI
+NTSYSAPI
 NTSTATUS
 NTAPI
 NtQueryDirectoryFileEx(
@@ -12366,6 +12401,32 @@ NTSTATUS
 NTAPI
 NtTestAlert(
     VOID);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtAlertThread(
+    _In_ HANDLE ThreadHandle);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtAlertResumeThread(
+    _In_ HANDLE ThreadHandle,
+    _Out_opt_ PULONG PreviousSuspendCount);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtAlertThreadByThreadId(
+    _In_ HANDLE ThreadId);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtWaitForAlertByThreadId(
+    _In_ PVOID Address,
+    _In_opt_ PLARGE_INTEGER Timeout);
 
 NTSYSAPI
 NTSTATUS

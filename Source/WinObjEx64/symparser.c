@@ -4,9 +4,9 @@
 *
 *  TITLE:       SYMPARSER.C
 *
-*  VERSION:     1.15
+*  VERSION:     1.16
 *
-*  DATE:        18 May 2021
+*  DATE:        29 June 2021
 *
 *  DbgHelp wrapper for symbols parser support.
 *
@@ -43,6 +43,7 @@
 #define DEFAULT_DLL         L"DbgHelp.dll"
 
 typedef struct _SYMGLOBALS {
+    BOOL Initialized;
     ULONG Options;
     HANDLE ProcessHandle;
     HMODULE DllHandle;
@@ -63,6 +64,9 @@ BasicTypeMapElement BasicTypeMapMSVC[] = {
     { btNoType,     0,      NULL                        },
     { btVoid,       0,      TEXT("void")                },
     { btChar,       1,      TEXT("char")                },
+    { btChar8,      1,      TEXT("char8_t")             },
+    { btChar16,     2,      TEXT("char16_t")            },
+    { btChar32,     4,      TEXT("char32_t")            },
     { btWChar,      2,      TEXT("wchar_t")             },
     { btInt,        1,      TEXT("char")                },
     { btInt,        2,      TEXT("short")               },
@@ -88,8 +92,6 @@ BasicTypeMapElement BasicTypeMapMSVC[] = {
     { btBit,        0,      NULL                        },
     { btBSTR,       0,      TEXT("BSTR")                },
     { btHresult,    4,      TEXT("HRESULT")             },
-    { btChar16,     2,      TEXT("char16_t")            },
-    { btChar32,     4,      TEXT("char32_t")            },
     { btMaxType,    0,      NULL                        }
 };
 
@@ -603,26 +605,26 @@ ULONG SymParserGetCount(
 /// <param name="Context"></param>
 /// <param name="TypeIndex"></param>
 /// <param name="Status"></param>
-/// <returns>Calling conversion id</returns>
-ULONG SymParserGetCallingConvertion(
+/// <returns>Calling convention id</returns>
+ULONG SymParserGetCallingConvention(
     _In_ PSYMCONTEXT Context,
     _In_ ULONG TypeIndex,
     _Out_opt_ PBOOL Status
 )
 {
-    ULONG ulCallingConvertion = 0;
+    ULONG ulCallingConvention = 0;
 
     BOOL bStatus = Context->DbgHelp.SymGetTypeInfo(
         Context->ProcessHandle,
         Context->ModuleBase,
         TypeIndex,
         TI_GET_CALLING_CONVENTION,
-        (PVOID)&ulCallingConvertion);
+        (PVOID)&ulCallingConvention);
 
     if (Status)
         *Status = bStatus;
 
-    return ulCallingConvertion;
+    return ulCallingConvention;
 }
 
 /// <summary>
@@ -1367,7 +1369,12 @@ PSYMCONTEXT SymParserCreate(
     VOID
 )
 {
-    PSYMCONTEXT Context = (PSYMCONTEXT)supHeapAlloc(sizeof(SYMCONTEXT));
+    PSYMCONTEXT Context;
+    
+    if (g_SymGlobals.Initialized == FALSE)
+        return NULL;
+
+    Context = (PSYMCONTEXT)supHeapAlloc(sizeof(SYMCONTEXT));
     if (Context) {
 
         RtlCopyMemory(&Context->DbgHelp, &g_SymGlobals.ApiSet, sizeof(DBGHELP_PTRS));
@@ -1389,7 +1396,7 @@ PSYMCONTEXT SymParserCreate(
         Context->Parser.GetValue = (SPGetValue)SymParserGetValue;
         Context->Parser.GetCount = (SPGetCount)SymParserGetCount;
         Context->Parser.GetUDTKind = (SPGetUDTKind)SymParserGetUDTKind;
-        Context->Parser.GetCallingConvertion = (SPGetCallingConvertion)SymParserGetCallingConvertion;
+        Context->Parser.GetCallingConvention = (SPGetCallingConvention)SymParserGetCallingConvention;
         Context->Parser.GetFieldOffset = (SPGetFieldOffset)SymParserGetFieldOffset;
         Context->Parser.LoadModule = (SPLoadModule)SymParserLoadModule;
         Context->Parser.UnloadModule = (SPUnloadModule)SymParserUnloadModule;
@@ -1445,6 +1452,8 @@ BOOL SymGlobalsInit(
     LPWSTR locaDbgHelplPath = NULL;
     SIZE_T nLen;
     WCHAR szWinPath[MAX_PATH + 1];
+
+    RtlSecureZeroMemory(&g_SymGlobals, sizeof(g_SymGlobals));
 
     //
     // Validate symbols path input length.
@@ -1564,7 +1573,9 @@ BOOL SymGlobalsInit(
         FreeLibrary(hDbg);
         g_SymGlobals.DllHandle = NULL;
     }
-    
+
+    g_SymGlobals.Initialized = bResult;
+
     return bResult;
 }
 

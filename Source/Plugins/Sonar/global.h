@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.03
 *
-*  DATE:        11 Jan 2021
+*  DATE:        27 July 2021
 *
 *  Common header file for the Windows Object Explorer Sonar plugin.
 *
@@ -43,6 +43,7 @@
 #include "treelist/treelist.h"
 #include "minirtl/minirtl.h"
 #include "ntos/ntsup.h"
+#include "ntos/ntbuilds.h"
 #include "plugin_def.h"
 #include "sup.h"
 #include "ui.h"

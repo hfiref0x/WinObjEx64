@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASCALLBACKS.C
 *
-*  VERSION:     1.90
+*  VERSION:     1.91
 *
-*  DATE:        31 May 2021
+*  DATE:        26 June 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -20,6 +20,7 @@
 #include "extras/extrasCallbacksPatterns.h"
 #include "treelist/treelist.h"
 #include "hde/hde64.h"
+#include "ksymbols.h"
 
 #define CBDLG_TRACKSIZE_MIN_X 640
 #define CBDLG_TRACKSIZE_MIN_Y 480
@@ -226,8 +227,7 @@ OBEX_CALLBACK_DISPATCH_ENTRY g_CallbacksDispatchTable[] = {
 //
 // All available names for CiCallbacks. Unknown is expected to be XBOX callback.
 //
-#define CI_CALLBACK_NAMES_COUNT 32
-static const WCHAR *CiCallbackNames[CI_CALLBACK_NAMES_COUNT] = {
+static const WCHAR *CiCallbackNames[] = {
     L"CiSetFileCache", //0
     L"CiGetFileCache", //1
     L"CiQueryInformation", //2
@@ -259,7 +259,8 @@ static const WCHAR *CiCallbackNames[CI_CALLBACK_NAMES_COUNT] = {
     L"CiDeleteCodeIntegrityOriginClaimMembers", //28
     L"CiDeleteCodeIntegrityOriginClaimForFileObject",//29
     L"CiHvciReportMmIncompatibility",//30
-    L"CiCompareExistingSePool"//31
+    L"CiCompareExistingSePool",//31
+    L"CiSetCachedOriginClaim"//32
 };
 
 #define CI_CALLBACKS_NAMES_W7_COUNT 3
@@ -394,8 +395,8 @@ static const BYTE CiCallbackIndexes_Win10RS3[CI_CALLBACK_NAMES_W10RS3_COUNT] = {
     22  //CiGetBuildExpiryTime
 };
 
-#define CI_CALLBACK_NAMES_W10RS4_20H2_COUNT 24
-static const BYTE CiCallbackIndexes_Win10RS4_20H2[CI_CALLBACK_NAMES_W10RS4_20H2_COUNT] = { //Windows 10 RS4/RS5/19H1/19H2/20H1/20H2
+#define CI_CALLBACK_NAMES_W10RS4_21H1_COUNT 24
+static const BYTE CiCallbackIndexes_Win10RS4_21H1[CI_CALLBACK_NAMES_W10RS4_21H1_COUNT] = { //Windows 10 RS4/RS5/19H1/19H2/20H1/20H2/21H1
     0,  //CiSetFileCache
     1,  //CiGetFileCache
     2,  //CiQueryInformation
@@ -422,8 +423,8 @@ static const BYTE CiCallbackIndexes_Win10RS4_20H2[CI_CALLBACK_NAMES_W10RS4_20H2_
     23  //CiCheckProcessDebugAccessPolicy
 };
 
-#define CI_CALLBACK_NAMES_W1021H1_COUNT 29
-static const BYTE CiCallbackIndexes_Win1021H1[CI_CALLBACK_NAMES_W1021H1_COUNT] = { //Windows 10 21H1
+#define CI_CALLBACK_NAMES_W11_COUNT 30
+static const BYTE CiCallbackIndexes_Win11[CI_CALLBACK_NAMES_W11_COUNT] = { //Windows 11
     0,  //CiSetFileCache
     1,  //CiGetFileCache
     2,  //CiQueryInformation
@@ -452,7 +453,8 @@ static const BYTE CiCallbackIndexes_Win1021H1[CI_CALLBACK_NAMES_W1021H1_COUNT] =
     28, //CiDeleteCodeIntegrityOriginClaimMembers
     29, //CiDeleteCodeIntegrityOriginClaimForFileObject
     30, //CiHvciReportMmIncompatibility
-    31  //CiCompareExistingSePool
+    31, //CiCompareExistingSePool
+    32  //CiSetCachedOriginClaim
 };
 
 /*
@@ -514,12 +516,13 @@ LPWSTR GetCiRoutineNameFromIndex(
     case NT_WIN10_19H2:
     case NT_WIN10_20H1:
     case NT_WIN10_20H2:
-        Indexes = CiCallbackIndexes_Win10RS4_20H2;
-        ArrayCount = CI_CALLBACK_NAMES_W10RS4_20H2_COUNT;
+    case NT_WIN10_21H1:
+        Indexes = CiCallbackIndexes_Win10RS4_21H1;
+        ArrayCount = CI_CALLBACK_NAMES_W10RS4_21H1_COUNT;
         break;
     default:
-        Indexes = CiCallbackIndexes_Win1021H1;
-        ArrayCount = CI_CALLBACK_NAMES_W1021H1_COUNT;
+        Indexes = CiCallbackIndexes_Win11;
+        ArrayCount = CI_CALLBACK_NAMES_W11_COUNT;
         break;
     }
 
@@ -527,7 +530,7 @@ LPWSTR GetCiRoutineNameFromIndex(
         return T_CannotQuery;
 
     index = Indexes[Index];
-    if (index >= CI_CALLBACK_NAMES_COUNT)
+    if (index >= RTL_NUMBER_OF(CiCallbackNames))
         return T_CannotQuery;
 
     return (LPWSTR)CiCallbackNames[index];
@@ -543,7 +546,7 @@ LPWSTR GetCiRoutineNameFromIndex(
 */
 OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
 {
-    ULONG_PTR Address = 0, Result = 0;
+    ULONG_PTR kvarAddress = 0, Result = 0;
 
     PBYTE   Signature = NULL, ptrCode = NULL, InstructionMatchPattern = NULL;
     ULONG   SignatureSize = 0, InstructionMatchLength;
@@ -551,6 +554,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
 
     PVOID   SectionBase;
     ULONG   SectionSize = 0, Index;
+    LPCWSTR KVARName;
 
     LONG    Rel = 0;
     hde64s  hs;
@@ -561,142 +565,172 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
     UNREFERENCED_PARAMETER(QueryFlags);
 
     do {
+
         //
-        // Locate PAGE image section as required variable is always in PAGE.
+        // Symbols query.
         //
-        SectionBase = supLookupImageSectionByName(
-            PAGE_SECTION,
-            PAGE_SECTION_LEGNTH,
-            (PVOID)hNtOs,
-            &SectionSize);
+        if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
 
-        if ((SectionBase == 0) || (SectionSize == 0))
-            break;
+            if (g_NtBuildNumber < NT_WIN8_RTM) {
 
-        InstructionMatchPattern = SeCiCallbacksMatchingPattern; //default matching pattern
-        InstructionMatchLength = 7; //lea
-        InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern);
+                KVARName = (LPCWSTR)KVAR_g_CiCallbacks;
 
-        switch (g_NtBuildNumber) {
-
-        case NT_WIN7_SP1:
-            Signature = g_CiCallbacksPattern_7601;
-            SignatureSize = sizeof(g_CiCallbacksPattern_7601);
-            InstructionMatchPattern = g_CiCallbacksMatchingPattern;
-            InstructionExactMatchLength = RTL_NUMBER_OF(g_CiCallbacksMatchingPattern);
-            break;
-
-        case NT_WIN8_RTM:
-        case NT_WIN8_BLUE:
-            Signature = SeCiCallbacksPattern_9200_9600;
-            SignatureSize = sizeof(SeCiCallbacksPattern_9200_9600);
-            break;
-
-        case NT_WIN10_THRESHOLD1:
-        case NT_WIN10_THRESHOLD2:
-            Signature = SeCiCallbacksPattern_10240_10586;
-            SignatureSize = sizeof(SeCiCallbacksPattern_10240_10586);
-            break;
-
-        case NT_WIN10_REDSTONE1:
-            Signature = SeCiCallbacksPattern_14393;
-            SignatureSize = sizeof(SeCiCallbacksPattern_14393);
-            break;
-
-        case NT_WIN10_REDSTONE2:
-        case NT_WIN10_REDSTONE3:
-            Signature = SeCiCallbacksPattern_15063_16299;
-            SignatureSize = sizeof(SeCiCallbacksPattern_15063_16299);
-            break;
-
-        case NT_WIN10_REDSTONE4:
-        case NT_WIN10_REDSTONE5:
-            Signature = SeCiCallbacksPattern_17134_17763;
-            SignatureSize = sizeof(SeCiCallbacksPattern_17134_17763);
-            break;
-
-        case NT_WIN10_19H1:
-        case NT_WIN10_19H2:
-        case NT_WIN10_20H1:
-        case NT_WIN10_20H2:
-            Signature = SeCiCallbacksPattern_19H1_20H2;
-            SignatureSize = sizeof(SeCiCallbacksPattern_19H1_20H2);
-            InstructionMatchPattern = SeCiCallbacksMatchingPattern_19H1_21H1;
-            InstructionMatchLength = 10; //mov
-            InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern_19H1_21H1);
-            break;
-        default:
-            Signature = SeCiCallbacksPattern_21H1;
-            SignatureSize = sizeof(SeCiCallbacksPattern_21H1);
-            InstructionMatchPattern = SeCiCallbacksMatchingPattern_19H1_21H1;
-            InstructionMatchLength = 10; //mov
-            InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern_19H1_21H1);
-            break;
-        }
-
-        ptrCode = (PBYTE)supFindPattern(
-            (PBYTE)SectionBase,
-            SectionSize,
-            Signature,
-            SignatureSize);
-
-        if (ptrCode == NULL)
-            break;
-
-        if (g_NtBuildNumber <= NT_WIN7_SP1) {
-
-            //
-            // Find reference to g_CiCallbacks in code.
-            //
-
-            Index = 0; //pattern search include target instruction, do not skip
-
-        }
-        else {
-
-            //
-            // Find reference to SeCiCallbacks/g_CiCallbacks in code.
-            //
-
-            Index = SignatureSize; //skip signature instructions
-
-        }
-
-        do {
-            hde64_disasm((void*)(ptrCode + Index), &hs);
-            if (hs.flags & F_ERROR)
-                break;
-            //
-            // mov cs:g_CiCallbacks, rax (for Windows 7)
-            // lea rcx, SeCiCallbacks (for 8/10 TH/RS)
-            // mov cs:SeCiCallbacks (19H1-21H1)
-            //
-            if (hs.len == InstructionMatchLength) {
-
-                //
-                // Match block found.
-                //
-                if (RtlCompareMemory((VOID*)&ptrCode[Index], (VOID*)InstructionMatchPattern,
-                    InstructionExactMatchLength) == InstructionExactMatchLength)
-                {
-                    Rel = *(PLONG)(ptrCode + Index + InstructionExactMatchLength);
-                    break;
-                }
             }
-            Index += hs.len;
+            else {
 
-        } while (Index < 64);
+                KVARName = (LPCWSTR)KVAR_SeCiCallbacks;
 
-        if (Rel == 0)
-            break;
+            }
 
-        Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-        Address = NtOsBase + Address - (ULONG_PTR)hNtOs;
+            kdGetAddressFromSymbol(&g_kdctx,
+                KVARName,
+                &kvarAddress);
 
-        if (!kdAddressInNtOsImage((PVOID)Address))
-            break;
+        }
 
-        Result = Address;
+        //
+        // Pattern searching.
+        //
+        if (kvarAddress == 0) {
+
+            //
+            // Locate PAGE image section as required variable is always in PAGE.
+            //
+            SectionBase = supLookupImageSectionByName(
+                PAGE_SECTION,
+                PAGE_SECTION_LEGNTH,
+                (PVOID)hNtOs,
+                &SectionSize);
+
+            if ((SectionBase == 0) || (SectionSize == 0))
+                break;
+
+            InstructionMatchPattern = SeCiCallbacksMatchingPattern; //default matching pattern
+            InstructionMatchLength = 7; //lea
+            InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern);
+
+            switch (g_NtBuildNumber) {
+
+            case NT_WIN7_SP1:
+                Signature = g_CiCallbacksPattern_7601;
+                SignatureSize = sizeof(g_CiCallbacksPattern_7601);
+                InstructionMatchPattern = g_CiCallbacksMatchingPattern;
+                InstructionExactMatchLength = RTL_NUMBER_OF(g_CiCallbacksMatchingPattern);
+                break;
+
+            case NT_WIN8_RTM:
+            case NT_WIN8_BLUE:
+                Signature = SeCiCallbacksPattern_9200_9600;
+                SignatureSize = sizeof(SeCiCallbacksPattern_9200_9600);
+                break;
+
+            case NT_WIN10_THRESHOLD1:
+            case NT_WIN10_THRESHOLD2:
+                Signature = SeCiCallbacksPattern_10240_10586;
+                SignatureSize = sizeof(SeCiCallbacksPattern_10240_10586);
+                break;
+
+            case NT_WIN10_REDSTONE1:
+                Signature = SeCiCallbacksPattern_14393;
+                SignatureSize = sizeof(SeCiCallbacksPattern_14393);
+                break;
+
+            case NT_WIN10_REDSTONE2:
+            case NT_WIN10_REDSTONE3:
+                Signature = SeCiCallbacksPattern_15063_16299;
+                SignatureSize = sizeof(SeCiCallbacksPattern_15063_16299);
+                break;
+
+            case NT_WIN10_REDSTONE4:
+            case NT_WIN10_REDSTONE5:
+                Signature = SeCiCallbacksPattern_17134_17763;
+                SignatureSize = sizeof(SeCiCallbacksPattern_17134_17763);
+                break;
+
+            case NT_WIN10_19H1:
+            case NT_WIN10_19H2:
+            case NT_WIN10_20H1:
+            case NT_WIN10_20H2:
+            case NT_WIN10_21H1:
+                Signature = SeCiCallbacksPattern_19H1_21H1;
+                SignatureSize = sizeof(SeCiCallbacksPattern_19H1_21H1);
+                InstructionMatchPattern = SeCiCallbacksMatchingPattern_19H1_21H1;
+                InstructionMatchLength = 10; //mov
+                InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern_19H1_21H1);
+                break;
+            default:
+                Signature = SeCiCallbacksPattern_Next;
+                SignatureSize = sizeof(SeCiCallbacksPattern_Next);
+                InstructionMatchPattern = SeCiCallbacksMatchingPattern_19H1_21H1;
+                InstructionMatchLength = 10; //mov
+                InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern_19H1_21H1);
+                break;
+            }
+
+            ptrCode = (PBYTE)supFindPattern(
+                (PBYTE)SectionBase,
+                SectionSize,
+                Signature,
+                SignatureSize);
+
+            if (ptrCode == NULL)
+                break;
+
+            if (g_NtBuildNumber <= NT_WIN7_SP1) {
+
+                //
+                // Find reference to g_CiCallbacks in code.
+                //
+
+                Index = 0; //pattern search include target instruction, do not skip
+
+            }
+            else {
+
+                //
+                // Find reference to SeCiCallbacks/g_CiCallbacks in code.
+                //
+
+                Index = SignatureSize; //skip signature instructions
+
+            }
+
+            do {
+                hde64_disasm((void*)(ptrCode + Index), &hs);
+                if (hs.flags & F_ERROR)
+                    break;
+                //
+                // mov cs:g_CiCallbacks, rax (for Windows 7)
+                // lea rcx, SeCiCallbacks (for 8/10 TH/RS)
+                // mov cs:SeCiCallbacks (19H1-21H1)
+                //
+                if (hs.len == InstructionMatchLength) {
+
+                    //
+                    // Match block found.
+                    //
+                    if (RtlCompareMemory((VOID*)&ptrCode[Index], (VOID*)InstructionMatchPattern,
+                        InstructionExactMatchLength) == InstructionExactMatchLength)
+                    {
+                        Rel = *(PLONG)(ptrCode + Index + InstructionExactMatchLength);
+                        break;
+                    }
+                }
+                Index += hs.len;
+
+            } while (Index < 64);
+
+            if (Rel == 0)
+                break;
+
+            kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
+            kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
+
+            if (!kdAddressInNtOsImage((PVOID)kvarAddress))
+                break;
+        }
+
+        Result = kvarAddress;
 
     } while (FALSE);
 
@@ -723,9 +757,10 @@ BOOL FindIopFileSystemQueueHeads(
     _Out_ ULONG_PTR *IopNetworkFileSystemQueueHead
 )
 {
+    BOOL bSymQuerySuccess = FALSE;
     ULONG Index, Count;
     LONG Rel = 0;
-    ULONG_PTR Address = 0;
+    ULONG_PTR kvarAddress = 0;
     PBYTE ptrCode;
     hde64s hs;
 
@@ -735,6 +770,60 @@ BOOL FindIopFileSystemQueueHeads(
     //
     // Assume failure.
     //
+    *IopCdRomFileSystemQueueHead = 0;
+    *IopDiskFileSystemQueueHead = 0;
+    *IopTapeFileSystemQueueHead = 0;
+    *IopNetworkFileSystemQueueHead = 0;
+
+    if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
+
+        do {
+
+            if (!kdGetAddressFromSymbol(&g_kdctx,
+                KVAR_IopCdRomFileSystemQueueHead,
+                &kvarAddress))
+            {
+                break;
+            }
+
+            *IopCdRomFileSystemQueueHead = kvarAddress;
+
+            if (!kdGetAddressFromSymbol(&g_kdctx,
+                KVAR_IopDiskFileSystemQueueHead,
+                &kvarAddress))
+            {
+                break;
+            }
+
+            *IopDiskFileSystemQueueHead = kvarAddress;
+
+            if (!kdGetAddressFromSymbol(&g_kdctx,
+                KVAR_IopTapeFileSystemQueueHead,
+                &kvarAddress))
+            {
+                break;
+            }
+
+            *IopTapeFileSystemQueueHead = kvarAddress;
+
+            if (!kdGetAddressFromSymbol(&g_kdctx,
+                KVAR_IopNetworkFileSystemQueueHead,
+                &kvarAddress))
+            {
+                break;
+            }
+
+            *IopNetworkFileSystemQueueHead = kvarAddress;
+
+            bSymQuerySuccess = TRUE;
+
+        } while (FALSE);
+
+    }
+
+    if (bSymQuerySuccess)
+        return TRUE;
+
     *IopCdRomFileSystemQueueHead = 0;
     *IopDiskFileSystemQueueHead = 0;
     *IopTapeFileSystemQueueHead = 0;
@@ -766,25 +855,25 @@ BOOL FindIopFileSystemQueueHeads(
                 {
                     Rel = *(PLONG)(ptrCode + Index + 3);
                     if (Rel) {
-                        Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-                        Address = NtOsBase + Address - (ULONG_PTR)hNtOs;
-                        if (kdAddressInNtOsImage((PVOID)Address)) {
+                        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
+                        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
+                        if (kdAddressInNtOsImage((PVOID)kvarAddress)) {
 
                             switch (Count) {
                             case 0:
-                                *IopNetworkFileSystemQueueHead = Address;
+                                *IopNetworkFileSystemQueueHead = kvarAddress;
                                 break;
 
                             case 1:
-                                *IopCdRomFileSystemQueueHead = Address;
+                                *IopCdRomFileSystemQueueHead = kvarAddress;
                                 break;
 
                             case 2:
-                                *IopDiskFileSystemQueueHead = Address;
+                                *IopDiskFileSystemQueueHead = kvarAddress;
                                 break;
 
                             case 3:
-                                *IopTapeFileSystemQueueHead = Address;
+                                *IopTapeFileSystemQueueHead = kvarAddress;
                                 break;
 
                             default:
@@ -822,26 +911,26 @@ BOOL FindIopFileSystemQueueHeads(
                 {
                     Rel = *(PLONG)(ptrCode + Index + 3);
                     if (Rel) {
-                        Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-                        Address = NtOsBase + Address - (ULONG_PTR)hNtOs;
-                        if (kdAddressInNtOsImage((PVOID)Address)) {
+                        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
+                        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
+                        if (kdAddressInNtOsImage((PVOID)kvarAddress)) {
 
                             switch (Count) {
 
                             case 0:
-                                *IopDiskFileSystemQueueHead = Address;
+                                *IopDiskFileSystemQueueHead = kvarAddress;
                                 break;
 
                             case 1:
-                                *IopCdRomFileSystemQueueHead = Address;
+                                *IopCdRomFileSystemQueueHead = kvarAddress;
                                 break;
 
                             case 2:
-                                *IopNetworkFileSystemQueueHead = Address;
+                                *IopNetworkFileSystemQueueHead = kvarAddress;
                                 break;
 
                             case 3:
-                                *IopTapeFileSystemQueueHead = Address;
+                                *IopTapeFileSystemQueueHead = kvarAddress;
                                 break;
 
                             default:
@@ -879,7 +968,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindIopFsNotifyChangeQueueHead)
 {
     ULONG Index;
     LONG Rel = 0;
-    ULONG_PTR Address = 0;
+    ULONG_PTR kvarAddress = 0;
     PBYTE ptrCode;
     hde64s hs;
 
@@ -888,49 +977,61 @@ OBEX_FINDCALLBACK_ROUTINE(FindIopFsNotifyChangeQueueHead)
 
     UNREFERENCED_PARAMETER(QueryFlags);
 
-    ptrCode = (PBYTE)GetProcAddress(hNtOs, "IoUnregisterFsRegistrationChange");
+    if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
 
-    if (ptrCode == NULL)
-        return 0;
+        kdGetAddressFromSymbol(&g_kdctx,
+            KVAR_IopFsNotifyChangeQueueHead,
+            &kvarAddress);
 
-    Index = 0;
-    Rel = 0;
+    }
 
-    do {
-        hde64_disasm(ptrCode + Index, &hs);
-        if (hs.flags & F_ERROR)
-            break;
+    if (kvarAddress == 0) {
 
-        if (hs.len == 7) {
-            //
-            // lea  rax, IopFsNotifyChangeQueueHead
-            // jmp  short
-            //
-            if ((ptrCode[Index] == 0x48) &&
-                (ptrCode[Index + 1] == 0x8D) &&
-                (ptrCode[Index + 2] == 0x05) &&
-                (ptrCode[Index + 7] == 0xEB))
-            {
-                Rel = *(PLONG)(ptrCode + Index + 3);
+        ptrCode = (PBYTE)GetProcAddress(hNtOs, "IoUnregisterFsRegistrationChange");
+
+        if (ptrCode == NULL)
+            return 0;
+
+        Index = 0;
+        Rel = 0;
+
+        do {
+            hde64_disasm(ptrCode + Index, &hs);
+            if (hs.flags & F_ERROR)
                 break;
+
+            if (hs.len == 7) {
+                //
+                // lea  rax, IopFsNotifyChangeQueueHead
+                // jmp  short
+                //
+                if ((ptrCode[Index] == 0x48) &&
+                    (ptrCode[Index + 1] == 0x8D) &&
+                    (ptrCode[Index + 2] == 0x05) &&
+                    (ptrCode[Index + 7] == 0xEB))
+                {
+                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    break;
+                }
+
             }
 
-        }
+            Index += hs.len;
 
-        Index += hs.len;
+        } while (Index < 256);
 
-    } while (Index < 256);
+        if (Rel == 0)
+            return 0;
 
-    if (Rel == 0)
-        return 0;
+        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
+        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
 
-    Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-    Address = NtOsBase + Address - (ULONG_PTR)hNtOs;
+        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
+            return 0;
 
-    if (!kdAddressInNtOsImage((PVOID)Address))
-        return 0;
+    }
 
-    return Address;
+    return kvarAddress;
 }
 
 /*
@@ -947,7 +1048,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindRtlpDebugPrintCallbackList)
 {
     ULONG Index;
     LONG Rel = 0;
-    ULONG_PTR Address = 0;
+    ULONG_PTR kvarAddress = 0;
     PBYTE ptrCode;
     hde64s hs;
 
@@ -956,86 +1057,98 @@ OBEX_FINDCALLBACK_ROUTINE(FindRtlpDebugPrintCallbackList)
 
     UNREFERENCED_PARAMETER(QueryFlags);
 
-    ptrCode = (PBYTE)GetProcAddress(hNtOs, "DbgSetDebugPrintCallback");
-    if (ptrCode == NULL)
-        return 0;
+    if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
 
-    //
-    // Find DbgpInsertDebugPrintCallback pointer.
-    //
-    Index = 0;
-    do {
+        kdGetAddressFromSymbol(&g_kdctx,
+            KVAR_RtlpDebugPrintCallbackList,
+            &kvarAddress);
 
-        hde64_disasm(ptrCode + Index, &hs);
-        if (hs.flags & F_ERROR)
-            break;
+    } 
 
-        //jmp/call DbgpInsertDebugPrintCallback
-        if (hs.len == 5) {
+    if (kvarAddress == 0) {
 
-            if ((ptrCode[Index] == 0xE9) ||
-                (ptrCode[Index] == 0xE8))
-            {
-                Rel = *(PLONG)(ptrCode + Index + 1);
-                break;
-            }
-        }
-        //jz
-        if (hs.len == 6) {
-
-            if (ptrCode[Index] == 0x0F) {
-                Rel = *(PLONG)(ptrCode + Index + 2);
-                break;
-            }
-        }
-        Index += hs.len;
-
-    } while (Index < 64);
-
-    if (Rel == 0)
-        return 0;
-
-    ptrCode = ptrCode + Index + (hs.len) + Rel;
-    Index = 0;
-    Rel = 0;
-
-    //
-    // Complicated search. Not unique search patterns.
-    //
-
-    do {
-        hde64_disasm(ptrCode + Index, &hs);
-        if (hs.flags & F_ERROR)
-            break;
+        ptrCode = (PBYTE)GetProcAddress(hNtOs, "DbgSetDebugPrintCallback");
+        if (ptrCode == NULL)
+            return 0;
 
         //
-        // lea  reg, RtlpDebugPrintCallbackList
+        // Find DbgpInsertDebugPrintCallback pointer.
         //
-        if (hs.len == 7) {
-            if ((ptrCode[Index] == 0x48) &&
-                (ptrCode[Index + 1] == 0x8D) &&
-                ((ptrCode[Index + 2] == 0x15) || (ptrCode[Index + 2] == 0x0D)) &&
-                (ptrCode[Index + hs.len] == 0x48))
-            {
-                Rel = *(PLONG)(ptrCode + Index + 3);
+        Index = 0;
+        do {
+
+            hde64_disasm(ptrCode + Index, &hs);
+            if (hs.flags & F_ERROR)
                 break;
+
+            //jmp/call DbgpInsertDebugPrintCallback
+            if (hs.len == 5) {
+
+                if ((ptrCode[Index] == 0xE9) ||
+                    (ptrCode[Index] == 0xE8))
+                {
+                    Rel = *(PLONG)(ptrCode + Index + 1);
+                    break;
+                }
             }
-        }
+            //jz
+            if (hs.len == 6) {
 
-        Index += hs.len;
+                if (ptrCode[Index] == 0x0F) {
+                    Rel = *(PLONG)(ptrCode + Index + 2);
+                    break;
+                }
+            }
+            Index += hs.len;
 
-    } while (Index < 512);
+        } while (Index < 64);
 
-    if (Rel == 0)
-        return 0;
+        if (Rel == 0)
+            return 0;
 
-    Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-    Address = NtOsBase + Address - (ULONG_PTR)hNtOs;
+        ptrCode = ptrCode + Index + (hs.len) + Rel;
+        Index = 0;
+        Rel = 0;
 
-    if (!kdAddressInNtOsImage((PVOID)Address))
-        return 0;
+        //
+        // Complicated search. Not unique search patterns.
+        //
 
-    return Address;
+        do {
+            hde64_disasm(ptrCode + Index, &hs);
+            if (hs.flags & F_ERROR)
+                break;
+
+            //
+            // lea  reg, RtlpDebugPrintCallbackList
+            //
+            if (hs.len == 7) {
+                if ((ptrCode[Index] == 0x48) &&
+                    (ptrCode[Index + 1] == 0x8D) &&
+                    ((ptrCode[Index + 2] == 0x15) || (ptrCode[Index + 2] == 0x0D)) &&
+                    (ptrCode[Index + hs.len] == 0x48))
+                {
+                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    break;
+                }
+            }
+
+            Index += hs.len;
+
+        } while (Index < 512);
+
+        if (Rel == 0)
+            return 0;
+
+        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
+        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
+
+        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
+            return 0;
+
+    }
+
+    return kvarAddress;
 }
 
 /*
@@ -1052,7 +1165,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindPopRegisteredPowerSettingCallbacks)
 {
     ULONG Index;
     LONG Rel = 0;
-    ULONG_PTR Address = 0;
+    ULONG_PTR kvarAddress = 0;
     PBYTE ptrCode;
     hde64s hs;
 
@@ -1061,50 +1174,62 @@ OBEX_FINDCALLBACK_ROUTINE(FindPopRegisteredPowerSettingCallbacks)
 
     UNREFERENCED_PARAMETER(QueryFlags);
 
-    ptrCode = (PBYTE)GetProcAddress(hNtOs, "PoRegisterPowerSettingCallback");
+    if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
 
-    if (ptrCode == NULL)
-        return 0;
+        kdGetAddressFromSymbol(&g_kdctx,
+            KVAR_PopRegisteredPowerSettingCallbacks,
+            &kvarAddress);
 
-    Index = 0;
-    Rel = 0;
+    }
 
-    do {
-        hde64_disasm(ptrCode + Index, &hs);
-        if (hs.flags & F_ERROR)
-            break;
+    if (kvarAddress == 0) {
 
-        if (hs.len == 7) {
-            //
-            // lea      rcx, PopRegisteredPowerSettingCallbacks
-            // mov      [rbx + 8], rax |
-            // cmp      [rax], rcx
-            //
-            if ((ptrCode[Index] == 0x48) &&
-                (ptrCode[Index + 1] == 0x8D) &&
-                (ptrCode[Index + 2] == 0x0D) &&
-                (ptrCode[Index + 7] == 0x48))
-            {
-                Rel = *(PLONG)(ptrCode + Index + 3);
+        ptrCode = (PBYTE)GetProcAddress(hNtOs, "PoRegisterPowerSettingCallback");
+
+        if (ptrCode == NULL)
+            return 0;
+
+        Index = 0;
+        Rel = 0;
+
+        do {
+            hde64_disasm(ptrCode + Index, &hs);
+            if (hs.flags & F_ERROR)
                 break;
+
+            if (hs.len == 7) {
+                //
+                // lea      rcx, PopRegisteredPowerSettingCallbacks
+                // mov      [rbx + 8], rax |
+                // cmp      [rax], rcx
+                //
+                if ((ptrCode[Index] == 0x48) &&
+                    (ptrCode[Index + 1] == 0x8D) &&
+                    (ptrCode[Index + 2] == 0x0D) &&
+                    (ptrCode[Index + 7] == 0x48))
+                {
+                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    break;
+                }
+
             }
 
-        }
+            Index += hs.len;
 
-        Index += hs.len;
+        } while (Index < 512);
 
-    } while (Index < 512);
+        if (Rel == 0)
+            return 0;
 
-    if (Rel == 0)
-        return 0;
+        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
+        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
 
-    Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-    Address = NtOsBase + Address - (ULONG_PTR)hNtOs;
+        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
+            return 0;
 
-    if (!kdAddressInNtOsImage((PVOID)Address))
-        return 0;
+    }
 
-    return Address;
+    return kvarAddress;
 }
 
 /*
@@ -1123,64 +1248,82 @@ OBEX_FINDCALLBACK_ROUTINE(FindSeFileSystemNotifyRoutinesHead)
     BOOL Extended = (BOOL)(ULONG)QueryFlags;
     ULONG Index;
     LONG Rel = 0;
-    ULONG_PTR Address = 0;
+    ULONG_PTR kvarAddress = 0;
+    LPCWSTR lpVarName;
     PBYTE ptrCode;
     hde64s hs;
 
     ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
     HMODULE hNtOs = (HINSTANCE)g_kdctx.NtOsImageMap;
 
-    //
-    // Routines have similar design.
-    //
-    if (Extended) {
-        ptrCode = (PBYTE)GetProcAddress(hNtOs, "SeRegisterLogonSessionTerminatedRoutineEx");
+    if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
+
+        if (Extended)
+            lpVarName = KVAR_SeFileSystemNotifyRoutinesExHead;
+        else
+            lpVarName = KVAR_SeFileSystemNotifyRoutinesHead;
+
+        kdGetAddressFromSymbol(&g_kdctx,
+            lpVarName,
+            &kvarAddress);
+
     }
-    else {
-        ptrCode = (PBYTE)GetProcAddress(hNtOs, "SeRegisterLogonSessionTerminatedRoutine");
-    }
 
-    if (ptrCode == NULL)
-        return 0;
+    if (kvarAddress == 0) {
 
-    Index = 0;
-    Rel = 0;
-
-    do {
-        hde64_disasm(ptrCode + Index, &hs);
-        if (hs.flags & F_ERROR)
-            break;
-
-        if (hs.len == 7) {
-
-            //
-            // mov     rax, cs:SeFileSystemNotifyRoutines(Ex)Head
-            //
-
-            if ((ptrCode[Index] == 0x48) &&
-                (ptrCode[Index + 1] == 0x8B) &&
-                (ptrCode[Index + 2] == 0x05))
-            {
-                Rel = *(PLONG)(ptrCode + Index + 3);
-                break;
-            }
-
+        //
+        // Routines have similar design.
+        //
+        if (Extended) {
+            ptrCode = (PBYTE)GetProcAddress(hNtOs, "SeRegisterLogonSessionTerminatedRoutineEx");
+        }
+        else {
+            ptrCode = (PBYTE)GetProcAddress(hNtOs, "SeRegisterLogonSessionTerminatedRoutine");
         }
 
-        Index += hs.len;
+        if (ptrCode == NULL)
+            return 0;
 
-    } while (Index < 128);
+        Index = 0;
+        Rel = 0;
 
-    if (Rel == 0)
-        return 0;
+        do {
+            hde64_disasm(ptrCode + Index, &hs);
+            if (hs.flags & F_ERROR)
+                break;
 
-    Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-    Address = NtOsBase + Address - (ULONG_PTR)hNtOs;
+            if (hs.len == 7) {
 
-    if (!kdAddressInNtOsImage((PVOID)Address))
-        return 0;
+                //
+                // mov     rax, cs:SeFileSystemNotifyRoutines(Ex)Head
+                //
 
-    return Address;
+                if ((ptrCode[Index] == 0x48) &&
+                    (ptrCode[Index + 1] == 0x8B) &&
+                    (ptrCode[Index + 2] == 0x05))
+                {
+                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    break;
+                }
+
+            }
+
+            Index += hs.len;
+
+        } while (Index < 128);
+
+        if (Rel == 0)
+            return 0;
+
+        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
+        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
+
+        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
+            return 0;
+
+    }
+
+    return kvarAddress;
 }
 
 /*
@@ -1299,59 +1442,77 @@ OBEX_FINDCALLBACK_ROUTINE(FindIopNotifyShutdownQueueHeadHead)
     BOOL bLastChance = (BOOL)(ULONG)QueryFlags;
     ULONG Index;
     LONG Rel = 0;
-    ULONG_PTR Address = 0;
+    ULONG_PTR kvarAddress = 0;
+    LPCWSTR lpVarName;
     PBYTE ptrCode;
     hde64s hs;
 
     ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
     HMODULE hNtOs = (HINSTANCE)g_kdctx.NtOsImageMap;
 
-    //
-    // Routines have similar design.
-    //
-    if (bLastChance) {
-        ptrCode = (PBYTE)GetProcAddress(hNtOs, "IoRegisterLastChanceShutdownNotification");
+    if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
+
+        if (bLastChance)
+            lpVarName = KVAR_IopNotifyLastChanceShutdownQueueHead;
+        else
+            lpVarName = KVAR_IopNotifyShutdownQueueHead;
+
+        kdGetAddressFromSymbol(&g_kdctx,
+            lpVarName,
+            &kvarAddress);
+
     }
-    else {
-        ptrCode = (PBYTE)GetProcAddress(hNtOs, "IoRegisterShutdownNotification");
-    }
 
-    if (ptrCode == NULL)
-        return 0;
+    if (kvarAddress == 0) {
 
-    Index = 0;
-    Rel = 0;
-
-    do {
-        hde64_disasm(ptrCode + Index, &hs);
-        if (hs.flags & F_ERROR)
-            break;
-
-        if (hs.len == 7) { //check if lea
-
-            if (((ptrCode[Index] == 0x48) || (ptrCode[Index] == 0x4C)) &&
-                (ptrCode[Index + 1] == 0x8D))
-            {
-                Rel = *(PLONG)(ptrCode + Index + 3);
-                break;
-            }
-
+        //
+        // Routines have similar design.
+        //
+        if (bLastChance) {
+            ptrCode = (PBYTE)GetProcAddress(hNtOs, "IoRegisterLastChanceShutdownNotification");
+        }
+        else {
+            ptrCode = (PBYTE)GetProcAddress(hNtOs, "IoRegisterShutdownNotification");
         }
 
-        Index += hs.len;
+        if (ptrCode == NULL)
+            return 0;
 
-    } while (Index < 128);
+        Index = 0;
+        Rel = 0;
 
-    if (Rel == 0)
-        return 0;
+        do {
+            hde64_disasm(ptrCode + Index, &hs);
+            if (hs.flags & F_ERROR)
+                break;
 
-    Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-    Address = NtOsBase + Address - (ULONG_PTR)hNtOs;
+            if (hs.len == 7) { //check if lea
 
-    if (!kdAddressInNtOsImage((PVOID)Address))
-        return 0;
+                if (((ptrCode[Index] == 0x48) || (ptrCode[Index] == 0x4C)) &&
+                    (ptrCode[Index + 1] == 0x8D))
+                {
+                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    break;
+                }
 
-    return Address;
+            }
+
+            Index += hs.len;
+
+        } while (Index < 128);
+
+        if (Rel == 0)
+            return 0;
+
+        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
+        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
+
+        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
+            return 0;
+
+    }
+
+    return kvarAddress;
 }
 
 /*
@@ -1369,7 +1530,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindCmCallbackHead)
 {
     ULONG Index, resultOffset;
     LONG Rel = 0, FirstInstructionLength;
-    ULONG_PTR Address = 0;
+    ULONG_PTR kvarAddress = 0;
     PBYTE ptrCode;
     hde64s hs, hs_next;
 
@@ -1378,65 +1539,77 @@ OBEX_FINDCALLBACK_ROUTINE(FindCmCallbackHead)
 
     UNREFERENCED_PARAMETER(QueryFlags);
 
-    ptrCode = (PBYTE)GetProcAddress(hNtOs, "CmUnRegisterCallback");
-    if (ptrCode == NULL)
-        return 0;
+    if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
 
-    Index = 0;
-    Rel = 0;
-    resultOffset = 0;
+        kdGetAddressFromSymbol(&g_kdctx,
+            KVAR_CallbackListHead,
+            &kvarAddress);
 
-    do {
-        hde64_disasm(ptrCode + Index, &hs);
-        if (hs.flags & F_ERROR)
-            break;
+    }
 
-        if (hs.len == 5) {
-            /*
-            ** lea     rdx, [rsp+20h] <-
-            ** lea     rcx, CallbackListHead
-            */
-            if ((ptrCode[Index] == 0x48) &&
-                (ptrCode[Index + 1] == 0x8D) &&
-                (ptrCode[Index + 2] == 0x54))
-            {
-                hde64_disasm(ptrCode + Index + hs.len, &hs_next);
-                if (hs_next.flags & F_ERROR)
-                    break;
-                if (hs_next.len == 7) {
+    if (kvarAddress == 0) {
 
-                    /*
-                    ** lea     rdx, [rsp+20h]
-                    ** lea     rcx, CallbackListHead <-
-                    */
-                    FirstInstructionLength = hs.len;
+        ptrCode = (PBYTE)GetProcAddress(hNtOs, "CmUnRegisterCallback");
+        if (ptrCode == NULL)
+            return 0;
 
-                    if ((ptrCode[Index + FirstInstructionLength] == 0x48) &&
-                        (ptrCode[Index + FirstInstructionLength + 1] == 0x8D) &&
-                        (ptrCode[Index + FirstInstructionLength + 2] == 0x0D))
-                    {
-                        resultOffset = Index + FirstInstructionLength + hs_next.len;
-                        Rel = *(PLONG)(ptrCode + Index + FirstInstructionLength + 3);
+        Index = 0;
+        Rel = 0;
+        resultOffset = 0;
+
+        do {
+            hde64_disasm(ptrCode + Index, &hs);
+            if (hs.flags & F_ERROR)
+                break;
+
+            if (hs.len == 5) {
+                /*
+                ** lea     rdx, [rsp+20h] <-
+                ** lea     rcx, CallbackListHead
+                */
+                if ((ptrCode[Index] == 0x48) &&
+                    (ptrCode[Index + 1] == 0x8D) &&
+                    (ptrCode[Index + 2] == 0x54))
+                {
+                    hde64_disasm(ptrCode + Index + hs.len, &hs_next);
+                    if (hs_next.flags & F_ERROR)
                         break;
+                    if (hs_next.len == 7) {
+
+                        /*
+                        ** lea     rdx, [rsp+20h]
+                        ** lea     rcx, CallbackListHead <-
+                        */
+                        FirstInstructionLength = hs.len;
+
+                        if ((ptrCode[Index + FirstInstructionLength] == 0x48) &&
+                            (ptrCode[Index + FirstInstructionLength + 1] == 0x8D) &&
+                            (ptrCode[Index + FirstInstructionLength + 2] == 0x0D))
+                        {
+                            resultOffset = Index + FirstInstructionLength + hs_next.len;
+                            Rel = *(PLONG)(ptrCode + Index + FirstInstructionLength + 3);
+                            break;
+                        }
                     }
                 }
             }
-        }
 
-        Index += hs.len;
+            Index += hs.len;
 
-    } while (Index < 256);
+        } while (Index < 256);
 
-    if (Rel == 0)
-        return 0;
+        if (Rel == 0)
+            return 0;
 
-    Address = (ULONG_PTR)ptrCode + resultOffset + Rel;
-    Address = NtOsBase + Address - (ULONG_PTR)hNtOs;
+        kvarAddress = (ULONG_PTR)ptrCode + resultOffset + Rel;
+        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
 
-    if (!kdAddressInNtOsImage((PVOID)Address))
-        return 0;
+        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
+            return 0;
 
-    return Address;
+    }
+
+    return kvarAddress;
 }
 
 /*
@@ -1453,7 +1626,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindKeBugCheckReasonCallbackHead)
 {
     ULONG Index;
     LONG Rel = 0;
-    ULONG_PTR Address = 0;
+    ULONG_PTR kvarAddress = 0;
     PBYTE ptrCode;
     hde64s hs;
 
@@ -1462,44 +1635,56 @@ OBEX_FINDCALLBACK_ROUTINE(FindKeBugCheckReasonCallbackHead)
 
     UNREFERENCED_PARAMETER(QueryFlags);
 
-    ptrCode = (PBYTE)GetProcAddress(hNtOs, "KeRegisterBugCheckReasonCallback");
-    if (ptrCode == NULL)
-        return 0;
+    if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
 
-    Index = 0;
-    Rel = 0;
+        kdGetAddressFromSymbol(&g_kdctx,
+            KVAR_KeBugCheckReasonCallbackListHead,
+            &kvarAddress);
 
-    do {
-        hde64_disasm(ptrCode + Index, &hs);
-        if (hs.flags & F_ERROR)
-            break;
+    }
 
-        if (hs.len == 7) { //check if lea
+    if (kvarAddress == 0) {
 
-            if (((ptrCode[Index] == 0x48) || (ptrCode[Index] == 0x4C)) &&
-                (ptrCode[Index + 1] == 0x8D) &&
-                ((ptrCode[Index + hs.len] == 0x48) || (ptrCode[Index + hs.len] == 0x83)))
-            {
-                Rel = *(PLONG)(ptrCode + Index + 3);
+        ptrCode = (PBYTE)GetProcAddress(hNtOs, "KeRegisterBugCheckReasonCallback");
+        if (ptrCode == NULL)
+            return 0;
+
+        Index = 0;
+        Rel = 0;
+
+        do {
+            hde64_disasm(ptrCode + Index, &hs);
+            if (hs.flags & F_ERROR)
                 break;
+
+            if (hs.len == 7) { //check if lea
+
+                if (((ptrCode[Index] == 0x48) || (ptrCode[Index] == 0x4C)) &&
+                    (ptrCode[Index + 1] == 0x8D) &&
+                    ((ptrCode[Index + hs.len] == 0x48) || (ptrCode[Index + hs.len] == 0x83)))
+                {
+                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    break;
+                }
+
             }
 
-        }
+            Index += hs.len;
 
-        Index += hs.len;
+        } while (Index < 512);
 
-    } while (Index < 512);
+        if (Rel == 0)
+            return 0;
 
-    if (Rel == 0)
-        return 0;
+        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
+        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
 
-    Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-    Address = NtOsBase + Address - (ULONG_PTR)hNtOs;
+        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
+            return 0;
 
-    if (!kdAddressInNtOsImage((PVOID)Address))
-        return 0;
+    }
 
-    return Address;
+    return kvarAddress;
 }
 
 /*
@@ -1516,7 +1701,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindKeBugCheckCallbackHead)
 {
     ULONG Index;
     LONG Rel = 0;
-    ULONG_PTR Address = 0;
+    ULONG_PTR kvarAddress = 0;
     PBYTE ptrCode;
     hde64s hs;
 
@@ -1525,44 +1710,56 @@ OBEX_FINDCALLBACK_ROUTINE(FindKeBugCheckCallbackHead)
 
     UNREFERENCED_PARAMETER(QueryFlags);
 
-    ptrCode = (PBYTE)GetProcAddress(hNtOs, "KeRegisterBugCheckCallback");
-    if (ptrCode == NULL)
-        return 0;
+    if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
 
-    Index = 0;
-    Rel = 0;
+        kdGetAddressFromSymbol(&g_kdctx,
+            KVAR_KeBugCheckCallbackListHead,
+            &kvarAddress);
 
-    do {
-        hde64_disasm(ptrCode + Index, &hs);
-        if (hs.flags & F_ERROR)
-            break;
+    }
 
-        if (hs.len == 7) { //check if lea + mov
+    if (kvarAddress == 0) {
 
-            if (((ptrCode[Index] == 0x48) || (ptrCode[Index] == 0x4C)) &&
-                (ptrCode[Index + 1] == 0x8D) &&
-                (ptrCode[Index + hs.len] == 0x48))
-            {
-                Rel = *(PLONG)(ptrCode + Index + 3);
+        ptrCode = (PBYTE)GetProcAddress(hNtOs, "KeRegisterBugCheckCallback");
+        if (ptrCode == NULL)
+            return 0;
+
+        Index = 0;
+        Rel = 0;
+
+        do {
+            hde64_disasm(ptrCode + Index, &hs);
+            if (hs.flags & F_ERROR)
                 break;
+
+            if (hs.len == 7) { //check if lea + mov
+
+                if (((ptrCode[Index] == 0x48) || (ptrCode[Index] == 0x4C)) &&
+                    (ptrCode[Index + 1] == 0x8D) &&
+                    (ptrCode[Index + hs.len] == 0x48))
+                {
+                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    break;
+                }
+
             }
 
-        }
+            Index += hs.len;
 
-        Index += hs.len;
+        } while (Index < 512);
 
-    } while (Index < 512);
+        if (Rel == 0)
+            return 0;
 
-    if (Rel == 0)
-        return 0;
+        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
+        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
 
-    Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-    Address = NtOsBase + Address - (ULONG_PTR)hNtOs;
+        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
+            return 0;
 
-    if (!kdAddressInNtOsImage((PVOID)Address))
-        return 0;
+    }
 
-    return Address;
+    return kvarAddress;
 }
 
 /*
@@ -1580,52 +1777,65 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspLoadImageNotifyRoutine)
 {
     ULONG Index;
     LONG Rel = 0;
-    ULONG_PTR Address = 0;
+    ULONG_PTR kvarAddress = 0;
     PBYTE ptrCode;
     hde64s hs;
 
     ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
     HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
 
-    ptrCode = (PBYTE)GetProcAddress(hNtOs, "PsRemoveLoadImageNotifyRoutine");
-    if (ptrCode == NULL)
-        return 0;
-
     UNREFERENCED_PARAMETER(QueryFlags);
 
-    Index = 0;
-    Rel = 0;
+    if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
 
-    do {
-        hde64_disasm(ptrCode + Index, &hs);
-        if (hs.flags & F_ERROR)
-            break;
+        kdGetAddressFromSymbol(&g_kdctx,
+            KVAR_PspLoadImageNotifyRoutine,
+            &kvarAddress);
 
-        if (hs.len == 7) { //check if lea
+    }
 
-            if (((ptrCode[Index] == 0x48) || (ptrCode[Index] == 0x4C)) &&
-                (ptrCode[Index + 1] == 0x8D))
-            {
-                Rel = *(PLONG)(ptrCode + Index + 3);
+    if (kvarAddress == 0) {
+
+        ptrCode = (PBYTE)GetProcAddress(hNtOs, "PsRemoveLoadImageNotifyRoutine");
+        if (ptrCode == NULL)
+            return 0;
+
+
+        Index = 0;
+        Rel = 0;
+
+        do {
+            hde64_disasm(ptrCode + Index, &hs);
+            if (hs.flags & F_ERROR)
                 break;
+
+            if (hs.len == 7) { //check if lea
+
+                if (((ptrCode[Index] == 0x48) || (ptrCode[Index] == 0x4C)) &&
+                    (ptrCode[Index + 1] == 0x8D))
+                {
+                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    break;
+                }
+
             }
 
-        }
+            Index += hs.len;
 
-        Index += hs.len;
+        } while (Index < 128);
 
-    } while (Index < 128);
+        if (Rel == 0)
+            return 0;
 
-    if (Rel == 0)
-        return 0;
+        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
+        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
 
-    Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-    Address = NtOsBase + Address - (ULONG_PTR)hNtOs;
+        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
+            return 0;
 
-    if (!kdAddressInNtOsImage((PVOID)Address))
-        return 0;
+    }
 
-    return Address;
+    return kvarAddress;
 }
 
 /*
@@ -1643,7 +1853,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspCreateThreadNotifyRoutine)
 {
     ULONG Index;
     LONG Rel = 0;
-    ULONG_PTR Address = 0;
+    ULONG_PTR kvarAddress = 0;
     PBYTE ptrCode;
     hde64s hs;
 
@@ -1652,43 +1862,55 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspCreateThreadNotifyRoutine)
 
     UNREFERENCED_PARAMETER(QueryFlags);
 
-    ptrCode = (PBYTE)GetProcAddress(hNtOs, "PsRemoveCreateThreadNotifyRoutine");
-    if (ptrCode == NULL)
-        return 0;
+    if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
 
-    Index = 0;
-    Rel = 0;
+        kdGetAddressFromSymbol(&g_kdctx,
+            KVAR_PspCreateThreadNotifyRoutine,
+            &kvarAddress);
 
-    do {
-        hde64_disasm(ptrCode + Index, &hs);
-        if (hs.flags & F_ERROR)
-            break;
+    }
 
-        if (hs.len == 7) { //check if lea
+    if (kvarAddress == 0) {
 
-            if (((ptrCode[Index] == 0x48) || (ptrCode[Index] == 0x4C)) &&
-                (ptrCode[Index + 1] == 0x8D))
-            {
-                Rel = *(PLONG)(ptrCode + Index + 3);
+        ptrCode = (PBYTE)GetProcAddress(hNtOs, "PsRemoveCreateThreadNotifyRoutine");
+        if (ptrCode == NULL)
+            return 0;
+
+        Index = 0;
+        Rel = 0;
+
+        do {
+            hde64_disasm(ptrCode + Index, &hs);
+            if (hs.flags & F_ERROR)
                 break;
+
+            if (hs.len == 7) { //check if lea
+
+                if (((ptrCode[Index] == 0x48) || (ptrCode[Index] == 0x4C)) &&
+                    (ptrCode[Index + 1] == 0x8D))
+                {
+                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    break;
+                }
+
             }
 
-        }
+            Index += hs.len;
 
-        Index += hs.len;
+        } while (Index < 128);
 
-    } while (Index < 128);
+        if (Rel == 0)
+            return 0;
 
-    if (Rel == 0)
-        return 0;
+        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
+        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
 
-    Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-    Address = NtOsBase + Address - (ULONG_PTR)hNtOs;
+        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
+            return 0;
 
-    if (!kdAddressInNtOsImage((PVOID)Address))
-        return 0;
+    }
 
-    return Address;
+    return kvarAddress;
 }
 
 /*
@@ -1705,7 +1927,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindDbgkLmdCallbacks)
 {
     ULONG Index;
     LONG Rel = 0;
-    ULONG_PTR Address = 0;
+    ULONG_PTR kvarAddress = 0;
     PBYTE ptrCode;
     hde64s hs;
 
@@ -1714,50 +1936,62 @@ OBEX_FINDCALLBACK_ROUTINE(FindDbgkLmdCallbacks)
 
     UNREFERENCED_PARAMETER(QueryFlags);
 
-    ptrCode = (PBYTE)GetProcAddress(hNtOs, "DbgkLkmdUnregisterCallback");
-    if (ptrCode == NULL)
-        return 0;
+    if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
 
-    Index = 0;
-    Rel = 0;
+        kdGetAddressFromSymbol(&g_kdctx,
+            KVAR_DbgkLmdCallbacks,
+            &kvarAddress);
 
-    //
-    // Find DbgkLmdCallbacks pointer
-    //
-    do {
-        hde64_disasm(ptrCode + Index, &hs);
-        if (hs.flags & F_ERROR)
-            break;
+    }
 
-        if (hs.len == 7) { //check if lea
+    if (kvarAddress == 0) {
 
-            //
-            // lea     rcx, DbgkLmdCallbacks
-            //
+        ptrCode = (PBYTE)GetProcAddress(hNtOs, "DbgkLkmdUnregisterCallback");
+        if (ptrCode == NULL)
+            return 0;
 
-            if (((ptrCode[Index] == 0x4C) || (ptrCode[Index] == 0x48)) &&
-                (ptrCode[Index + 1] == 0x8D))
-            {
-                Rel = *(PLONG)(ptrCode + Index + 3);
+        Index = 0;
+        Rel = 0;
+
+        //
+        // Find DbgkLmdCallbacks pointer
+        //
+        do {
+            hde64_disasm(ptrCode + Index, &hs);
+            if (hs.flags & F_ERROR)
                 break;
+
+            if (hs.len == 7) { //check if lea
+
+                //
+                // lea     rcx, DbgkLmdCallbacks
+                //
+
+                if (((ptrCode[Index] == 0x4C) || (ptrCode[Index] == 0x48)) &&
+                    (ptrCode[Index + 1] == 0x8D))
+                {
+                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    break;
+                }
+
             }
 
-        }
+            Index += hs.len;
 
-        Index += hs.len;
+        } while (Index < 64);
 
-    } while (Index < 64);
+        if (Rel == 0)
+            return 0;
 
-    if (Rel == 0)
-        return 0;
+        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
+        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
 
-    Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-    Address = NtOsBase + Address - (ULONG_PTR)hNtOs;
+        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
+            return 0;
 
-    if (!kdAddressInNtOsImage((PVOID)Address))
-        return 0;
+    }
 
-    return Address;
+    return kvarAddress;
 }
 
 /*
@@ -1776,7 +2010,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspCreateProcessNotifyRoutine)
 {
     ULONG Index;
     LONG Rel = 0;
-    ULONG_PTR Address = 0;
+    ULONG_PTR kvarAddress = 0;
     PBYTE ptrCode;
     hde64s hs;
 
@@ -1785,70 +2019,82 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspCreateProcessNotifyRoutine)
     ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
     HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
 
-    ptrCode = (PBYTE)GetProcAddress(hNtOs, "PsSetCreateProcessNotifyRoutine");
-    if (ptrCode == NULL)
-        return 0;
+    if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
 
-    //
-    // Find PspSetCreateProcessNotifyRoutine pointer.
-    //
-    Index = 0;
-    do {
+        kdGetAddressFromSymbol(&g_kdctx,
+            KVAR_PspCreateProcessNotifyRoutine,
+            &kvarAddress);
 
-        hde64_disasm(ptrCode + Index, &hs);
-        if (hs.flags & F_ERROR)
-            break;
+    }
 
-        //jmp/call PspSetCreateProcessNotifyRoutine
-        if ((ptrCode[Index] == 0xE9) ||
-            (ptrCode[Index] == 0xE8) ||
-            (ptrCode[Index] == 0xEB))
-        {
-            Rel = *(PLONG)(ptrCode + Index + 1);
-            break;
-        }
+    if (kvarAddress == 0) {
 
-        Index += hs.len;
+        ptrCode = (PBYTE)GetProcAddress(hNtOs, "PsSetCreateProcessNotifyRoutine");
+        if (ptrCode == NULL)
+            return 0;
 
-    } while (Index < 64);
+        //
+        // Find PspSetCreateProcessNotifyRoutine pointer.
+        //
+        Index = 0;
+        do {
 
-    if (Rel == 0)
-        return 0;
+            hde64_disasm(ptrCode + Index, &hs);
+            if (hs.flags & F_ERROR)
+                break;
 
-    ptrCode = ptrCode + Index + (hs.len) + Rel;
-    Index = 0;
-    Rel = 0;
-
-    do {
-        hde64_disasm(ptrCode + Index, &hs);
-        if (hs.flags & F_ERROR)
-            break;
-
-        if (hs.len == 7) { //check if lea
-
-            if ((ptrCode[Index] == 0x4C) &&
-                (ptrCode[Index + 1] == 0x8D))
+            //jmp/call PspSetCreateProcessNotifyRoutine
+            if ((ptrCode[Index] == 0xE9) ||
+                (ptrCode[Index] == 0xE8) ||
+                (ptrCode[Index] == 0xEB))
             {
-                Rel = *(PLONG)(ptrCode + Index + 3);
+                Rel = *(PLONG)(ptrCode + Index + 1);
                 break;
             }
 
-        }
+            Index += hs.len;
 
-        Index += hs.len;
+        } while (Index < 64);
 
-    } while (Index < 128);
+        if (Rel == 0)
+            return 0;
 
-    if (Rel == 0)
-        return 0;
+        ptrCode = ptrCode + Index + (hs.len) + Rel;
+        Index = 0;
+        Rel = 0;
 
-    Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-    Address = NtOsBase + Address - (ULONG_PTR)hNtOs;
+        do {
+            hde64_disasm(ptrCode + Index, &hs);
+            if (hs.flags & F_ERROR)
+                break;
 
-    if (!kdAddressInNtOsImage((PVOID)Address))
-        return 0;
+            if (hs.len == 7) { //check if lea
 
-    return Address;
+                if ((ptrCode[Index] == 0x4C) &&
+                    (ptrCode[Index + 1] == 0x8D))
+                {
+                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    break;
+                }
+
+            }
+
+            Index += hs.len;
+
+        } while (Index < 128);
+
+        if (Rel == 0)
+            return 0;
+
+        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
+        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
+
+        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
+            return 0;
+
+    }
+
+    return kvarAddress;
 }
 
 /*
@@ -1863,7 +2109,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspCreateProcessNotifyRoutine)
 */
 OBEX_FINDCALLBACK_ROUTINE(FindPsAltSystemCallHandlers)
 {
-    ULONG_PTR Address = 0, Result = 0;
+    ULONG_PTR kvarAddress = 0;
 
     ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
     HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
@@ -1875,13 +2121,21 @@ OBEX_FINDCALLBACK_ROUTINE(FindPsAltSystemCallHandlers)
 
     UNREFERENCED_PARAMETER(QueryFlags);
 
-    ptrCode = (PBYTE)GetProcAddress(hNtOs, "PsRegisterAltSystemCallHandler");
-    if (ptrCode == NULL)
-        return 0;
+    if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
 
-    InstructionExactMatchLength = sizeof(PsAltSystemCallHandlersPattern);
+        kdGetAddressFromSymbol(&g_kdctx,
+            KVAR_PsAltSystemCallHandlers,
+            &kvarAddress);
 
-    do {
+    }
+
+    if (kvarAddress == 0) {
+
+        ptrCode = (PBYTE)GetProcAddress(hNtOs, "PsRegisterAltSystemCallHandler");
+        if (ptrCode == NULL)
+            return 0;
+
+        InstructionExactMatchLength = sizeof(PsAltSystemCallHandlersPattern);
 
         Index = 0;
 
@@ -1910,19 +2164,17 @@ OBEX_FINDCALLBACK_ROUTINE(FindPsAltSystemCallHandlers)
         } while (Index < 128);
 
         if (Rel == 0)
-            break;
+            return 0;
 
-        Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-        Address = NtOsBase + Address - (ULONG_PTR)hNtOs;
+        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
+        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
 
-        if (!kdAddressInNtOsImage((PVOID)Address))
-            break;
+        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
+            return 0;
 
-        Result = Address;
+    }
 
-    } while (FALSE);
-
-    return Result;
+    return kvarAddress;
 }
 
 /*
@@ -1939,7 +2191,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
 {
     HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
 
-    ULONG_PTR Result = 0;
+    ULONG_PTR kvarAddress = 0;
     PBYTE   ptrCode;
     LONG    Rel = 0;
     ULONG   Index, c;
@@ -1947,69 +2199,82 @@ OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
 
     UNREFERENCED_PARAMETER(QueryFlags);
 
-    ptrCode = (PBYTE)GetProcAddress(hNtOs, "ExRegisterExtension");
-    if (ptrCode == NULL)
-        return 0;
+    if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
 
-    c = 0;
-    Index = 0;
-
-    //
-    // Find ExpFindHost
-    //
-
-    do {
-
-        hde64_disasm(ptrCode + Index, &hs);
-        if (hs.flags & F_ERROR)
-            break;
-
-        //
-        // Find call instruction.
-        //
-        if (hs.len != 5) {
-            Index += hs.len;
-            continue;
-        }
-
-        if (ptrCode[Index] == 0xE8)
-            c++;
-
-        if (c > 1) {
-            Rel = *(PLONG)(ptrCode + Index + 1);
-            break;
-        }
-
-        Index += hs.len;
-
-    } while (Index < 256);
-
-    if (Rel == 0)
-        return 0;
-
-    //
-    // Examine ExpFindHost
-    //
-    ptrCode = ptrCode + Index + 5 + Rel;
-
-    hde64_disasm(ptrCode, &hs);
-    if (hs.flags & F_ERROR)
-        return 0;
-
-    if (hs.len == 7) {
-        //
-        // mov     rax, cs:ExpHostList
-        //
-        if (ptrCode[1] == 0x8B) {
-            Rel = *(PLONG)(ptrCode + 3);
-            Result = kdAdjustAddressToNtOsBase((ULONG_PTR)ptrCode,
-                0,
-                hs.len,
-                Rel);
-        }
+        kdGetAddressFromSymbol(&g_kdctx,
+            KVAR_ExpHostList,
+            &kvarAddress);
 
     }
-    return Result;
+
+    if (kvarAddress == 0) {
+
+        ptrCode = (PBYTE)GetProcAddress(hNtOs, "ExRegisterExtension");
+        if (ptrCode == NULL)
+            return 0;
+
+        c = 0;
+        Index = 0;
+
+        //
+        // Find ExpFindHost
+        //
+
+        do {
+
+            hde64_disasm(ptrCode + Index, &hs);
+            if (hs.flags & F_ERROR)
+                break;
+
+            //
+            // Find call instruction.
+            //
+            if (hs.len != 5) {
+                Index += hs.len;
+                continue;
+            }
+
+            if (ptrCode[Index] == 0xE8)
+                c++;
+
+            if (c > 1) {
+                Rel = *(PLONG)(ptrCode + Index + 1);
+                break;
+            }
+
+            Index += hs.len;
+
+        } while (Index < 256);
+
+        if (Rel == 0)
+            return 0;
+
+        //
+        // Examine ExpFindHost
+        //
+        ptrCode = ptrCode + Index + 5 + Rel;
+
+        hde64_disasm(ptrCode, &hs);
+        if (hs.flags & F_ERROR)
+            return 0;
+
+        if (hs.len == 7) {
+            //
+            // mov     rax, cs:ExpHostList
+            //
+            if (ptrCode[1] == 0x8B) {
+                Rel = *(PLONG)(ptrCode + 3);
+                kvarAddress = kdAdjustAddressToNtOsBase((ULONG_PTR)ptrCode,
+                    0,
+                    hs.len,
+                    Rel);
+            }
+
+        }
+    
+    }
+
+    return kvarAddress;
 }
 
 /*

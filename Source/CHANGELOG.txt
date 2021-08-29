@@ -1,3 +1,7 @@
+v1.9.1
+21h2 compatibility improvements
+rtls updated
+
 v1.9.0
 added Section object structured dump
 added ALPC port connections list (similar to !alpc /lpc windbg command)

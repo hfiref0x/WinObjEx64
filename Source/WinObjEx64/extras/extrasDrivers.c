@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
-*  VERSION:     1.90
+*  VERSION:     1.91
 *
-*  DATE:        27 May 2021
+*  DATE:        10 Aug 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -396,6 +396,8 @@ VOID DrvListUnloadedDrivers(
     if (!kdQueryMmUnloadedDrivers(&g_kdctx,
         (PVOID*)&pvDrivers))
     {
+        _strcpy(szBuffer, TEXT("Could not resolve MmUnloadedDrivers"));
+        supStatusBarSetText(Context->StatusBar, 1, (LPWSTR)&szBuffer);
         return;
     }
 

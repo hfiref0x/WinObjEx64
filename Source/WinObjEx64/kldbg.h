@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.90
+*  VERSION:     1.91
 *
-*  DATE:        07 June 2021
+*  DATE:        27 July 2021
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -203,61 +203,6 @@ typedef struct _OBJREF {
 } OBJREF, *POBJREF;
 
 //
-// Defines for Major Windows NT release builds
-//
-
-// Windows 7 RTM
-#define NT_WIN7_RTM             7600
-
-// Windows 7 SP1
-#define NT_WIN7_SP1             7601
-
-// Windows 8 RTM
-#define NT_WIN8_RTM             9200
-
-// Windows 8.1
-#define NT_WIN8_BLUE            9600
-
-// Windows 10 TH1
-#define NT_WIN10_THRESHOLD1     10240
-
-// Windows 10 TH2
-#define NT_WIN10_THRESHOLD2     10586
-
-// Windows 10 RS1
-#define NT_WIN10_REDSTONE1      14393
-
-// Windows 10 RS2
-#define NT_WIN10_REDSTONE2      15063
-
-// Windows 10 RS3
-#define NT_WIN10_REDSTONE3      16299
-
-// Windows 10 RS4
-#define NT_WIN10_REDSTONE4      17134
-
-// Windows 10 RS5
-#define NT_WIN10_REDSTONE5      17763
-
-// Windows 10 19H1
-#define NT_WIN10_19H1           18362
-
-// Windows 10 19H2
-#define NT_WIN10_19H2           18363
-
-// Windows 10 20H1
-#define NT_WIN10_20H1           19041
-
-// Windows 10 20H2
-#define NT_WIN10_20H2           19042
-
-// Windows 10 21H1
-#define NT_WIN10_21H1           19043
-
-// Windows 10 Active Develepment Branch (21XX)
-#define NTX_WIN10_ADB           21382
-
-//
 // Defines for boundary descriptors
 //
 
@@ -443,16 +388,13 @@ BOOL kdFindKiServiceTable(
     _In_ ULONG_PTR KernelImageBase,
     _Inout_ KSERVICE_TABLE_DESCRIPTOR* ServiceTable);
 
-ULONG_PTR kdQueryWin32kApiSetTable(
-    _In_ HMODULE hWin32k);
-
 BOOL kdpReadSystemMemoryEx(
     _In_ ULONG_PTR Address,
     _Inout_ PVOID Buffer,
     _In_ ULONG BufferSize,
     _Out_opt_ PULONG NumberOfBytesRead);
 
-BOOL kdLoadSymbolsForNtKernelImage(
+BOOL kdLoadSymbolsForNtImage(
     _In_ PSYMCONTEXT SymContext,
     _In_ LPCWSTR ImageFileName);
 
@@ -504,7 +446,7 @@ BOOLEAN kdQueryMmUnloadedDrivers(
     _Out_ PVOID* UnloadedDrivers);
 
 BOOLEAN kdIsSymAvailable(
-    _In_ KLDBGCONTEXT* Context);
+    _In_opt_ SYMCONTEXT* SymContext);
 
 BOOL kdGetFieldOffsetFromSymbol(
     _In_ KLDBGCONTEXT* Context,
@@ -515,6 +457,13 @@ BOOL kdGetFieldOffsetFromSymbol(
 BOOL kdGetAddressFromSymbol(
     _In_ KLDBGCONTEXT* Context,
     _In_ LPCWSTR SymbolName,
+    _Inout_ ULONG_PTR* Address);
+
+BOOL kdGetAddressFromSymbolEx(
+    _In_ PSYMCONTEXT SymContext,
+    _In_ LPCWSTR SymbolName,
+    _In_ PVOID ImageBase,
+    _In_ ULONG_PTR ImageSize,
     _Inout_ ULONG_PTR* Address);
 
 /*

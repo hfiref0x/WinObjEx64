@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.03
 *
-*  DATE:        11 Jan 2021
+*  DATE:        26 July 2021
 * 
 *  Sonar plugin query information definitions.
 *
@@ -18,61 +18,6 @@
 *******************************************************************************/
 
 #pragma once
-
-//
-// Defines for Major Windows NT release builds
-//
-
-// Windows 7 RTM
-#define NT_WIN7_RTM             7600
-
-// Windows 7 SP1
-#define NT_WIN7_SP1             7601
-
-// Windows 8 RTM
-#define NT_WIN8_RTM             9200
-
-// Windows 8.1
-#define NT_WIN8_BLUE            9600
-
-// Windows 10 TH1
-#define NT_WIN10_THRESHOLD1     10240
-
-// Windows 10 TH2
-#define NT_WIN10_THRESHOLD2     10586
-
-// Windows 10 RS1
-#define NT_WIN10_REDSTONE1      14393
-
-// Windows 10 RS2
-#define NT_WIN10_REDSTONE2      15063
-
-// Windows 10 RS3
-#define NT_WIN10_REDSTONE3      16299
-
-// Windows 10 RS4
-#define NT_WIN10_REDSTONE4      17134
-
-// Windows 10 RS5
-#define NT_WIN10_REDSTONE5      17763
-
-// Windows 10 19H1
-#define NT_WIN10_19H1           18362
-
-// Windows 10 19H2
-#define NT_WIN10_19H2           18363
-
-// Windows 10 20H1
-#define NT_WIN10_20H1           19041
-
-// Windows 10 20H2
-#define NT_WIN10_20H2           19042
-
-// Windows 10 21H1
-#define NT_WIN10_21H1           19043
-
-// Windows 10 Active Develepment Branch (21XX)
-#define NTX_WIN10_ADB           21286
 
 typedef struct _PROTOCOL_BLOCK_VERSIONS {
     union {
@@ -278,7 +223,7 @@ typedef struct _NDIS_PROTOCOL_BLOCK_COMPATIBLE {
 
 } NDIS_PROTOCOL_BLOCK_COMPATIBLE, *PNDIS_PROTOCOL_BLOCK_COMPATIBLE;
 
-static LPWSTR g_lpszOpenBlockHandlers[] = {
+static LPCWSTR g_lpszOpenBlockHandlers[] = {
     TEXT("NextSendHandler"),
     TEXT("NextReturnNetBufferListsHandler"),
     TEXT("SendHandler"),
@@ -349,7 +294,7 @@ static LPWSTR g_lpszOpenBlockHandlers[] = {
     TEXT("CoOidRequestHandler")
 };
 
-static LPWSTR g_lpszProtocolBlockHandlers[] = {
+static LPCWSTR g_lpszProtocolBlockHandlers[] = {
     TEXT("BindAdapterHandlerEx"),
     TEXT("UnbindAdapterHandlerEx"),
     TEXT("OpenAdapterCompleteHandlerEx"),

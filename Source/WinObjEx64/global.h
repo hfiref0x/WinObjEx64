@@ -4,9 +4,9 @@
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.90
+*  VERSION:     1.91
 *
-*  DATE:        16 May 2021
+*  DATE:        26 July 2021
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -92,6 +92,7 @@
 #include "ntos\ntos.h"
 #include "ntos\ntalpc.h"
 #include "ntos\ntsup.h"
+#include "ntos\ntbuilds.h"
 
 #define _NTDEF_
 #include <ntsecapi.h>

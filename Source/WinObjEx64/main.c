@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.90
+*  VERSION:     1.91
 *
-*  DATE:        11 May 2021
+*  DATE:        16 July 2021
 *
 *  Program entry point and main window handler.
 *
@@ -1269,7 +1269,7 @@ UINT WinObjExMain()
     }
 
     //
-    // Wine 1.6 xenial does not suport this routine.
+    // Wine 1.6 xenial does not support this routine.
     //
     if (IsWine == FALSE) {
         RtlSetHeapInformation(NULL, HeapEnableTerminationOnCorruption, NULL, 0);

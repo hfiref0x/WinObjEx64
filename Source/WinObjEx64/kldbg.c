@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.90
+*  VERSION:     1.91
 *
-*  DATE:        05 June 2021
+*  DATE:        30 June 2021
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -1210,6 +1210,7 @@ PVOID ObDumpSymbolicLinkObjectVersionAware(
     case NT_WIN10_19H2:
     case NT_WIN10_20H1:
     case NT_WIN10_20H2:
+    case NT_WIN10_21H1:
         objectSize = sizeof(OBJECT_SYMBOLIC_LINK_V4);
         objectVersion = 4;
         break;
@@ -1390,7 +1391,7 @@ BOOLEAN ObpFindHeaderCookie(
     //
     // If symbols available, lookup address from them.
     //
-    if (kdIsSymAvailable(Context)) {
+    if (kdIsSymAvailable((PSYMCONTEXT)Context->NtOsSymContext)) {
 
         kdGetAddressFromSymbol(
             Context,
@@ -1465,7 +1466,7 @@ BOOLEAN ObpFindProcessObjectOffsets(
         //
         // If symbols available try lookup field offset from them.
         //
-        if (kdIsSymAvailable(Context)) {
+        if (kdIsSymAvailable((PSYMCONTEXT)Context->NtOsSymContext)) {
 
             if (pOffsetProcessId->Valid == FALSE) {
 
@@ -1574,7 +1575,7 @@ PVOID ObFindPrivateNamespaceLookupTable2(
         //
         // Symbols lookup.
         //
-        if (kdIsSymAvailable(Context)) {
+        if (kdIsSymAvailable((PSYMCONTEXT)Context->NtOsSymContext)) {
 
             kdGetAddressFromSymbol(
                 Context,
@@ -1880,7 +1881,7 @@ BOOL kdFindKiServiceTable(
         //
         // Symbols lookup.
         //
-        if (kdIsSymAvailable(&g_kdctx)) {
+        if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
 
             kdGetAddressFromSymbol(
                 &g_kdctx,
@@ -3230,7 +3231,7 @@ PVOID kdQueryIopInvalidDeviceRequest(
     //
     // Lookup using symbols.
     //
-    if (kdIsSymAvailable(&g_kdctx)) {
+    if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
 
         kdGetAddressFromSymbol(
             &g_kdctx,
@@ -3487,14 +3488,14 @@ BOOL kdExtractDriver(
 }
 
 /*
-* kdLoadSymbolsForNtKernelImage
+* kdLoadSymbolsForNtImage
 *
 * Purpose:
 *
-* Load symbols for ntoskrnl mapped image.
+* Load symbols for OS mapped image.
 *
 */
-BOOL kdLoadSymbolsForNtKernelImage(
+BOOL kdLoadSymbolsForNtImage(
     _In_ PSYMCONTEXT SymContext,
     _In_ LPCWSTR ImageFileName
 )
@@ -3582,7 +3583,7 @@ BOOL kdLoadNtKernelImage(
 
         if (Context->NtOsImageMap) {
 
-            kdLoadSymbolsForNtKernelImage(
+            kdLoadSymbolsForNtImage(
                 (PSYMCONTEXT)g_kdctx.NtOsSymContext,
                 szFileName);
 
@@ -3674,106 +3675,6 @@ UCHAR kdGetInstructionLength(
 }
 
 /*
-* kdQueryWin32kApiSetTable
-*
-* Purpose:
-*
-* Locate address of win32k!Win32kApiSetTable structure.
-*
-* N.B.
-* It would be much easier if MS will export this symbol.
-*
-*/
-ULONG_PTR kdQueryWin32kApiSetTable(
-    _In_ HMODULE hWin32k
-)
-{
-    PBYTE	    ptrCode = (PBYTE)hWin32k;
-
-    PVOID       SectionBase;
-    ULONG       SectionSize = 0, Index;
-    ULONG       instLength = 0, tempOffset;
-
-    ULONG_PTR   tableAddress = 0;
-    LONG        relativeValue = 0;
-    hde64s      hs;
-
-    __try {
-
-        //
-        // Locate .text image section as required variable is always in .text.
-        //
-        SectionBase = supLookupImageSectionByName(TEXT_SECTION,
-            TEXT_SECTION_LEGNTH,
-            (PVOID)hWin32k,
-            &SectionSize);
-
-        if ((SectionBase == 0) || (SectionSize == 0))
-            return 0;
-
-        Index = 0;
-        ptrCode = (PBYTE)SectionBase;
-
-        do {
-
-            hde64_disasm((void*)(ptrCode + Index), &hs);
-            if (hs.flags & F_ERROR)
-                break;
-
-            instLength = hs.len;
-
-            //
-            // Check if 3 byte length MOV.
-            //
-            if (instLength == IL_Win32kApiSetMov) {
-
-                tempOffset = Index + 1; //+1 to skip rex prefix
-
-                if (ptrCode[tempOffset] == 0x8B) {
-
-                    tempOffset = Index + instLength;
-                    hde64_disasm((void*)(ptrCode + tempOffset), &hs);
-                    if (hs.flags & F_ERROR)
-                        break;
-
-                    //
-                    // Check if next instruction is 7 bytes len LEA.
-                    //
-                    if (hs.len == IL_Win32kApiSetTable) {
-                        if (ptrCode[tempOffset + 1] == 0x8D) {
-
-                            //
-                            // Update counters.
-                            //
-                            Index = tempOffset;
-                            instLength = hs.len;
-
-                            relativeValue = *(PLONG)(ptrCode + tempOffset + (hs.len - 4));
-                            break;
-                        }
-                    }
-
-                }
-            }
-
-            Index += instLength;
-
-        } while (Index < SectionSize - 10);
-
-        if ((relativeValue == 0) || (instLength == 0))
-            return 0;
-
-        tableAddress = (ULONG_PTR)ptrCode + Index + instLength + relativeValue;
-
-    }
-    __except (WOBJ_EXCEPTION_FILTER_LOG) {
-        return 0;
-    }
-
-    return tableAddress;
-}
-
-/*
 * kdQueryMmUnloadedDrivers
 *
 * Purpose:
@@ -3791,7 +3692,7 @@ BOOLEAN kdQueryMmUnloadedDrivers(
     HMODULE             hNtOs;
     ULONG_PTR           NtOsBase, lookupAddress = 0;
 
-    PBYTE               ptrCode;
+    PBYTE               ptrCode, sigPattern;
     PVOID               SectionBase;
     ULONG               SectionSize = 0, bytesRead = 0;
 
@@ -3799,7 +3700,7 @@ BOOLEAN kdQueryMmUnloadedDrivers(
     PWCHAR              pwStaticBuffer = NULL;
     WORD                wMax, wLength;
 
-    ULONG               cbData;
+    ULONG               cbData, sigSize;
 
     ULONG               Index = 0, instLength = 0, tempOffset;
     LONG                relativeValue = 0;
@@ -3824,7 +3725,7 @@ BOOLEAN kdQueryMmUnloadedDrivers(
             //
             // Symbols lookup.
             //
-            if (kdIsSymAvailable(Context)) {
+            if (kdIsSymAvailable((PSYMCONTEXT)Context->NtOsSymContext)) {
 
                 kdGetAddressFromSymbol(
                     Context,
@@ -3849,23 +3750,38 @@ BOOLEAN kdQueryMmUnloadedDrivers(
                 if ((SectionBase == 0) || (SectionSize == 0))
                     break;
 
-                if (g_NtBuildNumber == NT_WIN10_THRESHOLD1)
-                    MiRememberUnloadedDriverPattern[0] = FIX_WIN10_THRESHOULD_REG;
-                else if (g_NtBuildNumber > NT_WIN10_20H1)
-                    MiRememberUnloadedDriverPattern[0] = FIX_WIN10_20H1_REG;
+                if (g_NtBuildNumber < NT_WIN10_20H1) {
+
+                    if (g_NtBuildNumber == NT_WIN10_THRESHOLD1)
+                        MiRememberUnloadedDriverPattern[0] = FIX_WIN10_THRESHOULD_REG;
+
+                    sigPattern = MiRememberUnloadedDriverPattern;
+                    sigSize = sizeof(MiRememberUnloadedDriverPattern);
+
+                }
+                else {
+
+                    //
+                    // Use 19041+ specific pattern as an array allocation code has been changed.
+                    //
+
+                    sigPattern = MiRememberUnloadedDriverPattern2;
+                    sigSize = sizeof(MiRememberUnloadedDriverPattern2);
+
+                }
 
                 ptrCode = (PBYTE)supFindPattern((PBYTE)SectionBase,
                     SectionSize,
-                    MiRememberUnloadedDriverPattern,
-                    sizeof(MiRememberUnloadedDriverPattern));
+                    sigPattern,
+                    sigSize);
 
                 if (ptrCode == NULL)
                     break;
 
-                if (RtlPointerToOffset(SectionBase, ptrCode) + 32 > SectionSize)
+                if (RtlPointerToOffset(SectionBase, ptrCode) + sigSize + 32 > SectionSize)
                     break;
 
-                Index = 0;
+                Index = sigSize;
                 tempOffset = 0;
 
                 do {
@@ -4090,7 +4006,7 @@ BOOLEAN kdQueryKernelShims(
             //
             // If symbols available then lookup kernel variable address from them.
             //
-            if (kdIsSymAvailable(Context)) {
+            if (kdIsSymAvailable((PSYMCONTEXT)Context->NtOsSymContext)) {
 
                 kdGetAddressFromSymbol(
                     Context,
@@ -4245,19 +4161,17 @@ BOOLEAN kdpOpenLoadDriverPublic(
 *
 * Purpose:
 *
-* Return TRUE if symbols are initialized.
+* Return TRUE if symbols context is initialized.
 *
 */
 BOOLEAN kdIsSymAvailable(
-    _In_ KLDBGCONTEXT* Context
+    _In_opt_ SYMCONTEXT *SymContext
 )
 {
-    PSYMCONTEXT symContext = (PSYMCONTEXT)Context->NtOsSymContext;
-
-    if (symContext == NULL)
+    if (SymContext == NULL)
         return FALSE;
 
-    if (symContext->ModuleBase == 0)
+    if (SymContext->ModuleBase == 0)
         return FALSE;
 
     return TRUE;
@@ -4322,22 +4236,23 @@ BOOL kdGetFieldOffsetFromSymbol(
 }
 
 /*
-* kdGetAddressFromSymbol
+* kdGetAddressFromSymbolEx
 *
 * Purpose:
 *
-* Get fully adjusted address for ntoskrnl symbol by it name.
+* Get fully adjusted address for symbol by it name.
 *
 */
-BOOL kdGetAddressFromSymbol(
-    _In_ KLDBGCONTEXT* Context,
+BOOL kdGetAddressFromSymbolEx(
+    _In_ PSYMCONTEXT SymContext,
     _In_ LPCWSTR SymbolName,
+    _In_ PVOID ImageBase,
+    _In_ ULONG_PTR ImageSize,
     _Inout_ ULONG_PTR* Address
 )
 {
     BOOL bResult = FALSE;
     ULONG_PTR address;
-    PSYMCONTEXT symContext = (PSYMCONTEXT)Context->NtOsSymContext;
 
     WCHAR szLog[WOBJ_MAX_MESSAGE - 1];
 
@@ -4355,16 +4270,15 @@ BOOL kdGetAddressFromSymbol(
     //
     // Verify context data.
     //
-    if (Context->NtOsBase == NULL ||
-        Context->NtOsSize == 0)
+    if (ImageBase == NULL || ImageSize == 0)
     {
         return FALSE;
     }
 
     __try {
 
-        address = symContext->Parser.LookupAddressBySymbol(
-            symContext,
+        address = SymContext->Parser.LookupAddressBySymbol(
+            SymContext,
             SymbolName,
             &bResult);
 
@@ -4376,14 +4290,17 @@ BOOL kdGetAddressFromSymbol(
     if (bResult && address) {
 
         //
-        // Adjust address to ntoskrnl base. 
+        // Adjust address to image base. 
         //
-        address = (ULONG_PTR)Context->NtOsBase + address - symContext->ModuleBase;
+        address = (ULONG_PTR)ImageBase + address - SymContext->ModuleBase;
 
         //
         // Validate resulting address value.
         //
-        if (kdAddressInNtOsImage((PVOID)address)) {
+        if (IN_REGION(address,
+            ImageBase,
+            ImageSize))
+        {
             *Address = address;
         }
         else {
@@ -4405,6 +4322,40 @@ BOOL kdGetAddressFromSymbol(
 
     logAdd(WOBJ_LOG_ENTRY_INFORMATION, szLog);
 
+    return bResult;
+}
+
+/*
+* kdGetAddressFromSymbol
+*
+* Purpose:
+*
+* Get fully adjusted address for ntoskrnl symbol by it name.
+*
+*/
+BOOL kdGetAddressFromSymbol(
+    _In_ KLDBGCONTEXT* Context,
+    _In_ LPCWSTR SymbolName,
+    _Inout_ ULONG_PTR* Address
+)
+{
+    BOOL bResult = FALSE;
+    ULONG_PTR address = 0;
+    PSYMCONTEXT symContext = (PSYMCONTEXT)Context->NtOsSymContext;
+
+    *Address = 0;
+
+    bResult = kdGetAddressFromSymbolEx(symContext,
+        SymbolName,
+        Context->NtOsBase,
+        Context->NtOsSize,
+        &address);
+
+    if (bResult) {
+
+        *Address = address;
+
+    }
 
     return bResult;
 }

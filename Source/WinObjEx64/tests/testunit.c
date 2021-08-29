@@ -4,9 +4,9 @@
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     1.90
+*  VERSION:     1.91
 *
-*  DATE:        29 May 2021
+*  DATE:        27 June 2021
 *
 *  Test code used while debug.
 *
@@ -20,7 +20,10 @@
 
 #include "global.h"
 #include "ntos\ntldr.h"
+#pragma warning(push)
+#pragma warning(disable:28251) //Inconsistent annotation for any intrin, "feature" of the latest MSVC
 #include <intrin.h>
+#pragma warning(pop)
 #include <aclapi.h>
 
 HANDLE g_TestIoCompletion = NULL, g_TestTransaction = NULL;
@@ -974,7 +977,7 @@ VOID TestSymbols()
     WCHAR* pStrEnd;
     WCHAR* pOutput; 
 
-    if (!kdIsSymAvailable(&g_kdctx))
+    if (!kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext))
         return;
 
     pOutput = (WCHAR*)supHeapAlloc(4 * MAX_SYM_NAME);

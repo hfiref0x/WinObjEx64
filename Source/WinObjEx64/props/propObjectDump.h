@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMP.H
 *
-*  VERSION:     1.90
+*  VERSION:     1.92
 *
-*  DATE:        11 May 2021
+*  DATE:        19 Sep 2021
 *
 *  Common header file for the object dump support.
 *
@@ -83,8 +83,32 @@ HTREEITEM propObDumpLong(
     _In_opt_ COLORREF BgColor,
     _In_opt_ COLORREF FontColor);
 
+VOID propObDumpLong64(
+    _In_ HWND TreeList,
+    _In_ HTREEITEM hParent,
+    _In_ LPWSTR lpszName,
+    _In_opt_ LPWSTR lpszDesc,
+    _In_opt_ LONG64 Value,
+    _In_ BOOL OutAsHex,
+    _In_ COLORREF BgColor,
+    _In_ COLORREF FontColor);
+
 VOID propObDumpListEntry(
     _In_ HWND TreeList,
     _In_ HTREEITEM hParent,
     _In_ LPWSTR ListEntryName,
     _In_opt_ PLIST_ENTRY ListEntry);
+
+VOID propObDumpUSHORT(
+    _In_ HWND TreeList,
+    _In_ HTREEITEM hParent,
+    _In_ LPWSTR Name,
+    _In_ USHORT Value,
+    _In_ BOOLEAN HexOutput);
+
+VOID propObDumpUnicodeString(
+    _In_ HWND TreeList,
+    _In_ HTREEITEM hParent,
+    _In_ LPWSTR StringName,
+    _In_ PUNICODE_STRING InputString,
+    _In_ BOOLEAN IsKernelPtr);

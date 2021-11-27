@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPSLIST.C
 *
-*  VERSION:     1.90
+*  VERSION:     1.92
 *
-*  DATE:        31 May 2021
+*  DATE:        11 Oct 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -176,8 +176,7 @@ INT_PTR PsListDialogResize(
 VOID PsListHandlePopupMenu(
     _In_ HWND hwndDlg,
     _In_ LPPOINT point,
-    _In_ UINT itemCopy,
-    _In_ UINT itemRefresh,
+    _In_opt_ LPARAM lParam,
     _In_ BOOL fTreeList
 )
 {
@@ -187,26 +186,37 @@ VOID PsListHandlePopupMenu(
     hMenu = CreatePopupMenu();
     if (hMenu) {
 
+        InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_OBJECT_PROPERTIES, T_PROPERTIES);
+
         if (fTreeList) {
-            InsertMenu(hMenu, uPos++, MF_BYCOMMAND, itemCopy, T_COPYOBJECT);
-            InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+
+            if (supTreeListAddCopyValueItem(hMenu,
+                PsDlgContext.TreeList,
+                ID_OBJECT_COPY,
+                uPos++,
+                lParam,
+                &PsDlgContext.tlSubItemHit))
+            {
+                InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+            }
+
         }
         else {
 
             if (supListViewAddCopyValueItem(hMenu,
                 PsDlgContext.ListView,
-                itemCopy,
-                uPos,
+                ID_OBJECT_COPY,
+                uPos++,
                 point,
                 &PsDlgContext.lvItemHit,
                 &PsDlgContext.lvColumnHit))
             {
-                InsertMenu(hMenu, ++uPos, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+                InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
             }
 
         }
 
-        InsertMenu(hMenu, uPos, MF_BYCOMMAND, itemRefresh, T_VIEW_REFRESH);
+        InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_VIEW_REFRESH, T_VIEW_REFRESH);
         TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, point->x, point->y, 0, hwndDlg, NULL);
         DestroyMenu(hMenu);
     }
@@ -289,8 +299,10 @@ PROP_UNNAMED_OBJECT_INFO* PsListGetObjectEntry(
                 ObjectEntry = (PROP_UNNAMED_OBJECT_INFO*)subitems->UserParam;
     }
     else {
-        nSelected = ListView_GetSelectionMark(PsDlgContext.ListView);
-        supGetListViewItemParam(PsDlgContext.ListView, nSelected, (PVOID*)&ObjectEntry);
+        if (ListView_GetSelectedCount(PsDlgContext.ListView)) {
+            nSelected = ListView_GetSelectionMark(PsDlgContext.ListView);
+            supGetListViewItemParam(PsDlgContext.ListView, nSelected, (PVOID*)&ObjectEntry);
+        }
     }
 
     return ObjectEntry;
@@ -1228,6 +1240,53 @@ VOID CreateObjectList(
 }
 
 /*
+* PsShowPropertiesDialog
+*
+* Purpose:
+*
+* Show properties dialog for Process/Thread list item.
+*
+*/
+INT_PTR PsShowPropertiesDialog(
+    _In_opt_ HWND TreeControl
+)
+{
+    PROP_UNNAMED_OBJECT_INFO* ObjectEntry;
+    TVHITTESTINFO hti;
+    POINT pt;
+
+    //
+    // Processes list item.
+    //
+    if (TreeControl) {
+
+        GetCursorPos(&pt);
+        hti.pt = pt;
+        ScreenToClient(TreeControl, &hti.pt);
+        if (TreeView_HitTest(TreeControl, &hti) &&
+            (hti.flags & (TVHT_ONITEM | TVHT_ONITEMRIGHT)))
+        {
+            ObjectEntry = PsListGetObjectEntry(TRUE, hti.hItem);
+            if (ObjectEntry) {
+                PsListHandleObjectProp(TRUE, ObjectEntry);
+            }
+        }
+
+    }
+    else {
+        //
+        // Threads list item.
+        //
+        ObjectEntry = PsListGetObjectEntry(FALSE, NULL);
+        if (ObjectEntry) {
+            PsListHandleObjectProp(FALSE, ObjectEntry);
+        }
+    }
+
+    return 1;
+}
+
+/*
 * PsListHandleNotify
 *
 * Purpose:
@@ -1244,14 +1303,9 @@ INT_PTR PsListHandleNotify(
     LPNMHDR nhdr = (LPNMHDR)lParam;
     INT     nImageIndex;
 
-    TVHITTESTINFO   hti;
-    POINT pt;
-
     HWND TreeControl;
 
     PROP_UNNAMED_OBJECT_INFO* ObjectEntry;
-
-    UNREFERENCED_PARAMETER(hwndDlg);
 
     if ((g_DialogRefresh) || (nhdr == NULL) || (g_DialogQuit))
         return 0;
@@ -1263,12 +1317,7 @@ INT_PTR PsListHandleNotify(
         switch (nhdr->code) {
 
         case NM_DBLCLK:
-            ObjectEntry = PsListGetObjectEntry(FALSE, NULL);
-            if (ObjectEntry) {
-                PsListHandleObjectProp(FALSE, ObjectEntry);
-            }
-
-            return 1;
+            return PsShowPropertiesDialog(NULL);
 
         case LVN_COLUMNCLICK:
             PsDlgContext.bInverseSort = !PsDlgContext.bInverseSort;
@@ -1307,18 +1356,7 @@ INT_PTR PsListHandleNotify(
             return PostMessage(hwndDlg, WM_NOTIFY, wParam, lParam);
 
         case NM_RETURN:
-            GetCursorPos(&pt);
-            hti.pt = pt;
-            ScreenToClient(TreeControl, &hti.pt);
-            if (TreeView_HitTest(TreeControl, &hti) &&
-                (hti.flags & (TVHT_ONITEM | TVHT_ONITEMRIGHT)))
-            {
-                ObjectEntry = PsListGetObjectEntry(TRUE, hti.hItem);
-                if (ObjectEntry) {
-                    PsListHandleObjectProp(TRUE, ObjectEntry);
-                }
-            }
-            return 1;
+            return PsShowPropertiesDialog(TreeControl);
 
         case TVN_SELCHANGED:
             ObjectEntry = PsListGetObjectEntry(TRUE, NULL);
@@ -1392,7 +1430,7 @@ INT_PTR CALLBACK PsListDialogProc(
 
         if ((HWND)wParam == TreeListControl) {
             GetCursorPos((LPPOINT)&crc);
-            PsListHandlePopupMenu(hwndDlg, (LPPOINT)&crc, ID_OBJECT_COPY, ID_VIEW_REFRESH, TRUE);
+            PsListHandlePopupMenu(hwndDlg, (LPPOINT)&crc, lParam, TRUE);
         }
 
         if ((HWND)wParam == PsDlgContext.ListView) {
@@ -1407,7 +1445,7 @@ INT_PTR CALLBACK PsListDialogProc(
             else
                 GetCursorPos((LPPOINT)&crc);
 
-            PsListHandlePopupMenu(hwndDlg, (LPPOINT)&crc, ID_OBJECT_COPY + 1, ID_VIEW_REFRESH + 1, FALSE);
+            PsListHandlePopupMenu(hwndDlg, (LPPOINT)&crc, 0, FALSE);
         }
 
         break;
@@ -1424,20 +1462,26 @@ INT_PTR CALLBACK PsListDialogProc(
         case IDCANCEL:
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
             return TRUE;
-        
-        case ID_OBJECT_COPY:
-            supCopyTreeListSubItemValue(PsDlgContext.TreeList, 0);
-            break;
 
-        case ID_OBJECT_COPY + 1:            
-            supListViewCopyItemValueToClipboard(PsDlgContext.ListView,
-                PsDlgContext.lvItemHit,
-                PsDlgContext.lvColumnHit);
+        case ID_OBJECT_COPY:
+            FocusWindow = GetFocus();
+            TreeListControl = TreeList_GetTreeControlWindow(PsDlgContext.TreeList);
+
+            if (FocusWindow == TreeListControl) {
+
+                supTreeListCopyItemValueToClipboard(PsDlgContext.TreeList,
+                    PsDlgContext.tlSubItemHit);
+
+            }
+            else if (FocusWindow == PsDlgContext.ListView) {
+                supListViewCopyItemValueToClipboard(PsDlgContext.ListView,
+                    PsDlgContext.lvItemHit,
+                    PsDlgContext.lvColumnHit);
+            }
 
             break;
 
         case ID_VIEW_REFRESH:
-        case ID_VIEW_REFRESH + 1:
 
             FocusWindow = GetFocus();
             TreeListControl = TreeList_GetTreeControlWindow(PsDlgContext.TreeList);
@@ -1447,6 +1491,18 @@ INT_PTR CALLBACK PsListDialogProc(
             }
             else if (FocusWindow == PsDlgContext.ListView) {
                 PsListHandleThreadRefresh();
+            }
+            break;
+
+        case ID_OBJECT_PROPERTIES:
+
+            FocusWindow = GetFocus();
+            TreeListControl = TreeList_GetTreeControlWindow(PsDlgContext.TreeList);
+            if (FocusWindow == TreeListControl) {
+                PsShowPropertiesDialog(TreeListControl);
+            }
+            else if (FocusWindow == PsDlgContext.ListView) {
+                PsShowPropertiesDialog(NULL);
             }
             break;
 
@@ -1587,6 +1643,8 @@ VOID extrasCreatePsListDialog(
     }
 
     g_WinObj.AuxDialogs[wobjPsListDlgId] = PsDlgContext.hwndDlg;
+
+    PsDlgContext.tlSubItemHit = -1;
 
     PsDlgContext.ListView = GetDlgItem(PsDlgContext.hwndDlg, IDC_PSLIST_LISTVIEW);
     PsDlgContext.StatusBar = GetDlgItem(PsDlgContext.hwndDlg, IDC_PSLIST_STATUSBAR);

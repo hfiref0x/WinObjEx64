@@ -4,9 +4,9 @@
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.91
+*  VERSION:     1.92
 *
-*  DATE:        10 Aug 2021
+*  DATE:        31 Oct 2021
 *
 *  Common header file for the user interface.
 *
@@ -49,8 +49,8 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 
 #define PROGRAM_MAJOR_VERSION       1
 #define PROGRAM_MINOR_VERSION       9
-#define PROGRAM_REVISION_NUMBER     1
-#define PROGRAM_BUILD_NUMBER        2108
+#define PROGRAM_REVISION_NUMBER     2
+#define PROGRAM_BUILD_NUMBER        2111
 
 #ifdef _USE_OWN_DRIVER
 #define PROGRAM_NAME            L"Windows Object Explorer 64-bit (Non-public version)"
@@ -66,11 +66,6 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 #define T_VIEWSD                L"View Security Descriptor..."
 #define T_RUNASADMIN            L"R&un as Administrator"
 #define T_RUNASSYSTEM           L"R&un as LocalSystem"
-#define T_COPYEPROCESS          L"Copy \"EPROCESS\""
-#define T_COPYOBJECT            L"Copy \"Object\""
-#define T_COPYVALUE             L"Copy \"Value\""
-#define T_COPYADDRESS           L"Copy \"Address\""
-#define T_COPYADDINFO           L"Copy \"Additional Information\""
 #define T_EXPORTTOFILE          L"Export List"
 #define T_JUMPTOFILE            L"Jump to File"
 #define T_DUMPDRIVER            L"Dump Driver"
@@ -136,14 +131,8 @@ typedef enum _WOBJ_DIALOGS_ID {
 extern HWND g_hwndObjectTree;
 extern HWND g_hwndObjectList;
 extern HIMAGELIST g_ListViewImages;
-extern HIMAGELIST g_ToolBarMenuImages;
 extern ATOM g_TreeListAtom;
 extern HTREEITEM g_SelectedTreeItem;
-
-//
-// Declared in propObjectDump.c
-//
-extern HWND g_TreeList;
 
 typedef struct _TL_SUBITEMS_FIXED {
     ULONG       ColorFlags;
@@ -245,8 +234,8 @@ typedef struct _VALUE_DESC {
 } VALUE_DESC, *PVALUE_DESC;
 
 typedef struct _WINSTA_DESC {
-    LPWSTR lpszWinSta;
-    LPWSTR lpszDesc;
+    LPCWSTR lpszWinSta;
+    LPCWSTR lpszDesc;
 } WINSTA_DESC, * PWINSTA_DESC;
 
 typedef struct _LVCOLUMNS_DATA {

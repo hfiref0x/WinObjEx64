@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTAPI.H
 *
-*  VERSION:     1.03
+*  VERSION:     1.92
 *
-*  DATE:        15 May 2021
+*  DATE:        13 Nov 2021
 *
 *  Windows SDK compatibility header.
 *
@@ -29,6 +29,10 @@
 #define sidTypeComputer 9
 #define sidTypeLabel 10
 #define sidTypeLogonSession 11
+
+#ifndef UFIELD_OFFSET
+#define UFIELD_OFFSET(type, field)    ((DWORD)(LONG_PTR)&(((type *)0)->field))
+#endif
 
 //
 // These constants are missing in Windows SDK 8.1
@@ -91,6 +95,14 @@
 
 #ifndef PF_AVX512F_INSTRUCTIONS_AVAILABLE
 #define PF_AVX512F_INSTRUCTIONS_AVAILABLE           41
+#endif
+
+#ifndef VER_SUITE_MULTIUSERTS
+#define VER_SUITE_MULTIUSERTS 0x00020000
+#endif
+
+#ifndef FILE_SUPPORTS_BLOCK_REFCOUNTING     
+#define FILE_SUPPORTS_BLOCK_REFCOUNTING             0
 #endif
 
 #ifndef _WIN32_WINNT_WIN10

@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASIPC.C
 *
-*  VERSION:     1.90
+*  VERSION:     1.92
 *
-*  DATE:        27 May 2021
+*  DATE:        03 Sep 2021
 *
 *  IPC supported: Pipes, Mailslots
 *
@@ -776,15 +776,17 @@ VOID IpcDlgHandlePopupMenu(
     hMenu = CreatePopupMenu();
     if (hMenu) {
 
+        InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_OBJECT_PROPERTIES, T_PROPERTIES);
+
         if (supListViewAddCopyValueItem(hMenu,
             Context->ListView,
             ID_OBJECT_COPY,
-            uPos,
+            uPos++,
             lpPoint,
             &Context->lvItemHit,
             &Context->lvColumnHit))
         {
-            InsertMenu(hMenu, ++uPos, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+            InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
         }
 
         InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_IPCLIST_REFRESH, T_VIEW_REFRESH);
@@ -816,7 +818,7 @@ INT_PTR CALLBACK IpcDlgProc(
     _In_  LPARAM lParam
 )
 {
-    INT dlgIndex;
+    INT dlgIndex, nSelected;
     EXTRASCONTEXT* pDlgContext;
 
     if (uMsg == g_WinObj.SettingsChangeMessage) {
@@ -886,6 +888,20 @@ INT_PTR CALLBACK IpcDlgProc(
                     pDlgContext->lvItemHit,
                     pDlgContext->lvColumnHit);
             }
+            break;
+
+        case ID_OBJECT_PROPERTIES:
+
+            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_IPCDLGCONTEXT);
+            if (pDlgContext) {
+                if (ListView_GetSelectedCount(pDlgContext->ListView)) {
+                    nSelected = ListView_GetSelectionMark(pDlgContext->ListView);
+                    if (nSelected >= 0) {
+                        IpcDlgShowProperties(nSelected, pDlgContext);
+                    }
+                }
+            }
+
             break;
 
         default:

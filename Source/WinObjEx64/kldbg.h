@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.91
+*  VERSION:     1.92
 *
-*  DATE:        27 July 2021
+*  DATE:        12 Nov 2021
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -19,6 +19,82 @@
 #pragma once
 
 #define IOCTL_KD_PASS_THROUGH CTL_CODE(FILE_DEVICE_UNKNOWN, 0x1, METHOD_NEITHER, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
+
+/******************************************************************************
+*
+* Object type versions
+* 
+* ALPC_PORT
+* DEVICE_MAP
+* DIRECTORY_OBJECT
+* DRIVER_EXTENSION
+* OBJECT_TYPE
+* OBJECT_SYMBOLIC_LINK
+* FLT_FILTER
+* 
+*******************************************************************************/
+
+// Structure version from W7 (7600)
+#define OBVERSION_ALPCPORT_V1  (1)
+// Structure version from W8 (9200)
+#define OBVERSION_ALPCPORT_V2  (2)
+// Structure version from W8 BLUE (9600)
+#define OBVERSION_ALPCPORT_V3  (3)
+// Structure version from W10 (10240)
+#define OBVERSION_ALPCPORT_V4  (4)
+
+// Structure version from W7 (7600) until W10 RS1
+#define OBVERSION_DEVICE_MAP_V1  (1)
+// Structure version from W10 RS1 (14393) until W11
+#define OBVERSION_DEVICE_MAP_V2  (2)
+// Structure version from W11 (22000)
+#define OBVERSION_DEVICE_MAP_V3  (3)
+
+// Structure version for W7-W8 BLUE (7600..9600)
+#define OBVERSION_DIRECTORY_V1 (1)
+// Structure version for W10 (10240..14393)
+#define OBVERSION_DIRECTORY_V2 (2)
+// Structure version for W10 (15063+)
+#define OBVERSION_DIRECTORY_V3 (3)
+
+// Public structure
+#define OBVERSION_DRIVER_EXTENSION_V1 (1)
+// Private, W7 (7600..7601)
+#define OBVERSION_DRIVER_EXTENSION_V2 (2)
+// Private, W8 (9200)
+#define OBVERSION_DRIVER_EXTENSION_V3 (3)
+// Private, since W8 BLUE (9600+)
+#define OBVERSION_DRIVER_EXTENSION_V4 (4)
+
+// Structure version W7 (7600..7601)
+#define OBVERSION_OBJECT_TYPE_V1 (1)
+// Structure version W8-W10 (9200..10586)
+#define OBVERSION_OBJECT_TYPE_V2 (2)
+// Structure version W10RS1 (14393)
+#define OBVERSION_OBJECT_TYPE_V3 (3)
+// Structure version W10RS2 (15063+)
+#define OBVERSION_OBJECT_TYPE_V4 (4)
+
+// Structure version W7-W8 BLUE (7600 - 9600)
+#define OBVERSION_OBJECT_SYMBOLIC_LINK_V1 (1)
+// Structure version W10 TH1/TH2 (10240..10586)
+#define OBVERSION_OBJECT_SYMBOLIC_LINK_V2 (2)
+// Structure version W10 RS1 (14393)
+#define OBVERSION_OBJECT_SYMBOLIC_LINK_V3 (3)
+// Structure version W10 RS3..21H1 (15063..19044)
+#define OBVERSION_OBJECT_SYMBOLIC_LINK_V4 (4)
+// Structure version W11 (22000)
+#define OBVERSION_OBJECT_SYMBOLIC_LINK_V5 (5)
+
+// Structure version W7 (7600 - 7601)
+#define OBVERSION_FLT_FILTER_V1 (1)
+// Structure version since W8 (9200..9600)
+#define OBVERSION_FLT_FILTER_V2 (2)
+// Structure version since W10 (10240+)
+#define OBVERSION_FLT_FILTER_V3 (3)
+// Structure version since W11
+#define OBVERSION_FLT_FILTER_V4 (4)
+
 
 #ifdef _USE_OWN_DRIVER
 #ifdef _USE_WINIO
@@ -39,6 +115,7 @@
 #define OBJECT_SHIFT 8
 
 #define KM_OBJECTS_ROOT_DIRECTORY  L"\\"
+#define OBJ_NAME_PATH_SEPARATOR L'\\'
 
 #define MM_SYSTEM_RANGE_START_7 0xFFFF080000000000
 #define MM_SYSTEM_RANGE_START_8 0xFFFF800000000000
@@ -51,6 +128,11 @@
 
 typedef ULONG_PTR *PUTable;
 
+#define OBP_ERROR_NAME_LITERAL L"<error>"
+#define OBP_ERROR_NAME_LITERAL_SIZE (sizeof(OBP_ERROR_NAME_LITERAL) - sizeof(UNICODE_NULL))
+#define OBP_ERROR_NONAME_LITERAL L"<noname>"
+#define OBP_ERROR_NONAME_LITERAL_SIZE (sizeof(OBP_ERROR_NONAME_LITERAL) - sizeof(UNICODE_NULL))
+
 //enum with information flags used by ObGetObjectHeaderOffset
 typedef enum _OBJ_HEADER_INFO_FLAG {
     HeaderCreatorInfoFlag = 0x1,
@@ -59,11 +141,6 @@ typedef enum _OBJ_HEADER_INFO_FLAG {
     HeaderQuotaInfoFlag = 0x8,
     HeaderProcessInfoFlag = 0x10
 } OBJ_HEADER_INFO_FLAG;
-
-typedef struct _OBJECT_COLLECTION {
-    LIST_ENTRY ListHead;
-    HANDLE Heap;
-} OBJECT_COLLECTION, *POBJECT_COLLECTION;
 
 typedef struct _OBHEADER_COOKIE {
     BOOLEAN Valid;
@@ -134,7 +211,7 @@ typedef struct _KLDBGCONTEXT {
 
     //index of directory type and root address
     USHORT DirectoryTypeIndex;
-    ULONG_PTR DirectoryRootAddress;
+    ULONG_PTR DirectoryRootObject;
 
     //kldbgdrv device handle
     HANDLE DeviceHandle;
@@ -156,12 +233,6 @@ typedef struct _KLDBGCONTEXT {
     //min/max user address
     ULONG_PTR MinimumUserModeAddress;
     ULONG_PTR MaximumUserModeAddress;
-
-    //objects collection
-    OBJECT_COLLECTION ObCollection;
-
-    //object list lock
-    CRITICAL_SECTION ObCollectionLock;
 
     PVOID NtOsSymContext;
 
@@ -263,8 +334,8 @@ typedef struct _W32K_API_SET_LOOKUP_PATTERN {
 } W32K_API_SET_LOOKUP_PATTERN, *PW32K_API_SET_LOOKUP_PATTERN;
 
 // return true to stop enumeration
-typedef BOOL(CALLBACK *PENUMERATE_COLLECTION_CALLBACK)(
-    _In_ POBJREF CollectionEntry,
+typedef BOOL(CALLBACK* PENUMERATE_PRIVATE_NAMESPACE_CALLBACK)(
+    _In_ POBJREF Entry,
     _In_opt_ PVOID Context
     );
 
@@ -288,7 +359,11 @@ NTSTATUS ObCopyBoundaryDescriptor(
 
 NTSTATUS ObEnumerateBoundaryDescriptorEntries(
     _In_ OBJECT_BOUNDARY_DESCRIPTOR *BoundaryDescriptor,
-    _In_opt_ PENUMERATE_BOUNDARY_DESCRIPTOR_CALLBACK Callback,
+    _In_ PENUMERATE_BOUNDARY_DESCRIPTOR_CALLBACK Callback,
+    _In_opt_ PVOID Context);
+
+BOOL ObEnumeratePrivateNamespaceTable(
+    _In_ PENUMERATE_PRIVATE_NAMESPACE_CALLBACK Callback,
     _In_opt_ PVOID Context);
 
 UCHAR ObDecodeTypeIndex(
@@ -325,16 +400,17 @@ PVOID ObDumpDriverExtensionVersionAware(
     _Out_ PULONG Size,
     _Out_ PULONG Version);
 
+PVOID ObDumpFltFilterObjectVersionAware(
+    _In_ ULONG_PTR ObjectAddress,
+    _Out_ PULONG Size,
+    _Out_ PULONG Version);
+
 POBJINFO ObQueryObject(
     _In_ LPWSTR lpDirectory,
     _In_ LPWSTR lpObjectName);
 
 POBJINFO ObQueryObjectByAddress(
     _In_ ULONG_PTR ObjectAddress);
-
-BOOL ObDumpTypeInfo(
-    _In_    ULONG_PTR ObjectAddress,
-    _Inout_ POBJECT_TYPE_COMPATIBLE ObjectTypeInfo);
 
 BOOL ObGetProcessImageFileName(
     _In_ ULONG_PTR ProcessObject,
@@ -346,36 +422,21 @@ BOOL ObGetProcessId(
 
 BOOL ObHeaderToNameInfoAddress(
     _In_    UCHAR ObjectInfoMask,
-    _In_    ULONG_PTR ObjectAddress,
-    _Inout_ PULONG_PTR HeaderAddress,
+    _In_    ULONG_PTR ObjectHeaderAddress,
+    _Inout_ PULONG_PTR HeaderInfoAddress,
     _In_    OBJ_HEADER_INFO_FLAG InfoFlag);
 
 BOOL ObHeaderToNameInfoAddressEx(
     _In_ UCHAR ObjectInfoMask,
-    _In_ ULONG_PTR ObjectAddress,
-    _Inout_ PULONG_PTR HeaderAddress,
+    _In_ ULONG_PTR ObjectHeaderAddress,
+    _Inout_ PULONG_PTR HeaderInfoAddress,
     _In_ BYTE DesiredHeaderBit);
-
-BOOL ObCollectionCreate(
-    _In_ POBJECT_COLLECTION Collection,
-    _In_ BOOL fNamespace,
-    _In_ BOOL Locked);
-
-VOID ObCollectionDestroy(
-    _In_ POBJECT_COLLECTION Collection);
-
-BOOL ObCollectionEnumerate(
-    _In_ POBJECT_COLLECTION Collection,
-    _In_ PENUMERATE_COLLECTION_CALLBACK Callback,
-    _In_opt_ PVOID Context);
-
-POBJREF ObCollectionFindByAddress(
-    _In_ POBJECT_COLLECTION Collection,
-    _In_ ULONG_PTR ObjectAddress,
-    _In_ BOOLEAN fNamespace);
 
 PVOID ObGetCallbackBlockRoutine(
     _In_ PVOID CallbackBlock);
+
+LPWSTR ObQueryFullNamespacePath(
+    _In_ ULONG_PTR ObjectAddress);
 
 BOOLEAN kdConnectDriver(
     VOID);
@@ -465,6 +526,12 @@ BOOL kdGetAddressFromSymbolEx(
     _In_ PVOID ImageBase,
     _In_ ULONG_PTR ImageSize,
     _Inout_ ULONG_PTR* Address);
+
+BOOLEAN kdDumpUnicodeString(
+    _In_ PUNICODE_STRING InputString,
+    _Out_ PUNICODE_STRING OutputString,
+    _Out_opt_ PVOID* ReferenceBufferPtr,
+    _In_ BOOLEAN IsKernelPtr);
 
 /*
 * ObGetObjectFastReference

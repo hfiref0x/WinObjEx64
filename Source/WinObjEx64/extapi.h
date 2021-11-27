@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       EXTAPI.H
 *
-*  VERSION:     1.86
+*  VERSION:     1.92
 *
-*  DATE:        26 May 2020
+*  DATE:        30 Oct 2021
 *
 *  Header for pre Windows10 missing API.
 *

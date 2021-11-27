@@ -246,6 +246,9 @@
     <ClCompile Include="symparser.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="hash.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc">
@@ -382,9 +385,6 @@
     <ClInclude Include="plugmngr.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\Shared\minirtl\minirtl.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\Shared\minirtl\rtltypes.h">
       <Filter>minirtl</Filter>
     </ClInclude>
@@ -444,6 +444,12 @@
     </ClInclude>
     <ClInclude Include="..\Shared\ntos\ntbuilds.h">
       <Filter>ntos</Filter>
+    </ClInclude>
+    <ClInclude Include="hash.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\minirtl\minirtl.h">
+      <Filter>minirtl</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.11
 *
-*  DATE:        01 June 2021
+*  DATE:        01 Oct 2021
 *
 *  Common header file for the Windows Object Explorer ApiSetView plugin.
 *

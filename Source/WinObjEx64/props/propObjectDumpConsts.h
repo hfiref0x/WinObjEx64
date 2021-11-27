@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMPCONSTS.H
 *
-*  VERSION:     1.90
+*  VERSION:     1.92
 *
-*  DATE:        11 May 2021
+*  DATE:        19 Sep 2021
 *
 *  Consts header file for structured object dumps.
 *
@@ -31,11 +31,12 @@
 #define FORMAT_HEXDWORD     L"0x%08X"
 #define FORMAT_HEXLONG      L"0x%08lX"
 #define FORMAT_ULONG        L"%u"
-#define FORMAT_LONG         L"%l"
-#define FORMAT_USHORT       L"0x%04u"
+#define FORMAT_USHORT       L"%04u"
 #define FORMAT_POINTER      L"0x%p"
 #define T_NULL              L"NULL"
 #define T_UNNAMED           L"Unnamed"
+
+#define T_GUID                      L"GUID"
 
 #define T_LIST_ENTRY                L"LIST_ENTRY"
 #define T_PLIST_ENTRY               L"PLIST_ENTRY"
@@ -85,11 +86,18 @@
 #define T_SEGMENT_FLAGS             L"SEGMENT_FLAGS"
 
 #define T_PFILE_OBJECT              L"PFILE_OBJECT"
+#define T_PDRIVER_OBJECT            L"PDRIVER_OBJECT"
 
+#define T_FILTER                    L"Filter"
 #define T_FLT_SERVER_PORT_OBJECT    L"FLT_SERVER_PORT_OBJECT"
 #define T_PFLT_FILTER               L"PFLT_FILTER"
 #define T_FLT_OBJECT                L"FLT_OBJECT"
+#define T_PFLTP_FRAME               L"PFLTP_FRAME"
 #define T_FLT_FILTER_FLAGS          L"FLT_FILTER_FLAGS"
+#define T_FLT_RESOURCE_LIST_HEAD    L"FLT_RESOURCE_LIST_HEAD"
+#define T_PFLT_VERIFIER_EXTENSION   L"PFLT_VERIFIER_EXTENSION"
+#define T_PALLOCATE_CONTEXT_HEADER  L"PALLOCATE_CONTEXT_HEADER"
+#define T_FLT_MUTEX_LIST_HEAD       L"FLT_MUTEX_LIST_HEAD"
 
 #define T_OBJECT_SYMBOLIC_LINK      L"OBJECT_SYMBOLIC_LINK"
 
@@ -112,18 +120,39 @@
 
 #define T_FIELD_SERVICE_KEYNAME     L"ServiceKeyName"
 
+#define T_DRIVEMAP                  L"DriveMap"
+#define T_DRIVETYPE                 L"DriveType"
+#define T_REFERENCECOUNT            L"ReferenceCount"
+#define T_SERVERSILO                L"ServerSilo"
+
 #define T_TIMER_NOTIFICATION        L"NotificationTimer"
 #define T_TIMER_SYNC                L"SynchronizationTimer"
 #define T_CHARACTERISTICS           L"Characteristics"
 #define T_FLAGS                     L"Flags"
 #define T_LENGTH                    L"Length"
 #define T_MAXIMUMLENGTH             L"MaximumLength"
+#define T_BUFFER                    L"Buffer"
 #define T_TYPEINDEX                 L"Index"
 #define T_REFNOTFOUND               L"! Reference not found"
 #define T_BADDRIVEROBJECT           L"! Bad DRIVER_OBJECT"
 #define T_INVALID_REQUEST           L"nt!IopInvalidDeviceRequest"
 
 #define T_PMI_SECTION_IMAGE_INFORMATION L"PMI_SECTION_IMAGE_INFORMATION"
+#define T_PFLT_OPERATION_REGISTRATION L"PFLT_OPERATION_REGISTRATION"
+#define T_EX_PUSH_LOCK_AUTO_EXPAND L"EX_PUSH_LOCK_AUTO_EXPAND"
+
+#define T_DEVICEMAP_DOSDEVICESDIRECTORY L"DosDevicesDirectory"
+#define T_DEVICEMAP_GLOBALDOSDEVICESDIRECTORY L"GlobalDosDevicesDirectory"
+#define T_DEVICEMAP_DOSDEVICESDIRECTORYHANDLE L"DosDevicesDirectoryHandle"
+
+#define MAX_KNONW_FLTOBJ_FLAGS 5
+static VALUE_DESC fltObjFlags[MAX_KNONW_FLTOBJ_FLAGS] = {
+    { L"FLT_OBFL_DRAINING", FLT_OBFL_DRAINING },
+    { L"FLT_OBFL_ZOMBIED", FLT_OBFL_ZOMBIED },
+    { L"FLT_OBFL_TYPE_INSTANCE", FLT_OBFL_TYPE_INSTANCE },
+    { L"FLT_OBFL_TYPE_FILTER", FLT_OBFL_TYPE_FILTER },
+    { L"FLT_OBFL_TYPE_VOLUME", FLT_OBFL_TYPE_VOLUME }
+};
 
 #define MAX_KNOWN_DRV_FLAGS 8
 static VALUE_DESC drvFlags[MAX_KNOWN_DRV_FLAGS] = {

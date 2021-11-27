@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTSUP.H
 *
-*  VERSION:     2.06
+*  VERSION:     2.09
 *
-*  DATE:        03 May 2021
+*  DATE:        14 Oct 2021
 *
 *  Common header file for the NT API support functions and definitions.
 *
@@ -173,7 +173,7 @@ BOOL ntsupQueryThreadWin32StartAddress(
 NTSTATUS ntsupOpenDirectory(
     _Out_ PHANDLE DirectoryHandle,
     _In_opt_ HANDLE RootDirectoryHandle,
-    _In_ LPWSTR DirectoryName,
+    _In_ LPCWSTR DirectoryName,
     _In_ ACCESS_MASK DesiredAccess);
 
 BOOL ntsupQueryProcessName(
@@ -192,6 +192,12 @@ NTSTATUS ntsupQueryProcessInformation(
     _In_ PROCESSINFOCLASS ProcessInformationClass,
     _Out_ PVOID* Buffer,
     _Out_opt_ PULONG ReturnLength,
+    _In_ PNTSUPMEMALLOC AllocMem,
+    _In_ PNTSUPMEMFREE FreeMem);
+
+NTSTATUS ntsupQueryProcessImageFileNameByProcessId(
+    _In_ HANDLE UniqueProcessId,
+    _Out_ PUNICODE_STRING ProcessImageFileName,
     _In_ PNTSUPMEMALLOC AllocMem,
     _In_ PNTSUPMEMFREE FreeMem);
 
@@ -219,6 +225,12 @@ NTSTATUS ntsupQuerySystemObjectInformationVariableSize(
     _Out_opt_ PULONG ReturnLength,
     _In_ PNTSUPMEMALLOC AllocMem,
     _In_ PNTSUPMEMFREE FreeMem);
+
+BOOLEAN ntsupQueryVsmProtectionInformation(
+    _Out_ PBOOLEAN pbDmaProtectionsAvailable,
+    _Out_ PBOOLEAN pbDmaProtectionsInUse,
+    _Out_ PBOOLEAN pbHardwareMbecAvailable,
+    _Out_ PBOOLEAN pbApicVirtualizationAvailable);
 
 BOOLEAN ntsupQueryHVCIState(
     _Out_ PBOOLEAN pbHVCIEnabled,

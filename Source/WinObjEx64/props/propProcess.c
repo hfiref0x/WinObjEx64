@@ -152,6 +152,7 @@ VOID ProcessShowProperties(
         //
         // Query process image filename and show shell properties dialog.
         //
+
         if (NT_SUCCESS(supQueryProcessImageFileNameWin32(processId, &pusFileName))) {
 
             if (pusFileName->Buffer && pusFileName->Length)

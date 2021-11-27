@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020
+*  (C) COPYRIGHT AUTHORS, 2020 - 2021
 *
 *  TITLE:       GLOBAL.H
 *
 *  VERSION:     1.00
 *
-*  DATE:        18 July 2020
+*  DATE:        01 Oct 2021
 *
 *  Common header file for the Windows Object Explorer ImageScope plugin.
 *
@@ -56,7 +56,7 @@
 
 //declared in main.c
 extern HINSTANCE g_ThisDLL;
-extern volatile BOOL g_PluginQuit;
+extern volatile DWORD g_PluginState;
 extern WINOBJEX_PLUGIN* g_Plugin;
 
 #ifdef _DEBUG

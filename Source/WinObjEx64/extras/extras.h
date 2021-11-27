@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRAS.H
 *
-*  VERSION:     1.90
+*  VERSION:     1.92
 *
-*  DATE:        11 May 2021
+*  DATE:        16 Sep 2021
 *
 *  Common header file for Extras dialogs.
 *
@@ -28,6 +28,7 @@ typedef struct _EXTRASCONTEXT {
     INT lvColumnCount;
     INT lvColumnHit;
     INT lvItemHit;
+    INT tlSubItemHit;
     BOOL bInverseSort;
     union {
         ULONG_PTR Reserved;

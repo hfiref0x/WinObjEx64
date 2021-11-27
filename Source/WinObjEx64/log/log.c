@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       LOG.C
 *
-*  VERSION:     1.87
+*  VERSION:     1.92
 *
-*  DATE:        29 June 2020
+*  DATE:        11 Oct 2021
 *
 *  Simplified log.
 *
@@ -187,7 +187,7 @@ BOOL CALLBACK LogViewerAddEntryCallback(
     FILETIME ConvertedTime;
     TIME_FIELDS TimeFields;
 
-    RtlZeroMemory(szTime, sizeof(szTime));
+    RtlSecureZeroMemory(szTime, sizeof(szTime));
 
     switch (Entry->Type) {
     case WOBJ_LOG_ENTRY_ERROR:

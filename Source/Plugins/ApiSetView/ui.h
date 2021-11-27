@@ -4,9 +4,9 @@
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.11
+*  VERSION:     1.12
 *
-*  DATE:        11 June 2021
+*  DATE:        30 Sep 2021
 *
 *  WinObjEx64 ApiSetView UI constants, definitions and includes.
 *
@@ -24,6 +24,7 @@
 
 #define DefaultSystemDpi            96
 #define WINOBJEX64_ICON_MAIN        174
+#define ID_OBJECT_COPY              40008
 
 #define T_EmptyString TEXT("")
 
@@ -39,6 +40,8 @@ typedef struct _GUI_CONTEXT {
     HANDLE PluginHeap;
     HANDLE WorkerThread;
     HICON WindowIcon;
+
+    INT tlSubItemHit;
 
     WCHAR SchemaFileName[MAX_PATH * 2];
 

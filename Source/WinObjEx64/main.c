@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.91
+*  VERSION:     1.92
 *
-*  DATE:        16 July 2021
+*  DATE:        12 Nov 2021
 *
 *  Program entry point and main window handler.
 *
@@ -299,8 +299,6 @@ VOID MainWindowOnRefresh(
 
     supSetWaitCursor(TRUE);
 
-    ObCollectionDestroy(&g_kdctx.ObCollection);
-
     supFreeSCMSnapshot(NULL);
     sapiFreeSnapshot();
 
@@ -386,7 +384,7 @@ LRESULT MainWindowHandleWMCommand(
 )
 {
     LPWSTR lpItemText;
-    HWND   hwndFocus;   
+    HWND   hwndFocus;
     WORD   ControlId = LOWORD(wParam);
 
     switch (ControlId) {
@@ -641,7 +639,7 @@ VOID MainWindowPopupMenuInsertViewSD(
 
         supSetMenuIcon(hMenu,
             ID_VIEW_SECURITYDESCRIPTOR,
-            (ULONG_PTR)hIcon);
+            hIcon);
 
         DestroyIcon(hIcon);
     }
@@ -667,7 +665,7 @@ VOID MainWindowHandleTreePopupMenu(
         InsertMenu(hMenu, 0, MF_BYCOMMAND, ID_OBJECT_PROPERTIES, T_PROPERTIES);
 
         supSetMenuIcon(hMenu, ID_OBJECT_PROPERTIES,
-            (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 0));
+            ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 0));
 
         MainWindowPopupMenuInsertViewSD(hMenu, 1);
 
@@ -704,7 +702,7 @@ VOID MainWindowHandleObjectPopupMenu(
     InsertMenu(hMenu, uPosition++, MF_BYCOMMAND, ID_OBJECT_PROPERTIES, T_PROPERTIES);
 
     supSetMenuIcon(hMenu, ID_OBJECT_PROPERTIES,
-        (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 0));
+        ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 0));
 
     objType = supObjectListGetObjectType(hwndlv, iItem);
 
@@ -721,11 +719,11 @@ VOID MainWindowHandleObjectPopupMenu(
         InsertMenu(hMenu, uPosition++, MF_BYCOMMAND, ID_OBJECT_GOTOLINKTARGET, T_GOTOLINKTARGET);
 
         supSetMenuIcon(hMenu, ID_OBJECT_GOTOLINKTARGET,
-            (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance,
+            ImageList_ExtractIcon(g_WinObj.hInstance,
                 g_ListViewImages,
                 g_TypeSymbolicLink.ImageIndex));
 
-        uGotoSymLinkEnable = MF_BYCOMMAND;
+        uGotoSymLinkEnable = MF_BYCOMMAND; //-V796
 
         //
         // Intentionally do not 'break' here.
@@ -845,8 +843,8 @@ LRESULT MainWindowHandleWMNotify(
 
             case LVN_ITEMCHANGED:
                 lvn = (LPNMLISTVIEW)lParam;
-                if ((lvn->uNewState & LVIS_SELECTED) && 
-                    !(lvn->uOldState & LVIS_SELECTED)) 
+                if ((lvn->uNewState & LVIS_SELECTED) &&
+                    !(lvn->uOldState & LVIS_SELECTED))
                 {
                     RtlSecureZeroMemory(&szItemString, sizeof(szItemString));
                     ListView_GetItemText(g_hwndObjectList, lvn->iItem, 0, szItemString, MAX_PATH);
@@ -1180,7 +1178,6 @@ DWORD WinObjInitGlobals(
         if (IsWine == FALSE) {
             RtlSetHeapInformation(g_WinObj.Heap, HeapEnableTerminationOnCorruption, NULL, 0);
         }
-        RtlInitializeCriticalSection(&g_WinObj.Lock);
 
         //
         // Remember %TEMP% directory.
@@ -1525,7 +1522,7 @@ UINT WinObjExMain()
                 //
                 hIcon = supGetStockIcon(SIID_SHIELD, SHGSI_ICON | SHGFI_SMALLICON);
                 if (hIcon)
-                    supSetMenuIcon(hMenu, ID_FILE_RUNASADMIN, (ULONG_PTR)hIcon);
+                    supSetMenuIcon(hMenu, ID_FILE_RUNASADMIN, hIcon);
 
             }
             else {
@@ -1549,7 +1546,7 @@ UINT WinObjExMain()
                             //
                             hIcon = supGetStockIcon(SIID_DESKTOPPC, SHGSI_ICON | SHGFI_SMALLICON);
                             if (hIcon)
-                                supSetMenuIcon(hMenu, ID_FILE_RUNASADMIN, (ULONG_PTR)hIcon);
+                                supSetMenuIcon(hMenu, ID_FILE_RUNASADMIN, hIcon);
 
                         }
                         else {
@@ -1606,25 +1603,25 @@ UINT WinObjExMain()
             LR_CREATEDIBSECTION);
 
         if (g_ToolBarMenuImages) {
-            supCreateToolbarButtons(hwndToolBar);
+            supCreateToolbarButtons(hwndToolBar, g_ToolBarMenuImages);
         }
 
         //set menu icons
         hMenu = GetSubMenu(GetMenu(MainWindow), IDMM_VIEW);
         if (hMenu && g_ToolBarMenuImages) {
             supSetMenuIcon(hMenu, ID_VIEW_REFRESH,
-                (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 1));
+                ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 1));
             supSetMenuIcon(hMenu, ID_VIEW_DISPLAYGRID,
-                (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 7));
+                ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 7));
         }
         hMenu = GetSubMenu(GetMenu(MainWindow), IDMM_OBJECT);
         if (hMenu && g_ListViewImages) {
 
             supSetMenuIcon(hMenu, ID_OBJECT_PROPERTIES,
-                (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 0));
+                ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 0));
 
             supSetMenuIcon(hMenu, ID_OBJECT_GOTOLINKTARGET,
-                (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance,
+                ImageList_ExtractIcon(g_WinObj.hInstance,
                     g_ListViewImages,
                     g_TypeSymbolicLink.ImageIndex));
         }
@@ -1632,8 +1629,9 @@ UINT WinObjExMain()
         //set object -> find object menu image
         hMenu = GetSubMenu(GetMenu(MainWindow), IDMM_FIND);
         if (hMenu && g_ToolBarMenuImages) {
+
             supSetMenuIcon(hMenu, ID_FIND_FINDOBJECT,
-                (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 2));
+                ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 2));
         }
 
         //
@@ -1646,23 +1644,23 @@ UINT WinObjExMain()
             // Pipes & mailslots images.
             //
             supSetMenuIcon(hMenu, ID_EXTRAS_MAILSLOTS,
-                (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 5));
+                ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 5));
             supSetMenuIcon(hMenu, ID_EXTRAS_PIPES,
-                (ULONG_PTR)ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 6));
+                ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 6));
 
             //
             // Process list menu image.
             //
             hIcon = supGetStockIcon(SIID_APPLICATION, SHGSI_ICON | SHGFI_SMALLICON);
             if (hIcon)
-                supSetMenuIcon(hMenu, ID_EXTRAS_PROCESSLIST, (ULONG_PTR)hIcon);
+                supSetMenuIcon(hMenu, ID_EXTRAS_PROCESSLIST, hIcon);
 
             //
             // Private namespaces menu image.
             //
             hIcon = supGetStockIcon(SIID_STACK, SHGSI_ICON | SHGFI_SMALLICON);
             if (hIcon)
-                supSetMenuIcon(hMenu, ID_EXTRAS_PRIVATENAMESPACES, (ULONG_PTR)hIcon);
+                supSetMenuIcon(hMenu, ID_EXTRAS_PRIVATENAMESPACES, hIcon);
 
         }
 
@@ -1674,7 +1672,7 @@ UINT WinObjExMain()
 
             hIcon = supGetStockIcon(SIID_HELP, SHGSI_ICON | SHGFI_SMALLICON);
             if (hIcon)
-                supSetMenuIcon(hMenu, ID_HELP_HELP, (ULONG_PTR)hIcon);
+                supSetMenuIcon(hMenu, ID_HELP_HELP, hIcon);
 
         }
 

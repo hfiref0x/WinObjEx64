@@ -97,17 +97,22 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Shared\minirtl\ultostr.c" />
+    <ClCompile Include="..\..\Shared\minirtl\_strcat.c" />
     <ClCompile Include="..\..\Shared\minirtl\_strcmpi.c" />
     <ClCompile Include="..\..\Shared\minirtl\_strcpy.c" />
+    <ClCompile Include="..\..\Shared\minirtl\_strend.c" />
     <ClCompile Include="..\..\Shared\minirtl\_strlen.c" />
     <ClCompile Include="..\..\Shared\minirtl\_strncmpi.c" />
+    <ClCompile Include="..\..\Shared\minirtl\_strncpy.c" />
     <ClCompile Include="..\..\Shared\minirtl\_strstri.c" />
+    <ClCompile Include="..\..\Shared\treelist\treelist.c" />
     <ClCompile Include="main.c" />
     <ClCompile Include="query.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Shared\minirtl\minirtl.h" />
     <ClInclude Include="..\..\Shared\minirtl\rtltypes.h" />
+    <ClInclude Include="..\..\Shared\treelist\treelist.h" />
     <ClInclude Include="..\plugin_def.h" />
     <ClInclude Include="global.h" />
     <ClInclude Include="query.h" />

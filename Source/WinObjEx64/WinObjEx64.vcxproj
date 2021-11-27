@@ -386,6 +386,7 @@
     <ClCompile Include="extras\extrasSSDT.c" />
     <ClCompile Include="extras\extrasUSD.c" />
     <ClCompile Include="findDlg.c" />
+    <ClCompile Include="hash.c" />
     <ClCompile Include="hde\hde64.c" />
     <ClCompile Include="instdrv.c" />
     <ClCompile Include="kldbg.c" />
@@ -445,6 +446,7 @@
     <ClInclude Include="extras\extrasUSD.h" />
     <ClInclude Include="findDlg.h" />
     <ClInclude Include="global.h" />
+    <ClInclude Include="hash.h" />
     <ClInclude Include="hde\hde64.h" />
     <ClInclude Include="hde\pstdint.h" />
     <ClInclude Include="hde\table64.h" />

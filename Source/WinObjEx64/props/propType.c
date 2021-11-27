@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPTYPE.C
 *
-*  VERSION:     1.90
+*  VERSION:     1.92
 *
-*  DATE:        11 May 2021
+*  DATE:        03 Sep 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -725,7 +725,12 @@ VOID propSetTypeInfo(
     // Driver info available, dump type.
     //
     if (pObject != NULL) {
-        bOkay = ObDumpTypeInfo(pObject->ObjectAddress, &ObjectTypeDump);
+        
+        bOkay = kdReadSystemMemoryEx(pObject->ObjectAddress, 
+            &ObjectTypeDump, 
+            sizeof(OBJECT_TYPE_COMPATIBLE), 
+            NULL);
+
         supHeapFree(pObject);
     }
 

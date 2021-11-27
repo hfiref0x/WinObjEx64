@@ -4,9 +4,9 @@
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     1.91
+*  VERSION:     1.92
 *
-*  DATE:        27 June 2021
+*  DATE:        13 Nov 2021
 *
 *  Test code used while debug.
 *
@@ -472,7 +472,6 @@ VOID TestWinsta(
     Context.lpObjectName = L"Winsta0";
 
     hWinsta = OpenWindowStation(L"WinSta0", FALSE, WINSTA_ALL_ACCESS);
-
     //hWinsta = supOpenWindowStationFromContext(&Context, FALSE, READ_CONTROL);
     if (hWinsta) {
         CloseWindowStation(hWinsta);
@@ -1094,8 +1093,34 @@ VOID TestSymbols()
     supHeapFree(pOutput);
 }
 
+#include <wtsapi32.h>
+#pragma comment(lib, "Wtsapi32.lib")
+
+VOID TestSessions()
+{
+    DWORD sessionsCount, i;
+    WTS_SESSION_INFO* pSessions;
+
+    if (WTSEnumerateSessions(WTS_CURRENT_SERVER_HANDLE, 
+        0, 
+        1, 
+        &pSessions, 
+        &sessionsCount))
+    {
+        for (i = 0; i < sessionsCount; i++) {
+            kdDebugPrint("Session %lu: %ws\n", pSessions[i].SessionId, pSessions[i].pWinStationName);
+        }
+        WTSFreeMemory(pSessions);
+    }
+}
+
 VOID TestCall()
 {
+    LPWSTR lpName = ObQueryFullNamespacePath(0xFFFFD9073578ED40);
+    if (lpName) {
+        DbgPrint("ObQueryFullNamespacePath>>%wS\n\n", lpName);
+        supHeapFree(lpName);
+    }
 }
 
 VOID TestStart(
@@ -1104,7 +1129,7 @@ VOID TestStart(
 {
     TestCall();
     //TestSectionControlArea();
-    TestSymbols();
+    //TestSymbols();
     //TestSectionImage();
     //TestShadowDirectory();
     //TestPsObjectSecurity();
@@ -1116,11 +1141,12 @@ VOID TestStart(
     //TestDebugObject();
     //TestMailslot();
     //TestPartition();
-    TestPrivateNamespace();
+    //TestPrivateNamespace();
     //TestIoCompletion();
-    //TestTimer();
+    TestTimer();
     //TestTransaction();
     //TestWinsta();
+    TestSessions();
     //TestThread();
     //PreHashTypes();
     //TestJob();

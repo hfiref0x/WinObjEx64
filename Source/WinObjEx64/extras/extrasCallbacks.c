@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASCALLBACKS.C
 *
-*  VERSION:     1.91
+*  VERSION:     1.92
 *
-*  DATE:        26 June 2021
+*  DATE:        10 Nov 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -263,198 +263,291 @@ static const WCHAR *CiCallbackNames[] = {
     L"CiSetCachedOriginClaim"//32
 };
 
-#define CI_CALLBACKS_NAMES_W7_COUNT 3
-static const BYTE CiCallbackIndexes_Win7[CI_CALLBACKS_NAMES_W7_COUNT] = { //Windows 7
-    3,  //CiValidateImageHeader
-    4,  //CiValidateImageData
-    2   //CiQueryInformation
+typedef enum _CiNameIds {
+    Id_CiSetFileCache = 0,
+    Id_CiGetFileCache,
+    Id_CiQueryInformation,
+    Id_CiValidateImageHeader,
+    Id_CiValidateImageData,
+    Id_CiHashMemory,
+    Id_KappxIsPackageFile,
+    Id_CiCompareSigningLevels,
+    Id_CiValidateFileAsImageType,
+    Id_CiRegisterSigningInformation,
+    Id_CiUnregisterSigningInformation,
+    Id_CiInitializePolicy,
+    Id_CiReleaseContext,
+    Id_XciUnknownCallback,
+    Id_CiGetStrongImageReference,
+    Id_CiHvciSetImageBaseAddress,
+    Id_CipQueryPolicyInformation,
+    Id_CiValidateDynamicCodePages,
+    Id_CiQuerySecurityPolicy,
+    Id_CiRevalidateImage,
+    Id_CiSetInformation,
+    Id_CiSetInformationProcess,
+    Id_CiGetBuildExpiryTime,
+    Id_CiCheckProcessDebugAccessPolicy,
+    Id_SIPolicyQueryPolicyInformation,
+    Id_SIPolicyQuerySecurityPolicy,
+    Id_CiSetUnlockInformation,
+    Id_CiGetCodeIntegrityOriginClaimForFileObject,
+    Id_CiDeleteCodeIntegrityOriginClaimMembers,
+    Id_CiDeleteCodeIntegrityOriginClaimForFileObject,
+    Id_CiHvciReportMmIncompatibility,
+    Id_CiCompareExistingSePool,
+    Id_CiSetCachedOriginClaim
+} CiNameIds;
+
+//
+// Callback name index arrays
+//
+
+//
+// Windows 7
+//
+static const BYTE CiCallbackIndexes_Win7[] = {
+    Id_CiCompareExistingSePool,
+    Id_CiValidateImageData,
+    Id_CiQueryInformation
 };
 
-#define CI_CALLBACK_NAMES_W8_COUNT 7
-static const BYTE CiCallbackIndexes_Win8[CI_CALLBACK_NAMES_W8_COUNT] = { //Windows 8
-    0,  //CiSetFileCache
-    1,  //CiGetFileCache
-    2,  //CiQueryInformation
-    3,  //CiValidateImageHeader
-    4,  //CiValidateImageData
-    5,  //CiHashMemory
-    6,  //KappxIsPackageFile
+//
+// Windows 8
+//
+static const BYTE CiCallbackIndexes_Win8[] = {
+    Id_CiSetFileCache,
+    Id_CiGetFileCache,
+    Id_CiQueryInformation,
+    Id_CiValidateImageHeader,
+    Id_CiValidateImageData,
+    Id_CiHashMemory,
+    Id_KappxIsPackageFile
 };
 
-#define CI_CALLBACK_NAMES_W81_COUNT 12
-static const BYTE CiCallbackIndexes_Win81[CI_CALLBACK_NAMES_W81_COUNT] = { //Windows 8.1
-    0,  //CiSetFileCache
-    1,  //CiGetFileCache
-    2,  //CiQueryInformation
-    3,  //CiValidateImageHeader
-    4,  //CiValidateImageData
-    5,  //CiHashMemory
-    6,  //KappxIsPackageFile
-    7,  //CiCompareSigningLevels
-    8,  //CiValidateFileAsImageType
-    9,  //CiRegisterSigningInformation
-    10, //CiUnregisterSigningInformation
-    11  //CiInitializePolicy
+//
+// Windows 8.1
+//
+static const BYTE CiCallbackIndexes_Win81[] = {
+    Id_CiSetFileCache,
+    Id_CiGetFileCache,
+    Id_CiQueryInformation,
+    Id_CiValidateImageHeader,
+    Id_CiValidateImageData,
+    Id_CiHashMemory,
+    Id_KappxIsPackageFile,
+    Id_CiCompareSigningLevels,
+    Id_CiValidateFileAsImageType,
+    Id_CiRegisterSigningInformation,
+    Id_CiUnregisterSigningInformation,
+    Id_CiInitializePolicy
 };
 
-#define CI_CALLBACK_NAMES_W10THRESHOLD_COUNT 18
-static const BYTE CiCallbackIndexes_Win10Threshold[CI_CALLBACK_NAMES_W10THRESHOLD_COUNT] = { //Windows 10 TH1/TH2
-    0,  //CiSetFileCache
-    1,  //CiGetFileCache
-    2,  //CiQueryInformation
-    3,  //CiValidateImageHeader
-    4,  //CiValidateImageData
-    5,  //CiHashMemory
-    6,  //KappxIsPackageFile
-    7,  //CiCompareSigningLevels
-    8,  //CiValidateFileAsImageType
-    9,  //CiRegisterSigningInformation
-    10, //CiUnregisterSigningInformation
-    11, //CiInitializePolicy
-    12, //CiReleaseContext
-    13, //Unknown XBOX
-    14, //CiGetStrongImageReference
-    15, //CiHvciSetImageBaseAddress
-    24, //SIPolicyQueryPolicyInformation
-    17  //CiValidateDynamicCodePages
+//
+// Windows 10 TH1/TH2
+//
+static const BYTE CiCallbackIndexes_Win10Threshold[] = {
+    Id_CiSetFileCache,
+    Id_CiGetFileCache,
+    Id_CiQueryInformation,
+    Id_CiValidateImageHeader,
+    Id_CiValidateImageData,
+    Id_CiHashMemory,
+    Id_KappxIsPackageFile,
+    Id_CiCompareSigningLevels,
+    Id_CiValidateFileAsImageType,
+    Id_CiRegisterSigningInformation,
+    Id_CiUnregisterSigningInformation,
+    Id_CiInitializePolicy,
+    Id_CiReleaseContext,
+    Id_XciUnknownCallback,
+    Id_CiGetStrongImageReference,
+    Id_CiHvciSetImageBaseAddress,
+    Id_SIPolicyQueryPolicyInformation,
+    Id_CiValidateDynamicCodePages
 };
 
-#define CI_CALLBACK_NAMES_W10RS1_COUNT 20
-static const BYTE CiCallbackIndexes_Win10RS1[CI_CALLBACK_NAMES_W10RS1_COUNT] = { //Windows 10 RS1
-    0,  //CiSetFileCache
-    1,  //CiGetFileCache
-    2,  //CiQueryInformation
-    3,  //CiValidateImageHeader
-    4,  //CiValidateImageData
-    5,  //CiHashMemory
-    6,  //KappxIsPackageFile
-    7,  //CiCompareSigningLevels
-    8,  //CiValidateFileAsImageType
-    9,  //CiRegisterSigningInformation
-    10, //CiUnregisterSigningInformation
-    11, //CiInitializePolicy
-    12, //CiReleaseContext
-    13, //Unknown XBOX
-    14, //CiGetStrongImageReference
-    15, //CiHvciSetImageBaseAddress
-    24, //SIPolicyQueryPolicyInformation
-    17, //CiValidateDynamicCodePages
-    25, //SIPolicyQuerySecurityPolicy
-    19  //CiRevalidateImage
+//
+// Windows 10 RS1
+//
+static const BYTE CiCallbackIndexes_Win10RS1[] = {
+    Id_CiSetFileCache,
+    Id_CiGetFileCache,
+    Id_CiQueryInformation,
+    Id_CiValidateImageHeader,
+    Id_CiValidateImageData,
+    Id_CiHashMemory,
+    Id_KappxIsPackageFile,
+    Id_CiCompareSigningLevels,
+    Id_CiValidateFileAsImageType,
+    Id_CiRegisterSigningInformation,
+    Id_CiUnregisterSigningInformation,
+    Id_CiInitializePolicy,
+    Id_CiReleaseContext,
+    Id_XciUnknownCallback,
+    Id_CiGetStrongImageReference,
+    Id_CiHvciSetImageBaseAddress,
+    Id_SIPolicyQueryPolicyInformation,
+    Id_CiValidateDynamicCodePages,
+    Id_SIPolicyQuerySecurityPolicy,
+    Id_CiRevalidateImage
 };
 
-#define CI_CALLBACK_NAMES_W10RS2_COUNT 22
-static const BYTE CiCallbackIndexes_Win10RS2[CI_CALLBACK_NAMES_W10RS2_COUNT] = { //Windows 10 RS2
-    0,  //CiSetFileCache
-    1,  //CiGetFileCache
-    2,  //CiQueryInformation
-    3,  //CiValidateImageHeader
-    4,  //CiValidateImageData
-    5,  //CiHashMemory
-    6,  //KappxIsPackageFile
-    7,  //CiCompareSigningLevels
-    8,  //CiValidateFileAsImageType
-    9,  //CiRegisterSigningInformation
-    10, //CiUnregisterSigningInformation
-    11, //CiInitializePolicy
-    12, //CiReleaseContext
-    13, //Unknown XBOX
-    14, //CiGetStrongImageReference
-    15, //CiHvciSetImageBaseAddress
-    16, //CipQueryPolicyInformation
-    17, //CiValidateDynamicCodePages
-    25, //SIPolicyQuerySecurityPolicy
-    19, //CiRevalidateImage
-    26, //CiSetUnlockInformation
-    22  //CiGetBuildExpiryTime
+//
+// Windows 10 RS2
+//
+static const BYTE CiCallbackIndexes_Win10RS2[] = {
+    Id_CiSetFileCache,
+    Id_CiGetFileCache,
+    Id_CiQueryInformation,
+    Id_CiValidateImageHeader,
+    Id_CiValidateImageData,
+    Id_CiHashMemory,
+    Id_KappxIsPackageFile,
+    Id_CiCompareSigningLevels,
+    Id_CiValidateFileAsImageType,
+    Id_CiRegisterSigningInformation,
+    Id_CiUnregisterSigningInformation,
+    Id_CiInitializePolicy,
+    Id_CiReleaseContext,
+    Id_XciUnknownCallback,
+    Id_CiGetStrongImageReference,
+    Id_CiHvciSetImageBaseAddress,
+    Id_CipQueryPolicyInformation,
+    Id_CiValidateDynamicCodePages,
+    Id_SIPolicyQuerySecurityPolicy,
+    Id_CiRevalidateImage,
+    Id_CiSetUnlockInformation,
+    Id_CiGetBuildExpiryTime
 };
 
-#define CI_CALLBACK_NAMES_W10RS3_COUNT 22
-static const BYTE CiCallbackIndexes_Win10RS3[CI_CALLBACK_NAMES_W10RS3_COUNT] = { //Windows 10 RS3
-    0,  //CiSetFileCache
-    1,  //CiGetFileCache
-    2,  //CiQueryInformation
-    3,  //CiValidateImageHeader
-    4,  //CiValidateImageData
-    5,  //CiHashMemory
-    6,  //KappxIsPackageFile
-    7,  //CiCompareSigningLevels
-    8,  //CiValidateFileAsImageType
-    9,  //CiRegisterSigningInformation
-    10, //CiUnregisterSigningInformation
-    11, //CiInitializePolicy
-    12, //CiReleaseContext
-    13, //Unknown XBOX
-    14, //CiGetStrongImageReference
-    15, //CiHvciSetImageBaseAddress
-    16, //CipQueryPolicyInformation
-    17, //CiValidateDynamicCodePages
-    18, //CiQuerySecurityPolicy
-    19, //CiRevalidateImage
-    20, //CiSetInformation
-    22  //CiGetBuildExpiryTime
+//
+// Windows 10 RS3
+//
+static const BYTE CiCallbackIndexes_Win10RS3[] = {
+    Id_CiSetFileCache,
+    Id_CiGetFileCache,
+    Id_CiQueryInformation,
+    Id_CiValidateImageHeader,
+    Id_CiValidateImageData,
+    Id_CiHashMemory,
+    Id_KappxIsPackageFile,
+    Id_CiCompareSigningLevels,
+    Id_CiValidateFileAsImageType,
+    Id_CiRegisterSigningInformation,
+    Id_CiUnregisterSigningInformation,
+    Id_CiInitializePolicy,
+    Id_CiReleaseContext,
+    Id_XciUnknownCallback,
+    Id_CiGetStrongImageReference,
+    Id_CiHvciSetImageBaseAddress,
+    Id_CipQueryPolicyInformation,
+    Id_CiValidateDynamicCodePages,
+    Id_CiQuerySecurityPolicy,
+    Id_CiRevalidateImage,
+    Id_CiSetInformation,
+    Id_CiGetBuildExpiryTime
 };
 
-#define CI_CALLBACK_NAMES_W10RS4_21H1_COUNT 24
-static const BYTE CiCallbackIndexes_Win10RS4_21H1[CI_CALLBACK_NAMES_W10RS4_21H1_COUNT] = { //Windows 10 RS4/RS5/19H1/19H2/20H1/20H2/21H1
-    0,  //CiSetFileCache
-    1,  //CiGetFileCache
-    2,  //CiQueryInformation
-    3,  //CiValidateImageHeader
-    4,  //CiValidateImageData
-    5,  //CiHashMemory
-    6,  //KappxIsPackageFile
-    7,  //CiCompareSigningLevels
-    8,  //CiValidateFileAsImageType
-    9,  //CiRegisterSigningInformation
-    10, //CiUnregisterSigningInformation
-    11, //CiInitializePolicy
-    12, //CiReleaseContext
-    13, //Unknown XBOX
-    14, //CiGetStrongImageReference
-    15, //CiHvciSetImageBaseAddress
-    16, //CipQueryPolicyInformation
-    17, //CiValidateDynamicCodePages
-    18, //CiQuerySecurityPolicy
-    19, //CiRevalidateImage
-    20, //CiSetInformation
-    21, //CiSetInformationProcess
-    22, //CiGetBuildExpiryTime
-    23  //CiCheckProcessDebugAccessPolicy
+//
+// Windows 10 RS4-21H2
+//
+static const BYTE CiCallbackIndexes_Win10RS4_21H2[] = {
+    Id_CiSetFileCache,
+    Id_CiGetFileCache,
+    Id_CiQueryInformation,
+    Id_CiValidateImageHeader,
+    Id_CiValidateImageData,
+    Id_CiHashMemory,
+    Id_KappxIsPackageFile,
+    Id_CiCompareSigningLevels,
+    Id_CiValidateFileAsImageType,
+    Id_CiRegisterSigningInformation,
+    Id_CiUnregisterSigningInformation,
+    Id_CiInitializePolicy,
+    Id_CiReleaseContext,
+    Id_XciUnknownCallback,
+    Id_CiGetStrongImageReference,
+    Id_CiHvciSetImageBaseAddress,
+    Id_CipQueryPolicyInformation,
+    Id_CiValidateDynamicCodePages,
+    Id_CiQuerySecurityPolicy,
+    Id_CiRevalidateImage,
+    Id_CiSetInformation,
+    Id_CiSetInformationProcess,
+    Id_CiGetBuildExpiryTime,
+    Id_CiCheckProcessDebugAccessPolicy
 };
 
-#define CI_CALLBACK_NAMES_W11_COUNT 30
-static const BYTE CiCallbackIndexes_Win11[CI_CALLBACK_NAMES_W11_COUNT] = { //Windows 11
-    0,  //CiSetFileCache
-    1,  //CiGetFileCache
-    2,  //CiQueryInformation
-    3,  //CiValidateImageHeader
-    4,  //CiValidateImageData
-    5,  //CiHashMemory
-    6,  //KappxIsPackageFile
-    7,  //CiCompareSigningLevels
-    8,  //CiValidateFileAsImageType
-    9,  //CiRegisterSigningInformation
-    10, //CiUnregisterSigningInformation
-    11, //CiInitializePolicy
-    12, //CiReleaseContext
-    13, //Unknown XBOX
-    14, //CiGetStrongImageReference
-    15, //CiHvciSetImageBaseAddress
-    16, //CipQueryPolicyInformation
-    17, //CiValidateDynamicCodePages
-    18, //CiQuerySecurityPolicy
-    19, //CiRevalidateImage
-    20, //CiSetInformation
-    21, //CiSetInformationProcess
-    22, //CiGetBuildExpiryTime
-    23, //CiCheckProcessDebugAccessPolicy
-    27, //CiGetCodeIntegrityOriginClaimForFileObject
-    28, //CiDeleteCodeIntegrityOriginClaimMembers
-    29, //CiDeleteCodeIntegrityOriginClaimForFileObject
-    30, //CiHvciReportMmIncompatibility
-    31, //CiCompareExistingSePool
-    32  //CiSetCachedOriginClaim
+//
+// Windows 11 21H2
+//
+static const BYTE CiCallbackIndexes_Win11[] = {
+    Id_CiSetFileCache,
+    Id_CiGetFileCache,
+    Id_CiQueryInformation,
+    Id_CiValidateImageHeader,
+    Id_CiValidateImageData,
+    Id_CiHashMemory,
+    Id_KappxIsPackageFile,
+    Id_CiCompareSigningLevels,
+    Id_CiValidateFileAsImageType,
+    Id_CiRegisterSigningInformation,
+    Id_CiUnregisterSigningInformation,
+    Id_CiInitializePolicy,
+    Id_CiReleaseContext,
+    Id_XciUnknownCallback,
+    Id_CiGetStrongImageReference,
+    Id_CiHvciSetImageBaseAddress,
+    Id_CipQueryPolicyInformation,
+    Id_CiValidateDynamicCodePages,
+    Id_CiQuerySecurityPolicy,
+    Id_CiRevalidateImage,
+    Id_CiSetInformation,
+    Id_CiSetInformationProcess,
+    Id_CiGetBuildExpiryTime,
+    Id_CiCheckProcessDebugAccessPolicy,
+    Id_CiGetCodeIntegrityOriginClaimForFileObject,
+    Id_CiDeleteCodeIntegrityOriginClaimMembers,
+    Id_CiDeleteCodeIntegrityOriginClaimForFileObject,
+    Id_CiHvciReportMmIncompatibility,
+    Id_CiCompareExistingSePool,
+    Id_CiSetCachedOriginClaim
+};
+
+//
+// Windows 11 Next
+//
+static const BYTE CiCallbackIndexes_Win11_Next[] = {
+    Id_CiSetFileCache,
+    Id_CiGetFileCache,
+    Id_CiQueryInformation,
+    Id_CiValidateImageHeader,
+    Id_CiValidateImageData,
+    Id_CiHashMemory,
+    Id_KappxIsPackageFile,
+    Id_CiCompareSigningLevels,
+    Id_CiValidateFileAsImageType,
+    Id_CiRegisterSigningInformation,
+    Id_CiUnregisterSigningInformation,
+    Id_CiInitializePolicy,
+    Id_CiReleaseContext,
+    Id_XciUnknownCallback,
+    Id_CiGetStrongImageReference,
+    Id_CiHvciSetImageBaseAddress,
+    Id_CipQueryPolicyInformation,
+    Id_CiQuerySecurityPolicy,
+    Id_CiRevalidateImage,
+    Id_CiSetInformation,
+    Id_CiSetInformationProcess,
+    Id_CiGetBuildExpiryTime,
+    Id_CiCheckProcessDebugAccessPolicy,
+    Id_CiGetCodeIntegrityOriginClaimForFileObject,
+    Id_CiDeleteCodeIntegrityOriginClaimMembers,
+    Id_CiDeleteCodeIntegrityOriginClaimForFileObject,
+    Id_CiHvciReportMmIncompatibility,
+    Id_CiCompareExistingSePool,
+    Id_CiSetCachedOriginClaim
 };
 
 /*
@@ -476,38 +569,38 @@ LPWSTR GetCiRoutineNameFromIndex(
     case NT_WIN7_RTM:
     case NT_WIN7_SP1:
         Indexes = CiCallbackIndexes_Win7;
-        ArrayCount = CI_CALLBACKS_NAMES_W7_COUNT;
+        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win7);
         break;
 
     case NT_WIN8_RTM:
         Indexes = CiCallbackIndexes_Win8;
-        ArrayCount = CI_CALLBACK_NAMES_W8_COUNT;
+        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win8);
         break;
 
     case NT_WIN8_BLUE:
         Indexes = CiCallbackIndexes_Win81;
-        ArrayCount = CI_CALLBACK_NAMES_W81_COUNT;
+        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win81);
         break;
 
     case NT_WIN10_THRESHOLD1:
     case NT_WIN10_THRESHOLD2:
         Indexes = CiCallbackIndexes_Win10Threshold;
-        ArrayCount = CI_CALLBACK_NAMES_W10THRESHOLD_COUNT;
+        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win10Threshold);
         break;
 
     case NT_WIN10_REDSTONE1:
         Indexes = CiCallbackIndexes_Win10RS1;
-        ArrayCount = CI_CALLBACK_NAMES_W10RS1_COUNT;
+        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win10RS1);
         break;
 
     case NT_WIN10_REDSTONE2:
         Indexes = CiCallbackIndexes_Win10RS2;
-        ArrayCount = CI_CALLBACK_NAMES_W10RS2_COUNT;
+        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win10RS2);
         break;
 
     case NT_WIN10_REDSTONE3:
         Indexes = CiCallbackIndexes_Win10RS3;
-        ArrayCount = CI_CALLBACK_NAMES_W10RS3_COUNT;
+        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win10RS3);
         break;
 
     case NT_WIN10_REDSTONE4:
@@ -517,12 +610,18 @@ LPWSTR GetCiRoutineNameFromIndex(
     case NT_WIN10_20H1:
     case NT_WIN10_20H2:
     case NT_WIN10_21H1:
-        Indexes = CiCallbackIndexes_Win10RS4_21H1;
-        ArrayCount = CI_CALLBACK_NAMES_W10RS4_21H1_COUNT;
+    case NT_WIN10_21H2:
+        Indexes = CiCallbackIndexes_Win10RS4_21H2;
+        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win10RS4_21H2);
         break;
-    default:
+    case NT_WIN11_21H2:
         Indexes = CiCallbackIndexes_Win11;
-        ArrayCount = CI_CALLBACK_NAMES_W11_COUNT;
+        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win11);
+        break;
+    case NTX_WIN11_ADB:
+    default:
+        Indexes = CiCallbackIndexes_Win11_Next;
+        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win11_Next);
         break;
     }
 
@@ -537,6 +636,38 @@ LPWSTR GetCiRoutineNameFromIndex(
 }
 
 /*
+* ComputeAddressInsideNtOs
+*
+* Purpose:
+*
+* Returns kernel variable computed address within ntoskrnl image or zero in case of error.
+*
+*/
+ULONG_PTR ComputeAddressInsideNtOs(
+    _In_ ULONG_PTR CodeBase,
+    _In_ ULONG_PTR Offset,
+    _In_ ULONG InstructionLength,
+    _In_ LONG Relative
+)
+{
+    ULONG_PTR address;
+
+    if (Relative == 0)
+        return 0;
+
+    address = kdAdjustAddressToNtOsBase(CodeBase, Offset, InstructionLength, Relative);
+
+    if (!IN_REGION(address,
+        g_kdctx.NtOsBase,
+        g_kdctx.NtOsSize))
+    {
+        return 0;
+    }
+
+    return address;
+}
+
+/*
 * FindCiCallbacks
 *
 * Purpose:
@@ -546,7 +677,7 @@ LPWSTR GetCiRoutineNameFromIndex(
 */
 OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
 {
-    ULONG_PTR kvarAddress = 0, Result = 0;
+    ULONG_PTR kvarAddress = 0;
 
     PBYTE   Signature = NULL, ptrCode = NULL, InstructionMatchPattern = NULL;
     ULONG   SignatureSize = 0, InstructionMatchLength;
@@ -558,9 +689,6 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
 
     LONG    Rel = 0;
     hde64s  hs;
-
-    ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
-    HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
 
     UNREFERENCED_PARAMETER(QueryFlags);
 
@@ -599,7 +727,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
             SectionBase = supLookupImageSectionByName(
                 PAGE_SECTION,
                 PAGE_SECTION_LEGNTH,
-                (PVOID)hNtOs,
+                g_kdctx.NtOsImageMap,
                 &SectionSize);
 
             if ((SectionBase == 0) || (SectionSize == 0))
@@ -652,18 +780,24 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
             case NT_WIN10_20H1:
             case NT_WIN10_20H2:
             case NT_WIN10_21H1:
-                Signature = SeCiCallbacksPattern_19H1_21H1;
-                SignatureSize = sizeof(SeCiCallbacksPattern_19H1_21H1);
-                InstructionMatchPattern = SeCiCallbacksMatchingPattern_19H1_21H1;
+            case NT_WIN10_21H2:
+                Signature = SeCiCallbacksPattern_19H1_21H2;
+                SignatureSize = sizeof(SeCiCallbacksPattern_19H1_21H2);
+                InstructionMatchPattern = SeCiCallbacksMatchingPattern_19H1_21H2;
                 InstructionMatchLength = 10; //mov
-                InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern_19H1_21H1);
+                InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern_19H1_21H2);
                 break;
+
+            case NT_WIN11_21H2:
             default:
-                Signature = SeCiCallbacksPattern_Next;
-                SignatureSize = sizeof(SeCiCallbacksPattern_Next);
-                InstructionMatchPattern = SeCiCallbacksMatchingPattern_19H1_21H1;
+                Signature = SeCiCallbacksPattern_W11_21H2;
+                if (g_NtBuildNumber > NT_WIN11_21H2) {
+                    SeCiCallbacksPattern_W11_21H2[2] = 0xEC; //test only, remove with proper find pattern mask support
+                }
+                SignatureSize = sizeof(SeCiCallbacksPattern_W11_21H2);
+                InstructionMatchPattern = SeCiCallbacksMatchingPattern_19H1_21H2;
                 InstructionMatchLength = 10; //mov
-                InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern_19H1_21H1);
+                InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern_19H1_21H2);
                 break;
             }
 
@@ -720,24 +854,16 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
 
             } while (Index < 64);
 
-            if (Rel == 0)
-                break;
+            kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
 
-            kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-            kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
-
-            if (!kdAddressInNtOsImage((PVOID)kvarAddress))
-                break;
         }
-
-        Result = kvarAddress;
 
     } while (FALSE);
 
-    if (Result == 0)
+    if (kvarAddress == 0)
         logAdd(WOBJ_LOG_ENTRY_WARNING, TEXT("Could not locate CiCallbacks"));
 
-    return Result;
+    return kvarAddress;
 }
 
 /*
@@ -763,9 +889,6 @@ BOOL FindIopFileSystemQueueHeads(
     ULONG_PTR kvarAddress = 0;
     PBYTE ptrCode;
     hde64s hs;
-
-    ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
-    HMODULE hNtOs = (HINSTANCE)g_kdctx.NtOsImageMap;
 
     //
     // Assume failure.
@@ -824,12 +947,8 @@ BOOL FindIopFileSystemQueueHeads(
     if (bSymQuerySuccess)
         return TRUE;
 
-    *IopCdRomFileSystemQueueHead = 0;
-    *IopDiskFileSystemQueueHead = 0;
-    *IopTapeFileSystemQueueHead = 0;
-    *IopNetworkFileSystemQueueHead = 0;
-
-    ptrCode = (PBYTE)GetProcAddress(hNtOs, "IoRegisterFileSystem");
+    ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, 
+        "IoRegisterFileSystem");
 
     if (ptrCode == NULL)
         return 0;
@@ -855,8 +974,9 @@ BOOL FindIopFileSystemQueueHeads(
                 {
                     Rel = *(PLONG)(ptrCode + Index + 3);
                     if (Rel) {
-                        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-                        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
+
+                        kvarAddress = kdAdjustAddressToNtOsBase((ULONG_PTR)ptrCode, Index, hs.len, Rel);
+
                         if (kdAddressInNtOsImage((PVOID)kvarAddress)) {
 
                             switch (Count) {
@@ -911,8 +1031,9 @@ BOOL FindIopFileSystemQueueHeads(
                 {
                     Rel = *(PLONG)(ptrCode + Index + 3);
                     if (Rel) {
-                        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-                        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
+
+                        kvarAddress = kdAdjustAddressToNtOsBase((ULONG_PTR)ptrCode, Index, hs.len, Rel);
+
                         if (kdAddressInNtOsImage((PVOID)kvarAddress)) {
 
                             switch (Count) {
@@ -972,9 +1093,6 @@ OBEX_FINDCALLBACK_ROUTINE(FindIopFsNotifyChangeQueueHead)
     PBYTE ptrCode;
     hde64s hs;
 
-    ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
-    HMODULE hNtOs = (HINSTANCE)g_kdctx.NtOsImageMap;
-
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
@@ -987,7 +1105,8 @@ OBEX_FINDCALLBACK_ROUTINE(FindIopFsNotifyChangeQueueHead)
 
     if (kvarAddress == 0) {
 
-        ptrCode = (PBYTE)GetProcAddress(hNtOs, "IoUnregisterFsRegistrationChange");
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, 
+            "IoUnregisterFsRegistrationChange");
 
         if (ptrCode == NULL)
             return 0;
@@ -1020,14 +1139,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindIopFsNotifyChangeQueueHead)
 
         } while (Index < 256);
 
-        if (Rel == 0)
-            return 0;
-
-        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
-
-        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
-            return 0;
+        kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
 
     }
 
@@ -1052,9 +1164,6 @@ OBEX_FINDCALLBACK_ROUTINE(FindRtlpDebugPrintCallbackList)
     PBYTE ptrCode;
     hde64s hs;
 
-    ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
-    HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
-
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
@@ -1067,7 +1176,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindRtlpDebugPrintCallbackList)
 
     if (kvarAddress == 0) {
 
-        ptrCode = (PBYTE)GetProcAddress(hNtOs, "DbgSetDebugPrintCallback");
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, "DbgSetDebugPrintCallback");
         if (ptrCode == NULL)
             return 0;
 
@@ -1137,14 +1246,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindRtlpDebugPrintCallbackList)
 
         } while (Index < 512);
 
-        if (Rel == 0)
-            return 0;
-
-        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
-
-        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
-            return 0;
+        kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
 
     }
 
@@ -1169,9 +1271,6 @@ OBEX_FINDCALLBACK_ROUTINE(FindPopRegisteredPowerSettingCallbacks)
     PBYTE ptrCode;
     hde64s hs;
 
-    ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
-    HMODULE hNtOs = (HINSTANCE)g_kdctx.NtOsImageMap;
-
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
@@ -1184,7 +1283,8 @@ OBEX_FINDCALLBACK_ROUTINE(FindPopRegisteredPowerSettingCallbacks)
 
     if (kvarAddress == 0) {
 
-        ptrCode = (PBYTE)GetProcAddress(hNtOs, "PoRegisterPowerSettingCallback");
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, 
+            "PoRegisterPowerSettingCallback");
 
         if (ptrCode == NULL)
             return 0;
@@ -1218,14 +1318,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindPopRegisteredPowerSettingCallbacks)
 
         } while (Index < 512);
 
-        if (Rel == 0)
-            return 0;
-
-        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
-
-        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
-            return 0;
+        kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
 
     }
 
@@ -1250,11 +1343,10 @@ OBEX_FINDCALLBACK_ROUTINE(FindSeFileSystemNotifyRoutinesHead)
     LONG Rel = 0;
     ULONG_PTR kvarAddress = 0;
     LPCWSTR lpVarName;
+    LPSTR lpCallbackName;
     PBYTE ptrCode;
     hde64s hs;
 
-    ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
-    HMODULE hNtOs = (HINSTANCE)g_kdctx.NtOsImageMap;
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
 
@@ -1275,12 +1367,13 @@ OBEX_FINDCALLBACK_ROUTINE(FindSeFileSystemNotifyRoutinesHead)
         // Routines have similar design.
         //
         if (Extended) {
-            ptrCode = (PBYTE)GetProcAddress(hNtOs, "SeRegisterLogonSessionTerminatedRoutineEx");
+            lpCallbackName = "SeRegisterLogonSessionTerminatedRoutineEx";
         }
         else {
-            ptrCode = (PBYTE)GetProcAddress(hNtOs, "SeRegisterLogonSessionTerminatedRoutine");
+            lpCallbackName = "SeRegisterLogonSessionTerminatedRoutine";
         }
 
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, lpCallbackName);
         if (ptrCode == NULL)
             return 0;
 
@@ -1312,14 +1405,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindSeFileSystemNotifyRoutinesHead)
 
         } while (Index < 128);
 
-        if (Rel == 0)
-            return 0;
-
-        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
-
-        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
-            return 0;
+        kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
 
     }
 
@@ -1401,15 +1487,15 @@ OBEX_FINDCALLBACK_ROUTINE(FindObjectTypeCallbackListHeadByType)
         // Calculate offset to structure field.
         //
         switch (ObjectVersion) {
-        case 1:
+        case OBVERSION_OBJECT_TYPE_V1:
             CallbackListOffset = FIELD_OFFSET(OBJECT_TYPE_7, CallbackList);
             break;
 
-        case 2:
+        case OBVERSION_OBJECT_TYPE_V2:
             CallbackListOffset = FIELD_OFFSET(OBJECT_TYPE_8, CallbackList);
             break;
 
-        case 3:
+        case OBVERSION_OBJECT_TYPE_V3:
             CallbackListOffset = FIELD_OFFSET(OBJECT_TYPE_RS1, CallbackList);
             break;
 
@@ -1444,11 +1530,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindIopNotifyShutdownQueueHeadHead)
     LONG Rel = 0;
     ULONG_PTR kvarAddress = 0;
     LPCWSTR lpVarName;
+    LPSTR lpCallbackName;
     PBYTE ptrCode;
     hde64s hs;
-
-    ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
-    HMODULE hNtOs = (HINSTANCE)g_kdctx.NtOsImageMap;
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
 
@@ -1469,12 +1553,13 @@ OBEX_FINDCALLBACK_ROUTINE(FindIopNotifyShutdownQueueHeadHead)
         // Routines have similar design.
         //
         if (bLastChance) {
-            ptrCode = (PBYTE)GetProcAddress(hNtOs, "IoRegisterLastChanceShutdownNotification");
+            lpCallbackName = "IoRegisterLastChanceShutdownNotification";
         }
         else {
-            ptrCode = (PBYTE)GetProcAddress(hNtOs, "IoRegisterShutdownNotification");
+            lpCallbackName = "IoRegisterShutdownNotification";
         }
 
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, lpCallbackName);
         if (ptrCode == NULL)
             return 0;
 
@@ -1501,14 +1586,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindIopNotifyShutdownQueueHeadHead)
 
         } while (Index < 128);
 
-        if (Rel == 0)
-            return 0;
-
-        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
-
-        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
-            return 0;
+        kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
 
     }
 
@@ -1534,9 +1612,6 @@ OBEX_FINDCALLBACK_ROUTINE(FindCmCallbackHead)
     PBYTE ptrCode;
     hde64s hs, hs_next;
 
-    ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
-    HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
-
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
@@ -1549,7 +1624,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindCmCallbackHead)
 
     if (kvarAddress == 0) {
 
-        ptrCode = (PBYTE)GetProcAddress(hNtOs, "CmUnRegisterCallback");
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, "CmUnRegisterCallback");
         if (ptrCode == NULL)
             return 0;
 
@@ -1598,14 +1673,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindCmCallbackHead)
 
         } while (Index < 256);
 
-        if (Rel == 0)
-            return 0;
-
-        kvarAddress = (ULONG_PTR)ptrCode + resultOffset + Rel;
-        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
-
-        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
-            return 0;
+        kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, resultOffset, 0, Rel);
 
     }
 
@@ -1630,9 +1698,6 @@ OBEX_FINDCALLBACK_ROUTINE(FindKeBugCheckReasonCallbackHead)
     PBYTE ptrCode;
     hde64s hs;
 
-    ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
-    HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
-
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
@@ -1645,7 +1710,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindKeBugCheckReasonCallbackHead)
 
     if (kvarAddress == 0) {
 
-        ptrCode = (PBYTE)GetProcAddress(hNtOs, "KeRegisterBugCheckReasonCallback");
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, 
+            "KeRegisterBugCheckReasonCallback");
+
         if (ptrCode == NULL)
             return 0;
 
@@ -1673,14 +1740,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindKeBugCheckReasonCallbackHead)
 
         } while (Index < 512);
 
-        if (Rel == 0)
-            return 0;
-
-        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
-
-        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
-            return 0;
+        kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
 
     }
 
@@ -1705,9 +1765,6 @@ OBEX_FINDCALLBACK_ROUTINE(FindKeBugCheckCallbackHead)
     PBYTE ptrCode;
     hde64s hs;
 
-    ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
-    HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
-
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
@@ -1720,7 +1777,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindKeBugCheckCallbackHead)
 
     if (kvarAddress == 0) {
 
-        ptrCode = (PBYTE)GetProcAddress(hNtOs, "KeRegisterBugCheckCallback");
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
+            "KeRegisterBugCheckCallback");
+
         if (ptrCode == NULL)
             return 0;
 
@@ -1748,14 +1807,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindKeBugCheckCallbackHead)
 
         } while (Index < 512);
 
-        if (Rel == 0)
-            return 0;
-
-        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
-
-        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
-            return 0;
+        kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
 
     }
 
@@ -1781,9 +1833,6 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspLoadImageNotifyRoutine)
     PBYTE ptrCode;
     hde64s hs;
 
-    ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
-    HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
-
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
@@ -1796,7 +1845,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspLoadImageNotifyRoutine)
 
     if (kvarAddress == 0) {
 
-        ptrCode = (PBYTE)GetProcAddress(hNtOs, "PsRemoveLoadImageNotifyRoutine");
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
+            "PsRemoveLoadImageNotifyRoutine");
+
         if (ptrCode == NULL)
             return 0;
 
@@ -1824,14 +1875,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspLoadImageNotifyRoutine)
 
         } while (Index < 128);
 
-        if (Rel == 0)
-            return 0;
-
-        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
-
-        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
-            return 0;
+        kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
 
     }
 
@@ -1857,9 +1901,6 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspCreateThreadNotifyRoutine)
     PBYTE ptrCode;
     hde64s hs;
 
-    ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
-    HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
-
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
@@ -1872,7 +1913,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspCreateThreadNotifyRoutine)
 
     if (kvarAddress == 0) {
 
-        ptrCode = (PBYTE)GetProcAddress(hNtOs, "PsRemoveCreateThreadNotifyRoutine");
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
+            "PsRemoveCreateThreadNotifyRoutine");
+
         if (ptrCode == NULL)
             return 0;
 
@@ -1899,14 +1942,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspCreateThreadNotifyRoutine)
 
         } while (Index < 128);
 
-        if (Rel == 0)
-            return 0;
-
-        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
-
-        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
-            return 0;
+        kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
 
     }
 
@@ -1931,9 +1967,6 @@ OBEX_FINDCALLBACK_ROUTINE(FindDbgkLmdCallbacks)
     PBYTE ptrCode;
     hde64s hs;
 
-    ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
-    HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
-
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
@@ -1946,7 +1979,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindDbgkLmdCallbacks)
 
     if (kvarAddress == 0) {
 
-        ptrCode = (PBYTE)GetProcAddress(hNtOs, "DbgkLkmdUnregisterCallback");
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
+            "DbgkLkmdUnregisterCallback");
+
         if (ptrCode == NULL)
             return 0;
 
@@ -1980,14 +2015,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindDbgkLmdCallbacks)
 
         } while (Index < 64);
 
-        if (Rel == 0)
-            return 0;
-
-        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
-
-        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
-            return 0;
+        kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
 
     }
 
@@ -2016,9 +2044,6 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspCreateProcessNotifyRoutine)
 
     UNREFERENCED_PARAMETER(QueryFlags);
 
-    ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
-    HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
-
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
 
         kdGetAddressFromSymbol(&g_kdctx,
@@ -2029,7 +2054,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspCreateProcessNotifyRoutine)
 
     if (kvarAddress == 0) {
 
-        ptrCode = (PBYTE)GetProcAddress(hNtOs, "PsSetCreateProcessNotifyRoutine");
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, 
+            "PsSetCreateProcessNotifyRoutine");
+
         if (ptrCode == NULL)
             return 0;
 
@@ -2083,14 +2110,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspCreateProcessNotifyRoutine)
 
         } while (Index < 128);
 
-        if (Rel == 0)
-            return 0;
-
-        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
-
-        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
-            return 0;
+        kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
 
     }
 
@@ -2111,9 +2131,6 @@ OBEX_FINDCALLBACK_ROUTINE(FindPsAltSystemCallHandlers)
 {
     ULONG_PTR kvarAddress = 0;
 
-    ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
-    HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
-
     ULONG   Index, InstructionExactMatchLength;
     PBYTE   ptrCode;
     LONG    Rel = 0;
@@ -2131,7 +2148,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindPsAltSystemCallHandlers)
 
     if (kvarAddress == 0) {
 
-        ptrCode = (PBYTE)GetProcAddress(hNtOs, "PsRegisterAltSystemCallHandler");
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
+            "PsRegisterAltSystemCallHandler");
+
         if (ptrCode == NULL)
             return 0;
 
@@ -2163,14 +2182,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindPsAltSystemCallHandlers)
 
         } while (Index < 128);
 
-        if (Rel == 0)
-            return 0;
-
-        kvarAddress = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-        kvarAddress = NtOsBase + kvarAddress - (ULONG_PTR)hNtOs;
-
-        if (!kdAddressInNtOsImage((PVOID)kvarAddress))
-            return 0;
+        kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
 
     }
 
@@ -2189,8 +2201,6 @@ OBEX_FINDCALLBACK_ROUTINE(FindPsAltSystemCallHandlers)
 */
 OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
 {
-    HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
-
     ULONG_PTR kvarAddress = 0;
     PBYTE   ptrCode;
     LONG    Rel = 0;
@@ -2209,7 +2219,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
 
     if (kvarAddress == 0) {
 
-        ptrCode = (PBYTE)GetProcAddress(hNtOs, "ExRegisterExtension");
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
+            "ExRegisterExtension");
+
         if (ptrCode == NULL)
             return 0;
 
@@ -2291,19 +2303,17 @@ OBEX_FINDCALLBACK_ROUTINE(FindExpCallbackListHead)
 {
     ULONG Index;
     LONG Rel;
-    ULONG_PTR Address;
     PBYTE ptrCode;
     hde64s hs;
-
-    ULONG_PTR NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
-    HMODULE hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
 
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (g_NtBuildNumber < NT_WIN8_BLUE)
         return 0;
 
-    ptrCode = (PBYTE)GetProcAddress(hNtOs, "ExCreateCallback");
+    ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
+        "ExCreateCallback");
+
     if (ptrCode == NULL)
         return 0;
 
@@ -2330,16 +2340,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindExpCallbackListHead)
 
     } while (Index < 512);
 
-    if (Rel == 0)
-        return 0;
-
-    Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-    Address = NtOsBase + Address - (ULONG_PTR)hNtOs;
-
-    if (!kdAddressInNtOsImage((PVOID)Address))
-        return 0;
-
-    return Address;
+    return ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
 }
 
 /*
@@ -4226,24 +4227,36 @@ VOID DisplayCallbacksList(
 *
 * Purpose:
 *
-* Callback treelist popup construction
+* Treelist popup construction
 *
 */
 VOID CallbacksDialogHandlePopupMenu(
-    _In_ HWND hwndDlg
+    _In_ HWND hwndDlg,
+    _In_ EXTRASCONTEXT* pDlgContext, 
+    _In_ LPARAM lParam
 )
 {
-    POINT pt1;
+    UINT uPos = 0;
     HMENU hMenu;
+    POINT pt1;
 
     if (GetCursorPos(&pt1) == FALSE)
         return;
 
     hMenu = CreatePopupMenu();
     if (hMenu) {
-        InsertMenu(hMenu, 0, MF_BYCOMMAND, ID_OBJECT_COPY, T_COPYADDRESS);
-        InsertMenu(hMenu, 1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-        InsertMenu(hMenu, 2, MF_BYCOMMAND, ID_VIEW_REFRESH, T_VIEW_REFRESH);
+        
+        if (supTreeListAddCopyValueItem(hMenu, 
+            pDlgContext->TreeList, 
+            ID_OBJECT_COPY, 
+            uPos++, 
+            lParam, 
+            &pDlgContext->tlSubItemHit)) 
+        {
+            InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+        }
+
+        InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_VIEW_REFRESH, T_VIEW_REFRESH);
 
         TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, hwndDlg, NULL);
         DestroyMenu(hMenu);
@@ -4280,33 +4293,6 @@ INT_PTR CallbacksDialogResize(
         SWP_NOZORDER);
 
     return 1;
-}
-
-/*
-* CallbacksDialogCopyAddress
-*
-* Purpose:
-*
-* Copy selected treelist item first column to clipboard.
-*
-*/
-VOID CallbacksDialogCopyAddress(
-    _In_ HWND TreeList
-)
-{
-    TVITEMEX    itemex;
-    WCHAR       szText[MAX_PATH + 1];
-
-    szText[0] = 0;
-    RtlSecureZeroMemory(&itemex, sizeof(itemex));
-    itemex.mask = TVIF_TEXT;
-    itemex.hItem = TreeList_GetSelection(TreeList);
-    itemex.pszText = szText;
-    itemex.cchTextMax = MAX_PATH;
-
-    if (TreeList_GetTreeItem(TreeList, &itemex, NULL)) {
-        supClipboardCopy(szText, sizeof(szText));
-    }
 }
 
 /*
@@ -4412,7 +4398,10 @@ INT_PTR CALLBACK CallbacksDialogProc(
         case ID_OBJECT_COPY:
             pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
             if (pDlgContext) {
-                CallbacksDialogCopyAddress(pDlgContext->TreeList);
+
+                supTreeListCopyItemValueToClipboard(pDlgContext->TreeList, 
+                    pDlgContext->tlSubItemHit);
+
             }
             break;
         case ID_VIEW_REFRESH:
@@ -4427,7 +4416,10 @@ INT_PTR CALLBACK CallbacksDialogProc(
         break;
 
     case WM_CONTEXTMENU:
-        CallbacksDialogHandlePopupMenu(hwndDlg);
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+            CallbacksDialogHandlePopupMenu(hwndDlg, pDlgContext, lParam);
+        }
         break;
 
     }
@@ -4464,6 +4456,8 @@ VOID extrasCreateCallbacksDialog(
     pDlgContext = (EXTRASCONTEXT*)supHeapAlloc(sizeof(EXTRASCONTEXT));
     if (pDlgContext == NULL)
         return;
+
+    pDlgContext->tlSubItemHit = -1;
 
     hwndDlg = CreateDialogParam(
         g_WinObj.hInstance,

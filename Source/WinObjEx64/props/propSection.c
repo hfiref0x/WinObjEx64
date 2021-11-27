@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPSECTION.C
 *
-*  VERSION:     1.90
+*  VERSION:     1.92
 *
-*  DATE:        12 May 2021
+*  DATE:        17 Sep 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -764,7 +764,15 @@ INT_PTR CALLBACK SectionPropertiesDialogProc(
     switch (uMsg) {
 
     case WM_CONTEXTMENU:
-        supObjectDumpHandlePopupMenu(hwndDlg);
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+            
+            supObjectDumpHandlePopupMenu(hwndDlg, 
+                pDlgContext->TreeList, 
+                &pDlgContext->tlSubItemHit, 
+                lParam);
+        
+        }
         break;
 
     case WM_COMMAND:
@@ -776,18 +784,8 @@ INT_PTR CALLBACK SectionPropertiesDialogProc(
         case ID_OBJECT_COPY:
             if (pDlgContext) {
 
-                supCopyTreeListSubItemValue(pDlgContext->TreeList,
-                    COLUMN_SECTION_VIEW_OBJECT);
-
-            }
-            break;
-
-        case ID_ADDINFO_COPY:
-            if (pDlgContext) {
-
-                supCopyTreeListSubItemValue(pDlgContext->TreeList,
-                    COLUMN_SECTION_VIEW_ADDRESS);
-
+                supTreeListCopyItemValueToClipboard(pDlgContext->TreeList,
+                    pDlgContext->tlSubItemHit);
             }
             break;
 
@@ -812,6 +810,7 @@ INT_PTR CALLBACK SectionPropertiesDialogProc(
             SetProp(hwndDlg, T_PROPCONTEXT, (HANDLE)pSheet->lParam);
             pDlgContext = (EXTRASCONTEXT*)supHeapAlloc(sizeof(EXTRASCONTEXT));
             if (pDlgContext) {
+                pDlgContext->tlSubItemHit = -1;
                 SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)pDlgContext);
                 SectionPropertiesCreate(hwndDlg, (PROP_OBJECT_INFO*)pSheet->lParam, pDlgContext);
             }

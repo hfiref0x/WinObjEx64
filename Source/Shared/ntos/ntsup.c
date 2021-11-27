@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTSUP.C
 *
-*  VERSION:     2.06
+*  VERSION:     2.10
 *
-*  DATE:        03 May 2021
+*  DATE:        31 Oct 2021
 *
 *  Native API support functions.
 *
@@ -511,7 +511,7 @@ BOOLEAN ntsupQueryUserModeAccessibleRange(
     ULONG     memIO = 0;
     SYSTEM_BASIC_INFORMATION sysBasicInfo;
 
-    RtlZeroMemory(&sysBasicInfo, sizeof(sysBasicInfo));
+    RtlSecureZeroMemory(&sysBasicInfo, sizeof(sysBasicInfo));
 
     ntStatus = NtQuerySystemInformation(
         SystemBasicInformation,
@@ -560,7 +560,7 @@ BOOLEAN ntsupIsKdEnabled(
     if (DebuggerNotPresent)
         *DebuggerNotPresent = FALSE;
 
-    RtlZeroMemory(&kdInfo, sizeof(kdInfo));
+    RtlSecureZeroMemory(&kdInfo, sizeof(kdInfo));
     
     ntStatus = NtQuerySystemInformation(
         SystemKernelDebuggerInformation,
@@ -582,7 +582,7 @@ BOOLEAN ntsupIsKdEnabled(
 
     if (DebuggerAllowed) {
 
-        RtlZeroMemory(&kdInfo, sizeof(kdInfo));
+        RtlSecureZeroMemory(&kdInfo, sizeof(kdInfo));
 
         ntStatus = NtQuerySystemInformation(
             SystemKernelDebuggerInformationEx,
@@ -938,7 +938,7 @@ BOOL ntsupQueryThreadWin32StartAddress(
 NTSTATUS ntsupOpenDirectory(
     _Out_ PHANDLE DirectoryHandle,
     _In_opt_ HANDLE RootDirectoryHandle,
-    _In_ LPWSTR DirectoryName,
+    _In_ LPCWSTR DirectoryName,
     _In_ ACCESS_MASK DesiredAccess
 )
 {
@@ -1053,6 +1053,54 @@ BOOL ntsupQueryProcessEntryById(
     } while (NextEntryDelta);
 
     return FALSE;
+}
+
+/*
+* ntsupQueryProcessImageFileNameByProcessId
+*
+* Purpose:
+*
+* Query image path for given process id in NT format.
+*
+* Use FreeMem to release allocated buffer.
+*
+*/
+NTSTATUS ntsupQueryProcessImageFileNameByProcessId(
+    _In_ HANDLE UniqueProcessId,
+    _Out_ PUNICODE_STRING ProcessImageFileName,
+    _In_ PNTSUPMEMALLOC AllocMem,
+    _In_ PNTSUPMEMFREE FreeMem
+)
+{
+    NTSTATUS ntStatus;
+    SYSTEM_PROCESS_ID_INFORMATION processData;
+
+    processData.ProcessId = UniqueProcessId;
+    processData.ImageName.Length = 0;
+    processData.ImageName.MaximumLength = 256;
+
+    do {
+
+        processData.ImageName.Buffer = (PWSTR)AllocMem(processData.ImageName.MaximumLength);
+        if (processData.ImageName.Buffer == NULL)
+            return STATUS_INSUFFICIENT_RESOURCES;
+
+        ntStatus = NtQuerySystemInformation(SystemProcessIdInformation,
+            (PVOID)&processData,
+            sizeof(SYSTEM_PROCESS_ID_INFORMATION),
+            NULL);
+
+        if (!NT_SUCCESS(ntStatus))
+            FreeMem(processData.ImageName.Buffer);
+
+    } while (ntStatus == STATUS_INFO_LENGTH_MISMATCH);
+
+    if (!NT_SUCCESS(ntStatus))
+        return ntStatus;
+
+    *ProcessImageFileName = processData.ImageName;
+
+    return ntStatus;
 }
 
 /*
@@ -1204,6 +1252,52 @@ NTSTATUS ntsupQuerySecurityInformation(
         ReturnLength,
         AllocMem,
         FreeMem);
+}
+
+/*
+* ntsupQueryVsmProtectionInformation
+*
+* Purpose:
+*
+* Query VSM protection information.
+*
+*/
+BOOLEAN ntsupQueryVsmProtectionInformation(
+    _Out_ PBOOLEAN pbDmaProtectionsAvailable,
+    _Out_ PBOOLEAN pbDmaProtectionsInUse,
+    _Out_ PBOOLEAN pbHardwareMbecAvailable,
+    _Out_ PBOOLEAN pbApicVirtualizationAvailable
+)
+{
+    NTSTATUS ntStatus;
+    ULONG returnLength;
+    SYSTEM_VSM_PROTECTION_INFORMATION svpi;
+
+    if (pbDmaProtectionsAvailable) *pbDmaProtectionsAvailable = FALSE;
+    if (pbDmaProtectionsInUse) *pbDmaProtectionsInUse = FALSE;
+    if (pbHardwareMbecAvailable) *pbHardwareMbecAvailable = FALSE;
+    if (pbApicVirtualizationAvailable) *pbApicVirtualizationAvailable = FALSE;
+
+    RtlSecureZeroMemory(&svpi, sizeof(SYSTEM_VSM_PROTECTION_INFORMATION));
+
+    ntStatus = NtQuerySystemInformation(
+        SystemVsmProtectionInformation,
+        &svpi,
+        sizeof(SYSTEM_VSM_PROTECTION_INFORMATION),
+        &returnLength);
+
+    if (NT_SUCCESS(ntStatus)) {
+        if (pbDmaProtectionsAvailable) *pbDmaProtectionsAvailable = svpi.DmaProtectionsAvailable;
+        if (pbDmaProtectionsInUse) *pbDmaProtectionsInUse = svpi.DmaProtectionsInUse;
+        if (pbHardwareMbecAvailable) *pbHardwareMbecAvailable = svpi.HardwareMbecAvailable;
+        if (pbApicVirtualizationAvailable) *pbApicVirtualizationAvailable = svpi.ApicVirtualizationAvailable;
+        return TRUE;
+    }
+    else {
+        RtlSetLastWin32Error(RtlNtStatusToDosError(ntStatus));
+    }
+
+    return FALSE;
 }
 
 /*

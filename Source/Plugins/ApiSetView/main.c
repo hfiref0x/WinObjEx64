@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.H
 *
-*  VERSION:     1.11
+*  VERSION:     1.13
 *
-*  DATE:        11 June 2021
+*  DATE:        01 Oct 2021
 *
 *  WinObjEx64 ApiSetView plugin.
 *
@@ -27,7 +27,160 @@ WINOBJEX_PLUGIN* g_Plugin = NULL;
 HINSTANCE g_ThisDLL = NULL;
 GUI_CONTEXT g_ctx;
 
-volatile BOOL g_PluginQuit = FALSE;
+volatile DWORD m_PluginState = PLUGIN_RUNNING;
+
+/*
+* ClipboardCopy
+*
+* Purpose:
+*
+* Copy text to the clipboard.
+*
+*/
+VOID ClipboardCopy(
+    _In_ LPWSTR lpText,
+    _In_ SIZE_T cbText
+)
+{
+    LPWSTR  lptstrCopy;
+    HGLOBAL hglbCopy;
+    SIZE_T  dwSize;
+
+    if (OpenClipboard(NULL)) {
+        EmptyClipboard();
+        dwSize = cbText + sizeof(UNICODE_NULL);
+        hglbCopy = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, dwSize);
+        if (hglbCopy != NULL) {
+            lptstrCopy = (LPWSTR)GlobalLock(hglbCopy);
+            if (lptstrCopy) {
+                RtlCopyMemory(lptstrCopy, lpText, cbText);
+            }
+            GlobalUnlock(hglbCopy);
+            if (!SetClipboardData(CF_UNICODETEXT, hglbCopy))
+                GlobalFree(hglbCopy);
+        }
+        CloseClipboard();
+    }
+}
+
+/*
+* TreeListCopyItemValueToClipboard
+*
+* Purpose:
+*
+* Copy selected treelist item text to the clipboard.
+*
+*/
+BOOL TreeListCopyItemValueToClipboard(
+    _In_ HWND hwndTreeList,
+    _In_ INT tlSubItemHit
+)
+{
+    INT         nIndex;
+    LPWSTR      lpCopyData = NULL;
+    SIZE_T      cbCopyData = 0;
+    TVITEMEX    itemex;
+    WCHAR       szText[MAX_PATH + 1];
+
+    TL_SUBITEMS_FIXED* pSubItems = NULL;
+
+    szText[0] = 0;
+    RtlSecureZeroMemory(&itemex, sizeof(itemex));
+    itemex.mask = TVIF_TEXT;
+    itemex.hItem = TreeList_GetSelection(hwndTreeList);
+    itemex.pszText = szText;
+    itemex.cchTextMax = MAX_PATH;
+
+    if (TreeList_GetTreeItem(hwndTreeList, &itemex, &pSubItems)) {
+
+        if ((tlSubItemHit > 0) && (pSubItems != NULL)) {
+
+            nIndex = (tlSubItemHit - 1);
+            if (nIndex < (INT)pSubItems->Count) {
+
+                lpCopyData = pSubItems->Text[nIndex];
+                cbCopyData = _strlen(lpCopyData) * sizeof(WCHAR);
+
+            }
+
+        }
+        else {
+            if (tlSubItemHit == 0) {
+                lpCopyData = szText;
+                cbCopyData = sizeof(szText);
+            }
+        }
+
+        if (lpCopyData && cbCopyData) {
+            ClipboardCopy(lpCopyData, cbCopyData);
+            return TRUE;
+        }
+        else {
+            if (OpenClipboard(NULL)) {
+                EmptyClipboard();
+                CloseClipboard();
+            }
+        }
+    }
+
+    return FALSE;
+}
+
+
+/*
+* TreeListAddCopyValueItem
+*
+* Purpose:
+*
+* Add copy to clipboard menu item depending on hit treelist header item.
+*
+*/
+BOOL TreeListAddCopyValueItem(
+    _In_ HMENU hMenu,
+    _In_ HWND hwndTreeList,
+    _In_ UINT uId,
+    _In_opt_ UINT uPos,
+    _In_ LPARAM lParam,
+    _In_ INT* pSubItemHit
+)
+{
+    HDHITTESTINFO hti;
+    HD_ITEM hdItem;
+    WCHAR szHeaderText[MAX_PATH + 1];
+    WCHAR szItem[MAX_PATH * 2];
+
+    *pSubItemHit = -1;
+
+    hti.iItem = -1;
+    hti.pt.x = LOWORD(lParam);
+    hti.pt.y = HIWORD(lParam);
+    ScreenToClient(hwndTreeList, &hti.pt);
+
+    hti.pt.y = 1;
+    if (TreeList_HeaderHittest(hwndTreeList, &hti) < 0)
+        return FALSE;
+
+    RtlSecureZeroMemory(&hdItem, sizeof(hdItem));
+
+    szHeaderText[0] = 0;
+    hdItem.mask = HDI_TEXT;
+
+    hdItem.cchTextMax = sizeof(szHeaderText) - 1;
+
+    hdItem.pszText = szHeaderText;
+    if (TreeList_GetHeaderItem(hwndTreeList, hti.iItem, &hdItem)) {
+        *pSubItemHit = hti.iItem;
+
+        _strcpy(szItem, TEXT("Copy \""));
+        _strcat(szItem, szHeaderText);
+        _strcat(szItem, TEXT("\""));
+        if (InsertMenu(hMenu, uPos, MF_BYCOMMAND, uId, szItem)) {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
 
 /*
 * ContextMenuHandler
@@ -39,25 +192,35 @@ volatile BOOL g_PluginQuit = FALSE;
 */
 VOID ContextMenuHandler(
     _In_ HWND hwndDlg,
+    _In_ HWND hwndTreeList,
     _In_ LPARAM lParam,
-    _In_ WPARAM wParam
+    _Inout_ INT* pSubItemHit
 )
 {
     POINT pt1;
     HMENU hMenu;
+    INT uPos = 0;
 
-    UNREFERENCED_PARAMETER(lParam);
-    UNREFERENCED_PARAMETER(wParam);
+    if (GetCursorPos(&pt1) == FALSE)
+        return;
 
-    if (GetCursorPos(&pt1)) {
-        hMenu = CreatePopupMenu();
-        if (hMenu) {
-            InsertMenu(hMenu, 0, MF_BYCOMMAND, IDC_BROWSE_BUTTON, TEXT("Select Schema File"));
-            InsertMenu(hMenu, 1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-            InsertMenu(hMenu, 2, MF_BYCOMMAND, ID_USE_SYSTEM_SCHEMA_FILE, TEXT("Use System Schema"));
-            TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, hwndDlg, NULL);
-            DestroyMenu(hMenu);
+    hMenu = CreatePopupMenu();
+    if (hMenu) {
+
+        if (TreeListAddCopyValueItem(hMenu,
+            hwndTreeList,
+            ID_OBJECT_COPY,
+            uPos++,
+            lParam,
+            pSubItemHit))
+        {
+            InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
         }
+        InsertMenu(hMenu, uPos++, MF_BYCOMMAND, IDC_BROWSE_BUTTON, TEXT("Select Schema File"));
+        InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+        InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_USE_SYSTEM_SCHEMA_FILE, TEXT("Use System Schema"));
+        TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, hwndDlg, NULL);
+        DestroyMenu(hMenu);
     }
 
 }
@@ -270,6 +433,7 @@ INT_PTR CALLBACK PluginDialogProc(
 
         g_ctx.MainWindow = hwndDlg;
         g_ctx.SearchEdit = GetDlgItem(hwndDlg, IDC_SEARCH_EDIT);
+        g_ctx.tlSubItemHit = -1;
 
         hIcon = LoadImage(
             g_ctx.ParamBlock.Instance,
@@ -297,6 +461,11 @@ INT_PTR CALLBACK PluginDialogProc(
 
         break;
 
+    case WM_CLOSE:
+        InterlockedExchange((PLONG)&m_PluginState, PLUGIN_STOP);
+        PostQuitMessage(0);
+        break;
+
     case WM_SHOWWINDOW:
         if (wParam) {
             CenterWindow(hwndDlg);
@@ -308,7 +477,12 @@ INT_PTR CALLBACK PluginDialogProc(
         break;
 
     case WM_CONTEXTMENU:
-        ContextMenuHandler(hwndDlg, lParam, wParam);
+
+        ContextMenuHandler(hwndDlg,
+            g_ctx.TreeList,
+            lParam,
+            &g_ctx.tlSubItemHit);
+
         break;
 
     case WM_NOTIFY:
@@ -372,18 +546,28 @@ INT_PTR CALLBACK PluginDialogProc(
 
         case IDOK:
         case IDCANCEL:
-            InterlockedExchange((LONG*)&g_PluginQuit, TRUE);
-            PostQuitMessage(0);
-            return EndDialog(hwndDlg, S_OK);
+            SendMessage(hwndDlg, WM_CLOSE, 0, 0);
+            return TRUE;
+
+        case ID_OBJECT_COPY:
+
+            TreeListCopyItemValueToClipboard(g_ctx.TreeList,
+                g_ctx.tlSubItemHit);
+
+            break;
+
 
         default:
             break;
         }
 
-    default:
         break;
+
+    default:
+        return FALSE;
     }
-    return 0;
+
+    return TRUE;
 }
 
 /*
@@ -431,8 +615,7 @@ DWORD WINAPI PluginThread(
     icex.dwICC = ICC_LISTVIEW_CLASSES | ICC_TREEVIEW_CLASSES;
     InitCommonControlsEx(&icex);
 
-    DialogBoxParam(
-        g_ThisDLL,
+    CreateDialogParam(g_ThisDLL,
         MAKEINTRESOURCE(IDD_ASDIALOG),
         NULL,
         PluginDialogProc,
@@ -447,7 +630,7 @@ DWORD WINAPI PluginThread(
         TranslateMessage(&msg1);
         DispatchMessage(&msg1);
 
-    } while (rv != 0 && g_PluginQuit == FALSE);
+    } while (rv != 0 && InterlockedAdd((PLONG)&m_PluginState, PLUGIN_RUNNING) == PLUGIN_RUNNING);
 
     PluginFreeGlobalResources();
 
@@ -470,7 +653,7 @@ NTSTATUS CALLBACK StartPlugin(
     NTSTATUS Status;
     WINOBJEX_PLUGIN_STATE State = PluginInitialization;
 
-    InterlockedExchange((PLONG)&g_PluginQuit, FALSE);
+    InterlockedExchange((PLONG)&m_PluginState, PLUGIN_RUNNING);
 
     RtlSecureZeroMemory(&g_ctx, sizeof(g_ctx));
 
@@ -520,7 +703,7 @@ void CALLBACK StopPlugin(
 )
 {
     if (g_ctx.WorkerThread) {
-        InterlockedExchange((PLONG)&g_PluginQuit, TRUE);//force stop
+        InterlockedExchange((PLONG)&m_PluginState, PLUGIN_STOP);//force stop
         if (WaitForSingleObject(g_ctx.WorkerThread, 1000) == WAIT_TIMEOUT) {
             TerminateThread(g_ctx.WorkerThread, 0);
         }

@@ -1,12 +1,12 @@
 /************************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017 - 2019, translated from Microsoft sources/debugger
+*  (C) COPYRIGHT AUTHORS, 2017 - 2021, translated from Microsoft sources/debugger
 *
 *  TITLE:       APISETX.H
 *
-*  VERSION:     1.06
+*  VERSION:     1.07
 *
-*  DATE:        11 May 2019
+*  DATE:        13 Nov 2021
 *
 *  Common header file for the ApiSetSchema definitions.
 *
@@ -27,11 +27,16 @@
 #define APISETX
 
 //
-// Copy-pasted from MS headers.
+// Copy-pasted from MS headers from the pre nerfed state.
 //
 
+#ifndef API_SET_SECTION_NAME
 #define API_SET_SECTION_NAME            ".apiset"
+#endif
+
+#ifndef API_SET_SCHEMA_SUFFIX
 #define API_SET_SCHEMA_SUFFIX           L".sys"
+#endif
 
 #define API_SET_PREFIX_API 0x2d004900500041 
 #define API_SET_PREFIX_EXT 0x2d005400580045
@@ -54,16 +59,27 @@
 #define API_SET_SCHEMA_ENTRY_FLAGS_SEALED        0x00000001UL
 #define API_SET_SCHEMA_ENTRY_FLAGS_EXTENSION     0x00000002UL
 
+#ifndef API_SET_SCHEMA_VERSION_V2
 #define API_SET_SCHEMA_VERSION_V2    2
+#endif
+
+#ifndef API_SET_SCHEMA_VERSION_V3
 #define API_SET_SCHEMA_VERSION_V3    3  //private
+#endif
+
+#ifndef API_SET_SCHEMA_VERSION_V4
 #define API_SET_SCHEMA_VERSION_V4    4
+#endif
+
+#ifndef API_SET_SCHEMA_VERSION_V6
 #define API_SET_SCHEMA_VERSION_V6    6
+#endif
 
 #define API_SET_EMPTY_NAMESPACE_VALUE(ValueEntry) \
     ((ValueEntry->ValueOffset == 0) && (ValueEntry->ValueLength == 0) && \
     (ValueEntry->NameOffset == 0) && (ValueEntry->NameLength == 0))
 
-#define APISET_TO_UPPER_PREFIX(x) ((x) & 0xFFFFFFDFFFDFFFDFULL)
+#define API_SET_TO_UPPER_PREFIX(x) ((x) & 0xFFFFFFDFFFDFFFDFULL)
 
 //
 // Macro for APISET structures.

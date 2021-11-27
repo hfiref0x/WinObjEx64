@@ -69,6 +69,11 @@ winobjex64\findDlg.h
 
 * Find Object routines including window dialog procedure
 
+winobjex64\hash.c
+winobjex64\hash.h
+
+* Hash support
+
 winobjex64\instdrv.c
 winobjex64\instdrv.h
 

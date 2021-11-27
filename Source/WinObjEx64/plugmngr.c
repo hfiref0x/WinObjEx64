@@ -4,9 +4,9 @@
 *
 *  TITLE:       PLUGMNGR.C
 *
-*  VERSION:     1.90
+*  VERSION:     1.92
 *
-*  DATE:        27 May 2021
+*  DATE:        31 Oct 2021
 *
 *  Plugin manager.
 *
@@ -728,17 +728,29 @@ VOID PmProcessEntry(
             //
 
             if (g_WinObj.IsWine && PluginEntry->Plugin.SupportWine == FALSE) {
-                MessageBox(ParentWindow, TEXT("This plugin does not support Wine"), PROGRAM_NAME, MB_ICONINFORMATION);
+                
+                MessageBox(ParentWindow, 
+                    TEXT("This plugin does not support Wine"), 
+                    PROGRAM_NAME, MB_ICONINFORMATION);
+
                 return;
             }
 
             if (PluginEntry->Plugin.NeedAdmin && g_kdctx.IsFullAdmin == FALSE) {
-                MessageBox(ParentWindow, TEXT("This plugin require administrator privileges"), PROGRAM_NAME, MB_ICONINFORMATION);
+                
+                MessageBox(ParentWindow, 
+                    TEXT("This plugin requires administrator privileges and cannot be run.\n\nIf your account is in an Administrator group make sure you run WinObjEx64 elevated."), 
+                    PROGRAM_NAME, MB_ICONINFORMATION);
+
                 return;
             }
 
             if (PluginEntry->Plugin.NeedDriver && g_kdctx.DriverOpenLoadStatus != STATUS_SUCCESS) {
-                MessageBox(ParentWindow, TEXT("This plugin require driver usage to run"), PROGRAM_NAME, MB_ICONINFORMATION);
+                
+                MessageBox(ParentWindow, 
+                    TEXT("This plugin requires driver usage to run"), 
+                    PROGRAM_NAME, MB_ICONINFORMATION);
+
                 return;
             }
 
@@ -750,7 +762,11 @@ VOID PmProcessEntry(
             if (PluginEntry->Plugin.Type == ContextPlugin) {
 
                 if (!PmpAllocateObjectData(ParentWindow, &ParamBlock.Object)) {
-                    MessageBox(ParentWindow, TEXT("Cannot allocate memory for plugin data"), PROGRAM_NAME, MB_ICONERROR);
+                    
+                    MessageBox(ParentWindow, 
+                        TEXT("Cannot allocate memory for plugin data"), 
+                        PROGRAM_NAME, MB_ICONERROR);
+                    
                     return;
                 }
             }

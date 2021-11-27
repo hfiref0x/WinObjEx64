@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.91
+*  VERSION:     1.92
 *
-*  DATE:        30 June 2021
+*  DATE:        13 Nov 2021
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -585,29 +585,29 @@ BYTE ObGetObjectHeaderOffsetEx(
 */
 BOOL ObHeaderToNameInfoAddressEx(
     _In_ UCHAR ObjectInfoMask,
-    _In_ ULONG_PTR ObjectAddress,
-    _Inout_ PULONG_PTR HeaderAddress,
+    _In_ ULONG_PTR ObjectHeaderAddress,
+    _Inout_ PULONG_PTR HeaderInfoAddress,
     _In_ BYTE DesiredHeaderBit
 )
 {
     BYTE      HeaderOffset;
     ULONG_PTR Address;
 
-    if (HeaderAddress == NULL)
+    if (HeaderInfoAddress == NULL)
         return FALSE;
 
-    if (ObjectAddress < g_kdctx.SystemRangeStart)
+    if (ObjectHeaderAddress < g_kdctx.SystemRangeStart)
         return FALSE;
 
     HeaderOffset = ObGetObjectHeaderOffsetEx(ObjectInfoMask, DesiredHeaderBit);
     if (HeaderOffset == 0)
         return FALSE;
 
-    Address = ObjectAddress - HeaderOffset;
+    Address = ObjectHeaderAddress - HeaderOffset;
     if (Address < g_kdctx.SystemRangeStart)
         return FALSE;
 
-    *HeaderAddress = Address;
+    *HeaderInfoAddress = Address;
     return TRUE;
 }
 
@@ -670,29 +670,29 @@ BYTE ObGetObjectHeaderOffset(
 */
 BOOL ObHeaderToNameInfoAddress(
     _In_ UCHAR ObjectInfoMask,
-    _In_ ULONG_PTR ObjectAddress,
-    _Inout_ PULONG_PTR HeaderAddress,
+    _In_ ULONG_PTR ObjectHeaderAddress,
+    _Inout_ PULONG_PTR HeaderInfoAddress,
     _In_ OBJ_HEADER_INFO_FLAG InfoFlag
 )
 {
     BYTE      HeaderOffset;
     ULONG_PTR Address;
 
-    if (HeaderAddress == NULL)
+    if (HeaderInfoAddress == NULL)
         return FALSE;
 
-    if (ObjectAddress < g_kdctx.SystemRangeStart)
+    if (ObjectHeaderAddress < g_kdctx.SystemRangeStart)
         return FALSE;
 
     HeaderOffset = ObGetObjectHeaderOffset(ObjectInfoMask, InfoFlag);
     if (HeaderOffset == 0)
         return FALSE;
 
-    Address = ObjectAddress - HeaderOffset;
+    Address = ObjectHeaderAddress - HeaderOffset;
     if (Address < g_kdctx.SystemRangeStart)
         return FALSE;
 
-    *HeaderAddress = Address;
+    *HeaderInfoAddress = Address;
     return TRUE;
 }
 
@@ -728,7 +728,7 @@ NTSTATUS ObIsValidUnicodeStringWorker(
             {
                 return STATUS_INVALID_PARAMETER;
             }
-            
+
             if (((SourceString->Length % sizeof(WCHAR)) != 0) ||
                 ((SourceString->MaximumLength % sizeof(WCHAR)) != 0) ||
                 (SourceString->Length > SourceString->MaximumLength) ||
@@ -900,7 +900,7 @@ BOOLEAN ObpValidateSidBuffer(
 */
 NTSTATUS ObEnumerateBoundaryDescriptorEntries(
     _In_ OBJECT_BOUNDARY_DESCRIPTOR* BoundaryDescriptor,
-    _In_opt_ PENUMERATE_BOUNDARY_DESCRIPTOR_CALLBACK Callback,
+    _In_ PENUMERATE_BOUNDARY_DESCRIPTOR_CALLBACK Callback,
     _In_opt_ PVOID Context
 )
 {
@@ -969,10 +969,8 @@ NTSTATUS ObEnumerateBoundaryDescriptorEntries(
             return GetExceptionCode();
         }
 
-        if (Callback) {
-            if (Callback(CurrentEntry, Context))
-                return STATUS_SUCCESS;
-        }
+        if (Callback(CurrentEntry, Context))
+            return STATUS_SUCCESS;
 
         CurrentEntry = NextEntry;
 
@@ -1045,22 +1043,22 @@ PVOID ObDumpObjectTypeVersionAware(
     case NT_WIN7_RTM:
     case NT_WIN7_SP1:
         objectSize = sizeof(OBJECT_TYPE_7);
-        objectVersion = 1;
+        objectVersion = OBVERSION_OBJECT_TYPE_V1;
         break;
     case NT_WIN8_RTM:
     case NT_WIN8_BLUE:
     case NT_WIN10_THRESHOLD1:
     case NT_WIN10_THRESHOLD2:
         objectSize = sizeof(OBJECT_TYPE_8);
-        objectVersion = 2;
+        objectVersion = OBVERSION_OBJECT_TYPE_V2;
         break;
     case NT_WIN10_REDSTONE1:
         objectSize = sizeof(OBJECT_TYPE_RS1);
-        objectVersion = 3;
+        objectVersion = OBVERSION_OBJECT_TYPE_V3;
         break;
     default:
         objectSize = sizeof(OBJECT_TYPE_RS2);
-        objectVersion = 4;
+        objectVersion = OBVERSION_OBJECT_TYPE_V4;
         break;
     }
 
@@ -1094,19 +1092,19 @@ PVOID ObDumpAlpcPortObjectVersionAware(
     case NT_WIN7_RTM:
     case NT_WIN7_SP1:
         objectSize = sizeof(ALPC_PORT_7600);
-        objectVersion = 1;
+        objectVersion = OBVERSION_ALPCPORT_V1;
         break;
     case NT_WIN8_RTM:
         objectSize = sizeof(ALPC_PORT_9200);
-        objectVersion = 2;
+        objectVersion = OBVERSION_ALPCPORT_V2;
         break;
     case NT_WIN8_BLUE:
         objectSize = sizeof(ALPC_PORT_9600);
-        objectVersion = 3;
+        objectVersion = OBVERSION_ALPCPORT_V3;
         break;
     default:
         objectSize = sizeof(ALPC_PORT_10240);
-        objectVersion = 4;
+        objectVersion = OBVERSION_ALPCPORT_V4;
         break;
     }
 
@@ -1143,19 +1141,19 @@ PVOID ObDumpDirectoryObjectVersionAware(
     case NT_WIN8_RTM:
     case NT_WIN8_BLUE:
         objectSize = sizeof(OBJECT_DIRECTORY);
-        objectVersion = 1;
+        objectVersion = OBVERSION_DIRECTORY_V1;
         break;
 
     case NT_WIN10_THRESHOLD1:
     case NT_WIN10_THRESHOLD2:
     case NT_WIN10_REDSTONE1:
         objectSize = sizeof(OBJECT_DIRECTORY_V2);
-        objectVersion = 2;
+        objectVersion = OBVERSION_DIRECTORY_V2;
         break;
 
     default:
         objectSize = sizeof(OBJECT_DIRECTORY_V3);
-        objectVersion = 3;
+        objectVersion = OBVERSION_DIRECTORY_V3;
         break;
     }
 
@@ -1191,16 +1189,16 @@ PVOID ObDumpSymbolicLinkObjectVersionAware(
     case NT_WIN8_RTM:
     case NT_WIN8_BLUE:
         objectSize = sizeof(OBJECT_SYMBOLIC_LINK_V1);
-        objectVersion = 1;
+        objectVersion = OBVERSION_OBJECT_SYMBOLIC_LINK_V1;
         break;
     case NT_WIN10_THRESHOLD1:
     case NT_WIN10_THRESHOLD2:
         objectSize = sizeof(OBJECT_SYMBOLIC_LINK_V2);
-        objectVersion = 2;
+        objectVersion = OBVERSION_OBJECT_SYMBOLIC_LINK_V2;
         break;
     case NT_WIN10_REDSTONE1:
         objectSize = sizeof(OBJECT_SYMBOLIC_LINK_V3);
-        objectVersion = 3;
+        objectVersion = OBVERSION_OBJECT_SYMBOLIC_LINK_V3;
         break;
     case NT_WIN10_REDSTONE2:
     case NT_WIN10_REDSTONE3:
@@ -1211,12 +1209,14 @@ PVOID ObDumpSymbolicLinkObjectVersionAware(
     case NT_WIN10_20H1:
     case NT_WIN10_20H2:
     case NT_WIN10_21H1:
+    case NT_WIN10_21H2:
         objectSize = sizeof(OBJECT_SYMBOLIC_LINK_V4);
-        objectVersion = 4;
+        objectVersion = OBVERSION_OBJECT_SYMBOLIC_LINK_V4;
         break;
+    case NT_WIN11_21H2:
     default:
         objectSize = sizeof(OBJECT_SYMBOLIC_LINK_V5);
-        objectVersion = 5;
+        objectVersion = OBVERSION_OBJECT_SYMBOLIC_LINK_V5;
         break;
     }
 
@@ -1246,22 +1246,23 @@ PVOID ObDumpDeviceMapVersionAware(
     ULONG objectSize = 0;
     ULONG objectVersion = 0;
 
-    switch (g_NtBuildNumber) {
-    case NT_WIN7_RTM:
-    case NT_WIN7_SP1:
-    case NT_WIN8_RTM:
-    case NT_WIN8_BLUE:
-    case NT_WIN10_THRESHOLD1:
-    case NT_WIN10_THRESHOLD2:
+    if (g_NtBuildNumber >= NT_WIN7_RTM &&
+        g_NtBuildNumber < NT_WIN10_REDSTONE1)
+    {
         objectSize = sizeof(DEVICE_MAP_V1);
-        objectVersion = 1;
-        break;
-    case NT_WIN10_REDSTONE1:
-    default:
-        objectSize = sizeof(DEVICE_MAP_V2);
-        objectVersion = 2;
-        break;
+        objectVersion = OBVERSION_DEVICE_MAP_V1;
     }
+    else
+        if (g_NtBuildNumber >= NT_WIN10_REDSTONE1 &&
+            g_NtBuildNumber < NT_WIN11_21H2)
+        {
+            objectSize = sizeof(DEVICE_MAP_V2);
+            objectVersion = OBVERSION_DEVICE_MAP_V2;
+        }
+        else {
+            objectSize = sizeof(DEVICE_MAP_V3);
+            objectVersion = OBVERSION_DEVICE_MAP_V3;
+        }
 
     return ObpDumpObjectWithSpecifiedSize(ObjectAddress,
         objectSize,
@@ -1291,7 +1292,7 @@ PVOID ObDumpDriverExtensionVersionAware(
 
     if (g_NtBuildNumber >= NT_WIN8_BLUE) {
         objectSize = sizeof(DRIVER_EXTENSION_V4);
-        objectVersion = 4;
+        objectVersion = OBVERSION_DRIVER_EXTENSION_V4;
     }
     else {
 
@@ -1299,15 +1300,15 @@ PVOID ObDumpDriverExtensionVersionAware(
         case NT_WIN7_RTM:
         case NT_WIN7_SP1:
             objectSize = sizeof(DRIVER_EXTENSION_V2);
-            objectVersion = 2;
+            objectVersion = OBVERSION_DRIVER_EXTENSION_V2;
             break;
         case NT_WIN8_RTM:
             objectSize = sizeof(DRIVER_EXTENSION_V3);
-            objectVersion = 3;
+            objectVersion = OBVERSION_DRIVER_EXTENSION_V3;
             break;
         default:
             objectSize = sizeof(DRIVER_EXTENSION);
-            objectVersion = 1;
+            objectVersion = OBVERSION_DRIVER_EXTENSION_V1;
             break;
         }
     }
@@ -1317,6 +1318,133 @@ PVOID ObDumpDriverExtensionVersionAware(
         objectVersion,
         Size,
         Version);
+}
+
+/*
+* ObDumpFltFilterObjectVersionAware
+*
+* Purpose:
+*
+* Return dumped FLT_FILTER structure version aware.
+*
+* Use supVirtualFree to free returned buffer.
+*
+*/
+PVOID ObDumpFltFilterObjectVersionAware(
+    _In_ ULONG_PTR ObjectAddress,
+    _Out_ PULONG Size,
+    _Out_ PULONG Version
+)
+{
+    ULONG objectSize = 0;
+    ULONG objectVersion = 0;
+
+    if (g_NtBuildNumber >= NT_WIN7_RTM &&
+        g_NtBuildNumber <= NT_WIN7_SP1)
+    {
+        objectSize = sizeof(FLT_FILTER_V1);
+        objectVersion = OBVERSION_FLT_FILTER_V1;
+    }
+    else if (g_NtBuildNumber >= NT_WIN8_RTM &&
+        g_NtBuildNumber <= NT_WIN8_BLUE)
+    {
+        objectSize = sizeof(FLT_FILTER_V2);
+        objectVersion = OBVERSION_FLT_FILTER_V2;
+    }
+    else if (g_NtBuildNumber >= NT_WIN10_THRESHOLD1 &&
+        g_NtBuildNumber < NT_WIN11_21H2)
+    {
+        objectSize = sizeof(FLT_FILTER_V3);
+        objectVersion = OBVERSION_FLT_FILTER_V3;
+    }
+    else {
+        objectSize = sizeof(FLT_FILTER_V4);
+        objectVersion = OBVERSION_FLT_FILTER_V4;
+    }
+
+    return ObpDumpObjectWithSpecifiedSize(ObjectAddress,
+        objectSize,
+        objectVersion,
+        Size,
+        Version);
+}
+
+/*
+* kdDumpUnicodeString
+*
+* Purpose:
+*
+* Dump UNICODE_STRING from kernel space.
+*
+*/
+BOOLEAN kdDumpUnicodeString(
+    _In_ PUNICODE_STRING InputString,
+    _Out_ PUNICODE_STRING OutputString,
+    _Out_opt_ PVOID* ReferenceBufferPtr,
+    _In_ BOOLEAN IsKernelPtr
+)
+{
+    ULONG readBytes = 0;
+    SIZE_T dumpSize;
+    LPWSTR lpStringBuffer;
+    UNICODE_STRING uStr;
+
+    OutputString->Buffer = NULL;
+    OutputString->Length = 0;
+    OutputString->MaximumLength = 0;
+
+    if (ReferenceBufferPtr)
+        *ReferenceBufferPtr = NULL;
+
+    RtlInitEmptyUnicodeString(&uStr, NULL, 0);
+
+    if (IsKernelPtr) {
+
+        if (kdReadSystemMemoryEx((ULONG_PTR)InputString,
+            &uStr,
+            sizeof(UNICODE_STRING),
+            &readBytes))
+        {
+            if (readBytes != sizeof(UNICODE_STRING))
+                return FALSE;
+        }
+    }
+    else {
+
+        uStr.Buffer = InputString->Buffer;
+        uStr.Length = InputString->Length;
+        uStr.MaximumLength = InputString->MaximumLength;
+
+    }
+
+    if (uStr.Length == 0 || uStr.MaximumLength == 0)
+        return FALSE;
+
+    dumpSize = (SIZE_T)uStr.MaximumLength + MAX_PATH;
+    lpStringBuffer = (LPWSTR)supHeapAlloc(dumpSize);
+    if (lpStringBuffer == NULL)
+        return FALSE;
+
+    if (kdReadSystemMemoryEx((ULONG_PTR)uStr.Buffer,
+        lpStringBuffer,
+        uStr.Length,
+        &readBytes))
+    {
+        if (readBytes == uStr.Length) {
+
+            OutputString->Buffer = lpStringBuffer;
+            OutputString->Length = uStr.Length;
+            OutputString->MaximumLength = uStr.MaximumLength;
+
+            if (ReferenceBufferPtr)
+                *ReferenceBufferPtr = uStr.Buffer;
+
+            return TRUE;
+        }
+    }
+
+    supHeapFree(lpStringBuffer);
+    return FALSE;
 }
 
 /*
@@ -1347,7 +1475,7 @@ UCHAR ObDecodeTypeIndex(
     }
 
     ObjectHeader = OBJECT_TO_OBJECT_HEADER(Object);
-    TypeIndex = (EncodedTypeIndex ^ 
+    TypeIndex = (EncodedTypeIndex ^
         (UCHAR)((ULONG_PTR)ObjectHeader >> OBJECT_SHIFT) ^
         g_kdctx.Data->ObHeaderCookie.Value);
 
@@ -1797,7 +1925,7 @@ PVOID ObGetCallbackBlockRoutine(
 BOOL kdpFindKiServiceTableByPattern(
     _In_ ULONG_PTR MappedImageBase,
     _In_ ULONG_PTR KernelImageBase,
-    _Out_ ULONG_PTR *Address
+    _Out_ ULONG_PTR* Address
 )
 {
     ULONG signatureSize;
@@ -2409,25 +2537,6 @@ POBJINFO ObQueryObject(
 }
 
 /*
-* ObDumpTypeInfo
-*
-* Purpose:
-*
-* Dumps Type header including initializer.
-*
-*/
-BOOL ObDumpTypeInfo(
-    _In_ ULONG_PTR ObjectAddress,
-    _Inout_ POBJECT_TYPE_COMPATIBLE ObjectTypeInfo
-)
-{
-    return kdReadSystemMemoryEx(ObjectAddress,
-        ObjectTypeInfo,
-        sizeof(OBJECT_TYPE_COMPATIBLE),
-        NULL);
-}
-
-/*
 * ObGetProcessId
 *
 * Purpose:
@@ -2488,11 +2597,11 @@ BOOL ObGetProcessImageFileName(
 }
 
 /*
-* ObpWalkDirectoryRecursive
+* ObpEnumeratePrivateNamespaceTable
 *
 * Purpose:
 *
-* Recursively dump Object Manager directories.
+* Enumerate Object Manager private namespace objects.
 *
 * Note:
 *
@@ -2500,221 +2609,16 @@ BOOL ObGetProcessImageFileName(
 * this routine change as we rely here only on HashBuckets which is on same offset.
 *
 */
-VOID ObpWalkDirectoryRecursive(
-    _In_ BOOL fIsRoot,
-    _In_ PLIST_ENTRY ListHead,
-    _In_ HANDLE ListHeap,
-    _In_opt_ LPWSTR lpRootDirectory,
-    _In_ ULONG_PTR DirectoryAddress,
-    _In_ USHORT DirectoryTypeIndex
+BOOL ObpEnumeratePrivateNamespaceTable(
+    _In_ ULONG_PTR TableAddress,
+    _In_ PENUMERATE_PRIVATE_NAMESPACE_CALLBACK Callback,
+    _In_opt_ PVOID Context
 )
 {
-    UCHAR      ObjectTypeIndex;
-    UINT       BucketId;
-    SIZE_T     dirLen, fLen, rdirLen, retSize;
-    ULONG_PTR  ObjectHeaderAddress, HeadItem, LookupItem, InfoHeaderAddress;
-    POBJREF    ObjectEntry;
-    LPWSTR     lpObjectName, lpDirectoryName;
-
-    OBJECT_HEADER           ObjectHeader;
-    OBJECT_DIRECTORY        DirectoryObject;
-    OBJECT_DIRECTORY_ENTRY  DirectoryEntry;
-
-    RtlZeroMemory(&DirectoryObject, sizeof(OBJECT_DIRECTORY));
-
-    if (!kdReadSystemMemoryEx(DirectoryAddress,
-        &DirectoryObject,
-        sizeof(OBJECT_DIRECTORY),
-        NULL))
-    {
-        kdDebugPrint("%s kdReadSystemMemoryEx(DirectoryAddress) failed\r\n", __FUNCTION__);
-        return;
-    }
-
-    if (lpRootDirectory != NULL) {
-        rdirLen = (1 + _strlen(lpRootDirectory)) * sizeof(WCHAR);
-    }
-    else {
-        rdirLen = 0;
-    }
-
-    lpObjectName = NULL;
-    retSize = 0;
-    ObjectTypeIndex = 0;
-
-    for (BucketId = 0; BucketId < NUMBER_HASH_BUCKETS; BucketId++) {
-
-        HeadItem = (ULONG_PTR)DirectoryObject.HashBuckets[BucketId];
-        if (HeadItem != 0) {
-
-            LookupItem = HeadItem;
-
-            do {
-
-                //
-                // Read object directory entry.
-                //
-                RtlZeroMemory(&DirectoryEntry, sizeof(OBJECT_DIRECTORY_ENTRY));
-
-                if (kdReadSystemMemoryEx(LookupItem,
-                    &DirectoryEntry,
-                    sizeof(OBJECT_DIRECTORY_ENTRY),
-                    NULL))
-                {
-
-                    //
-                    // Read object.
-                    // First read header from directory entry object.
-                    //
-                    RtlZeroMemory(&ObjectHeader, sizeof(OBJECT_HEADER));
-                    ObjectHeaderAddress = (ULONG_PTR)OBJECT_TO_OBJECT_HEADER(DirectoryEntry.Object);
-
-                    if (kdReadSystemMemoryEx(ObjectHeaderAddress,
-                        &ObjectHeader,
-                        sizeof(OBJECT_HEADER),
-                        NULL))
-                    {
-
-                        //
-                        // Second read object data.
-                        // Query object name.
-                        //
-                        InfoHeaderAddress = 0;
-                        retSize = 0;
-                        if (ObHeaderToNameInfoAddress(ObjectHeader.InfoMask,
-                            ObjectHeaderAddress,
-                            &InfoHeaderAddress,
-                            HeaderNameInfoFlag))
-                        {
-                            lpObjectName = ObQueryNameString(InfoHeaderAddress,
-                                &retSize,
-                                g_WinObj.Heap);
-                        }
-
-                        //
-                        // Allocate object entry.
-                        //
-                        ObjectEntry = (POBJREF)RtlAllocateHeap(ListHeap,
-                            HEAP_ZERO_MEMORY,
-                            sizeof(OBJREF));
-
-                        if (ObjectEntry) {
-
-                            //
-                            // Save object address.
-                            //
-                            ObjectEntry->ObjectAddress = (ULONG_PTR)DirectoryEntry.Object;
-                            ObjectEntry->HeaderAddress = ObjectHeaderAddress;
-                            ObjectEntry->TypeIndex = ObjectHeader.TypeIndex;
-
-                            //
-                            // Copy dir + name.
-                            //
-                            if (lpObjectName) {
-
-                                fLen = (_strlen(lpObjectName) * sizeof(WCHAR)) +
-                                    (2 * sizeof(WCHAR)) +
-                                    rdirLen + sizeof(UNICODE_NULL);
-
-                                ObjectEntry->ObjectName = (LPWSTR)RtlAllocateHeap(ListHeap,
-                                    HEAP_ZERO_MEMORY,
-                                    fLen);
-
-                                if (ObjectEntry->ObjectName) {
-                                    _strcpy(ObjectEntry->ObjectName, lpRootDirectory);
-                                    if (fIsRoot == FALSE) {
-                                        _strcat(ObjectEntry->ObjectName, L"\\");
-                                    }
-                                    _strcat(ObjectEntry->ObjectName, lpObjectName);
-                                }
-                            }
-
-                            InsertHeadList(ListHead, &ObjectEntry->ListEntry);
-                        }
-
-                        //
-                        // Check if current object is a directory.
-                        //
-                        ObjectTypeIndex = ObDecodeTypeIndex(DirectoryEntry.Object, ObjectHeader.TypeIndex);
-                        if (ObjectTypeIndex == DirectoryTypeIndex) {
-
-                            //
-                            // Build new directory string (old directory + \ + current).
-                            //
-                            fLen = 0;
-                            if (lpObjectName) {
-                                fLen = retSize;
-                            }
-
-                            dirLen = fLen + rdirLen + (2 * sizeof(WCHAR)) + sizeof(UNICODE_NULL);
-                            lpDirectoryName = (LPWSTR)supHeapAlloc(dirLen);
-                            if (lpDirectoryName) {
-                                _strcpy(lpDirectoryName, lpRootDirectory);
-                                if (fIsRoot == FALSE) {
-                                    _strcat(lpDirectoryName, L"\\");
-                                }
-                                if (lpObjectName) {
-                                    _strcat(lpDirectoryName, lpObjectName);
-                                }
-                            }
-
-                            //
-                            // Walk subdirectory.
-                            //
-                            ObpWalkDirectoryRecursive(FALSE,
-                                ListHead,
-                                ListHeap,
-                                lpDirectoryName,
-                                (ULONG_PTR)DirectoryEntry.Object,
-                                DirectoryTypeIndex);
-
-                            if (lpDirectoryName) {
-                                supHeapFree(lpDirectoryName);
-                                lpDirectoryName = NULL;
-                            }
-                        }
-
-                        if (lpObjectName) {
-                            supHeapFree(lpObjectName);
-                            lpObjectName = NULL;
-                        }
-
-                    } //if (kdReadSystemMemoryEx(OBJECT_HEADER)
-
-                    LookupItem = (ULONG_PTR)DirectoryEntry.ChainLink;
-
-                } //if (kdReadSystemMemoryEx(OBJECT_DIRECTORY_ENTRY)			
-                else {
-                    LookupItem = 0;
-                }
-
-            } while (LookupItem != 0); // do
-        }
-    }
-}
-
-/*
-* ObpWalkPrivateNamespaceTable
-*
-* Purpose:
-*
-* Dump Object Manager private namespace objects.
-*
-* Note:
-*
-* OBJECT_DIRECTORY definition changed in Windows 10, however this doesn't require
-* this routine change as we rely here only on HashBuckets which is on same offset.
-*
-*/
-BOOL ObpWalkPrivateNamespaceTable(
-    _In_ PLIST_ENTRY ListHead,
-    _In_ HANDLE ListHeap,
-    _In_ ULONG_PTR TableAddress
-)
-{
+    BOOL          bStopEnumeration = FALSE;
     ULONG         i, j = 0;
-    ULONG         objectsCount = 0;
     ULONG_PTR     ObjectHeaderAddress, HeadItem, LookupItem, InfoHeaderAddress;
+    HANDLE        ListHeap = (HANDLE)Context;
     PLIST_ENTRY   Next, Head;
     LIST_ENTRY    ListEntry;
     POBJREF       ObjectEntry;
@@ -2725,13 +2629,8 @@ BOOL ObpWalkPrivateNamespaceTable(
     OBJECT_NAMESPACE_LOOKUPTABLE LookupTable;
     OBJECT_NAMESPACE_ENTRY       LookupEntry;
 
-    if (
-        (ListHead == NULL) ||
-        (TableAddress == 0)
-        )
-    {
-        return FALSE;
-    }
+    if (ListHeap == NULL)
+        ListHeap = g_WinObj.Heap;
 
     //
     // Dump namespace lookup table.
@@ -2801,9 +2700,10 @@ BOOL ObpWalkPrivateNamespaceTable(
                                 sizeof(OBJECT_HEADER),
                                 NULL))
                             {
+
                                 //
-                                // Allocate object entry
-                                //
+                               // Allocate object entry
+                               //
                                 ObjectEntry = (POBJREF)RtlAllocateHeap(ListHeap,
                                     HEAP_ZERO_MEMORY,
                                     sizeof(OBJREF));
@@ -2852,8 +2752,9 @@ BOOL ObpWalkPrivateNamespaceTable(
 
                                     }
 
-                                    objectsCount += 1;
-                                    InsertHeadList(ListHead, &ObjectEntry->ListEntry);
+                                    bStopEnumeration = Callback(ObjectEntry, Context);
+                                    if (bStopEnumeration)
+                                        return TRUE;
 
                                 } //if (ObjectEntry)
                             }
@@ -2869,261 +2770,260 @@ BOOL ObpWalkPrivateNamespaceTable(
             Next = ListEntry.Flink;
         }
     }
-    return (objectsCount > 0);
+
+    return TRUE;
 }
 
 /*
-* ObCollectionCreateInternal
+* ObEnumeratePrivateNamespaceTable
 *
 * Purpose:
 *
-* Create collection of object directory dumped info.
-*
-* Collection must be destroyed with ObCollectionDestroy after use.
-*
-* If specified will dump private namespace objects.
+* Enumerate Object Manager private namespace objects.
 *
 */
-BOOL ObCollectionCreateInternal(
-    _In_ POBJECT_COLLECTION Collection,
-    _In_ BOOL fNamespace
-)
-{
-    BOOL bResult = FALSE;
-
-    Collection->Heap = RtlCreateHeap(HEAP_GROWABLE, NULL, 0, 0, NULL, NULL);
-
-    if (Collection->Heap == NULL)
-        return FALSE;
-
-    RtlSetHeapInformation(Collection->Heap, HeapEnableTerminationOnCorruption, NULL, 0);
-
-    __try {
-
-        InitializeListHead(&Collection->ListHead);
-
-        if (fNamespace == FALSE) {
-            if (
-                (g_kdctx.DirectoryRootAddress == 0) ||
-                (g_kdctx.DirectoryTypeIndex == 0)
-                )
-            {
-                if (!ObGetDirectoryObjectAddress(NULL,
-                    &g_kdctx.DirectoryRootAddress,
-                    &g_kdctx.DirectoryTypeIndex))
-                {
-                    SetLastError(ERROR_INTERNAL_ERROR);
-                    goto _FailWeLeave;
-                }
-            }
-
-            if (
-                (g_kdctx.DirectoryRootAddress != 0) &&
-                (g_kdctx.DirectoryTypeIndex != 0)
-                )
-            {
-                ObpWalkDirectoryRecursive(TRUE,
-                    &Collection->ListHead,
-                    Collection->Heap,
-                    KM_OBJECTS_ROOT_DIRECTORY,
-                    g_kdctx.DirectoryRootAddress,
-                    g_kdctx.DirectoryTypeIndex);
-
-                bResult = TRUE;
-            }
-        }
-        else {
-
-            if (g_kdctx.Data->PrivateNamespaceLookupTable == NULL)
-                g_kdctx.Data->PrivateNamespaceLookupTable = ObFindPrivateNamespaceLookupTable(&g_kdctx);
-
-            if (g_kdctx.Data->PrivateNamespaceLookupTable != NULL) {
-
-                bResult = ObpWalkPrivateNamespaceTable(&Collection->ListHead,
-                    Collection->Heap,
-                    (ULONG_PTR)g_kdctx.Data->PrivateNamespaceLookupTable);
-
-            }
-            else {
-                SetLastError(ERROR_INTERNAL_ERROR);
-            }
-        }
-
-    }
-    __except (WOBJ_EXCEPTION_FILTER) {
-        bResult = FALSE;
-    }
-
-_FailWeLeave:
-
-    return bResult;
-}
-
-/*
-* ObCollectionCreate
-*
-* Purpose:
-*
-* Create collection of object directory dumped info.
-*
-* Collection must be destroyed with ObCollectionDestroy after use.
-*
-* Calls internal function.
-*
-*/
-BOOL ObCollectionCreate(
-    _In_ POBJECT_COLLECTION Collection,
-    _In_ BOOL fNamespace,
-    _In_ BOOL Locked
-)
-{
-    BOOL bResult = FALSE;
-
-    if (Collection == NULL)
-        return bResult;
-
-    if (!kdConnectDriver())
-        return bResult;
-
-    if (Locked) {
-        bResult = ObCollectionCreateInternal(Collection, fNamespace);
-    }
-    else {
-        EnterCriticalSection(&g_kdctx.ObCollectionLock);
-        bResult = ObCollectionCreateInternal(Collection, fNamespace);
-        LeaveCriticalSection(&g_kdctx.ObCollectionLock);
-    }
-
-    return bResult;
-}
-
-/*
-* ObCollectionDestroy
-*
-* Purpose:
-*
-* Destroy collection with object directory dumped info
-*
-*/
-VOID ObCollectionDestroy(
-    _In_ POBJECT_COLLECTION Collection
-)
-{
-    if (Collection == NULL)
-        return;
-
-    EnterCriticalSection(&g_kdctx.ObCollectionLock);
-
-    if (Collection->Heap) {
-        RtlDestroyHeap(Collection->Heap);
-        Collection->Heap = NULL;
-    }
-    InitializeListHead(&Collection->ListHead);
-
-    LeaveCriticalSection(&g_kdctx.ObCollectionLock);
-}
-
-/*
-* ObCollectionEnumerate
-*
-* Purpose:
-*
-* Enumerate object collection and callback on each element.
-*
-*/
-BOOL ObCollectionEnumerate(
-    _In_ POBJECT_COLLECTION Collection,
-    _In_ PENUMERATE_COLLECTION_CALLBACK Callback,
+BOOL ObEnumeratePrivateNamespaceTable(
+    _In_ PENUMERATE_PRIVATE_NAMESPACE_CALLBACK Callback,
     _In_opt_ PVOID Context
 )
 {
-    BOOL        bCancelled = FALSE;
-    POBJREF     ObjectEntry = NULL;
-    PLIST_ENTRY Head, Next;
-
-    if ((Collection == NULL) || (Callback == NULL))
+    if (!kdConnectDriver())
         return FALSE;
 
-    EnterCriticalSection(&g_kdctx.ObCollectionLock);
+    if (g_kdctx.Data->PrivateNamespaceLookupTable == NULL)
+        g_kdctx.Data->PrivateNamespaceLookupTable = ObFindPrivateNamespaceLookupTable(&g_kdctx);
 
-    if (!IsListEmpty(&Collection->ListHead)) {
-        Head = &Collection->ListHead;
-        Next = Head->Flink;
-        while ((Next != NULL) && (Next != Head)) {
-            ObjectEntry = CONTAINING_RECORD(Next, OBJREF, ListEntry);
-            bCancelled = Callback(ObjectEntry, Context);
-            if (bCancelled)
-                break;
+    if (g_kdctx.Data->PrivateNamespaceLookupTable == NULL)
+        return FALSE;
 
-            Next = Next->Flink;
-        }
+    return ObpEnumeratePrivateNamespaceTable(
+        (ULONG_PTR)g_kdctx.Data->PrivateNamespaceLookupTable,
+        Callback,
+        Context);
+}
+
+typedef struct _OB_NAME_ELEMENT {
+    LIST_ENTRY ListEntry;
+    LPCWSTR lpszName;
+} OB_NAME_ELEMENT, * POB_NAME_ELEMENT;
+
+BOOL ObpAddNameElementEntry(
+    _In_ PLIST_ENTRY ListHead,
+    _In_opt_ LPCWSTR ElementName
+)
+{
+    POB_NAME_ELEMENT pObElement;
+
+    pObElement = (POB_NAME_ELEMENT)supHeapAlloc(sizeof(OB_NAME_ELEMENT));
+    if (pObElement == NULL)
+        return FALSE;
+
+    pObElement->lpszName = ElementName;
+
+    InsertHeadList(ListHead, &pObElement->ListEntry);
+
+    return TRUE;
+}
+
+BOOL ObpDumpNameElementSpecial(
+    _In_ PLIST_ENTRY ListHead,
+    _In_ LPWSTR SpecialElement,
+    _In_ DWORD Size 
+)
+{
+    SIZE_T allocSize;
+    LPWSTR lpName;
+
+    allocSize = Size + sizeof(UNICODE_NULL);
+    lpName = (LPWSTR)supHeapAlloc(allocSize);
+    if (lpName == NULL) {
+        return FALSE;
     }
 
-    LeaveCriticalSection(&g_kdctx.ObCollectionLock);
+    _strcpy(lpName, SpecialElement);
 
-    return (bCancelled == FALSE);
+    if (!ObpAddNameElementEntry(ListHead, lpName)) {
+        supHeapFree(lpName);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+BOOL ObpDumpNameElement(
+    _In_ PLIST_ENTRY ListHead,
+    _In_ POBJECT_HEADER_NAME_INFO NameInformation,
+    _Out_ PSIZE_T ElementLength
+)
+{
+    SIZE_T allocSize;
+    USHORT nameLength;
+    LPWSTR lpName;
+
+    *ElementLength = 0;
+
+    nameLength = NameInformation->Name.Length;
+    if (nameLength == 0)
+        return FALSE;
+
+    allocSize = nameLength + sizeof(UNICODE_NULL);
+    lpName = (LPWSTR)supHeapAlloc(allocSize);
+    if (lpName == NULL) {
+        return FALSE;
+    }
+
+    if (!kdReadSystemMemoryEx((ULONG_PTR)NameInformation->Name.Buffer,
+        lpName,
+        nameLength,
+        NULL))
+    {
+        supHeapFree(lpName);
+        return FALSE;
+    }
+
+    if (!ObpAddNameElementEntry(ListHead, lpName)) {
+        supHeapFree(lpName);
+        return FALSE;
+    }
+
+    *ElementLength = nameLength;
+
+    return TRUE;
+}
+
+SIZE_T ObpDumpObjectName(
+    _In_ PLIST_ENTRY ListHead,
+    _In_ ULONG_PTR ObjectAddress,
+    _Out_ PULONG_PTR NextObject
+)
+{
+    ULONG_PTR lookupObject = ObjectAddress;
+    ULONG_PTR objectHeaderAddress;
+    ULONG_PTR headerInfoAddress;
+    OBJECT_HEADER objectHeader;
+    OBJECT_HEADER_NAME_INFO nameInfo;
+    SIZE_T pathLength = 0;
+
+    *NextObject = 0;
+
+    //
+    // Process object first.
+    //
+    objectHeaderAddress = (ULONG_PTR)OBJECT_TO_OBJECT_HEADER(lookupObject);
+    RtlSecureZeroMemory(&objectHeader, sizeof(OBJECT_HEADER));
+    if (!kdReadSystemMemoryEx(objectHeaderAddress,
+        &objectHeader,
+        sizeof(OBJECT_HEADER),
+        NULL))
+    {
+        //
+        // Nothing to process, object header is not available.
+        //
+        return 0;
+    }
+
+    //
+    // Query OBJECT_HEADER_NAME_INFO address
+    //
+    headerInfoAddress = 0;
+    if (!ObHeaderToNameInfoAddress(objectHeader.InfoMask,
+        objectHeaderAddress,
+        &headerInfoAddress,
+        HeaderNameInfoFlag))
+    {     
+        //
+        // Nothing to process, object is unnamed.
+        //
+        return 0;
+    }
+
+    //
+    // Dump OBJECT_HEADER_NAME_INFO
+    //
+    RtlSecureZeroMemory(&nameInfo, sizeof(nameInfo));
+
+    if (!kdReadSystemMemoryEx(headerInfoAddress,
+        &nameInfo,
+        sizeof(nameInfo),
+        NULL))
+    {
+        ObpDumpNameElementSpecial(ListHead, OBP_ERROR_NAME_LITERAL, OBP_ERROR_NAME_LITERAL_SIZE);
+        return OBP_ERROR_NAME_LITERAL_SIZE + sizeof(OBJ_NAME_PATH_SEPARATOR);
+    }
+    
+    *NextObject = (ULONG_PTR)nameInfo.Directory;
+
+    if (ObpDumpNameElement(ListHead, &nameInfo, &pathLength))
+        return pathLength + sizeof(OBJ_NAME_PATH_SEPARATOR);
+
+    return 0;
 }
 
 /*
-* ObCollectionFindByAddress
+* ObQueryFullNamespacePath
 *
 * Purpose:
 *
-* Find object by address in object directory dump collection.
-* Use supHeapFree to free memory.
+* This routine if possible builds full object namespace path for given object.
 *
 */
-POBJREF ObCollectionFindByAddress(
-    _In_ POBJECT_COLLECTION Collection,
-    _In_ ULONG_PTR ObjectAddress,
-    _In_ BOOLEAN fNamespace
+LPWSTR ObQueryFullNamespacePath(
+    _In_ ULONG_PTR ObjectAddress
 )
 {
-    BOOL        IsCollectionPresent = FALSE;
-    POBJREF     objectEntry = NULL, returnObject = NULL;
-    PLIST_ENTRY Head, Next;
+    ULONG_PTR lookupObject = ObjectAddress, nextObject;
+    LIST_ENTRY listHead, * listEntry;
+    POB_NAME_ELEMENT pNameElement;
+    LPWSTR lpObjectName = NULL;
+    SIZE_T pathLength, totalLength;
 
-    if (Collection == NULL)
-        return NULL;
+    if (lookupObject == g_kdctx.DirectoryRootObject) {
 
-    EnterCriticalSection(&g_kdctx.ObCollectionLock);
-
-    if (IsListEmpty(&Collection->ListHead)) {
-        IsCollectionPresent = ObCollectionCreate(Collection, fNamespace, TRUE);
-    }
-    else {
-        IsCollectionPresent = TRUE;
-    }
-
-    if (IsCollectionPresent) {
-        Head = &Collection->ListHead;
-        Next = Head->Flink;
-        while ((Next != NULL) && (Next != Head)) {
-            objectEntry = CONTAINING_RECORD(Next, OBJREF, ListEntry);
-            if (objectEntry->ObjectAddress == ObjectAddress) {
-
-                returnObject = (POBJREF)supHeapAlloc(sizeof(OBJREF));
-                if (returnObject) {
-                    RtlCopyMemory(returnObject, objectEntry, sizeof(OBJREF));
-
-                    returnObject->ObjectName = (LPWSTR)supHeapAlloc(
-                        (1 + _strlen(objectEntry->ObjectName)) * sizeof(WCHAR));
-
-                    if (returnObject->ObjectName) {
-                        _strcpy(returnObject->ObjectName, objectEntry->ObjectName);
-                    }
-
-                }
-
-                break;
-            }
-            Next = Next->Flink;
+        lpObjectName = (LPWSTR)supHeapAlloc(sizeof(KM_OBJECTS_ROOT_DIRECTORY) + sizeof(UNICODE_NULL));
+        if (lpObjectName) {
+            _strcpy(lpObjectName, KM_OBJECTS_ROOT_DIRECTORY);
         }
+        return lpObjectName;
     }
 
-    LeaveCriticalSection(&g_kdctx.ObCollectionLock);
+    InitializeListHead(&listHead);
+    totalLength = 0;
 
-    return returnObject;
+    while ((lookupObject != g_kdctx.DirectoryRootObject) && (lookupObject != 0)) {
+
+        nextObject = 0;
+        totalLength += ObpDumpObjectName(&listHead, lookupObject, &nextObject);
+        if (totalLength > UNICODE_STRING_MAX_BYTES)
+            break;
+
+        lookupObject = nextObject;
+    }
+
+    //
+    // Build path.
+    //
+    if (!IsListEmpty(&listHead)) {
+
+        lpObjectName = (LPWSTR)supHeapAlloc(totalLength + sizeof(UNICODE_NULL));
+        if (lpObjectName) {
+            pathLength = 0;
+            listEntry = listHead.Flink;
+            while ((listEntry != NULL) && (listEntry != &listHead)) {
+                pNameElement = CONTAINING_RECORD(listEntry, OB_NAME_ELEMENT, ListEntry);
+                if (pNameElement->lpszName) {
+                    lpObjectName[pathLength++] = OBJ_NAME_PATH_SEPARATOR;
+                    _strcpy(lpObjectName + pathLength, pNameElement->lpszName);
+                    pathLength += _strlen(pNameElement->lpszName);
+                    supHeapFree((PVOID)pNameElement->lpszName);
+                }
+                listEntry = listEntry->Flink;
+                supHeapFree(pNameElement);
+            }
+        }
+
+    }
+
+    return lpObjectName;
 }
 
 /*
@@ -3319,6 +3219,7 @@ BOOL kdpReadSystemMemoryEx(
     _Out_opt_ PULONG NumberOfBytesRead
 )
 {
+    BOOL            bResult;
     NTSTATUS        status;
     KLDBG           kldbg;
     IO_STATUS_BLOCK iost;
@@ -3327,11 +3228,12 @@ BOOL kdpReadSystemMemoryEx(
     if (NumberOfBytesRead)
         *NumberOfBytesRead = 0;
 
-    if ((Buffer == NULL) || (BufferSize == 0))
+    if ((Buffer == NULL) ||
+        (BufferSize == 0) ||
+        (Address < g_kdctx.SystemRangeStart))
+    {
         return FALSE;
-
-    if (Address < g_kdctx.SystemRangeStart)
-        return FALSE;
+    }
 
     if (!kdConnectDriver())
         return FALSE;
@@ -3370,16 +3272,18 @@ BOOL kdpReadSystemMemoryEx(
             FALSE,
             NULL);
 
-        if (NT_SUCCESS(status))
-            status = iost.Status;
     }
 
-    if (NT_SUCCESS(status)) {
+    if (NT_SUCCESS(status))
+        status = iost.Status;
+
+    bResult = NT_SUCCESS(status);
+
+    if (bResult) {
 
         if (NumberOfBytesRead)
             *NumberOfBytesRead = (ULONG)iost.Information;
 
-        return TRUE;
     }
     else {
         //
@@ -3391,8 +3295,9 @@ BOOL kdpReadSystemMemoryEx(
         }
 
         kdReportReadError(__FUNCTIONW__, Address, BufferSize, status, &iost);
-        return FALSE;
     }
+
+    return bResult;
 }
 
 /*
@@ -3470,7 +3375,7 @@ BOOL kdExtractDriverResource(
 *
 */
 BOOL kdExtractDriver(
-    _In_ WCHAR * szDriverPath
+    _In_ WCHAR* szDriverPath
 )
 {
     BOOL bResult = FALSE;
@@ -3612,7 +3517,7 @@ BOOL kdQuerySystemInformation(
     // Query "\\" directory address and remember directory object type index.
     //
     ObGetDirectoryObjectAddress(NULL,
-        &Context->DirectoryRootAddress,
+        &Context->DirectoryRootObject,
         &Context->DirectoryTypeIndex);
 
     //
@@ -4037,7 +3942,7 @@ BOOLEAN kdQueryKernelShims(
                     KseEnginePattern,
                     sizeof(KseEnginePattern));
 
-                if (lookupAddress) 
+                if (lookupAddress)
                     lookupAddress -= FIELD_OFFSET(KSE_ENGINE, State);
 
             }
@@ -4119,7 +4024,7 @@ BOOLEAN kdQueryKernelShims(
 *
 */
 BOOLEAN kdpOpenLoadDriverPublic(
-    _In_ WCHAR * szDriverPath
+    _In_ WCHAR* szDriverPath
 )
 {
     BOOLEAN bResult;
@@ -4165,7 +4070,7 @@ BOOLEAN kdpOpenLoadDriverPublic(
 *
 */
 BOOLEAN kdIsSymAvailable(
-    _In_opt_ SYMCONTEXT *SymContext
+    _In_opt_ SYMCONTEXT* SymContext
 )
 {
     if (SymContext == NULL)
@@ -4385,7 +4290,7 @@ BOOL CALLBACK symCallbackProc(
     case CBA_EVENT:
         if (CallbackData) {
             pEvent = (PIMAGEHLP_CBA_EVENT)CallbackData;
-            if (pEvent->severity == sevInfo) {              
+            if (pEvent->severity == sevInfo) {
                 if (pEvent->desc[0] > 0x20 && pEvent->desc[0] < 0x7f) {
                     supUpdateLoadBannerText(g_hwndBanner, pEvent->desc, TRUE);
                 }
@@ -4503,8 +4408,6 @@ VOID kdInit(
     g_kdctx.DriverOpenLoadStatus = ERROR_NOT_CAPABLE;
 
     InitializeListHead(&g_kdctx.Data->KseEngineDump.ShimmedDriversDumpListHead);
-    InitializeListHead(&g_kdctx.ObCollection.ListHead);
-    RtlInitializeCriticalSection(&g_kdctx.ObCollectionLock);
 
     //
     // Minimum supported client is windows 7
@@ -4673,12 +4576,6 @@ VOID kdShutdown(
         CloseHandle(g_kdctx.DeviceHandle);
         g_kdctx.DeviceHandle = NULL;
     }
-
-    //
-    // Destroy collection if present.
-    //
-    ObCollectionDestroy(&g_kdctx.ObCollection);
-    RtlDeleteCriticalSection(&g_kdctx.ObCollectionLock);
 
 #ifdef _USE_OWN_DRIVER
     kdpUnloadHelperDriver();

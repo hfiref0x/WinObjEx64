@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPN.C
 *
-*  VERSION:     1.90
+*  VERSION:     1.92
 *
-*  DATE:        28 May 2021
+*  DATE:        12 Nov 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -20,8 +20,8 @@
 #include "propDlg.h"
 
 EXTRASCONTEXT PnDlgContext;
-OBJECT_COLLECTION PNSCollection;
 ULONG PNSNumberOfObjects = 0;
+HANDLE PNSObjectsHeap = NULL;
 
 #ifdef _USE_OWN_DRIVER
 #define T_NAMESPACE_QUERY_FAILED TEXT("Unable to list namespaces! Make sure you run this program as Admin.")
@@ -233,7 +233,6 @@ BOOL PNDlgQueryInfo(
 #ifndef _DEBUG
     HWND hwndBanner;
 #endif
-    BOOL bResult = FALSE;
 
     PNSNumberOfObjects = 0;
 
@@ -249,15 +248,10 @@ BOOL PNDlgQueryInfo(
 
     __try {
 
-        bResult = ObCollectionCreate(&PNSCollection, TRUE, FALSE);
-        if (bResult) {
+        ObEnumeratePrivateNamespaceTable(
+            PNDlgEnumerateCallback,
+            (PVOID)PNSObjectsHeap);
 
-            bResult = ObCollectionEnumerate(
-                &PNSCollection,
-                PNDlgEnumerateCallback,
-                NULL);
-
-        }
     }
     __finally {
 #ifndef _DEBUG
@@ -265,7 +259,7 @@ BOOL PNDlgQueryInfo(
 #endif
     }
 
-    return bResult;
+    return (PNSNumberOfObjects > 0);
 }
 
 #define MAX_LOOKUP_NAME 256
@@ -682,6 +676,17 @@ VOID PNDlgCopySelectedSid(
     }
 }
 
+VOID PNDialogCreateDataHeap(
+    _In_ BOOLEAN bRefresh
+)
+{
+    if (bRefresh) {
+        if (PNSObjectsHeap) RtlDestroyHeap(PNSObjectsHeap);
+    }
+    PNSObjectsHeap = RtlCreateHeap(HEAP_GROWABLE, NULL, 0, 0, NULL, NULL);
+    if (PNSObjectsHeap) RtlSetHeapInformation(PNSObjectsHeap, HeapEnableTerminationOnCorruption, NULL, 0);
+}
+
 /*
 * PNDialogShowInfo
 *
@@ -695,9 +700,10 @@ VOID PNDialogShowInfo(
 {
     ENUMCHILDWNDDATA ChildWndData;
 
+    PNDialogCreateDataHeap(bRefresh);
+
     if (bRefresh) {
         ListView_DeleteAllItems(PnDlgContext.ListView);
-        ObCollectionDestroy(&PNSCollection);
         PNDlgResetOutput();
     }
 
@@ -741,15 +747,17 @@ VOID PNDialogHandlePopup(
     hMenu = CreatePopupMenu();
     if (hMenu) {
 
+        InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_OBJECT_PROPERTIES, T_PROPERTIES);
+
         if (supListViewAddCopyValueItem(hMenu,
             Context->ListView,
             ID_OBJECT_COPY,
-            uPos,
+            uPos++,
             lpPoint,
             &Context->lvItemHit,
             &Context->lvColumnHit))
         {
-            InsertMenu(hMenu, ++uPos, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+            InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
             InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_VIEW_REFRESH, T_VIEW_REFRESH);
 
             TrackPopupMenu(hMenu,
@@ -762,6 +770,23 @@ VOID PNDialogHandlePopup(
         }
         DestroyMenu(hMenu);
     }
+}
+
+/*
+* PNDialogOnClose
+*
+* Purpose:
+*
+* Private Namespace Dialog WM_CLOSE handler.
+*
+*/
+VOID PNDialogOnClose(
+    _In_ HWND hwndDlg
+)
+{
+    DestroyWindow(hwndDlg);
+    if (PNSObjectsHeap) RtlDestroyHeap(PNSObjectsHeap);
+    g_WinObj.AuxDialogs[wobjPNSDlgId] = NULL;
 }
 
 /*
@@ -779,6 +804,8 @@ INT_PTR CALLBACK PNDialogProc(
     _In_  LPARAM lParam
 )
 {
+    INT nSelected;
+
     if (uMsg == g_WinObj.SettingsChangeMessage) {
         extrasHandleSettingsChange(&PnDlgContext);
         return TRUE;
@@ -805,9 +832,7 @@ INT_PTR CALLBACK PNDialogProc(
         break;
 
     case WM_CLOSE:
-        DestroyWindow(hwndDlg);
-        ObCollectionDestroy(&PNSCollection);
-        g_WinObj.AuxDialogs[wobjPNSDlgId] = NULL;
+        PNDialogOnClose(hwndDlg);
         break;
 
     case WM_COMMAND:
@@ -837,6 +862,19 @@ INT_PTR CALLBACK PNDialogProc(
             supListViewCopyItemValueToClipboard(PnDlgContext.ListView,
                 PnDlgContext.lvItemHit,
                 PnDlgContext.lvColumnHit);
+            break;
+
+        case ID_OBJECT_PROPERTIES:
+
+            if (ListView_GetSelectedCount(PnDlgContext.ListView)) {
+
+                nSelected = ListView_GetSelectionMark(PnDlgContext.ListView);
+                if (nSelected >= 0) {
+                    PNDlgShowObjectProperties(nSelected);
+                }
+
+            }
+
             break;
 
         default:
@@ -882,8 +920,6 @@ VOID extrasCreatePNDialog(
 
     if (PnDlgContext.hwndDlg == NULL)
         return;
-
-    RtlSecureZeroMemory(&PNSCollection, sizeof(OBJECT_COLLECTION));
 
     g_WinObj.AuxDialogs[wobjPNSDlgId] = PnDlgContext.hwndDlg;
 

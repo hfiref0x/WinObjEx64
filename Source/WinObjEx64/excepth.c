@@ -46,7 +46,7 @@ BOOL exceptWriteDump(
     BOOL    bResult;
     HMODULE hDbgHelp;
     HANDLE  hFile;
-    WCHAR   szFileName[MAX_PATH * 2];
+    WCHAR   szFileName[MAX_PATH * 2]; //-V1072
 
     MINIDUMP_EXCEPTION_INFORMATION mdei;
 

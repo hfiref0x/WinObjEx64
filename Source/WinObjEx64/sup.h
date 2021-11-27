@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.90
+*  VERSION:     1.92
 *
-*  DATE:        28 May 2021
+*  DATE:        19 Nov 2021
 *
 *  Common header file for the program support routines.
 *
@@ -36,12 +36,14 @@ extern HWND g_hwndBanner;
 
 typedef struct _SAPIDB {
     LIST_ENTRY ListHead;
-    HANDLE     sapiHeap;
+    HANDLE     HeapHandle;
+    CRITICAL_SECTION Lock;
 } SAPIDB, *PSAPIDB;
 
 typedef struct _SCMDB {
     ULONG NumberOfEntries;
     PVOID Entries;
+    CRITICAL_SECTION Lock;
 } SCMDB, *PSCMDB;
 
 typedef struct _ENUMICONINFO {
@@ -115,6 +117,7 @@ typedef struct _PROCESS_MITIGATION_POLICIES_ALL {
     PROCESS_MITIGATION_CHILD_PROCESS_POLICY_W10 ChildProcessPolicy;
     PROCESS_MITIGATION_SIDE_CHANNEL_ISOLATION_POLICY_W10 SideChannelIsolationPolicy;
     PROCESS_MITIGATION_USER_SHADOW_STACK_POLICY_W10 UserShadowStackPolicy;
+    PROCESS_MITIGATION_REDIRECTION_TRUST_POLICY_W10 RedirectionTrustPolicy;
 } PROCESS_MITIGATION_POLICIES_ALL, *PPROCESS_MITIGATION_POLICIES;
 
 typedef struct _PROCESS_MITIGATION_POLICY_RAW_DATA {
@@ -167,6 +170,46 @@ typedef struct tagVERHEAD {
 
 #define DWORDUP(x) (((x)+3)&~3)
 
+typedef enum _IMAGE_VERIFY_STATUS {
+    StatusOk = 0,
+    StatusBadNtSignature = 1,
+    StatusBadOptionalHeader = 2,
+    StatusBadOptionalHeaderMagic = 3,
+    StatusBadFileHeaderMagic = 4,
+    StatusBadFileHeaderCharacteristics = 5,
+    StatusBadFileHeaderMachine = 6,
+    StatusBadNtHeaders = 7,
+    StatusBadFileAlignment = 8,
+    StatusBadSectionAlignment = 9,
+    StatusBadSizeOfHeaders = 10,
+    StatusBadSizeOfImage = 11,
+    StatusBadNewExeOffset = 12,
+    StatusBadDosMagic = 13,
+    StatusExceptionOccurred = 14,
+    StatusBadSectionCount = 15,
+    StatusBadSecurityDirectoryVA = 16,
+    StatusBadSecurityDirectorySize = 17,
+    StatusUnknownError = 0xff
+} IMAGE_VERIFY_STATUS, * PIMAGE_VERIFY_STATUS;
+
+typedef struct _FILE_EXCLUDE_DATA {
+    ULONG ChecksumOffset;
+    ULONG SecurityOffset;
+    PIMAGE_DATA_DIRECTORY SecurityDirectory;
+} FILE_EXCLUDE_DATA, * PFILE_EXCLUDE_DATA;
+
+typedef struct _FILE_VIEW_INFO {
+    IMAGE_VERIFY_STATUS Status;
+    LPCWSTR FileName;
+    HANDLE FileHandle;
+    HANDLE SectionHandle;
+    PVOID ViewBase;
+    SIZE_T ViewSize;
+    LARGE_INTEGER FileSize;
+    PIMAGE_NT_HEADERS NtHeaders;
+    FILE_EXCLUDE_DATA ExcludeData;
+} FILE_VIEW_INFO, * PFILE_VIEW_INFO;
+
 //
 // Use shared NTSUP forward.
 //
@@ -187,6 +230,7 @@ typedef struct tagVERHEAD {
 #define supQueryProcessInformation ntsupQueryProcessInformation
 #define supQueryObjectInformation ntsupQueryObjectInformation
 #define supWriteBufferToFile ntsupWriteBufferToFile
+#define supQueryVsmProtectionInformation ntsupQueryVsmProtectionInformation
 #define supQueryHVCIState ntsupQueryHVCIState
 #define supLookupImageSectionByName ntsupLookupImageSectionByName
 #define supFindPattern ntsupFindPattern
@@ -248,7 +292,7 @@ BOOL supQueryObjectFromHandle(
     _Out_opt_ USHORT* TypeIndex);
 
 HICON supGetMainIcon(
-    _In_ LPWSTR lpFileName,
+    _In_ LPCWSTR lpFileName,
     _In_ INT cx,
     _In_ INT cy);
 
@@ -296,10 +340,22 @@ UINT supGetObjectNameIndexByTypeIndex(
 VOID supRunAsAdmin(
     VOID);
 
+BOOL supTreeListCopyItemValueToClipboard(
+    _In_ HWND hwndTreeList,
+    _In_ INT tlSubItemHit);
+
 BOOL supListViewCopyItemValueToClipboard(
     _In_ HWND hwndListView,
     _In_ INT iItem,
     _In_ INT iSubItem);
+
+BOOL supTreeListAddCopyValueItem(
+    _In_ HMENU hMenu,
+    _In_ HWND hwndTreeList,
+    _In_ UINT uId,
+    _In_opt_ UINT uPos,
+    _In_ LPARAM lParam,
+    _In_ INT* pSubItemHit);
 
 BOOL supListViewAddCopyValueItem(
     _In_ HMENU hMenu,
@@ -312,8 +368,8 @@ BOOL supListViewAddCopyValueItem(
 
 VOID supSetMenuIcon(
     _In_ HMENU hMenu,
-    _In_ UINT Item,
-    _In_ ULONG_PTR IconData);
+    _In_ UINT iItem,
+    _In_ HICON hIcon);
 
 VOID supSetGotoLinkTargetToolButtonState(
     _In_ HWND hwnd,
@@ -327,7 +383,8 @@ WOBJ_OBJECT_TYPE supObjectListGetObjectType(
     _In_ INT iItem);
 
 VOID supCreateToolbarButtons(
-    _In_ HWND hWndToolbar);
+    _In_ HWND hWndToolbar,
+    _In_ HIMAGELIST hImageList);
 
 VOID supInit(
     _In_ BOOLEAN IsFullAdmin);
@@ -343,7 +400,7 @@ VOID supShowProperties(
     _In_ LPWSTR lpFileName);
 
 VOID supClipboardCopy(
-    _In_ LPWSTR lpText,
+    _In_ LPCWSTR lpText,
     _In_ SIZE_T cbText);
 
 LPWSTR supGetItemText(
@@ -366,22 +423,22 @@ BOOL supQuerySectionFileInfo(
     _In_ DWORD ccBuffer);
 
 BOOL supQueryTypeInfo(
-    _In_ LPWSTR lpTypeName,
+    _In_ LPCWSTR lpTypeName,
     _Inout_	LPWSTR Buffer,
     _In_ DWORD ccBuffer);
 
 BOOL supQueryDriverDescription(
-    _In_ LPWSTR lpDriverName,
+    _In_ LPCWSTR lpDriverName,
     _Inout_	LPWSTR Buffer,
     _In_ DWORD ccBuffer);
 
 BOOL supQueryDeviceDescription(
-    _In_ LPWSTR lpDeviceName,
+    _In_ LPCWSTR lpDeviceName,
     _Inout_	LPWSTR Buffer,
     _In_ DWORD ccBuffer);
 
 BOOL supQueryWinstationDescription(
-    _In_ LPWSTR lpWindowStationName,
+    _In_ LPCWSTR lpWindowStationName,
     _Inout_	LPWSTR Buffer,
     _In_ DWORD ccBuffer);
 
@@ -412,8 +469,8 @@ NTSTATUS supOpenDeviceObjectEx(
 
 NTSTATUS supOpenDirectoryForObject(
     _Out_ PHANDLE DirectoryHandle,
-    _In_ LPWSTR lpObjectName,
-    _In_ LPWSTR lpDirectory);
+    _In_ LPCWSTR lpObjectName,
+    _In_ LPCWSTR lpDirectory);
 
 BOOL supDumpSyscallTableConverted(
     _In_ ULONG_PTR ServiceTableAddress,
@@ -436,7 +493,7 @@ VOID sapiFreeSnapshot(
 BOOL supSaveDialogExecute(
     _In_ HWND OwnerWindow,
     _Inout_ LPWSTR SaveFileName,
-    _In_ LPWSTR lpDialogFilter);
+    _In_ LPCWSTR DialogFilter);
 
 VOID supSetListViewSettings(
     _In_ HWND hwndLV,
@@ -451,7 +508,7 @@ HICON supGetStockIcon(
     _In_ UINT uFlags);
 
 BOOL supGetWin32FileName(
-    _In_ LPWSTR FileName,
+    _In_ LPCWSTR FileName,
     _Inout_ LPWSTR Win32FileName,
     _In_ SIZE_T ccWin32FileName);
 
@@ -515,8 +572,8 @@ INT supGetMaxCompareTwoFixedStrings(
 NTSTATUS supOpenNamedObjectByType(
     _Out_ HANDLE* ObjectHandle,
     _In_ ULONG TypeIndex,
-    _In_ LPWSTR ObjectDirectory,
-    _In_ LPWSTR ObjectName,
+    _In_ LPCWSTR ObjectDirectory,
+    _In_ LPCWSTR ObjectName,
     _In_ ACCESS_MASK DesiredAccess);
 
 HANDLE supOpenObjectFromContext(
@@ -531,7 +588,7 @@ BOOL supCloseObjectFromContext(
 
 VOID supShowLastError(
     _In_ HWND hWnd,
-    _In_ LPWSTR Source,
+    _In_ LPCWSTR Source,
     _In_ DWORD LastError);
 
 LPWSTR supFormatNtError(
@@ -543,12 +600,8 @@ PSID supQueryTokenUserSid(
 PSID supQueryProcessSid(
     _In_ HANDLE ProcessHandle);
 
-VOID supCopyTreeListSubItemValue(
-    _In_ HWND TreeList,
-    _In_ UINT ValueIndex);
-
 VOID supJumpToFile(
-    _In_ LPWSTR lpFilePath);
+    _In_ LPCWSTR lpFilePath);
 
 PVOID supBSearch(
     _In_ PCVOID key,
@@ -663,7 +716,7 @@ HRESULT WINAPI supShellExecInExplorerProcess(
 
 VOID supShowNtStatus(
     _In_ HWND hWnd,
-    _In_ LPWSTR lpText,
+    _In_ LPCWSTR lpText,
     _In_ NTSTATUS Status);
 
 UINT supGetDPIValue(
@@ -687,7 +740,7 @@ NTSTATUS supOpenTokenByParam(
 
 BOOL supRegDeleteKeyRecursive(
     _In_ HKEY hKeyRoot,
-    _In_ LPWSTR lpSubKey);
+    _In_ LPCWSTR lpSubKey);
 
 INT supAddListViewColumn(
     _In_ HWND ListViewHwnd,
@@ -729,7 +782,7 @@ ULONG supGetTimeAsSecondsSince1970(
 BOOL supRichEdit32Load();
 
 VOID supReportAbnormalTermination(
-    _In_ LPWSTR FunctionName);
+    _In_ LPCWSTR FunctionName);
 
 VOID supReportException(
     _In_ ULONG ExceptionCode,
@@ -741,7 +794,7 @@ BOOL supGetVersionInfoFromSection(
     _Out_ LPVOID * VersionData);
 
 VOID supReportAPIError(
-    _In_ LPWSTR FunctionName,
+    _In_ LPCWSTR FunctionName,
     _In_ NTSTATUS NtStatus);
 
 BOOLEAN supIsFileImageSection(
@@ -752,14 +805,14 @@ BOOLEAN supIsDriverShimmed(
     _In_ PVOID DriverBaseAddress);
 
 BOOL supListViewExportToFile(
-    _In_ LPWSTR FileName,
+    _In_ LPCWSTR FileName,
     _In_ HWND WindowHandle,
     _In_ HWND ListView);
 
 VOID supStatusBarSetText(
     _In_ HWND hwndStatusBar,
     _In_ WPARAM partIndex,
-    _In_ LPWSTR lpText);
+    _In_ LPCWSTR lpText);
 
 VOID supJumpToFileListView(
     _In_ HWND hwndList,
@@ -823,7 +876,10 @@ wchar_t* supExtractFileName(
     _In_ const wchar_t* lpFullPath);
 
 VOID supObjectDumpHandlePopupMenu(
-    _In_ HWND hwndDlg);
+    _In_ HWND hwndDlg,
+    _In_ HWND hwndTreeList,
+    _In_ INT* pSubItemHit,
+    _In_ LPARAM lParam);
 
 VOID supObDumpShowError(
     _In_ HWND hwndDlg,
@@ -837,3 +893,22 @@ NTSTATUS supIsBootDriveVHD(
 
 LPWSTR supPathAddBackSlash(
     _In_ LPWSTR lpszPath);
+
+NTSTATUS supQueryProcessImageFileNameByProcessId(
+    _In_ HANDLE UniqueProcessId,
+    _Out_ PUNICODE_STRING ProcessImageFileName);
+
+LPWSTR supPrintHash(
+    _In_reads_bytes_(Length) LPBYTE Buffer,
+    _In_ ULONG Length,
+    _In_ BOOLEAN UpcaseHex);
+
+NTSTATUS supMapInputFileForRead(
+    _In_ PFILE_VIEW_INFO ViewInformation,
+    _In_ BOOLEAN PartialMap);
+
+VOID supDestroyFileViewInfo(
+    _In_ PFILE_VIEW_INFO ViewInformation);
+
+BOOLEAN supIsValidImage(
+    _In_ PFILE_VIEW_INFO ViewInformation);

@@ -16,6 +16,9 @@
     <Filter Include="minirtl">
       <UniqueIdentifier>{d8ef8d3d-fe7d-4908-93bf-5279accdabfe}</UniqueIdentifier>
     </Filter>
+    <Filter Include="treelist">
+      <UniqueIdentifier>{83c6e752-f5b5-48a7-8e6f-231cba8a450d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.c">
@@ -42,6 +45,18 @@
     <ClCompile Include="..\..\Shared\minirtl\_strstri.c">
       <Filter>minirtl</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Shared\minirtl\_strcat.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Shared\minirtl\_strend.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Shared\treelist\treelist.c">
+      <Filter>treelist</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Shared\minirtl\_strncpy.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="global.h">
@@ -64,6 +79,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Shared\minirtl\rtltypes.h">
       <Filter>minirtl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Shared\treelist\treelist.h">
+      <Filter>treelist</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

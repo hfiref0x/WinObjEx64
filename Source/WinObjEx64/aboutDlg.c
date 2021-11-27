@@ -4,9 +4,9 @@
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     1.90
+*  VERSION:     1.92
 *
-*  DATE:        05 June 2021
+*  DATE:        14 Oct 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -231,8 +231,8 @@ VOID AboutDialogInit(
 */
 VOID AddParameterValue(
     _In_ HWND OutputWindow,
-    _In_ LPWSTR Parameter,
-    _In_ LPWSTR Value)
+    _In_ LPCWSTR Parameter,
+    _In_ LPCWSTR Value)
 {
     LONG StartPos = 0;
 
@@ -381,6 +381,7 @@ VOID AboutDialogCollectGlobals(
     SYSTEM_CODEINTEGRITY_INFORMATION CodeIntegrity;
     SYSTEM_KERNEL_VA_SHADOW_INFORMATION KernelVaShadow;
     SYSTEM_SPECULATION_CONTROL_INFORMATION SpeculationControl;
+    SYSTEM_VSM_PROTECTION_INFORMATION VsmProtectionInfo;
     SYSTEM_INFO SystemInfo;
     ULONG Dummy;
 
@@ -525,7 +526,7 @@ VOID AboutDialogCollectGlobals(
     AddParameterValueBool(hwndOutput, TEXT("IsSecureBoot"), g_kdctx.IsSecureBoot); //secure boot enabled
     AddParameterValueBool(hwndOutput, TEXT("IsOurLoad"), g_kdctx.IsOurLoad); //driver was loaded by our program instance
 
-    AddParameterValue64Hex(hwndOutput, TEXT("DirectoryRootAddress"), g_kdctx.DirectoryRootAddress); //address of object root directory
+    AddParameterValue64Hex(hwndOutput, TEXT("DirectoryRootObject"), g_kdctx.DirectoryRootObject); //address of object root directory
     AddParameterValueUlong(hwndOutput, TEXT("DirectoryTypeIndex"), g_kdctx.DirectoryTypeIndex);
 
     AddParameterValue64Hex(hwndOutput, TEXT("NtOsBase"), (ULONG_PTR)g_kdctx.NtOsBase);
@@ -626,6 +627,19 @@ VOID AboutDialogCollectGlobals(
         &Dummy)))
     {
         AddParameterValue32Hex(hwndOutput, TEXT("SpeculationControl Flags"), SpeculationControl.Flags);
+    }
+
+    RtlSecureZeroMemory(&VsmProtectionInfo, sizeof(VsmProtectionInfo));
+    if (NT_SUCCESS(NtQuerySystemInformation(
+        SystemVsmProtectionInformation,
+        &VsmProtectionInfo,
+        sizeof(VsmProtectionInfo),
+        &Dummy)))
+    {
+        AddParameterValueBool(hwndOutput, TEXT("Vsm.DmaProtectionsAvailable"), VsmProtectionInfo.DmaProtectionsAvailable);
+        AddParameterValueBool(hwndOutput, TEXT("Vsm.DmaProtectionsInUse"), VsmProtectionInfo.DmaProtectionsInUse);
+        AddParameterValueBool(hwndOutput, TEXT("Vsm.HardwareMbecAvailable"), VsmProtectionInfo.HardwareMbecAvailable);
+        AddParameterValueBool(hwndOutput, TEXT("Vsm.ApicVirtualizationAvailable"), VsmProtectionInfo.ApicVirtualizationAvailable);
     }
 
     AddParameterValue(hwndOutput, TEXT("TempDirectory"), g_WinObj.szTempDirectory);

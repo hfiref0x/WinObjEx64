@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017 - 2020
+*  (C) COPYRIGHT AUTHORS, 2017 - 2021
 *
 *  TITLE:       EXTAPI.C
 *
-*  VERSION:     1.86
+*  VERSION:     1.92
 *
-*  DATE:        26 May 2020
+*  DATE:        30 Oct 2021
 *
 *  Support unit for pre Windows 10 missing APIs.
 *
@@ -80,7 +80,7 @@ NTSTATUS ExApiSetInit(
         }
 
     }
- 
+
     Status = (g_ExtApiSet.NumberOfAPI == EXTAPI_ALL_MAPPED) ?
         STATUS_SUCCESS : STATUS_NOT_ALL_ASSIGNED;
 

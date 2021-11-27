@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.01
 *
-*  DATE:        27 May 2021
+*  DATE:        01 Oct 2021
 *
 *  WinObjEx64 ImageScope UI.
 *
@@ -1387,7 +1387,7 @@ VOID OnNotify(
 {
     GUI_CONTEXT* Context;
 
-    if (g_PluginQuit)
+    if (InterlockedAdd((PLONG)&g_PluginState, PLUGIN_RUNNING) == PLUGIN_STOP)
         return;
 
     Context = (GUI_CONTEXT*)GetWindowLongPtr(hWnd, GWLP_USERDATA);
@@ -1600,7 +1600,7 @@ BOOL RunUI(
         TranslateMessage(&msg1);
         DispatchMessage(&msg1);
 
-    } while ((rv != 0) && (g_PluginQuit == FALSE));
+    } while (rv != 0 && InterlockedAdd((PLONG)&g_PluginState, PLUGIN_RUNNING) == PLUGIN_RUNNING);
 
     TabDestroyControl(Context->TabHeader);
     DestroyWindow(Context->MainWindow);

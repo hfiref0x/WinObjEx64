@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTLDR.C
 *
-*  VERSION:     1.19
+*  VERSION:     1.20
 *
-*  DATE:        14 Jan 2021
+*  DATE:        13 Nov 2021
 *
 *  NT loader related code.
 *
@@ -80,6 +80,9 @@ NTSTATUS NtRawGetProcAddress(
         return STATUS_OBJECT_NAME_NOT_FOUND;
 
     exprva = NtHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
+    if (exprva == 0)
+        return STATUS_INVALID_IMAGE_FORMAT;
+
     expsize = NtHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size;
 
     exp = (PIMAGE_EXPORT_DIRECTORY)((ULONG_PTR)Module + exprva);
@@ -458,16 +461,19 @@ NTSTATUS NtLdrApiSetResolveLibrary(
         //
         // Only Win10+ version supported.
         //
-        if (ApiSetNamespace->Version != 6)
+        if (ApiSetNamespace->Version != API_SET_SCHEMA_VERSION_V6)
             return STATUS_UNKNOWN_REVISION;
 
-        if (ApiSetToResolve->Length < 8)
+        //
+        // Must include something except prefix.
+        //
+        if (ApiSetToResolve->Length <= API_SET_PREFIX_NAME_U_SIZE)
             return STATUS_INVALID_PARAMETER_2;
 
         //
         // Check prefix.
         //
-        SchemaPrefix = APISET_TO_UPPER_PREFIX(((ULONG64*)ApiSetToResolve->Buffer)[0]);
+        SchemaPrefix = API_SET_TO_UPPER_PREFIX(((ULONG64*)ApiSetToResolve->Buffer)[0]);
         if ((SchemaPrefix != API_SET_PREFIX_API) && (SchemaPrefix != API_SET_PREFIX_EXT)) //API- or EXT- only
             return STATUS_INVALID_PARAMETER;
 
@@ -533,7 +539,7 @@ NTSTATUS NtLdrApiSetResolveLibrary(
                 // Host library name is not null terminated, handle that.
                 //
                 BufferPtr = (PWSTR)RtlAllocateHeap(NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY,
-                    HostLibraryEntry->ValueLength + sizeof(WCHAR));
+                    HostLibraryEntry->ValueLength + sizeof(UNICODE_NULL));
 
                 if (BufferPtr) {
 

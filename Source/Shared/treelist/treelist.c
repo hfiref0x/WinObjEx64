@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       TREELIST.C
 *
-*  VERSION:     1.30
+*  VERSION:     1.34
 *
-*  DATE:        22 July 2020
+*  DATE:        16 Sept 2021
 *
 *  TreeList control.
 *
@@ -712,6 +712,18 @@ LRESULT CALLBACK TreeListWindowProc(
 
         return SendMessage((HWND)GetWindowLongPtr(hwnd, TL_HEADERCONTROL_SLOT), HDM_INSERTITEM, wParam, lParam);
 
+    case HDM_GETITEM:
+
+        return SendMessage((HWND)GetWindowLongPtr(hwnd, TL_HEADERCONTROL_SLOT), HDM_GETITEM, wParam, lParam);
+
+    case HDM_SETITEM:
+
+        return SendMessage((HWND)GetWindowLongPtr(hwnd, TL_HEADERCONTROL_SLOT), HDM_SETITEM, wParam, lParam);
+
+    case HDM_HITTEST:
+
+        return SendMessage((HWND)GetWindowLongPtr(hwnd, TL_HEADERCONTROL_SLOT), HDM_HITTEST, 0, lParam);
+    
     case TVM_GETNEXTITEM:
 
         return SendMessage((HWND)GetWindowLongPtr(hwnd, TL_TREECONTROL_SLOT), TVM_GETNEXTITEM, wParam, lParam);

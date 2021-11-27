@@ -4,9 +4,9 @@
 *
 *  TITLE:       OBJECTS.C
 *
-*  VERSION:     1.90
+*  VERSION:     1.92
 *
-*  DATE:        17 May 2021
+*  DATE:        03 Oct 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -28,6 +28,7 @@ WOBJ_TYPE_DESC g_TypeComposition = { L"Composition", 0xf009caea, ObjectTypeCompo
 WOBJ_TYPE_DESC g_TypeController = { L"Controller", 0x38a0df3c, ObjectTypeController, IDI_ICON_CONTROLLER, IDS_DESC_CONTROLLER };
 WOBJ_TYPE_DESC g_TypeCoreMessaging = { L"CoreMessaging", 0x86bcebe5, ObjectTypeCoreMessaging, IDI_ICON_COREMESSAGING, IDS_DESC_COREMESSAGING };
 WOBJ_TYPE_DESC g_TypeCoverageSampler = { L"CoverageSampler", 0xb6a0f960, ObjectTypeCoverageSampler, IDI_ICON_COVERAGESAMPLER, IDS_DESC_COVERAGESAMPLER };
+WOBJ_TYPE_DESC g_TypeCpuPartition = { L"CpuPartition", 0xafdf1c82, ObjectTypeCpuPartition, IDI_ICON_CPUPARTITION, IDI_DESC_CPUPARTITION };
 WOBJ_TYPE_DESC g_TypeDebugObject = { L"DebugObject", 0x8282e52, ObjectTypeDebugObject, IDI_ICON_DEBUGOBJECT, IDS_DESC_DEBUGOBJECT };
 WOBJ_TYPE_DESC g_TypeDesktop = { OBTYPE_NAME_DESKTOP, 0xd1ffc79c, ObjectTypeDesktop, IDI_ICON_DESKTOP, IDS_DESC_DESKTOP };
 WOBJ_TYPE_DESC g_TypeDevice = { L"Device", OBTYPE_HASH_DEVICE, ObjectTypeDevice, IDI_ICON_DEVICE, IDS_DESC_DEVICE };
@@ -108,6 +109,7 @@ static WOBJ_TYPE_DESC* gpObjectTypes[] = {
     &g_TypeController,
     &g_TypeCoreMessaging,
     &g_TypeCoverageSampler,
+    &g_TypeCpuPartition,
     &g_TypeDebugObject,
     &g_TypeDesktop,
     &g_TypeDevice,

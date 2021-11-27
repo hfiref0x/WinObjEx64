@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     1.90
+*  VERSION:     1.92
 *
-*  DATE:        16 May 2021
+*  DATE:        19 Nov 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -531,6 +531,28 @@ VOID propSetProcessMitigationsInfo(
                 SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
             }
 
+        }
+    }
+
+    //
+    // Redirection Trust.
+    //
+    if (supGetProcessMitigationPolicy(hProcess,
+        (PROCESS_MITIGATION_POLICY)ProcessRedirectionTrustPolicy,
+        sizeof(PROCESS_MITIGATION_REDIRECTION_TRUST_POLICY_W10),
+        &Policies.RedirectionTrustPolicy))
+    {
+        if (Policies.RedirectionTrustPolicy.Flags) {
+
+            if (Policies.RedirectionTrustPolicy.EnforceRedirectionTrust) {
+                _strcpy(szBuffer, TEXT("RedirectionTrust -> Enforced"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
+
+            if (Policies.RedirectionTrustPolicy.AuditRedirectionTrust) {
+                _strcpy(szBuffer, TEXT("AuditRedirectionTrust -> Enabled"));
+                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            }
         }
     }
 

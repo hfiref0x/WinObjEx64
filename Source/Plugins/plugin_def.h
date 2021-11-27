@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2020
+*  (C) COPYRIGHT AUTHORS, 2019 - 2021
 *
 *  TITLE:       PLUGIN_DEF.H
 *
 *  VERSION:     1.10
 *
-*  DATE:        17 July 2020
+*  DATE:        01 Oct 2021
 *
 *  Common header file for the plugin subsystem definitions.
 *
@@ -27,6 +27,14 @@
 #define MAX_PLUGIN_NAME 32
 #define MAX_AUTHORS_NAME 32
 #define MAX_PLUGIN_DESCRIPTION 128
+
+// Plugin run state
+
+// Indicates that plugin is running or about to run
+#define PLUGIN_RUNNING  0
+
+// Indicates that plugin need to be stopped
+#define PLUGIN_STOP     1
 
 typedef BOOL(CALLBACK* pfnReadSystemMemoryEx)(
     _In_ ULONG_PTR Address,

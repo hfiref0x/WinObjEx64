@@ -4,9 +4,9 @@
 *
 *  TITLE:       SYMPARSER.C
 *
-*  VERSION:     1.16
+*  VERSION:     1.17
 *
-*  DATE:        29 June 2021
+*  DATE:        11 Oct 2021
 *
 *  DbgHelp wrapper for symbols parser support.
 *
@@ -1342,7 +1342,7 @@ BOOL SympInitPointers(
 
     UINT i;
 
-    RtlZeroMemory(dwPtrs, sizeof(dwPtrs));
+    RtlSecureZeroMemory(dwPtrs, sizeof(dwPtrs));
 
     for (i = 0; i < RTL_NUMBER_OF(szFuncs); i++) {
         dwPtrs[i] = (DWORD64)GetProcAddress(hDbgHelp, szFuncs[i]);
@@ -1510,7 +1510,7 @@ BOOL SymGlobalsInit(
     //
     // Init dbghelp pointers and allocate context.
     //
-    RtlZeroMemory(&g_SymGlobals.ApiSet, sizeof(DBGHELP_PTRS));
+    RtlSecureZeroMemory(&g_SymGlobals.ApiSet, sizeof(DBGHELP_PTRS));
 
     if (SympInitPointers(hDbg, &g_SymGlobals.ApiSet)) {
 

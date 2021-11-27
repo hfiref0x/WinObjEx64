@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.00
 *
-*  DATE:        27 July 2021
+*  DATE:        01 Oct 2021
 *
 *  WinObjEx64 ImageScope plugin.
 *
@@ -24,13 +24,13 @@
 //
 HINSTANCE g_ThisDLL = NULL;
 
+volatile DWORD g_PluginState = PLUGIN_RUNNING;
+
 //
 // Plugin entry.
 //
 WINOBJEX_PLUGIN* g_Plugin = NULL;
-
-volatile BOOL g_PluginQuit = FALSE;
-volatile LONG g_RefCount = 0;
+volatile LONG m_RefCount = 0;
 
 VOID PmpCopyObjectData(
     _In_ WINOBJEX_PARAM_OBJECT* Source,
@@ -123,7 +123,7 @@ DWORD WINAPI PluginThread(
     ULONG uResult = 0;
     GUI_CONTEXT* Context = (GUI_CONTEXT*)Parameter;
 
-    InterlockedIncrement(&g_RefCount);
+    InterlockedIncrement(&m_RefCount);
 
     do {
 
@@ -145,7 +145,7 @@ DWORD WINAPI PluginThread(
 
     } while (FALSE);
 
-    InterlockedDecrement(&g_RefCount);
+    InterlockedDecrement(&m_RefCount);
 
     if (Context) {
         PluginFreeGlobalResources(Context);
@@ -287,9 +287,9 @@ void CALLBACK StopPlugin(
     VOID
 )
 {
-    InterlockedExchange((PLONG)&g_PluginQuit, TRUE);
+    InterlockedExchange((PLONG)&g_PluginState, PLUGIN_STOP);
 
-    while (g_RefCount);
+    while (m_RefCount);
 
     if (g_Plugin->GuiShutdownCallback)
         g_Plugin->GuiShutdownCallback(g_Plugin, g_ThisDLL, NULL);

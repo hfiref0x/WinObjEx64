@@ -4,9 +4,9 @@
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.91
+*  VERSION:     1.92
 *
-*  DATE:        26 July 2021
+*  DATE:        28 Oct 2021
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -34,6 +34,7 @@
 #pragma warning(disable: 4091) // 'typedef ': ignored on left of '%s' when no variable is declared
 #pragma warning(disable: 4201) // nameless struct/union
 #pragma warning(disable: 4390) // empty controlled statement
+#pragma warning(disable: 5105) // macro expansion producing 'defined' has undefined behavior
 #pragma warning(disable: 6320) // Exception-filter expression is the constant EXCEPTION_EXECUTE_HANDLER.
 #pragma warning(disable: 6258) // Using TerminateThread does not allow proper thread clean up.
 
@@ -66,6 +67,12 @@
 #pragma comment(lib, "libucrt.lib")
 #pragma comment(lib, "libvcruntime.lib")
 #endif
+#endif
+#endif
+
+#if defined (_MSC_VER)
+#if (_MSC_VER >= 1920)
+#pragma comment(linker,"/merge:_RDATA=.rdata")
 #endif
 #endif
 
@@ -110,6 +117,7 @@
 #include "excepth.h"
 #include "extapi.h"
 #include "plugmngr.h"
+#include "hash.h"
 #include "log\log.h"
 #include "tests\testunit.h"
 
@@ -153,7 +161,6 @@ typedef struct _WINOBJ_GLOBALS {
     HANDLE Heap;
     LPWSTR CurrentObjectPath;
     pfnHtmlHelpW HtmlHelpW;
-    CRITICAL_SECTION Lock;
     RTL_OSVERSIONINFOW osver;
     HWND AuxDialogs[wobjMaxDlgId];
     WCHAR szTempDirectory[MAX_PATH + 1]; //not including backslash

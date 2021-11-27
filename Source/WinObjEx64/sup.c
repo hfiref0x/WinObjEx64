@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.90
+*  VERSION:     1.92
 *
-*  DATE:        03 June 2021
+*  DATE:        19 Nov 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -416,7 +416,7 @@ BOOL supInitTreeListForDump(
 *
 */
 VOID supClipboardCopy(
-    _In_ LPWSTR lpText,
+    _In_ LPCWSTR lpText,
     _In_ SIZE_T cbText
 )
 {
@@ -501,14 +501,12 @@ BOOL supQueryObjectFromHandle(
     BOOL bFound = FALSE;
     PSYSTEM_HANDLE_INFORMATION_EX pHandles;
 
-    if (Address)
-        *Address = 0;
-    if (TypeIndex)
-        *TypeIndex = 0;
-
     if (Address == NULL) {
         return bFound;
     }
+
+    if (TypeIndex)
+        *TypeIndex = 0;
 
     pHandles = (PSYSTEM_HANDLE_INFORMATION_EX)supGetSystemInfo(SystemExtendedHandleInformation, NULL);
     if (pHandles) {
@@ -520,6 +518,9 @@ BOOL supQueryObjectFromHandle(
 
         supHeapFree(pHandles);
     }
+
+    if (!bFound) *Address = 0;
+
     return bFound;
 }
 
@@ -695,7 +696,7 @@ BOOL supEnumIconCallback(
 *
 */
 HICON supGetMainIcon(
-    _In_ LPWSTR lpFileName,
+    _In_ LPCWSTR lpFileName,
     _In_ INT cx,
     _In_ INT cy
 )
@@ -1378,7 +1379,7 @@ VOID supShowProperties(
 *
 */
 VOID supJumpToFile(
-    _In_ LPWSTR lpFilePath
+    _In_ LPCWSTR lpFilePath
 )
 {
     LPITEMIDLIST pidList;
@@ -1545,6 +1546,62 @@ VOID supSetGotoLinkTargetToolButtonState(
 }
 
 /*
+* supTreeListAddCopyValueItem
+*
+* Purpose:
+*
+* Add copy to clipboard menu item depending on hit treelist header item.
+*
+*/
+BOOL supTreeListAddCopyValueItem(
+    _In_ HMENU hMenu,
+    _In_ HWND hwndTreeList,
+    _In_ UINT uId,
+    _In_opt_ UINT uPos,
+    _In_ LPARAM lParam,
+    _In_ INT *pSubItemHit
+)
+{
+    HDHITTESTINFO hti;
+    HD_ITEM hdItem;
+    WCHAR szHeaderText[MAX_PATH + 1];
+    WCHAR szItem[MAX_PATH * 2];
+
+    *pSubItemHit = -1;
+
+    hti.iItem = -1;
+    hti.pt.x = LOWORD(lParam);
+    hti.pt.y = HIWORD(lParam);
+    ScreenToClient(hwndTreeList, &hti.pt);
+
+    hti.pt.y = 1;
+    if (TreeList_HeaderHittest(hwndTreeList, &hti) < 0)
+        return FALSE;
+
+    RtlSecureZeroMemory(&hdItem, sizeof(hdItem));
+
+    szHeaderText[0] = 0;
+    hdItem.mask = HDI_TEXT;
+
+    hdItem.cchTextMax = sizeof(szHeaderText) - 1;
+
+    hdItem.pszText = szHeaderText;
+    if (TreeList_GetHeaderItem(hwndTreeList, hti.iItem, &hdItem)) {
+
+        *pSubItemHit = hti.iItem;
+
+        _strcpy(szItem, TEXT("Copy \""));
+        _strcat(szItem, szHeaderText);
+        _strcat(szItem, TEXT("\""));
+        if (InsertMenu(hMenu, uPos, MF_BYCOMMAND, uId, szItem)) {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+/*
 * supListViewAddCopyValueItem
 *
 * Purpose:
@@ -1591,6 +1648,69 @@ BOOL supListViewAddCopyValueItem(
             *pColumnHit = lvht.iSubItem;
             *pItemHit = lvht.iItem;
             return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+/*
+* supTreeListCopyItemValueToClipboard
+*
+* Purpose:
+*
+* Copy selected treelist item text to the clipboard.
+*
+*/
+BOOL supTreeListCopyItemValueToClipboard(
+    _In_ HWND hwndTreeList,
+    _In_ INT tlSubItemHit
+)
+{
+    INT         nIndex;
+    LPWSTR      lpCopyData = NULL;
+    SIZE_T      cbCopyData = 0;
+    TVITEMEX    itemex;
+    WCHAR       szText[MAX_PATH + 1];
+
+    TL_SUBITEMS_FIXED* pSubItems = NULL;
+
+    szText[0] = 0;
+    RtlSecureZeroMemory(&itemex, sizeof(itemex));
+    itemex.mask = TVIF_TEXT;
+    itemex.hItem = TreeList_GetSelection(hwndTreeList);
+    itemex.pszText = szText;
+    itemex.cchTextMax = MAX_PATH;
+
+    if (TreeList_GetTreeItem(hwndTreeList, &itemex, &pSubItems)) {
+
+        if ((tlSubItemHit > 0) && (pSubItems != NULL)) {
+
+            nIndex = (tlSubItemHit - 1);
+            if (nIndex < (INT)pSubItems->Count) {
+
+                lpCopyData = pSubItems->Text[nIndex];
+                cbCopyData = _strlen(lpCopyData) * sizeof(WCHAR);
+
+            }
+
+        }
+        else {
+            if (tlSubItemHit == 0) {
+                lpCopyData = szText;
+                cbCopyData = sizeof(szText);
+            }
+        }
+
+        if (lpCopyData && cbCopyData) {
+            supClipboardCopy(lpCopyData, cbCopyData);
+            return TRUE;
+        }
+        else {
+            if (OpenClipboard(NULL)) {
+                EmptyClipboard();
+                CloseClipboard();
+            }
         }
     }
 
@@ -1648,8 +1768,8 @@ BOOL supListViewCopyItemValueToClipboard(
 */
 VOID supSetMenuIcon(
     _In_ HMENU hMenu,
-    _In_ UINT Item,
-    _In_ ULONG_PTR IconData
+    _In_ UINT iItem,
+    _In_ HICON hIcon
 )
 {
     MENUITEMINFO mii;
@@ -1657,8 +1777,8 @@ VOID supSetMenuIcon(
     mii.cbSize = sizeof(mii);
     mii.fMask = MIIM_BITMAP | MIIM_DATA;
     mii.hbmpItem = HBMMENU_CALLBACK;
-    mii.dwItemData = IconData;
-    SetMenuItemInfo(hMenu, Item, FALSE, &mii);
+    mii.dwItemData = (ULONG_PTR)hIcon;
+    SetMenuItemInfo(hMenu, iItem, FALSE, &mii);
 }
 
 /*
@@ -1670,7 +1790,8 @@ VOID supSetMenuIcon(
 *
 */
 VOID supCreateToolbarButtons(
-    _In_ HWND hWndToolbar
+    _In_ HWND hWndToolbar,
+    _In_ HIMAGELIST hImageList
 )
 {
     TBBUTTON tbButtons[] = {
@@ -1682,7 +1803,7 @@ VOID supCreateToolbarButtons(
         { 2, ID_FIND_FINDOBJECT, TBSTATE_ENABLED, BTNS_BUTTON, {0}, 0, -1 }
     };
 
-    SendMessage(hWndToolbar, TB_SETIMAGELIST, 0, (LPARAM)g_ToolBarMenuImages);
+    SendMessage(hWndToolbar, TB_SETIMAGELIST, 0, (LPARAM)hImageList);
     SendMessage(hWndToolbar, TB_LOADIMAGES, (WPARAM)IDB_STD_SMALL_COLOR, (LPARAM)HINST_COMMCTRL);
     SendMessage(hWndToolbar, TB_BUTTONSTRUCTSIZE, (WPARAM)sizeof(TBBUTTON), 0);
     SendMessage(hWndToolbar, TB_ADDBUTTONS, (WPARAM)RTL_NUMBER_OF(tbButtons), (LPARAM)&tbButtons);
@@ -1809,11 +1930,12 @@ VOID supInit(
 
     kdInit(IsFullAdmin);
 
-    if (IsFullAdmin) {
-        supCreateSCMSnapshot(SERVICE_DRIVER, NULL);
-    }
+    RtlInitializeCriticalSection(&g_sapiDB.Lock);
+    RtlInitializeCriticalSection(&g_scmDB.Lock);
 
+    if (IsFullAdmin) supCreateSCMSnapshot(SERVICE_DRIVER, NULL);
     sapiCreateSetupDBSnapshot();
+
     g_pObjectTypesInfo = (POBJECT_TYPES_INFORMATION)supGetObjectTypesInfo();
 
     status = ExApiSetInit();
@@ -1849,6 +1971,9 @@ VOID supShutdown(
 
     supFreeSCMSnapshot(NULL);
     sapiFreeSnapshot();
+
+    RtlDeleteCriticalSection(&g_sapiDB.Lock);
+    RtlDeleteCriticalSection(&g_scmDB.Lock);
 
     if (g_pObjectTypesInfo) supHeapFree(g_pObjectTypesInfo);
 
@@ -1957,10 +2082,10 @@ BOOL supCreateSCMSnapshot(
                 Snapshot->NumberOfEntries = dwNumServices;
             }
             else {
-                EnterCriticalSection(&g_WinObj.Lock);
+                EnterCriticalSection(&g_scmDB.Lock);
                 g_scmDB.Entries = Services;
                 g_scmDB.NumberOfEntries = dwNumServices;
-                LeaveCriticalSection(&g_WinObj.Lock);
+                LeaveCriticalSection(&g_scmDB.Lock);
             }
         }
 
@@ -1988,11 +2113,11 @@ VOID supFreeSCMSnapshot(
         Snapshot->Entries = NULL;
     }
     else {
-        EnterCriticalSection(&g_WinObj.Lock);
+        EnterCriticalSection(&g_scmDB.Lock);
         supHeapFree(g_scmDB.Entries);
         g_scmDB.Entries = NULL;
         g_scmDB.NumberOfEntries = 0;
-        LeaveCriticalSection(&g_WinObj.Lock);
+        LeaveCriticalSection(&g_scmDB.Lock);
     }
 }
 
@@ -2095,7 +2220,7 @@ BOOL sapiCreateSetupDBSnapshot(
     if (g_WinObj.IsWine == FALSE) {
         RtlSetHeapInformation(Heap, HeapEnableTerminationOnCorruption, NULL, 0);
     }
-    g_sapiDB.sapiHeap = Heap;
+    g_sapiDB.HeapHandle = Heap;
 
     hDevInfo = SetupDiGetClassDevs(NULL, NULL, NULL, DIGCF_PRESENT | DIGCF_ALLCLASSES);
     if (hDevInfo != INVALID_HANDLE_VALUE) {
@@ -2162,12 +2287,12 @@ VOID sapiFreeSnapshot(
     VOID
 )
 {
-    EnterCriticalSection(&g_WinObj.Lock);
-    RtlDestroyHeap(g_sapiDB.sapiHeap);
-    g_sapiDB.sapiHeap = NULL;
+    EnterCriticalSection(&g_sapiDB.Lock);
+    RtlDestroyHeap(g_sapiDB.HeapHandle);
+    g_sapiDB.HeapHandle = NULL;
     g_sapiDB.ListHead.Blink = NULL;
     g_sapiDB.ListHead.Flink = NULL;
-    LeaveCriticalSection(&g_WinObj.Lock);
+    LeaveCriticalSection(&g_sapiDB.Lock);
 }
 
 /*
@@ -2204,13 +2329,13 @@ BOOL WINAPI supCallbackShowChildWindow(
 *
 */
 BOOL supQueryWinstationDescription(
-    _In_ LPWSTR lpWindowStationName,
+    _In_ LPCWSTR lpWindowStationName,
     _Inout_ LPWSTR Buffer,
     _In_ DWORD ccBuffer //size of buffer in chars
 )
 {
-    BOOL   bFound = FALSE;
-    LPWSTR lpType;
+    BOOL    bFound = FALSE;
+    LPCWSTR lpType;
 
     ULONG entryId;
 
@@ -2261,7 +2386,7 @@ BOOL supQueryWinstationDescription(
 *
 */
 BOOL supQueryTypeInfo(
-    _In_ LPWSTR lpTypeName,
+    _In_ LPCWSTR lpTypeName,
     _Inout_ LPWSTR Buffer,
     _In_ DWORD ccBuffer //size of buffer in chars
 )
@@ -2331,7 +2456,7 @@ BOOL supQueryTypeInfo(
 *
 */
 BOOL supQueryDeviceDescription(
-    _In_ LPWSTR lpDeviceName,
+    _In_ LPCWSTR lpDeviceName,
     _Inout_ LPWSTR Buffer,
     _In_ DWORD ccBuffer //size of buffer in chars
 )
@@ -2364,7 +2489,7 @@ BOOL supQueryDeviceDescription(
         }
         _strcat(lpFullDeviceName, lpDeviceName);
 
-        EnterCriticalSection(&g_WinObj.Lock);
+        EnterCriticalSection(&g_sapiDB.Lock);
 
         //
         // Enumerate devices.
@@ -2392,7 +2517,7 @@ BOOL supQueryDeviceDescription(
             Entry = Entry->Flink;
         }
 
-        LeaveCriticalSection(&g_WinObj.Lock);
+        LeaveCriticalSection(&g_sapiDB.Lock);
 
         supHeapFree(lpFullDeviceName);
     }
@@ -2410,7 +2535,7 @@ BOOL supQueryDeviceDescription(
 *
 */
 BOOL supQueryDriverDescription(
-    _In_ LPWSTR lpDriverName,
+    _In_ LPCWSTR lpDriverName,
     _Inout_ LPWSTR Buffer,
     _In_ DWORD ccBuffer //size of buffer in chars
 )
@@ -2443,7 +2568,7 @@ BOOL supQueryDriverDescription(
     // First attempt - look in SCM database.
     //
 
-    RtlEnterCriticalSection(&g_WinObj.Lock);
+    RtlEnterCriticalSection(&g_scmDB.Lock);
 
     if (g_scmDB.Entries != NULL) {
         pInfo = (LPENUM_SERVICE_STATUS_PROCESS)g_scmDB.Entries;
@@ -2472,7 +2597,7 @@ BOOL supQueryDriverDescription(
         }
     }
 
-    RtlLeaveCriticalSection(&g_WinObj.Lock);
+    RtlLeaveCriticalSection(&g_scmDB.Lock);
 
     // second attempt - query through registry and fs
     if (bResult == FALSE) {
@@ -2795,14 +2920,14 @@ BOOL supQuerySectionFileInfo(
 */
 NTSTATUS supOpenDirectoryForObject(
     _Out_ PHANDLE DirectoryHandle,
-    _In_ LPWSTR lpObjectName,
-    _In_ LPWSTR lpDirectory
+    _In_ LPCWSTR lpObjectName,
+    _In_ LPCWSTR lpDirectory
 )
 {
     BOOL   needFree = FALSE;
     NTSTATUS ntStatus;
     SIZE_T i, l, rdirLen, ldirSz;
-    LPWSTR SingleDirName, LookupDirName;
+    LPWSTR singleDirName, lookupDirName;
 
     *DirectoryHandle = NULL;
 
@@ -2811,7 +2936,7 @@ NTSTATUS supOpenDirectoryForObject(
     if (lpDirectory == NULL)
         return STATUS_INVALID_PARAMETER_3;
 
-    LookupDirName = lpDirectory;
+    lookupDirName = (LPWSTR)lpDirectory;
 
     //
     // 1) Check if object is directory self
@@ -2819,20 +2944,21 @@ NTSTATUS supOpenDirectoryForObject(
     // Else go to 3
     //
     l = 0;
-    rdirLen = _strlen(lpDirectory);
+    rdirLen = _strlen(lookupDirName);
     for (i = 0; i < rdirLen; i++) {
-        if (lpDirectory[i] == TEXT('\\'))
+        if (lookupDirName[i] == TEXT('\\'))
             l = i + 1;
     }
-    SingleDirName = &lpDirectory[l];
-    if (_strcmpi(SingleDirName, lpObjectName) == 0) {
+
+    singleDirName = &lookupDirName[l];
+    if (_strcmpi(singleDirName, lpObjectName) == 0) {
         //
         //  2) If we are looking for directory, move search directory up
         //  e.g. lpDirectory = \ObjectTypes, lpObjectName = ObjectTypes then lpDirectory = \ 
         //
         ldirSz = rdirLen * sizeof(WCHAR) + sizeof(UNICODE_NULL);
-        LookupDirName = (LPWSTR)supHeapAlloc(ldirSz);
-        if (LookupDirName == NULL)
+        lookupDirName = (LPWSTR)supHeapAlloc(ldirSz);
+        if (lookupDirName == NULL)
             return STATUS_INSUFFICIENT_RESOURCES;
 
         needFree = TRUE;
@@ -2840,15 +2966,15 @@ NTSTATUS supOpenDirectoryForObject(
         //special case for root 
         if (l == 1) l++;
 
-        supCopyMemory(LookupDirName, ldirSz, lpDirectory, (l - 1) * sizeof(WCHAR));
+        supCopyMemory(lookupDirName, ldirSz, lpDirectory, (l - 1) * sizeof(WCHAR));
     }
     //
     // 3) Open directory
     //
-    ntStatus = supOpenDirectory(DirectoryHandle, NULL, LookupDirName, DIRECTORY_QUERY);
+    ntStatus = supOpenDirectory(DirectoryHandle, NULL, lookupDirName, DIRECTORY_QUERY);
 
     if (needFree) {
-        supHeapFree(LookupDirName);
+        supHeapFree(lookupDirName);
     }
 
     return ntStatus;
@@ -2865,7 +2991,7 @@ NTSTATUS supOpenDirectoryForObject(
 BOOL supSaveDialogExecute(
     _In_ HWND OwnerWindow,
     _Inout_ LPWSTR SaveFileName,
-    _In_ LPWSTR lpDialogFilter
+    _In_ LPCWSTR DialogFilter
 )
 {
     OPENFILENAME tag1;
@@ -2874,7 +3000,7 @@ BOOL supSaveDialogExecute(
 
     tag1.lStructSize = sizeof(OPENFILENAME);
     tag1.hwndOwner = OwnerWindow;
-    tag1.lpstrFilter = lpDialogFilter;
+    tag1.lpstrFilter = DialogFilter;
     tag1.lpstrFile = SaveFileName;
     tag1.nMaxFile = MAX_PATH;
     tag1.lpstrInitialDir = NULL;
@@ -3051,7 +3177,7 @@ BOOL supxConvertFileName(
 *
 */
 BOOL supGetWin32FileName(
-    _In_ LPWSTR FileName,
+    _In_ LPCWSTR FileName,
     _Inout_ LPWSTR Win32FileName,
     _In_ SIZE_T ccWin32FileName
 )
@@ -3135,17 +3261,18 @@ BOOLEAN supQuerySecureBootState(
     _Out_ PBOOLEAN pbSecureBoot
 )
 {
-    BOOLEAN bResult = FALSE;
     BOOLEAN bSecureBoot = FALSE;
     HKEY    hKey;
     DWORD   dwState, dwSize, returnLength;
     LSTATUS lRet;
 
+    SYSTEM_SECUREBOOT_INFORMATION sbi;
+
     if (pbSecureBoot)
         *pbSecureBoot = FALSE;
 
     //
-    // First attempt, query firmware environment variable, will not work if not fulladmin.
+    // 1) query firmware environment variable, will not work if not fulladmin.
     //
     if (supEnablePrivilege(SE_SYSTEM_ENVIRONMENT_PRIVILEGE, TRUE)) {
 
@@ -3162,16 +3289,33 @@ BOOLEAN supQuerySecureBootState(
             if (pbSecureBoot) {
                 *pbSecureBoot = bSecureBoot;
             }
-            bResult = TRUE;
+            return TRUE;
         }
     }
 
-    if (bResult) {
-        return bResult;
+    //
+    // 2) NtQSI(SystemSecureBootInformation).
+    //
+    RtlSecureZeroMemory(&sbi, sizeof(sbi));
+    if (NT_SUCCESS(NtQuerySystemInformation(SystemSecureBootInformation,
+        &sbi,
+        sizeof(SYSTEM_SECUREBOOT_INFORMATION),
+        &returnLength)))
+    {
+        if (sbi.SecureBootCapable == FALSE) {
+            if (pbSecureBoot)
+                *pbSecureBoot = FALSE;
+        }
+        else {
+            if (pbSecureBoot)
+                *pbSecureBoot = sbi.SecureBootEnabled;
+        }
+
+        return TRUE;
     }
 
     //
-    // Second attempt, query state from registry.
+    // 3) Query state from registry.
     //
     hKey = NULL;
     lRet = RegOpenKeyEx(HKEY_LOCAL_MACHINE, T_SECUREBOOTSTATEKEY, 0, KEY_QUERY_VALUE, &hKey);
@@ -3179,30 +3323,27 @@ BOOLEAN supQuerySecureBootState(
         dwState = 0;
         dwSize = sizeof(DWORD);
         lRet = RegQueryValueEx(hKey, T_SECUREBOOTSTATEVALUE, NULL, NULL, (LPBYTE)&dwState, &dwSize);
+        RegCloseKey(hKey);
+
         if (lRet == ERROR_SUCCESS) {
 
             if (pbSecureBoot) {
                 *pbSecureBoot = (dwState == 1);
             }
-            bResult = TRUE;
+            return TRUE;
         }
-        RegCloseKey(hKey);
-    }
-
-    if (bResult) {
-        return bResult;
     }
 
     //
-    // Third attempt, query state from user shared data.
+    // 4) Query state from user shared data.
     //
     dwState = USER_SHARED_DATA->DbgSecureBootEnabled;
     if (pbSecureBoot) {
         *pbSecureBoot = (dwState == 1);
-    }
-    bResult = TRUE;
+        return TRUE;
+    }  
 
-    return bResult;
+    return FALSE;
 }
 
 /*
@@ -4285,8 +4426,8 @@ NTSTATUS supOpenDeviceObjectEx(
 NTSTATUS supOpenNamedObjectByType(
     _Out_ HANDLE* ObjectHandle,
     _In_ ULONG TypeIndex,
-    _In_ LPWSTR ObjectDirectory,
-    _In_ LPWSTR ObjectName,
+    _In_ LPCWSTR ObjectDirectory,
+    _In_ LPCWSTR ObjectName,
     _In_ ACCESS_MASK DesiredAccess
 )
 {
@@ -5137,7 +5278,7 @@ BOOL supCloseObjectFromContext(
 */
 VOID supShowLastError(
     _In_ HWND hWnd,
-    _In_ LPWSTR Source,
+    _In_ LPCWSTR Source,
     _In_ DWORD LastError
 )
 {
@@ -5169,7 +5310,7 @@ VOID supShowLastError(
 */
 VOID supShowNtStatus(
     _In_ HWND hWnd,
-    _In_ LPWSTR lpText,
+    _In_ LPCWSTR lpText,
     _In_ NTSTATUS Status
 )
 {
@@ -5215,51 +5356,6 @@ LPWSTR supFormatNtError(
         NULL);
 
     return lpMessage;
-}
-
-/*
-* supCopyTreeListSubItemValue
-*
-* Purpose:
-*
-* Copy treelist value to the clipboard.
-*
-*/
-VOID supCopyTreeListSubItemValue(
-    _In_ HWND TreeList,
-    _In_ UINT ValueIndex
-)
-{
-    SIZE_T             cbText;
-    LPWSTR             lpText;
-    TL_SUBITEMS_FIXED* subitems = NULL;
-    TVITEMEX           itemex;
-    WCHAR              textbuf[MAX_PATH + 1];
-
-    __try {
-
-        RtlSecureZeroMemory(&itemex, sizeof(itemex));
-        RtlSecureZeroMemory(textbuf, sizeof(textbuf));
-        itemex.mask = TVIF_TEXT;
-        itemex.hItem = TreeList_GetSelection(TreeList);
-        itemex.pszText = textbuf;
-        itemex.cchTextMax = MAX_PATH;
-
-        TreeList_GetTreeItem(TreeList, &itemex, &subitems);
-
-        if (subitems) {
-            if (ValueIndex < subitems->Count) {
-                lpText = subitems->Text[ValueIndex];
-                if (lpText) {
-                    cbText = _strlen(lpText) * sizeof(WCHAR);
-                    supClipboardCopy(lpText, cbText);
-                }
-            }
-        }
-    }
-    __except (WOBJ_EXCEPTION_FILTER) {
-        return;
-    }
 }
 
 /*
@@ -5880,7 +5976,7 @@ int __cdecl supxHandlesLookupCallback2(
     int i;
     PSYSTEM_HANDLE_TABLE_ENTRY_INFO_EX elem1 = (PSYSTEM_HANDLE_TABLE_ENTRY_INFO_EX)first;
     PSYSTEM_HANDLE_TABLE_ENTRY_INFO_EX elem2 = (PSYSTEM_HANDLE_TABLE_ENTRY_INFO_EX)second;
-
+    
     ULONG_PTR FirstObject = (ULONG_PTR)elem1->Object;
     ULONG_PTR SecondObject = (ULONG_PTR)elem2->Object;
 
@@ -6725,7 +6821,7 @@ BOOL supxDeleteKeyRecursive(
 */
 BOOL supRegDeleteKeyRecursive(
     _In_ HKEY hKeyRoot,
-    _In_ LPWSTR lpSubKey)
+    _In_ LPCWSTR lpSubKey)
 {
     WCHAR szKeyName[MAX_PATH * 2];
     RtlSecureZeroMemory(szKeyName, sizeof(szKeyName));
@@ -6951,7 +7047,7 @@ BOOL supRichEdit32Load()
 *
 */
 VOID supReportAbnormalTermination(
-    _In_ LPWSTR FunctionName
+    _In_ LPCWSTR FunctionName
 )
 {
     WCHAR szBuffer[512];
@@ -7008,7 +7104,7 @@ VOID supReportException(
 *
 */
 VOID supReportAPIError(
-    _In_ LPWSTR FunctionName,
+    _In_ LPCWSTR FunctionName,
     _In_ NTSTATUS NtStatus
 )
 {
@@ -7136,8 +7232,8 @@ BOOL supxListViewExportCSV(
     if (!text)
         return FALSE;
 
-    RtlZeroMemory(&ih, sizeof(HDITEM));
-    RtlZeroMemory(&lvi, sizeof(LVITEM));
+    RtlSecureZeroMemory(&ih, sizeof(HDITEM));
+    RtlSecureZeroMemory(&lvi, sizeof(LVITEM));
 
     ih.pszText = lvi.pszText = text;
     ih.cchTextMax = lvi.cchTextMax = 32767;
@@ -7226,7 +7322,7 @@ BOOL supxListViewExportCSV(
 *
 */
 BOOL supListViewExportToFile(
-    _In_ LPWSTR FileName,
+    _In_ LPCWSTR FileName,
     _In_ HWND WindowHandle,
     _In_ HWND ListView
 )
@@ -7264,7 +7360,7 @@ BOOL supListViewExportToFile(
 VOID supStatusBarSetText(
     _In_ HWND hwndStatusBar,
     _In_ WPARAM partIndex,
-    _In_ LPWSTR lpText
+    _In_ LPCWSTR lpText
 )
 {
     SendMessage(hwndStatusBar, SB_SETTEXT, partIndex, (LPARAM)lpText);
@@ -7484,6 +7580,25 @@ NTSTATUS supQueryProcessImageFileNameWin32(
     }
 
     return ntStatus;
+}
+
+/*
+* supQueryProcessImageFileNameByProcessId
+*
+* Purpose:
+*
+* Query process filename by process id in native format.
+*
+*/
+NTSTATUS supQueryProcessImageFileNameByProcessId(
+    _In_ HANDLE UniqueProcessId,
+    _Out_ PUNICODE_STRING ProcessImageFileName
+)
+{
+    return ntsupQueryProcessImageFileNameByProcessId(UniqueProcessId,
+        ProcessImageFileName,
+        (PNTSUPMEMALLOC)supHeapAlloc,
+        (PNTSUPMEMFREE)supHeapFree);
 }
 
 /*
@@ -7740,7 +7855,10 @@ wchar_t* supExtractFileName(
 *
 */
 VOID supObjectDumpHandlePopupMenu(
-    _In_ HWND hwndDlg
+    _In_ HWND hwndDlg,
+    _In_ HWND hwndTreeList,
+    _In_ INT *pSubItemHit,
+    _In_ LPARAM lParam
 )
 {
     POINT pt1;
@@ -7751,9 +7869,16 @@ VOID supObjectDumpHandlePopupMenu(
 
     hMenu = CreatePopupMenu();
     if (hMenu) {
-        InsertMenu(hMenu, 0, MF_BYCOMMAND, ID_OBJECT_COPY, T_COPYVALUE);
-        InsertMenu(hMenu, 1, MF_BYCOMMAND, ID_ADDINFO_COPY, T_COPYADDINFO);
-        TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, hwndDlg, NULL);
+
+        if (supTreeListAddCopyValueItem(hMenu,
+            hwndTreeList,
+            ID_OBJECT_COPY,
+            0,
+            lParam,
+            pSubItemHit)) 
+        {
+            TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, hwndDlg, NULL);
+        }
         DestroyMenu(hMenu);
     }
 }
@@ -7887,4 +8012,449 @@ LPWSTR supPathAddBackSlash(
     }
 
     return lpszResult;
+}
+
+__inline WCHAR nibbletoh(BYTE c, BOOLEAN upcase)
+{
+    if (c < 10)
+        return L'0' + c;
+
+    c -= 10;
+
+    if (upcase)
+        return L'A' + c;
+
+    return L'a' + c;
+}
+
+/*
+* supPrintHash
+*
+* Purpose:
+*
+* Output hash.
+* Returned buffer must be freed with supHeapFree when no longer needed.
+*
+*/
+LPWSTR supPrintHash(
+    _In_reads_bytes_(Length) LPBYTE Buffer,
+    _In_ ULONG Length,
+    _In_ BOOLEAN UpcaseHex
+)
+{
+    ULONG   c;
+    PWCHAR  lpText;
+    BYTE    x;
+
+    lpText = (LPWSTR)supHeapAlloc(sizeof(WCHAR) + ((SIZE_T)Length * 2 * sizeof(WCHAR)));
+    if (lpText) {
+
+        for (c = 0; c < Length; ++c) {
+            x = Buffer[c];
+
+            lpText[c * 2] = nibbletoh(x >> 4, UpcaseHex);
+            lpText[c * 2 + 1] = nibbletoh(x & 15, UpcaseHex);
+        }
+
+        lpText[Length * 2] = 0;
+    }
+
+    return lpText;
+}
+
+/*
+* supDestroyFileViewInfo
+*
+* Purpose:
+*
+* Deallocate file view information resources.
+*
+*/
+VOID supDestroyFileViewInfo(
+    _In_ PFILE_VIEW_INFO ViewInformation
+)
+{
+    if (ViewInformation->FileHandle != INVALID_HANDLE_VALUE) {
+        CloseHandle(ViewInformation->FileHandle);
+        ViewInformation->FileHandle = INVALID_HANDLE_VALUE;
+    }
+    if (ViewInformation->SectionHandle) {
+        NtClose(ViewInformation->SectionHandle);
+        ViewInformation->SectionHandle = NULL;
+    }
+    if (ViewInformation->ViewBase) {
+        if (NT_SUCCESS(NtUnmapViewOfSection(NtCurrentProcess(),
+            ViewInformation->ViewBase)))
+        {
+            ViewInformation->ViewBase = NULL;
+            ViewInformation->ViewSize = 0;
+        }
+    }
+
+    ViewInformation->NtHeaders = NULL;
+    ViewInformation->FileSize.QuadPart = 0;
+}
+
+#define PE_SIGNATURE_SIZE           4
+#define RTL_MEG                     (1024UL * 1024UL)
+#define RTLP_IMAGE_MAX_DOS_HEADER   (256UL * RTL_MEG)
+#define MM_SIZE_OF_LARGEST_IMAGE    ((ULONG)0x77000000)
+#define MM_MAXIMUM_IMAGE_HEADER     (2 * PAGE_SIZE)
+#define MM_MAXIMUM_IMAGE_SECTIONS                       \
+     ((MM_MAXIMUM_IMAGE_HEADER - (PAGE_SIZE + sizeof(IMAGE_NT_HEADERS))) /  \
+            sizeof(IMAGE_SECTION_HEADER))
+
+/*
+* supxInitializeFileViewInfo
+*
+* Purpose:
+*
+* Open file for mapping, create section, remember file size.
+*
+*/
+NTSTATUS supxInitializeFileViewInfo(
+    _In_ PFILE_VIEW_INFO ViewInformation
+)
+{
+    NTSTATUS ntStatus = STATUS_SUCCESS;
+    HANDLE fileHandle, sectionHandle = NULL;
+    LARGE_INTEGER fileSize;
+
+    fileSize.QuadPart = 0;
+    fileHandle = CreateFile(ViewInformation->FileName,
+        GENERIC_READ,
+        FILE_SHARE_READ,
+        NULL,
+        OPEN_EXISTING,
+        FILE_SUPPORTS_BLOCK_REFCOUNTING | FILE_ATTRIBUTE_NORMAL,
+        NULL);
+
+    if (fileHandle != INVALID_HANDLE_VALUE) {
+
+        if (!GetFileSizeEx(fileHandle, &fileSize)) {
+            CloseHandle(fileHandle);
+            fileHandle = INVALID_HANDLE_VALUE;
+            ntStatus = STATUS_FILE_INVALID;
+        }
+        else {
+
+            ntStatus = NtCreateSection(
+                &sectionHandle,
+                SECTION_QUERY | SECTION_MAP_READ,
+                NULL,
+                &fileSize,
+                PAGE_READONLY,
+                SEC_COMMIT,
+                fileHandle);
+
+            if (!NT_SUCCESS(ntStatus)) {
+                CloseHandle(fileHandle);
+                fileHandle = INVALID_HANDLE_VALUE;
+            }
+
+        }
+
+    }
+    else {
+        ntStatus = STATUS_OBJECT_NAME_NOT_FOUND;
+    }
+
+    ViewInformation->Status = StatusOk;
+    ViewInformation->FileHandle = fileHandle;
+    ViewInformation->FileSize = fileSize;
+    ViewInformation->SectionHandle = sectionHandle;
+
+    return ntStatus;
+}
+
+/*
+* supMapInputFileForRead
+*
+* Purpose:
+*
+* Create mapped section from input file.
+*
+*/
+NTSTATUS supMapInputFileForRead(
+    _In_ PFILE_VIEW_INFO ViewInformation,
+    _In_ BOOLEAN PartialMap
+)
+{
+    NTSTATUS ntStatus;
+    SIZE_T viewSize;
+
+    ntStatus = supxInitializeFileViewInfo(ViewInformation);
+    if (!NT_SUCCESS(ntStatus))
+        return ntStatus;
+
+    if (PartialMap) {
+
+        if (ViewInformation->FileSize.QuadPart < RTL_MEG)
+            viewSize = (SIZE_T)ViewInformation->FileSize.QuadPart;
+        else
+            viewSize = (SIZE_T)RTL_MEG;
+
+    }
+    else {
+
+        viewSize = (SIZE_T)ViewInformation->FileSize.QuadPart;
+
+    }
+
+    ntStatus = NtMapViewOfSection(ViewInformation->SectionHandle,
+        NtCurrentProcess(),
+        &ViewInformation->ViewBase,
+        0,
+        0,
+        NULL,
+        &viewSize,
+        ViewShare,
+        0,
+        PAGE_READONLY);
+
+    if (NT_SUCCESS(ntStatus))
+        ViewInformation->ViewSize = viewSize;
+
+    return ntStatus;
+}
+
+#pragma warning(push)
+#pragma warning(disable: 4319)
+
+/*
+* supxValidateNtHeader
+*
+* Purpose:
+*
+* Common validation for file image header.
+*
+*/
+BOOLEAN supxValidateNtHeader(
+    _In_ PIMAGE_NT_HEADERS Header,
+    _Out_ PIMAGE_VERIFY_STATUS VerifyStatus
+)
+{
+    INT i;
+    ULONG64 lastSectionVA;
+    PIMAGE_NT_HEADERS32 pHdr32;
+    PIMAGE_NT_HEADERS64 pHdr64;
+    PIMAGE_SECTION_HEADER pSection;
+
+    if (Header->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC) {
+
+        pHdr64 = (PIMAGE_NT_HEADERS64)(Header);
+
+        if (((pHdr64->OptionalHeader.FileAlignment & 511) != 0) &&
+            (pHdr64->OptionalHeader.FileAlignment != pHdr64->OptionalHeader.SectionAlignment))
+        {
+            *VerifyStatus = StatusBadFileAlignment;
+            return FALSE;
+        }
+
+        if (pHdr64->OptionalHeader.FileAlignment == 0) {
+            *VerifyStatus = StatusBadFileAlignment;
+            return FALSE;
+        }
+
+        if (((pHdr64->OptionalHeader.SectionAlignment - 1) &
+            pHdr64->OptionalHeader.SectionAlignment) != 0)
+        {
+            *VerifyStatus = StatusBadSectionAlignment;
+            return FALSE;
+        }
+
+        if (((pHdr64->OptionalHeader.FileAlignment - 1) &
+            pHdr64->OptionalHeader.FileAlignment) != 0)
+        {
+            *VerifyStatus = StatusBadFileAlignment;
+            return FALSE;
+        }
+
+        if (pHdr64->OptionalHeader.SectionAlignment < pHdr64->OptionalHeader.FileAlignment) {
+            *VerifyStatus = StatusBadSectionAlignment;
+            return FALSE;
+        }
+
+        if (pHdr64->OptionalHeader.SizeOfImage > MM_SIZE_OF_LARGEST_IMAGE) {
+            *VerifyStatus = StatusBadSizeOfImage;
+            return FALSE;
+        }
+
+        if (pHdr64->FileHeader.NumberOfSections > MM_MAXIMUM_IMAGE_SECTIONS) {
+            *VerifyStatus = StatusBadSectionCount;
+            return FALSE;
+        }
+
+        if (pHdr64->FileHeader.Machine != IMAGE_FILE_MACHINE_IA64 &&
+            pHdr64->FileHeader.Machine != IMAGE_FILE_MACHINE_AMD64)
+        {
+            *VerifyStatus = StatusBadFileHeaderMachine;
+            return FALSE;
+        }
+
+    }
+    else if (Header->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC) {
+
+        pHdr32 = (PIMAGE_NT_HEADERS32)(Header);
+
+        if (((pHdr32->OptionalHeader.FileAlignment & 511) != 0) &&
+            (pHdr32->OptionalHeader.FileAlignment != pHdr32->OptionalHeader.SectionAlignment))
+        {
+            *VerifyStatus = StatusBadFileAlignment;
+            return FALSE;
+        }
+
+        if (pHdr32->OptionalHeader.FileAlignment == 0) {
+            *VerifyStatus = StatusBadFileAlignment;
+            return FALSE;
+        }
+
+        if (((pHdr32->OptionalHeader.SectionAlignment - 1) &
+            pHdr32->OptionalHeader.SectionAlignment) != 0)
+        {
+            *VerifyStatus = StatusBadSectionAlignment;
+            return FALSE;
+        }
+
+        if (((pHdr32->OptionalHeader.FileAlignment - 1) &
+            pHdr32->OptionalHeader.FileAlignment) != 0)
+        {
+            *VerifyStatus = StatusBadFileAlignment;
+            return FALSE;
+        }
+
+        if (pHdr32->OptionalHeader.SectionAlignment < pHdr32->OptionalHeader.FileAlignment) {
+            *VerifyStatus = StatusBadSectionAlignment;
+            return FALSE;
+        }
+
+        if (pHdr32->OptionalHeader.SizeOfImage > MM_SIZE_OF_LARGEST_IMAGE) {
+            *VerifyStatus = StatusBadSizeOfImage;
+            return FALSE;
+        }
+
+        if (pHdr32->FileHeader.NumberOfSections > MM_MAXIMUM_IMAGE_SECTIONS) {
+            *VerifyStatus = StatusBadSectionCount;
+            return FALSE;
+        }
+
+        if ((pHdr32->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC) &&
+            !(pHdr32->FileHeader.Machine == IMAGE_FILE_MACHINE_I386))
+        {
+            *VerifyStatus = StatusBadFileHeaderMachine;
+            return FALSE;
+        }
+
+    }
+    else {
+        *VerifyStatus = StatusBadOptionalHeaderMagic;
+        return FALSE;
+    }
+
+    pSection = IMAGE_FIRST_SECTION(Header);
+
+    lastSectionVA = (ULONG64)pSection->VirtualAddress;
+
+    for (i = 0; i < Header->FileHeader.NumberOfSections; i++, pSection++) {
+
+        if (pSection->VirtualAddress != lastSectionVA) {
+            *VerifyStatus = StatusBadNtHeaders;
+            return FALSE;
+        }
+
+        lastSectionVA += ALIGN_UP_BY(pSection->Misc.VirtualSize,
+            Header->OptionalHeader.SectionAlignment);
+
+    }
+
+    if (lastSectionVA != Header->OptionalHeader.SizeOfImage) {
+        *VerifyStatus = StatusBadNtHeaders;
+        return FALSE;
+    }
+
+    *VerifyStatus = StatusOk;
+    return TRUE;
+}
+
+#pragma warning(pop)
+
+/*
+* supIsValidImage
+*
+* Purpose:
+*
+* Check whatever image is in valid PE format.
+*
+*/
+BOOLEAN supIsValidImage(
+    _In_ PFILE_VIEW_INFO ViewInformation
+)
+{
+    PIMAGE_DOS_HEADER dosHeader = (PIMAGE_DOS_HEADER)ViewInformation->ViewBase;
+    PIMAGE_NT_HEADERS ntHeaders = NULL;
+
+    ViewInformation->Status = StatusUnknownError;
+
+    __try {
+
+        if (dosHeader->e_magic != IMAGE_DOS_SIGNATURE) {
+            ViewInformation->Status = StatusBadDosMagic;
+            return FALSE;
+        }
+
+        if (dosHeader->e_lfanew == 0 ||
+            (ULONG)dosHeader->e_lfanew > ViewInformation->FileSize.LowPart ||
+            (((ULONG)dosHeader->e_lfanew + PE_SIGNATURE_SIZE +
+                (ULONG)sizeof(IMAGE_FILE_HEADER)) >= ViewInformation->FileSize.LowPart) ||
+            dosHeader->e_lfanew >= RTLP_IMAGE_MAX_DOS_HEADER)
+        {
+            ViewInformation->Status = StatusBadNewExeOffset;
+            return FALSE;
+        }
+
+        if (((ULONG)dosHeader->e_lfanew +
+            sizeof(IMAGE_NT_HEADERS) +
+            (16 * sizeof(IMAGE_SECTION_HEADER))) <= (ULONG)dosHeader->e_lfanew)
+        {
+            ViewInformation->Status = StatusBadNewExeOffset;
+            return FALSE;
+        }
+
+        ntHeaders = (PIMAGE_NT_HEADERS)((PCHAR)ViewInformation->ViewBase + (ULONG)dosHeader->e_lfanew);
+        if (ntHeaders->Signature != IMAGE_NT_SIGNATURE) {
+            ViewInformation->Status = StatusBadNtSignature;
+            return FALSE;
+        }
+
+        if ((ULONG)dosHeader->e_lfanew >= ntHeaders->OptionalHeader.SizeOfImage) {
+            ViewInformation->Status = StatusBadNewExeOffset;
+            return FALSE;
+        }
+
+        if (ntHeaders->FileHeader.SizeOfOptionalHeader == 0 ||
+            ntHeaders->FileHeader.SizeOfOptionalHeader & (sizeof(ULONG_PTR) - 1))
+        {
+            ViewInformation->Status = StatusBadOptionalHeader;
+            return FALSE;
+        }
+
+        if (!(ntHeaders->FileHeader.Characteristics & IMAGE_FILE_EXECUTABLE_IMAGE)) {
+            ViewInformation->Status = StatusBadFileHeaderCharacteristics;
+            return FALSE;
+        }
+
+        if (ntHeaders->FileHeader.Machine != IMAGE_FILE_MACHINE_AMD64 &&
+            ntHeaders->FileHeader.Machine != IMAGE_FILE_MACHINE_I386)
+        {
+            ViewInformation->Status = StatusBadFileHeaderMachine;
+            return FALSE;
+        }
+
+        return supxValidateNtHeader(ntHeaders, &ViewInformation->Status);
+
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        ViewInformation->Status = StatusExceptionOccurred;
+        return FALSE;
+    }
 }

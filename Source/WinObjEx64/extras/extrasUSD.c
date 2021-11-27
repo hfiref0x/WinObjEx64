@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASUSD.C
 *
-*  VERSION:     1.90
+*  VERSION:     1.92
 *
-*  DATE:        31 May 2021
+*  DATE:        18 Sep 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -36,7 +36,9 @@ VOID UsdDumpSharedRegion(
 {
     BOOL                bAny = FALSE;
     UINT                i;
-    DWORD               mask;
+    DWORD               mask, cFlags;
+
+    LPCWSTR             *pvSharedFlagsDesc;
 
     HTREEITEM           h_tviRootItem, h_tviSubItem, h_tviLast = NULL;
     LPWSTR              lpType;
@@ -58,7 +60,7 @@ VOID UsdDumpSharedRegion(
             break;
 
         //
-        //KUSER_SHARED_DATA
+        // KUSER_SHARED_DATA
         //
 
         h_tviRootItem = supTreeListAddItem(
@@ -74,7 +76,9 @@ VOID UsdDumpSharedRegion(
             break;
         }
 
-        //NtSystemRoot
+        //
+        // NtSystemRoot
+        //
         RtlSecureZeroMemory(&subitems, sizeof(subitems));
         subitems.Text[0] = pUserSharedData->NtSystemRoot;
         subitems.Count = 1;
@@ -88,7 +92,9 @@ VOID UsdDumpSharedRegion(
             TEXT("NtSystemRoot"),
             &subitems);
 
-        //NtProductType
+        //
+        // NtProductType
+        //
         switch (pUserSharedData->NtProductType) {
         case NtProductWinNt:
             lpType = TEXT("NtProductWinNt");
@@ -125,7 +131,9 @@ VOID UsdDumpSharedRegion(
             (COLORREF)0,
             TRUE);
 
-        //Version
+        //
+        // NtMajorVersion
+        //
         propObDumpUlong(
             g_UsdDlgContext.TreeList,
             h_tviRootItem,
@@ -137,6 +145,9 @@ VOID UsdDumpSharedRegion(
             (COLORREF)0,
             (COLORREF)0);
 
+        //
+        // NtMinorVersion
+        // 
         propObDumpUlong(
             g_UsdDlgContext.TreeList,
             h_tviRootItem,
@@ -151,7 +162,7 @@ VOID UsdDumpSharedRegion(
         //
         // Prior to Windows 10 this field declared as reserved.
         //
-        if (g_WinObj.osver.dwMajorVersion >= 10) {
+        if (g_NtBuildNumber >= NT_WIN10_THRESHOLD1) {
             propObDumpUlong(
                 g_UsdDlgContext.TreeList,
                 h_tviRootItem,
@@ -164,7 +175,9 @@ VOID UsdDumpSharedRegion(
                 (COLORREF)0);
         }
 
-        //ProcessorFeatures
+        //
+        // ProcessorFeatures
+        //
         h_tviSubItem = supTreeListAddItem(
             g_UsdDlgContext.TreeList,
             h_tviRootItem,
@@ -202,7 +215,7 @@ VOID UsdDumpSharedRegion(
             }
 
             //
-            // Output dotted corner.
+            // Output dotted corner for processor features.
             //
             if (h_tviLast) {
                 RtlSecureZeroMemory(&itemex, sizeof(itemex));
@@ -232,7 +245,9 @@ VOID UsdDumpSharedRegion(
             }
         }
 
-        //AlternativeArchitecture
+        //
+        // AlternativeArchitecture
+        //
         switch (pUserSharedData->AlternativeArchitecture) {
         case StandardDesign:
             lpType = TEXT("StandardDesign");
@@ -256,7 +271,9 @@ VOID UsdDumpSharedRegion(
             (COLORREF)0,
             (COLORREF)0);
 
-        //SuiteMask
+        //
+        // SuiteMask
+        //
         RtlSecureZeroMemory(&subitems, sizeof(subitems));
         RtlSecureZeroMemory(&szValue, sizeof(szValue));
         szValue[0] = TEXT('0');
@@ -303,7 +320,7 @@ VOID UsdDumpSharedRegion(
             }
 
             //
-            // Output dotted corner.
+            // Output dotted corner for suite mask.
             //
             if (h_tviLast) {
                 RtlSecureZeroMemory(&itemex, sizeof(itemex));
@@ -316,7 +333,9 @@ VOID UsdDumpSharedRegion(
             }
         }
 
-        //KdDebuggerEnabled
+        //
+        // KdDebuggerEnabled
+        //
         propObDumpByte(
             g_UsdDlgContext.TreeList,
             h_tviRootItem,
@@ -327,7 +346,9 @@ VOID UsdDumpSharedRegion(
             (COLORREF)0,
             TRUE);
 
-        //MitigationPolicies
+        //
+        // MitigationPolicies
+        //
 
         if (g_NtBuildNumber < NT_WIN8_RTM) {
 
@@ -345,7 +366,7 @@ VOID UsdDumpSharedRegion(
         else {
 
             //
-            // Expanded to more values starting from Windows 8+.
+            // Expanded to more values starting from Windows 8+
             //
 
             RtlSecureZeroMemory(&subitems, sizeof(subitems));
@@ -403,7 +424,22 @@ VOID UsdDumpSharedRegion(
             }
         }
 
-        //SafeBootMode
+        //
+        // ActiveConsoleId
+        //
+        propObDumpUlong(g_UsdDlgContext.TreeList,
+            h_tviRootItem,
+            TEXT("ActiveConsoleId"),
+            NULL,
+            pUserSharedData->ActiveConsoleId,
+            TRUE,
+            FALSE,
+            (COLORREF)0,
+            (COLORREF)0);
+
+        //
+        // SafeBootMode
+        //
         propObDumpByte(
             g_UsdDlgContext.TreeList,
             h_tviRootItem,
@@ -414,7 +450,9 @@ VOID UsdDumpSharedRegion(
             (COLORREF)0,
             TRUE);
 
-        //SharedDataFlags
+        //
+        // SharedDataFlags
+        //
         RtlSecureZeroMemory(&subitems, sizeof(subitems));
         RtlSecureZeroMemory(&szValue, sizeof(szValue));
         szValue[0] = TEXT('0');
@@ -433,15 +471,26 @@ VOID UsdDumpSharedRegion(
             &subitems);
 
         if (h_tviSubItem) {
+
             h_tviLast = NULL;
-            for (i = 0; i < MAX_KNOWN_SHAREDDATAFLAGS; i++) {
+
+            if (g_NtBuildNumber < NT_WIN8_RTM) {
+                pvSharedFlagsDesc = T_SharedDataFlagsW7;
+                cFlags = RTL_NUMBER_OF(T_SharedDataFlagsW7);
+            }
+            else {
+                pvSharedFlagsDesc = T_SharedDataFlags;
+                cFlags = RTL_NUMBER_OF(T_SharedDataFlags);
+            }
+
+            for (i = 0; i < cFlags; i++) {
                 if (GET_BIT(pUserSharedData->SharedDataFlags, i)) {
                     RtlSecureZeroMemory(&subitems, sizeof(subitems));
                     RtlSecureZeroMemory(&szValue, sizeof(szValue));
                     _strcpy(szValue, TEXT("BitPos: "));
                     ultostr(i, _strend(szValue));
                     subitems.Text[0] = szValue;
-                    subitems.Text[1] = (LPWSTR)T_SharedDataFlags[i];
+                    subitems.Text[1] = (LPWSTR)pvSharedFlagsDesc[i];
                     subitems.Count = 2;
                     h_tviLast = supTreeListAddItem(
                         g_UsdDlgContext.TreeList,
@@ -455,7 +504,7 @@ VOID UsdDumpSharedRegion(
             }
 
             //
-            // Output dotted corner.
+            // Output dotted corner for shared data flags
             //
             if (h_tviLast) {
                 RtlSecureZeroMemory(&itemex, sizeof(itemex));
@@ -469,7 +518,70 @@ VOID UsdDumpSharedRegion(
 
         }
 
+        //
+        // Cookie
+        //
+        propObDumpUlong(g_UsdDlgContext.TreeList,
+            h_tviRootItem,
+            TEXT("Cookie"),
+            NULL,
+            pUserSharedData->Cookie,
+            TRUE,
+            FALSE,
+            (COLORREF)0,
+            (COLORREF)0);
+
+        //
+        // ActiveProcessorCount
+        //
+        propObDumpUlong(g_UsdDlgContext.TreeList,
+            h_tviRootItem,
+            TEXT("ActiveProcessorCount"),
+            NULL,
+            pUserSharedData->ActiveProcessorCount,
+            FALSE,
+            FALSE,
+            (COLORREF)0,
+            (COLORREF)0);
+
     } while (FALSE);
+}
+
+/*
+* UsdDialogHandlePopupMenu
+*
+* Purpose:
+*
+* Treelist popup construction
+*
+*/
+VOID UsdDialogHandlePopupMenu(
+    _In_ HWND hwndDlg,
+    _In_ LPARAM lParam
+)
+{
+    HMENU hMenu;
+    POINT pt1;
+
+    if (GetCursorPos(&pt1) == FALSE)
+        return;
+
+    hMenu = CreatePopupMenu();
+    if (hMenu) {
+
+        if (supTreeListAddCopyValueItem(hMenu,
+            g_UsdDlgContext.TreeList,
+            ID_OBJECT_COPY,
+            0,
+            lParam,
+            &g_UsdDlgContext.tlSubItemHit))
+        {
+            TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, hwndDlg, NULL);
+        }
+
+        DestroyMenu(hMenu);
+
+    }
 }
 
 /*
@@ -487,8 +599,6 @@ INT_PTR CALLBACK UsdDialogProc(
     _In_  LPARAM lParam
 )
 {
-    UNREFERENCED_PARAMETER(lParam);
-
     switch (uMsg) {
 
     case WM_INITDIALOG:
@@ -502,9 +612,29 @@ INT_PTR CALLBACK UsdDialogProc(
         break;
 
     case WM_COMMAND:
-        if (GET_WM_COMMAND_ID(wParam, lParam) == IDCANCEL) {
+
+        switch (GET_WM_COMMAND_ID(wParam, lParam)) {
+        case IDCANCEL:
+
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
+            return TRUE;
+
+        case ID_OBJECT_COPY:
+
+            supTreeListCopyItemValueToClipboard(g_UsdDlgContext.TreeList,
+                g_UsdDlgContext.tlSubItemHit);
+
+            break;
+
+        default:
+            break;
         }
+
+        break;
+
+    case WM_CONTEXTMENU:
+
+        UsdDialogHandlePopupMenu(hwndDlg, lParam);
         break;
 
     default:
@@ -539,6 +669,8 @@ VOID extrasCreateUsdDialog(
         return;
 
     g_WinObj.AuxDialogs[wobjUSDDlgId] = g_UsdDlgContext.hwndDlg;
+
+    g_UsdDlgContext.tlSubItemHit = -1;
 
     UsdDumpSharedRegion(g_UsdDlgContext.hwndDlg);
 }

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2019
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       EXTRASUSD.H
 *
-*  VERSION:     1.82
+*  VERSION:     1.92
 *
-*  DATE:        01 Nov 2019
+*  DATE:        17 Sep 2021
 *
 *  Common header file for Extras User Shared Data dialog.
 *
@@ -63,8 +63,17 @@ static LPWSTR T_PROCESSOR_FEATURES[] = {
     L"PF_AVX512F_INSTRUCTIONS_AVAILABLE",
 };
 
-#define MAX_KNOWN_SHAREDDATAFLAGS 11
-static LPCWSTR T_SharedDataFlags[MAX_KNOWN_SHAREDDATAFLAGS] = {
+static LPCWSTR T_SharedDataFlagsW7[] = {
+    L"DbgErrorPortPresent",
+    L"DbgElevationEnabled",
+    L"DbgVirtEnabled",
+    L"DbgInstallerDetectEnabled",
+    L"DbgSystemDllRelocated",
+    L"DbgDynProcessorEnabled",
+    L"DbgSEHValidationEnabled"
+};
+
+static LPCWSTR T_SharedDataFlags[] = {
     L"DbgErrorPortPresent",
     L"DbgElevationEnabled",
     L"DbgVirtEnabled",
@@ -98,7 +107,7 @@ static VALUE_DESC SuiteMasks[MAX_KNOWN_SUITEMASKS] = {
     { L"StorageServer", VER_SUITE_STORAGE_SERVER },
     { L"ComputeServer", VER_SUITE_COMPUTE_SERVER },
     { L"HomeServer", VER_SUITE_WH_SERVER },
-    { L"MultiUserTS", 0x00020000 }
+    { L"MultiUserTS", VER_SUITE_MULTIUSERTS }
 };
 
 VOID extrasCreateUsdDialog(

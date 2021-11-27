@@ -2,6 +2,7 @@ ActivationObject - 19H1, win32k managed object
 ActivityReference - new RS2 object
 CoreMessagining - new RS1 object, win32k managed object
 CoverageSampler - new RS4 object, ETW
+CpuPartition - new Win11 object, unnamed objects
 EtwSessionDemuxEntry - new Win10 object
 IoCompletionReserve - same as IoCompletion except using reserve process allocated memory
 IoRing - new 21H2 object, circular buffer used to queue multiple I/O operations simultaneously

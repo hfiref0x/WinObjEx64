@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
-*  VERSION:     1.91
+*  VERSION:     1.92
 *
-*  DATE:        10 Aug 2021
+*  DATE:        30 Oct 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -24,6 +24,14 @@ BOOLEAN g_DrvDlgShimsEnabled = FALSE;
 #define ID_DRVLIST_SAVE     40002
 #define ID_DRVLIST_PROP     ID_OBJECT_PROPERTIES
 #define ID_DRVLIST_REFRESH  ID_VIEW_REFRESH
+
+#define ID_CALC_HASH_MD5            6000
+#define ID_CALC_HASH_SHA1           6001
+#define ID_CALC_HASH_SHA256         6002
+#define ID_CALC_HASH_SHA384         6003
+#define ID_CALC_HASH_SHA512         6004
+#define ID_CALC_HASH_PAGE_SHA1      6005
+#define ID_CALC_HASH_PAGE_SHA256    6006
 
 #define COLUMN_DRVLIST_LOAD_ORDER               0
 #define COLUMN_DRVLIST_DRIVER_NAME              1
@@ -43,6 +51,93 @@ BOOLEAN g_DrvDlgShimsEnabled = FALSE;
 
 EXTRASCONTEXT g_DriversDlgContext[DDM_Max];
 
+static ULONG g_cDrvShimmed = 0;
+
+LPCWSTR g_cryptAlgoIdRef[] = {
+    BCRYPT_MD5_ALGORITHM,
+    BCRYPT_SHA1_ALGORITHM,
+    BCRYPT_SHA256_ALGORITHM,
+    BCRYPT_SHA384_ALGORITHM,
+    BCRYPT_SHA512_ALGORITHM
+};
+
+/*
+* DrvListCopyHash
+*
+* Purpose:
+*
+* Copy hash menu handler.
+*
+*/
+VOID DrvListCopyHash(
+    _In_ EXTRASCONTEXT* Context,
+    _In_ UINT MenuId
+)
+{
+    INT         mark;
+    NTSTATUS    ntStatus;
+    LPWSTR      lpItem, lpszHash = NULL;
+    WCHAR       szBuffer[MAX_PATH + 1];
+
+    FILE_VIEW_INFO fvi;
+
+    if (ListView_GetSelectedCount(Context->ListView) == 0)
+        return;
+
+    mark = ListView_GetSelectionMark(Context->ListView);
+    if (mark < 0)
+        return;
+
+    lpItem = supGetItemText(Context->ListView, mark,
+        COLUMN_DRVLIST_MODULE_NAME, NULL);
+
+    if (lpItem == NULL)
+        return;
+
+    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+    if (supGetWin32FileName(lpItem, szBuffer, MAX_PATH)) {
+
+        RtlSecureZeroMemory(&fvi, sizeof(fvi));
+
+        fvi.FileName = szBuffer;
+
+        ntStatus = HashLoadFile(&fvi, FALSE);
+        if (NT_SUCCESS(ntStatus)) {
+
+            if (MenuId >= ID_CALC_HASH_PAGE_SHA1 && MenuId <= ID_CALC_HASH_PAGE_SHA256) {
+
+                lpszHash = ComputeHashForFile(&fvi,
+                    (MenuId == ID_CALC_HASH_PAGE_SHA1) ? BCRYPT_SHA1_ALGORITHM : BCRYPT_SHA256_ALGORITHM,
+                    PAGE_SIZE,
+                    g_WinObj.Heap,
+                    TRUE);
+
+            }
+            else if (MenuId >= ID_CALC_HASH_MD5 && MenuId <= ID_CALC_HASH_SHA512) {
+
+                lpszHash = ComputeHashForFile(&fvi,
+                    g_cryptAlgoIdRef[MenuId - ID_CALC_HASH_MD5],
+                    PAGE_SIZE,
+                    g_WinObj.Heap,
+                    FALSE);
+            }
+
+            HashUnloadFile(&fvi);
+        }
+        else {
+            supShowNtStatus(Context->hwndDlg, TEXT("Error loading file, NTSTATUS: "), ntStatus);
+        }
+    }
+
+    supHeapFree(lpItem);
+
+    if (lpszHash) {
+        supClipboardCopy(lpszHash, _strlen(lpszHash) * sizeof(WCHAR));
+        supHeapFree(lpszHash);
+    }
+
+}
+
 /*
 * DrvUpdateStatusBar
 *
@@ -56,10 +151,24 @@ VOID DrvUpdateStatusBar(
     _In_ INT iItem)
 {
     INT iSubItem;
-    WCHAR szBuffer[MAX_PATH + 1];
+    INT sbParts[] = { 100, -1 };
+    WCHAR szBuffer[MAX_PATH];
 
     _strcpy(szBuffer, TEXT("Total: "));
     ultostr(ListView_GetItemCount(Context->ListView), _strend(szBuffer));
+
+    //
+    // Add "shimmed" drivers count for normal dialog mode.
+    //
+    if (Context->DialogMode == DDM_Normal) {
+        if (g_cDrvShimmed) {
+            _strcat(szBuffer, TEXT(", Shimmed: "));
+            ultostr(g_cDrvShimmed, _strend(szBuffer));
+            sbParts[0] = 240;
+        }
+    }
+
+    SendMessage(Context->StatusBar, SB_SETPARTS, 2, (LPARAM)&sbParts);
     supStatusBarSetText(Context->StatusBar, 0, (LPWSTR)&szBuffer);
 
     if (iItem >= 0) {
@@ -98,8 +207,9 @@ VOID DrvHandlePopupMenu(
 )
 {
     HMENU hMenu;
-    UINT uPos = 0;
+    UINT uPos = 0, i;
     EXTRASCONTEXT* Context = (EXTRASCONTEXT*)lpUserParam;
+    WCHAR szMenuText[MAX_PATH + 1];
 
     hMenu = CreatePopupMenu();
     if (hMenu) {
@@ -130,6 +240,40 @@ VOID DrvHandlePopupMenu(
         InsertMenu(hMenu, ++uPos, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
         InsertMenu(hMenu, ++uPos, MF_BYCOMMAND, ID_DRVLIST_REFRESH, T_VIEW_REFRESH);
 
+        if (Context->DialogMode == DDM_Normal) {
+            //
+            // Hashes.
+            //
+            InsertMenu(hMenu, ++uPos, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+            for (i = ID_CALC_HASH_MD5; i < ID_CALC_HASH_PAGE_SHA1; i++) {
+                RtlStringCchPrintfSecure(szMenuText,
+                    MAX_PATH,
+                    TEXT("Copy Authenticode %ws hash"),
+                    g_cryptAlgoIdRef[i - ID_CALC_HASH_MD5]);
+                InsertMenu(hMenu, ++uPos, MF_BYCOMMAND, i, szMenuText);
+            }
+
+            InsertMenu(hMenu, ++uPos, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+
+            RtlStringCchPrintfSecure(szMenuText,
+                MAX_PATH,
+                TEXT("Copy %ws page hash"),
+                BCRYPT_SHA1_ALGORITHM);
+
+            InsertMenu(hMenu, ++uPos, MF_BYCOMMAND, ID_CALC_HASH_PAGE_SHA1, szMenuText);
+
+            RtlStringCchPrintfSecure(szMenuText,
+                MAX_PATH,
+                TEXT("Copy %ws page hash"),
+                BCRYPT_SHA256_ALGORITHM);
+
+            InsertMenu(hMenu, ++uPos, MF_BYCOMMAND, ID_CALC_HASH_PAGE_SHA256, szMenuText);
+
+        }
+
+        //
+        // Track.
+        //
         TrackPopupMenu(hMenu,
             TPM_RIGHTBUTTON | TPM_LEFTALIGN,
             lpPoint->x,
@@ -158,17 +302,19 @@ VOID DrvListViewProperties(
     INT     mark;
     WCHAR   szBuffer[MAX_PATH + 1];
 
-    mark = ListView_GetSelectionMark(Context->ListView);
-    if (mark >= 0) {
+    if (ListView_GetSelectedCount(Context->ListView)) {
+        mark = ListView_GetSelectionMark(Context->ListView);
+        if (mark >= 0) {
 
-        lpItem = supGetItemText(Context->ListView, mark,
-            COLUMN_DRVLIST_MODULE_NAME, NULL);
+            lpItem = supGetItemText(Context->ListView, mark,
+                COLUMN_DRVLIST_MODULE_NAME, NULL);
 
-        if (lpItem) {
-            RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-            if (supGetWin32FileName(lpItem, szBuffer, MAX_PATH))
-                supShowProperties(Context->hwndDlg, szBuffer);
-            supHeapFree(lpItem);
+            if (lpItem) {
+                RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+                if (supGetWin32FileName(lpItem, szBuffer, MAX_PATH))
+                    supShowProperties(Context->hwndDlg, szBuffer);
+                supHeapFree(lpItem);
+            }
         }
     }
 }
@@ -492,6 +638,8 @@ VOID DrvListDrivers(
     RTL_PROCESS_MODULES* pModulesList = NULL;
     PRTL_PROCESS_MODULE_INFORMATION pModule;
 
+    g_cDrvShimmed = 0;
+
     if (bRefresh) {
         ListView_DeleteAllItems(hwndList);
         kdQueryKernelShims(&g_kdctx, TRUE);
@@ -549,7 +697,7 @@ VOID DrvListDrivers(
 
             }
         }
-        
+
         lvitem.mask = LVIF_TEXT;
         lvitem.iSubItem = 1;
         lvitem.pszText = szBuffer;
@@ -591,8 +739,9 @@ VOID DrvListDrivers(
 
             if (supIsDriverShimmed(
                 &g_kdctx.Data->KseEngineDump,
-                pModule->ImageBase)) 
+                pModule->ImageBase))
             {
+                g_cDrvShimmed += 1;
                 _strcpy(szBuffer, TEXT("Yes"));
             }
 
@@ -770,6 +919,16 @@ VOID DriversHandleWMCommand(
         }
         break;
 
+    case ID_CALC_HASH_MD5:
+    case ID_CALC_HASH_SHA1:
+    case ID_CALC_HASH_SHA256:
+    case ID_CALC_HASH_SHA384:
+    case ID_CALC_HASH_SHA512:
+    case ID_CALC_HASH_PAGE_SHA1:
+    case ID_CALC_HASH_PAGE_SHA256:
+        DrvListCopyHash(pDlgContext, LOWORD(wParam));
+        break;
+
     default:
         break;
     }
@@ -897,7 +1056,6 @@ VOID extrasCreateDriversDialog(
 )
 {
     INT dlgIndex;
-    INT SbParts[] = { 100, -1 };
     INT iImage = ImageList_GetImageCount(g_ListViewImages) - 1, iColumn;
 
     ULONG columnsCount;
@@ -971,7 +1129,6 @@ VOID extrasCreateDriversDialog(
     SetWindowText(hwndDlg, lpCaption);
 
     pDlgContext->StatusBar = GetDlgItem(hwndDlg, ID_EXTRASLIST_STATUSBAR);
-    SendMessage(pDlgContext->StatusBar, SB_SETPARTS, 2, (LPARAM)&SbParts);
 
     extrasSetDlgIcon(pDlgContext);
 

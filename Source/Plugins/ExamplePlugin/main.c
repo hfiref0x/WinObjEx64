@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2020
+*  (C) COPYRIGHT AUTHORS, 2019 - 2021
 *
 *  TITLE:       MAIN.C
 *
 *  VERSION:     1.01
 *
-*  DATE:        27 June 2020
+*  DATE:        01 Oct 2021
 *
 *  WinObjEx64 example and test plugin.
 *
@@ -27,7 +27,8 @@
 #include "ntos/ntos.h"
 #include "plugin_def.h"
 
-volatile BOOL g_StopPlugin = FALSE;
+volatile DWORD m_PluginState = PLUGIN_RUNNING;
+
 HANDLE g_hThread = NULL;
 WINOBJEX_PARAM_BLOCK g_ParamBlock;
 WINOBJEX_PLUGIN* g_Plugin = NULL;
@@ -50,7 +51,7 @@ DWORD WINAPI PluginThread(
     MessageBox(GetDesktopWindow(), TEXT("This is message from example plugin, plugin will stop in 5 sec."), TEXT("ExamplePlugin"), MB_ICONINFORMATION);
 
     Sleep(5000);
-    InterlockedExchange((PLONG)&g_StopPlugin, TRUE);
+    InterlockedExchange((PLONG)&m_PluginState, PLUGIN_STOP);
 
     if (g_Plugin->StateChangeCallback)
         g_Plugin->StateChangeCallback(g_Plugin, PluginStopped, NULL);
@@ -77,7 +78,7 @@ NTSTATUS CALLBACK StartPlugin(
     DbgPrint("StartPlugin called from thread 0x%lx\r\n", GetCurrentThreadId());
 
     RtlCopyMemory(&g_ParamBlock, ParamBlock, sizeof(WINOBJEX_PARAM_BLOCK));
-    InterlockedExchange((PLONG)&g_StopPlugin, FALSE);
+    InterlockedExchange((PLONG)&m_PluginState, PLUGIN_RUNNING);
     g_hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)PluginThread, (PVOID)NULL, 0, &ThreadId);
     if (g_hThread) {
         Status = STATUS_SUCCESS;
@@ -112,13 +113,13 @@ void CALLBACK StopPlugin(
     DbgPrint("StopPlugin called from thread 0x%lx\r\n", GetCurrentThreadId());
 
     if (g_hThread) {
-        InterlockedExchange((PLONG)&g_StopPlugin, TRUE);
+        InterlockedExchange((PLONG)&m_PluginState, PLUGIN_STOP);
         if (WaitForSingleObject(g_hThread, 1000) == WAIT_TIMEOUT) {
-            DbgPrint("Wait timeout, terminating plugin thread, g_hTread = %llx\r\n", g_hThread);
+            DbgPrint("Wait timeout, terminating plugin thread, g_hTread = %llx\r\n", (ULONG_PTR)g_hThread);
             TerminateThread(g_hThread, 0);
         }
         else {
-            DbgPrint("Wait success, plugin thread stopped, g_Thread = %llx\r\n", g_hThread);
+            DbgPrint("Wait success, plugin thread stopped, g_Thread = %llx\r\n", (ULONG_PTR)g_hThread);
         }
         CloseHandle(g_hThread);
         g_hThread = NULL;

@@ -5,9 +5,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.185
+*  VERSION:     1.186
 *
-*  DATE:        19 Nov 2021
+*  DATE:        29 Nov 2021
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -5127,6 +5127,47 @@ typedef struct _RTL_CALLBACK_REGISTER {
     PVOID DebugPrintCallback;
     LIST_ENTRY ListEntry;
 } RTL_CALLBACK_REGISTER, *PRTL_CALLBACK_REGISTER;
+
+typedef
+VOID
+(*PPO_COALESCING_CALLBACK) (
+    _In_ ULONG Reason,
+    _In_ PDEVICE_OBJECT DeviceObject,
+    _In_ PVOID Context);
+
+typedef struct _PO_COALESCING_CALLBACK_V1 {
+    EX_PUSH_LOCK PushLock;
+    PVOID CoalescingCallback;
+    PVOID SelfPtr;
+    PPO_COALESCING_CALLBACK Callback;
+    BOOLEAN ClientOrServer;
+    PVOID Context;
+} PO_COALESCING_CALLBACK_V1, * PPO_COALESCING_CALLBACK_V1;
+
+typedef struct _PO_COALESCING_CALLBACK_V2 {
+    EX_PUSH_LOCK PushLock;
+    PVOID CoalescingCallback;
+    PVOID SelfPtr;
+    PPO_COALESCING_CALLBACK Callback;
+    BOOLEAN ClientOrServer;
+    PVOID Context;
+    LIST_ENTRY Link;
+    EX_CALLBACK ExCallback;
+} PO_COALESCING_CALLBACK_V2, * PPO_COALESCING_CALLBACK_V2;
+
+typedef
+BOOLEAN
+(*PNMI_CALLBACK)(
+    __in_opt PVOID Context,
+    __in BOOLEAN Handled
+    );
+
+typedef struct _KNMI_HANDLER_CALLBACK {
+    struct _KNMI_HANDLER_CALLBACK* Next;
+    PNMI_CALLBACK Callback;
+    PVOID Context;
+    PVOID Handle;
+} KNMI_HANDLER_CALLBACK, * PKNMI_HANDLER_CALLBACK;
 
 /*
 ** Callbacks END

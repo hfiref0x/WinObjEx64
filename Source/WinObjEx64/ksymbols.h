@@ -4,9 +4,9 @@
 *
 *  TITLE:       KSYMBOLS.H
 *
-*  VERSION:     1.91
+*  VERSION:     1.92
 *
-*  DATE:        26 June 2021
+*  DATE:        29 Nov 2021
 *
 *  Header file for kernel symbol names.
 *
@@ -57,6 +57,9 @@
 #define KVAR_PsAltSystemCallHandlers                L"PsAltSystemCallHandlers"
 
 #define KVAR_ExpHostList                            L"ExpHostList"
+
+#define KVAR_PopCoalescingCallbackRoutine           L"PopCoalescingCallbackRoutine"
+#define KVAR_PopCoalRegistrationList                L"PopCoalRegistrationList"
 
 #define KVAR_Win32kApiSetTable                      L"Win32kApiSetTable"
 

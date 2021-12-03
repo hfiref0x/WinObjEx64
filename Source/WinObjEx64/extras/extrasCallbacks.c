@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.92
 *
-*  DATE:        10 Nov 2021
+*  DATE:        29 Nov 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -93,6 +93,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPsAltSystemCallHandlers);
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks);
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpExHostCallbacks);
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpExpCallbackListCallbacks);
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCoalescingCallbacks);
 
 OBEX_FINDCALLBACK_ROUTINE(FindPspCreateProcessNotifyRoutine);
 OBEX_FINDCALLBACK_ROUTINE(FindPspCreateThreadNotifyRoutine);
@@ -111,6 +112,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindPsAltSystemCallHandlers);
 OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks);
 OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks);
 OBEX_FINDCALLBACK_ROUTINE(FindExpCallbackListHead);
+OBEX_FINDCALLBACK_ROUTINE(FindPoCoalescingCallbacks);
 
 OBEX_CALLBACK_DISPATCH_ENTRY g_CallbacksDispatchTable[] = {
     {
@@ -221,6 +223,11 @@ OBEX_CALLBACK_DISPATCH_ENTRY g_CallbacksDispatchTable[] = {
         0, L"ExpCallbackList",
         QueryCallbackGeneric, DumpExpCallbackListCallbacks, FindExpCallbackListHead,
         &g_SystemCallbacks.ExpCallbackListHead
+    },
+    {
+        0, L"PowerCoalescing",
+        QueryCallbackGeneric, DumpPoCoalescingCallbacks, FindPoCoalescingCallbacks,
+        &g_SystemCallbacks.PoCoalescingCallbacks
     }
 };
 
@@ -307,7 +314,7 @@ typedef enum _CiNameIds {
 // Windows 7
 //
 static const BYTE CiCallbackIndexes_Win7[] = {
-    Id_CiCompareExistingSePool,
+    Id_CiValidateImageHeader,
     Id_CiValidateImageData,
     Id_CiQueryInformation
 };
@@ -2344,6 +2351,91 @@ OBEX_FINDCALLBACK_ROUTINE(FindExpCallbackListHead)
 }
 
 /*
+* FindPoCoalescingCallbacks
+*
+* Purpose:
+*
+* Returns the address of PopCoalescingCallbackRoutine array or
+* PopCoalRegistrationList list head for callbacks registered with:
+*
+*   PoRegisterCoalescingCallback
+*
+*/
+OBEX_FINDCALLBACK_ROUTINE(FindPoCoalescingCallbacks)
+{
+    ULONG Index;
+    LONG Rel;
+    PBYTE ptrCode;
+    hde64s hs;
+    LPCWSTR lpSymbolName;
+    BYTE checkByte;
+    ULONG_PTR kvarAddress = 0;
+
+    UNREFERENCED_PARAMETER(QueryFlags);
+
+    //
+    // Not available before Windows 8.
+    //
+    if (g_NtBuildNumber < NT_WIN8_BLUE)
+        return 0;
+
+    if (g_NtBuildNumber < NT_WIN10_REDSTONE4) {
+        lpSymbolName = KVAR_PopCoalescingCallbackRoutine;
+        checkByte = 0x0D;
+    }
+    else {
+        lpSymbolName = KVAR_PopCoalRegistrationList;
+        checkByte = 0x15;
+    }
+
+
+    if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
+
+        kdGetAddressFromSymbol(&g_kdctx,
+            lpSymbolName,
+            &kvarAddress);
+
+    }
+
+    if (kvarAddress == 0) {
+
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
+            "PoRegisterCoalescingCallback");
+
+        if (ptrCode == NULL)
+            return 0;
+
+        Index = 0;
+        Rel = 0;
+
+        do {
+
+            hde64_disasm(ptrCode + Index, &hs);
+            if (hs.flags & F_ERROR)
+                break;
+
+            if (hs.len == 7) { //check if lea
+
+                if ((ptrCode[Index] == 0x48) &&
+                    (ptrCode[Index + 1] == 0x8D) &&
+                    (ptrCode[Index + 2] == checkByte)) //universal for both types of implementation
+                {
+                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    break;
+                }
+            }
+
+            Index += hs.len;
+
+        } while (Index < 256);
+
+        kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
+    }
+
+    return kvarAddress;
+}
+
+/*
 * AddRootEntryToList
 *
 * Purpose:
@@ -3992,6 +4084,128 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExpCallbackListCallbacks)
             break;
 
         ListEntry.Flink = NextEntry.Flink;
+    }
+}
+
+/*
+* DumpPoCoalescingCallbacks
+*
+* Purpose:
+*
+* Read PoRegisterCoalescingCallback created objects from kernel and send them to output window.
+*
+*/
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCoalescingCallbacks)
+{
+    ULONG CallbacksCount, i;
+
+    LIST_ENTRY ListEntry;
+
+    ULONG_PTR ListHead = KernelVariableAddress;
+    ULONG_PTR objectFastRef, callbackAddress;
+
+    union {
+        PO_COALESCING_CALLBACK_V1 v1;
+        PO_COALESCING_CALLBACK_V2 v2;
+    } callbackObject;
+
+    EX_FAST_REF Callbacks[PopCoalescingCallbackRoutineCount_V2];
+
+    HTREEITEM RootItem;
+
+    //
+    // Add callback root entry to the treelist.
+    //
+    RootItem = AddRootEntryToList(TreeList, CallbackType);
+    if (RootItem == 0)
+        return;
+
+    //
+    // Before Win10 RS4 this list implemented as the array of the fixed size.
+    //
+    if (g_NtBuildNumber < NT_WIN10_REDSTONE4) {
+
+        RtlSecureZeroMemory(Callbacks, sizeof(Callbacks));
+
+        //
+        // Before Win10 RS3 this list is limited to 8 callbacks.
+        // In Win10 RS3 this list increased up to 32 callbacks.
+        //
+        if (g_NtBuildNumber < NT_WIN10_REDSTONE3)
+            CallbacksCount = PopCoalescingCallbackRoutineCount_V1;
+        else
+            CallbacksCount = PopCoalescingCallbackRoutineCount_V2;
+
+        if (kdReadSystemMemory(KernelVariableAddress,
+            &Callbacks, CallbacksCount * sizeof(EX_FAST_REF)))
+        {
+
+            for (i = 0; i < CallbacksCount; i++) {
+
+                if (Callbacks[i].Value) {
+
+                    objectFastRef = (ULONG_PTR)ObGetObjectFastReference(Callbacks[i]);
+                    RtlSecureZeroMemory(&callbackObject, sizeof(callbackObject));
+
+                    if (kdReadSystemMemoryEx(objectFastRef,
+                        &callbackObject.v1,
+                        sizeof(callbackObject.v1),
+                        NULL))
+                    {
+                        AddEntryToList(TreeList,
+                            RootItem,
+                            (ULONG_PTR)callbackObject.v1.Callback,
+                            L"CoalescingCallback",
+                            Modules);
+                    }
+
+
+                }
+            }
+        }
+    }
+    else
+    {
+        ListEntry.Flink = ListEntry.Blink = NULL;
+
+        //
+        // Read head.
+        //
+        if (!kdReadSystemMemoryEx(
+            ListHead,
+            &ListEntry,
+            sizeof(LIST_ENTRY),
+            NULL))
+        {
+            return;
+        }
+
+        //
+        // Walk list entries.
+        //
+        while ((ULONG_PTR)ListEntry.Flink != ListHead) {
+
+            RtlSecureZeroMemory(&callbackObject, sizeof(callbackObject));
+
+            callbackAddress = (ULONG_PTR)ListEntry.Flink - FIELD_OFFSET(PO_COALESCING_CALLBACK_V2, Link);
+
+            if (!kdReadSystemMemoryEx(callbackAddress,
+                &callbackObject.v2,
+                sizeof(callbackObject.v2),
+                NULL))
+            {
+                break;
+            }
+
+            AddEntryToList(TreeList,
+                RootItem,
+                (ULONG_PTR)callbackObject.v2.Callback,
+                L"CoalescingCallback",
+                Modules);
+
+            ListEntry.Flink = callbackObject.v2.Link.Flink;
+        }
+
     }
 }
 

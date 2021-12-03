@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.92
 *
-*  DATE:        12 Nov 2021
+*  DATE:        29 Nov 2021
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -293,6 +293,8 @@ typedef struct _OBJREF {
 #define PspCreateThreadNotifyRoutineCount       64
 #define PspLoadImageNotifyRoutineCount          64
 #define DbgkLmdCount                            8
+#define PopCoalescingCallbackRoutineCount_V1    8
+#define PopCoalescingCallbackRoutineCount_V2    32
 
 typedef struct _NOTIFICATION_CALLBACKS {
     ULONG_PTR PspCreateProcessNotifyRoutine;
@@ -320,6 +322,7 @@ typedef struct _NOTIFICATION_CALLBACKS {
     ULONG_PTR CiCallbacks;
     ULONG_PTR ExpHostListHead;
     ULONG_PTR ExpCallbackListHead;
+    ULONG_PTR PoCoalescingCallbacks;
 } NOTIFICATION_CALLBACKS, *PNOTIFICATION_CALLBACKS;
 
 //

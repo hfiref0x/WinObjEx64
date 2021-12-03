@@ -1116,11 +1116,7 @@ VOID TestSessions()
 
 VOID TestCall()
 {
-    LPWSTR lpName = ObQueryFullNamespacePath(0xFFFFD9073578ED40);
-    if (lpName) {
-        DbgPrint("ObQueryFullNamespacePath>>%wS\n\n", lpName);
-        supHeapFree(lpName);
-    }
+
 }
 
 VOID TestStart(

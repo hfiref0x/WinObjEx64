@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.92
 *
-*  DATE:        03 Oct 2021
+*  DATE:        03 Dec 2021
 *
 *  Header file for internal Windows object types handling.
 *
@@ -214,6 +214,7 @@ typedef struct _WOBJ_TYPE_DESC {
 
 extern WOBJ_TYPE_DESC g_TypeUnknown;
 extern WOBJ_TYPE_DESC g_TypeSymbolicLink;
+extern WOBJ_TYPE_DESC g_TypeDriver;
 extern ULONG g_ObjectTypesCount;
 
 HIMAGELIST ObManagerLoadImageList(

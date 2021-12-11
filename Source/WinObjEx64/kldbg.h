@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.92
 *
-*  DATE:        29 Nov 2021
+*  DATE:        03 Dec 2021
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -348,6 +348,12 @@ typedef BOOL(CALLBACK *PENUMERATE_BOUNDARY_DESCRIPTOR_CALLBACK)(
     _In_opt_ PVOID Context
     );
 
+// return true to stop enumeration
+typedef BOOL(CALLBACK* PENUMERATE_UNLOADED_DRIVERS_CALLBACK)(
+    _In_ PUNLOADED_DRIVERS Entry,
+    _In_opt_ PVOID Context
+    );
+
 NTSTATUS ObIsValidUnicodeString(
     _In_ PCUNICODE_STRING SourceString);
 
@@ -441,6 +447,22 @@ PVOID ObGetCallbackBlockRoutine(
 LPWSTR ObQueryFullNamespacePath(
     _In_ ULONG_PTR ObjectAddress);
 
+VOID kdReportErrorByFunction(
+    _In_ LPCWSTR FunctionName,
+    _In_ LPCWSTR ErrorMessage);
+
+VOID kdReportReadErrorSimple(
+    _In_ LPCWSTR FunctionName,
+    _In_ ULONG_PTR KernelAddress,
+    _In_ ULONG InputBufferLength);
+
+VOID kdReportReadError(
+    _In_ LPCWSTR FunctionName,
+    _In_ ULONG_PTR KernelAddress,
+    _In_ ULONG InputBufferLength,
+    _In_ NTSTATUS Status,
+    _In_ PIO_STATUS_BLOCK Iosb);
+
 BOOLEAN kdConnectDriver(
     VOID);
 
@@ -452,24 +474,42 @@ BOOL kdFindKiServiceTable(
     _In_ ULONG_PTR KernelImageBase,
     _Inout_ KSERVICE_TABLE_DESCRIPTOR* ServiceTable);
 
+BOOL kdLoadSymbolsForNtImage(
+    _In_ PSYMCONTEXT SymContext,
+    _In_ LPCWSTR ImageFileName);
+
+BOOL kdpReadSystemMemoryEx2(
+    _In_opt_ LPCWSTR CallerFunction,
+    _In_ ULONG_PTR Address,
+    _Inout_ PVOID Buffer,
+    _In_ ULONG BufferSize,
+    _Out_opt_ PULONG NumberOfBytesRead);
+
 BOOL kdpReadSystemMemoryEx(
     _In_ ULONG_PTR Address,
     _Inout_ PVOID Buffer,
     _In_ ULONG BufferSize,
     _Out_opt_ PULONG NumberOfBytesRead);
 
-BOOL kdLoadSymbolsForNtImage(
-    _In_ PSYMCONTEXT SymContext,
-    _In_ LPCWSTR ImageFileName);
+#define kdReadSystemMemoryEx2(Address, Buffer, BufferSize, NumberOfBytesRead) \
+   kdpReadSystemMemoryEx2(__FUNCTIONW__, Address, Buffer, BufferSize, NumberOfBytesRead)
 
 #ifdef _USE_OWN_DRIVER
 #ifdef _USE_WINIO
 #define kdReadSystemMemoryEx WinIoReadSystemMemoryEx
 #else
+#ifdef _DEBUG
+#define kdReadSystemMemoryEx kdReadSystemMemoryEx2
+#else
 #define kdReadSystemMemoryEx kdpReadSystemMemoryEx
 #endif
-#else 
+#endif
+#else
+#ifdef _DEBUG
+#define kdReadSystemMemoryEx kdReadSystemMemoryEx2
+#else
 #define kdReadSystemMemoryEx kdpReadSystemMemoryEx
+#endif
 #endif
 
 #define kdReadSystemMemory(Address, Buffer, BufferSize) \
@@ -487,13 +527,6 @@ VOID kdInit(
 VOID kdShutdown(
     VOID);
 
-VOID kdReportReadError(
-    _In_ LPWSTR FunctionName,
-    _In_ ULONG_PTR KernelAddress,
-    _In_ ULONG InputBufferLength,
-    _In_ NTSTATUS Status,
-    _In_ PIO_STATUS_BLOCK Iosb);
-
 UCHAR kdGetInstructionLength(
     _In_ PVOID ptrCode,
     _Out_ PULONG ptrFlags);
@@ -505,9 +538,9 @@ BOOLEAN kdQueryKernelShims(
     _In_ PKLDBGCONTEXT Context,
     _In_ BOOLEAN RefreshList);
 
-BOOLEAN kdQueryMmUnloadedDrivers(
-    _In_ PKLDBGCONTEXT Context,
-    _Out_ PVOID* UnloadedDrivers);
+BOOL kdEnumerateMmUnloadedDrivers(
+    _In_ PENUMERATE_UNLOADED_DRIVERS_CALLBACK Callback,
+    _In_opt_ PVOID Context);
 
 BOOLEAN kdIsSymAvailable(
     _In_opt_ SYMCONTEXT* SymContext);

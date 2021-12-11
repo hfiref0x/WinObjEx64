@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.92
 *
-*  DATE:        28 Oct 2021
+*  DATE:        03 Dec 2021
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -100,6 +100,7 @@
 #include "ntos\ntalpc.h"
 #include "ntos\ntsup.h"
 #include "ntos\ntbuilds.h"
+#include "ntuser\ntuser.h"
 
 #define _NTDEF_
 #include <ntsecapi.h>

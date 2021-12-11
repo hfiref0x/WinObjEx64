@@ -4,9 +4,9 @@
 *
 *  TITLE:       FINDDLG.C
 *
-*  VERSION:     1.90
+*  VERSION:     1.92
 *
-*  DATE:        27 May 2021
+*  DATE:        07 Dec 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -577,13 +577,13 @@ VOID FindDlgAddTypes(
     }
 
     __try {
-        //type collection available, list it
-        if (g_WinObj.IsWine) {
-            pObject = OBJECT_TYPES_FIRST_ENTRY_WINE(g_pObjectTypesInfo);
-        }
-        else {
-            pObject = OBJECT_TYPES_FIRST_ENTRY(g_pObjectTypesInfo);
-        }
+        //
+        // Type collection available, list it.
+        //
+        //
+        // Warning: older Wine/Staging incorrectly implement memory structure layout for this structure and therefore will crash.            
+        //
+        pObject = OBJECT_TYPES_FIRST_ENTRY(g_pObjectTypesInfo);
 
         for (i = 0; i < g_pObjectTypesInfo->NumberOfTypes; i++) {
             sz = pObject->TypeName.MaximumLength + sizeof(UNICODE_NULL);
@@ -600,11 +600,12 @@ VOID FindDlgAddTypes(
             }
             pObject = OBJECT_TYPES_NEXT_ENTRY(pObject);
         }
+    }
+    __finally {
         SendMessage(hComboBox, CB_ADDSTRING, (WPARAM)0, (LPARAM)L"*");
         SendMessage(hComboBox, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
-    }
-    __except (WOBJ_EXCEPTION_FILTER) {
-        return;
+        if (AbnormalTermination())
+            supReportAbnormalTermination(__FUNCTIONW__);
     }
 }
 

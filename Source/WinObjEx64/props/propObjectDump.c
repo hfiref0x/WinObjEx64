@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.92
 *
-*  DATE:        14 Nov 2021
+*  DATE:        03 Dec 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1327,11 +1327,10 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpDriverObject)
     do {
 
         //dump drvObject
-        if (!kdReadSystemMemoryEx(
+        if (!kdReadSystemMemory(
             Context->ObjectInfo.ObjectAddress,
             &drvObject,
-            sizeof(drvObject),
-            NULL))
+            sizeof(drvObject)))
         {
             break;
         }
@@ -1341,11 +1340,10 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpDriverObject)
         bOkay = TRUE;
 
         //dump drvObject->DriverSection
-        if (!kdReadSystemMemoryEx(
+        if (!kdReadSystemMemory(
             (ULONG_PTR)drvObject.DriverSection,
             &ldrEntry,
-            sizeof(ldrEntry),
-            NULL))
+            sizeof(ldrEntry)))
         {
             break;
         }
@@ -1612,11 +1610,10 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpDriverObject)
 
         RtlSecureZeroMemory(&fastIoDispatch, sizeof(fastIoDispatch));
 
-        if (kdReadSystemMemoryEx(
+        if (kdReadSystemMemory(
             (ULONG_PTR)drvObject.FastIoDispatch,
             &fastIoDispatch,
-            sizeof(fastIoDispatch),
-            NULL))
+            sizeof(fastIoDispatch)))
         {
 
             h_tviRootItem = supTreeListAddItem(
@@ -1667,7 +1664,7 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpDriverObject)
                 }
             }
 
-        } //kdReadSystemMemoryEx
+        } //kdReadSystemMemory
     } //if
 
     //
@@ -1718,11 +1715,10 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpDeviceObject)
     //dump devObject
     RtlSecureZeroMemory(&devObject, sizeof(devObject));
 
-    if (!kdReadSystemMemoryEx(
+    if (!kdReadSystemMemory(
         Context->ObjectInfo.ObjectAddress,
         &devObject,
-        sizeof(devObject),
-        NULL))
+        sizeof(devObject)))
     {
         supObDumpShowError(hwndDlg, NULL);
         return;
@@ -2066,11 +2062,10 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpDeviceObject)
 
         RtlSecureZeroMemory(&devObjExt, sizeof(devObjExt));
 
-        if (!kdReadSystemMemoryEx(
+        if (!kdReadSystemMemory(
             (ULONG_PTR)devObject.DeviceObjectExtension,
             &devObjExt,
-            sizeof(devObjExt),
-            NULL))
+            sizeof(devObjExt)))
         {
             return; //safe to exit, nothing after this
         }
@@ -2463,10 +2458,9 @@ VOID propObDumpDirectoryObjectInternal(
 
             RtlSecureZeroMemory(&dirEntry, sizeof(dirEntry));
 
-            if (kdReadSystemMemoryEx((ULONG_PTR)DirObject.Versions.CompatDirObject->HashBuckets[i],
+            if (kdReadSystemMemory((ULONG_PTR)DirObject.Versions.CompatDirObject->HashBuckets[i],
                 &dirEntry,
-                sizeof(dirEntry),
-                NULL))
+                sizeof(dirEntry)))
             {
 
                 ChainLink.Blink = NULL;
@@ -2476,11 +2470,10 @@ VOID propObDumpDirectoryObjectInternal(
                     propObDumpAddress(TreeList, h_tviEntry, lpType, T_EMPTY, NULL, 0, 0);
                 }
                 else {
-                    if (kdReadSystemMemoryEx(
+                    if (kdReadSystemMemory(
                         (ULONG_PTR)dirEntry.ChainLink,
                         &ChainLink,
-                        sizeof(ChainLink),
-                        NULL))
+                        sizeof(ChainLink)))
                     {
                         propObDumpListEntry(TreeList, h_tviEntry, lpType, &ChainLink);
                     }
@@ -2796,11 +2789,10 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpSyncObject)
     }
 
     //dump object
-    if (!kdReadSystemMemoryEx(
+    if (!kdReadSystemMemory(
         Context->ObjectInfo.ObjectAddress,
         Object,
-        ObjectSize,
-        NULL))
+        ObjectSize))
     {
         supObDumpShowError(hwndDlg, NULL);
         supHeapFree(Object);
@@ -3351,11 +3343,10 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpQueueObject)
     //dump Queue object
     RtlSecureZeroMemory(&Queue, sizeof(Queue));
 
-    if (!kdReadSystemMemoryEx(
+    if (!kdReadSystemMemory(
         Context->ObjectInfo.ObjectAddress,
         &Queue,
-        sizeof(Queue),
-        NULL))
+        sizeof(Queue)))
     {
         supObDumpShowError(hwndDlg, NULL);
         return;
@@ -3787,11 +3778,10 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpFltServerPort)
     //dump PortObject
     RtlSecureZeroMemory(&FltServerPortObject, sizeof(FltServerPortObject));
 
-    if (!kdReadSystemMemoryEx(
+    if (!kdReadSystemMemory(
         Context->ObjectInfo.ObjectAddress,
         &FltServerPortObject,
-        sizeof(FltServerPortObject),
-        NULL))
+        sizeof(FltServerPortObject)))
     {
         supObDumpShowError(hwndDlg, NULL);
         return;
@@ -3880,11 +3870,10 @@ VOID propObxDumpAlpcPortCommunicationInfo(
     if (dumpBuffer == NULL)
         return;
 
-    if (!kdReadSystemMemoryEx(
+    if (!kdReadSystemMemory(
         StructureAddress,
         dumpBuffer,
-        readSize,
-        NULL))
+        readSize))
     {
         supVirtualFree(dumpBuffer);
         return;
@@ -4355,11 +4344,10 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpCallback)
     //
     RtlSecureZeroMemory(&ObjectDump, sizeof(CALLBACK_OBJECT));
 
-    if (!kdReadSystemMemoryEx(
+    if (!kdReadSystemMemory(
         Context->ObjectInfo.ObjectAddress,
         (PVOID)&ObjectDump,
-        sizeof(ObjectDump),
-        NULL))
+        sizeof(ObjectDump)))
     {
         supObDumpShowError(hwndDlg, NULL);
         return;
@@ -4406,10 +4394,9 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpCallback)
         // Read callback registration data.
         //
         RtlSecureZeroMemory(&CallbackRegistration, sizeof(CallbackRegistration));
-        if (!kdReadSystemMemoryEx((ULONG_PTR)ListEntry.Flink,
+        if (!kdReadSystemMemory((ULONG_PTR)ListEntry.Flink,
             (PVOID)&CallbackRegistration,
-            sizeof(CallbackRegistration),
-            NULL))
+            sizeof(CallbackRegistration)))
         {
             //
             // Abort all output on error.

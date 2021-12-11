@@ -2,9 +2,11 @@ v1.9.2
 more Win10/11 21h2 compatibility changes
 added FLT_FILTER, FLT_OBJECT structured dump
 added authenticode hash calculation for loaded drivers (extras->Drivers, use popup menu on driver entry)
+added coalescing callbacks to callbacks list
 various minor UI changes
-rtls updated
+fix misbehavior with recent wine staging 6.x
 internal rearrange
+rtls updated
 
 v1.9.1
 21h2 compatibility improvements

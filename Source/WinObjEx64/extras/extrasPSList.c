@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.92
 *
-*  DATE:        11 Oct 2021
+*  DATE:        03 Dec 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -35,8 +35,11 @@ EXTRASCONTEXT   PsDlgContext;
 static int      y_splitter_pos = 300, y_capture_pos = 0, y_splitter_max = 0;
 
 HANDLE g_PsListWait = NULL;
-ULONG g_DialogQuit = 0, g_DialogRefresh = 0;
 HANDLE g_PsListHeap = NULL;
+
+BOOL g_IsDialogQuit;
+BOOL g_IsRefresh;
+
 
 LIST_ENTRY g_PsListHead;
 
@@ -457,58 +460,55 @@ HTREEITEM AddProcessEntryTreeList(
 )
 {
     HTREEITEM hTreeItem = NULL;
-    PSID ProcessSid = NULL;
-    HANDLE UniqueProcessId;
+    PSID processSid = NULL;
+    HANDLE uniqueProcessId;
     PROP_UNNAMED_OBJECT_INFO* objectEntry;
     TL_SUBITEMS_FIXED subitems;
 
-    ULONG Length, r;
-    PWSTR Caption = NULL, PtrString, UserName = NULL;
-
-    PROCESS_EXTENDED_BASIC_INFORMATION exbi;
+    ULONG cbCaption;
+    PWSTR lpCaption = NULL, lpEnd, lpUserName = NULL;
+    BOOL bIsProtected = FALSE;
     WCHAR szEPROCESS[32];
-
-    SID SidLocalService = { SID_REVISION, 1, SECURITY_NT_AUTHORITY, { SECURITY_LOCAL_SERVICE_RID } };
 
     objectEntry = PsxAllocateUnnamedObjectEntry(Data, ObjectTypeProcess);
     if (objectEntry == NULL)
         return NULL;
 
-    UniqueProcessId = objectEntry->ClientId.UniqueProcess;
+    uniqueProcessId = objectEntry->ClientId.UniqueProcess;
 
     //
     // Id + Name
     //
-    Length = 32;
+    cbCaption = 32;
     if (objectEntry->ImageName.Length) {
-        Length += objectEntry->ImageName.Length;
+        cbCaption += objectEntry->ImageName.Length;
     }
     else {
-        if (UniqueProcessId == 0) {
-            Length += T_IDLE_PROCESS_LENGTH;
+        if (uniqueProcessId == 0) {
+            cbCaption += T_IDLE_PROCESS_LENGTH;
         }
     }
 
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
 
-    Caption = (PWSTR)supHeapAlloc(Length);
-    if (Caption) {
+    lpCaption = (PWSTR)supHeapAlloc(cbCaption);
+    if (lpCaption) {
 
-        PtrString = _strcat(Caption, TEXT("["));
-        ultostr(HandleToULong(UniqueProcessId), PtrString);
-        _strcat(Caption, TEXT("]"));
+        lpEnd = _strcat(lpCaption, TEXT("["));
+        ultostr(HandleToULong(uniqueProcessId), lpEnd);
+        _strcat(lpCaption, TEXT("]"));
 
-        _strcat(Caption, TEXT(" "));
+        _strcat(lpCaption, TEXT(" "));
 
-        if (UniqueProcessId == 0) {
-            _strcat(Caption, T_IDLE_PROCESS);
+        if (uniqueProcessId == 0) {
+            _strcat(lpCaption, T_IDLE_PROCESS);
         }
         else {
             if (objectEntry->ImageName.Buffer) {
-                _strcat(Caption, objectEntry->ImageName.Buffer);
+                _strcat(lpCaption, objectEntry->ImageName.Buffer);
             }
             else {
-                _strcat(Caption, T_Unknown);
+                _strcat(lpCaption, T_Unknown);
             }
         }
     }
@@ -536,13 +536,13 @@ HTREEITEM AddProcessEntryTreeList(
     // 1. Services.
     //
     if (ProcessHandle) {
-        ProcessSid = supQueryProcessSid(ProcessHandle);
+        processSid = supQueryProcessSid(ProcessHandle);
     }
 
     if (ServicesList) {
 
-        if (PsListProcessInServicesList(UniqueProcessId, ServicesList) ||
-            ((ProcessSid) && RtlEqualSid(&SidLocalService, ProcessSid)))
+        if (PsListProcessInServicesList(uniqueProcessId, ServicesList) ||
+            ((processSid) && supIsLocalServiceSid(processSid)))
         {
             subitems.ColorFlags = TLF_BGCOLOR_SET;
             subitems.BgColor = 0xd0d0ff;
@@ -553,8 +553,8 @@ HTREEITEM AddProcessEntryTreeList(
     //
     // 2. Current user process.
     //
-    if (ProcessSid && OurSid) {
-        if (RtlEqualSid(OurSid, ProcessSid)) {
+    if (processSid && OurSid) {
+        if (RtlEqualSid(OurSid, processSid)) {
             subitems.ColorFlags = TLF_BGCOLOR_SET;
             subitems.BgColor = 0xffd0d0;
         }
@@ -566,18 +566,13 @@ HTREEITEM AddProcessEntryTreeList(
     //
     if (ProcessHandle) {
 
-        if (g_ExtApiSet.IsImmersiveProcess) {
-            if (g_ExtApiSet.IsImmersiveProcess(ProcessHandle)) {
-                subitems.ColorFlags = TLF_BGCOLOR_SET;
-                subitems.BgColor = 0xeaea00;
-            }
+        if (supIsImmersiveProcess(ProcessHandle)) {
+            subitems.ColorFlags = TLF_BGCOLOR_SET;
+            subitems.BgColor = 0xeaea00;
         }
 
-        exbi.Size = sizeof(PROCESS_EXTENDED_BASIC_INFORMATION);
-        if (NT_SUCCESS(NtQueryInformationProcess(ProcessHandle, ProcessBasicInformation,
-            &exbi, sizeof(exbi), &r)))
-        {
-            if (exbi.IsProtectedProcess) {
+        if (NT_SUCCESS(supIsProtectedProcess(ProcessHandle, &bIsProtected))) {
+            if (bIsProtected) {
                 subitems.ColorFlags = TLF_BGCOLOR_SET;
                 subitems.BgColor = 0xe6ffe6;
             }
@@ -588,13 +583,16 @@ HTREEITEM AddProcessEntryTreeList(
     //
     // User.
     //
-    if (ProcessSid && PolicyHandle) {
+    if (processSid && PolicyHandle) {
 
-        if (supLookupSidUserAndDomainEx(ProcessSid, PolicyHandle, &UserName)) {
-            subitems.Text[1] = UserName;
+        if (supLookupSidUserAndDomainEx(processSid, PolicyHandle, &lpUserName)) {
+            subitems.Text[1] = lpUserName;
         }
-        supHeapFree(ProcessSid);
+
     }
+
+    if (processSid)
+        supHeapFree(processSid);
 
     hTreeItem = supTreeListAddItem(
         PsDlgContext.TreeList,
@@ -602,13 +600,13 @@ HTREEITEM AddProcessEntryTreeList(
         TVIF_TEXT | TVIF_STATE,
         TVIS_EXPANDED,
         TVIS_EXPANDED,
-        Caption,
+        lpCaption,
         &subitems);
 
-    if (UserName)
-        supHeapFree(UserName);
-    if (Caption)
-        supHeapFree(Caption);
+    if (lpUserName)
+        supHeapFree(lpUserName);
+    if (lpCaption)
+        supHeapFree(lpCaption);
 
     return hTreeItem;
 }
@@ -785,7 +783,7 @@ DWORD WINAPI CreateThreadListProc(
     PSYSTEM_PROCESSES_INFORMATION Process;
     PSYSTEM_THREAD_INFORMATION Thread;
     PRTL_PROCESS_MODULES pModules = NULL;
-    PSYSTEM_HANDLE_INFORMATION_EX SortedHandleList = NULL;
+    PSUP_HANDLE_DUMP SortedHandleList = NULL;
 
     PROP_UNNAMED_OBJECT_INFO* objectEntry, * threadEntry;
     OBEX_THREAD_LOOKUP_ENTRY* stl = NULL, * stlptr;
@@ -951,7 +949,6 @@ DWORD WINAPI CreateThreadListProc(
                 szBuffer[0] = TEXT('0');
                 szBuffer[1] = TEXT('x');
                 szBuffer[2] = 0;
-
                 u64tohex((ULONG_PTR)startAddress, &szBuffer[2]);
 
                 lvitem.iSubItem++;
@@ -1002,8 +999,7 @@ DWORD WINAPI CreateThreadListProc(
 
         if (pModules) supHeapFree(pModules);
         if (stl) supHeapFree(stl);
-
-        supHandlesFreeList(SortedHandleList);
+        if (SortedHandleList) supHeapFree(SortedHandleList);
 
         if (ProcessList) supHeapFree(ProcessList);
 
@@ -1037,7 +1033,7 @@ DWORD WINAPI CreateProcessListProc(
 
     HANDLE ProcessHandle = NULL;
     PVOID InfoBuffer = NULL;
-    PSYSTEM_HANDLE_INFORMATION_EX SortedHandleList = NULL;
+    PSUP_HANDLE_DUMP SortedHandleList = NULL;
     PSID OurSid = NULL;
     PWSTR lpErrorMsg;
 
@@ -1059,8 +1055,9 @@ DWORD WINAPI CreateProcessListProc(
         dwWaitResult = WaitForSingleObject(g_PsListWait, INFINITE);
         if (dwWaitResult == WAIT_OBJECT_0) {
 
+            InterlockedExchange((PLONG)&g_IsRefresh, TRUE);
+
             InitializeListHead(&g_PsListHead);
-            InterlockedIncrement((PLONG)&g_DialogRefresh);
 
             supSetWaitCursor(TRUE);
 
@@ -1187,16 +1184,13 @@ DWORD WINAPI CreateProcessListProc(
             supReportAbnormalTermination(__FUNCTIONW__);
 
         if (OurSid) supHeapFree(OurSid);
-        supFreeSCMSnapshot(&ServicesList);
         if (InfoBuffer) supHeapFree(InfoBuffer);
-
-        supHandlesFreeList(SortedHandleList);
+        if (SortedHandleList) supHeapFree(SortedHandleList);
         supPHLFree(&g_PsListHead, FALSE);
-
-        InterlockedDecrement((PLONG)&g_DialogRefresh);
-
+        supFreeSCMSnapshot(&ServicesList);
         supSetWaitCursor(FALSE);
 
+        InterlockedExchange((PLONG)&g_IsRefresh, FALSE);
         ReleaseMutex(g_PsListWait);
     }
     return 0;
@@ -1219,8 +1213,11 @@ VOID CreateObjectList(
     HANDLE hThread;
     LPTHREAD_START_ROUTINE lpThreadRoutine;
 
-    if (g_DialogQuit)
+    if (InterlockedCompareExchange((PLONG)&g_IsDialogQuit,
+        TRUE, TRUE) == TRUE) 
+    {
         return;
+    }
 
     if (ListThreads)
         lpThreadRoutine = (LPTHREAD_START_ROUTINE)CreateThreadListProc;
@@ -1307,7 +1304,13 @@ INT_PTR PsListHandleNotify(
 
     PROP_UNNAMED_OBJECT_INFO* ObjectEntry;
 
-    if ((g_DialogRefresh) || (nhdr == NULL) || (g_DialogQuit))
+    if (nhdr == NULL)
+        return 0;
+
+    if (InterlockedCompareExchange((PLONG)&g_IsRefresh, TRUE, TRUE) == TRUE)
+        return 0;
+
+    if (InterlockedCompareExchange((PLONG)&g_IsDialogQuit, TRUE, TRUE) == TRUE)
         return 0;
 
     TreeControl = (HWND)TreeList_GetTreeControlWindow(PsDlgContext.TreeList);
@@ -1561,7 +1564,9 @@ INT_PTR CALLBACK PsListDialogProc(
         break;
 
     case WM_CLOSE:
-        InterlockedAdd((PLONG)&g_DialogQuit, 1);
+
+        InterlockedExchange((PLONG)&g_IsDialogQuit, TRUE);
+
         if (g_PsListWait) {
             CloseHandle(g_PsListWait);
             g_PsListWait = NULL;
@@ -1692,8 +1697,9 @@ VOID extrasCreatePsListDialog(
 
     PsListDialogResize();
 
-    g_DialogQuit = 0;
-    g_DialogRefresh = 0;
+    g_IsDialogQuit = FALSE;
+    g_IsRefresh = FALSE;
+
     g_PsListWait = CreateMutex(NULL, FALSE, NULL);
     if (g_PsListWait) {
         g_PsListHeap = RtlCreateHeap(HEAP_GROWABLE, NULL, 0, 0, NULL, NULL);

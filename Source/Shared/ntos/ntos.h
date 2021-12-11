@@ -5,9 +5,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.186
+*  VERSION:     1.187
 *
-*  DATE:        29 Nov 2021
+*  DATE:        03 Dec 2021
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -14015,7 +14015,8 @@ typedef enum _SYSDBG_COMMAND {
     SysDbgClearUmBreakPid,
     SysDbgGetUmAttachPid,
     SysDbgClearUmAttachPid,
-    SysDbgGetLiveKernelDump
+    SysDbgGetLiveKernelDump,
+    SysDbgKdPullRemoteFile
 } SYSDBG_COMMAND, *PSYSDBG_COMMAND;
 
 typedef struct _SYSDBG_VIRTUAL {

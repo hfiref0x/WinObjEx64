@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.92
 *
-*  DATE:        29 Nov 2021
+*  DATE:        05 Dec 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -2697,7 +2697,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpDbgkLCallbacks)
 
         for (c = 0; c < DbgkLmdCount; c++) {
 
-            if (Callbacks[c].Value) {
+            if (Callbacks[c].Value > g_kdctx.SystemRangeStart) {
 
                 Address = (ULONG_PTR)ObGetObjectFastReference(Callbacks[c]);
                 Function = (ULONG_PTR)ObGetCallbackBlockRoutine((PVOID)Address);
@@ -2789,11 +2789,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpKeBugCheckCallbacks)
     //
     // Read head.
     //
-    if (!kdReadSystemMemoryEx(
+    if (!kdReadSystemMemory(
         ListHead,
         &ListEntry,
-        sizeof(LIST_ENTRY),
-        NULL))
+        sizeof(LIST_ENTRY)))
     {
         return;
     }
@@ -2805,10 +2804,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpKeBugCheckCallbacks)
 
         RtlSecureZeroMemory(&CallbackRecord, sizeof(CallbackRecord));
 
-        if (!kdReadSystemMemoryEx((ULONG_PTR)ListEntry.Flink,
+        if (!kdReadSystemMemory((ULONG_PTR)ListEntry.Flink,
             &CallbackRecord,
-            sizeof(CallbackRecord),
-            NULL))
+            sizeof(CallbackRecord)))
         {
             break;
         }
@@ -2893,11 +2891,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpKeBugCheckReasonCallbacks)
     //
     // Read head.
     //
-    if (!kdReadSystemMemoryEx(
+    if (!kdReadSystemMemory(
         ListHead,
         &ListEntry,
-        sizeof(LIST_ENTRY),
-        NULL))
+        sizeof(LIST_ENTRY)))
     {
         return;
     }
@@ -2909,10 +2906,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpKeBugCheckReasonCallbacks)
 
         RtlSecureZeroMemory(&CallbackRecord, sizeof(CallbackRecord));
 
-        if (!kdReadSystemMemoryEx((ULONG_PTR)ListEntry.Flink,
+        if (!kdReadSystemMemory((ULONG_PTR)ListEntry.Flink,
             &CallbackRecord,
-            sizeof(CallbackRecord),
-            NULL))
+            sizeof(CallbackRecord)))
         {
             break;
         }
@@ -2958,11 +2954,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCmCallbacks)
     //
     // Read head.
     //
-    if (!kdReadSystemMemoryEx(
+    if (!kdReadSystemMemory(
         ListHead,
         &ListEntry,
-        sizeof(LIST_ENTRY),
-        NULL))
+        sizeof(LIST_ENTRY)))
     {
         return;
     }
@@ -2974,10 +2969,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCmCallbacks)
 
         RtlSecureZeroMemory(&CallbackRecord, sizeof(CallbackRecord));
 
-        if (!kdReadSystemMemoryEx((ULONG_PTR)ListEntry.Flink,
+        if (!kdReadSystemMemory((ULONG_PTR)ListEntry.Flink,
             &CallbackRecord,
-            sizeof(CallbackRecord),
-            NULL))
+            sizeof(CallbackRecord)))
         {
             break;
         }
@@ -3030,11 +3024,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoCallbacks)
     //
     // Read head.
     //
-    if (!kdReadSystemMemoryEx(
+    if (!kdReadSystemMemory(
         ListHead,
         &ListEntry,
-        sizeof(LIST_ENTRY),
-        NULL))
+        sizeof(LIST_ENTRY)))
     {
         return;
     }
@@ -3046,10 +3039,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoCallbacks)
 
         RtlSecureZeroMemory(&EntryPacket, sizeof(EntryPacket));
 
-        if (!kdReadSystemMemoryEx((ULONG_PTR)ListEntry.Flink,
+        if (!kdReadSystemMemory(
+            (ULONG_PTR)ListEntry.Flink,
             &EntryPacket,
-            sizeof(EntryPacket),
-            NULL))
+            sizeof(EntryPacket)))
         {
             break;
         }
@@ -3067,19 +3060,17 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoCallbacks)
             //
             RtlSecureZeroMemory(&DeviceObject, sizeof(DeviceObject));
 
-            if (kdReadSystemMemoryEx((ULONG_PTR)EntryPacket.DeviceObject,
+            if (kdReadSystemMemory((ULONG_PTR)EntryPacket.DeviceObject,
                 (PVOID)&DeviceObject,
-                sizeof(DeviceObject),
-                NULL))
+                sizeof(DeviceObject)))
             {
                 //
                 // Read DRIVER_OBJECT.
                 //
                 RtlSecureZeroMemory(&DriverObject, sizeof(DriverObject));
-                if (kdReadSystemMemoryEx((ULONG_PTR)DeviceObject.DriverObject,
+                if (kdReadSystemMemory((ULONG_PTR)DeviceObject.DriverObject,
                     (PVOID)&DriverObject,
-                    sizeof(DriverObject),
-                    NULL))
+                    sizeof(DriverObject)))
                 {
                     Routine = DriverObject.MajorFunction[IRP_MJ_SHUTDOWN];
                     lpDescription = TEXT("IRP_MJ_SHUTDOWN");
@@ -3137,11 +3128,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpObCallbacks)
     //
     // Read head.
     //
-    if (!kdReadSystemMemoryEx(
+    if (!kdReadSystemMemory(
         ListHead,
         &ListEntry,
-        sizeof(LIST_ENTRY),
-        NULL))
+        sizeof(LIST_ENTRY)))
     {
         return;
     }
@@ -3153,10 +3143,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpObCallbacks)
 
         RtlSecureZeroMemory(&CallbackRecord, sizeof(CallbackRecord));
 
-        if (!kdReadSystemMemoryEx((ULONG_PTR)ListEntry.Flink,
+        if (!kdReadSystemMemory((ULONG_PTR)ListEntry.Flink,
             &CallbackRecord,
-            sizeof(CallbackRecord),
-            NULL))
+            sizeof(CallbackRecord)))
         {
             break;
         }
@@ -3167,19 +3156,17 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpObCallbacks)
         bAltitudeRead = FALSE;
 
         RtlSecureZeroMemory(&Registration, sizeof(Registration));
-        if (kdReadSystemMemoryEx((ULONG_PTR)CallbackRecord.Registration,
+        if (kdReadSystemMemory((ULONG_PTR)CallbackRecord.Registration,
             (PVOID)&Registration,
-            sizeof(Registration),
-            NULL))
+            sizeof(Registration)))
         {
             AltitudeSize = 8 + (SIZE_T)Registration.Altitude.Length;
             lpInfoBuffer = (LPWSTR)supHeapAlloc(AltitudeSize);
             if (lpInfoBuffer) {
 
-                bAltitudeRead = kdReadSystemMemoryEx((ULONG_PTR)Registration.Altitude.Buffer,
+                bAltitudeRead = kdReadSystemMemory((ULONG_PTR)Registration.Altitude.Buffer,
                     (PVOID)lpInfoBuffer,
-                    Registration.Altitude.Length,
-                    NULL);
+                    Registration.Altitude.Length);
             }
         }
 
@@ -3274,10 +3261,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpSeFileSystemCallbacks)
     //
     RtlSecureZeroMemory(&SeEntry, sizeof(SeEntry));
 
-    if (!kdReadSystemMemoryEx(KernelVariableAddress,
+    if (!kdReadSystemMemory(KernelVariableAddress,
         (PVOID)&SeEntry,
-        sizeof(SeEntry),
-        NULL))
+        sizeof(SeEntry)))
     {
         return;
     }
@@ -3290,10 +3276,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpSeFileSystemCallbacks)
 
         RtlSecureZeroMemory(&SeEntry, sizeof(SeEntry));
 
-        if (!kdReadSystemMemoryEx(Next,
+        if (!kdReadSystemMemory(Next,
             (PVOID)&SeEntry,
-            sizeof(SeEntry),
-            NULL))
+            sizeof(SeEntry)))
         {
             break;
         }
@@ -3374,11 +3359,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCallbacks)
         //
         // Read head.
         //
-        if (!kdReadSystemMemoryEx(
+        if (!kdReadSystemMemory(
             ListHead,
             &ListEntry,
-            sizeof(LIST_ENTRY),
-            NULL))
+            sizeof(LIST_ENTRY)))
         {
             __leave;
         }
@@ -3390,10 +3374,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCallbacks)
 
             RtlSecureZeroMemory(Buffer, BufferSize);
 
-            if (!kdReadSystemMemoryEx((ULONG_PTR)ListEntry.Flink,
+            if (!kdReadSystemMemory((ULONG_PTR)ListEntry.Flink,
                 Buffer,
-                ReadSize,
-                NULL))
+                ReadSize))
             {
                 break;
             }
@@ -3478,11 +3461,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpDbgPrintCallbacks)
     //
     // Read head.
     //
-    if (!kdReadSystemMemoryEx(
+    if (!kdReadSystemMemory(
         ListHead,
         &ListEntry,
-        sizeof(ListEntry),
-        NULL))
+        sizeof(ListEntry)))
     {
         return;
     }
@@ -3496,10 +3478,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpDbgPrintCallbacks)
 
         RecordAddress = (ULONG_PTR)ListEntry.Flink - FIELD_OFFSET(RTL_CALLBACK_REGISTER, ListEntry);
 
-        if (!kdReadSystemMemoryEx((ULONG_PTR)RecordAddress,
+        if (!kdReadSystemMemory((ULONG_PTR)RecordAddress,
             &CallbackRecord,
-            sizeof(CallbackRecord),
-            NULL))
+            sizeof(CallbackRecord)))
         {
             break;
         }
@@ -3548,11 +3529,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoFsRegistrationCallbacks)
     //
     // Read head.
     //
-    if (!kdReadSystemMemoryEx(
+    if (!kdReadSystemMemory(
         ListHead,
         &ListEntry,
-        sizeof(LIST_ENTRY),
-        NULL))
+        sizeof(LIST_ENTRY)))
     {
         return;
     }
@@ -3564,10 +3544,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoFsRegistrationCallbacks)
 
         RtlSecureZeroMemory(&CallbackRecord, sizeof(CallbackRecord));
 
-        if (!kdReadSystemMemoryEx((ULONG_PTR)ListEntry.Flink,
+        if (!kdReadSystemMemory((ULONG_PTR)ListEntry.Flink,
             &CallbackRecord,
-            sizeof(CallbackRecord),
-            NULL))
+            sizeof(CallbackRecord)))
         {
             break;
         }
@@ -3625,11 +3604,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoFileSystemCallbacks)
     //
     // Read head.
     //
-    if (!kdReadSystemMemoryEx(
+    if (!kdReadSystemMemory(
         ListHead,
         &ListEntry,
-        sizeof(LIST_ENTRY),
-        NULL))
+        sizeof(LIST_ENTRY)))
     {
         return;
     }
@@ -3646,10 +3624,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoFileSystemCallbacks)
         //
         // Read DEVICE_OBJECT.
         //
-        if (!kdReadSystemMemoryEx(DeviceObjectAddress,
+        if (!kdReadSystemMemory(DeviceObjectAddress,
             &DeviceObject,
-            sizeof(DeviceObject),
-            NULL))
+            sizeof(DeviceObject)))
         {
             break;
         }
@@ -3665,10 +3642,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoFileSystemCallbacks)
         // Read DRIVER_OBJECT.
         //
         RtlSecureZeroMemory(&DriverObject, sizeof(DriverObject));
-        if (kdReadSystemMemoryEx((ULONG_PTR)DeviceObject.DriverObject,
+        if (kdReadSystemMemory((ULONG_PTR)DeviceObject.DriverObject,
             &DriverObject,
-            sizeof(DriverObject),
-            NULL))
+            sizeof(DriverObject)))
         {
             //
             // Determinate address to display.
@@ -3690,10 +3666,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoFileSystemCallbacks)
                 lpType = (LPWSTR)supHeapAlloc((SIZE_T)DriverObject.DriverName.Length + sizeof(UNICODE_NULL));
                 if (lpType) {
                     bNeedFree = TRUE;
-                    if (!kdReadSystemMemoryEx((ULONG_PTR)DriverObject.DriverName.Buffer,
+                    if (!kdReadSystemMemory((ULONG_PTR)DriverObject.DriverName.Buffer,
                         lpType,
-                        (ULONG)DriverObject.DriverName.Length,
-                        NULL))
+                        (ULONG)DriverObject.DriverName.Length))
                     {
                         supHeapFree(lpType);
                         lpType = NULL;
@@ -3717,11 +3692,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoFileSystemCallbacks)
         //
         NextEntry.Blink = NextEntry.Flink = NULL;
 
-        if (!kdReadSystemMemoryEx(
+        if (!kdReadSystemMemory(
             (ULONG_PTR)ListEntry.Flink,
             &NextEntry,
-            sizeof(LIST_ENTRY),
-            NULL))
+            sizeof(LIST_ENTRY)))
         {
             break;
         }
@@ -3752,7 +3726,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks)
 
     ULONG_PTR SizeOfCiCallbacks = 0;
 
-    ULONG BytesRead = 0, i, c;
+    ULONG i, c;
 
     BOOL bRevisionMarker;
 
@@ -3769,10 +3743,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks)
         CallbacksData = (PULONG_PTR)supVirtualAlloc((SIZE_T)SizeOfCiCallbacks);
         if (CallbacksData) {
 
-            if (kdReadSystemMemoryEx(KernelVariableAddress,
+            if (kdReadSystemMemory(KernelVariableAddress,
                 CallbacksData,
-                (ULONG)SizeOfCiCallbacks,
-                &BytesRead))
+                (ULONG)SizeOfCiCallbacks))
             {
                 c = (ULONG)(SizeOfCiCallbacks / sizeof(ULONG_PTR));
                 for (i = 0; i < c; i++) {
@@ -3806,10 +3779,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks)
         //
         // Probe size element.
         //
-        if (!kdReadSystemMemoryEx(KernelVariableAddress,
+        if (!kdReadSystemMemory(KernelVariableAddress,
             &SizeOfCiCallbacks,
-            sizeof(ULONG_PTR),
-            &BytesRead))
+            sizeof(ULONG_PTR)))
         {
             return;
         }
@@ -3823,10 +3795,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks)
         CallbacksData = (PULONG_PTR)supVirtualAlloc((SIZE_T)SizeOfCiCallbacks);
         if (CallbacksData) {
 
-            if (kdReadSystemMemoryEx(KernelVariableAddress,
+            if (kdReadSystemMemory(KernelVariableAddress,
                 CallbacksData,
-                (ULONG)SizeOfCiCallbacks,
-                &BytesRead))
+                (ULONG)SizeOfCiCallbacks))
             {
                 SizeOfCiCallbacks -= sizeof(ULONG_PTR); //exclude structure sizeof
                 bRevisionMarker = (g_NtBuildNumber >= NT_WIN10_REDSTONE1); //there is a revision marker at the end of this structure.
@@ -3896,11 +3867,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExHostCallbacks)
     //
     // Read head.
     //
-    if (!kdReadSystemMemoryEx(
+    if (!kdReadSystemMemory(
         ListHead,
         &ListEntry,
-        sizeof(LIST_ENTRY),
-        NULL))
+        sizeof(LIST_ENTRY)))
     {
         return;
     }
@@ -3912,10 +3882,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExHostCallbacks)
 
         RtlSecureZeroMemory(&HostEntry, sizeof(HostEntry));
 
-        if (!kdReadSystemMemoryEx((ULONG_PTR)ListEntry.Flink,
+        if (!kdReadSystemMemory((ULONG_PTR)ListEntry.Flink,
             &HostEntry,
-            sizeof(HostEntry),
-            NULL))
+            sizeof(HostEntry)))
         {
             break;
         }
@@ -3937,31 +3906,32 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExHostCallbacks)
             }
 
             //
-            // Read table.
+            // Read function table.
             //
-            HostTableDump = (ULONG_PTR*)supHeapAlloc(NumberOfCallbacks * sizeof(PVOID));
-            if (HostTableDump) {
+            if (HostEntry.FunctionTable) {
+                HostTableDump = (ULONG_PTR*)supHeapAlloc(NumberOfCallbacks * sizeof(PVOID));
+                if (HostTableDump) {
 
-                if (kdReadSystemMemoryEx(
-                    (ULONG_PTR)HostEntry.FunctionTable,
-                    HostTableDump,
-                    NumberOfCallbacks * sizeof(PVOID),
-                    NULL))
-                {
+                    if (kdReadSystemMemory(
+                        (ULONG_PTR)HostEntry.FunctionTable,
+                        HostTableDump,
+                        NumberOfCallbacks * sizeof(PVOID)))
+                    {
 
-                    for (i = 0; i < NumberOfCallbacks; i++) {
-                        if (HostTableDump[i]) {
-                            AddEntryToList(TreeList,
-                                RootItem,
-                                (ULONG_PTR)HostTableDump[i],
-                                L"Callback",
-                                Modules);
+                        for (i = 0; i < NumberOfCallbacks; i++) {
+                            if (HostTableDump[i]) {
+                                AddEntryToList(TreeList,
+                                    RootItem,
+                                    (ULONG_PTR)HostTableDump[i],
+                                    L"Callback",
+                                    Modules);
+                            }
                         }
+
                     }
 
+                    supHeapFree(HostTableDump);
                 }
-
-                supHeapFree(HostTableDump);
             }
         }
 
@@ -4002,11 +3972,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExpCallbackListCallbacks)
     //
     // Read head.
     //
-    if (!kdReadSystemMemoryEx(
+    if (!kdReadSystemMemory(
         ListHead,
         &ListEntry,
-        sizeof(LIST_ENTRY),
-        NULL))
+        sizeof(LIST_ENTRY)))
     {
         return;
     }
@@ -4020,10 +3989,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExpCallbackListCallbacks)
 
         CallbackObjectAddress = (ULONG_PTR)ListEntry.Flink - FIELD_OFFSET(CALLBACK_OBJECT_V2, ExpCallbackList);
 
-        if (!kdReadSystemMemoryEx(CallbackObjectAddress,
+        if (!kdReadSystemMemory(CallbackObjectAddress,
             &CallbackObject,
-            sizeof(CallbackObject),
-            NULL)
+            sizeof(CallbackObject))
             ||
             CallbackObject.Signature != EX_CALLBACK_SIGNATURE)
         {
@@ -4049,10 +4017,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExpCallbackListCallbacks)
             // Read callback registration data.
             //
             RtlSecureZeroMemory(&CallbackRegistration, sizeof(CallbackRegistration));
-            if (!kdReadSystemMemoryEx((ULONG_PTR)RegistrationsListEntry.Flink,
+            if (!kdReadSystemMemory((ULONG_PTR)RegistrationsListEntry.Flink,
                 (PVOID)&CallbackRegistration,
-                sizeof(CallbackRegistration),
-                NULL))
+                sizeof(CallbackRegistration)))
             {
                 break;
             }
@@ -4071,11 +4038,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExpCallbackListCallbacks)
         //
         NextEntry.Blink = NextEntry.Flink = NULL;
 
-        if (!kdReadSystemMemoryEx(
+        if (!kdReadSystemMemory(
             (ULONG_PTR)ListEntry.Flink,
             &NextEntry,
-            sizeof(LIST_ENTRY),
-            NULL))
+            sizeof(LIST_ENTRY)))
         {
             break;
         }
@@ -4137,7 +4103,8 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCoalescingCallbacks)
             CallbacksCount = PopCoalescingCallbackRoutineCount_V2;
 
         if (kdReadSystemMemory(KernelVariableAddress,
-            &Callbacks, CallbacksCount * sizeof(EX_FAST_REF)))
+            &Callbacks, 
+            CallbacksCount * sizeof(EX_FAST_REF)))
         {
 
             for (i = 0; i < CallbacksCount; i++) {
@@ -4147,10 +4114,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCoalescingCallbacks)
                     objectFastRef = (ULONG_PTR)ObGetObjectFastReference(Callbacks[i]);
                     RtlSecureZeroMemory(&callbackObject, sizeof(callbackObject));
 
-                    if (kdReadSystemMemoryEx(objectFastRef,
+                    if (kdReadSystemMemory(objectFastRef,
                         &callbackObject.v1,
-                        sizeof(callbackObject.v1),
-                        NULL))
+                        sizeof(callbackObject.v1)))
                     {
                         AddEntryToList(TreeList,
                             RootItem,
@@ -4171,11 +4137,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCoalescingCallbacks)
         //
         // Read head.
         //
-        if (!kdReadSystemMemoryEx(
+        if (!kdReadSystemMemory(
             ListHead,
             &ListEntry,
-            sizeof(LIST_ENTRY),
-            NULL))
+            sizeof(LIST_ENTRY)))
         {
             return;
         }
@@ -4189,10 +4154,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCoalescingCallbacks)
 
             callbackAddress = (ULONG_PTR)ListEntry.Flink - FIELD_OFFSET(PO_COALESCING_CALLBACK_V2, Link);
 
-            if (!kdReadSystemMemoryEx(callbackAddress,
+            if (!kdReadSystemMemory(callbackAddress,
                 &callbackObject.v2,
-                sizeof(callbackObject.v2),
-                NULL))
+                sizeof(callbackObject.v2)))
             {
                 break;
             }
@@ -4236,7 +4200,7 @@ OBEX_QUERYCALLBACK_ROUTINE(QueryIopFsListsCallbacks)
                 &g_SystemCallbacks.IopTapeFileSystemQueueHead,
                 &g_SystemCallbacks.IopNetworkFileSystemQueueHead))
             {
-                kdDebugPrint("Could not locate all Iop listheads\r\n");
+                kdReportErrorByFunction(__FUNCTIONW__, TEXT("Could not locate all Iop ListHeads"));
                 return STATUS_NOT_FOUND;
             }
         }

@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPALPCPORT.C
 *
-*  VERSION:     1.90
+*  VERSION:     1.92
 *
-*  DATE:        31 May 2021
+*  DATE:        03 Dec 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -326,11 +326,10 @@ BOOL AlpcPortEnumerateClients(
 
             comsNextEntry.Flink = comsNextEntry.Blink = NULL;
 
-            if (!kdReadSystemMemoryEx(
+            if (!kdReadSystemMemory(
                 (ULONG_PTR)comsListEntry.Flink,
                 &comsNextEntry,
-                sizeof(LIST_ENTRY),
-                NULL))
+                sizeof(LIST_ENTRY)))
             {
                 break;
             }

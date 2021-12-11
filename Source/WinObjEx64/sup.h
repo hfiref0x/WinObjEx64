@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.92
 *
-*  DATE:        19 Nov 2021
+*  DATE:        03 Dec 2021
 *
 *  Common header file for the program support routines.
 *
@@ -57,6 +57,16 @@ typedef	struct _PHL_ENTRY {
     HANDLE UniqueProcessId;
     PVOID DataPtr;
 } PHL_ENTRY, *PPHL_ENTRY;
+
+typedef struct _SUP_HANDLE_DUMP_ENTRY {
+    PVOID Object;
+    ULONG_PTR HandleValue;
+} SUP_HANDLE_DUMP_ENTRY, * PSUP_HANDLE_DUMP_ENTRY;
+
+typedef struct _SUP_HANDLE_DUMP {
+    ULONG_PTR NumberOfHandles;
+    SUP_HANDLE_DUMP_ENTRY Handles[ANYSIZE_ARRAY];
+} SUP_HANDLE_DUMP, * PSUP_HANDLE_DUMP;
 
 typedef struct _OBEX_PROCESS_LOOKUP_ENTRY {
     HANDLE hProcess;
@@ -528,12 +538,22 @@ NTSTATUS supQueryObjectTrustLabel(
     _Out_ PULONG ProtectionType,
     _Out_ PULONG ProtectionLevel);
 
+BOOL supIsImmersiveProcess(
+    _In_ HANDLE hProcess);
+
+NTSTATUS supIsProtectedProcess(
+    _In_ HANDLE hProcess,
+    _Out_ PBOOL pbProtected);
+
 NTSTATUS supIsLocalSystem(
     _In_ HANDLE hToken,
     _Out_ PBOOL pbResult);
 
 BOOL supRunAsLocalSystem(
     _In_ HWND hwndParent);
+
+BOOLEAN supIsLocalServiceSid(
+    _In_ PSID Sid);
 
 VOID supUpdateLvColumnHeaderImage(
     _In_ HWND ListView,
@@ -673,17 +693,14 @@ NTSTATUS supLsaOpenMachinePolicy(
     _In_ ACCESS_MASK DesiredAccess,
     _Out_ PLSA_HANDLE PolicyHandle);
 
-PSYSTEM_HANDLE_INFORMATION_EX supHandlesCreateFilteredAndSortedList(
+PSUP_HANDLE_DUMP supHandlesCreateFilteredAndSortedList(
     _In_ ULONG_PTR FilterUniqueProcessId,
     _In_ BOOLEAN fObject);
 
 BOOL supHandlesQueryObjectAddress(
-    _In_ PSYSTEM_HANDLE_INFORMATION_EX SortedHandleList,
+    _In_ PSUP_HANDLE_DUMP SortedHandleList,
     _In_ HANDLE ObjectHandle,
     _Out_ PULONG_PTR ObjectAddress);
-
-BOOL supHandlesFreeList(
-    PSYSTEM_HANDLE_INFORMATION_EX SortedHandleList);
 
 BOOL supPHLCreate(
     _Inout_ PLIST_ENTRY ListHead,

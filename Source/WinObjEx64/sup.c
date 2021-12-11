@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.92
 *
-*  DATE:        19 Nov 2021
+*  DATE:        07 Dec 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -457,29 +457,30 @@ BOOL supQueryObjectFromHandleEx(
     _Out_opt_ USHORT* TypeIndex
 )
 {
-    ULONG_PTR   i;
+    USHORT      objectTypeIndex = 0;
     BOOL        bFound = FALSE;
     DWORD       CurrentProcessId = GetCurrentProcessId();
-
-    if (Address)
-        *Address = 0;
-    if (TypeIndex)
-        *TypeIndex = 0;
+    ULONG_PTR   i, objectAddress = 0;
 
     for (i = 0; i < HandlesDump->NumberOfHandles; i++) {
         if (HandlesDump->Handles[i].UniqueProcessId == (ULONG_PTR)CurrentProcessId) {
             if (HandlesDump->Handles[i].HandleValue == (ULONG_PTR)Object) {
                 if (Address) {
-                    *Address = (ULONG_PTR)HandlesDump->Handles[i].Object;
+                    objectAddress = (ULONG_PTR)HandlesDump->Handles[i].Object;
                 }
                 if (TypeIndex) {
-                    *TypeIndex = HandlesDump->Handles[i].ObjectTypeIndex;
+                    objectTypeIndex = HandlesDump->Handles[i].ObjectTypeIndex;
                 }
                 bFound = TRUE;
                 break;
             }
         }
     }
+
+    if (Address)
+        *Address = objectAddress;
+    if (TypeIndex)
+        *TypeIndex = objectTypeIndex;
 
     return bFound;
 }
@@ -538,7 +539,7 @@ BOOL supDumpSyscallTableConverted(
     _Out_ PUTable* Table
 )
 {
-    ULONG   ServiceId, memIO, bytesRead;
+    ULONG   ServiceId, memIO;
     BOOL    bResult = FALSE;
     PULONG  ServiceTableDumped = NULL;
     PUTable ConvertedTable;
@@ -550,12 +551,11 @@ BOOL supDumpSyscallTableConverted(
     memIO = ServiceLimit * sizeof(ULONG);
     ServiceTableDumped = (PULONG)supHeapAlloc(memIO);
     if (ServiceTableDumped) {
-        bytesRead = 0;
         if (kdReadSystemMemoryEx(
             ServiceTableAddress,
             (PVOID)ServiceTableDumped,
             memIO,
-            &bytesRead))
+            NULL))
         {
             ConvertedTable = (PULONG_PTR)supHeapAlloc(ServiceLimit * sizeof(ULONG_PTR));
 
@@ -1278,12 +1278,7 @@ UINT supGetObjectNameIndexByTypeIndex(
 
         Index = ObDecodeTypeIndex(Object, TypeIndex);
 
-        if (g_WinObj.IsWine) {
-            pObject = OBJECT_TYPES_FIRST_ENTRY_WINE(g_pObjectTypesInfo);
-        }
-        else {
-            pObject = OBJECT_TYPES_FIRST_ENTRY(g_pObjectTypesInfo);
-        }
+        pObject = OBJECT_TYPES_FIRST_ENTRY(g_pObjectTypesInfo);
 
         for (i = 0; i < g_pObjectTypesInfo->NumberOfTypes; i++) {
             if (g_NtBuildNumber >= NT_WIN8_RTM) {
@@ -1306,7 +1301,8 @@ UINT supGetObjectNameIndexByTypeIndex(
             pObject = OBJECT_TYPES_NEXT_ENTRY(pObject);
         }
     }
-    __except (WOBJ_EXCEPTION_FILTER) {
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        supReportAbnormalTermination(__FUNCTIONW__);
         return ObjectTypeUnknown;
     }
     return ObjectTypeUnknown;
@@ -2407,12 +2403,10 @@ BOOL supQueryTypeInfo(
 
     __try {
 
-        if (g_WinObj.IsWine) {
-            pObject = OBJECT_TYPES_FIRST_ENTRY_WINE(g_pObjectTypesInfo);
-        }
-        else {
-            pObject = OBJECT_TYPES_FIRST_ENTRY(g_pObjectTypesInfo);
-        }
+        //
+        // Warning: older Wine/Staging incorrectly implement memory structure layout for this structure and therefore will crash.            
+        //
+        pObject = OBJECT_TYPES_FIRST_ENTRY(g_pObjectTypesInfo);
 
         for (i = 0; i < g_pObjectTypesInfo->NumberOfTypes; i++) {
             if (_strncmpi(pObject->TypeName.Buffer,
@@ -2439,7 +2433,8 @@ BOOL supQueryTypeInfo(
         }
 
     }
-    __except (WOBJ_EXCEPTION_FILTER) {
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        supReportAbnormalTermination(__FUNCTIONW__);
         return FALSE;
     }
     return bResult;
@@ -3597,6 +3592,52 @@ PSID supQueryProcessSid(
 }
 
 /*
+* supIsImmersiveProcess
+*
+* Purpose:
+*
+* Wrapper for IsImmersiveProcess, since it is not present on Win7.
+*
+*/
+BOOL supIsImmersiveProcess(
+    _In_ HANDLE hProcess
+)
+{
+    if (g_ExtApiSet.IsImmersiveProcess)
+        return g_ExtApiSet.IsImmersiveProcess(hProcess);
+
+    return FALSE;
+}
+
+/*
+* supIsProtectedProcess
+*
+* Purpose:
+*
+* Check if given process is protected process.
+*
+*/
+NTSTATUS supIsProtectedProcess(
+    _In_ HANDLE hProcess,
+    _Out_ PBOOL pbProtected
+)
+{
+    NTSTATUS ntStatus;
+    ULONG requredLength = 0;
+    PROCESS_EXTENDED_BASIC_INFORMATION exbi;
+
+    exbi.Size = sizeof(PROCESS_EXTENDED_BASIC_INFORMATION);
+    ntStatus = NtQueryInformationProcess(hProcess, ProcessBasicInformation,
+        &exbi, sizeof(exbi), &requredLength);
+    
+    if (NT_SUCCESS(ntStatus)) {
+        *pbProtected  = (exbi.IsProtectedProcess != 0);
+    }
+
+    return ntStatus;
+}
+
+/*
 * supIsLocalSystem
 *
 * Purpose:
@@ -3653,6 +3694,23 @@ NTSTATUS supIsLocalSystem(
         *pbResult = bResult;
 
     return status;
+}
+
+/*
+* supIsLocalServiceSid
+*
+* Purpose:
+*
+* Check if given sid is sid of local service.
+*
+*/
+BOOLEAN supIsLocalServiceSid(
+    _In_ PSID Sid
+)
+{
+    SID sidLocalService = { SID_REVISION, 1, SECURITY_NT_AUTHORITY, { SECURITY_LOCAL_SERVICE_RID } };
+
+    return RtlEqualSid(&sidLocalService, Sid);
 }
 
 /*
@@ -5628,8 +5686,8 @@ BOOL supPrintTimeConverted(
     FILETIME ConvertedTime;
     TIME_FIELDS TimeFields;
 
-    if ((Time == NULL) || (lpszBuffer == NULL)) return 0;
-    if (cchBuffer == 0) return 0;
+    if ((Time == NULL) || (lpszBuffer == NULL)) return FALSE;
+    if (cchBuffer == 0) return FALSE;
 
     RtlSecureZeroMemory(&ConvertedTime, sizeof(ConvertedTime));
     if (FileTimeToLocalFileTime((PFILETIME)Time, (PFILETIME)&ConvertedTime)) {
@@ -5650,10 +5708,10 @@ BOOL supPrintTimeConverted(
             g_szMonths[TimeFields.Month - 1],
             TimeFields.Year);
 
-        return 1;
+        return TRUE;
     }
 
-    return 0;
+    return FALSE;
 }
 
 /*
@@ -5946,8 +6004,8 @@ int __cdecl supxHandlesLookupCallback(
 )
 {
     int i;
-    PSYSTEM_HANDLE_TABLE_ENTRY_INFO_EX elem1 = (PSYSTEM_HANDLE_TABLE_ENTRY_INFO_EX)first;
-    PSYSTEM_HANDLE_TABLE_ENTRY_INFO_EX elem2 = (PSYSTEM_HANDLE_TABLE_ENTRY_INFO_EX)second;
+    PSUP_HANDLE_DUMP_ENTRY elem1 = (PSUP_HANDLE_DUMP_ENTRY)first;
+    PSUP_HANDLE_DUMP_ENTRY elem2 = (PSUP_HANDLE_DUMP_ENTRY)second;
 
     if (elem1->HandleValue == elem2->HandleValue)
         i = 0;
@@ -5974,8 +6032,8 @@ int __cdecl supxHandlesLookupCallback2(
 )
 {
     int i;
-    PSYSTEM_HANDLE_TABLE_ENTRY_INFO_EX elem1 = (PSYSTEM_HANDLE_TABLE_ENTRY_INFO_EX)first;
-    PSYSTEM_HANDLE_TABLE_ENTRY_INFO_EX elem2 = (PSYSTEM_HANDLE_TABLE_ENTRY_INFO_EX)second;
+    PSUP_HANDLE_DUMP_ENTRY elem1 = (PSUP_HANDLE_DUMP_ENTRY)first;
+    PSUP_HANDLE_DUMP_ENTRY elem2 = (PSUP_HANDLE_DUMP_ENTRY)second;
     
     ULONG_PTR FirstObject = (ULONG_PTR)elem1->Object;
     ULONG_PTR SecondObject = (ULONG_PTR)elem2->Object;
@@ -5998,15 +6056,16 @@ int __cdecl supxHandlesLookupCallback2(
 *
 * Create sorted handles list of given process.
 *
-* Use supHandlesFreeList to release allocated memory.
+* Use supHeapFree to release allocated memory.
 *
 */
-PSYSTEM_HANDLE_INFORMATION_EX supHandlesCreateFilteredAndSortedList(
+PSUP_HANDLE_DUMP supHandlesCreateFilteredAndSortedList(
     _In_ ULONG_PTR FilterUniqueProcessId,
     _In_ BOOLEAN fObject
 )
 {
-    PSYSTEM_HANDLE_INFORMATION_EX resultSnapshot = NULL, handleDump;
+    PSYSTEM_HANDLE_INFORMATION_EX handleDump;
+    PSUP_HANDLE_DUMP resultSnapshot;
     ULONG_PTR i, cLast = 0;
 
     ULONG returnLength = 0;
@@ -6021,10 +6080,10 @@ PSYSTEM_HANDLE_INFORMATION_EX supHandlesCreateFilteredAndSortedList(
     if (handleDump == NULL)
         return NULL;
 
-    stBufferSize = sizeof(SYSTEM_HANDLE_INFORMATION_EX) +
-        handleDump->NumberOfHandles * sizeof(SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX);
+    stBufferSize = sizeof(SUP_HANDLE_DUMP) +
+        handleDump->NumberOfHandles * sizeof(PSUP_HANDLE_DUMP_ENTRY);
 
-    resultSnapshot = (PSYSTEM_HANDLE_INFORMATION_EX)supHeapAlloc(stBufferSize);
+    resultSnapshot = (PSUP_HANDLE_DUMP)supHeapAlloc(stBufferSize);
 
     if (resultSnapshot) {
         for (i = 0; i < handleDump->NumberOfHandles; i++) {
@@ -6039,32 +6098,13 @@ PSYSTEM_HANDLE_INFORMATION_EX supHandlesCreateFilteredAndSortedList(
 
         RtlQuickSort((PVOID)&resultSnapshot->Handles,
             resultSnapshot->NumberOfHandles,
-            sizeof(SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX),
+            sizeof(SUP_HANDLE_DUMP_ENTRY),
             (fObject) ? supxHandlesLookupCallback2 : supxHandlesLookupCallback);
     }
 
     supHeapFree(handleDump);
 
     return resultSnapshot;
-}
-
-/*
-* supHandlesFreeList
-*
-* Purpose:
-*
-* Free memory allocated for handle list.
-*
-*/
-BOOL supHandlesFreeList(
-    PSYSTEM_HANDLE_INFORMATION_EX SortedHandleList
-)
-{
-    if (SortedHandleList) {
-
-        return supHeapFree(SortedHandleList);
-    }
-    return FALSE;
 }
 
 /*
@@ -6076,20 +6116,20 @@ BOOL supHandlesFreeList(
 *
 */
 BOOL supHandlesQueryObjectAddress(
-    _In_ PSYSTEM_HANDLE_INFORMATION_EX SortedHandleList,
+    _In_ PSUP_HANDLE_DUMP SortedHandleList,
     _In_ HANDLE ObjectHandle,
     _Out_ PULONG_PTR ObjectAddress
 )
 {
-    SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX* SearchResult, SearchEntry;
+    SUP_HANDLE_DUMP_ENTRY* SearchResult, SearchEntry;
 
     SearchEntry.HandleValue = (ULONG_PTR)ObjectHandle;
 
-    SearchResult = (PSYSTEM_HANDLE_TABLE_ENTRY_INFO_EX)supBSearch(
+    SearchResult = (PSUP_HANDLE_DUMP_ENTRY)supBSearch(
         (PCVOID)&SearchEntry,
         SortedHandleList->Handles,
         SortedHandleList->NumberOfHandles,
-        sizeof(SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX),
+        sizeof(SUP_HANDLE_DUMP_ENTRY),
         supxHandlesLookupCallback);
 
     if (SearchResult) {

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2021
 *
 *  TITLE:       LOG.H
 *
-*  VERSION:     1.86
+*  VERSION:     1.92
 *
-*  DATE:        17 May 2020
+*  DATE:        03 Dec 2021
 *
 *  Header file for simplified log support.
 *
@@ -26,7 +26,7 @@
 //
 // Maximum messages in log.
 //
-#define WOBJ_MAX_LOG_CAPACITY 2048
+#define WOBJ_MAX_LOG_CAPACITY 4096
 
 //
 // Maximum length of message in log.

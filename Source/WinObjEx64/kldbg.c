@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.92
 *
-*  DATE:        13 Nov 2021
+*  DATE:        05 Dec 2021
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -816,10 +816,9 @@ NTSTATUS ObCopyBoundaryDescriptor(
     //
     // Read header.
     //
-    if (!kdReadSystemMemoryEx(BoundaryDescriptorAddress,
+    if (!kdReadSystemMemory(BoundaryDescriptorAddress,
         &BoundaryDescriptorHeader,
-        sizeof(OBJECT_BOUNDARY_DESCRIPTOR),
-        NULL))
+        sizeof(OBJECT_BOUNDARY_DESCRIPTOR)))
     {
         return STATUS_DEVICE_NOT_READY;
     }
@@ -848,10 +847,9 @@ NTSTATUS ObCopyBoundaryDescriptor(
     if (CopyDescriptor == NULL)
         return STATUS_MEMORY_NOT_ALLOCATED;
 
-    if (kdReadSystemMemoryEx(BoundaryDescriptorAddress,
+    if (kdReadSystemMemory(BoundaryDescriptorAddress,
         CopyDescriptor,
-        TotalSize,
-        NULL))
+        TotalSize))
     {
         *BoundaryDescriptor = CopyDescriptor;
         if (BoundaryDescriptorSize)
@@ -1551,11 +1549,10 @@ BOOLEAN ObpFindHeaderCookie(
 
     }
 
-    if (kdReadSystemMemoryEx(
+    if (kdReadSystemMemory(
         lookupAddress,
         &cookieValue,
-        sizeof(cookieValue),
-        NULL))
+        sizeof(cookieValue)))
     {
         Cookie->Valid = TRUE;
         Cookie->Value = cookieValue;
@@ -1787,10 +1784,9 @@ PVOID ObFindPrivateNamespaceLookupTable2(
         //
         RtlSecureZeroMemory(&PspHostSiloGlobals, sizeof(PspHostSiloGlobals));
 
-        if (kdReadSystemMemoryEx(varAddress,
+        if (kdReadSystemMemory(varAddress,
             &PspHostSiloGlobals,
-            sizeof(PspHostSiloGlobals),
-            NULL))
+            sizeof(PspHostSiloGlobals)))
         {
             //
             // Return adjusted address of PrivateNamespaceLookupTable.
@@ -1902,10 +1898,9 @@ PVOID ObGetCallbackBlockRoutine(
 
     readBlock.Function = NULL;
 
-    if (!kdReadSystemMemoryEx((ULONG_PTR)CallbackBlock,
+    if (!kdReadSystemMemory((ULONG_PTR)CallbackBlock,
         &readBlock,
-        sizeof(EX_CALLBACK_ROUTINE_BLOCK),
-        NULL))
+        sizeof(EX_CALLBACK_ROUTINE_BLOCK)))
     {
         return NULL;
     }
@@ -2036,11 +2031,10 @@ BOOL kdFindKiServiceTable(
 
     }
 
-    return kdReadSystemMemoryEx(
+    return kdReadSystemMemory(
         varAddress,
         ServiceTable,
-        sizeof(KSERVICE_TABLE_DESCRIPTOR),
-        NULL);
+        sizeof(KSERVICE_TABLE_DESCRIPTOR));
 }
 
 /*
@@ -2111,10 +2105,9 @@ LPWSTR ObQueryNameString(
 
     RtlSecureZeroMemory(&nameInfo, sizeof(OBJECT_HEADER_NAME_INFO));
 
-    if (kdReadSystemMemoryEx(NameInfoAddress,
+    if (kdReadSystemMemory(NameInfoAddress,
         &nameInfo,
-        sizeof(OBJECT_HEADER_NAME_INFO),
-        NULL))
+        sizeof(OBJECT_HEADER_NAME_INFO)))
     {
         if (nameInfo.Name.Length) {
 
@@ -2128,10 +2121,9 @@ LPWSTR ObQueryNameString(
 
                 NameInfoAddress = (ULONG_PTR)nameInfo.Name.Buffer;
 
-                if (kdReadSystemMemoryEx(NameInfoAddress,
+                if (kdReadSystemMemory(NameInfoAddress,
                     objectName,
-                    nameInfo.Name.Length,
-                    NULL))
+                    nameInfo.Name.Length))
                 {
                     if (ReturnLength)
                         *ReturnLength = allocLength;
@@ -2211,12 +2203,11 @@ POBJINFO ObpCopyObjectBasicInfo(
         //
         RtlSecureZeroMemory(&ObjectHeader, sizeof(OBJECT_HEADER));
 
-        if (!kdReadSystemMemoryEx(HeaderAddress,
+        if (!kdReadSystemMemory(HeaderAddress,
             &ObjectHeader,
-            sizeof(OBJECT_HEADER),
-            NULL))
+            sizeof(OBJECT_HEADER)))
         {
-            kdDebugPrint("%s kdReadSystemMemoryEx(ObjectHeaderAddress) failed\r\n", __FUNCTION__);
+            kdReportReadErrorSimple(__FUNCTIONW__, HeaderAddress, sizeof(OBJECT_HEADER));
             return NULL;
         }
 
@@ -2251,10 +2242,9 @@ POBJINFO ObpCopyObjectBasicInfo(
         &InfoHeaderAddress,
         HeaderQuotaInfoFlag))
     {
-        kdReadSystemMemoryEx(HeaderAddress,
+        kdReadSystemMemory(HeaderAddress,
             &lpData->ObjectQuotaHeader,
-            sizeof(OBJECT_HEADER_QUOTA_INFO),
-            NULL);
+            sizeof(OBJECT_HEADER_QUOTA_INFO));
     }
 
     return lpData;
@@ -2299,12 +2289,11 @@ POBJINFO ObpWalkDirectory(
         //
         RtlSecureZeroMemory(&DirectoryObject, sizeof(OBJECT_DIRECTORY));
 
-        if (!kdReadSystemMemoryEx(DirectoryAddress,
+        if (!kdReadSystemMemory(DirectoryAddress,
             &DirectoryObject,
-            sizeof(OBJECT_DIRECTORY),
-            NULL))
+            sizeof(OBJECT_DIRECTORY)))
         {
-            kdDebugPrint("%s kdReadSystemMemoryEx(DirectoryAddress) failed\r\n", __FUNCTION__);
+            kdReportReadErrorSimple(__FUNCTIONW__, DirectoryAddress, sizeof(OBJECT_DIRECTORY));
             return NULL;
         }
 
@@ -2336,12 +2325,11 @@ POBJINFO ObpWalkDirectory(
                     //
                     RtlSecureZeroMemory(&DirectoryEntry, sizeof(OBJECT_DIRECTORY_ENTRY));
 
-                    if (!kdReadSystemMemoryEx(LookupItem,
+                    if (!kdReadSystemMemory(LookupItem,
                         &DirectoryEntry,
-                        sizeof(OBJECT_DIRECTORY_ENTRY),
-                        NULL))
+                        sizeof(OBJECT_DIRECTORY_ENTRY)))
                     {
-                        kdDebugPrint("%s kdReadSystemMemoryEx(OBJECT_DIRECTORY_ENTRY(HashEntry)) failed\r\n", __FUNCTION__);
+                        kdReportReadErrorSimple(__FUNCTIONW__, LookupItem, sizeof(OBJECT_DIRECTORY_ENTRY));
                         break;
                     }
 
@@ -2351,12 +2339,11 @@ POBJINFO ObpWalkDirectory(
                     RtlSecureZeroMemory(&ObjectHeader, sizeof(OBJECT_HEADER));
                     ObjectHeaderAddress = (ULONG_PTR)OBJECT_TO_OBJECT_HEADER(DirectoryEntry.Object);
 
-                    if (!kdReadSystemMemoryEx(ObjectHeaderAddress,
+                    if (!kdReadSystemMemory(ObjectHeaderAddress,
                         &ObjectHeader,
-                        sizeof(OBJECT_HEADER),
-                        NULL))
+                        sizeof(OBJECT_HEADER)))
                     {
-                        kdDebugPrint("%s kdReadSystemMemoryEx(ObjectHeaderAddress(Entry.Object)) failed\r\n", __FUNCTION__);
+                        kdReportReadErrorSimple(__FUNCTIONW__, ObjectHeaderAddress, sizeof(OBJECT_HEADER));
                         goto NextItem;
                     }
 
@@ -2441,12 +2428,11 @@ POBJINFO ObQueryObjectByAddress(
     RtlSecureZeroMemory(&ObjectHeader, sizeof(OBJECT_HEADER));
     ObjectHeaderAddress = (ULONG_PTR)OBJECT_TO_OBJECT_HEADER(ObjectAddress);
 
-    if (!kdReadSystemMemoryEx(ObjectHeaderAddress,
+    if (!kdReadSystemMemory(ObjectHeaderAddress,
         &ObjectHeader,
-        sizeof(OBJECT_HEADER),
-        NULL))
+        sizeof(OBJECT_HEADER)))
     {
-        kdDebugPrint("%s kdReadSystemMemoryEx(ObjectHeaderAddress(ObjectAddress)) failed\r\n", __FUNCTION__);
+        kdReportReadErrorSimple(__FUNCTIONW__, ObjectHeaderAddress, sizeof(OBJECT_HEADER));
         return NULL;
     }
 
@@ -2637,10 +2623,9 @@ BOOL ObpEnumeratePrivateNamespaceTable(
     //
     RtlSecureZeroMemory(&LookupTable, sizeof(OBJECT_NAMESPACE_LOOKUPTABLE));
 
-    if (!kdReadSystemMemoryEx(TableAddress,
+    if (!kdReadSystemMemory(TableAddress,
         &LookupTable,
-        sizeof(OBJECT_NAMESPACE_LOOKUPTABLE),
-        NULL))
+        sizeof(OBJECT_NAMESPACE_LOOKUPTABLE)))
     {
         return FALSE;
     }
@@ -2656,10 +2641,9 @@ BOOL ObpEnumeratePrivateNamespaceTable(
 
             RtlSecureZeroMemory(&LookupEntry, sizeof(OBJECT_NAMESPACE_ENTRY));
 
-            if (!kdReadSystemMemoryEx((ULONG_PTR)Next,
+            if (!kdReadSystemMemory((ULONG_PTR)Next,
                 &LookupEntry,
-                sizeof(OBJECT_NAMESPACE_ENTRY),
-                NULL))
+                sizeof(OBJECT_NAMESPACE_ENTRY)))
             {
                 break;
             }
@@ -2668,10 +2652,9 @@ BOOL ObpEnumeratePrivateNamespaceTable(
 
             RtlSecureZeroMemory(&DirObject, sizeof(OBJECT_DIRECTORY));
 
-            if (!kdReadSystemMemoryEx((ULONG_PTR)LookupEntry.NamespaceRootDirectory,
+            if (!kdReadSystemMemory((ULONG_PTR)LookupEntry.NamespaceRootDirectory,
                 &DirObject,
-                sizeof(OBJECT_DIRECTORY),
-                NULL))
+                sizeof(OBJECT_DIRECTORY)))
             {
                 break;
             }
@@ -2687,18 +2670,16 @@ BOOL ObpEnumeratePrivateNamespaceTable(
 
                         RtlSecureZeroMemory(&Entry, sizeof(OBJECT_DIRECTORY_ENTRY));
 
-                        if (kdReadSystemMemoryEx(LookupItem,
+                        if (kdReadSystemMemory(LookupItem,
                             &Entry,
-                            sizeof(OBJECT_DIRECTORY_ENTRY),
-                            NULL)) {
+                            sizeof(OBJECT_DIRECTORY_ENTRY))) {
 
                             RtlSecureZeroMemory(&ObjectHeader, sizeof(OBJECT_HEADER));
                             ObjectHeaderAddress = (ULONG_PTR)OBJECT_TO_OBJECT_HEADER(Entry.Object);
 
-                            if (kdReadSystemMemoryEx(ObjectHeaderAddress,
+                            if (kdReadSystemMemory(ObjectHeaderAddress,
                                 &ObjectHeader,
-                                sizeof(OBJECT_HEADER),
-                                NULL))
+                                sizeof(OBJECT_HEADER)))
                             {
 
                                 //
@@ -2872,10 +2853,9 @@ BOOL ObpDumpNameElement(
         return FALSE;
     }
 
-    if (!kdReadSystemMemoryEx((ULONG_PTR)NameInformation->Name.Buffer,
+    if (!kdReadSystemMemory((ULONG_PTR)NameInformation->Name.Buffer,
         lpName,
-        nameLength,
-        NULL))
+        nameLength))
     {
         supHeapFree(lpName);
         return FALSE;
@@ -2911,10 +2891,9 @@ SIZE_T ObpDumpObjectName(
     //
     objectHeaderAddress = (ULONG_PTR)OBJECT_TO_OBJECT_HEADER(lookupObject);
     RtlSecureZeroMemory(&objectHeader, sizeof(OBJECT_HEADER));
-    if (!kdReadSystemMemoryEx(objectHeaderAddress,
+    if (!kdReadSystemMemory(objectHeaderAddress,
         &objectHeader,
-        sizeof(OBJECT_HEADER),
-        NULL))
+        sizeof(OBJECT_HEADER)))
     {
         //
         // Nothing to process, object header is not available.
@@ -2942,10 +2921,9 @@ SIZE_T ObpDumpObjectName(
     //
     RtlSecureZeroMemory(&nameInfo, sizeof(nameInfo));
 
-    if (!kdReadSystemMemoryEx(headerInfoAddress,
+    if (!kdReadSystemMemory(headerInfoAddress,
         &nameInfo,
-        sizeof(nameInfo),
-        NULL))
+        sizeof(nameInfo)))
     {
         ObpDumpNameElementSpecial(ListHead, OBP_ERROR_NAME_LITERAL, OBP_ERROR_NAME_LITERAL_SIZE);
         return OBP_ERROR_NAME_LITERAL_SIZE + sizeof(OBJ_NAME_PATH_SEPARATOR);
@@ -3152,10 +3130,9 @@ PVOID kdQueryIopInvalidDeviceRequest(
 
             RtlSecureZeroMemory(&drvObject, sizeof(drvObject));
 
-            if (kdReadSystemMemoryEx(drvObjectAddress,
+            if (kdReadSystemMemory(drvObjectAddress,
                 &drvObject,
-                sizeof(drvObject),
-                NULL))
+                sizeof(drvObject)))
             {
                 pHandler = drvObject.MajorFunction[IRP_MJ_CREATE_MAILSLOT];
 
@@ -3173,6 +3150,57 @@ PVOID kdQueryIopInvalidDeviceRequest(
 }
 
 /*
+* kdReportErrorByFunction
+*
+* Purpose:
+*
+* Log details about failed function call.
+*
+*/
+VOID kdReportErrorByFunction(
+    _In_ LPCWSTR FunctionName,
+    _In_ LPCWSTR ErrorMessage
+)
+{
+    WCHAR szBuffer[WOBJ_MAX_MESSAGE];
+    
+    RtlStringCchPrintfSecure(szBuffer,
+        ARRAYSIZE(szBuffer),
+        TEXT("%ws, %ws"),
+        FunctionName, ErrorMessage);
+
+    logAdd(WOBJ_LOG_ENTRY_ERROR,
+        szBuffer);
+}
+
+/*
+* kdReportReadErrorSimple
+*
+* Purpose:
+*
+* Log details about failed driver call without additional info.
+*
+*/
+VOID kdReportReadErrorSimple(
+    _In_ LPCWSTR FunctionName,
+    _In_ ULONG_PTR KernelAddress,
+    _In_ ULONG InputBufferLength
+)
+{
+    WCHAR szBuffer[512];
+
+    RtlStringCchPrintfSecure(szBuffer,
+        ARRAYSIZE(szBuffer),
+        TEXT("%ws read at 0x%llX, InputBufferLength 0x%lX"),
+        FunctionName,
+        KernelAddress,
+        InputBufferLength);
+
+    logAdd(WOBJ_LOG_ENTRY_ERROR,
+        szBuffer);
+}
+
+/*
 * kdReportReadError
 *
 * Purpose:
@@ -3181,7 +3209,7 @@ PVOID kdQueryIopInvalidDeviceRequest(
 *
 */
 VOID kdReportReadError(
-    _In_ LPWSTR FunctionName,
+    _In_ LPCWSTR FunctionName,
     _In_ ULONG_PTR KernelAddress,
     _In_ ULONG InputBufferLength,
     _In_ NTSTATUS Status,
@@ -3205,28 +3233,36 @@ VOID kdReportReadError(
 }
 
 /*
-* kdpReadSystemMemoryEx
+* kdpReadSystemMemoryWithStatus
 *
 * Purpose:
 *
 * Wrapper around SysDbgReadVirtual request to the KLDBGDRV
 *
 */
-BOOL kdpReadSystemMemoryEx(
+BOOL kdpReadSystemMemoryWithStatus(
     _In_ ULONG_PTR Address,
     _Inout_ PVOID Buffer,
     _In_ ULONG BufferSize,
-    _Out_opt_ PULONG NumberOfBytesRead
+    _Out_opt_ PULONG NumberOfBytesRead,
+    _Out_opt_ NTSTATUS* Status,
+    _Out_opt_ PIO_STATUS_BLOCK IoStatus
 )
 {
     BOOL            bResult;
-    NTSTATUS        status;
+    NTSTATUS        ntStatus;
     KLDBG           kldbg;
     IO_STATUS_BLOCK iost;
     SYSDBG_VIRTUAL  dbgRequest;
 
     if (NumberOfBytesRead)
         *NumberOfBytesRead = 0;
+    if (Status)
+        *Status = STATUS_UNSUCCESSFUL;
+    if (IoStatus) {
+        IoStatus->Information = 0;
+        IoStatus->Status = STATUS_UNSUCCESSFUL;
+    }
 
     if ((Buffer == NULL) ||
         (BufferSize == 0) ||
@@ -3255,7 +3291,7 @@ BOOL kdpReadSystemMemoryEx(
     iost.Information = 0;
     iost.Status = 0;
 
-    status = NtDeviceIoControlFile(g_kdctx.DeviceHandle,
+    ntStatus = NtDeviceIoControlFile(g_kdctx.DeviceHandle,
         NULL,
         NULL,
         NULL,
@@ -3266,18 +3302,26 @@ BOOL kdpReadSystemMemoryEx(
         &dbgRequest,
         sizeof(dbgRequest));
 
-    if (status == STATUS_PENDING) {
+    if (ntStatus == STATUS_PENDING) {
 
-        status = NtWaitForSingleObject(g_kdctx.DeviceHandle,
+        ntStatus = NtWaitForSingleObject(g_kdctx.DeviceHandle,
             FALSE,
             NULL);
 
     }
 
-    if (NT_SUCCESS(status))
-        status = iost.Status;
+    if (Status)
+        *Status = ntStatus;
 
-    bResult = NT_SUCCESS(status);
+    if (NT_SUCCESS(ntStatus))
+        ntStatus = iost.Status;
+
+    if (IoStatus) {
+        IoStatus->Information = iost.Information;
+        IoStatus->Status = iost.Status;
+    }
+
+    bResult = NT_SUCCESS(ntStatus);
 
     if (bResult) {
 
@@ -3289,15 +3333,85 @@ BOOL kdpReadSystemMemoryEx(
         //
         // We don't need this information in case of error.
         //
-        if (!NT_ERROR(status)) {
+        if (!NT_ERROR(ntStatus)) {
             if (NumberOfBytesRead)
                 *NumberOfBytesRead = (ULONG)iost.Information;
         }
 
-        kdReportReadError(__FUNCTIONW__, Address, BufferSize, status, &iost);
     }
 
     return bResult;
+}
+
+/*
+* kdpReadSystemMemoryEx2
+*
+* Purpose:
+*
+* Call internal kdpReadSystemMemoryWithStatus and log status for debug purposes.
+*
+*/
+BOOL kdpReadSystemMemoryEx2(
+    _In_opt_ LPCWSTR CallerFunction,
+    _In_ ULONG_PTR Address,
+    _Inout_ PVOID Buffer,
+    _In_ ULONG BufferSize,
+    _Out_opt_ PULONG NumberOfBytesRead
+)
+{
+    NTSTATUS ntStatus;
+    ULONG numberOfBytesRead = 0;
+    LPCWSTR lpSrcFunction;
+    IO_STATUS_BLOCK iost;
+
+    BOOL bResult = kdpReadSystemMemoryWithStatus(Address,
+        Buffer,
+        BufferSize,
+        &numberOfBytesRead,
+        &ntStatus,
+        &iost);
+
+    if (NumberOfBytesRead)
+        *NumberOfBytesRead = numberOfBytesRead;
+
+    if (CallerFunction)
+        lpSrcFunction = CallerFunction;
+    else
+        lpSrcFunction = __FUNCTIONW__;
+
+    if (bResult == FALSE) {
+        kdReportReadError(lpSrcFunction, Address, BufferSize, ntStatus, &iost);
+    }
+    else {
+        //
+        // Incomplete read.
+        //
+        if (numberOfBytesRead != BufferSize) {
+            iost.Status = STATUS_PARTIAL_COPY;
+            iost.Information = numberOfBytesRead;
+            kdReportReadError(lpSrcFunction, Address, BufferSize, ntStatus, &iost);
+        }
+    }
+
+    return bResult;
+}
+
+/*
+* kdpReadSystemMemoryEx
+*
+* Purpose:
+*
+* Call internal kdpReadSystemMemoryEx2.
+*
+*/
+BOOL kdpReadSystemMemoryEx(
+    _In_ ULONG_PTR Address,
+    _Inout_ PVOID Buffer,
+    _In_ ULONG BufferSize,
+    _Out_opt_ PULONG NumberOfBytesRead
+)
+{
+    return kdpReadSystemMemoryEx2(NULL, Address, Buffer, BufferSize, NumberOfBytesRead);
 }
 
 /*
@@ -3580,32 +3694,25 @@ UCHAR kdGetInstructionLength(
 }
 
 /*
-* kdQueryMmUnloadedDrivers
+* kdpQueryMmUnloadedDrivers
 *
 * Purpose:
 *
-* Locate and dump kernel MmUnloadedDrivers array.
+* Locate MmUnloadedDrivers array address.
 *
 */
-BOOLEAN kdQueryMmUnloadedDrivers(
-    _In_ PKLDBGCONTEXT Context,
-    _Out_ PVOID* UnloadedDrivers
+BOOLEAN kdpQueryMmUnloadedDrivers(
+    _In_ PKLDBGCONTEXT Context
 )
 {
-    BOOLEAN             bResult = FALSE;
-
     HMODULE             hNtOs;
     ULONG_PTR           NtOsBase, lookupAddress = 0;
 
     PBYTE               ptrCode, sigPattern;
     PVOID               SectionBase;
-    ULONG               SectionSize = 0, bytesRead = 0;
+    ULONG               SectionSize = 0;
 
-    PUNLOADED_DRIVERS   pvDrivers = NULL;
-    PWCHAR              pwStaticBuffer = NULL;
-    WORD                wMax, wLength;
-
-    ULONG               cbData, sigSize;
+    ULONG               sigSize;
 
     ULONG               Index = 0, instLength = 0, tempOffset;
     LONG                relativeValue = 0;
@@ -3613,174 +3720,204 @@ BOOLEAN kdQueryMmUnloadedDrivers(
 
     PKLDBG_SYSTEM_ADDRESS kdpMmUnloadedDrivers = &Context->Data->MmUnloadedDrivers;
 
+    if (kdpMmUnloadedDrivers->Valid)
+        return TRUE;
 
-    *UnloadedDrivers = NULL;
-
-    NtOsBase = (ULONG_PTR)Context->NtOsBase;
-    hNtOs = (HMODULE)Context->NtOsImageMap;
+    NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
+    hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
 
     do {
 
-        pwStaticBuffer = (PWCHAR)supHeapAlloc(UNICODE_STRING_MAX_BYTES + sizeof(UNICODE_NULL));
-        if (pwStaticBuffer == NULL)
-            break;
+        //
+        // Symbols lookup.
+        //
+        if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
 
-        if (kdpMmUnloadedDrivers->Valid == FALSE) {
+            kdGetAddressFromSymbol(
+                &g_kdctx,
+                KVAR_MmUnloadedDrivers,
+                &lookupAddress);
+
+        }
+
+        //
+        // Pattern search.
+        //
+        if (lookupAddress == 0) {
 
             //
-            // Symbols lookup.
+            // Locate PAGE image section.
             //
-            if (kdIsSymAvailable((PSYMCONTEXT)Context->NtOsSymContext)) {
+            SectionBase = supLookupImageSectionByName(PAGE_SECTION,
+                PAGE_SECTION_LEGNTH,
+                (PVOID)hNtOs,
+                &SectionSize);
 
-                kdGetAddressFromSymbol(
-                    Context,
-                    KVAR_MmUnloadedDrivers,
-                    &lookupAddress);
+            if ((SectionBase == 0) || (SectionSize == 0))
+                break;
+
+            if (g_NtBuildNumber < NT_WIN10_20H1) {
+
+                if (g_NtBuildNumber == NT_WIN10_THRESHOLD1)
+                    MiRememberUnloadedDriverPattern[0] = FIX_WIN10_THRESHOULD_REG;
+
+                sigPattern = MiRememberUnloadedDriverPattern;
+                sigSize = sizeof(MiRememberUnloadedDriverPattern);
+
+            }
+            else {
+
+                //
+                // Use 19041+ specific pattern as an array allocation code has been changed.
+                //
+
+                sigPattern = MiRememberUnloadedDriverPattern2;
+                sigSize = sizeof(MiRememberUnloadedDriverPattern2);
 
             }
 
-            //
-            // Pattern search.
-            //
-            if (lookupAddress == 0) {
+            ptrCode = (PBYTE)supFindPattern((PBYTE)SectionBase,
+                SectionSize,
+                sigPattern,
+                sigSize);
+
+            if (ptrCode == NULL)
+                break;
+
+            if (RtlPointerToOffset(SectionBase, ptrCode) + sigSize + 32 > SectionSize)
+                break;
+
+            Index = sigSize;
+            tempOffset = 0;
+
+            do {
+
+                hde64_disasm(RtlOffsetToPointer(ptrCode, Index), &hs);
+                if (hs.flags & F_ERROR)
+                    break;
+
+                instLength = hs.len;
 
                 //
-                // Locate PAGE image section.
+                // Call ExAlloc/MiAlloc
                 //
-                SectionBase = supLookupImageSectionByName(PAGE_SECTION,
-                    PAGE_SECTION_LEGNTH,
-                    (PVOID)hNtOs,
-                    &SectionSize);
+                if (instLength == 5) {
 
-                if ((SectionBase == 0) || (SectionSize == 0))
-                    break;
+                    if (ptrCode[Index] == 0xE8) {
 
-                if (g_NtBuildNumber < NT_WIN10_20H1) {
+                        //
+                        // Fetch next instruction
+                        //
+                        tempOffset = Index + instLength;
 
-                    if (g_NtBuildNumber == NT_WIN10_THRESHOLD1)
-                        MiRememberUnloadedDriverPattern[0] = FIX_WIN10_THRESHOULD_REG;
+                        hde64_disasm(RtlOffsetToPointer(ptrCode, tempOffset), &hs);
+                        if (hs.flags & F_ERROR)
+                            break;
 
-                    sigPattern = MiRememberUnloadedDriverPattern;
-                    sigSize = sizeof(MiRememberUnloadedDriverPattern);
+                        //
+                        // Must be MOV
+                        //
+                        if (hs.len == 7) {
 
-                }
-                else {
+                            if (ptrCode[tempOffset] == 0x48) {
 
-                    //
-                    // Use 19041+ specific pattern as an array allocation code has been changed.
-                    //
+                                Index = tempOffset;
+                                instLength = hs.len;
 
-                    sigPattern = MiRememberUnloadedDriverPattern2;
-                    sigSize = sizeof(MiRememberUnloadedDriverPattern2);
-
-                }
-
-                ptrCode = (PBYTE)supFindPattern((PBYTE)SectionBase,
-                    SectionSize,
-                    sigPattern,
-                    sigSize);
-
-                if (ptrCode == NULL)
-                    break;
-
-                if (RtlPointerToOffset(SectionBase, ptrCode) + sigSize + 32 > SectionSize)
-                    break;
-
-                Index = sigSize;
-                tempOffset = 0;
-
-                do {
-
-                    hde64_disasm(RtlOffsetToPointer(ptrCode, Index), &hs);
-                    if (hs.flags & F_ERROR)
-                        break;
-
-                    instLength = hs.len;
-
-                    //
-                    // Call ExAlloc/MiAlloc
-                    //
-                    if (instLength == 5) {
-
-                        if (ptrCode[Index] == 0xE8) {
-
-                            //
-                            // Fetch next instruction
-                            //
-                            tempOffset = Index + instLength;
-
-                            hde64_disasm(RtlOffsetToPointer(ptrCode, tempOffset), &hs);
-                            if (hs.flags & F_ERROR)
+                                relativeValue = *(PLONG)(ptrCode + tempOffset + (hs.len - 4));
                                 break;
 
-                            //
-                            // Must be MOV
-                            //
-                            if (hs.len == 7) {
-
-                                if (ptrCode[tempOffset] == 0x48) {
-
-                                    Index = tempOffset;
-                                    instLength = hs.len;
-
-                                    relativeValue = *(PLONG)(ptrCode + tempOffset + (hs.len - 4));
-                                    break;
-
-                                }
-
                             }
-                        }
 
+                        }
                     }
 
-                    Index += instLength;
+                }
 
-                } while (Index < 32);
+                Index += instLength;
 
-                if ((relativeValue == 0) || (instLength == 0))
-                    break;
+            } while (Index < 32);
 
-                //
-                // Resolve MmUnloadedDrivers.
-                //
-                lookupAddress = kdAdjustAddressToNtOsBase((ULONG_PTR)ptrCode, Index, instLength, relativeValue);
-                if (!kdAddressInNtOsImage((PVOID)lookupAddress))
-                    break;
-
-            }
-
-            //
-            // Read ptr value.
-            //
-            if (!kdReadSystemMemoryEx(lookupAddress, &lookupAddress, sizeof(ULONG_PTR), &bytesRead))
+            if ((relativeValue == 0) || (instLength == 0))
                 break;
 
             //
-            // Store resolved array address in the private data context.
+            // Resolve MmUnloadedDrivers.
             //
-            kdpMmUnloadedDrivers->Address = lookupAddress;
-            kdpMmUnloadedDrivers->Valid = TRUE;
-
-        }
-        else {
-
-            //
-            // Array address already resolved.
-            //
-            lookupAddress = kdpMmUnloadedDrivers->Address;
-        }
-
-        //
-        // Dump array to user mode.
-        //
-        cbData = MI_UNLOADED_DRIVERS * sizeof(UNLOADED_DRIVERS);
-        pvDrivers = (PUNLOADED_DRIVERS)supHeapAlloc(cbData);
-        if (pvDrivers) {
-
-            if (!kdReadSystemMemoryEx(lookupAddress, pvDrivers, cbData, &bytesRead))
+            lookupAddress = kdAdjustAddressToNtOsBase((ULONG_PTR)ptrCode, Index, instLength, relativeValue);
+            if (!kdAddressInNtOsImage((PVOID)lookupAddress))
                 break;
 
-            bResult = TRUE;
+        }
+
+        //
+        // Read ptr value.
+        //
+        if (!kdReadSystemMemory(lookupAddress, &lookupAddress, sizeof(ULONG_PTR)))
+            break;
+
+        //
+        // Store resolved array address in the private data context.
+        //
+        kdpMmUnloadedDrivers->Address = lookupAddress;
+        kdpMmUnloadedDrivers->Valid = TRUE;
+
+    } while (FALSE);
+
+    return kdpMmUnloadedDrivers->Valid;
+}
+
+/*
+* kdEnumerateMmUnloadedDrivers
+*
+* Purpose:
+*
+* Locate unloaded drivers array and walk through it entries.
+*
+*/
+BOOL kdEnumerateMmUnloadedDrivers(
+    _In_ PENUMERATE_UNLOADED_DRIVERS_CALLBACK Callback,
+    _In_opt_ PVOID Context
+)
+{
+    BOOL                bResult = FALSE, bStopEnumeration = FALSE;
+    HMODULE             hNtOs;
+    ULONG_PTR           NtOsBase, lookupAddress = 0;
+
+    ULONG               bytesRead = 0;
+
+    PUNLOADED_DRIVERS   pvDrivers = NULL;
+    PWCHAR              pwStaticBuffer = NULL;
+    WORD                wMax, wLength;
+
+    ULONG               cbData;
+
+    ULONG               Index = 0;
+
+    PKLDBG_SYSTEM_ADDRESS kdpMmUnloadedDrivers = &g_kdctx.Data->MmUnloadedDrivers;
+
+    NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
+    hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
+
+    if (!kdpQueryMmUnloadedDrivers(&g_kdctx))
+        return FALSE;
+
+    pwStaticBuffer = (PWCHAR)supHeapAlloc(UNICODE_STRING_MAX_BYTES + sizeof(UNICODE_NULL));
+    if (pwStaticBuffer == NULL)
+        return FALSE;
+
+    lookupAddress = kdpMmUnloadedDrivers->Address;
+
+    //
+    // Dump array to user mode.
+    //
+    cbData = MI_UNLOADED_DRIVERS * sizeof(UNLOADED_DRIVERS);
+    pvDrivers = (PUNLOADED_DRIVERS)supHeapAlloc(cbData);
+    if (pvDrivers) {
+
+        bResult = kdReadSystemMemory(lookupAddress, pvDrivers, cbData);
+
+        if (bResult) {
 
             for (Index = 0; Index < MI_UNLOADED_DRIVERS; Index++) {
 
@@ -3804,37 +3941,27 @@ BOOLEAN kdQueryMmUnloadedDrivers(
 
                     pwStaticBuffer[bytesRead / sizeof(WCHAR)] = 0;
 
-                    RtlCreateUnicodeString(&pvDrivers[Index].Name,
-                        pwStaticBuffer);
+                    if (RtlCreateUnicodeString(&pvDrivers[Index].Name,
+                        pwStaticBuffer))
+                    {
 
+                        if (Callback(&pvDrivers[Index], Context))
+                            bStopEnumeration = TRUE;
+
+                        RtlFreeUnicodeString(&pvDrivers[Index].Name);
+
+                        if (bStopEnumeration)
+                            break;
+                    }
                 }
-            }
-
-        }
-
-    } while (FALSE);
-
-    if (bResult == FALSE) {
-        if (pvDrivers) {
-
-            for (Index = 0; Index < MI_UNLOADED_DRIVERS; Index++) {
-
-                if (NT_SUCCESS(ObIsValidUnicodeString(&pvDrivers[Index].Name)))
-                {
-                    RtlFreeUnicodeString(&pvDrivers[Index].Name);
-                }
-
-            }
+            } //for
 
             supHeapFree(pvDrivers);
-            pvDrivers = NULL;
+
         }
     }
 
-    if (pwStaticBuffer)
-        supHeapFree(pwStaticBuffer);
-
-    *UnloadedDrivers = pvDrivers;
+    supHeapFree(pwStaticBuffer);
 
     return bResult;
 }
@@ -3930,7 +4057,7 @@ BOOLEAN kdQueryKernelShims(
 
                 ptrCode = (PBYTE)GetProcAddress(hNtOs, "KseSetDeviceFlags");
                 if (ptrCode == NULL) {
-                    kdDebugPrint("Kse routine not found\r\n");
+                    logAdd(WOBJ_LOG_ENTRY_ERROR, TEXT("KseSetDeviceFlags not found"));
                     return FALSE;
                 }
 
@@ -3948,7 +4075,7 @@ BOOLEAN kdQueryKernelShims(
             }
 
             if (!kdAddressInNtOsImage((PVOID)lookupAddress)) {
-                kdDebugPrint("KseEngine address is invalid\r\n");
+                logAdd(WOBJ_LOG_ENTRY_ERROR, TEXT("KseEngine address is invalid"));
                 return FALSE;
             }
 
@@ -3972,10 +4099,9 @@ BOOLEAN kdQueryKernelShims(
 
         ListEntry.Blink = ListEntry.Flink = NULL;
 
-        if (kdReadSystemMemoryEx(KseShimmedDriversListHead,
+        if (kdReadSystemMemory(KseShimmedDriversListHead,
             &ListEntry,
-            sizeof(LIST_ENTRY),
-            NULL))
+            sizeof(LIST_ENTRY)))
         {
             while ((ULONG_PTR)ListEntry.Flink != KseShimmedDriversListHead) {
 
@@ -3985,14 +4111,13 @@ BOOLEAN kdQueryKernelShims(
                     break;
                 }
 
-                if (!kdReadSystemMemoryEx((ULONG_PTR)ListEntry.Flink,
+                if (!kdReadSystemMemory((ULONG_PTR)ListEntry.Flink,
                     ShimmedDriver,
-                    sizeof(KSE_SHIMMED_DRIVER),
-                    NULL))
+                    sizeof(KSE_SHIMMED_DRIVER)))
                 {
                     supHeapFree(ShimmedDriver);
                     KseEngineDumpValid = FALSE;
-                    kdDebugPrint("KseEngine entry read error\r\n");
+                    logAdd(WOBJ_LOG_ENTRY_ERROR, TEXT("KseEngine entry read error"));
                     break;
                 }
 
@@ -4001,7 +4126,7 @@ BOOLEAN kdQueryKernelShims(
             }
         }
         else {
-            kdDebugPrint("KseEngine->ShimmedDriversListHead read error\r\n");
+            logAdd(WOBJ_LOG_ENTRY_ERROR, TEXT("KseEngine->ShimmedDriversListHead read error"));
             KseEngineDumpValid = FALSE;
         }
 

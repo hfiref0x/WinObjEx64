@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.92
 *
-*  DATE:        30 Oct 2021
+*  DATE:        07 Dec 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -512,6 +512,72 @@ INT CALLBACK DrvDlgCompareFunc(
 }
 
 /*
+* DrvListCbEnumerateUnloadedDrivers
+*
+* Purpose:
+*
+* Unloaded drivers enumeration callback.
+*
+*/
+BOOL DrvListCbEnumerateUnloadedDrivers(
+    _In_ PUNLOADED_DRIVERS Entry,
+    _In_ EXTRASCONTEXT* Context
+)
+{
+    INT     lvItemIndex;
+    LPWSTR  lpName;
+    HWND    hwndList;
+    LVITEM  lvitem;
+    WCHAR   szBuffer[100];
+
+    hwndList = Context->ListView;
+
+    if (Entry->StartAddress && Entry->EndAddress) {
+
+        if (!NT_SUCCESS(ObIsValidUnicodeString(&Entry->Name)))
+            lpName = T_Unknown;
+        else
+            lpName = Entry->Name.Buffer;
+
+        RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
+        lvitem.mask = LVIF_TEXT | LVIF_IMAGE;
+        lvitem.iItem = MAXINT;
+        lvitem.iImage = g_TypeDriver.ImageIndex;
+        lvitem.pszText = lpName;
+
+        lvItemIndex = ListView_InsertItem(hwndList, &lvitem);
+
+        lvitem.pszText = szBuffer;
+
+        //StartAddress
+        szBuffer[0] = L'0';
+        szBuffer[1] = L'x';
+        szBuffer[2] = 0;
+        u64tohex((ULONG_PTR)Entry->StartAddress, &szBuffer[2]);
+        lvitem.iSubItem = 1;
+        lvitem.iItem = lvItemIndex;
+        ListView_SetItem(hwndList, &lvitem);
+
+        //EndAddress
+        szBuffer[0] = L'0';
+        szBuffer[1] = L'x';
+        szBuffer[2] = 0;
+        u64tohex((ULONG_PTR)Entry->EndAddress, &szBuffer[2]);
+        lvitem.iSubItem = 2;
+        ListView_SetItem(hwndList, &lvitem);
+
+        //CurrentTime
+        szBuffer[0] = 0;
+        supPrintTimeConverted(&Entry->CurrentTime, szBuffer, RTL_NUMBER_OF(szBuffer));
+        lvitem.iSubItem = 3;
+        ListView_SetItem(hwndList, &lvitem);
+
+    }
+
+    return FALSE;
+}
+
+/*
 * DrvListUnloadedDrivers
 *
 * Purpose:
@@ -524,87 +590,25 @@ VOID DrvListUnloadedDrivers(
     _In_ BOOLEAN bRefresh
 )
 {
-    BOOLEAN bValidName;
-    ULONG   i;
-    LPWSTR  lpName;
     HWND    hwndList = Context->ListView;
-    INT     lvItemIndex, iImage;
-
-    LVITEM lvitem;
     WCHAR  szBuffer[100];
-
-    PUNLOADED_DRIVERS pvDrivers = NULL;
 
     if (bRefresh) {
         ListView_DeleteAllItems(hwndList);
     }
 
-    if (!kdQueryMmUnloadedDrivers(&g_kdctx,
-        (PVOID*)&pvDrivers))
+    supListViewEnableRedraw(hwndList, FALSE);
+
+    if (!kdEnumerateMmUnloadedDrivers(
+        (PENUMERATE_UNLOADED_DRIVERS_CALLBACK)DrvListCbEnumerateUnloadedDrivers,
+        (PVOID)Context))
     {
         _strcpy(szBuffer, TEXT("Could not resolve MmUnloadedDrivers"));
         supStatusBarSetText(Context->StatusBar, 1, (LPWSTR)&szBuffer);
         return;
     }
 
-    iImage = ObManagerGetImageIndexByTypeIndex(ObjectTypeDriver);
-
-    supListViewEnableRedraw(hwndList, FALSE);
-
-    for (i = 0; i < MI_UNLOADED_DRIVERS; i++) {
-
-        if (pvDrivers[i].StartAddress &&
-            pvDrivers[i].EndAddress)
-        {
-            bValidName = NT_SUCCESS(ObIsValidUnicodeString(&pvDrivers[i].Name));
-
-            if (!bValidName)
-                lpName = T_Unknown;
-            else
-                lpName = pvDrivers[i].Name.Buffer;
-
-            RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
-            lvitem.mask = LVIF_TEXT | LVIF_IMAGE;
-            lvitem.iItem = MAXINT;
-            lvitem.iImage = iImage;
-            lvitem.pszText = lpName;
-
-            lvItemIndex = ListView_InsertItem(hwndList, &lvitem);
-
-            lvitem.pszText = szBuffer;
-
-            //StartAddress
-            szBuffer[0] = L'0';
-            szBuffer[1] = L'x';
-            szBuffer[2] = 0;
-            u64tohex((ULONG_PTR)pvDrivers[i].StartAddress, &szBuffer[2]);
-            lvitem.iSubItem = 1;
-            lvitem.iItem = lvItemIndex;
-            ListView_SetItem(hwndList, &lvitem);
-
-            //EndAddress
-            szBuffer[0] = L'0';
-            szBuffer[1] = L'x';
-            szBuffer[2] = 0;
-            u64tohex((ULONG_PTR)pvDrivers[i].EndAddress, &szBuffer[2]);
-            lvitem.iSubItem = 2;
-            ListView_SetItem(hwndList, &lvitem);
-
-            //CurrentTime
-            szBuffer[0] = 0;
-            supPrintTimeConverted(&pvDrivers[i].CurrentTime, szBuffer, RTL_NUMBER_OF(szBuffer));
-            lvitem.iSubItem = 3;
-            ListView_SetItem(hwndList, &lvitem);
-
-            if (bValidName) RtlFreeUnicodeString(&pvDrivers[i].Name);
-
-        }
-
-    }
-
     DrvUpdateStatusBar(Context, -1);
-
-    supHeapFree(pvDrivers);
 
     ListView_SortItemsEx(hwndList,
         &DrvDlgCompareFunc,
@@ -626,7 +630,7 @@ VOID DrvListDrivers(
     _In_ BOOLEAN bRefresh
 )
 {
-    INT    lvItemIndex, iImage;
+    INT    lvItemIndex;
     ULONG  i;
 
     PCHAR  lpDriverName;
@@ -649,8 +653,6 @@ VOID DrvListDrivers(
     if (pModulesList == NULL)
         return;
 
-    iImage = ObManagerGetImageIndexByTypeIndex(ObjectTypeDriver);
-
     supListViewEnableRedraw(hwndList, FALSE);
 
     for (i = 0; i < pModulesList->NumberOfModules; i++) {
@@ -668,7 +670,7 @@ VOID DrvListDrivers(
 
         lvitem.mask = LVIF_TEXT | LVIF_IMAGE;
         lvitem.iItem = MAXINT;
-        lvitem.iImage = iImage;
+        lvitem.iImage = g_TypeDriver.ImageIndex;
         lvitem.pszText = szBuffer;
         lvItemIndex = ListView_InsertItem(hwndList, &lvitem);
 

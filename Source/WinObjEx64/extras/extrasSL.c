@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSL.C
 *
-*  VERSION:     1.90
+*  VERSION:     1.92
 *
-*  DATE:        27 May 2021
+*  DATE:        09 Dec 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,7 +17,40 @@
 #include "global.h"
 #include "extras.h"
 
+typedef struct _SL_ENUM_CONTEXT {
+    EXTRASCONTEXT* DialogContext;
+    LPCWSTR lpFilterByName;
+} SL_ENUM_CONTEXT, * PSL_ENUM_CONTEXT;
+
+#define T_SLCACHE_READ_FAIL TEXT("Unable to read SL cache!")
+
 UINT g_SLCacheImageIndex;
+
+/*
+* SLCacheOnReadFailed
+*
+* Purpose:
+*
+* Hide controls in case of cache read general error.
+*
+*/
+VOID SLCacheOnReadFailed(
+    _In_ EXTRASCONTEXT* Context
+)
+{
+    ENUMCHILDWNDDATA ChildWndData;
+
+    //
+    // Hide all controls in case of error and display warning.
+    //
+    if (GetWindowRect(Context->hwndDlg, &ChildWndData.Rect)) {
+        ChildWndData.nCmdShow = SW_HIDE;
+        EnumChildWindows(Context->hwndDlg, supCallbackShowChildWindow, (LPARAM)&ChildWndData);
+    }
+    ShowWindow(GetDlgItem(Context->hwndDlg, ID_SLCACHEINFO), SW_SHOW);
+    SetDlgItemText(Context->hwndDlg, ID_SLCACHEINFO, T_SLCACHE_READ_FAIL);
+
+}
 
 /*
 * SLCacheListCompareFunc
@@ -373,6 +406,130 @@ VOID SLCacheDialogHandlePopup(
 }
 
 /*
+* SLCacheEnumerateCallback
+*
+* Purpose:
+*
+* Callback used to output cache descriptor.
+*
+*/
+BOOL CALLBACK SLCacheEnumerateCallback(
+    _In_ SL_KMEM_CACHE_VALUE_DESCRIPTOR* CacheDescriptor,
+    _In_ SL_ENUM_CONTEXT* Context
+)
+{
+    INT lvItemIndex;
+    LPWSTR EntryName, EntryType;
+    LVITEM lvItem;
+
+    WCHAR szBuffer[100];
+
+    EntryName = (LPWSTR)supHeapAlloc(CacheDescriptor->NameLength + sizeof(WCHAR));
+    if (EntryName) {
+
+        RtlCopyMemory(EntryName, CacheDescriptor->Name, CacheDescriptor->NameLength);
+
+        if (Context->lpFilterByName) {
+
+            if (_strstri(EntryName, Context->lpFilterByName) == NULL) {
+                supHeapFree(EntryName);
+                return FALSE;
+            }
+        }
+
+        //Name
+        RtlSecureZeroMemory(&lvItem, sizeof(lvItem));
+        lvItem.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM;
+        lvItem.iItem = MAXINT;
+        lvItem.iImage = g_SLCacheImageIndex;
+        lvItem.pszText = EntryName;
+        lvItem.lParam = (LPARAM)CacheDescriptor;
+        lvItemIndex = ListView_InsertItem(Context->DialogContext->ListView, &lvItem);
+
+        EntryType = xxxSLCacheGetDescriptorDataType(CacheDescriptor);
+        if (EntryType == NULL) {
+            szBuffer[0] = 0;
+            ultostr(CacheDescriptor->Type, szBuffer);
+            EntryType = (LPWSTR)&szBuffer;
+        }
+
+        //Type
+        lvItem.mask = LVIF_TEXT;
+        lvItem.iSubItem = 1;
+        lvItem.pszText = EntryType;
+        lvItem.iItem = lvItemIndex;
+        ListView_SetItem(Context->DialogContext->ListView, &lvItem);
+
+        supHeapFree(EntryName);
+
+    }
+    return FALSE;
+}
+
+PVOID xxxSLCacheUpdateData(
+    _In_ EXTRASCONTEXT* Context
+)
+{
+    PVOID SLCacheData = (PVOID)Context->Reserved;
+    if (SLCacheData) {
+        supHeapFree(SLCacheData);
+        Context->Reserved = 0;
+    }
+    SLCacheData = (PVOID)supSLCacheRead();
+    if (SLCacheData)
+        Context->Reserved = (ULONG_PTR)SLCacheData;
+
+    return SLCacheData;
+}
+
+/*
+* SLCacheListItems
+*
+* Purpose:
+*
+* Read and output SL cache items.
+*
+*/
+VOID SLCacheListItems(
+    _In_ EXTRASCONTEXT* Context,
+    _In_opt_ LPCWSTR FilterByName,
+    _In_ BOOL RefreshList
+)
+{
+    PVOID SLCacheData = (PVOID)Context->Reserved;
+    WCHAR szBuffer[100];
+
+    SL_ENUM_CONTEXT enumContext;
+
+    if (RefreshList) {
+        ListView_DeleteAllItems(Context->ListView);
+        SLCacheData = xxxSLCacheUpdateData(Context);
+    }
+
+    if (SLCacheData == NULL) {
+        MessageBox(Context->hwndDlg, T_SLCACHE_READ_FAIL, NULL, MB_ICONERROR);
+        return;
+    }
+
+    supListViewEnableRedraw(Context->ListView, FALSE);
+
+    enumContext.lpFilterByName = FilterByName;
+    enumContext.DialogContext = Context;
+
+    supSLCacheEnumerate(SLCacheData,
+        (PENUMERATE_SL_CACHE_VALUE_DESCRIPTORS_CALLBACK)SLCacheEnumerateCallback,
+        &enumContext);
+
+    RtlStringCchPrintfSecure(szBuffer, ARRAYSIZE(szBuffer),
+        TEXT("Software Licensing Cache, descriptors: %i"),
+        ListView_GetItemCount(Context->ListView));
+
+    SetWindowText(Context->hwndDlg, szBuffer);
+
+    supListViewEnableRedraw(Context->ListView, TRUE);
+}
+
+/*
 * SLCacheDialogProc
 *
 * Purpose:
@@ -389,6 +546,8 @@ INT_PTR CALLBACK SLCacheDialogProc(
 {
     EXTRASCONTEXT* pDlgContext;
     LPNMLISTVIEW nhdr = (LPNMLISTVIEW)lParam;
+    LPCWSTR lpFilter = NULL;
+    WCHAR szFilterOption[MAX_PATH + 1];
 
     if (uMsg == g_WinObj.SettingsChangeMessage) {
         pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
@@ -464,6 +623,29 @@ INT_PTR CALLBACK SLCacheDialogProc(
             }
             break;
 
+        case IDC_SLSEARCH:
+
+            if (GET_WM_COMMAND_CMD(wParam, lParam) == EN_CHANGE) {
+
+                pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+                if (pDlgContext) {
+
+                    RtlSecureZeroMemory(szFilterOption, sizeof(szFilterOption));
+                    if (GetDlgItemText(hwndDlg,
+                        IDC_SLSEARCH,
+                        szFilterOption,
+                        MAX_PATH))
+                    {
+                        if (szFilterOption[0] != 0) {
+                            lpFilter = szFilterOption;
+                        }
+                    }
+
+                    SLCacheListItems(pDlgContext, lpFilter, TRUE);
+                }
+            }
+            break;
+
         default:
             break;
         }
@@ -473,63 +655,6 @@ INT_PTR CALLBACK SLCacheDialogProc(
     }
 
     return TRUE;
-}
-
-/*
-* SLCacheEnumerateCallback
-*
-* Purpose:
-*
-* Callback used to output cache descriptor.
-*
-*/
-BOOL CALLBACK SLCacheEnumerateCallback(
-    _In_ SL_KMEM_CACHE_VALUE_DESCRIPTOR* CacheDescriptor,
-    _In_opt_ PVOID Context
-)
-{
-    INT lvItemIndex;
-    LPWSTR EntryName, EntryType;
-    EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)Context;
-    LVITEM lvItem;
-
-    WCHAR szBuffer[100];
-
-    if (pDlgContext == NULL)
-        return FALSE;
-
-    EntryName = (LPWSTR)supHeapAlloc(CacheDescriptor->NameLength + sizeof(WCHAR));
-    if (EntryName) {
-
-        RtlCopyMemory(EntryName, CacheDescriptor->Name, CacheDescriptor->NameLength);
-
-        //Name
-        RtlSecureZeroMemory(&lvItem, sizeof(lvItem));
-        lvItem.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM;
-        lvItem.iItem = MAXINT;
-        lvItem.iImage = g_SLCacheImageIndex;
-        lvItem.pszText = EntryName;
-        lvItem.lParam = (LPARAM)CacheDescriptor;
-        lvItemIndex = ListView_InsertItem(pDlgContext->ListView, &lvItem);
-
-        EntryType = xxxSLCacheGetDescriptorDataType(CacheDescriptor);
-        if (EntryType == NULL) {
-            szBuffer[0] = 0;
-            ultostr(CacheDescriptor->Type, szBuffer);
-            EntryType = (LPWSTR)&szBuffer;
-        }
-
-        //Type
-        lvItem.mask = LVIF_TEXT;
-        lvItem.iSubItem = 1;
-        lvItem.pszText = EntryType;
-        lvItem.iItem = lvItemIndex;
-        ListView_SetItem(pDlgContext->ListView, &lvItem);
-
-        supHeapFree(EntryName);
-
-    }
-    return FALSE;
 }
 
 /*
@@ -548,9 +673,6 @@ VOID extrasCreateSLCacheDialog(
 
     HWND            hwndDlg;
     EXTRASCONTEXT* pDlgContext;
-
-    ENUMCHILDWNDDATA ChildWndData;
-    WCHAR szBuffer[100];
 
     INT iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
     LVCOLUMNS_DATA columnData[] =
@@ -617,33 +739,19 @@ VOID extrasCreateSLCacheDialog(
                 columnData,
                 RTL_NUMBER_OF(columnData));
 
+            SendDlgItemMessage(pDlgContext->hwndDlg, IDC_SLSEARCH,
+                EM_SETLIMITTEXT, (WPARAM)MAX_PATH, (LPARAM)0);
+
             //
             // Remember image index.
             //
             g_SLCacheImageIndex = ObManagerGetImageIndexByTypeIndex(ObjectTypeToken);
-
-            supListViewEnableRedraw(pDlgContext->ListView, FALSE);
-
             pDlgContext->Reserved = (ULONG_PTR)SLCacheData;
-            supSLCacheEnumerate(SLCacheData, SLCacheEnumerateCallback, pDlgContext);
+            SLCacheListItems(pDlgContext, NULL, FALSE);
 
-            _strcpy(szBuffer, TEXT("SLCache, number of descriptors = "));
-            itostr(ListView_GetItemCount(pDlgContext->ListView), _strend(szBuffer));
-            SetWindowText(pDlgContext->hwndDlg, szBuffer);
-
-            supListViewEnableRedraw(pDlgContext->ListView, TRUE);
         }
     }
     else {
-
-        //
-        // Hide all controls in case of error and display warning.
-        //
-        if (GetWindowRect(pDlgContext->hwndDlg, &ChildWndData.Rect)) {
-            ChildWndData.nCmdShow = SW_HIDE;
-            EnumChildWindows(pDlgContext->hwndDlg, supCallbackShowChildWindow, (LPARAM)&ChildWndData);
-        }
-        ShowWindow(GetDlgItem(pDlgContext->hwndDlg, ID_SLCACHEINFO), SW_SHOW);
-        SetDlgItemText(pDlgContext->hwndDlg, ID_SLCACHEINFO, TEXT("Unable to read SL cache!"));
+        SLCacheOnReadFailed(pDlgContext);
     }
 }

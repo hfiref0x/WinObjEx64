@@ -428,6 +428,7 @@
     <ClInclude Include="..\Shared\ntos\ntldr.h" />
     <ClInclude Include="..\Shared\ntos\ntos.h" />
     <ClInclude Include="..\Shared\ntos\ntsup.h" />
+    <ClInclude Include="..\Shared\ntuser\ntuser.h" />
     <ClInclude Include="..\Shared\sdk\extdef.h" />
     <ClInclude Include="..\Shared\treelist\treelist.h" />
     <ClInclude Include="aboutDlg.h" />

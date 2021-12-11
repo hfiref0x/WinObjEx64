@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.92
 *
-*  DATE:        31 Oct 2021
+*  DATE:        03 Dec 2021
 *
 *  Plugin manager.
 *
@@ -22,6 +22,32 @@
 
 LIST_ENTRY g_PluginsListHead;
 volatile UINT g_PluginCount = 0;
+
+/*
+* PmpReadSystemMemoryEx
+*
+* Purpose:
+*
+* Read system memory function wrapper for plugins.
+*
+*/
+BOOL PmpReadSystemMemoryEx(
+    _In_ ULONG_PTR Address,
+    _Inout_ PVOID Buffer,
+    _In_ ULONG BufferSize,
+    _Out_opt_ PULONG NumberOfBytesRead
+)
+{
+#ifdef _USE_OWN_DRIVER
+#ifdef _USE_WINIO
+    return WinIoReadSystemMemoryEx(Address, Buffer, BufferSize, NumberOfBytesRead);
+#else
+    return kdReadSystemMemoryEx(Address, Buffer, BufferSize, NumberOfBytesRead);
+#endif
+#else
+    return kdReadSystemMemoryEx(Address, Buffer, BufferSize, NumberOfBytesRead);
+#endif
+}
 
 /*
 * PmpReportInvalidPlugin
@@ -779,7 +805,7 @@ VOID PmProcessEntry(
             //
             // Function pointers.
             // 
-            ParamBlock.ReadSystemMemoryEx = (pfnReadSystemMemoryEx)&kdReadSystemMemoryEx;
+            ParamBlock.ReadSystemMemoryEx = (pfnReadSystemMemoryEx)&PmpReadSystemMemoryEx;
             ParamBlock.GetInstructionLength = (pfnGetInstructionLength)&kdGetInstructionLength;
             ParamBlock.OpenNamedObjectByType = (pfnOpenNamedObjectByType)&supOpenNamedObjectByType;
 

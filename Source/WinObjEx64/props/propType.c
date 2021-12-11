@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.92
 *
-*  DATE:        03 Sep 2021
+*  DATE:        07 Dec 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -555,12 +555,11 @@ BOOL propQueryTypeInfo(
                 break;
             }
 
-            if (g_WinObj.IsWine) {
-                pObject = OBJECT_TYPES_FIRST_ENTRY_WINE(pObjectTypes);
-            }
-            else {
-                pObject = OBJECT_TYPES_FIRST_ENTRY(pObjectTypes);
-            }
+            //
+            // Warning: older Wine/Staging incorrectly implement memory structure layout for this structure and therefore will crash.            
+            //
+
+            pObject = OBJECT_TYPES_FIRST_ENTRY(pObjectTypes);
 
             for (i = 0; i < pObjectTypes->NumberOfTypes; i++) {
 
@@ -604,7 +603,8 @@ BOOL propQueryTypeInfo(
             supHeapFree(pObjectTypes);
         }
     }
-    __except (WOBJ_EXCEPTION_FILTER) {
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        supReportAbnormalTermination(__FUNCTIONW__);
         return FALSE;
     }
 
@@ -726,10 +726,9 @@ VOID propSetTypeInfo(
     //
     if (pObject != NULL) {
         
-        bOkay = kdReadSystemMemoryEx(pObject->ObjectAddress, 
+        bOkay = kdReadSystemMemory(pObject->ObjectAddress, 
             &ObjectTypeDump, 
-            sizeof(OBJECT_TYPE_COMPATIBLE), 
-            NULL);
+            sizeof(OBJECT_TYPE_COMPATIBLE));
 
         supHeapFree(pObject);
     }

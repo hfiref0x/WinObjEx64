@@ -1,14 +1,14 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2018 - 2019
+*  (C) COPYRIGHT AUTHORS, 2018 - 2021
 *
 *  TITLE:       WINE.H
 *
-*  VERSION:     1.73
+*  VERSION:     1.92
 *
-*  DATE:        09 Mar 2019
+*  DATE:        06 Dec 2021
 *
-*  Agent Donald code.
+*  Wine/Wine staging support header file.
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -18,9 +18,6 @@
 *******************************************************************************/
 
 #pragma once
-
-#define OBJECT_TYPES_FIRST_ENTRY_WINE(ObjectTypes) (POBJECT_TYPE_INFORMATION) \
-    RtlOffsetToPointer(ObjectTypes, ALIGN_UP(sizeof(OBJECT_TYPES_INFORMATION), ULONG))
 
 typedef char* (__cdecl *pwine_get_version)(void);
 

@@ -5,7 +5,7 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 IDR_KDBGDRV SYS "..\\drvstore\\kldbgdrv.sys"
 #else
 #ifdef _UseWinIo
-IDR_KDBGDRV SYS "..\\drvstore\\ene64drv.sys"
+IDR_KDBGDRV SYS "..\\drvstore\\winio.sys"
 #else
 IDR_KDBGDRV SYS "..\\drvstore\\wodbgdrv.sys"
 #endif

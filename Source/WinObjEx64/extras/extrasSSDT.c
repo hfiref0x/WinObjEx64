@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     1.91
+*  VERSION:     1.93
 *
-*  DATE:        28 June 2021
+*  DATE:        11 May 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -25,11 +25,21 @@
 // Win32kApiSetTable signatures
 //
 
-// MOV pattern
-#define IL_Win32kApiSetMov                      3
-
 // lea reg, Win32kApiSetTable
 #define IL_Win32kApiSetTable                    7
+
+//
+// InitializeWin32Call search pattern
+//
+// push rbp
+// push r12
+// push r13
+// push r14
+// push r15
+//
+BYTE g_pbInitializeWin32CallPattern[] = {
+    0x55, 0x41, 0x54, 0x41, 0x55, 0x41, 0x56, 0x41, 0x57
+};
 
 //
 // Win32kApiSetTable adapter patterns
@@ -38,14 +48,16 @@ BYTE Win32kApiSetAdapterPattern1[] = {
    0x4C, 0x8B, 0x15
 };
 BYTE Win32kApiSetAdapterPattern2[] = {
-   0x48, 0x8B, 0x05
+   0x48, 0x8B, 0x05 
+};
+BYTE Win32kApiSetAdapterPattern3[] = {
+   0x4C, 0x8B, 0x1D // mov r11, value
 };
 
-#define W32K_API_SET_ADAPTERS_COUNT 2
-
-W32K_API_SET_LOOKUP_PATTERN W32kApiSetAdapters[W32K_API_SET_ADAPTERS_COUNT] = {
+W32K_API_SET_LOOKUP_PATTERN W32kApiSetAdapters[] = {
     { sizeof(Win32kApiSetAdapterPattern1), Win32kApiSetAdapterPattern1 },
-    { sizeof(Win32kApiSetAdapterPattern2), Win32kApiSetAdapterPattern2 }
+    { sizeof(Win32kApiSetAdapterPattern2), Win32kApiSetAdapterPattern2 },
+    { sizeof(Win32kApiSetAdapterPattern3), Win32kApiSetAdapterPattern3 }
 };
 
 //
@@ -133,9 +145,8 @@ ULONG_PTR SdtQueryWin32kApiSetTable(
 
     PVOID       SectionBase;
     ULONG       SectionSize = 0, Index;
-    ULONG       instLength = 0, tempOffset;
 
-    ULONG_PTR   tableAddress = 0;
+    ULONG_PTR   tableAddress = 0, instructionLength = 0;
     LONG        relativeValue = 0;
     hde64s      hs;
 
@@ -145,7 +156,7 @@ ULONG_PTR SdtQueryWin32kApiSetTable(
             KVAR_Win32kApiSetTable,
             ImageBase,
             ImageSize,
-            &tableAddress)) 
+            &tableAddress))
         {
             tableAddress = tableAddress - (ULONG_PTR)ImageBase + (ULONG_PTR)hModule;
         }
@@ -164,8 +175,19 @@ ULONG_PTR SdtQueryWin32kApiSetTable(
         if (SectionBase == 0 || SectionSize < 10)
             return 0;
 
+        //
+        // Locate InitializeWin32Call body.
+        //
+        ptrCode = (PBYTE)supFindPattern((PBYTE)SectionBase,
+            SectionSize,
+            g_pbInitializeWin32CallPattern,
+            sizeof(g_pbInitializeWin32CallPattern));
+
+        if (ptrCode == NULL)
+            return 0;
+
         Index = 0;
-        ptrCode = (PBYTE)SectionBase;
+        instructionLength = 0;
 
         do {
 
@@ -173,50 +195,27 @@ ULONG_PTR SdtQueryWin32kApiSetTable(
             if (hs.flags & F_ERROR)
                 break;
 
-            instLength = hs.len;
+            if (hs.len == IL_Win32kApiSetTable) {
 
-            //
-            // Check if 3 byte length MOV.
-            //
-            if (instLength == IL_Win32kApiSetMov) {
-
-                tempOffset = Index + 1; //+1 to skip rex prefix
-
-                if (ptrCode[tempOffset] == 0x8B) {
-
-                    tempOffset = Index + instLength;
-                    hde64_disasm((void*)(ptrCode + tempOffset), &hs);
-                    if (hs.flags & F_ERROR)
-                        break;
-
-                    //
-                    // Check if next instruction is 7 bytes len LEA.
-                    //
-                    if (hs.len == IL_Win32kApiSetTable) {
-                        if (ptrCode[tempOffset + 1] == 0x8D) {
-
-                            //
-                            // Update counters.
-                            //
-                            Index = tempOffset;
-                            instLength = hs.len;
-
-                            relativeValue = *(PLONG)(ptrCode + tempOffset + (hs.len - 4));
-                            break;
-                        }
-                    }
-
+                if ((ptrCode[Index] == 0x4C) &&
+                    (ptrCode[Index + 1] == 0x8D))
+                {
+                    relativeValue = *(PLONG)(ptrCode + Index + (hs.len - 4));
+                    instructionLength = hs.len;
+                    break;
                 }
+
             }
 
-            Index += instLength;
+            Index += hs.len;
 
-        } while (Index < SectionSize - 10);
+        } while (Index < 256);
 
-        if (relativeValue == 0 || instLength == 0)
+
+        if (relativeValue == 0 || instructionLength == 0)
             return 0;
 
-        tableAddress = (ULONG_PTR)ptrCode + Index + instLength + relativeValue;
+        tableAddress = (ULONG_PTR)ptrCode + Index + instructionLength + relativeValue;
 
     }
 
@@ -382,7 +381,7 @@ BOOL SdtDlgHandleNotify(
         pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
         if (pDlgContext) {
 
-            pDlgContext->bInverseSort = !pDlgContext->bInverseSort;
+            pDlgContext->bInverseSort = (~pDlgContext->bInverseSort) & 1;
             pDlgContext->lvColumnToSort = pListView->iSubItem;
             CallbackParam.lParam = (LPARAM)pDlgContext->lvColumnToSort;
             CallbackParam.Value = pDlgContext->DialogMode;
@@ -879,7 +878,7 @@ ULONG_PTR ApiSetExtractReferenceFromAdapter(
 
                 bFound = FALSE;
 
-                for (i = 0; i < W32K_API_SET_ADAPTERS_COUNT; i++) {
+                for (i = 0; i < RTL_NUMBER_OF(W32kApiSetAdapters); i++) {
 
                     PatternSize = W32kApiSetAdapters[i].Size;
                     PatternData = W32kApiSetAdapters[i].Data;
@@ -1111,10 +1110,10 @@ NTSTATUS SdtResolveServiceEntryModule(
             ApiSetReference = ApiSetExtractReferenceFromAdapter(FunctionPtr);
             if (ApiSetReference) {
 
-                if (g_NtBuildNumber <= NT_WIN10_21H1)
-                    ApiSetTableEntrySize = sizeof(W32K_API_SET_TABLE_ENTRY);
-                else
+                if (g_NtBuildNumber >= NT_WIN11_21H2)
                     ApiSetTableEntrySize = sizeof(W32K_API_SET_TABLE_ENTRY_V2);
+                else
+                    ApiSetTableEntrySize = sizeof(W32K_API_SET_TABLE_ENTRY);
 
                 resolveStatus = ApiSetResolveWin32kTableEntry(
                     Win32kApiSetTable,

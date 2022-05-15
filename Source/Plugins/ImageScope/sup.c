@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020 - 2021
+*  (C) COPYRIGHT AUTHORS, 2020 - 2022
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.01
+*  VERSION:     1.02
 *
-*  DATE:        08 Jan 2021
+*  DATE:        11 May 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -457,7 +457,7 @@ BOOL supListViewAddCopyValueItem(
     _In_ HMENU hMenu,
     _In_ HWND hwndLv,
     _In_ UINT uId,
-    _In_opt_ UINT uPos,
+    _In_ UINT uPos,
     _In_ POINT* lpPoint,
     _Out_ INT* pItemHit,
     _Out_ INT* pColumnHit

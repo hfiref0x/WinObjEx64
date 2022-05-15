@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     1.92
+*  VERSION:     1.93
 *
-*  DATE:        03 Dec 2021
+*  DATE:        13 May 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -155,7 +155,7 @@ VOID propObDumpAddressWithModule(
     _In_opt_ PVOID Address,
     _In_ PRTL_PROCESS_MODULES pModules,
     _In_opt_ PVOID SelfDriverBase,
-    _In_opt_ ULONG SelfDriverSize
+    _In_ ULONG SelfDriverSize
 )
 {
     TL_SUBITEMS_FIXED   subitems;
@@ -217,8 +217,8 @@ VOID propObDumpPushLock(
     _In_ HWND TreeList,
     _In_ HTREEITEM hParent,
     _In_ PVOID PushLockPtr,
-    _In_opt_ COLORREF BgColor,
-    _In_opt_ COLORREF FontColor
+    _In_ COLORREF BgColor,
+    _In_ COLORREF FontColor
 )
 {
     TL_SUBITEMS_FIXED   subitems;
@@ -257,8 +257,8 @@ VOID propObDumpByte(
     _In_ LPWSTR lpszName,
     _In_opt_ LPWSTR lpszDesc,
     _In_ BYTE Value,
-    _In_opt_ COLORREF BgColor,
-    _In_opt_ COLORREF FontColor,
+    _In_ COLORREF BgColor,
+    _In_ COLORREF FontColor,
     _In_ BOOL IsBool
 )
 {
@@ -321,8 +321,8 @@ HTREEITEM propObDumpSetString(
     _In_ LPWSTR lpszName,
     _In_opt_ LPWSTR lpszDesc,
     _In_opt_ LPWSTR lpszValue,
-    _In_opt_ COLORREF BgColor,
-    _In_opt_ COLORREF FontColor
+    _In_ COLORREF BgColor,
+    _In_ COLORREF FontColor
 )
 {
     TL_SUBITEMS_FIXED   subitems;
@@ -377,8 +377,8 @@ HTREEITEM propObDumpUlong(
     _In_ ULONG Value,
     _In_ BOOL HexDump,
     _In_ BOOL IsUShort,
-    _In_opt_ COLORREF BgColor,
-    _In_opt_ COLORREF FontColor
+    _In_ COLORREF BgColor,
+    _In_ COLORREF FontColor
 )
 {
     TL_SUBITEMS_FIXED   subitems;
@@ -459,8 +459,8 @@ HTREEITEM propObDumpLong(
     _In_opt_ LPWSTR lpszDesc, //additional text to be displayed
     _In_ LONG Value,
     _In_ BOOL HexDump,
-    _In_opt_ COLORREF BgColor,
-    _In_opt_ COLORREF FontColor
+    _In_ COLORREF BgColor,
+    _In_ COLORREF FontColor
 )
 {
     TL_SUBITEMS_FIXED   subitems;
@@ -521,7 +521,7 @@ VOID propObDumpUlong64(
     _In_ HTREEITEM hParent,
     _In_ LPWSTR lpszName,
     _In_opt_ LPWSTR lpszDesc, //additional text to be displayed
-    _In_opt_ ULONG64 Value,
+    _In_ ULONG64 Value,
     _In_ BOOL OutAsHex,
     _In_ COLORREF BgColor,
     _In_ COLORREF FontColor
@@ -583,7 +583,7 @@ VOID propObDumpLong64(
     _In_ HTREEITEM hParent,
     _In_ LPWSTR lpszName,
     _In_opt_ LPWSTR lpszDesc, //additional text to be displayed
-    _In_opt_ LONG64 Value,
+    _In_ LONG64 Value,
     _In_ BOOL OutAsHex,
     _In_ COLORREF BgColor,
     _In_ COLORREF FontColor

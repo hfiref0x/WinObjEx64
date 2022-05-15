@@ -1,3 +1,12 @@
+v1.9.3
+updated SeCiCallbacks search for newest Windows versions
+fixed win32k ApiSet resolving for Win10 21H2
+fixed ObCallbacks enumeration issues
+support for various kernel driver helpers
+ported to msvc 2022 (with backward compatibility to 2019)
+bugfixes
+rtls updated
+
 v1.9.2
 more Win10/11 21h2 compatibility changes
 added FLT_FILTER, FLT_OBJECT structured dump

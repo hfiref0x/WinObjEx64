@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2018 - 2021
+*  (C) COPYRIGHT AUTHORS, 2018 - 2022
 *
 *  TITLE:       EXTRASCALLBACKS.C
 *
-*  VERSION:     1.92
+*  VERSION:     1.93
 *
-*  DATE:        05 Dec 2021
+*  DATE:        13 May 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -25,12 +25,56 @@
 #define CBDLG_TRACKSIZE_MIN_X 640
 #define CBDLG_TRACKSIZE_MIN_Y 480
 
+//
+// Known CiCallbacks structure sizes (including marker tag), update this from time to time.
+//
+#define CBT_SIZE_REDSTONE5    0xD0
+#define CBT_SIZE_19HX         0xD0
+#define CBT_SIZE_VB_V1        0xD0
+#define CBT_SIZE_VB_V2        0xE8
+#define CBT_SIZE_CO_V1        0x100
+#define CBT_SIZE_NI_V1        0xF8
+#define CBT_SIZE_CU_V1        0xF8
+
+typedef struct _CBT_MAPPING {
+    ULONG Build;
+    ULONG Tag;
+    ULONG Size;
+} CBT_MAPPING, * PCBT_MAPPING;
+
+CBT_MAPPING g_CbtMapping[] = {
+    { NT_WIN10_REDSTONE5, NTDDI_WIN10_RS5, CBT_SIZE_REDSTONE5 },
+    { NT_WIN10_19H1, NTDDI_WIN10_19H1, CBT_SIZE_19HX },
+    { NT_WIN10_19H2, NTDDI_WIN10_19H1, CBT_SIZE_19HX },
+
+    { NT_WIN10_20H1, NTDDI_WIN10_VB, CBT_SIZE_VB_V1 },
+    { NT_WIN10_20H1, NTDDI_WIN10_VB, CBT_SIZE_VB_V2 },
+
+    { NT_WIN10_20H2, NTDDI_WIN10_VB, CBT_SIZE_VB_V1 },
+    { NT_WIN10_20H2, NTDDI_WIN10_VB, CBT_SIZE_VB_V2 },
+
+    { NT_WIN10_21H1, NTDDI_WIN10_VB, CBT_SIZE_VB_V1 },
+    { NT_WIN10_21H1, NTDDI_WIN10_VB, CBT_SIZE_VB_V2 },
+
+    { NT_WIN10_21H2, NTDDI_WIN10_VB, CBT_SIZE_VB_V1 },
+    { NT_WIN10_21H2, NTDDI_WIN10_VB, CBT_SIZE_VB_V2 },
+
+    { NT_WIN11_21H2, NTDDI_WIN10_CO, CBT_SIZE_CO_V1 },
+    { NT_WIN11_22H2, NTDDI_WIN10_NI, CBT_SIZE_NI_V1 },
+    { NTX_WIN11_ADB, NTDDI_WIN10_CU, CBT_SIZE_CU_V1 }
+};
+
+//
+// CiCompareSigningLevels offset
+//
+#define CiCompareSigningLevels_Offset 0x40
+
 ULONG g_CallbacksCount;
 
 typedef struct _OBEX_CALLBACK_DISPATCH_ENTRY OBEX_CALLBACK_DISPATCH_ENTRY;
 
 typedef ULONG_PTR(CALLBACK *POBEX_FINDCALLBACK_ROUTINE)(
-    _In_opt_ ULONG_PTR QueryFlags);
+    _In_ ULONG_PTR QueryFlags);
 
 typedef VOID(CALLBACK *POBEX_DISPLAYCALLBACK_ROUTINE)(
     _In_ HWND TreeList,
@@ -39,7 +83,7 @@ typedef VOID(CALLBACK *POBEX_DISPLAYCALLBACK_ROUTINE)(
     _In_ PRTL_PROCESS_MODULES Modules);
 
 typedef NTSTATUS(CALLBACK *POBEX_QUERYCALLBACK_ROUTINE)(
-    _In_opt_ ULONG_PTR QueryFlags,
+    _In_ ULONG_PTR QueryFlags,
     _In_ POBEX_DISPLAYCALLBACK_ROUTINE DisplayRoutine,
     _In_opt_ POBEX_FINDCALLBACK_ROUTINE FindRoutine,
     _In_opt_ LPWSTR CallbackType,
@@ -48,12 +92,12 @@ typedef NTSTATUS(CALLBACK *POBEX_QUERYCALLBACK_ROUTINE)(
     _Inout_opt_ PULONG_PTR SystemCallbacksRef);
 
 #define OBEX_FINDCALLBACK_ROUTINE(n) ULONG_PTR CALLBACK n(    \
-    _In_opt_ ULONG_PTR QueryFlags)
+    _In_ ULONG_PTR QueryFlags)
 
 #define OBEX_QUERYCALLBACK_ROUTINE(n) NTSTATUS CALLBACK n(    \
-    _In_opt_ ULONG_PTR QueryFlags,                            \
+    _In_ ULONG_PTR QueryFlags,                                \
     _In_ POBEX_DISPLAYCALLBACK_ROUTINE DisplayRoutine,        \
-    _In_opt_ POBEX_FINDCALLBACK_ROUTINE FindRoutine,         \
+    _In_opt_ POBEX_FINDCALLBACK_ROUTINE FindRoutine,          \
     _In_opt_ LPWSTR CallbackType,                             \
     _In_ HWND TreeList,                                       \
     _In_ PRTL_PROCESS_MODULES Modules,                        \
@@ -109,6 +153,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindObjectTypeCallbackListHeadByType);
 OBEX_FINDCALLBACK_ROUTINE(FindRtlpDebugPrintCallbackList);
 OBEX_FINDCALLBACK_ROUTINE(FindDbgkLmdCallbacks);
 OBEX_FINDCALLBACK_ROUTINE(FindPsAltSystemCallHandlers);
+OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacksEx);
 OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks);
 OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks);
 OBEX_FINDCALLBACK_ROUTINE(FindExpCallbackListHead);
@@ -487,6 +532,39 @@ static const BYTE CiCallbackIndexes_Win10RS4_21H2[] = {
 };
 
 //
+// Windows 10 21H2 updated
+//
+static const BYTE CiCallbackIndexes_Win1021H2_V2[] = {
+    Id_CiSetFileCache,
+    Id_CiGetFileCache,
+    Id_CiQueryInformation,
+    Id_CiValidateImageHeader,
+    Id_CiValidateImageData,
+    Id_CiHashMemory,
+    Id_KappxIsPackageFile,
+    Id_CiCompareSigningLevels,
+    Id_CiValidateFileAsImageType,
+    Id_CiRegisterSigningInformation,
+    Id_CiUnregisterSigningInformation,
+    Id_CiInitializePolicy,
+    Id_CiReleaseContext,
+    Id_XciUnknownCallback,
+    Id_CiGetStrongImageReference,
+    Id_CiHvciSetImageBaseAddress,
+    Id_CipQueryPolicyInformation,
+    Id_CiValidateDynamicCodePages,
+    Id_CiQuerySecurityPolicy,
+    Id_CiRevalidateImage,
+    Id_CiSetInformation,
+    Id_CiSetInformationProcess,
+    Id_CiGetBuildExpiryTime,
+    Id_CiCheckProcessDebugAccessPolicy,
+    Id_CiGetCodeIntegrityOriginClaimForFileObject,
+    Id_CiDeleteCodeIntegrityOriginClaimMembers,
+    Id_CiDeleteCodeIntegrityOriginClaimForFileObject
+};
+
+//
 // Windows 11 21H2
 //
 static const BYTE CiCallbackIndexes_Win11[] = {
@@ -566,7 +644,8 @@ static const BYTE CiCallbackIndexes_Win11_Next[] = {
 *
 */
 LPWSTR GetCiRoutineNameFromIndex(
-    _In_ ULONG Index)
+    _In_ ULONG Index,
+    _In_ ULONG_PTR CiCallbacksSize)
 {
     ULONG ArrayCount = 0, index;
     CONST BYTE *Indexes;
@@ -614,17 +693,34 @@ LPWSTR GetCiRoutineNameFromIndex(
     case NT_WIN10_REDSTONE5:
     case NT_WIN10_19H1:
     case NT_WIN10_19H2:
+        Indexes = CiCallbackIndexes_Win10RS4_21H2;
+        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win10RS4_21H2);
+        break;
+
     case NT_WIN10_20H1:
     case NT_WIN10_20H2:
     case NT_WIN10_21H1:
     case NT_WIN10_21H2:
-        Indexes = CiCallbackIndexes_Win10RS4_21H2;
-        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win10RS4_21H2);
+        
+        switch (CiCallbacksSize) {
+        case CBT_SIZE_VB_V2:
+            Indexes = CiCallbackIndexes_Win1021H2_V2;
+            ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win1021H2_V2);
+            break;
+
+        case CBT_SIZE_VB_V1:
+        default:
+            Indexes = CiCallbackIndexes_Win10RS4_21H2;
+            ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win10RS4_21H2);
+            break;
+        }
         break;
+
     case NT_WIN11_21H2:
         Indexes = CiCallbackIndexes_Win11;
         ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win11);
         break;
+    case NT_WIN11_22H2:
     case NTX_WIN11_ADB:
     default:
         Indexes = CiCallbackIndexes_Win11_Next;
@@ -675,6 +771,97 @@ ULONG_PTR ComputeAddressInsideNtOs(
 }
 
 /*
+* FindCiCallbacksEx
+*
+* Purpose:
+*
+* Locate address of ntoskrnl SeCiCallbacks structure for Redstone5+.
+*
+*/
+OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacksEx)
+{
+    PBYTE       ptrCode;
+    ULONG_PTR   cbSize = 0, ulTag = 0, Index = 0, kvarAddress = 0;
+    LONG        Rel = 0;
+    hde64s      hs;
+
+    UNREFERENCED_PARAMETER(QueryFlags);
+
+    //
+    // NtCompareSigningLevels added in REDSTONE2 (15063)
+    // It is a call to SeCiCallbacks[CiCompareSigningLevelsId]
+    // Before REDSTONE5 it is called via wrapper SeCompareSigningLevels
+    // From REDSTONE6 and above it is inlined
+    //
+
+    ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
+        "NtCompareSigningLevels");
+
+    if (ptrCode == NULL)
+        return 0;
+
+    do {
+        hde64_disasm((void*)(ptrCode + Index), &hs);
+        if (hs.flags & F_ERROR)
+            break;
+
+        if (hs.len == 7) {
+
+            if ((ptrCode[Index] == 0x4C) &&
+                (ptrCode[Index + 1] == 0x8B) &&
+                (ptrCode[Index + 2] == 0x05))
+            {
+                Rel = *(PLONG)(ptrCode + Index + 3);
+                break;
+            }
+        }
+
+        Index += hs.len;
+
+    } while (Index < 64);
+
+    if (Rel == 0)
+        return 0;
+
+    kvarAddress = kdAdjustAddressToNtOsBase((ULONG_PTR)ptrCode, Index, hs.len, Rel);
+    kvarAddress -= CiCompareSigningLevels_Offset;
+
+    //
+    // Read head - structure size.
+    //
+    if (!kdReadSystemMemory(kvarAddress, &cbSize, sizeof(cbSize)))
+        return 0;
+
+    if (cbSize == 0 || cbSize > 0x1000)
+        return 0;
+
+    //
+    // Read tail - marker tag.
+    //
+    if (!kdReadSystemMemory(kvarAddress + (cbSize - sizeof(ULONG_PTR)), &ulTag, sizeof(ulTag)))
+        return 0;
+
+    for (Index = 0; Index < RTL_NUMBER_OF(g_CbtMapping); Index++) {
+
+        if (g_CbtMapping[Index].Build == g_NtBuildNumber) {
+
+            //
+            // Validate for known table values.
+            //
+            if (cbSize == g_CbtMapping[Index].Size &&
+                ulTag == g_CbtMapping[Index].Tag)
+            {
+                return kvarAddress;
+            }
+
+        }
+
+    }
+
+    return 0;
+}
+
+/*
 * FindCiCallbacks
 *
 * Purpose:
@@ -696,8 +883,6 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
 
     LONG    Rel = 0;
     hde64s  hs;
-
-    UNREFERENCED_PARAMETER(QueryFlags);
 
     do {
 
@@ -728,141 +913,125 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
         //
         if (kvarAddress == 0) {
 
-            //
-            // Locate PAGE image section as required variable is always in PAGE.
-            //
-            SectionBase = supLookupImageSectionByName(
-                PAGE_SECTION,
-                PAGE_SECTION_LEGNTH,
-                g_kdctx.NtOsImageMap,
-                &SectionSize);
+            if (g_NtBuildNumber >= NT_WIN10_REDSTONE5) {
 
-            if ((SectionBase == 0) || (SectionSize == 0))
-                break;
-
-            InstructionMatchPattern = SeCiCallbacksMatchingPattern; //default matching pattern
-            InstructionMatchLength = 7; //lea
-            InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern);
-
-            switch (g_NtBuildNumber) {
-
-            case NT_WIN7_SP1:
-                Signature = g_CiCallbacksPattern_7601;
-                SignatureSize = sizeof(g_CiCallbacksPattern_7601);
-                InstructionMatchPattern = g_CiCallbacksMatchingPattern;
-                InstructionExactMatchLength = RTL_NUMBER_OF(g_CiCallbacksMatchingPattern);
-                break;
-
-            case NT_WIN8_RTM:
-            case NT_WIN8_BLUE:
-                Signature = SeCiCallbacksPattern_9200_9600;
-                SignatureSize = sizeof(SeCiCallbacksPattern_9200_9600);
-                break;
-
-            case NT_WIN10_THRESHOLD1:
-            case NT_WIN10_THRESHOLD2:
-                Signature = SeCiCallbacksPattern_10240_10586;
-                SignatureSize = sizeof(SeCiCallbacksPattern_10240_10586);
-                break;
-
-            case NT_WIN10_REDSTONE1:
-                Signature = SeCiCallbacksPattern_14393;
-                SignatureSize = sizeof(SeCiCallbacksPattern_14393);
-                break;
-
-            case NT_WIN10_REDSTONE2:
-            case NT_WIN10_REDSTONE3:
-                Signature = SeCiCallbacksPattern_15063_16299;
-                SignatureSize = sizeof(SeCiCallbacksPattern_15063_16299);
-                break;
-
-            case NT_WIN10_REDSTONE4:
-            case NT_WIN10_REDSTONE5:
-                Signature = SeCiCallbacksPattern_17134_17763;
-                SignatureSize = sizeof(SeCiCallbacksPattern_17134_17763);
-                break;
-
-            case NT_WIN10_19H1:
-            case NT_WIN10_19H2:
-            case NT_WIN10_20H1:
-            case NT_WIN10_20H2:
-            case NT_WIN10_21H1:
-            case NT_WIN10_21H2:
-                Signature = SeCiCallbacksPattern_19H1_21H2;
-                SignatureSize = sizeof(SeCiCallbacksPattern_19H1_21H2);
-                InstructionMatchPattern = SeCiCallbacksMatchingPattern_19H1_21H2;
-                InstructionMatchLength = 10; //mov
-                InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern_19H1_21H2);
-                break;
-
-            case NT_WIN11_21H2:
-            default:
-                Signature = SeCiCallbacksPattern_W11_21H2;
-                if (g_NtBuildNumber > NT_WIN11_21H2) {
-                    SeCiCallbacksPattern_W11_21H2[2] = 0xEC; //test only, remove with proper find pattern mask support
-                }
-                SignatureSize = sizeof(SeCiCallbacksPattern_W11_21H2);
-                InstructionMatchPattern = SeCiCallbacksMatchingPattern_19H1_21H2;
-                InstructionMatchLength = 10; //mov
-                InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern_19H1_21H2);
-                break;
-            }
-
-            ptrCode = (PBYTE)supFindPattern(
-                (PBYTE)SectionBase,
-                SectionSize,
-                Signature,
-                SignatureSize);
-
-            if (ptrCode == NULL)
-                break;
-
-            if (g_NtBuildNumber <= NT_WIN7_SP1) {
-
-                //
-                // Find reference to g_CiCallbacks in code.
-                //
-
-                Index = 0; //pattern search include target instruction, do not skip
+                kvarAddress = FindCiCallbacksEx(QueryFlags);
 
             }
             else {
 
                 //
-                // Find reference to SeCiCallbacks/g_CiCallbacks in code.
+                // Locate PAGE image section as required variable is always in PAGE.
                 //
+                SectionBase = supLookupImageSectionByName(
+                    PAGE_SECTION,
+                    PAGE_SECTION_LEGNTH,
+                    g_kdctx.NtOsImageMap,
+                    &SectionSize);
 
-                Index = SignatureSize; //skip signature instructions
+                if ((SectionBase == 0) || (SectionSize == 0))
+                    break;
+
+                InstructionMatchPattern = SeCiCallbacksMatchingPattern; //default matching pattern
+                InstructionMatchLength = 7; //lea
+                InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern);
+
+                switch (g_NtBuildNumber) {
+
+                case NT_WIN7_SP1:
+                    Signature = g_CiCallbacksPattern_7601;
+                    SignatureSize = sizeof(g_CiCallbacksPattern_7601);
+                    InstructionMatchPattern = g_CiCallbacksMatchingPattern;
+                    InstructionExactMatchLength = RTL_NUMBER_OF(g_CiCallbacksMatchingPattern);
+                    break;
+
+                case NT_WIN8_RTM:
+                case NT_WIN8_BLUE:
+                    Signature = SeCiCallbacksPattern_9200_9600;
+                    SignatureSize = sizeof(SeCiCallbacksPattern_9200_9600);
+                    break;
+
+                case NT_WIN10_THRESHOLD1:
+                case NT_WIN10_THRESHOLD2:
+                    Signature = SeCiCallbacksPattern_10240_10586;
+                    SignatureSize = sizeof(SeCiCallbacksPattern_10240_10586);
+                    break;
+
+                case NT_WIN10_REDSTONE1:
+                    Signature = SeCiCallbacksPattern_14393;
+                    SignatureSize = sizeof(SeCiCallbacksPattern_14393);
+                    break;
+
+                case NT_WIN10_REDSTONE2:
+                case NT_WIN10_REDSTONE3:
+                    Signature = SeCiCallbacksPattern_15063_16299;
+                    SignatureSize = sizeof(SeCiCallbacksPattern_15063_16299);
+                    break;
+
+                case NT_WIN10_REDSTONE4:
+                default:
+                    Signature = SeCiCallbacksPattern_17134_17763;
+                    SignatureSize = sizeof(SeCiCallbacksPattern_17134_17763);
+                    break;
+
+                }
+
+                ptrCode = (PBYTE)supFindPattern(
+                    (PBYTE)SectionBase,
+                    SectionSize,
+                    Signature,
+                    SignatureSize);
+
+                if (ptrCode == NULL)
+                    break;
+
+                if (g_NtBuildNumber <= NT_WIN7_SP1) {
+
+                    //
+                    // Find reference to g_CiCallbacks in code.
+                    //
+
+                    Index = 0; //pattern search include target instruction, do not skip
+
+                }
+                else {
+
+                    //
+                    // Find reference to SeCiCallbacks/g_CiCallbacks in code.
+                    //
+
+                    Index = SignatureSize; //skip signature instructions
+
+                }
+
+                do {
+                    hde64_disasm((void*)(ptrCode + Index), &hs);
+                    if (hs.flags & F_ERROR)
+                        break;
+                    //
+                    // mov cs:g_CiCallbacks, rax (for Windows 7)
+                    // lea rcx, SeCiCallbacks (for 8/10 TH/RS)
+                    // mov cs:SeCiCallbacks (19H1-21H1)
+                    //
+                    if (hs.len == InstructionMatchLength) {
+
+                        //
+                        // Match block found.
+                        //
+                        if (RtlCompareMemory((VOID*)&ptrCode[Index], (VOID*)InstructionMatchPattern,
+                            InstructionExactMatchLength) == InstructionExactMatchLength)
+                        {
+                            Rel = *(PLONG)(ptrCode + Index + InstructionExactMatchLength);
+                            break;
+                        }
+                    }
+                    Index += hs.len;
+
+                } while (Index < 64);
+
+                kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
 
             }
-
-            do {
-                hde64_disasm((void*)(ptrCode + Index), &hs);
-                if (hs.flags & F_ERROR)
-                    break;
-                //
-                // mov cs:g_CiCallbacks, rax (for Windows 7)
-                // lea rcx, SeCiCallbacks (for 8/10 TH/RS)
-                // mov cs:SeCiCallbacks (19H1-21H1)
-                //
-                if (hs.len == InstructionMatchLength) {
-
-                    //
-                    // Match block found.
-                    //
-                    if (RtlCompareMemory((VOID*)&ptrCode[Index], (VOID*)InstructionMatchPattern,
-                        InstructionExactMatchLength) == InstructionExactMatchLength)
-                    {
-                        Rel = *(PLONG)(ptrCode + Index + InstructionExactMatchLength);
-                        break;
-                    }
-                }
-                Index += hs.len;
-
-            } while (Index < 64);
-
-            kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
-
         }
 
     } while (FALSE);
@@ -871,6 +1040,50 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
         logAdd(WOBJ_LOG_ENTRY_WARNING, TEXT("Could not locate CiCallbacks"));
 
     return kvarAddress;
+}
+
+BOOL IopFileSystemIsValidPattern(
+    _In_ PBYTE Buffer,
+    _In_ ULONG Offset,
+    _In_ ULONG InstructionSize
+)
+{
+    BOOL bResult = FALSE;
+
+    if (g_NtBuildNumber <= NT_WIN11_21H2) {
+
+        //
+        // lea  rdx, xxx                
+        //
+        if ((Buffer[Offset] == 0x48) &&
+            (Buffer[Offset + 1] == 0x8D) &&
+            (Buffer[Offset + 2] == 0x0D) &&
+            ((Buffer[Offset + InstructionSize] == 0x48) || (Buffer[Offset + InstructionSize] == 0xE9)))
+        {
+            bResult = TRUE;
+        }
+
+    }
+    else { //win11 22h1+
+
+        //
+        // mov  rcx, xxx                
+        //
+        if ((Buffer[Offset] == 0x48) &&
+            (Buffer[Offset + 1] == 0x8B) &&
+            (Buffer[Offset + 2] == 0x0D) &&
+            (
+                (Buffer[Offset + InstructionSize] == 0x48) ||
+                (Buffer[Offset + InstructionSize] == 0xE9) ||
+                (Buffer[Offset + InstructionSize] == 0x8B))
+            )
+        {
+            bResult = TRUE;
+        }
+
+    }
+
+    return bResult;
 }
 
 /*
@@ -1028,14 +1241,8 @@ BOOL FindIopFileSystemQueueHeads(
                 break;
 
             if (hs.len == 7) {
-                //
-                // lea  rdx, xxx                
-                //
-                if ((ptrCode[Index] == 0x48) &&
-                    (ptrCode[Index + 1] == 0x8D) &&
-                    (ptrCode[Index + 2] == 0x0D) &&
-                    ((ptrCode[Index + hs.len] == 0x48) || (ptrCode[Index + hs.len] == 0xE9)))
-                {
+
+                if (IopFileSystemIsValidPattern(ptrCode, Index, hs.len)) {
                     Rel = *(PLONG)(ptrCode + Index + 3);
                     if (Rel) {
 
@@ -3090,6 +3297,50 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoCallbacks)
 
 }
 
+VOID AddObCallbackEntry(
+    _In_ HWND TreeList,
+    _In_ HTREEITEM RootItem,
+    _In_ LPWSTR CallbackType,
+    _In_ PVOID Callback,
+    _In_ OB_OPERATION CallbackOperation,
+    _In_opt_ LPWSTR Altitude,
+    _In_ SIZE_T AltitudeSize,
+    _In_ PRTL_PROCESS_MODULES Modules
+)
+{
+    LPWSTR lpText;
+    SIZE_T Size;
+    BOOL bAltitudePresent = (Altitude && AltitudeSize);
+
+    Size = MAX_PATH * sizeof(WCHAR);
+
+    if (bAltitudePresent)
+        Size += AltitudeSize;
+
+    lpText = (LPWSTR)supHeapAlloc(Size);
+
+    if (lpText) {
+
+        _strcpy(lpText, CallbackType);
+
+        if (bAltitudePresent) {
+            _strcat(lpText, TEXT(", Altitude: "));
+            _strcat(lpText, Altitude);
+        }
+
+        if (CallbackOperation & OB_OPERATION_HANDLE_CREATE) _strcat(lpText, TEXT(", CreateHandle"));
+        if (CallbackOperation & OB_OPERATION_HANDLE_DUPLICATE) _strcat(lpText, TEXT(", DuplicateHandle"));
+
+        AddEntryToList(TreeList,
+            RootItem,
+            (ULONG_PTR)Callback,
+            lpText,
+            Modules);
+
+        supHeapFree(lpText);
+    }
+}
+
 /*
 * DumpObCallbacks
 *
@@ -3100,19 +3351,17 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoCallbacks)
 */
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpObCallbacks)
 {
-    BOOL bAltitudeRead, bNeedFree;
-
     ULONG_PTR ListHead = KernelVariableAddress;
 
-    LPWSTR lpInfoBuffer = NULL, lpType;
+    LPWSTR lpAltitudeBuffer;
 
-    SIZE_T Size, AltitudeSize = 0;
+    SIZE_T AltitudeSize = 0;
 
     LIST_ENTRY ListEntry;
 
-    OB_CALLBACK_CONTEXT_BLOCK CallbackRecord;
+    OB_CALLBACK_CONTEXT_BLOCK CallbackEntry;
 
-    OB_CALLBACK_REGISTRATION Registration;
+    OB_REGISTRATION RegEntry;
 
     HTREEITEM RootItem;
 
@@ -3141,11 +3390,12 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpObCallbacks)
     //
     while ((ULONG_PTR)ListEntry.Flink != ListHead) {
 
-        RtlSecureZeroMemory(&CallbackRecord, sizeof(CallbackRecord));
+        lpAltitudeBuffer = NULL;
+        RtlSecureZeroMemory(&CallbackEntry, sizeof(CallbackEntry));
 
         if (!kdReadSystemMemory((ULONG_PTR)ListEntry.Flink,
-            &CallbackRecord,
-            sizeof(CallbackRecord)))
+            &CallbackEntry,
+            sizeof(OB_CALLBACK_CONTEXT_BLOCK)))
         {
             break;
         }
@@ -3153,81 +3403,56 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpObCallbacks)
         //
         // Read Altitude.
         //
-        bAltitudeRead = FALSE;
-
-        RtlSecureZeroMemory(&Registration, sizeof(Registration));
-        if (kdReadSystemMemory((ULONG_PTR)CallbackRecord.Registration,
-            (PVOID)&Registration,
-            sizeof(Registration)))
+        RtlSecureZeroMemory(&RegEntry, sizeof(RegEntry));
+        if (kdReadSystemMemory((ULONG_PTR)CallbackEntry.Registration,
+            (PVOID)&RegEntry,
+            sizeof(OB_REGISTRATION)))
         {
-            AltitudeSize = 8 + (SIZE_T)Registration.Altitude.Length;
-            lpInfoBuffer = (LPWSTR)supHeapAlloc(AltitudeSize);
-            if (lpInfoBuffer) {
+            AltitudeSize = 8 + (SIZE_T)RegEntry.Altitude.Length;
+            lpAltitudeBuffer = (LPWSTR)supHeapAlloc(AltitudeSize);
+            if (lpAltitudeBuffer) {
 
-                bAltitudeRead = kdReadSystemMemory((ULONG_PTR)Registration.Altitude.Buffer,
-                    (PVOID)lpInfoBuffer,
-                    Registration.Altitude.Length);
+                kdReadSystemMemory((ULONG_PTR)RegEntry.Altitude.Buffer,
+                    (PVOID)lpAltitudeBuffer,
+                    RegEntry.Altitude.Length);
             }
         }
 
         //
         // Output PreCallback.
         //
-        if ((ULONG_PTR)CallbackRecord.PreCallback > g_kdctx.SystemRangeStart) {
+        if ((ULONG_PTR)CallbackEntry.PreCallback > g_kdctx.SystemRangeStart) {
 
-            bNeedFree = FALSE;
-
-            if (bAltitudeRead) {
-                Size = AltitudeSize + MAX_PATH;
-                lpType = (LPWSTR)supHeapAlloc(Size);
-                if (lpType) {
-                    _strcpy(lpType, TEXT("PreCallback, Altitude: "));
-                    _strcat(lpType, lpInfoBuffer);
-                    bNeedFree = TRUE;
-                }
-            }
-            else
-                lpType = TEXT("PreCallback");
-
-            AddEntryToList(TreeList,
+            AddObCallbackEntry(TreeList,
                 RootItem,
-                (ULONG_PTR)CallbackRecord.PreCallback,
-                lpType,
+                TEXT("PreCallback"),
+                CallbackEntry.PreCallback,
+                CallbackEntry.Operations,
+                lpAltitudeBuffer,
+                AltitudeSize,
                 Modules);
 
-            if (bNeedFree) supHeapFree(lpType);
         }
 
         //
         // Output PostCallback.
         //
-        if ((ULONG_PTR)CallbackRecord.PostCallback > g_kdctx.SystemRangeStart) {
+        if ((ULONG_PTR)CallbackEntry.PostCallback > g_kdctx.SystemRangeStart) {
 
-            bNeedFree = FALSE;
-
-            if (bAltitudeRead) {
-                Size = AltitudeSize + MAX_PATH;
-                lpType = (LPWSTR)supHeapAlloc(Size);
-                if (lpType) {
-                    _strcpy(lpType, TEXT("PostCallback, Altitude: "));
-                    _strcat(lpType, lpInfoBuffer);
-                    bNeedFree = TRUE;
-                }
-            }
-            else
-                lpType = TEXT("PostCallback");
-
-            AddEntryToList(TreeList,
+            AddObCallbackEntry(TreeList,
                 RootItem,
-                (ULONG_PTR)CallbackRecord.PostCallback,
-                lpType,
+                TEXT("PostCallback"),
+                CallbackEntry.PostCallback,
+                CallbackEntry.Operations,
+                lpAltitudeBuffer,
+                AltitudeSize,
                 Modules);
 
-            if (bNeedFree) supHeapFree(lpType);
         }
-        ListEntry.Flink = CallbackRecord.CallbackListEntry.Flink;
 
-        if (lpInfoBuffer) supHeapFree(lpInfoBuffer);
+        ListEntry.Flink = CallbackEntry.CallbackListEntry.Flink;
+
+        if (lpAltitudeBuffer) supHeapFree(lpAltitudeBuffer);
     }
 
 }
@@ -3720,15 +3945,13 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks)
 {
     HTREEITEM RootItem;
 
-    ULONG_PTR *CallbacksData;
+    PULONG_PTR CallbacksData, DataPtr;
 
     LPWSTR CallbackName;
 
-    ULONG_PTR SizeOfCiCallbacks = 0;
+    ULONG_PTR CallbacksSize = 0, EffectiveSize;
 
     ULONG i, c;
-
-    BOOL bRevisionMarker;
 
     //
     // Add callback root entry to the treelist.
@@ -3738,19 +3961,19 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks)
         return;
 
     if (g_NtBuildNumber <= NT_WIN7_SP1) {
-        SizeOfCiCallbacks = 3 * sizeof(ULONG_PTR);
+        CallbacksSize = 3 * sizeof(ULONG_PTR);
 
-        CallbacksData = (PULONG_PTR)supVirtualAlloc((SIZE_T)SizeOfCiCallbacks);
+        CallbacksData = (PULONG_PTR)supVirtualAlloc((SIZE_T)CallbacksSize);
         if (CallbacksData) {
 
             if (kdReadSystemMemory(KernelVariableAddress,
                 CallbacksData,
-                (ULONG)SizeOfCiCallbacks))
+                (ULONG)CallbacksSize))
             {
-                c = (ULONG)(SizeOfCiCallbacks / sizeof(ULONG_PTR));
+                c = (ULONG)(CallbacksSize / sizeof(ULONG_PTR));
                 for (i = 0; i < c; i++) {
 
-                    CallbackName = GetCiRoutineNameFromIndex(i);
+                    CallbackName = GetCiRoutineNameFromIndex(i, 0);
 
                     if (CallbacksData[i]) {
 
@@ -3780,7 +4003,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks)
         // Probe size element.
         //
         if (!kdReadSystemMemory(KernelVariableAddress,
-            &SizeOfCiCallbacks,
+            &CallbacksSize,
             sizeof(ULONG_PTR)))
         {
             return;
@@ -3789,31 +4012,49 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks)
         //
         // Check size.
         //
-        if ((SizeOfCiCallbacks == 0) || (SizeOfCiCallbacks > PAGE_SIZE))
+        if ((CallbacksSize == 0) || (CallbacksSize > PAGE_SIZE))
             return;
 
-        CallbacksData = (PULONG_PTR)supVirtualAlloc((SIZE_T)SizeOfCiCallbacks);
+        CallbacksData = (PULONG_PTR)supVirtualAlloc((SIZE_T)CallbacksSize);
         if (CallbacksData) {
 
             if (kdReadSystemMemory(KernelVariableAddress,
                 CallbacksData,
-                (ULONG)SizeOfCiCallbacks))
+                (ULONG)CallbacksSize))
             {
-                SizeOfCiCallbacks -= sizeof(ULONG_PTR); //exclude structure sizeof
-                bRevisionMarker = (g_NtBuildNumber >= NT_WIN10_REDSTONE1); //there is a revision marker at the end of this structure.
-                if (bRevisionMarker) SizeOfCiCallbacks -= sizeof(ULONG_PTR); //exclude marker (windows 10 + revision)
+                /*
+                * Windows 10/11 x64 structure layout
+                *
+                * CI_CALLBACKS
+                *
+                * +0   ULONG_PTR StructureSize (in bytes)
+                * +8   PTR Callback1
+                * ...
+                * +N   PTR CallbackN
+                * +N+8 ULONG_PTR Marker
+                *
+                */
+                EffectiveSize = CallbacksSize;
+                DataPtr = CallbacksData;
 
-                c = (ULONG)(SizeOfCiCallbacks / sizeof(ULONG_PTR));
+                // skip sizeof element
+                DataPtr++;
+                EffectiveSize -= sizeof(ULONG_PTR);
 
-                for (i = 1; i <= c; i++) {
+                if (g_NtBuildNumber >= NT_WIN10_REDSTONE1)
+                    EffectiveSize -= sizeof(ULONG_PTR); //exclude final marker
 
-                    CallbackName = GetCiRoutineNameFromIndex(i - 1);
+                c = (ULONG)(EffectiveSize / sizeof(ULONG_PTR));
 
-                    if (CallbacksData[i]) {
+                for (i = 0; i < c; i++) {
+
+                    CallbackName = GetCiRoutineNameFromIndex(i, CallbacksSize);
+
+                    if (*DataPtr) {
 
                         AddEntryToList(TreeList,
                             RootItem,
-                            CallbacksData[i],
+                            *DataPtr,
                             CallbackName,
                             Modules);
 
@@ -3822,10 +4063,12 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks)
 
                         AddZeroEntryToList(TreeList,
                             RootItem,
-                            CallbacksData[i],
+                            0,
                             CallbackName);
 
                     }
+
+                    DataPtr++;
 
                 }
             }

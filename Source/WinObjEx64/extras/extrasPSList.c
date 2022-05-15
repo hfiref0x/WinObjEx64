@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2021
+*  (C) COPYRIGHT AUTHORS, 2019 - 2022
 *
 *  TITLE:       EXTRASPSLIST.C
 *
-*  VERSION:     1.92
+*  VERSION:     1.93
 *
-*  DATE:        03 Dec 2021
+*  DATE:        13 May 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -179,7 +179,7 @@ INT_PTR PsListDialogResize(
 VOID PsListHandlePopupMenu(
     _In_ HWND hwndDlg,
     _In_ LPPOINT point,
-    _In_opt_ LPARAM lParam,
+    _In_ LPARAM lParam,
     _In_ BOOL fTreeList
 )
 {
@@ -1323,7 +1323,7 @@ INT_PTR PsListHandleNotify(
             return PsShowPropertiesDialog(NULL);
 
         case LVN_COLUMNCLICK:
-            PsDlgContext.bInverseSort = !PsDlgContext.bInverseSort;
+            PsDlgContext.bInverseSort = (~PsDlgContext.bInverseSort) & 1;
             PsDlgContext.lvColumnToSort = ((NMLISTVIEW*)lParam)->iSubItem;
 
             ListView_SortItemsEx(PsDlgContext.ListView, &PsListCompareFunc, (LPARAM)PsDlgContext.lvColumnToSort);

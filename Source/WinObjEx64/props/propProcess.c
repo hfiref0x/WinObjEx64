@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       PROPPROCESS.C
 *
-*  VERSION:     1.90
+*  VERSION:     1.93
 *
-*  DATE:        27 May 2021
+*  DATE:        11 May 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -198,7 +198,7 @@ BOOL ProcessListHandleNotify(
     case LVN_COLUMNCLICK:
         pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
         if (pDlgContext) {
-            pDlgContext->bInverseSort = !pDlgContext->bInverseSort;
+            pDlgContext->bInverseSort = (~pDlgContext->bInverseSort) & 1;
             pDlgContext->lvColumnToSort = pListView->iSubItem;
 
             ListView_SortItemsEx(

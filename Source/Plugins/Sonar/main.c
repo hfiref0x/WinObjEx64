@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2021
+*  (C) COPYRIGHT AUTHORS, 2019 - 2022
 *
 *  TITLE:       MAIN.H
 *
-*  VERSION:     1.03
+*  VERSION:     1.15
 *
-*  DATE:        31 May 2021
+*  DATE:        11 May 2022
 *
 *  WinObjEx64 Sonar plugin.
 *
@@ -22,7 +22,7 @@
 //
 // Maximum tested build Sonar is known to work.
 //
-#define SONAR_MAX_TESTED_BUILD 21382
+#define SONAR_MAX_TESTED_BUILD NTX_WIN11_ADB
 
 //
 // Dll instance.
@@ -30,9 +30,9 @@
 HINSTANCE g_ThisDLL = NULL;
 
 //
-// Quit flag.
+// Run state.
 //
-volatile BOOL g_PluginQuit = FALSE;
+volatile DWORD m_PluginState = PLUGIN_RUNNING;
 
 //
 // Number of listview columns.
@@ -594,7 +594,7 @@ VOID DumpProtocolInfo(
 
     PVOID ProtocolHandlers[_countof(g_lpszProtocolBlockHandlers)];
 
-    ListView_DeleteAllItems(g_ctx.ListView);  
+    ListView_DeleteAllItems(g_ctx.ListView);
 
     pModulesList = ntsupGetLoadedModulesListEx(
         FALSE,
@@ -770,8 +770,9 @@ VOID DumpOpenBlockInfo(
 */
 VOID OnContextMenu(
     _In_ HWND hwnd,
-    _In_ UINT idItem,
-    _In_ LPPOINT lpPoint
+    _In_ LPPOINT lpPoint,
+    _In_ LPARAM lParam,
+    _In_ BOOLEAN fTreeList
 )
 {
     HMENU hMenu;
@@ -779,21 +780,24 @@ VOID OnContextMenu(
     hMenu = CreatePopupMenu();
     if (hMenu) {
 
-        if (idItem == ID_MENU_COPY_VALUE) {
+        //
+        // Add "Copy %item%" menu item.
+        //
+        if (fTreeList) {
 
-            //
-            // Add copy value text for treelist.
-            //
-            InsertMenu(hMenu, 0, MF_BYCOMMAND, idItem, TEXT("Copy Object Field"));
+            supTreeListAddCopyValueItem(hMenu,
+                g_ctx.TreeList,
+                ID_MENU_COPY_VALUE,
+                0,
+                lParam,
+                &g_ctx.tlSubItemHit);
+
         }
         else {
 
-            //
-            // Add "Copy %item%" menu item.
-            //
             supListViewAddCopyValueItem(hMenu,
                 g_ctx.ListView,
-                idItem,
+                ID_MENU_COPY_VALUE,
                 0,
                 lpPoint,
                 &g_ctx.LvItemHit,
@@ -996,7 +1000,7 @@ VOID OnNotify(
             break;
 
         case LVN_COLUMNCLICK:
-            g_ctx.bInverseSort = !g_ctx.bInverseSort;
+            g_ctx.bInverseSort = (~g_ctx.bInverseSort) & 1;
             SortColumn = ((NMLISTVIEW*)lParam)->iSubItem;
 
             ListView_SortItemsEx(g_ctx.ListView, &ListViewCompareFunc, SortColumn);
@@ -1047,7 +1051,7 @@ LRESULT CALLBACK MainWindowProc(
     INT dy;
     RECT crc;
     INT mark;
-    HWND TreeListControl;
+    HWND TreeListControl, FocusWindow;
 
     switch (uMsg) {
 
@@ -1059,7 +1063,7 @@ LRESULT CALLBACK MainWindowProc(
 
         if ((HWND)wParam == TreeListControl) {
             GetCursorPos((LPPOINT)&crc);
-            OnContextMenu(hwnd, ID_MENU_COPY_VALUE, (LPPOINT)&crc);
+            OnContextMenu(hwnd, (LPPOINT)&crc, lParam, TRUE);
         }
 
         if ((HWND)wParam == g_ctx.ListView) {
@@ -1074,7 +1078,7 @@ LRESULT CALLBACK MainWindowProc(
             else
                 GetCursorPos((LPPOINT)&crc);
 
-            OnContextMenu(hwnd, ID_MENU_COPY_VALUE + 1, (LPPOINT)&crc);
+            OnContextMenu(hwnd, (LPPOINT)&crc, 0, FALSE);
         }
         break;
 
@@ -1087,14 +1091,26 @@ LRESULT CALLBACK MainWindowProc(
             break;
 
         case ID_MENU_COPY_VALUE:
-            supCopyTreeListSubItemValue(g_ctx.TreeList, 0);
-            break;
 
-        case ID_MENU_COPY_VALUE + 1:
+            FocusWindow = GetFocus();
+            TreeListControl = TreeList_GetTreeControlWindow(g_ctx.TreeList);
 
-            supListViewCopyItemValueToClipboard(g_ctx.ListView,
-                g_ctx.LvItemHit,
-                g_ctx.LvColumnHit);
+            //
+            // Copy text to the clipboard.
+            //
+            if (FocusWindow == TreeListControl) {
+
+                supTreeListCopyItemValueToClipboard(g_ctx.TreeList,
+                    g_ctx.tlSubItemHit);
+
+            }
+            else if (FocusWindow == g_ctx.ListView) {
+
+                supListViewCopyItemValueToClipboard(g_ctx.ListView,
+                    g_ctx.LvItemHit,
+                    g_ctx.LvColumnHit);
+
+            }
 
             break;
 
@@ -1157,7 +1173,7 @@ LRESULT CALLBACK MainWindowProc(
         break;
 
     case WM_CLOSE:
-        InterlockedExchange((PLONG)&g_PluginQuit, TRUE);
+        InterlockedExchange((PLONG)&m_PluginState, PLUGIN_STOP);
         PostQuitMessage(0);
         break;
 
@@ -1385,6 +1401,8 @@ DWORD WINAPI PluginThread(
         //
         // Init treelist.
         //
+        g_ctx.tlSubItemHit = -1;
+
         RtlSecureZeroMemory(&hdritem, sizeof(hdritem));
         hdritem.mask = HDI_FORMAT | HDI_TEXT | HDI_WIDTH;
         hdritem.fmt = HDF_LEFT | HDF_BITMAP_ON_RIGHT | HDF_STRING;
@@ -1432,7 +1450,7 @@ DWORD WINAPI PluginThread(
             TranslateMessage(&msg1);
             DispatchMessage(&msg1);
 
-        } while ((rv != 0) && (g_PluginQuit == FALSE));
+        } while (rv != 0 && InterlockedAdd((PLONG)&m_PluginState, PLUGIN_RUNNING) == PLUGIN_RUNNING);
 
     } while (FALSE);
 
@@ -1459,7 +1477,7 @@ NTSTATUS CALLBACK StartPlugin(
     NTSTATUS Status;
     WINOBJEX_PLUGIN_STATE State = PluginInitialization;
 
-    InterlockedExchange((PLONG)&g_PluginQuit, FALSE);
+    InterlockedExchange((PLONG)&m_PluginState, PLUGIN_RUNNING);
 
     RtlSecureZeroMemory(&g_ctx, sizeof(g_ctx));
 
@@ -1505,7 +1523,7 @@ void CALLBACK StopPlugin(
 )
 {
     if (g_ctx.WorkerThread) {
-        InterlockedExchange((PLONG)&g_PluginQuit, TRUE);//force stop
+        InterlockedExchange((PLONG)&m_PluginState, PLUGIN_STOP);//force stop
         if (WaitForSingleObject(g_ctx.WorkerThread, 1000) == WAIT_TIMEOUT) {
 #pragma warning(push)
 #pragma warning(disable: 6258)

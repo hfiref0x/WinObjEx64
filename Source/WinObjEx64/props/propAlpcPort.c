@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2021
+*  (C) COPYRIGHT AUTHORS, 2021 - 2022
 *
 *  TITLE:       PROPALPCPORT.C
 *
-*  VERSION:     1.92
+*  VERSION:     1.93
 *
-*  DATE:        03 Dec 2021
+*  DATE:        11 May 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -174,7 +174,7 @@ BOOL AlpcPortListHandleNotify(
     case LVN_COLUMNCLICK:
         pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
         if (pDlgContext) {
-            pDlgContext->bInverseSort = !pDlgContext->bInverseSort;
+            pDlgContext->bInverseSort = (~pDlgContext->bInverseSort) & 1;
             pDlgContext->lvColumnToSort = ((NMLISTVIEW*)nhdr)->iSubItem;
 
             ListView_SortItemsEx(

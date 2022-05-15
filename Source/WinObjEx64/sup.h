@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.92
+*  VERSION:     1.93
 *
-*  DATE:        03 Dec 2021
+*  DATE:        13 May 2022
 *
 *  Common header file for the program support routines.
 *
@@ -110,6 +110,11 @@ typedef NTSTATUS(NTAPI* PNTOBJECTOPENPROCEDURE)(
     _Out_ PHANDLE ObjectHandle,
     _In_ ACCESS_MASK DesiredAccess,
     _In_ POBJECT_ATTRIBUTES ObjectAttributes);
+
+typedef NTSTATUS(CALLBACK* pfnLoadDriverCallback)(
+    _In_ PUNICODE_STRING RegistryPath,
+    _In_opt_ PVOID Param
+    );
 
 typedef struct _PROCESS_MITIGATION_POLICIES_ALL {
     PROCESS_MITIGATION_DEP_POLICY DEPPolicy;
@@ -248,6 +253,8 @@ typedef struct _FILE_VIEW_INFO {
 #define supOpenThread ntsupOpenThread
 #define supCICustomKernelSignersAllowed ntsupCICustomKernelSignersAllowed
 #define supPrivilegeEnabled ntsupPrivilegeEnabled
+#define supIsObjectExists ntsupIsObjectExists
+#define supIsKdEnabled ntsupIsKdEnabled
 #define supListViewEnableRedraw(ListView, fEnable) SendMessage(ListView, WM_SETREDRAW, (WPARAM)fEnable, (LPARAM)0)
 
 ULONG supConvertFromPteProtectionMask(
@@ -363,7 +370,7 @@ BOOL supTreeListAddCopyValueItem(
     _In_ HMENU hMenu,
     _In_ HWND hwndTreeList,
     _In_ UINT uId,
-    _In_opt_ UINT uPos,
+    _In_ UINT uPos,
     _In_ LPARAM lParam,
     _In_ INT* pSubItemHit);
 
@@ -371,7 +378,7 @@ BOOL supListViewAddCopyValueItem(
     _In_ HMENU hMenu,
     _In_ HWND hwndLv,
     _In_ UINT uId,
-    _In_opt_ UINT uPos,
+    _In_ UINT uPos,
     _In_ POINT* lpPoint,
     _Out_ INT* pItemHit,
     _Out_ INT* pColumnHit);
@@ -384,7 +391,7 @@ VOID supSetMenuIcon(
 VOID supSetGotoLinkTargetToolButtonState(
     _In_ HWND hwnd,
     _In_opt_ HWND hwndlv,
-    _In_opt_ INT iItem,
+    _In_ INT iItem,
     _In_ BOOL bForce,
     _In_ BOOL bForceEnable);
 
@@ -929,3 +936,45 @@ VOID supDestroyFileViewInfo(
 
 BOOLEAN supIsValidImage(
     _In_ PFILE_VIEW_INFO ViewInformation);
+
+NTSTATUS supLoadDriverEx(
+    _In_ LPCWSTR DriverName,
+    _In_ LPCWSTR DriverPath,
+    _In_ BOOLEAN UnloadPreviousInstance,
+    _In_opt_ pfnLoadDriverCallback Callback,
+    _In_opt_ PVOID CallbackParam);
+
+NTSTATUS supLoadDriver(
+    _In_ LPCWSTR DriverName,
+    _In_ LPCWSTR DriverPath,
+    _In_ BOOLEAN UnloadPreviousInstance);
+
+NTSTATUS supUnloadDriver(
+    _In_ LPCWSTR DriverName,
+    _In_ BOOLEAN fRemove);
+
+NTSTATUS supOpenDriverEx(
+    _In_ LPCWSTR DriverName,
+    _In_ ACCESS_MASK DesiredAccess,
+    _Out_opt_ PHANDLE DeviceHandle);
+
+NTSTATUS supOpenDriver(
+    _In_ LPCWSTR DriverName,
+    _In_ ACCESS_MASK DesiredAccess,
+    _Out_ PHANDLE DeviceHandle);
+
+BOOL supDeleteFileWithWait(
+    _In_ ULONG WaitMilliseconds,
+    _In_ ULONG NumberOfAttempts,
+    _In_ LPCWSTR lpFileName);
+
+NTSTATUS supCallDriver(
+    _In_ HANDLE DeviceHandle,
+    _In_ ULONG IoControlCode,
+    _In_opt_ PVOID InputBuffer,
+    _In_ ULONG InputBufferLength,
+    _In_opt_ PVOID OutputBuffer,
+    _In_ ULONG OutputBufferLength);
+
+BOOLEAN supIsLongTermServicingWindows(
+    VOID);

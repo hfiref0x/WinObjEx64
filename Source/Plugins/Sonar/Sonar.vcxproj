@@ -14,19 +14,19 @@
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{91A5250B-99D2-48F9-B649-82D66C9A6396}</ProjectGuid>
     <RootNamespace>Sonar</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.19041.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
     <SpectreMitigation>false</SpectreMitigation>
@@ -102,6 +102,7 @@
     <ClCompile Include="..\..\Shared\minirtl\_strend.c" />
     <ClCompile Include="..\..\Shared\minirtl\_strlen.c" />
     <ClCompile Include="..\..\Shared\minirtl\_strncmp.c" />
+    <ClCompile Include="..\..\Shared\minirtl\_strncmpi.c" />
     <ClCompile Include="..\..\Shared\minirtl\_strncpy.c" />
     <ClCompile Include="..\..\Shared\ntos\ntsup.c" />
     <ClCompile Include="..\..\Shared\treelist\treelist.c" />
@@ -111,6 +112,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Shared\minirtl\minirtl.h" />
+    <ClInclude Include="..\..\Shared\ntos\ntbuilds.h" />
     <ClInclude Include="..\..\Shared\ntos\ntos.h" />
     <ClInclude Include="..\..\Shared\ntos\ntsup.h" />
     <ClInclude Include="..\..\Shared\treelist\treelist.h" />

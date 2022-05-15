@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2011 - 2021 UGN/HE
+*  (C) COPYRIGHT AUTHORS, 2011 - 2022 UGN/HE
 *
 *  TITLE:       NTSUP.C
 *
-*  VERSION:     2.10
+*  VERSION:     2.11
 *
-*  DATE:        31 Oct 2021
+*  DATE:        22 Apr 2022
 *
 *  Native API support functions.
 *
@@ -23,6 +23,7 @@
 
 #pragma warning(push)
 #pragma warning(disable: 26812) // Prefer 'enum class' over 'enum'
+#pragma warning(disable: 6320) // exception may mask
 
 /*
 * ntsupHeapAlloc
@@ -2148,6 +2149,153 @@ NTSTATUS ntsupEnableWow64Redirection(
 
     Value = IntToPtr(bEnable);
     return RtlWow64EnableFsRedirectionEx(Value, &OldValue);
+}
+
+/*
+* ntsupDetectObjectCallback
+*
+* Purpose:
+*
+* Comparer callback routine used in objects enumeration.
+*
+*/
+NTSTATUS NTAPI ntsupDetectObjectCallback(
+    _In_ POBJECT_DIRECTORY_INFORMATION Entry,
+    _In_ PVOID CallbackParam
+)
+{
+    POBJSCANPARAM Param = (POBJSCANPARAM)CallbackParam;
+
+    if (Entry == NULL) {
+        return STATUS_INVALID_PARAMETER_1;
+    }
+
+    if (CallbackParam == NULL) {
+        return STATUS_INVALID_PARAMETER_2;
+    }
+
+    if (Param->Buffer == NULL || Param->BufferSize == 0) {
+        return STATUS_MEMORY_NOT_ALLOCATED;
+    }
+
+    if (Entry->Name.Buffer) {
+        if (_strcmpi_w(Entry->Name.Buffer, Param->Buffer) == 0) {
+            return STATUS_SUCCESS;
+        }
+    }
+    return STATUS_UNSUCCESSFUL;
+}
+
+/*
+* ntsupEnumSystemObjects
+*
+* Purpose:
+*
+* Lookup object by name in given directory.
+*
+*/
+NTSTATUS NTAPI ntsupEnumSystemObjects(
+    _In_opt_ LPCWSTR pwszRootDirectory,
+    _In_opt_ HANDLE hRootDirectory,
+    _In_ PENUMOBJECTSCALLBACK CallbackProc,
+    _In_opt_ PVOID CallbackParam
+)
+{
+    ULONG               ctx, rlen;
+    HANDLE              hDirectory = NULL;
+    NTSTATUS            status;
+    NTSTATUS            CallbackStatus;
+    OBJECT_ATTRIBUTES   attr;
+    UNICODE_STRING      sname;
+
+    POBJECT_DIRECTORY_INFORMATION    objinf;
+
+    if (CallbackProc == NULL) {
+        return STATUS_INVALID_PARAMETER_4;
+    }
+
+    status = STATUS_UNSUCCESSFUL;
+
+    __try {
+
+        // We can use root directory.
+        if (pwszRootDirectory != NULL) {
+            RtlSecureZeroMemory(&sname, sizeof(sname));
+            RtlInitUnicodeString(&sname, pwszRootDirectory);
+            InitializeObjectAttributes(&attr, &sname, OBJ_CASE_INSENSITIVE, NULL, NULL);
+            status = NtOpenDirectoryObject(&hDirectory, DIRECTORY_QUERY, &attr);
+            if (!NT_SUCCESS(status)) {
+                return status;
+            }
+        }
+        else {
+            if (hRootDirectory == NULL) {
+                return STATUS_INVALID_PARAMETER_2;
+            }
+            hDirectory = hRootDirectory;
+        }
+
+        // Enumerate objects in directory.
+        ctx = 0;
+        do {
+
+            rlen = 0;
+            status = NtQueryDirectoryObject(hDirectory, NULL, 0, TRUE, FALSE, &ctx, &rlen);
+            if (status != STATUS_BUFFER_TOO_SMALL)
+                break;
+
+            objinf = (POBJECT_DIRECTORY_INFORMATION)ntsupHeapAlloc(rlen);
+            if (objinf == NULL)
+                break;
+
+            status = NtQueryDirectoryObject(hDirectory, objinf, rlen, TRUE, FALSE, &ctx, &rlen);
+            if (!NT_SUCCESS(status)) {
+                ntsupHeapFree(objinf);
+                break;
+            }
+
+            CallbackStatus = CallbackProc(objinf, CallbackParam);
+
+            ntsupHeapFree(objinf);
+
+            if (NT_SUCCESS(CallbackStatus)) {
+                status = STATUS_SUCCESS;
+                break;
+            }
+
+        } while (TRUE);
+
+        if (hDirectory != NULL) {
+            NtClose(hDirectory);
+        }
+
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        status = STATUS_ACCESS_VIOLATION;
+    }
+
+    return status;
+}
+
+/*
+* ntsupIsObjectExists
+*
+* Purpose:
+*
+* Return TRUE if the given object exists, FALSE otherwise.
+*
+*/
+BOOLEAN ntsupIsObjectExists(
+    _In_ LPCWSTR RootDirectory,
+    _In_ LPCWSTR ObjectName
+)
+{
+    OBJSCANPARAM Param;
+
+    Param.Buffer = ObjectName;
+    Param.BufferSize = (ULONG)_strlen(ObjectName);
+
+    return NT_SUCCESS(ntsupEnumSystemObjects(RootDirectory, NULL, ntsupDetectObjectCallback, &Param));
 }
 
 #pragma warning(pop)

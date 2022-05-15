@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.92
+*  VERSION:     1.93
 *
-*  DATE:        07 Dec 2021
+*  DATE:        13 May 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1520,7 +1520,7 @@ WOBJ_OBJECT_TYPE supObjectListGetObjectType(
 VOID supSetGotoLinkTargetToolButtonState(
     _In_ HWND hwnd,
     _In_opt_ HWND hwndlv,
-    _In_opt_ INT iItem,
+    _In_ INT iItem,
     _In_ BOOL bForce,
     _In_ BOOL bForceEnable
 )
@@ -1553,7 +1553,7 @@ BOOL supTreeListAddCopyValueItem(
     _In_ HMENU hMenu,
     _In_ HWND hwndTreeList,
     _In_ UINT uId,
-    _In_opt_ UINT uPos,
+    _In_ UINT uPos,
     _In_ LPARAM lParam,
     _In_ INT *pSubItemHit
 )
@@ -1609,7 +1609,7 @@ BOOL supListViewAddCopyValueItem(
     _In_ HMENU hMenu,
     _In_ HWND hwndLv,
     _In_ UINT uId,
-    _In_opt_ UINT uPos,
+    _In_ UINT uPos,
     _In_ POINT* lpPoint,
     _Out_ INT* pItemHit,
     _Out_ INT* pColumnHit
@@ -8095,8 +8095,10 @@ LPWSTR supPrintHash(
             lpText[c * 2] = nibbletoh(x >> 4, UpcaseHex);
             lpText[c * 2 + 1] = nibbletoh(x & 15, UpcaseHex);
         }
-
+#pragma warning(push)
+#pragma warning(disable: 6305)
         lpText[Length * 2] = 0;
+#pragma warning(pop)
     }
 
     return lpText;
@@ -8497,4 +8499,502 @@ BOOLEAN supIsValidImage(
         ViewInformation->Status = StatusExceptionOccurred;
         return FALSE;
     }
+}
+
+/*
+* supxCreateDriverEntry
+*
+* Purpose:
+*
+* Creating registry entry for driver.
+*
+*/
+NTSTATUS supxCreateDriverEntry(
+    _In_opt_ LPCWSTR DriverPath,
+    _In_ LPCWSTR KeyName
+)
+{
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    DWORD dwData, dwResult;
+    HKEY keyHandle = NULL;
+    UNICODE_STRING driverImagePath;
+
+    RtlInitEmptyUnicodeString(&driverImagePath, NULL, 0);
+
+    if (DriverPath) {
+        if (!RtlDosPathNameToNtPathName_U(DriverPath,
+            &driverImagePath,
+            NULL,
+            NULL))
+        {
+            return STATUS_INVALID_PARAMETER_2;
+        }
+    }
+
+    if (ERROR_SUCCESS != RegCreateKeyEx(HKEY_LOCAL_MACHINE,
+        KeyName,
+        0,
+        NULL,
+        REG_OPTION_NON_VOLATILE,
+        KEY_ALL_ACCESS,
+        NULL,
+        &keyHandle,
+        NULL))
+    {
+        status = STATUS_ACCESS_DENIED;
+        goto Cleanup;
+    }
+
+    dwResult = ERROR_SUCCESS;
+
+    do {
+
+        dwData = SERVICE_ERROR_NORMAL;
+        dwResult = RegSetValueEx(keyHandle,
+            TEXT("ErrorControl"),
+            0,
+            REG_DWORD,
+            (BYTE*)&dwData,
+            sizeof(dwData));
+        if (dwResult != ERROR_SUCCESS)
+            break;
+
+        dwData = SERVICE_KERNEL_DRIVER;
+        dwResult = RegSetValueEx(keyHandle,
+            TEXT("Type"),
+            0,
+            REG_DWORD,
+            (BYTE*)&dwData,
+            sizeof(dwData));
+        if (dwResult != ERROR_SUCCESS)
+            break;
+
+        dwData = SERVICE_DEMAND_START;
+        dwResult = RegSetValueEx(keyHandle,
+            TEXT("Start"),
+            0,
+            REG_DWORD,
+            (BYTE*)&dwData,
+            sizeof(dwData));
+
+        if (dwResult != ERROR_SUCCESS)
+            break;
+
+        if (DriverPath) {
+            dwResult = RegSetValueEx(keyHandle,
+                TEXT("ImagePath"),
+                0,
+                REG_EXPAND_SZ,
+                (BYTE*)driverImagePath.Buffer,
+                (DWORD)driverImagePath.Length + sizeof(UNICODE_NULL));
+        }
+
+    } while (FALSE);
+
+    RegCloseKey(keyHandle);
+
+    if (dwResult != ERROR_SUCCESS) {
+        status = STATUS_ACCESS_DENIED;
+    }
+    else
+    {
+        status = STATUS_SUCCESS;
+    }
+
+Cleanup:
+    if (DriverPath) {
+        if (driverImagePath.Buffer) {
+            RtlFreeUnicodeString(&driverImagePath);
+        }
+    }
+    return status;
+}
+
+/*
+* supLoadDriverEx
+*
+* Purpose:
+*
+* Install driver and load it.
+*
+* N.B.
+* SE_LOAD_DRIVER_PRIVILEGE is required to be assigned and enabled.
+*
+*/
+NTSTATUS supLoadDriverEx(
+    _In_ LPCWSTR DriverName,
+    _In_ LPCWSTR DriverPath,
+    _In_ BOOLEAN UnloadPreviousInstance,
+    _In_opt_ pfnLoadDriverCallback Callback,
+    _In_opt_ PVOID CallbackParam
+)
+{
+    SIZE_T keyOffset;
+    NTSTATUS status;
+    UNICODE_STRING driverServiceName;
+
+    WCHAR szBuffer[MAX_PATH + 1];
+
+    if (DriverName == NULL)
+        return STATUS_INVALID_PARAMETER_1;
+    if (DriverPath == NULL)
+        return STATUS_INVALID_PARAMETER_2;
+
+    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+
+    keyOffset = RTL_NUMBER_OF(NT_REG_PREP);
+
+    if (FAILED(RtlStringCchPrintfSecure(szBuffer, MAX_PATH,
+        DRIVER_REGKEY,
+        NT_REG_PREP,
+        DriverName)))
+    {
+        return STATUS_INVALID_PARAMETER_1;
+    }
+
+    status = supxCreateDriverEntry(DriverPath,
+        &szBuffer[keyOffset]);
+
+    if (!NT_SUCCESS(status))
+        return status;
+
+    RtlInitUnicodeString(&driverServiceName, szBuffer);
+
+    if (Callback) {
+        status = Callback(&driverServiceName, CallbackParam);
+        if (!NT_SUCCESS(status))
+            return status;
+    }
+
+    if (supEnablePrivilege(SE_LOAD_DRIVER_PRIVILEGE, TRUE)) {
+
+        status = NtLoadDriver(&driverServiceName);
+
+        if (UnloadPreviousInstance) {
+            if ((status == STATUS_IMAGE_ALREADY_LOADED) ||
+                (status == STATUS_OBJECT_NAME_COLLISION) ||
+                (status == STATUS_OBJECT_NAME_EXISTS))
+            {
+                status = NtUnloadDriver(&driverServiceName);
+                if (NT_SUCCESS(status)) {
+                    status = NtLoadDriver(&driverServiceName);
+                }
+            }
+        }
+        else {
+            if (status == STATUS_OBJECT_NAME_EXISTS)
+                status = STATUS_SUCCESS;
+        }
+
+        supEnablePrivilege(SE_LOAD_DRIVER_PRIVILEGE, FALSE);
+    }
+    else {
+        status = STATUS_PRIVILEGE_NOT_HELD;
+    }
+
+    return status;
+}
+
+/*
+* supLoadDriver
+*
+* Purpose:
+*
+* Install driver and load it.
+*
+* N.B.
+* SE_LOAD_DRIVER_PRIVILEGE is required to be assigned and enabled.
+*
+*/
+NTSTATUS supLoadDriver(
+    _In_ LPCWSTR DriverName,
+    _In_ LPCWSTR DriverPath,
+    _In_ BOOLEAN UnloadPreviousInstance
+)
+{
+    return supLoadDriverEx(DriverName,
+        DriverPath,
+        UnloadPreviousInstance,
+        NULL,
+        NULL);
+}
+
+/*
+* supUnloadDriver
+*
+* Purpose:
+*
+* Call driver unload and remove corresponding registry key.
+*
+* N.B.
+* SE_LOAD_DRIVER_PRIVILEGE is required to be assigned and enabled.
+*
+*/
+NTSTATUS supUnloadDriver(
+    _In_ LPCWSTR DriverName,
+    _In_ BOOLEAN fRemove
+)
+{
+    NTSTATUS status;
+    SIZE_T keyOffset;
+    UNICODE_STRING driverServiceName;
+
+    WCHAR szBuffer[MAX_PATH + 1];
+
+    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+
+    if (FAILED(RtlStringCchPrintfSecure(szBuffer, MAX_PATH,
+        DRIVER_REGKEY,
+        NT_REG_PREP,
+        DriverName)))
+    {
+        return STATUS_INVALID_PARAMETER_1;
+    }
+
+    keyOffset = RTL_NUMBER_OF(NT_REG_PREP);
+
+    status = supxCreateDriverEntry(NULL,
+        &szBuffer[keyOffset]);
+
+    if (!NT_SUCCESS(status))
+        return status;
+
+    if (supEnablePrivilege(SE_LOAD_DRIVER_PRIVILEGE, TRUE)) {
+
+        RtlInitUnicodeString(&driverServiceName, szBuffer);
+        status = NtUnloadDriver(&driverServiceName);
+
+        supEnablePrivilege(SE_LOAD_DRIVER_PRIVILEGE, FALSE);
+    }
+    else {
+        status = STATUS_PRIVILEGE_NOT_HELD;
+    }
+
+    if (NT_SUCCESS(status)) {
+        if (fRemove)
+            supRegDeleteKeyRecursive(HKEY_LOCAL_MACHINE, &szBuffer[keyOffset]);
+    }
+
+    return status;
+}
+
+/*
+* supOpenDriverEx
+*
+* Purpose:
+*
+* Open handle for driver.
+*
+*/
+NTSTATUS supOpenDriverEx(
+    _In_ LPCWSTR DriverName,
+    _In_ ACCESS_MASK DesiredAccess,
+    _Out_opt_ PHANDLE DeviceHandle
+)
+{
+    HANDLE deviceHandle = NULL;
+    UNICODE_STRING usDeviceLink;
+    OBJECT_ATTRIBUTES obja;
+    IO_STATUS_BLOCK iost;
+
+    NTSTATUS ntStatus;
+
+    RtlInitUnicodeString(&usDeviceLink, DriverName);
+    InitializeObjectAttributes(&obja, &usDeviceLink, OBJ_CASE_INSENSITIVE, NULL, NULL);
+
+    ntStatus = NtCreateFile(&deviceHandle,
+        DesiredAccess,
+        &obja,
+        &iost,
+        NULL,
+        0,
+        0,
+        FILE_OPEN,
+        0,
+        NULL,
+        0);
+
+    if (NT_SUCCESS(ntStatus)) {
+        if (DeviceHandle)
+            *DeviceHandle = deviceHandle;
+    }
+
+    return ntStatus;
+}
+
+/*
+* supOpenDriver
+*
+* Purpose:
+*
+* Open handle for driver through \\DosDevices.
+*
+*/
+NTSTATUS supOpenDriver(
+    _In_ LPCWSTR DriverName,
+    _In_ ACCESS_MASK DesiredAccess,
+    _Out_ PHANDLE DeviceHandle
+)
+{
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    WCHAR szDeviceLink[MAX_PATH + 1];
+
+    // assume failure
+    if (DeviceHandle)
+        *DeviceHandle = NULL;
+    else
+        return STATUS_INVALID_PARAMETER_2;
+
+    if (DriverName) {
+
+        RtlSecureZeroMemory(szDeviceLink, sizeof(szDeviceLink));
+
+        if (FAILED(RtlStringCchPrintfSecure(szDeviceLink,
+            MAX_PATH,
+            TEXT("\\DosDevices\\%wS"),
+            DriverName)))
+        {
+            return STATUS_INVALID_PARAMETER_1;
+        }
+
+        status = supOpenDriverEx(szDeviceLink,
+            DesiredAccess,
+            DeviceHandle);
+
+        if (status == STATUS_OBJECT_NAME_NOT_FOUND ||
+            status == STATUS_NO_SUCH_DEVICE)
+        {
+
+            //
+            // Check the case when no symlink available.
+            //
+
+            RtlSecureZeroMemory(szDeviceLink, sizeof(szDeviceLink));
+
+            if (FAILED(RtlStringCchPrintfSecure(szDeviceLink,
+                MAX_PATH,
+                TEXT("\\Device\\%wS"),
+                DriverName)))
+            {
+                return STATUS_INVALID_PARAMETER_1;
+            }
+
+            status = supOpenDriverEx(szDeviceLink,
+                DesiredAccess,
+                DeviceHandle);
+
+        }
+
+    }
+    else {
+        status = STATUS_INVALID_PARAMETER_1;
+    }
+
+    return status;
+}
+
+/*
+* supDeleteFileWithWait
+*
+* Purpose:
+*
+* Removes file from disk.
+*
+*/
+BOOL supDeleteFileWithWait(
+    _In_ ULONG WaitMilliseconds,
+    _In_ ULONG NumberOfAttempts,
+    _In_ LPCWSTR lpFileName
+)
+{
+    ULONG retryCount = NumberOfAttempts;
+
+    do {
+
+        Sleep(WaitMilliseconds);
+        if (DeleteFile(lpFileName)) {
+            return TRUE;
+        }
+
+        retryCount--;
+
+    } while (retryCount);
+
+    return FALSE;
+}
+
+/*
+* supCallDriver
+*
+* Purpose:
+*
+* Call driver.
+*
+*/
+NTSTATUS supCallDriver(
+    _In_ HANDLE DeviceHandle,
+    _In_ ULONG IoControlCode,
+    _In_opt_ PVOID InputBuffer,
+    _In_ ULONG InputBufferLength,
+    _In_opt_ PVOID OutputBuffer,
+    _In_ ULONG OutputBufferLength)
+{
+    IO_STATUS_BLOCK ioStatus;
+
+    return NtDeviceIoControlFile(DeviceHandle,
+        NULL,
+        NULL,
+        NULL,
+        &ioStatus,
+        IoControlCode,
+        InputBuffer,
+        InputBufferLength,
+        OutputBuffer,
+        OutputBufferLength);
+}
+
+/*
+* supIsLongTermServicingWindows
+*
+* Purpose:
+*
+* Attempt to detect LTSC/LTSB product type.
+*
+*/
+BOOLEAN supIsLongTermServicingWindows(
+    VOID
+)
+{
+    NTSTATUS ntStatus;
+    ULONG dataLicense = 0, dataSize = 0, dataType = 0, i;
+
+    UNICODE_STRING usLicenseValue = RTL_CONSTANT_STRING(L"Kernel-ProductInfo");
+
+    DWORD suiteType[] = {
+        PRODUCT_ENTERPRISE_S,              // LTSB/C
+        PRODUCT_ENTERPRISE_S_N,            // LTSB/C N
+        PRODUCT_ENTERPRISE_S_EVALUATION,   // LTSB/C Evaluation
+        PRODUCT_ENTERPRISE_S_N_EVALUATION, // LTSB/C N Evaluation
+        PRODUCT_IOTENTERPRISES             // IoT Enterprise LTSC
+    };
+
+    ntStatus = NtQueryLicenseValue(
+        &usLicenseValue,
+        &dataType,
+        (PVOID)&dataLicense,
+        sizeof(DWORD),
+        &dataSize);
+
+    if (NT_SUCCESS(ntStatus) &&
+        dataType == REG_DWORD &&
+        dataSize == sizeof(DWORD))
+    {
+        for (i = 0; i < RTL_NUMBER_OF(suiteType); i++) {
+            if (dataLicense == suiteType[i]) {
+                return TRUE;
+            }
+        }
+    }
+
+    return FALSE;
 }

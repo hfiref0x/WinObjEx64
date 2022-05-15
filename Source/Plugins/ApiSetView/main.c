@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2021
+*  (C) COPYRIGHT AUTHORS, 2019 - 2022
 *
 *  TITLE:       MAIN.H
 *
 *  VERSION:     1.13
 *
-*  DATE:        01 Oct 2021
+*  DATE:        11 May 2022
 *
 *  WinObjEx64 ApiSetView plugin.
 *
@@ -139,7 +139,7 @@ BOOL TreeListAddCopyValueItem(
     _In_ HMENU hMenu,
     _In_ HWND hwndTreeList,
     _In_ UINT uId,
-    _In_opt_ UINT uPos,
+    _In_ UINT uPos,
     _In_ LPARAM lParam,
     _In_ INT* pSubItemHit
 )

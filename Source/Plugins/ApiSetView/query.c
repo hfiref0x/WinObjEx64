@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2021
+*  (C) COPYRIGHT AUTHORS, 2019 - 2022
 *
 *  TITLE:       QUERY.C
 *
-*  VERSION:     1.11
+*  VERSION:     1.12
 *
-*  DATE:        11 June 2021
+*  DATE:        11 May 2022
 *
 *  Query and output ApiSet specific data.
 *
@@ -141,7 +141,7 @@ LPWSTR GetApiSetEntryName(
 HTREEITEM OutNamespaceEntry(
     _In_ HTREEITEM RootItem,
     _In_ LPWSTR EntryName,
-    _In_opt_ ULONG Flags
+    _In_ ULONG Flags
 )
 {
     ULONG i, flagsValue;
@@ -259,7 +259,7 @@ void OutNamespaceValue(
     _In_ ULONG ValueLength,
     _In_ ULONG NameOffset,
     _In_ ULONG NameLength,
-    _In_opt_ ULONG Flags
+    _In_ ULONG Flags
 )
 {
     TL_SUBITEMS_FIXED tlSubItems;

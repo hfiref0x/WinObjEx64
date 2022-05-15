@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       PROPTYPECONSTS.H
 *
-*  VERSION:     1.86
+*  VERSION:     1.93
 *
-*  DATE:        17 May 2020
+*  DATE:        24 Mar 2022
 *
 *  Consts header file for Type property sheet.
 *
@@ -160,9 +160,10 @@ static VALUE_DESC a_SemaphoreProp[MAX_KNOWN_SEMAPHORE_ATTRIBUTES] = {
 };
 
 //Known SymLink Access Rights
-#define MAX_KNOWN_SYMLINK_ATTRIBUTES 1
+#define MAX_KNOWN_SYMLINK_ATTRIBUTES 2
 static VALUE_DESC a_SymLinkProp[MAX_KNOWN_SYMLINK_ATTRIBUTES] = {
-    { L"SYMBOLIC_LINK_QUERY", SYMBOLIC_LINK_QUERY }
+    { L"SYMBOLIC_LINK_QUERY", SYMBOLIC_LINK_QUERY },
+    { L"SYMBOLIC_LINK_SET", SYMBOLIC_LINK_SET }
 };
 
 //Known Type Access Rights

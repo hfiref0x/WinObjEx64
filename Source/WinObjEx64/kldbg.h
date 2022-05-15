@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.92
+*  VERSION:     1.93
 *
-*  DATE:        03 Dec 2021
+*  DATE:        22 Apr 2022
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -94,20 +94,6 @@
 #define OBVERSION_FLT_FILTER_V3 (3)
 // Structure version since W11
 #define OBVERSION_FLT_FILTER_V4 (4)
-
-
-#ifdef _USE_OWN_DRIVER
-#ifdef _USE_WINIO
-#define KLDBGDRV                L"EneTechIo"
-#define KLDBGDRVSYS             L"\\drivers\\ene64drv.sys"
-#else
-#define KLDBGDRV                L"wodbgdrv"
-#define KLDBGDRVSYS             L"\\drivers\\wodbgdrv.sys"
-#endif
-#else
-#define KLDBGDRV                L"kldbgdrv"
-#define KLDBGDRVSYS             L"\\drivers\\kldbgdrv.sys"
-#endif
 
 #define NT_REG_PREP             L"\\Registry\\Machine"
 #define DRIVER_REGKEY           L"%wS\\System\\CurrentControlSet\\Services\\%wS"
@@ -200,9 +186,6 @@ typedef struct _KLDBGCONTEXT {
     //Is user full admin
     BOOLEAN IsFullAdmin;
 
-    //we loaded driver?
-    BOOLEAN IsOurLoad;
-
     //secureboot enabled?
     BOOLEAN IsSecureBoot;
 
@@ -213,19 +196,12 @@ typedef struct _KLDBGCONTEXT {
     USHORT DirectoryTypeIndex;
     ULONG_PTR DirectoryRootObject;
 
-    //kldbgdrv device handle
-    HANDLE DeviceHandle;
-
     //ntoskrnl base and size
     PVOID NtOsBase;
     ULONG NtOsSize;
 
     //ntoskrnl mapped image
     PVOID NtOsImageMap;
-
-    //driver loading/open status
-    ULONG DriverOpenLoadStatus;
-    ULONG DriverConnectStatus;
 
     //system range start
     ULONG_PTR SystemRangeStart;
@@ -235,6 +211,8 @@ typedef struct _KLDBGCONTEXT {
     ULONG_PTR MaximumUserModeAddress;
 
     PVOID NtOsSymContext;
+
+    WDRV_CONTEXT DriverContext;
 
     PKLDBGPDATA Data;
 
@@ -463,6 +441,9 @@ VOID kdReportReadError(
     _In_ NTSTATUS Status,
     _In_ PIO_STATUS_BLOCK Iosb);
 
+BOOLEAN kdIoDriverLoaded(
+    VOID);
+
 BOOLEAN kdConnectDriver(
     VOID);
 
@@ -478,42 +459,18 @@ BOOL kdLoadSymbolsForNtImage(
     _In_ PSYMCONTEXT SymContext,
     _In_ LPCWSTR ImageFileName);
 
-BOOL kdpReadSystemMemoryEx2(
+BOOL kdReadSystemMemory2(
     _In_opt_ LPCWSTR CallerFunction,
     _In_ ULONG_PTR Address,
     _Inout_ PVOID Buffer,
     _In_ ULONG BufferSize,
     _Out_opt_ PULONG NumberOfBytesRead);
 
-BOOL kdpReadSystemMemoryEx(
-    _In_ ULONG_PTR Address,
-    _Inout_ PVOID Buffer,
-    _In_ ULONG BufferSize,
-    _Out_opt_ PULONG NumberOfBytesRead);
-
-#define kdReadSystemMemoryEx2(Address, Buffer, BufferSize, NumberOfBytesRead) \
-   kdpReadSystemMemoryEx2(__FUNCTIONW__, Address, Buffer, BufferSize, NumberOfBytesRead)
-
-#ifdef _USE_OWN_DRIVER
-#ifdef _USE_WINIO
-#define kdReadSystemMemoryEx WinIoReadSystemMemoryEx
-#else
-#ifdef _DEBUG
-#define kdReadSystemMemoryEx kdReadSystemMemoryEx2
-#else
-#define kdReadSystemMemoryEx kdpReadSystemMemoryEx
-#endif
-#endif
-#else
-#ifdef _DEBUG
-#define kdReadSystemMemoryEx kdReadSystemMemoryEx2
-#else
-#define kdReadSystemMemoryEx kdpReadSystemMemoryEx
-#endif
-#endif
-
 #define kdReadSystemMemory(Address, Buffer, BufferSize) \
-    kdReadSystemMemoryEx(Address, Buffer, BufferSize, NULL)
+    kdReadSystemMemory2(__FUNCTIONW__, Address, Buffer, BufferSize, NULL)
+
+#define kdReadSystemMemoryEx(Address, Buffer, BufferSize, NumberOfBytesRead) \
+    kdReadSystemMemory2(NULL, Address, Buffer, BufferSize, NumberOfBytesRead)
 
 #ifdef _DEBUG
 #define kdDebugPrint(f, ...) DbgPrint(f, __VA_ARGS__)

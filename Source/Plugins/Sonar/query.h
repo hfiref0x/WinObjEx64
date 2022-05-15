@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.03
 *
-*  DATE:        26 July 2021
+*  DATE:        04 Sep 2021
 * 
 *  Sonar plugin query information definitions.
 *
@@ -26,7 +26,7 @@ typedef struct _PROTOCOL_BLOCK_VERSIONS {
             NDIS_PROTOCOL_BLOCK_9200 *v2;
             NDIS_PROTOCOL_BLOCK_9600_17134 *v3;
             NDIS_PROTOCOL_BLOCK_17763 *v4;
-            NDIS_PROTOCOL_BLOCK_18362_21286 *v5;
+            NDIS_PROTOCOL_BLOCK_18362_22000 *v5;
         } Versions;
         PVOID Ref;
     } u1;
@@ -46,8 +46,8 @@ typedef struct _OPEN_BLOCK_VERSIONS {
                 NDIS_OPEN_BLOCK_14393_17134 *v4;
             } u_v4;
             union {
-                NDIS_COMMON_OPEN_BLOCK_17763_21286 *v5c;
-                NDIS_OPEN_BLOCK_17763_21286 *v5;
+                NDIS_COMMON_OPEN_BLOCK_17763_22000 *v5c;
+                NDIS_OPEN_BLOCK_17763_22000 *v5;
             } u_v5;
         } Versions;
         PVOID Ref;

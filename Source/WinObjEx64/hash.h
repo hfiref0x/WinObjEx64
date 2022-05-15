@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2021
+*  (C) COPYRIGHT AUTHORS, 2021 - 2022
 *
 *  TITLE:       HASH.H
 *
-*  VERSION:     1.92
+*  VERSION:     1.93
 *
-*  DATE:        28 Oct 2021
+*  DATE:        13 May 2022
 *
 *  Header file for the hash support routines.
 *
@@ -53,6 +53,6 @@ FORCEINLINE VOID HashUnloadFile(
 LPWSTR ComputeHashForFile(
     _In_ PFILE_VIEW_INFO ViewInformation,
     _In_ LPCWSTR lpAlgId,
-    _In_opt_ DWORD PageSize,
+    _In_ DWORD PageSize,
     _In_ HANDLE HeapHandle,
     _In_ BOOLEAN FirstPageHashOnly);

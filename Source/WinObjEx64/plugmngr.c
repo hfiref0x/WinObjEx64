@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2021
+*  (C) COPYRIGHT AUTHORS, 2019 - 2022
 *
 *  TITLE:       PLUGMNGR.C
 *
-*  VERSION:     1.92
+*  VERSION:     1.93
 *
-*  DATE:        03 Dec 2021
+*  DATE:        22 Apr 2022
 *
 *  Plugin manager.
 *
@@ -38,15 +38,7 @@ BOOL PmpReadSystemMemoryEx(
     _Out_opt_ PULONG NumberOfBytesRead
 )
 {
-#ifdef _USE_OWN_DRIVER
-#ifdef _USE_WINIO
-    return WinIoReadSystemMemoryEx(Address, Buffer, BufferSize, NumberOfBytesRead);
-#else
-    return kdReadSystemMemoryEx(Address, Buffer, BufferSize, NumberOfBytesRead);
-#endif
-#else
-    return kdReadSystemMemoryEx(Address, Buffer, BufferSize, NumberOfBytesRead);
-#endif
+    return kdReadSystemMemory2(NULL, Address, Buffer, BufferSize, NumberOfBytesRead);
 }
 
 /*
@@ -771,7 +763,7 @@ VOID PmProcessEntry(
                 return;
             }
 
-            if (PluginEntry->Plugin.NeedDriver && g_kdctx.DriverOpenLoadStatus != STATUS_SUCCESS) {
+            if (PluginEntry->Plugin.NeedDriver && kdIoDriverLoaded() == FALSE) {
                 
                 MessageBox(ParentWindow, 
                     TEXT("This plugin requires driver usage to run"), 

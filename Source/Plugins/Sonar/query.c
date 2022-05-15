@@ -280,8 +280,10 @@ PVOID DumpProtocolBlockVersionAware(
     case NT_WIN10_20H1:
     case NT_WIN10_20H2:
     case NT_WIN10_21H1:
+    case NT_WIN10_21H2:
+    case NTX_WIN11_ADB:
     default:
-        ObjectSize = sizeof(NDIS_PROTOCOL_BLOCK_18362_21286);
+        ObjectSize = sizeof(NDIS_PROTOCOL_BLOCK_18362_22000);
         ObjectVersion = 5;
         break;
 
@@ -345,8 +347,10 @@ PVOID DumpOpenBlockVersionAware(
     case NT_WIN10_20H1:
     case NT_WIN10_20H2:
     case NT_WIN10_21H1:
+    case NT_WIN10_21H2:
+    case NTX_WIN11_ADB:
     default:
-        ObjectSize = sizeof(NDIS_OPEN_BLOCK_17763_21286);
+        ObjectSize = sizeof(NDIS_OPEN_BLOCK_17763_22000);
         ObjectVersion = 5;
         break;
     }
@@ -465,8 +469,10 @@ ULONG GetNextProtocolOffset(
     case NT_WIN10_20H1:
     case NT_WIN10_20H2:
     case NT_WIN10_21H1:
+    case NT_WIN10_21H2:
+    case NTX_WIN11_ADB:
     default:
-        Offset = FIELD_OFFSET(NDIS_PROTOCOL_BLOCK_18362_21286, NextProtocol);
+        Offset = FIELD_OFFSET(NDIS_PROTOCOL_BLOCK_18362_22000, NextProtocol);
         break;
 
     }

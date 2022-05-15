@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2016 - 2021
+*  (C) COPYRIGHT AUTHORS, 2016 - 2022
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
-*  VERSION:     1.92
+*  VERSION:     1.93
 *
-*  DATE:        07 Dec 2021
+*  DATE:        11 May 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -788,7 +788,7 @@ BOOL CALLBACK DriversHandleNotify(
 
     case LVN_COLUMNCLICK:
 
-        Context->bInverseSort = !Context->bInverseSort;
+        Context->bInverseSort = (~Context->bInverseSort) & 1;
         Context->lvColumnToSort = NMListView->iSubItem;
 
         ListView_SortItemsEx(Context->ListView,

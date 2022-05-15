@@ -206,19 +206,20 @@ All driver helpers require WinObjEx64 to be run with administrative privileges.
 # Build 
 
 WinObjEx64 comes with full source code.
-In order to build from source you need Microsoft Visual Studio 2015/2017/2019 and later versions.
+In order to build from source you need Microsoft Visual Studio 2015 and later versions.
 
 ## Instructions
 
 * Select Platform ToolSet first for project in solution you want to build (Project->Properties->General): 
-  * v120 for Visual Studio 2013;
   * v140 for Visual Studio 2015; 
   * v141 for Visual Studio 2017;
-  * v142 for Visual Studio 2019.
+  * v142 for Visual Studio 2019;
+  * v143 for Visual Studio 2022.
 * For v140 and above set Target Platform Version (Project->Properties->General):
   * If v140 then select 8.1;
-  * If v141/v142 then select 10.
+  * If v141 and above then select 10.
 * Minimum required Windows SDK version 8.1
+* Recommended Windows SDK version 10.0.19041
  
  
 # What is new
@@ -230,6 +231,6 @@ In order to build from source you need Microsoft Visual Studio 2015/2017/2019 an
 # Authors
 
 
-(c) 2015 - 2021 WinObjEx64 Project
+(c) 2015 - 2022 WinObjEx64 Project
 
 Original WinObjEx (c) 2003 - 2005 Four-F

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2021
+*  (C) COPYRIGHT AUTHORS, 2019 - 2022
 *
 *  TITLE:       EXTRASCALLBACKSPATTERNS.H
 *
-*  VERSION:     1.92
+*  VERSION:     1.93
 *
-*  DATE:        10 Nov 2021
+*  DATE:        11 May 2022
 *
 *  Header with search patterns used by Callbacks dialog routines.
 *
@@ -60,30 +60,9 @@ BYTE SeCiCallbacksPattern_17134_17763[] = {
     0x48, 0x83, 0xEC, 0x20, 0xBB, 0xD0, 0x00, 0x00, 0x00
 };
 
-//
-// Windows 19H1/19H2/20H1/20H2/21H1/21H2
-//
-// Locate SepInitializeCodeIntegrity pattern.
-// These are params for memset.
-//
-
-BYTE SeCiCallbacksPattern_19H1_21H2[] = { 
-    0x41, 0xB8, 0xC4, 0x00, 0x00, 0x00, 0xBF, 0x06, 0x00, 0x00, 0x00 
-};
-
-// Windows 11
-
-BYTE SeCiCallbacksPattern_W11_21H2[] = {
-    0x41, 0xB8, 0xF4, 0x00, 0x00, 0x00, 0xBF, 0x06, 0x00, 0x00, 0x00
-};
-
 // Instruction match pattern
 BYTE SeCiCallbacksMatchingPattern[] = {
     0x48, 0x8D, 0x0D
-};
-
-BYTE SeCiCallbacksMatchingPattern_19H1_21H2[] = {
-    0xC7, 0x05
 };
 
 //Windows 7

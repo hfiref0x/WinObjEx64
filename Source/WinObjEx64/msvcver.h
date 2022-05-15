@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2018 - 2019
+*  (C) COPYRIGHT AUTHORS, 2018 - 2022
 *
 *  TITLE:       MSVCVER.H
 *
-*  VERSION:     1.72
+*  VERSION:     1.93
 *
-*  DATE:        04 Feb 2019
+*  DATE:        30 Apr 2022
 *
 *  Visual Studio compiler version determination.
 *
@@ -20,7 +20,9 @@
 #pragma once
 
 #if defined _MSC_VER && _MSC_FULL_VER
-    #if (_MSC_VER >= 1920) //2019 all variants (will be too many to list)
+    #if (_MSC_VER >= 1930) 
+        #define VC_VER L"MSVC 2022" //2022 all variants (too many to list)
+    #elif (_MSC_VER >= 1920 && _MSC_VER < 1930) //2019 all variants (too many to list)
         #define VC_VER L"MSVC 2019"
     #elif (_MSC_VER >= 1910) //2017 all variants (too many to list)
         #define VC_VER L"MSVC 2017"

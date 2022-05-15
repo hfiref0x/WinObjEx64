@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017 - 2021
+*  (C) COPYRIGHT AUTHORS, 2017 - 2022
 *
 *  TITLE:       EXTRASIPC.C
 *
-*  VERSION:     1.92
+*  VERSION:     1.93
 *
-*  DATE:        03 Sep 2021
+*  DATE:        11 May 2022
 *
 *  IPC supported: Pipes, Mailslots
 *
@@ -724,7 +724,7 @@ BOOL IpcDlgHandleNotify(
     switch (nhdr->code) {
 
     case LVN_COLUMNCLICK:
-        pDlgContext->bInverseSort = !pDlgContext->bInverseSort;
+        pDlgContext->bInverseSort = (~pDlgContext->bInverseSort) & 1;
 
         CallbackParam.lParam = 0;
         CallbackParam.Value = pDlgContext->DialogMode;

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       PROPOBJECTDUMP.H
 *
-*  VERSION:     1.92
+*  VERSION:     1.93
 *
-*  DATE:        19 Sep 2021
+*  DATE:        13 May 2022
 *
 *  Common header file for the object dump support.
 *
@@ -32,15 +32,15 @@ HTREEITEM propObDumpUlong(
     _In_ ULONG Value,
     _In_ BOOL HexDump,
     _In_ BOOL IsUShort,
-    _In_opt_ COLORREF BgColor,
-    _In_opt_ COLORREF FontColor);
+    _In_ COLORREF BgColor,
+    _In_ COLORREF FontColor);
 
 VOID propObDumpUlong64(
     _In_ HWND TreeList,
     _In_ HTREEITEM hParent,
     _In_ LPWSTR lpszName,
     _In_opt_ LPWSTR lpszDesc,
-    _In_opt_ ULONG64 Value,
+    _In_ ULONG64 Value,
     _In_ BOOL OutAsHex,
     _In_ COLORREF BgColor,
     _In_ COLORREF FontColor);
@@ -51,8 +51,8 @@ VOID propObDumpByte(
     _In_ LPWSTR lpszName,
     _In_opt_ LPWSTR lpszDesc,
     _In_ BYTE Value,
-    _In_opt_ COLORREF BgColor,
-    _In_opt_ COLORREF FontColor,
+    _In_ COLORREF BgColor,
+    _In_ COLORREF FontColor,
     _In_ BOOL IsBool);
 
 HTREEITEM propObDumpAddress(
@@ -70,8 +70,8 @@ HTREEITEM propObDumpSetString(
     _In_ LPWSTR lpszName,
     _In_opt_ LPWSTR lpszDesc,
     _In_opt_ LPWSTR lpszValue,
-    _In_opt_ COLORREF BgColor,
-    _In_opt_ COLORREF FontColor);
+    _In_ COLORREF BgColor,
+    _In_ COLORREF FontColor);
 
 HTREEITEM propObDumpLong(
     _In_ HWND TreeList,
@@ -80,8 +80,8 @@ HTREEITEM propObDumpLong(
     _In_opt_ LPWSTR lpszDesc,
     _In_ LONG Value,
     _In_ BOOL HexDump,
-    _In_opt_ COLORREF BgColor,
-    _In_opt_ COLORREF FontColor);
+    _In_ COLORREF BgColor,
+    _In_ COLORREF FontColor);
 
 VOID propObDumpLong64(
     _In_ HWND TreeList,

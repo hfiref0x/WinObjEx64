@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     1.92
+*  VERSION:     1.93
 *
-*  DATE:        13 Nov 2021
+*  DATE:        14 May 2022
 *
 *  Test code used while debug.
 *
@@ -1119,10 +1119,60 @@ VOID TestCall()
 
 }
 
+VOID TestObCallback()
+{
+    struct {
+        ULONG Value1;
+        ULONG Value2;
+        HANDLE Pid1;
+        HANDLE Pid2;
+        BYTE Spare[392];
+    } request;
+    
+    NTSTATUS ntStatus;
+    DWORD procId1 = 3448;
+
+    HANDLE deviceHandle = CreateFile(TEXT("\\\\.\\ImfObCallback"),
+        GENERIC_READ | GENERIC_WRITE,
+        0,
+        NULL,
+        OPEN_EXISTING,
+        0,
+        NULL);
+
+    if (deviceHandle != INVALID_HANDLE_VALUE) {
+
+        ntStatus = supCallDriver(deviceHandle,
+            0x22200C,
+            NULL,
+            0,
+            NULL,
+            0);
+
+        if (NT_SUCCESS(ntStatus)) {
+
+            RtlSecureZeroMemory(&request, sizeof(request));
+            request.Pid1 = UlongToHandle(procId1);
+            request.Pid2 = NULL;
+
+            ntStatus = supCallDriver(deviceHandle,
+                0x222008,
+                &request,
+                sizeof(request),
+                NULL,
+                0);
+
+        }
+
+        CloseHandle(deviceHandle);
+    }
+}
+
 VOID TestStart(
     VOID
 )
 {
+    TestObCallback();
     TestCall();
     //TestSectionControlArea();
     //TestSymbols();

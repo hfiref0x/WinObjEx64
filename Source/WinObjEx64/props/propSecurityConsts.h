@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       PROPSECURITYCONSTS.H
 *
-*  VERSION:     1.87
+*  VERSION:     1.93
 *
-*  DATE:        26 Nov 2020
+*  DATE:        24 Mar 2022
 *
 *  Consts header file for Security property sheet.
 *
@@ -159,9 +159,10 @@ static SI_ACCESS SemaphoreAccessValues[MAX_KNOWN_SEMAPHORE_ACCESS_VALUE] = {
 //
 //Symlink Access Values
 //
-#define MAX_KNOWN_SYMLINK_ACCESS_VALUE 1
+#define MAX_KNOWN_SYMLINK_ACCESS_VALUE 2
 static SI_ACCESS SymlinkAccessValues[MAX_KNOWN_SYMLINK_ACCESS_VALUE] = {
-    { &GUID_NULL, SYMBOLIC_LINK_QUERY, L"Link Query", SI_ACCESS_DEFAULT_FLAGS }
+    { &GUID_NULL, SYMBOLIC_LINK_QUERY, L"Link Query", SI_ACCESS_DEFAULT_FLAGS },
+    { &GUID_NULL, SYMBOLIC_LINK_SET, L"Link Set", SI_ACCESS_DEFAULT_FLAGS }
 };
 
 //

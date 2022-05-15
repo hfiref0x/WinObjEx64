@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT H.E., 2015 - 2021
+*  (C) COPYRIGHT H.E., 2015 - 2022
 *
 *  TITLE:       SYMPARSER.H
 *
-*  VERSION:     1.16
+*  VERSION:     1.17
 *
-*  DATE:        29 June 2021
+*  DATE:        13 May 2022
 *
 *  Header file of DbgHelp wrapper for symbols parser support.
 *
@@ -115,7 +115,7 @@ typedef DWORD64(WINAPI* pfnSymLoadModuleExW)(
     _In_ DWORD64 BaseOfDll,
     _In_ DWORD DllSize,
     _In_opt_ PMODLOAD_DATA Data,
-    _In_opt_ DWORD Flags);
+    _In_ DWORD Flags);
 
 typedef BOOL(WINAPI* pfnSymGetTypeInfo)(
     _In_ HANDLE hProcess,
@@ -174,8 +174,8 @@ typedef BOOL(WINAPI* SPRegisterCallback)(
 typedef BOOL(WINAPI* SPLoadModule)(
     _In_ PSYMCONTEXT Context,
     _In_ LPCWSTR lpModulePath,
-    _In_opt_ DWORD64 BaseOfDll,
-    _In_opt_ DWORD SizeOfDll);
+    _In_ DWORD64 BaseOfDll,
+    _In_ DWORD SizeOfDll);
 
 typedef BOOL(WINAPI* SPUnloadModule)(
     _In_ PSYMCONTEXT Context);
@@ -318,14 +318,14 @@ typedef struct _SYMCONTEXT {
 } SYMCONTEXT, * PSYMCONTEXT;
 
 BOOL SymGlobalsInit(
-    _In_opt_ DWORD SymOptions,
+    _In_ DWORD SymOptions,
     _In_opt_ HANDLE ProcessHandle,
     _In_opt_ LPCWSTR lpDbgHelpPath,
     _In_opt_ LPCWSTR lpSymbolPath,
     _In_ LPCWSTR lpSystemPath,
     _In_ LPCWSTR lpTempPath,
     _In_opt_ PSYMBOL_REGISTERED_CALLBACK64 CallbackFunction,
-    _In_opt_ ULONG64 UserContext);
+    _In_ ULONG64 UserContext);
 
 BOOL SymGlobalsFree();
 

@@ -161,8 +161,8 @@ BOOL SymParserRegisterCallback(
 BOOL SymParserLoadModule(
     _In_ PSYMCONTEXT Context,
     _In_ LPCWSTR lpModulePath,
-    _In_opt_ DWORD64 BaseOfDll,
-    _In_opt_ DWORD SizeOfDll
+    _In_ DWORD64 BaseOfDll,
+    _In_ DWORD SizeOfDll
 )
 {
     DWORD64 moduleBase;
@@ -1436,14 +1436,14 @@ VOID SymParserDestroy(
 /// <param name="lpTempPath">Temp directory, maximum length is MAX_PATH</param>
 /// <returns>TRUE on success</returns>
 BOOL SymGlobalsInit(
-    _In_opt_ DWORD SymOptions,
+    _In_ DWORD SymOptions,
     _In_opt_ HANDLE ProcessHandle,
     _In_opt_ LPCWSTR lpDbgHelpPath,
     _In_opt_ LPCWSTR lpSymbolPath,
     _In_ LPCWSTR lpSystemPath,
     _In_ LPCWSTR lpTempPath,
     _In_opt_ PSYMBOL_REGISTERED_CALLBACK64 CallbackFunction,
-    _In_opt_ ULONG64 UserContext
+    _In_ ULONG64 UserContext
 )
 {
     BOOL bResult = FALSE;

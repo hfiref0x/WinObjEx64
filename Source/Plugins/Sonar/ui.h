@@ -4,9 +4,9 @@
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.03
+*  VERSION:     1.14
 *
-*  DATE:        11 Jan 2021
+*  DATE:        30 Sep 2021
 *
 *  WinObjEx64 Sonar UI constants, definitions and includes.
 *
@@ -72,6 +72,8 @@ typedef struct _SONARCONTEXT {
 
     INT LvItemHit;
     INT LvColumnHit;
+
+    INT tlSubItemHit;
 
     UINT CurrentDPI;
 

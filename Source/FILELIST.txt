@@ -1,264 +1,214 @@
+* Driver providers interface *
+winobjex64\drivers\wdrvprv.c
+winobjex64\drivers\wdrvprv.h
+** WINDBG/WODBG provider **
+winobjex64\drivers\wdbgdrv.c
+winobjex64\drivers\wdbgdrv.h
+** WINIO provider **
+winobjex64\drivers\winio.c
+winobjex64\drivers\winio.h
+** RKHDRV provider **
+winobjex64\drivers\rkhdrv.c
+winobjex64\drivers\rkhdrv.h
+** HE/Alice provider **
+winobjex64\drivers\alice.c
+winobjex64\drivers\alice.h
+
+* About dialog routines including window dialog procedure *
 winobjex64\aboutDlg.c
 winobjex64\aboutDlg.h
 
-* About dialog routines including window dialog procedure
-
-winobjex64\drvhelper.c
-winobjex64\drvhelper.h
-
-* Support for WinIo as additional memory read driver (mitigations enabled)
-
+* Custom access violation exception handler including minidump *
 winobjex64\excepth.c
 winobjex64\excepth.h
 
-* Custom access violation exception handler including minidump
-
+* Extras menu handler *
 winobjex64\extras\extras.c
 winobjex64\extras\extras.h
 
-* Extras menu handler
-
+* Windows 7/8/8.1 missing API support *
 winobjex64\extapi.c
 winobjex64\extapi.h
 
-* Windows 7/8/8.1 missing API support
-
+* Windows kernel callbacks list *
 winobjex64\extas\extrasCallbacks.c
 winobjex64\extras\extrasCallbacks.h
 winobjex64\extras\extrasCallbacksPatterns.h
 
-* Windows kernel callbacks list
-
+* Drivers list *
 winobjex64\extras\extrasDrivers.c
 winobjex64\extras\extrasDrivers.h
 
-* Drivers list
-
+* KiServiceTable/W32pServiceTable list *
 winobjex64\extras\extrasSSDT.c
 winobjex64\extras\extrasSSDT.h
 
-* KiServiceTable/W32pServiceTable list
-
+* Pipes and mailslots dialog *
 winobjex64\extras\extrasIPC.c
 winobjex64\extras\extrasIPC.h
 
-* Pipes and mailslots dialog
-
+* Windows Private Namespaces dialog *
 winobjex64\extras\extrasPN.c
 winobjex64\extras\extrasPN.h
 
-* Windows Private Namespaces dialog
-
+* Process list dialog *
 winobjex64\extras\extrasPSList.c
 winobjex64\extras\extrasPSList.h
 
-* Process list dialog
-
+* Software Licensing Cache dialog *
 winobjex64\extras\extrasSL.c
 winobjex64\extras\extrasSL.h
 
-* Software Licensing Cache dialog
-
+* UserSharedData dialog *
 winobjex64\extras\extrasUSD.c
 winobjex64\extras\extrasUSD.h
 
-* UserSharedData dialog
-
+* Find Object routines including window dialog procedure *
 winobjex64\findDlg.c
 winobjex64\findDlg.h
 
-* Find Object routines including window dialog procedure
-
+* Authenticode hash support *
 winobjex64\hash.c
 winobjex64\hash.h
 
-* Hash support
-
-winobjex64\instdrv.c
-winobjex64\instdrv.h
-
-* Helper driver installation routines
-
+* Windows Kernel Debugging Driver support routines, object related internal API set *
 winobjex64\kldbg.c
 winobjex64\kldbg.h
 
-* Windows Kernel Debugging Driver support routines, object related internal API set
-
+* Signature patterns used to find undocumented stuff *
 winobjex64\kldbg_pattern.h
 
-* Signature patterns used to find undocumented stuff
-
+* Header file for kernel symbol names *
 winobjex64\ksymbols.h
 
-* Header file for kernel symbol names
-
+* Treeview and listview handlers for main window *
 winobjex64\list.c
 winobjex64\list.h
 
-* Treeview and listview handlers for main window
-
+* WinObjEx64 internal logviewer *
 winonjex64\log\log.c
 winonjex64\log\log.h
 
-* WinObjEx64 internal logviewer
-
+* Program entry point and initialization routines, main window dialog procedure handler *
 winobjex64\main.c
 
-* Program entry point and initialization routines, main window dialog procedure handler
-
+* Set of reimplemented rtl routines *
 winobjex64\minirtl\minirtl.c
 winobjex64\minirtl\minirtl.h
 
-* Set of reimplemented rtl routines
-
+* MS VisualC compiler versions header file *
 winobjex64\msvcver.h
 
-* MS VisualC compiler versions header file
-
+* Known objects support functions and global objects table *
 winobjex64\objects.c
-
-* Known objects support functions
-
 winobjex64\objects.h
 
-* Known objects table
-
+* Plugin manager *
 winobjex64\plugmngr.c
 winobjex64\plugmngr.h
 
-* Plugin manager
-
+* Symbols support *
 winobjex64\symparser.c
 winobjex64\symparser.h
 
-* Symbols support
-
+* Property sheet for ALPC Port information *
 winobjex64\props\propAlpcPort.c
 winobjex64\props\propAlpcPort.h
 
-* Property sheet for ALPC Port information
-
+* Property sheet "Basic" handlers, including window procedures and consts *
 winobjex64\props\propBasic.c
 winobjex64\props\propBasic.h
 winobjex64\props\propBasicConsts.h
 
-* Property sheet "Basic" handlers, including window procedures and consts
-
+* Property sheet "Desktop" handlers *
 winobjex64\props\propDesktop.c
 winobjex64\props\propDesktop.h
 
-* Property sheet "Desktop" handlers
-
+* "Properties" property sheet creation and window procedures, all sheets created here *
 winobjex64\props\propDlg.c
 winobjex64\props\propDlg.h
 
-* "Properties" property sheet creation and window procedures, all sheets created here
-
+* Dumping and decoding kernel objects for "Object" property sheet *
 winobjex64\props\propDriver.c - property sheet "Driver" handlers, including window procedures
 winobjex64\props\propDriver.h
-
 winobjex64\props\propObjectDump.c 
 winobjex64\props\propObjectDump.h
 
-* Dumping and decoding kernel objects for "Object" property sheet
-
+* Kernel object string converted constants *
 winobjex64\props\propObjectDumpConsts.h
 
-* Kernel object string converted constants
-
+* Property sheet "Process" handler, window procedure *
 winobjex64\props\propProcess.c
 winobjex64\props\propProcess.h
 
-* Property sheet "Process" handler, window procedure
-
+* Property sheet for Section object dump information *
 winobjex64\props\propSection.c
 winobjex64\props\propSection.h
 
-* Property sheet for Section object dump information
-
+* "Security" property sheet handler and ISecurityInformation implementation *
 winobjex64\props\propSecurity.c
 winobjex64\props\propSecurity.h
 
-* "Security" property sheet handler and ISecurityInformation implementation
-
+* Object type access values, generic mappings here *
 winobjex64\props\propSecurityConsts.h
 
-* Object type access values, generic mappings here
-
+* Property sheet "Token" handler, window procedure *
 winobjex64\props\propToken.c
 winobjex64\props\propToken.h
 
-* Property sheet "Token" handler, window procedure
-
+* Property sheet "Type" handlers, including window procedure for "Procedures" sheet *
 winobjex64\props\propType.c
 winobjex64\props\propType.h
 
-* Property sheet "Type" handlers, including window procedure for "Procedures" sheet
-
+* Known object access rights converted to strings listed here *
 winobjex64\props\propTypeConsts.h
 
-* Known object access rights converted to strings listed here
-
+* "View Security Descriptor" dialog routines including window procedure *
 winobjex64\sdviewDlg.c
 winobjex64\sdviewDlg.h
 
-* "View Security Descriptor" dialog routines including window procedure
-
+* Support api set and consts *
 winobjex64\sup.c
 winobjex64\sup.h
 winobjex64\supConsts.h
 
-* Support api set and consts
-
+* All objects test code here *
 winobjex64\tests\testunit.c
 winobjex64\tests\testunit.h
 
-* All objects test code here
-
+* systreeview32 combined with sysheader32 control *
 shared\treelist\treelist.c
 shared\treelist\treelist.h
 
-* systreeview32 combined with sysheader32 control
-
+* Wine support header file *
 winobjex64\wine.h
 winobjex64\wine.c
 
-* Wine support header file
-
+* Global include file *
 winobjex64\global.h
 
-* Global include file
-
+* NT os internals related definitions and prototypes *
 shared\ntos\ntos.h
 
-* NT os internals related definitions and prototypes
-
+* MS ALPC port dedicated header file *
 shared\ntos\ntalpc.h
 
-* MS ALPC port dedicated header file
-
+* NT PE loader related declarations and routines *
 shared\ntos\ntldr.c
 shared\ntos\ntldr.h
 
-* NT PE loader related declarations and routines
-
+* Native API shared rtl *
 shared\ntos\ntsup.c
 shared\ntos\ntsup.h
 
-* Native API shared rtl
-
+* MS ApiSetSchema dedicated header file *
 shared\ntos\apisetx.h
 
-* MS ApiSetSchema dedicated header file
-
+* Windows SDK 8.1 missing definitions support *
 shared\sdk\extdef.h
 
-* Windows SDK 8.1 missing definitions support
-
+* Visual Studio generated resource header *
 winobjex64\resource.h
 
-* Visual Studio generated resource header
-
+* User interface global constant *
 winobjex64\ui.h
-
-* User interface global constant

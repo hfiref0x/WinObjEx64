@@ -5,9 +5,9 @@
 *
 *  TITLE:       NDIS.H
 *
-*  VERSION:     1.02
+*  VERSION:     1.03
 *
-*  DATE:        11 Jan 2021
+*  DATE:        04 Se 2021
 *
 *  Common header file for the NDIS related definitions/structures.
 *
@@ -38,7 +38,6 @@ extern "C" {
 #pragma warning(push)
 #pragma warning(disable: 4201) // nonstandard extension used: nameless struct/union
 #pragma warning(disable: 4214) // nonstandard extension used : bit field types other than int
-
 
 //
 // Basic types from MS ndis.h
@@ -671,7 +670,7 @@ typedef struct _NDIS_OPEN_BLOCK_14393_17134
     /* 0x0480 */ PVOID CoOidRequestHandler;
 } NDIS_OPEN_BLOCK_14393_17134, *PNDIS_OPEN_BLOCK_14393_17134; /* size: 0x0488 */
 
-typedef struct _NDIS_OPEN_BLOCK_17763_21286
+typedef struct _NDIS_OPEN_BLOCK_17763_22000
 {
     /* 0x0000 */ long Padding_297[240];
     /* 0x03c0 */ struct _NDIS_CO_AF_BLOCK* NextAf;
@@ -691,7 +690,7 @@ typedef struct _NDIS_OPEN_BLOCK_17763_21286
     /* 0x0438 */ PVOID MiniportCoOidRequestHandler;
     /* 0x0440 */ PVOID CoOidRequestCompleteHandler;
     /* 0x0448 */ PVOID CoOidRequestHandler;
-} NDIS_OPEN_BLOCK_17763_21286, *PNDIS_OPEN_BLOCK_17763_21286; /* size: 0x0450 */
+} NDIS_OPEN_BLOCK_17763_22000, *PNDIS_OPEN_BLOCK_17763_22000; /* size: 0x0450 */
 
 typedef struct _NDIS_COMMON_OPEN_BLOCK_9600_10586
 {
@@ -986,7 +985,7 @@ typedef struct _NDIS_COMMON_OPEN_BLOCK_14393_17134
     /* 0x03f0 */ KEVENT* WaitNetPnpEvent;
 } NDIS_COMMON_OPEN_BLOCK_14393_17134, *PNDIS_COMMON_OPEN_BLOCK_14393_17134; /* size: 0x03f8 */
 
-typedef struct _NDIS_COMMON_OPEN_BLOCK_17763_21286
+typedef struct _NDIS_COMMON_OPEN_BLOCK_17763_22000
 {
     union
     {
@@ -1121,7 +1120,7 @@ typedef struct _NDIS_COMMON_OPEN_BLOCK_17763_21286
     /* 0x0390 */ KEVENT* WaitNetPnpEvent;
     /* 0x0398 */ PKTMON_COMPONENT_CONTEXT PktMonComp;
     /* 0x03a8 */ PKTMON_EDGE_CONTEXT PktMonEdge;
-} NDIS_COMMON_OPEN_BLOCK_17763_21286, *PNDIS_COMMON_OPEN_BLOCK_17763_21286; /* size: 0x03c0 */
+} NDIS_COMMON_OPEN_BLOCK_17763_22000, *PNDIS_COMMON_OPEN_BLOCK_17763_22000; /* size: 0x03c0 */
 
 typedef struct _NDIS_PROTOCOL_BLOCK_7601 {
     NDIS_OBJECT_HEADER Header;
@@ -1533,7 +1532,7 @@ typedef struct _NDIS_PROTOCOL_BLOCK_17763
     /* 0x0340 */ PVOID NotifyBindCompleteWorkItem; //class pointer
 } NDIS_PROTOCOL_BLOCK_17763, *PNDIS_PROTOCOL_BLOCK_17763; /* size: 0x0378 */
 
-typedef struct _NDIS_PROTOCOL_BLOCK_18362_21286
+typedef struct _NDIS_PROTOCOL_BLOCK_18362_22000
 {
     /* 0x0000 */ NDIS_OBJECT_HEADER Header;
     /* 0x0004 */ long Padding_126;
@@ -1625,7 +1624,7 @@ typedef struct _NDIS_PROTOCOL_BLOCK_18362_21286
     /* 0x0328 */ UNICODE_STRING ImageName;
     /* 0x0338 */ PVOID Bind; //class pointer
     /* 0x0340 */ PVOID NotifyBindCompleteWorkItem; //class pointer
-} NDIS_PROTOCOL_BLOCK_18362_21286, *PNDIS_PROTOCOL_BLOCK_18362_21286; /* size: 0x0378 */
+} NDIS_PROTOCOL_BLOCK_18362_22000, *PNDIS_PROTOCOL_BLOCK_18362_22000; /* size: 0x0378 */
 
 
 //

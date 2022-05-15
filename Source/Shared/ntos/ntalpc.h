@@ -1,12 +1,12 @@
 /************************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017 - 2021, translated from Microsoft sources/debugger
+*  (C) COPYRIGHT AUTHORS, 2017 - 2022, translated from Microsoft sources/debugger
 *
 *  TITLE:       NTALPC.H
 *
-*  VERSION:     1.90
+*  VERSION:     1.95
 *
-*  DATE:        02 May 2021
+*  DATE:        02 Feb 2022
 *
 *  Common header file for the ntos ALPC/CSR related functions and definitions.
 *
@@ -52,6 +52,14 @@ extern "C" {
 #define USERSRV_FIRST_API_NUMBER        1024
 
 #define CSR_CSRSS_SECTION_SIZE          65536
+
+#define ALPC_MSGFLG_REPLY_MESSAGE 0x1
+#define ALPC_MSGFLG_LPC_MODE 0x2
+#define ALPC_MSGFLG_RELEASE_MESSAGE 0x10000
+#define ALPC_MSGFLG_SYNC_REQUEST 0x20000
+#define ALPC_MSGFLG_WAIT_USER_MODE 0x100000
+#define ALPC_MSGFLG_WAIT_ALERTABLE 0x200000
+#define ALPC_MSGFLG_WOW64_CALL 0x80000000
 
 typedef enum _ALPC_PORT_INFORMATION_CLASS {
     AlpcBasicInformation,
@@ -99,6 +107,11 @@ typedef struct _ALPC_PORT_ATTRIBUTES {
     ULONG Reserved;
 #endif
 } ALPC_PORT_ATTRIBUTES, *PALPC_PORT_ATTRIBUTES;
+
+typedef struct _ALPC_MESSAGE_ATTRIBUTES {
+    ULONG AllocatedAttributes;
+    ULONG ValidAttributes;
+} ALPC_MESSAGE_ATTRIBUTES, * PALPC_MESSAGE_ATTRIBUTES;
 
 typedef struct _ALPC_BASIC_INFORMATION {
     ULONG Flags;
@@ -466,6 +479,32 @@ NtAlpcQueryInformation(
     _In_ ULONG Length,
     _Out_opt_ PULONG ReturnLength);
 
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtAlpcAcceptConnectPort(
+    _Out_ PHANDLE PortHandle,
+    _In_ HANDLE ConnectionPortHandle,
+    _In_ ULONG Flags,
+    _In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
+    _In_opt_ PALPC_PORT_ATTRIBUTES PortAttributes,
+    _In_opt_ PVOID PortContext,
+    _In_opt_ PPORT_MESSAGE ConnectionRequest,
+    _Inout_opt_ PALPC_MESSAGE_ATTRIBUTES ConnectionMessageAttributes,
+    _In_ BOOLEAN AcceptConnection);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtAlpcSendWaitReceivePort(
+    _In_ HANDLE PortHandle,
+    _In_ ULONG Flags,
+    _In_opt_ PPORT_MESSAGE pSendMessage,
+    _Inout_opt_ PALPC_MESSAGE_ATTRIBUTES SendMessageAttributes,
+    _Out_opt_ PPORT_MESSAGE pReceiveMessage,
+    _Inout_opt_ PSIZE_T BufferLength,
+    _Inout_opt_ PALPC_MESSAGE_ATTRIBUTES ReceiveMessageAttributes,
+    _In_opt_ PLARGE_INTEGER Timeout);
 
 //
 // NTALPC_RTL HEADER END

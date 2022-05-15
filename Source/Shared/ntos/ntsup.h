@@ -1,12 +1,12 @@
 /************************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2011 - 2021 UGN/HE
+*  (C) COPYRIGHT AUTHORS, 2011 - 2022 UGN/HE
 *
 *  TITLE:       NTSUP.H
 *
-*  VERSION:     2.09
+*  VERSION:     2.11
 *
-*  DATE:        14 Oct 2021
+*  DATE:        22 Apr 2022
 *
 *  Common header file for the NT API support functions and definitions.
 *
@@ -73,6 +73,15 @@ typedef BOOL(CALLBACK* PNTSUPMEMFREE)(
 #define ntsupProcessHeap() NtCurrentPeb()->ProcessHeap
 
 #define NTQSI_MAX_BUFFER_LENGTH (512 * 1024 * 1024)
+
+typedef struct _OBJSCANPARAM {
+    PCWSTR Buffer;
+    ULONG BufferSize;
+} OBJSCANPARAM, * POBJSCANPARAM;
+
+typedef NTSTATUS(NTAPI* PENUMOBJECTSCALLBACK)(
+    _In_ POBJECT_DIRECTORY_INFORMATION Entry, 
+    _In_opt_ PVOID CallbackParam);
 
 PVOID ntsupHeapAlloc(
     _In_ SIZE_T Size);
@@ -314,6 +323,10 @@ NTSTATUS ntsupEnableWow64Redirection(
 BOOLEAN ntsupIsKdEnabled(
     _Out_opt_ PBOOLEAN DebuggerAllowed,
     _Out_opt_ PBOOLEAN DebuggerNotPresent);
+
+BOOLEAN ntsupIsObjectExists(
+    _In_ LPCWSTR RootDirectory,
+    _In_ LPCWSTR ObjectName);
 
 #ifdef ENABLE_C_EXTERN
 #ifdef __cplusplus

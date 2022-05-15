@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.92
+*  VERSION:     1.93
 *
-*  DATE:        03 Dec 2021
+*  DATE:        22 Apr 2022
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -108,13 +108,12 @@
 
 #include "symparser.h"
 #include "objects.h"
+#include "drivers\wdrvprv.h"
 #include "kldbg.h"
-#include "drvhelper.h"
 #include "ui.h"
 #include "sup.h"
 #include "supConsts.h"
 #include "list.h"
-#include "instdrv.h"
 #include "excepth.h"
 #include "extapi.h"
 #include "plugmngr.h"

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2021
+*  (C) COPYRIGHT AUTHORS, 2019 - 2022
 *
 *  TITLE:       EXTAPI.H
 *
-*  VERSION:     1.92
+*  VERSION:     1.93
 *
-*  DATE:        13 Nov 2021
+*  DATE:        13 May 2022
 *
 *  Windows SDK compatibility header.
 *
@@ -123,3 +123,63 @@ typedef enum DPI_AWARENESS {
 #define DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED     ((DPI_AWARENESS_CONTEXT)-5)
 
 #endif //_WIN32_WINNT_WIN10
+
+#ifndef NTDDI_WINTHRESHOLD
+#define NTDDI_WINTHRESHOLD 0x0A000000   /* ABRACADABRA_THRESHOLD */
+#endif
+
+#ifndef NTDDI_WIN10
+#define NTDDI_WIN10 0x0A000000          /* ABRACADABRA_THRESHOLD */
+#endif 
+
+#ifndef NTDDI_WIN10_TH2
+#define NTDDI_WIN10_TH2 0x0A000001      /* ABRACADABRA_WIN10_TH2 */
+#endif
+
+#ifndef NTDDI_WIN10_RS1
+#define NTDDI_WIN10_RS1 0x0A000002      /* ABRACADABRA_WIN10_RS1 */
+#endif
+
+#ifndef NTDDI_WIN10_RS2
+#define NTDDI_WIN10_RS2 0x0A000003      /* ABRACADABRA_WIN10_RS2 */
+#endif
+
+#ifndef NTDDI_WIN10_RS3
+#define NTDDI_WIN10_RS3 0x0A000004      /* ABRACADABRA_WIN10_RS3 */
+#endif
+
+#ifndef NTDDI_WIN10_RS4
+#define NTDDI_WIN10_RS4 0x0A000005      /* ABRACADABRA_WIN10_RS4 */
+#endif
+
+#ifndef NTDDI_WIN10_RS5
+#define NTDDI_WIN10_RS5 0x0A000006      /* ABRACADABRA_WIN10_RS5 */
+#endif
+
+#ifndef NTDDI_WIN10_19H1
+#define NTDDI_WIN10_19H1 0x0A000007     /* ABRACADABRA_WIN10_19H1 */
+#endif
+
+#ifndef NTDDI_WIN10_VB
+#define NTDDI_WIN10_VB 0x0A000008       /* ABRACADABRA_WIN10_VB */
+#endif
+
+#ifndef NTDDI_WIN10_MN
+#define NTDDI_WIN10_MN 0x0A000009       /* ABRACADABRA_WIN10_MN */
+#endif
+
+#ifndef NTDDI_WIN10_FE
+#define NTDDI_WIN10_FE 0x0A00000A       /* ABRACADABRA_WIN10_FE */
+#endif
+
+#ifndef NTDDI_WIN10_CO
+#define NTDDI_WIN10_CO 0x0A00000B       /* ABRACADABRA_WIN10_C0 */
+#endif
+
+#ifndef NTDDI_WIN10_NI
+#define NTDDI_WIN10_NI 0x0A00000C       /* ABRACADABRA_WIN10_NI */
+#endif
+
+#ifndef NTDDI_WIN10_CU
+#define NTDDI_WIN10_CU 0x0A00000D       /* ABRACADABRA_WIN10_CU */
+#endif

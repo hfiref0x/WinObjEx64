@@ -32,20 +32,20 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugWithDriver|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
     <SpectreMitigation>false</SpectreMitigation>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
     <SpectreMitigation>false</SpectreMitigation>
@@ -53,7 +53,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleasePrivateDriver|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
     <SpectreMitigation>false</SpectreMitigation>
@@ -61,7 +61,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWinIoDriver|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
     <SpectreMitigation>false</SpectreMitigation>
@@ -103,7 +103,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>.\output\$(Platform)\$(Configuration)\bin\</OutDir>
     <IntDir>.\output\$(Platform)\$(Configuration)\</IntDir>
-    <CodeAnalysisRuleSet>NativeRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
     <RunCodeAnalysis>true</RunCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleasePrivateDriver|x64'">
@@ -162,7 +162,7 @@
       <SDLCheck>true</SDLCheck>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalIncludeDirectories>$(SolutionDir)\Shared;$(ProjectDir);$(ProjectDir)\props;$(ProjectDir)\extras</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_DEBUG;_WINDOWS;_USE_OWN_DRIVER;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_WINDOWS;_USE_OWN_DRIVER;_USE_WINIO;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <CompileAs>CompileAsCpp</CompileAs>
     </ClCompile>
     <Link>
@@ -184,8 +184,11 @@
     </Bscmake>
     <ResourceCompile />
     <ResourceCompile>
-      <PreprocessorDefinitions>_UseOwnDriver;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_UseOwnDriver;_UseWinIo;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
+    <PostBuildEvent>
+      <Command>$(ProjectDir)Utils\GenAsIo2Unlock .\output\$(Platform)\$(Configuration)\$(TargetName)$(TargetExt)</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -257,7 +260,7 @@
       <AdditionalIncludeDirectories>$(SolutionDir)\Shared;$(ProjectDir);$(ProjectDir)\props;$(ProjectDir)\extras</AdditionalIncludeDirectories>
       <EnablePREfast>true</EnablePREfast>
       <ControlFlowGuard>Guard</ControlFlowGuard>
-      <CompileAs>CompileAsCpp</CompileAs>
+      <CompileAs>CompileAsC</CompileAs>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -315,7 +318,6 @@
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <GenerateDebugInformation>false</GenerateDebugInformation>
       <Version>6.0</Version>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <GenerateMapFile>true</GenerateMapFile>
@@ -323,6 +325,7 @@
       <EntryPointSymbol>
       </EntryPointSymbol>
       <SetChecksum>true</SetChecksum>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
     </Link>
     <Manifest>
       <SuppressStartupBanner>false</SuppressStartupBanner>
@@ -337,8 +340,7 @@
       </Command>
     </CustomBuildStep>
     <PostBuildEvent>
-      <Command>
-      </Command>
+      <Command>$(ProjectDir)Utils\GenAsIo2Unlock .\output\$(Platform)\$(Configuration)\bin\$(TargetName)$(TargetExt)</Command>
     </PostBuildEvent>
     <ResourceCompile>
       <PreprocessorDefinitions>_UseOwnDriver;_UseWinIo;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -373,7 +375,9 @@
     <ClCompile Include="..\Shared\ntos\ntsup.c" />
     <ClCompile Include="..\Shared\treelist\treelist.c" />
     <ClCompile Include="aboutDlg.c" />
-    <ClCompile Include="drvhelper.c" />
+    <ClCompile Include="drivers\wdbgdrv.c" />
+    <ClCompile Include="drivers\wdrvprv.c" />
+    <ClCompile Include="drivers\winio.c" />
     <ClCompile Include="excepth.c" />
     <ClCompile Include="extapi.c" />
     <ClCompile Include="extras\extras.c" />
@@ -388,7 +392,6 @@
     <ClCompile Include="findDlg.c" />
     <ClCompile Include="hash.c" />
     <ClCompile Include="hde\hde64.c" />
-    <ClCompile Include="instdrv.c" />
     <ClCompile Include="kldbg.c" />
     <ClCompile Include="symparser.c" />
     <ClCompile Include="list.c" />
@@ -432,7 +435,9 @@
     <ClInclude Include="..\Shared\sdk\extdef.h" />
     <ClInclude Include="..\Shared\treelist\treelist.h" />
     <ClInclude Include="aboutDlg.h" />
-    <ClInclude Include="drvhelper.h" />
+    <ClInclude Include="drivers\wdbgdrv.h" />
+    <ClInclude Include="drivers\wdrvprv.h" />
+    <ClInclude Include="drivers\winio.h" />
     <ClInclude Include="excepth.h" />
     <ClInclude Include="extapi.h" />
     <ClInclude Include="extras\extras.h" />
@@ -451,7 +456,6 @@
     <ClInclude Include="hde\hde64.h" />
     <ClInclude Include="hde\pstdint.h" />
     <ClInclude Include="hde\table64.h" />
-    <ClInclude Include="instdrv.h" />
     <ClInclude Include="kldbg.h" />
     <ClInclude Include="ksymbols.h" />
     <ClInclude Include="symparser.h" />

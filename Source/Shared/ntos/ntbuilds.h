@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2021
+*  (C) COPYRIGHT AUTHORS, 2021 - 2022
 *
 *  TITLE:       NTBUILDS.H
 *
-*  VERSION:     1.00
+*  VERSION:     1.10
 *
-*  DATE:        01 Nov 2021
+*  DATE:        13 May 2022
 *
 *  Windows NT builds definition file.
 *
@@ -76,5 +76,8 @@
 // Windows 11 21H2
 #define NT_WIN11_21H2           22000
 
-// Windows 11 Active Develepment Branch (21XX)
-#define NTX_WIN11_ADB           22494
+// Windows 11 22H2
+#define NT_WIN11_22H2           22610
+
+// Windows 11 Active Develepment Branch (23H2)
+#define NTX_WIN11_ADB           25115

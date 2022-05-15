@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.01
+*  VERSION:     1.14
 *
-*  DATE:        08 Jan 2021
+*  DATE:        28 Sep 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -28,7 +28,10 @@ BOOL HeapMemoryFree(_In_ PVOID Memory)
     return HeapFree(g_ctx.PluginHeap, 0, Memory);
 }
 
-#define DBUFFER_SIZE 512
+//
+// Conversion buffer size
+//
+#define CONVERT_NTNAME_BUFFER_SIZE 512
 
 /*
 * supConvertFileName
@@ -40,71 +43,87 @@ BOOL HeapMemoryFree(_In_ PVOID Memory)
 */
 BOOL supConvertFileName(
     _In_ LPWSTR NtFileName,
-    _In_ LPWSTR DosFileName,
+    _Inout_ LPWSTR DosFileName,
     _In_ SIZE_T ccDosFileName
 )
 {
-    BOOL    bSuccess = FALSE, bFound = FALSE;
-    WCHAR   szDrive[3];
-    WCHAR   szName[MAX_PATH + 1]; //for the device partition name
-    WCHAR   szTemp[DBUFFER_SIZE]; //for the disk array
-    UINT    uNameLen = 0;
-    WCHAR* p;
-    SIZE_T  l = 0, k = 0;
+    BOOL bFound = FALSE;
 
-    if ((NtFileName == NULL) || (DosFileName == NULL) || (ccDosFileName < MAX_PATH))
-        return bSuccess;
+    SIZE_T nLen;
 
+    WCHAR szDrive[3];
+    WCHAR szName[MAX_PATH];
+    WCHAR szTemp[CONVERT_NTNAME_BUFFER_SIZE];
+    WCHAR* pszTemp;
+
+    //
+    // All input parameters are validated by caller before.
+    //
+
+    //
+    // Drive template.
+    //
     szDrive[0] = L'X';
     szDrive[1] = L':';
     szDrive[2] = 0;
 
-    RtlSecureZeroMemory(szTemp, sizeof(szTemp));
+    //
+    // Query array of logical disk drive strings.
+    //
+    szTemp[0] = 0;
+    if (GetLogicalDriveStrings(CONVERT_NTNAME_BUFFER_SIZE - 1, szTemp) == 0)
+        return FALSE;
 
-    uNameLen = GetLogicalDriveStrings(DBUFFER_SIZE - 1, szTemp);
-    if (uNameLen == 0)
-        return bSuccess;
-
-    p = szTemp;
+    pszTemp = szTemp;
 
     do {
 
-        *szDrive = *p;
+        //
+        // Copy the drive letter to the template string.
+        //
+        *szDrive = *pszTemp;
+        szName[0] = 0;
 
-        RtlSecureZeroMemory(szName, sizeof(szName));
-
+        //
+        // Lookup each device name.
+        //
         if (QueryDosDevice(szDrive, szName, MAX_PATH)) {
 
-            uNameLen = (UINT)_strlen(szName);
+            nLen = _strlen(szName);
 
-            if (uNameLen < MAX_PATH) {
+            if (nLen < MAX_PATH) {
 
-                bFound = (_strncmp(NtFileName, szName, uNameLen) == 0);
+                //
+                // Match device name.
+                //
+                bFound = (_strncmpi(NtFileName, szName, nLen) == 0);
 
-                if (bFound && *(NtFileName + uNameLen) == TEXT('\\')) {
+                if (bFound) {
 
-                    _strcpy(DosFileName, szDrive);
-                    l = _strlen(DosFileName);
-                    k = _strlen(NtFileName);
+                    //
+                    // Build output name.
+                    //
+                    StringCchPrintf(DosFileName,
+                        ccDosFileName,
+                        TEXT("%ws%ws"),
+                        szDrive,
+                        NtFileName + nLen);
 
-                    _strncpy(&DosFileName[l],
-                        ccDosFileName - l,
-                        NtFileName + uNameLen,
-                        k - uNameLen);
-
-                    bSuccess = TRUE;
-                    break;
                 }
+
             }
 
         }
 
-        while (*p++);
+        //
+        // Go to the next NULL character, i.e. the next drive name.
+        //
+        while (*pszTemp++);
 
-    } while (!bFound && *p); // end of string
-    return bSuccess;
+    } while (!bFound && *pszTemp);
+
+    return bFound;
 }
-
 /*
 * supGetWin32FileName
 *
@@ -211,48 +230,58 @@ VOID supClipboardCopy(
 }
 
 /*
-* supCopyTreeListSubItemValue
+* supTreeListAddCopyValueItem
 *
 * Purpose:
 *
-* Copy treelist value to the clipboard.
+* Add copy to clipboard menu item depending on hit treelist header item.
 *
 */
-VOID supCopyTreeListSubItemValue(
-    _In_ HWND TreeList,
-    _In_ UINT ValueIndex
+BOOL supTreeListAddCopyValueItem(
+    _In_ HMENU hMenu,
+    _In_ HWND hwndTreeList,
+    _In_ UINT uId,
+    _In_opt_ UINT uPos,
+    _In_ LPARAM lParam,
+    _In_ INT* pSubItemHit
 )
 {
-    SIZE_T             cbText;
-    LPWSTR             lpText;
-    TL_SUBITEMS_FIXED* subitems = NULL;
-    TVITEMEX           itemex;
-    WCHAR              textbuf[MAX_PATH + 1];
+    HDHITTESTINFO hti;
+    HD_ITEM hdItem;
+    WCHAR szHeaderText[MAX_PATH + 1];
+    WCHAR szItem[MAX_PATH * 2];
 
-    __try {
+    *pSubItemHit = -1;
 
-        RtlSecureZeroMemory(&itemex, sizeof(itemex));
-        RtlSecureZeroMemory(textbuf, sizeof(textbuf));
-        itemex.mask = TVIF_TEXT;
-        itemex.hItem = TreeList_GetSelection(TreeList);
-        itemex.pszText = textbuf;
-        itemex.cchTextMax = MAX_PATH;
+    hti.iItem = -1;
+    hti.pt.x = LOWORD(lParam);
+    hti.pt.y = HIWORD(lParam);
+    ScreenToClient(hwndTreeList, &hti.pt);
 
-        TreeList_GetTreeItem(TreeList, &itemex, &subitems);
+    hti.pt.y = 1;
+    if (TreeList_HeaderHittest(hwndTreeList, &hti) < 0)
+        return FALSE;
 
-        if (subitems) {
-            if (ValueIndex < subitems->Count) {
-                lpText = subitems->Text[ValueIndex];
-                if (lpText) {
-                    cbText = _strlen(lpText) * sizeof(WCHAR);
-                    supClipboardCopy(lpText, cbText);
-                }
-            }
+    RtlSecureZeroMemory(&hdItem, sizeof(hdItem));
+
+    szHeaderText[0] = 0;
+    hdItem.mask = HDI_TEXT;
+
+    hdItem.cchTextMax = sizeof(szHeaderText) - 1;
+
+    hdItem.pszText = szHeaderText;
+    if (TreeList_GetHeaderItem(hwndTreeList, hti.iItem, &hdItem)) {
+        *pSubItemHit = hti.iItem;
+
+        _strcpy(szItem, TEXT("Copy \""));
+        _strcat(szItem, szHeaderText);
+        _strcat(szItem, TEXT("\""));
+        if (InsertMenu(hMenu, uPos, MF_BYCOMMAND, uId, szItem)) {
+            return TRUE;
         }
     }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
-        return;
-    }
+
+    return FALSE;
 }
 
 /*
@@ -423,6 +452,69 @@ BOOL supListViewCopyItemValueToClipboard(
         if (OpenClipboard(NULL)) {
             EmptyClipboard();
             CloseClipboard();
+        }
+    }
+
+    return FALSE;
+}
+
+/*
+* supTreeListCopyItemValueToClipboard
+*
+* Purpose:
+*
+* Copy selected treelist item text to the clipboard.
+*
+*/
+BOOL supTreeListCopyItemValueToClipboard(
+    _In_ HWND hwndTreeList,
+    _In_ INT tlSubItemHit
+)
+{
+    INT         nIndex;
+    LPWSTR      lpCopyData = NULL;
+    SIZE_T      cbCopyData = 0;
+    TVITEMEX    itemex;
+    WCHAR       szText[MAX_PATH + 1];
+
+    TL_SUBITEMS_FIXED* pSubItems = NULL;
+
+    szText[0] = 0;
+    RtlSecureZeroMemory(&itemex, sizeof(itemex));
+    itemex.mask = TVIF_TEXT;
+    itemex.hItem = TreeList_GetSelection(hwndTreeList);
+    itemex.pszText = szText;
+    itemex.cchTextMax = MAX_PATH;
+
+    if (TreeList_GetTreeItem(hwndTreeList, &itemex, &pSubItems)) {
+
+        if ((tlSubItemHit > 0) && (pSubItems != NULL)) {
+
+            nIndex = (tlSubItemHit - 1);
+            if (nIndex < (INT)pSubItems->Count) {
+
+                lpCopyData = pSubItems->Text[nIndex];
+                cbCopyData = _strlen(lpCopyData) * sizeof(WCHAR);
+
+            }
+
+        }
+        else {
+            if (tlSubItemHit == 0) {
+                lpCopyData = szText;
+                cbCopyData = sizeof(szText);
+            }
+        }
+
+        if (lpCopyData && cbCopyData) {
+            supClipboardCopy(lpCopyData, cbCopyData);
+            return TRUE;
+        }
+        else {
+            if (OpenClipboard(NULL)) {
+                EmptyClipboard();
+                CloseClipboard();
+            }
         }
     }
 

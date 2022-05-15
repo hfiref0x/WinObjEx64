@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.01
+*  VERSION:     1.14
 *
-*  DATE:        08 Jan 2021
+*  DATE:        30 Sep 2021
 * 
 *  Sonar plugin support definitions and declarations.
 *
@@ -34,9 +34,13 @@ VOID supClipboardCopy(
     _In_ LPWSTR lpText,
     _In_ SIZE_T cbText);
 
-VOID supCopyTreeListSubItemValue(
-    _In_ HWND TreeList,
-    _In_ UINT ValueIndex);
+BOOL supTreeListAddCopyValueItem(
+    _In_ HMENU hMenu,
+    _In_ HWND hwndTreeList,
+    _In_ UINT uId,
+    _In_opt_ UINT uPos,
+    _In_ LPARAM lParam,
+    _In_ INT* pSubItemHit);
 
 LPWSTR supGetItemText(
     _In_ HWND ListView,
@@ -64,6 +68,10 @@ BOOL supListViewCopyItemValueToClipboard(
     _In_ HWND hwndListView,
     _In_ INT iItem,
     _In_ INT iSubItem);
+
+BOOL supTreeListCopyItemValueToClipboard(
+    _In_ HWND hwndTreeList,
+    _In_ INT tlSubItemHit);
 
 INT supGetMaxCompareTwoFixedStrings(
     _In_ HWND ListView,

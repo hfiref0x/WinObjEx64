@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.92
+*  VERSION:     1.93
 *
-*  DATE:        29 Nov 2021
+*  DATE:        24 Mar 2022
 *
 *  Common header file for the user interface.
 *
@@ -49,8 +49,8 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 
 #define PROGRAM_MAJOR_VERSION       1
 #define PROGRAM_MINOR_VERSION       9
-#define PROGRAM_REVISION_NUMBER     2
-#define PROGRAM_BUILD_NUMBER        2112
+#define PROGRAM_REVISION_NUMBER     3
+#define PROGRAM_BUILD_NUMBER        2205
 
 #ifdef _USE_OWN_DRIVER
 #define PROGRAM_NAME            L"Windows Object Explorer 64-bit (Non-public version)"

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.92
+*  VERSION:     1.93
 *
-*  DATE:        12 Nov 2021
+*  DATE:        11 May 2022
 *
 *  Program entry point and main window handler.
 *
@@ -72,7 +72,7 @@ VOID MainWindowExtrasDisableAdminFeatures(
     //
     // These features require driver usage.
     //
-    if (g_kdctx.DeviceHandle == NULL) {
+    if (FALSE == kdIoDriverLoaded()) {
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_SSDT, FALSE, &mii);
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_PRIVATENAMESPACES, FALSE, &mii);
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_W32PSERVICETABLE, FALSE, &mii);
@@ -358,7 +358,7 @@ VOID MainWindowOnDisplayGridChange(
 {
     DWORD lvExStyle;
     DWORD dwProcessId = GetCurrentProcessId();
-    g_WinObj.ListViewDisplayGrid = !g_WinObj.ListViewDisplayGrid;
+    g_WinObj.ListViewDisplayGrid = (~g_WinObj.ListViewDisplayGrid) & 1;
     lvExStyle = ListView_GetExtendedListViewStyle(g_hwndObjectList);
     if (g_WinObj.ListViewDisplayGrid)
         lvExStyle |= LVS_EX_GRIDLINES;
@@ -872,7 +872,7 @@ LRESULT MainWindowHandleWMNotify(
 
                 //handle sort by column
             case LVN_COLUMNCLICK:
-                bMainWndSortInverse = !bMainWndSortInverse;
+                bMainWndSortInverse = (~bMainWndSortInverse) & 1;
                 SortColumn = ((NMLISTVIEW*)lParam)->iSubItem;
                 ListView_SortItemsEx(g_hwndObjectList, &MainWindowObjectListCompareFunc, SortColumn);
 

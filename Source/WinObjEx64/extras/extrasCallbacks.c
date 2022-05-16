@@ -32,6 +32,7 @@
 #define CBT_SIZE_19HX         0xD0
 #define CBT_SIZE_VB_V1        0xD0
 #define CBT_SIZE_VB_V2        0xE8
+#define CBT_SIZE_FE_V1        0xF8
 #define CBT_SIZE_CO_V1        0x100
 #define CBT_SIZE_NI_V1        0xF8
 #define CBT_SIZE_CU_V1        0xF8
@@ -58,6 +59,8 @@ CBT_MAPPING g_CbtMapping[] = {
 
     { NT_WIN10_21H2, NTDDI_WIN10_VB, CBT_SIZE_VB_V1 },
     { NT_WIN10_21H2, NTDDI_WIN10_VB, CBT_SIZE_VB_V2 },
+
+    { NT_WINSRV_21H1, NTDDI_WIN10_FE, CBT_SIZE_FE_V1 },
 
     { NT_WIN11_21H2, NTDDI_WIN10_CO, CBT_SIZE_CO_V1 },
     { NT_WIN11_22H2, NTDDI_WIN10_NI, CBT_SIZE_NI_V1 },
@@ -565,6 +568,41 @@ static const BYTE CiCallbackIndexes_Win1021H2_V2[] = {
 };
 
 //
+// Windows Server 2022
+//
+static const BYTE CiCallbacksIndexes_WinSrv21H2[] = {
+    Id_CiSetFileCache,
+    Id_CiGetFileCache,
+    Id_CiQueryInformation,
+    Id_CiValidateImageHeader,
+    Id_CiValidateImageData,
+    Id_CiHashMemory,
+    Id_KappxIsPackageFile,
+    Id_CiCompareSigningLevels,
+    Id_CiValidateFileAsImageType,
+    Id_CiRegisterSigningInformation,
+    Id_CiUnregisterSigningInformation,
+    Id_CiInitializePolicy,
+    Id_CiReleaseContext,
+    Id_XciUnknownCallback,
+    Id_CiGetStrongImageReference,
+    Id_CiHvciSetImageBaseAddress,
+    Id_CipQueryPolicyInformation,
+    Id_CiValidateDynamicCodePages,
+    Id_CiQuerySecurityPolicy,
+    Id_CiRevalidateImage,
+    Id_CiSetInformation,
+    Id_CiSetInformationProcess,
+    Id_CiGetBuildExpiryTime,
+    Id_CiCheckProcessDebugAccessPolicy,
+    Id_CiGetCodeIntegrityOriginClaimForFileObject,
+    Id_CiDeleteCodeIntegrityOriginClaimMembers,
+    Id_CiDeleteCodeIntegrityOriginClaimForFileObject,
+    Id_CiHvciReportMmIncompatibility,
+    Id_CiCompareExistingSePool
+};
+
+//
 // Windows 11 21H2
 //
 static const BYTE CiCallbackIndexes_Win11[] = {
@@ -716,10 +754,16 @@ LPWSTR GetCiRoutineNameFromIndex(
         }
         break;
 
+    case NT_WINSRV_21H1:
+        Indexes = CiCallbacksIndexes_WinSrv21H2;
+        ArrayCount = RTL_NUMBER_OF(CiCallbacksIndexes_WinSrv21H2);
+        break;
+
     case NT_WIN11_21H2:
         Indexes = CiCallbackIndexes_Win11;
         ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win11);
         break;
+
     case NT_WIN11_22H2:
     case NTX_WIN11_ADB:
     default:

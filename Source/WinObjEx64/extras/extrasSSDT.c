@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.93
 *
-*  DATE:        11 May 2022
+*  DATE:        15 May 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1110,7 +1110,7 @@ NTSTATUS SdtResolveServiceEntryModule(
             ApiSetReference = ApiSetExtractReferenceFromAdapter(FunctionPtr);
             if (ApiSetReference) {
 
-                if (g_NtBuildNumber >= NT_WIN11_21H2)
+                if (g_NtBuildNumber >= NT_WINSRV_21H1)
                     ApiSetTableEntrySize = sizeof(W32K_API_SET_TABLE_ENTRY_V2);
                 else
                     ApiSetTableEntrySize = sizeof(W32K_API_SET_TABLE_ENTRY);

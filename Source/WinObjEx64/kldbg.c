@@ -821,6 +821,7 @@ PVOID ObDumpSymbolicLinkObjectVersionAware(
         objectSize = sizeof(OBJECT_SYMBOLIC_LINK_V4);
         objectVersion = OBVERSION_OBJECT_SYMBOLIC_LINK_V4;
         break;
+    case NT_WINSRV_21H1:
     case NT_WIN11_21H2:
     case NT_WIN11_22H2:
     default:
@@ -961,7 +962,7 @@ PVOID ObDumpFltFilterObjectVersionAware(
         objectVersion = OBVERSION_FLT_FILTER_V2;
     }
     else if (g_NtBuildNumber >= NT_WIN10_THRESHOLD1 &&
-        g_NtBuildNumber < NT_WIN11_21H2)
+        g_NtBuildNumber < NT_WINSRV_21H1)
     {
         objectSize = sizeof(FLT_FILTER_V3);
         objectVersion = OBVERSION_FLT_FILTER_V3;

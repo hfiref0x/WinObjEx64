@@ -4,9 +4,9 @@
 *
 *  TITLE:       PLUGMNGR.C
 *
-*  VERSION:     1.93
+*  VERSION:     1.94
 *
-*  DATE:        22 Apr 2022
+*  DATE:        31 May 2022
 *
 *  Plugin manager.
 *
@@ -63,7 +63,7 @@ VOID PmpReportInvalidPlugin(
         _strcpy(lpCombined, TEXT("File "));
         _strcat(lpCombined, lpszPluginFileName);
         _strcat(lpCombined, TEXT(" is not a valid WinObjEx64 plugin"));
-        logAdd(WOBJ_LOG_ENTRY_INFORMATION, lpCombined);
+        logAdd(EntryTypeInformation, lpCombined);
         supHeapFree(lpCombined);
     }
 }

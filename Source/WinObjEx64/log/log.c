@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       LOG.C
 *
-*  VERSION:     1.92
+*  VERSION:     1.94
 *
-*  DATE:        11 Oct 2021
+*  DATE:        31 May 2022
 *
 *  Simplified log.
 *
@@ -70,7 +70,7 @@ VOID logFree()
 *
 */
 VOID logAdd(
-    _In_ ULONG Type,
+    _In_ WOBJ_ENTRY_TYPE EntryType,
     _In_ WCHAR* Message
 )
 {
@@ -81,7 +81,7 @@ VOID logAdd(
 
         Index = g_WinObjLog.Count;
 
-        g_WinObjLog.Entries[Index].Type = Type;
+        g_WinObjLog.Entries[Index].Type = EntryType;
         GetSystemTimeAsFileTime((PFILETIME)&g_WinObjLog.Entries[Index].LoggedTime);
         _strncpy(g_WinObjLog.Entries[Index].MessageData, WOBJ_MAX_MESSAGE, Message, WOBJ_MAX_MESSAGE);
 
@@ -190,16 +190,16 @@ BOOL CALLBACK LogViewerAddEntryCallback(
     RtlSecureZeroMemory(szTime, sizeof(szTime));
 
     switch (Entry->Type) {
-    case WOBJ_LOG_ENTRY_ERROR:
+    case EntryTypeError:
         lpType = TEXT("Error");
         break;
-    case WOBJ_LOG_ENTRY_SUCCESS:
+    case EntryTypeSuccess:
         lpType = TEXT("Success");
         break;
-    case WOBJ_LOG_ENTRY_WARNING:
+    case EntryTypeWarning:
         lpType = TEXT("Warning");
         break;
-    case WOBJ_LOG_ENTRY_INFORMATION:
+    case EntryTypeInformation:
         lpType = TEXT("Information");
         break;
     default:

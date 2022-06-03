@@ -5,9 +5,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.194
+*  VERSION:     1.196
 *
-*  DATE:        14 May 2022
+*  DATE:        01 Jun 2022
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -36,7 +36,6 @@
 
 #ifndef NTOS_RTL
 #define NTOS_RTL
-
 
 //
 // NTOS_RTL HEADER BEGIN
@@ -104,6 +103,7 @@ typedef PVOID PHEAD;
 typedef PVOID PEJOB;
 typedef struct _IO_TIMER* PIO_TIMER;
 typedef LARGE_INTEGER PHYSICAL_ADDRESS;
+typedef struct _EJOB* PESILO;
 
 #ifndef _WIN32_WINNT_WIN10
 #define _WIN32_WINNT_WIN10 0x0A00
@@ -4973,8 +4973,38 @@ typedef struct _SECTION_COMPAT {
 */
 
 /*
+*  Configuration Manager control vector
+*/
+typedef struct _CM_SYSTEM_CONTROL_VECTOR_V1 {
+    PWSTR  KeyPath;
+    PWSTR  ValueName;
+    PVOID  Buffer;
+    PULONG BufferLength;
+    PULONG Type;
+} CM_SYSTEM_CONTROL_VECTOR_V1, * PCM_SYSTEM_CONTROL_VECTOR_V1;
+
+//
+// Since Windows 10 RS4
+//
+typedef struct _CM_SYSTEM_CONTROL_VECTOR_V2 {
+    PWSTR  KeyPath;
+    PWSTR  ValueName;
+    PVOID  Buffer;
+    PULONG BufferLength;
+    PULONG Type;
+    ULONG Flags; //0 or 1 depends on flag from LOADER_PARAMETER_BLOCK attached hives
+    ULONG Spare0;
+} CM_SYSTEM_CONTROL_VECTOR_V2, * PCM_SYSTEM_CONTROL_VECTOR_V2;
+
+/*
 ** Callbacks START
 */
+
+typedef NTSTATUS(*PEX_CALLBACK_FUNCTION) (
+    IN PVOID CallbackContext,
+    IN PVOID Argument1,
+    IN PVOID Argument2
+    );
 
 typedef VOID(NTAPI* PEX_HOST_NOTIFICATION) (
     _In_ ULONG NotificationType,
@@ -5053,9 +5083,10 @@ typedef struct _KBUGCHECK_REASON_CALLBACK_RECORD {
 
 typedef struct _CM_CALLBACK_CONTEXT_BLOCK {
     LIST_ENTRY CallbackListEntry;
-    LIST_ENTRY PreCallListHead;
-    PVOID Unknown1;
-    PVOID Function; //PEX_CALLBACK_FUNCTION
+    LONG PreCallListHead;
+    LARGE_INTEGER Cookie;
+    PVOID CallerContext; 
+    PEX_CALLBACK_FUNCTION Function;
     UNICODE_STRING Altitude;
     LIST_ENTRY ObjectContextListHead;
 } CM_CALLBACK_CONTEXT_BLOCK, *PCM_CALLBACK_CONTEXT_BLOCK;
@@ -5208,6 +5239,55 @@ typedef struct _KNMI_HANDLER_CALLBACK {
     PVOID Context;
     PVOID Handle;
 } KNMI_HANDLER_CALLBACK, * PKNMI_HANDLER_CALLBACK;
+
+typedef
+NTSTATUS
+(NTAPI* SILO_MONITOR_CREATE_CALLBACK)(
+    _In_ PESILO Silo
+    );
+
+typedef
+VOID
+(NTAPI* SILO_MONITOR_TERMINATE_CALLBACK)(
+    _In_ PESILO Silo
+    );
+
+#define SILO_MONITOR_REGISTRATION_VERSION (1)
+
+typedef struct _SERVER_SILO_MONITOR {
+    LIST_ENTRY ListEntry;
+    UCHAR Version;
+    BOOLEAN MonitorHost;
+    BOOLEAN MonitorExistingSilos;
+    UCHAR Reserved[5];
+    SILO_MONITOR_CREATE_CALLBACK CreateCallback;
+    SILO_MONITOR_TERMINATE_CALLBACK TerminateCallback;
+    union {
+        PUNICODE_STRING DriverObjectName;
+        PUNICODE_STRING ComponentName;
+    };
+} SERVER_SILO_MONITOR, * PSERVER_SILO_MONITOR;
+
+//
+// Errata Manager
+//
+typedef struct _EMP_CALLBACK_DB_RECORD {
+    GUID CallbackId;
+    PVOID CallbackFunc;
+    LONG_PTR CallbackFuncReference;
+    PVOID Context;
+    SINGLE_LIST_ENTRY List;
+    SINGLE_LIST_ENTRY CallbackDependencyListHead;
+    ULONG NumberOfStrings;
+    ULONG NumberOfNumerics;
+    ULONG NumberOfEntries;
+    struct _EMP_ENTRY_DB_RECORD* EntryList[1];
+} EMP_CALLBACK_DB_RECORD, * PEMP_CALLBACK_DB_RECORD;
+
+typedef struct _EMP_CALLBACK_LIST_ENTRY {
+    EMP_CALLBACK_DB_RECORD* CallbackRecord;
+    SINGLE_LIST_ENTRY CallbackListEntry;
+} EMP_CALLBACK_LIST_ENTRY, * PEMP_CALLBACK_LIST_ENTRY;
 
 /*
 ** Callbacks END
@@ -9594,8 +9674,8 @@ NTAPI
 RtlCreateHeap(
     _In_ ULONG Flags,
     _In_opt_ PVOID HeapBase,
-    _In_opt_ SIZE_T ReserveSize,
-    _In_opt_ SIZE_T CommitSize,
+    _In_ SIZE_T ReserveSize,
+    _In_ SIZE_T CommitSize,
     _In_opt_ PVOID Lock,
     _In_opt_ PRTL_HEAP_PARAMETERS Parameters);
 
@@ -9612,7 +9692,7 @@ RtlSetHeapInformation(
     _In_ PVOID HeapHandle,
     _In_ HEAP_INFORMATION_CLASS HeapInformationClass,
     _In_opt_ PVOID HeapInformation,
-    _In_opt_ SIZE_T HeapInformationLength);
+    _In_ SIZE_T HeapInformationLength);
 
 NTSYSAPI
 NTSTATUS
@@ -10729,6 +10809,16 @@ NtCreateTimer(
 NTSYSAPI
 NTSTATUS
 NTAPI
+NtCreateTimer2(
+    _Out_ PHANDLE TimerHandle,
+    _In_opt_ PVOID Reserved1,
+    _In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
+    _In_ ULONG Attributes,
+    _In_ ACCESS_MASK DesiredAccess);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
 NtSetTimer(
     _In_ HANDLE TimerHandle,
     _In_ PLARGE_INTEGER DueTime,
@@ -10737,6 +10827,15 @@ NtSetTimer(
     _In_ BOOLEAN WakeTimer,
     _In_opt_ LONG Period,
     _Out_opt_ PBOOLEAN PreviousState);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtSetTimer2(
+    _In_ HANDLE TimerHandle,
+    _In_ PLARGE_INTEGER DueTime,
+    _In_opt_ PLARGE_INTEGER Period,
+    _In_ PVOID Parameters);
 
 NTSYSAPI
 NTSTATUS
@@ -10772,6 +10871,13 @@ NtCancelTimer(
     _In_ HANDLE TimerHandle,
     _Out_opt_ PBOOLEAN CurrentState);
 
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtCancelTimer2(
+    _In_ HANDLE TimerHandle,
+    _In_ PVOID Parameters);
+
 //ref from ph2
 
 NTSYSAPI
@@ -10788,15 +10894,6 @@ NtSetIRTimer(
     _In_ HANDLE TimerHandle,
     _In_opt_ PLARGE_INTEGER DueTime);
 
-NTSYSAPI
-NTSTATUS
-NTAPI
-NtCreateTimer2(
-    _Out_ PHANDLE TimerHandle,
-    _In_opt_ PVOID Reserved1,
-    _In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
-    _In_ ULONG Attributes,
-    _In_ ACCESS_MASK DesiredAccess);
 
 /************************************************************************************
 *
@@ -11051,6 +11148,41 @@ NtWaitForMultipleObjects(
     _In_ WAIT_TYPE WaitType,
     _In_ BOOLEAN Alertable,
     _In_opt_ PLARGE_INTEGER Timeout);
+
+/************************************************************************************
+*
+* Time.
+*
+************************************************************************************/
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtQuerySystemTime(
+    _Out_ PLARGE_INTEGER SystemTime);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtSetSystemTime(
+    _In_opt_ PLARGE_INTEGER SystemTime,
+    _Out_opt_ PLARGE_INTEGER PreviousTime);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtQueryTimerResolution(
+    _Out_ PULONG MaximumTime,
+    _Out_ PULONG MinimumTime,
+    _Out_ PULONG CurrentTime);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtSetTimerResolution(
+    _In_ ULONG DesiredTime,
+    _In_ BOOLEAN SetResolution,
+    _Out_ PULONG ActualTime);
 
 /************************************************************************************
 *
@@ -12681,7 +12813,7 @@ NtCreateIoCompletion(
     _Out_ PHANDLE IoCompletionHandle,
     _In_ ACCESS_MASK DesiredAccess,
     _In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
-    _In_opt_ ULONG Count);
+    _In_ ULONG Count);
 
 NTSYSAPI
 NTSTATUS
@@ -12748,9 +12880,9 @@ NtCreateTransaction(
     _In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
     _In_opt_ LPGUID Uow,
     _In_opt_ HANDLE TmHandle,
-    _In_opt_ ULONG CreateOptions,
-    _In_opt_ ULONG IsolationLevel,
-    _In_opt_ ULONG IsolationFlags,
+    _In_ ULONG CreateOptions,
+    _In_ ULONG IsolationLevel,
+    _In_ ULONG IsolationFlags,
     _In_opt_ PLARGE_INTEGER Timeout,
     _In_opt_ PUNICODE_STRING Description);
 
@@ -12860,6 +12992,19 @@ NtOpenTransactionManager(
     _In_opt_ PUNICODE_STRING LogFileName,
     _In_opt_ LPGUID TmIdentity,
     _In_opt_ ULONG OpenOptions);
+
+/************************************************************************************
+*
+* Performance Counter.
+*
+************************************************************************************/
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtQueryPerformanceCounter(
+    _Out_ PLARGE_INTEGER PerformanceCounter,
+    _Out_opt_ PLARGE_INTEGER PerformanceFrequency);
 
 /************************************************************************************
 *

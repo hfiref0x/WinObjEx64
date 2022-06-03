@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.93
+*  VERSION:     1.94
 *
-*  DATE:        22 Apr 2022
+*  DATE:        31 May 2022
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -110,7 +110,10 @@
 #define TEXT_SECTION_LEGNTH sizeof(TEXT_SECTION)
 
 #define PAGE_SECTION "PAGE"
-#define PAGE_SECTION_LEGNTH sizeof(PAGE_SECTION)
+#define PAGE_SECTION_LENGTH sizeof(PAGE_SECTION)
+
+#define INIT_SECTION "INIT"
+#define INIT_SECTION_LENGTH sizeof(INIT_SECTION)
 
 typedef ULONG_PTR *PUTable;
 
@@ -174,6 +177,9 @@ typedef struct _KLDBGPDATA {
 
     //unloaded drivers array address
     KLDBG_SYSTEM_ADDRESS MmUnloadedDrivers; 
+
+    //address of data in mapped ntoskrnl
+    PVOID CmControlVector;
 
     //EPROCESS specific offsets
     EPROCESS_OFFSET PsUniqueProcessId;  
@@ -301,6 +307,10 @@ typedef struct _NOTIFICATION_CALLBACKS {
     ULONG_PTR ExpHostListHead;
     ULONG_PTR ExpCallbackListHead;
     ULONG_PTR PoCoalescingCallbacks;
+    ULONG_PTR PspPicoProviderRoutines;
+    ULONG_PTR KiNmiCallbackListHead;
+    ULONG_PTR PspSiloMonitorList;
+    ULONG_PTR EmpCallbackListHead;
 } NOTIFICATION_CALLBACKS, *PNOTIFICATION_CALLBACKS;
 
 //
@@ -413,12 +423,6 @@ BOOL ObHeaderToNameInfoAddress(
     _Inout_ PULONG_PTR HeaderInfoAddress,
     _In_    OBJ_HEADER_INFO_FLAG InfoFlag);
 
-BOOL ObHeaderToNameInfoAddressEx(
-    _In_ UCHAR ObjectInfoMask,
-    _In_ ULONG_PTR ObjectHeaderAddress,
-    _Inout_ PULONG_PTR HeaderInfoAddress,
-    _In_ BYTE DesiredHeaderBit);
-
 PVOID ObGetCallbackBlockRoutine(
     _In_ PVOID CallbackBlock);
 
@@ -494,6 +498,9 @@ VOID kdDestroyShimmedDriversList(
 BOOLEAN kdQueryKernelShims(
     _In_ PKLDBGCONTEXT Context,
     _In_ BOOLEAN RefreshList);
+
+PVOID kdQueryCmControlVector(
+    _In_ PKLDBGCONTEXT Context);
 
 BOOL kdEnumerateMmUnloadedDrivers(
     _In_ PENUMERATE_UNLOADED_DRIVERS_CALLBACK Callback,

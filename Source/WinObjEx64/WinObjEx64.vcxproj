@@ -382,6 +382,7 @@
     <ClCompile Include="extapi.c" />
     <ClCompile Include="extras\extras.c" />
     <ClCompile Include="extras\extrasCallbacks.c" />
+    <ClCompile Include="extras\extrasCmOpt.c" />
     <ClCompile Include="extras\extrasDrivers.c" />
     <ClCompile Include="extras\extrasIPC.c" />
     <ClCompile Include="extras\extrasPN.c" />
@@ -443,6 +444,7 @@
     <ClInclude Include="extras\extras.h" />
     <ClInclude Include="extras\extrasCallbacks.h" />
     <ClInclude Include="extras\extrasCallbacksPatterns.h" />
+    <ClInclude Include="extras\extrasCmOpt.h" />
     <ClInclude Include="extras\extrasDrivers.h" />
     <ClInclude Include="extras\extrasIPC.h" />
     <ClInclude Include="extras\extrasPN.h" />

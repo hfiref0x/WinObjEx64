@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       EXTRAS.C
 *
-*  VERSION:     1.90
+*  VERSION:     1.94
 *
-*  DATE:        11 May 2021
+*  DATE:        31 May 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -24,6 +24,7 @@
 #include "extrasPSList.h"
 #include "extrasCallbacks.h"
 #include "extrasSL.h"
+#include "extrasCmOpt.h"
 
 /*
 * extrasHandleSettingsChange
@@ -210,6 +211,10 @@ VOID extrasShowDialogById(
 
     case ID_EXTRAS_SOFTWARELICENSECACHE:
         extrasCreateSLCacheDialog(ParentWindow);
+        break;
+
+    case ID_EXTRAS_CMCONTROLVECTOR:
+        extrasCreateCmOptDialog(ParentWindow);
         break;
 
 

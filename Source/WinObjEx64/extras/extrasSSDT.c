@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     1.93
+*  VERSION:     1.94
 *
-*  DATE:        15 May 2022
+*  DATE:        31 May 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1222,7 +1222,7 @@ NTSTATUS SdtResolveServiceEntryModule(
 *
 */
 VOID SdtListReportEvent(
-    _In_ ULONG EventType,
+    _In_ WOBJ_ENTRY_TYPE EventType,
     _In_ LPCWSTR FunctionName,
     _In_ LPCWSTR ErrorString
 )
@@ -1235,8 +1235,7 @@ VOID SdtListReportEvent(
         FunctionName,
         ErrorString);
 
-    logAdd(EventType,
-        szBuffer);
+    logAdd(EventType, szBuffer);
 }
 
 /*
@@ -1258,7 +1257,7 @@ VOID SdtListReportFunctionResolveError(
     _strcpy(szErrorBuffer, TEXT("could not resolve function "));
     MultiByteToWideChar(CP_ACP, 0, FunctionName, -1, _strend(szErrorBuffer), MAX_PATH);
     _strcat(szErrorBuffer, TEXT(" address"));
-    SdtListReportEvent(WOBJ_LOG_ENTRY_ERROR, __FUNCTIONW__, szErrorBuffer);
+    SdtListReportEvent(EntryTypeError, __FUNCTIONW__, szErrorBuffer);
 }
 
 /*
@@ -1287,7 +1286,7 @@ VOID SdtListReportResolveModuleError(
     switch (Status) {
 
     case STATUS_INTERNAL_ERROR:
-        SdtListReportEvent(WOBJ_LOG_ENTRY_ERROR, ErrorSource, TEXT("HDE Error"));
+        _strcpy(szErrorBuffer, TEXT("HDE Error"));
         break;
 
     case STATUS_APISET_NOT_HOSTED:
@@ -1296,7 +1295,6 @@ VOID SdtListReportResolveModuleError(
         //
         _strcpy(szErrorBuffer, TEXT("not an apiset adapter for "));
         MultiByteToWideChar(CP_ACP, 0, Table->Name, -1, _strend(szErrorBuffer), MAX_PATH);
-        SdtListReportEvent(WOBJ_LOG_ENTRY_ERROR, ErrorSource, szErrorBuffer);
         break;
 
     case STATUS_APISET_NOT_PRESENT:
@@ -1305,7 +1303,6 @@ VOID SdtListReportResolveModuleError(
         // 
         _strcpy(szErrorBuffer, TEXT("extension contains a host for a non-existent apiset "));
         MultiByteToWideChar(CP_ACP, 0, Table->Name, -1, _strend(szErrorBuffer), MAX_PATH);
-        SdtListReportEvent(WOBJ_LOG_ENTRY_INFORMATION, ErrorSource, szErrorBuffer);
         break;
 
     case STATUS_PROCEDURE_NOT_FOUND:
@@ -1316,7 +1313,6 @@ VOID SdtListReportResolveModuleError(
         ultostr(Table->Index, _strend(szErrorBuffer));
         _strcat(szErrorBuffer, TEXT(", service name "));
         MultiByteToWideChar(CP_ACP, 0, Table->Name, -1, _strend(szErrorBuffer), MAX_PATH);
-        SdtListReportEvent(WOBJ_LOG_ENTRY_INFORMATION, ErrorSource, szErrorBuffer);
         break;
 
     case STATUS_DLL_NOT_FOUND:
@@ -1330,7 +1326,6 @@ VOID SdtListReportResolveModuleError(
             _strend(szErrorBuffer),
             MAX_PATH);
 
-        SdtListReportEvent(WOBJ_LOG_ENTRY_ERROR, ErrorSource, szErrorBuffer);
         break;
 
     default:
@@ -1339,9 +1334,10 @@ VOID SdtListReportResolveModuleError(
         //
         _strcpy(szErrorBuffer, TEXT("unexpected error 0x"));
         ultohex(Status, _strend(szErrorBuffer));
-        SdtListReportEvent(WOBJ_LOG_ENTRY_ERROR, ErrorSource, szErrorBuffer);
         break;
     }
+
+    SdtListReportEvent(EntryTypeError, ErrorSource, szErrorBuffer);
 }
 
 /*
@@ -1640,7 +1636,7 @@ BOOL SdtListCreateTableShadow(
                                         //
                                         // Log error.
                                         //
-                                        SdtListReportEvent(WOBJ_LOG_ENTRY_ERROR, __FUNCTIONW__, TEXT("could not load forwarded module"));
+                                        SdtListReportEvent(EntryTypeError, __FUNCTIONW__, TEXT("could not load forwarded module"));
                                     }
 
                                 } // if (ForwarderFunctionName)

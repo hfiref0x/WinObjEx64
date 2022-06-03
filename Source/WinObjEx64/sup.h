@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.93
+*  VERSION:     1.94
 *
-*  DATE:        13 May 2022
+*  DATE:        31 May 2022
 *
 *  Common header file for the program support routines.
 *
@@ -103,6 +103,12 @@ typedef BOOL(CALLBACK* PENUMERATE_SL_CACHE_VALUE_DESCRIPTORS_CALLBACK)(
 // return true to stop enumeration
 typedef BOOL(CALLBACK* PENUMERATE_HANDLE_DUMP_CALLBACK)(
     _In_ SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX* HandleEntry,
+    _In_opt_ PVOID UserContext
+    );
+
+typedef BOOL(CALLBACK* PSUPFINDREF_CALLBACK)(
+    _In_ PBYTE ReferencePointer,
+    _In_ ULONG Offset,
     _In_opt_ PVOID UserContext
     );
 
@@ -256,6 +262,7 @@ typedef struct _FILE_VIEW_INFO {
 #define supIsObjectExists ntsupIsObjectExists
 #define supIsKdEnabled ntsupIsKdEnabled
 #define supListViewEnableRedraw(ListView, fEnable) SendMessage(ListView, WM_SETREDRAW, (WPARAM)fEnable, (LPARAM)0)
+#define supIsLxssAvailable() ntsupIsObjectExists(TEXT("\\Device"), TEXT("Lxss"))
 
 ULONG supConvertFromPteProtectionMask(
     _In_ ULONG ProtectionMask);
@@ -567,6 +574,13 @@ VOID supUpdateLvColumnHeaderImage(
     _In_ INT NumberOfColumns,
     _In_ INT UpdateColumn,
     _In_ INT ImageIndex);
+
+INT supGetMaxOfTwoUlongFromHex(
+    _In_ HWND ListView,
+    _In_ LPARAM lParam1,
+    _In_ LPARAM lParam2,
+    _In_ LPARAM lParamSort,
+    _In_ BOOL Inverse);
 
 INT supGetMaxOfTwoU64FromHex(
     _In_ HWND ListView,
@@ -978,3 +992,11 @@ NTSTATUS supCallDriver(
 
 BOOLEAN supIsLongTermServicingWindows(
     VOID);
+
+PBYTE supFindReferenceBySignature(
+    _In_ PBYTE Buffer,
+    _In_ ULONG BufferSize,
+    _In_ PBYTE Signature,
+    _In_ ULONG SignatureSize,
+    _In_opt_ PSUPFINDREF_CALLBACK Callback,
+    _In_opt_ PVOID CallbackContext);

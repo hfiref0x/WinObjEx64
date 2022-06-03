@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.93
+*  VERSION:     1.94
 *
-*  DATE:        13 May 2022
+*  DATE:        31 May 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1938,7 +1938,7 @@ VOID supInit(
     if (!NT_SUCCESS(status)) {
         _strcpy(szError, TEXT("ExApiSetInit() failed, 0x"));
         ultohex(status, _strend(szError));
-        logAdd(WOBJ_LOG_ENTRY_ERROR, szError);
+        logAdd(EntryTypeError, szError);
     }
 
     supQueryAlpcPortObjectTypeIndex(&g_WinObj.AlpcPortTypeInfo);
@@ -4094,6 +4094,57 @@ VOID supUpdateLvColumnHeaderImage(
         }
         ListView_SetColumn(ListView, i, &col);
     }
+}
+
+/*
+* supGetMaxOfTwoUlongFromHex
+*
+* Purpose:
+*
+* Returned value used in listview comparer functions.
+*
+*/
+INT supGetMaxOfTwoUlongFromHex(
+    _In_ HWND ListView,
+    _In_ LPARAM lParam1,
+    _In_ LPARAM lParam2,
+    _In_ LPARAM lParamSort,
+    _In_ BOOL Inverse
+)
+{
+    INT       nResult;
+    LPWSTR    lpItem1 = NULL, lpItem2 = NULL;
+    ULONG     ad1, ad2;
+    WCHAR     szText[MAX_TEXT_CONVERSION_ULONG64 + 1];
+
+    RtlSecureZeroMemory(&szText, sizeof(szText));
+
+    lpItem1 = supGetItemText2(
+        ListView,
+        (INT)lParam1,
+        (INT)lParamSort,
+        szText,
+        MAX_TEXT_CONVERSION_ULONG64);
+
+    ad1 = hextoul(&lpItem1[2]);
+
+    RtlSecureZeroMemory(&szText, sizeof(szText));
+
+    lpItem2 = supGetItemText2(
+        ListView,
+        (INT)lParam2,
+        (INT)lParamSort,
+        szText,
+        MAX_TEXT_CONVERSION_ULONG64);
+
+    ad2 = hextoul(&lpItem2[2]);
+
+    if (Inverse)
+        nResult = ad1 < ad2;
+    else
+        nResult = ad1 > ad2;
+
+    return nResult;
 }
 
 /*
@@ -6387,7 +6438,7 @@ PVOID supSLCacheRead(
         }
         NtClose(KeyHandle);
     }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
+    __except (WOBJ_EXCEPTION_FILTER_LOG) {
         return NULL;
     }
 
@@ -7095,8 +7146,7 @@ VOID supReportAbnormalTermination(
     _strcpy(szBuffer, TEXT("AbnormalTermination of "));
     _strcat(szBuffer, FunctionName);
 
-    logAdd(WOBJ_LOG_ENTRY_ERROR,
-        szBuffer);
+    logAdd(EntryTypeError, szBuffer);
 }
 
 /*
@@ -7131,8 +7181,7 @@ VOID supReportException(
         }
     }
 
-    logAdd(WOBJ_LOG_ENTRY_ERROR,
-        szBuffer);
+    logAdd(EntryTypeError, szBuffer);
 }
 
 /*
@@ -7156,8 +7205,7 @@ VOID supReportAPIError(
         FunctionName,
         NtStatus);
 
-    logAdd(WOBJ_LOG_ENTRY_ERROR,
-        szBuffer);
+    logAdd(EntryTypeError, szBuffer);
 }
 
 /*
@@ -8997,4 +9045,56 @@ BOOLEAN supIsLongTermServicingWindows(
     }
 
     return FALSE;
+}
+
+/*
+* supFindReferenceBySignature
+*
+* Purpose:
+*
+* Lookup reference in image relocated buffer.
+*
+*/
+PBYTE supFindReferenceBySignature(
+    _In_ PBYTE Buffer,
+    _In_ ULONG BufferSize,
+    _In_ PBYTE Signature,
+    _In_ ULONG SignatureSize,
+    _In_opt_ PSUPFINDREF_CALLBACK Callback,
+    _In_opt_ PVOID CallbackContext
+)
+{
+    ULONG_PTR ptr, value;
+    ULONG i;
+    PBYTE refPtr;
+
+    ptr = (ULONG_PTR)supFindPattern(Buffer,
+        BufferSize,
+        Signature,
+        SignatureSize);
+
+    if (ptr) {
+
+        for (i = 0; i < BufferSize - sizeof(ULONG_PTR); i++) {
+
+            refPtr = Buffer + i;
+            value = *(PULONG_PTR)refPtr;
+
+            if (value == ptr) {
+                
+                if (Callback) {
+
+                    if (Callback(refPtr, i, CallbackContext))
+                        return refPtr;
+
+                }
+                else {
+                    return refPtr;
+                }
+            }
+        }
+
+    }
+
+    return NULL;
 }

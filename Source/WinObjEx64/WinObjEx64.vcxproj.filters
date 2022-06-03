@@ -252,6 +252,9 @@
     <ClCompile Include="drivers\wdbgdrv.c">
       <Filter>Source Files\drivers</Filter>
     </ClCompile>
+    <ClCompile Include="extras\extrasCmOpt.c">
+      <Filter>Source Files\extras</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc">
@@ -459,6 +462,9 @@
     </ClInclude>
     <ClInclude Include="..\Shared\sdk\extdef.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="extras\extrasCmOpt.h">
+      <Filter>Source Files\extras</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

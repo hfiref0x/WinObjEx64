@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       LOG.H
 *
-*  VERSION:     1.92
+*  VERSION:     1.94
 *
-*  DATE:        03 Dec 2021
+*  DATE:        31 May 2022
 *
 *  Header file for simplified log support.
 *
@@ -18,10 +18,13 @@
 *******************************************************************************/
 #pragma once
 
-#define WOBJ_LOG_ENTRY_ERROR 0
-#define WOBJ_LOG_ENTRY_SUCCESS 1
-#define WOBJ_LOG_ENTRY_INFORMATION 2
-#define WOBJ_LOG_ENTRY_WARNING 3
+typedef enum _WOBJ_ENTRY_TYPE {
+    EntryTypeError = 0,
+    EntryTypeSuccess,
+    EntryTypeInformation,
+    EntryTypeWarning,
+    EntryTypeMax
+} WOBJ_ENTRY_TYPE;
 
 //
 // Maximum messages in log.
@@ -34,7 +37,7 @@
 #define WOBJ_MAX_MESSAGE 2000
 
 typedef struct _WOBJ_LOG_ENTRY {
-    ULONG Type;
+    WOBJ_ENTRY_TYPE Type;
     LARGE_INTEGER LoggedTime;
     WCHAR MessageData[WOBJ_MAX_MESSAGE + 1];
     BYTE Reserved[72];
@@ -55,7 +58,7 @@ VOID logCreate();
 VOID logFree();
 
 VOID logAdd(
-    _In_ ULONG Type,
+    _In_ WOBJ_ENTRY_TYPE EntryType,
     _In_ WCHAR* Message);
 
 BOOL logEnumEntries(

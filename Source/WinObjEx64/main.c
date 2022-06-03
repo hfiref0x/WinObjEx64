@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.93
+*  VERSION:     1.94
 *
-*  DATE:        11 May 2022
+*  DATE:        31 May 2022
 *
 *  Program entry point and main window handler.
 *
@@ -104,6 +104,7 @@ VOID MainWindowExtrasDisableAdminFeatures(
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_SOFTWARELICENSECACHE, FALSE, &mii);
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_SSDT, FALSE, &mii);
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_W32PSERVICETABLE, FALSE, &mii);
+        SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_CMCONTROLVECTOR, FALSE, &mii);
     }
 }
 
@@ -471,6 +472,7 @@ LRESULT MainWindowHandleWMCommand(
     case ID_EXTRAS_PROCESSLIST:
     case ID_EXTRAS_CALLBACKS:
     case ID_EXTRAS_SOFTWARELICENSECACHE:
+    case ID_EXTRAS_CMCONTROLVECTOR:
         //
         // Extras -> Pipes
         //           Mailslots
@@ -483,6 +485,7 @@ LRESULT MainWindowHandleWMCommand(
         //           Process List
         //           Callbacks
         //           Software Licensing Cache
+        //           CmControlVector
         //
         extrasShowDialogById(hwnd, ControlId);
         break;

@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.93
+*  VERSION:     1.94
 *
-*  DATE:        13 May 2022
+*  DATE:        31 May 2022
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -34,8 +34,6 @@ ULONG g_NtBuildNumber;
 
 //Callbacks
 NOTIFICATION_CALLBACKS g_SystemCallbacks;
-
-UCHAR ObpInfoMaskToOffset[0x100];
 
 //Context private data
 KLDBGPDATA g_kdpdata;
@@ -94,131 +92,6 @@ ULONG_PTR ObFindAddress(
 }
 
 /*
-* ObpInitInfoBlockOffsets
-*
-* Purpose:
-*
-* Initialize block offsets table for working with OBJECT_HEADER data.
-*
-* Note:
-*
-* ObpInfoMaskToOffset size depends on Windows version (Win7 = 64, Win10 = 256)
-*
-* 9200 (Windows 8 Blue)
-* OBJECT_HEADER_AUDIT_INFO added
-*
-* 10586 (Windows 10 TH2)
-* OBJECT_HEADER_HANDLE_REVOCATION_INFO added (size in ObpInitInfoBlockOffsets = 32)
-*
-* 14393 (Windows 10 RS1)
-* OBJECT_HEADER_EXTENDED_INFO added and replaced OBJECT_HEADER_HANDLE_REVOCATION_INFO in ObpInitInfoBlockOffsets
-* size = 16
-*
-* HANDLE_REVOCATION_INFO moved to OBJECT_FOOTER which is a part of OBJECT_HEADER_EXTENDED_INFO as pointer.
-*
-*/
-VOID ObpInitInfoBlockOffsets()
-{
-    UCHAR* p = ObpInfoMaskToOffset;
-    UINT i;
-    UCHAR c;
-
-    i = 0;
-
-    do {
-        c = 0;
-        if (i & 1)
-            c += sizeof(OBJECT_HEADER_CREATOR_INFO);
-        if (i & 2)
-            c += sizeof(OBJECT_HEADER_NAME_INFO);
-        if (i & 4)
-            c += sizeof(OBJECT_HEADER_HANDLE_INFO);
-        if (i & 8)
-            c += sizeof(OBJECT_HEADER_QUOTA_INFO);
-        if (i & 0x10)
-            c += sizeof(OBJECT_HEADER_PROCESS_INFO);
-
-        if (i & 0x20) {
-            // Padding?
-            if (g_NtBuildNumber < NT_WIN8_RTM) {
-                c += sizeof(OBJECT_HEADER_PADDING_INFO);
-            }
-            else {
-                c += sizeof(OBJECT_HEADER_AUDIT_INFO);
-            }
-        }
-
-        //OBJECT_HEADER_EXTENDED_INFO (OBJECT_HEADER_HANDLE_REVOCATION_INFO in NT_WIN10_THRESHOLD2)
-        if (i & 0x40) {
-            if (g_NtBuildNumber == NT_WIN10_THRESHOLD2)
-                c += sizeof(OBJECT_HEADER_HANDLE_REVOCATION_INFO);
-            else
-                c += sizeof(OBJECT_HEADER_EXTENDED_INFO);
-        }
-
-        if (i & 0x80)
-            c += sizeof(OBJECT_HEADER_PADDING_INFO);
-
-        p[i] = c;
-        i++;
-    } while (i < 256);
-
-    return;
-}
-
-/*
-* ObGetObjectHeaderOffsetEx
-*
-* Purpose:
-*
-* Query requested structure offset for the given mask
-*
-*/
-BYTE ObGetObjectHeaderOffsetEx(
-    _In_ BYTE InfoMask,
-    _In_ BYTE DesiredHeaderBit
-)
-{
-    return ObpInfoMaskToOffset[InfoMask & (DesiredHeaderBit | (DesiredHeaderBit - 1))];
-}
-
-/*
-* ObHeaderToNameInfoAddressEx
-*
-* Purpose:
-*
-* Calculate address of name structure from object header flags and object address using ObpInfoMaskToOffset.
-*
-*/
-BOOL ObHeaderToNameInfoAddressEx(
-    _In_ UCHAR ObjectInfoMask,
-    _In_ ULONG_PTR ObjectHeaderAddress,
-    _Inout_ PULONG_PTR HeaderInfoAddress,
-    _In_ BYTE DesiredHeaderBit
-)
-{
-    BYTE      HeaderOffset;
-    ULONG_PTR Address;
-
-    if (HeaderInfoAddress == NULL)
-        return FALSE;
-
-    if (ObjectHeaderAddress < g_kdctx.SystemRangeStart)
-        return FALSE;
-
-    HeaderOffset = ObGetObjectHeaderOffsetEx(ObjectInfoMask, DesiredHeaderBit);
-    if (HeaderOffset == 0)
-        return FALSE;
-
-    Address = ObjectHeaderAddress - HeaderOffset;
-    if (Address < g_kdctx.SystemRangeStart)
-        return FALSE;
-
-    *HeaderInfoAddress = Address;
-    return TRUE;
-}
-
-/*
 * ObGetObjectHeaderOffset
 *
 * Purpose:
@@ -226,9 +99,10 @@ BOOL ObHeaderToNameInfoAddressEx(
 * Query requested structure offset for the given mask
 *
 *
-* Object In Memory Disposition (Obsolete, see ObpInitInfoBlockOffsets comments)
+* Object In Memory Disposition
 *
 * POOL_HEADER
+* Various (version, dependent)
 * OBJECT_HEADER_PROCESS_INFO
 * OBJECT_HEADER_QUOTA_INFO
 * OBJECT_HEADER_HANDLE_INFO
@@ -1448,7 +1322,7 @@ PVOID ObFindPrivateNamespaceLookupTable(
         // Locate PAGE image section.
         //
         SectionBase = supLookupImageSectionByName(PAGE_SECTION,
-            PAGE_SECTION_LEGNTH,
+            PAGE_SECTION_LENGTH,
             (PVOID)hNtOs,
             &SectionSize);
 
@@ -2758,7 +2632,7 @@ VOID kdReportErrorByFunction(
         TEXT("%ws, %ws"),
         FunctionName, ErrorMessage);
 
-    logAdd(WOBJ_LOG_ENTRY_ERROR,
+    logAdd(EntryTypeError,
         szBuffer);
 }
 
@@ -2785,7 +2659,7 @@ VOID kdReportReadErrorSimple(
         KernelAddress,
         InputBufferLength);
 
-    logAdd(WOBJ_LOG_ENTRY_ERROR,
+    logAdd(EntryTypeError,
         szBuffer);
 }
 
@@ -2817,7 +2691,7 @@ VOID kdReportReadError(
         Iosb->Information,
         InputBufferLength);
 
-    logAdd(WOBJ_LOG_ENTRY_ERROR,
+    logAdd(EntryTypeError,
         szBuffer);
 }
 
@@ -3131,7 +3005,7 @@ BOOLEAN kdpQueryMmUnloadedDrivers(
             // Locate PAGE image section.
             //
             SectionBase = supLookupImageSectionByName(PAGE_SECTION,
-                PAGE_SECTION_LEGNTH,
+                PAGE_SECTION_LENGTH,
                 (PVOID)hNtOs,
                 &SectionSize);
 
@@ -3439,7 +3313,7 @@ BOOLEAN kdQueryKernelShims(
 
                 ptrCode = (PBYTE)GetProcAddress(hNtOs, "KseSetDeviceFlags");
                 if (ptrCode == NULL) {
-                    logAdd(WOBJ_LOG_ENTRY_ERROR, TEXT("KseSetDeviceFlags not found"));
+                    logAdd(EntryTypeError, TEXT("KseSetDeviceFlags not found"));
                     return FALSE;
                 }
 
@@ -3457,7 +3331,7 @@ BOOLEAN kdQueryKernelShims(
             }
 
             if (!kdAddressInNtOsImage((PVOID)lookupAddress)) {
-                logAdd(WOBJ_LOG_ENTRY_ERROR, TEXT("KseEngine address is invalid"));
+                logAdd(EntryTypeError, TEXT("KseEngine address is invalid"));
                 return FALSE;
             }
 
@@ -3499,7 +3373,7 @@ BOOLEAN kdQueryKernelShims(
                 {
                     supHeapFree(ShimmedDriver);
                     KseEngineDumpValid = FALSE;
-                    logAdd(WOBJ_LOG_ENTRY_ERROR, TEXT("KseEngine entry read error"));
+                    logAdd(EntryTypeError, TEXT("KseEngine entry read error"));
                     break;
                 }
 
@@ -3508,7 +3382,7 @@ BOOLEAN kdQueryKernelShims(
             }
         }
         else {
-            logAdd(WOBJ_LOG_ENTRY_ERROR, TEXT("KseEngine->ShimmedDriversListHead read error"));
+            logAdd(EntryTypeError, TEXT("KseEngine->ShimmedDriversListHead read error"));
             KseEngineDumpValid = FALSE;
         }
 
@@ -3520,6 +3394,49 @@ BOOLEAN kdQueryKernelShims(
     }
 
     return KseEngineDumpValid;
+}
+
+/*
+* kdQueryCmControlVector
+*
+* Purpose:
+*
+* Return address of CmControlVector data array in mapped kernel.
+*
+*/
+PVOID kdQueryCmControlVector(
+    _In_ PKLDBGCONTEXT Context
+)
+{
+    PVOID CmControlVector = NULL;
+    ULONG SectionSize;
+    PBYTE SectionBase;
+    PBYTE RefPointer;
+
+    WCHAR szSignature[] = { L'P', L'r', L'o', L't', L'e', L'c', L't', L'i', L'o', L'n', L'M', L'o', L'd', L'e', 0 };
+
+    SectionBase = (PBYTE)supLookupImageSectionByName(INIT_SECTION,
+        INIT_SECTION_LENGTH,
+        Context->NtOsImageMap,
+        &SectionSize);
+
+    if (SectionBase) {
+
+        RefPointer = supFindReferenceBySignature(
+            SectionBase,
+            SectionSize,
+            (PBYTE)&szSignature,
+            sizeof(szSignature),
+            NULL,
+            NULL);
+
+        if (RefPointer) {
+            CmControlVector = RefPointer - sizeof(ULONG_PTR);
+        }
+
+    }
+
+    return CmControlVector;
 }
 
 /*
@@ -3573,7 +3490,7 @@ BOOL kdGetFieldOffsetFromSymbol(
         SymbolName,
         FieldName);
 
-    logAdd(WOBJ_LOG_ENTRY_INFORMATION, szLog);
+    logAdd(EntryTypeInformation, szLog);
 
     __try {
 
@@ -3596,7 +3513,7 @@ BOOL kdGetFieldOffsetFromSymbol(
         bResult,
         *Offset);
 
-    logAdd(WOBJ_LOG_ENTRY_INFORMATION, szLog);
+    logAdd(EntryTypeInformation, szLog);
 
     return bResult;
 }
@@ -3629,7 +3546,7 @@ BOOL kdGetAddressFromSymbolEx(
         __FUNCTIONW__,
         SymbolName);
 
-    logAdd(WOBJ_LOG_ENTRY_INFORMATION, szLog);
+    logAdd(EntryTypeInformation, szLog);
 
     *Address = 0;
 
@@ -3686,7 +3603,7 @@ BOOL kdGetAddressFromSymbolEx(
         bResult,
         address);
 
-    logAdd(WOBJ_LOG_ENTRY_INFORMATION, szLog);
+    logAdd(EntryTypeInformation, szLog);
 
     return bResult;
 }
@@ -3924,17 +3841,13 @@ VOID kdInit(
             ntStatus);
 
         MessageBox(GetDesktopWindow(), szBuffer, TEXT("WinObjEx64"), MB_ICONINFORMATION);
-
+        logAdd(EntryTypeError, szBuffer);
     }
 
     //
     // Init driver relying variables.
     //
     if (kdIoDriverLoaded()) {
-        //
-        // Query Ob specific offsets.
-        //
-        ObpInitInfoBlockOffsets();
 
         //
         // Locate and remember ObHeaderCookie, routine require driver usage, do not move.

@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
-*  VERSION:     1.93
+*  VERSION:     1.94
 *
-*  DATE:        11 May 2022
+*  DATE:        31 May 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -372,7 +372,7 @@ VOID DrvDumpDriver(
         supGetItemText2(
             Context->ListView,
             iPos,
-            2,
+            COLUMN_DRVLIST_DRIVER_ADDRESS,
             szDriverDumpInfo,
             MAX_TEXT_CONVERSION_ULONG64);
 
@@ -387,7 +387,7 @@ VOID DrvDumpDriver(
         supGetItemText2(
             Context->ListView,
             iPos,
-            3,
+            COLUMN_DRVLIST_SIZE,
             szDriverDumpInfo,
             MAX_TEXT_CONVERSION_ULONG64);
 
@@ -887,7 +887,7 @@ VOID DriversHandleWMCommand(
             if (pDlgContext->DialogMode == DDM_Normal)
                 lpFileName = TEXT("Drivers.csv");
             else
-                lpFileName = TEXT("UnloadedDrivers.txt");
+                lpFileName = TEXT("UnloadedDrivers.csv");
 
             if (supListViewExportToFile(
                 lpFileName,

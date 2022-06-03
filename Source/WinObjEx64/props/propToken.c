@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2021
+*  (C) COPYRIGHT AUTHORS, 2019 - 2022
 *
 *  TITLE:       PROPTOKEN.C
 *
-*  VERSION:     1.88
+*  VERSION:     1.94
 *
-*  DATE:        05 Dec 2020
+*  DATE:        31 May 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -178,6 +178,7 @@ VOID TokenPageListInfo(
     PTOKEN_GROUPS pTokenGroups;
     PTOKEN_APPCONTAINER_INFORMATION pTokenAppContainer;
     TOKEN_ELEVATION TokenElv;
+    TOKEN_STATISTICS TokenStats;
 
     WCHAR szBuffer[MAX_PATH], szPrivName[MAX_PATH + 1];
 
@@ -429,6 +430,16 @@ VOID TokenPageListInfo(
         {
             ElementName = (i > 0) ? TEXT("Yes") : TEXT("No");
             SetDlgItemText(hwndDlg, IDC_TOKEN_UIACCESS, ElementName);
+        }
+
+        if (NT_SUCCESS(NtQueryInformationToken(TokenHandle, TokenStatistics,
+            (PVOID)&TokenStats, sizeof(TOKEN_STATISTICS), &r)))
+        {
+            szBuffer[0] = 0;
+            RtlStringCchPrintfSecure(szBuffer, MAX_PATH, L"0x%x-%x$", 
+                TokenStats.AuthenticationId.HighPart,
+                TokenStats.AuthenticationId.LowPart);
+            SetDlgItemText(hwndDlg, IDC_TOKEN_AUTHID, szBuffer);
         }
 
         NtClose(TokenHandle);

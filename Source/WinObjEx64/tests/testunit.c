@@ -4,9 +4,9 @@
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     1.93
+*  VERSION:     1.94
 *
-*  DATE:        14 May 2022
+*  DATE:        31 May 2022
 *
 *  Test code used while debug.
 *
@@ -1114,9 +1114,39 @@ VOID TestSessions()
     }
 }
 
+VOID TestCmControlVector()
+{
+    union {
+        union {
+            CM_SYSTEM_CONTROL_VECTOR_V1* v1;
+            CM_SYSTEM_CONTROL_VECTOR_V2* v2;
+        } Version;
+        PBYTE Ref;
+    } CmControlVector;
+
+    SIZE_T size;
+
+    CmControlVector.Ref = (PBYTE)kdQueryCmControlVector(&g_kdctx);
+
+    if (g_NtBuildNumber >= NT_WIN10_REDSTONE4)
+        size = sizeof(CM_SYSTEM_CONTROL_VECTOR_V2);
+    else
+        size = sizeof(CM_SYSTEM_CONTROL_VECTOR_V1);
+
+
+    while (CmControlVector.Version.v1->KeyPath != NULL) {
+
+        OutputDebugString(CmControlVector.Version.v1->KeyPath);
+        OutputDebugString(L"\r\n");
+        OutputDebugString(CmControlVector.Version.v1->ValueName);
+        OutputDebugString(L"\r\n============\r\n");
+
+        CmControlVector.Ref += size;
+    }
+}
+
 VOID TestCall()
 {
-
 }
 
 VOID TestObCallback()
@@ -1172,7 +1202,8 @@ VOID TestStart(
     VOID
 )
 {
-    TestObCallback();
+    TestCmControlVector();
+    //TestObCallback();
     TestCall();
     //TestSectionControlArea();
     //TestSymbols();

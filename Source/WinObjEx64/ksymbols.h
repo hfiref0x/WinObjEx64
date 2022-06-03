@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020 - 2021
+*  (C) COPYRIGHT AUTHORS, 2020 - 2022
 *
 *  TITLE:       KSYMBOLS.H
 *
-*  VERSION:     1.92
+*  VERSION:     1.94
 *
-*  DATE:        29 Nov 2021
+*  DATE:        30 May 2022
 *
 *  Header file for kernel symbol names.
 *
@@ -60,6 +60,14 @@
 
 #define KVAR_PopCoalescingCallbackRoutine           L"PopCoalescingCallbackRoutine"
 #define KVAR_PopCoalRegistrationList                L"PopCoalRegistrationList"
+
+#define KVAR_PspPicoProviderRoutines                L"PspPicoProviderRoutines"
+
+#define KVAR_KiNmiCallbackListHead                  L"KiNmiCallbackListHead"
+
+#define KVAR_PspSiloMonitorList                     L"PspSiloMonitorList"
+
+#define KVAR_EmpCallbackListHead                    L"EmpCallbackListHead"
 
 #define KVAR_Win32kApiSetTable                      L"Win32kApiSetTable"
 

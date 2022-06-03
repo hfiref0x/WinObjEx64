@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPN.C
 *
-*  VERSION:     1.93
+*  VERSION:     1.94
 *
-*  DATE:        11 May 2022
+*  DATE:        31 May 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -572,7 +572,7 @@ VOID PNDlgShowNamespaceInfo(
                 (PVOID)pnsInfo.NamespaceLookupEntry,
                 ntStatus);
 
-            logAdd(WOBJ_LOG_ENTRY_ERROR, szBuffer);
+            logAdd(EntryTypeError, szBuffer);
         }
 
     }

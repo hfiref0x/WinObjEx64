@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASCALLBACKS.C
 *
-*  VERSION:     1.93
+*  VERSION:     1.94
 *
-*  DATE:        13 May 2022
+*  DATE:        30 May 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -141,6 +141,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks);
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpExHostCallbacks);
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpExpCallbackListCallbacks);
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCoalescingCallbacks);
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpPspPicoProviderRoutines);
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpKiNmiCallbackListHead);
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpPspSiloMonitorList);
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpEmpCallbackListHead);
 
 OBEX_FINDCALLBACK_ROUTINE(FindPspCreateProcessNotifyRoutine);
 OBEX_FINDCALLBACK_ROUTINE(FindPspCreateThreadNotifyRoutine);
@@ -161,6 +165,10 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks);
 OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks);
 OBEX_FINDCALLBACK_ROUTINE(FindExpCallbackListHead);
 OBEX_FINDCALLBACK_ROUTINE(FindPoCoalescingCallbacks);
+OBEX_FINDCALLBACK_ROUTINE(FindPspPicoProviderRoutines);
+OBEX_FINDCALLBACK_ROUTINE(FindKiNmiCallbackListHead);
+OBEX_FINDCALLBACK_ROUTINE(FindPspSiloMonitorList);
+OBEX_FINDCALLBACK_ROUTINE(FindEmpCallbackListHead);
 
 OBEX_CALLBACK_DISPATCH_ENTRY g_CallbacksDispatchTable[] = {
     {
@@ -276,6 +284,26 @@ OBEX_CALLBACK_DISPATCH_ENTRY g_CallbacksDispatchTable[] = {
         0, L"PowerCoalescing",
         QueryCallbackGeneric, DumpPoCoalescingCallbacks, FindPoCoalescingCallbacks,
         &g_SystemCallbacks.PoCoalescingCallbacks
+    },
+    {
+        0, L"PicoProviderRoutines",
+        QueryCallbackGeneric, DumpPspPicoProviderRoutines, FindPspPicoProviderRoutines,
+        &g_SystemCallbacks.PspPicoProviderRoutines
+    },
+    {
+        0, L"NmiCallbacks",
+        QueryCallbackGeneric, DumpKiNmiCallbackListHead, FindKiNmiCallbackListHead,
+        &g_SystemCallbacks.KiNmiCallbackListHead
+    },
+    {
+        0, L"SiloMonitor",
+        QueryCallbackGeneric, DumpPspSiloMonitorList, FindPspSiloMonitorList,
+        &g_SystemCallbacks.PspSiloMonitorList
+    },
+    {
+        0, L"EmpCallbacks",
+        QueryCallbackGeneric, DumpEmpCallbackListHead, FindEmpCallbackListHead,
+        &g_SystemCallbacks.EmpCallbackListHead
     }
 };
 
@@ -969,7 +997,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
                 //
                 SectionBase = supLookupImageSectionByName(
                     PAGE_SECTION,
-                    PAGE_SECTION_LEGNTH,
+                    PAGE_SECTION_LENGTH,
                     g_kdctx.NtOsImageMap,
                     &SectionSize);
 
@@ -1081,7 +1109,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
     } while (FALSE);
 
     if (kvarAddress == 0)
-        logAdd(WOBJ_LOG_ENTRY_WARNING, TEXT("Could not locate CiCallbacks"));
+        logAdd(EntryTypeWarning, TEXT("Could not locate CiCallbacks"));
 
     return kvarAddress;
 }
@@ -2687,6 +2715,426 @@ OBEX_FINDCALLBACK_ROUTINE(FindPoCoalescingCallbacks)
 }
 
 /*
+* FindPspPicoProviderRoutines
+*
+* Purpose:
+*
+* Returns the address of PspPicoProviderRoutines array of callbacks registered with:
+*
+*   PsRegisterPicoProvider
+*
+*/
+OBEX_FINDCALLBACK_ROUTINE(FindPspPicoProviderRoutines)
+{
+    ULONG Index;
+    LONG Rel;
+    PBYTE ptrCode;
+    hde64s hs;
+    ULONG_PTR kvarAddress = 0;
+
+    UNREFERENCED_PARAMETER(QueryFlags);
+
+    //
+    // Not available prior Win 10 and in Win10 TH2.
+    //
+    if (g_NtBuildNumber < NT_WIN10_THRESHOLD1 ||
+        g_NtBuildNumber == NT_WIN10_THRESHOLD2)
+    {
+        return 0;
+    }
+
+    if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
+
+        kdGetAddressFromSymbol(&g_kdctx,
+            KVAR_PspPicoProviderRoutines,
+            &kvarAddress);
+
+    }
+
+    if (kvarAddress == 0) {
+
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
+            "PsRegisterPicoProvider");
+
+        if (ptrCode == NULL)
+            return 0;
+
+        Index = 0;
+        Rel = 0;
+
+        do {
+
+            hde64_disasm(ptrCode + Index, &hs);
+            if (hs.flags & F_ERROR)
+                break;
+
+            if (hs.len == 7) { //check if movups
+
+                if ((ptrCode[Index] == 0x0F) &&
+                    (ptrCode[Index + 1] == 0x11) &&
+                    (ptrCode[Index + 2] == 0x05))
+                {
+                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    break;
+                }
+            }
+
+            Index += hs.len;
+
+        } while (Index < 256);
+
+        kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
+
+    }
+
+    return kvarAddress;
+}
+
+/*
+* FindKiNmiCallbackListHead
+*
+* Purpose:
+*
+* Returns the address of KiNmiCallbackListHead for callbacks registered with:
+*
+*   KeRegisterNmiCallback
+*
+*/
+OBEX_FINDCALLBACK_ROUTINE(FindKiNmiCallbackListHead)
+{
+    ULONG Index, c;
+    LONG Rel;
+    PBYTE ptrCode;
+    hde64s hs;
+    ULONG_PTR kvarAddress = 0;
+
+    UNREFERENCED_PARAMETER(QueryFlags);
+
+    //
+    // Don't want to bother with support of such legacy code 
+    // as we need support for only LTSB/C legacy stuff.
+    //
+    if (g_NtBuildNumber < NT_WIN10_THRESHOLD1)
+        return 0;
+
+    if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
+
+        kdGetAddressFromSymbol(&g_kdctx,
+            KVAR_KiNmiCallbackListHead,
+            &kvarAddress);
+
+    }
+
+    if (kvarAddress == 0) {
+
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
+            "KeDeregisterNmiCallback");
+
+        if (ptrCode == NULL)
+            return 0;
+
+        Index = 0;
+        Rel = 0;
+
+        if (g_NtBuildNumber < NT_WIN10_REDSTONE3) {
+
+            c = 0;
+
+            do {
+
+                hde64_disasm(&ptrCode[Index], &hs);
+                if (hs.flags & F_ERROR)
+                    break;
+
+                if (hs.len == 7) {
+
+                    if (ptrCode[Index] == 0x48 &&
+                        ptrCode[Index + 1] == 0x8D &&
+                        ptrCode[Index + 2] == 0x0D)
+                    {
+                        c += 1;
+                    }
+                }
+
+                if (c > 2) {
+                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    break;
+                }
+
+                Index += hs.len;
+
+            } while (Index < 256);
+
+
+        }
+        else {
+
+            do {
+
+                hde64_disasm(ptrCode + Index, &hs);
+                if (hs.flags & F_ERROR)
+                    break;
+
+                if (hs.len == 5) {
+
+                    //
+                    // Find KiDeregisterNmiSxCallback.
+                    //
+                    if (ptrCode[Index] == 0xE8) {
+                        Rel = *(PLONG)(ptrCode + Index + 1);
+                        break;
+                    }
+                }
+
+                Index += hs.len;
+
+            } while (Index < 64);
+
+            if (Rel != 0) {
+
+                ptrCode = ptrCode + Index + hs.len + Rel;
+                Index = 0;
+                Rel = 0;
+                c = 0;
+
+                //
+                // Scan KiDeregisterNmiSxCallback.
+                //
+                do {
+
+                    hde64_disasm(&ptrCode[Index], &hs);
+                    if (hs.flags & F_ERROR)
+                        break;
+
+                    if (hs.len == 7) {
+
+                        if (ptrCode[Index] == 0x48 &&
+                            ptrCode[Index + 1] == 0x8D &&
+                            ptrCode[Index + 2] == 0x0D)
+                        {
+                            c += 1;
+                        }
+                    }
+
+                    //
+                    // Second lea is ours.
+                    //
+                    if (c > 1) {
+                        Rel = *(PLONG)(ptrCode + Index + 3);
+                        break;
+                    }
+
+                    Index += hs.len;
+
+                } while (Index < 128);
+
+            }
+
+        }
+
+        kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
+
+    }
+
+    return kvarAddress;
+}
+
+/*
+* FindPspSiloMonitorList
+*
+* Purpose:
+*
+* Returns the address of PspSiloMonitorList for callbacks registered with:
+*
+*   PsRegisterSiloMonitor
+*
+*/
+OBEX_FINDCALLBACK_ROUTINE(FindPspSiloMonitorList)
+{
+    ULONG Index;
+    LONG Rel;
+    PBYTE ptrCode;
+    hde64s hs;
+    ULONG_PTR kvarAddress = 0;
+
+    UNREFERENCED_PARAMETER(QueryFlags);
+
+    //
+    // Not available prior Windows 10 RS3.
+    //
+    if (g_NtBuildNumber < NT_WIN10_REDSTONE3)
+        return 0;
+
+    if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
+
+        kdGetAddressFromSymbol(&g_kdctx,
+            KVAR_PspSiloMonitorList,
+            &kvarAddress);
+
+    }
+
+    if (kvarAddress == 0) {
+
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
+            "PsStartSiloMonitor");
+
+        if (ptrCode == NULL)
+            return 0;
+
+        Index = 0;
+        Rel = 0;
+
+        do {
+
+            hde64_disasm(ptrCode + Index, &hs);
+            if (hs.flags & F_ERROR)
+                break;
+
+            if (hs.len == 7) {
+
+                if (ptrCode[Index] == 0x48 &&
+                    ptrCode[Index + 1] == 0x8D &&
+                    ptrCode[Index + 2] == 0x0D &&
+                    ptrCode[Index + hs.len] == 0x48)
+                {
+                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    break;
+                }
+            }
+
+            Index += hs.len;
+
+        } while (Index < 512);
+
+        kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
+
+    }
+
+    return kvarAddress;
+}
+
+/*
+* FindEmpCallbackListHead
+*
+* Purpose:
+*
+* Returns the address of EmpCallbackListHead for callbacks registered with:
+*
+*   EmProviderRegister
+*
+*/
+OBEX_FINDCALLBACK_ROUTINE(FindEmpCallbackListHead)
+{
+    ULONG Index;
+    LONG Rel;
+    PBYTE ptrCode;
+    hde64s hs;
+    ULONG_PTR kvarAddress = 0;
+
+    PVOID SectionBase;
+    ULONG SectionSize = 0, SignatureSize = 0;
+    PBYTE Signature = NULL;
+
+    UNREFERENCED_PARAMETER(QueryFlags);
+
+    if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
+
+        kdGetAddressFromSymbol(&g_kdctx,
+            KVAR_EmpCallbackListHead,
+            &kvarAddress);
+
+    }
+
+    if (kvarAddress == 0) {
+
+        //
+        // Locate PAGE image section as required variable is always in PAGE.
+        //
+        SectionBase = supLookupImageSectionByName(
+            PAGE_SECTION,
+            PAGE_SECTION_LENGTH,
+            g_kdctx.NtOsImageMap,
+            &SectionSize);
+
+        if ((SectionBase == 0) || (SectionSize == 0))
+            return 0;
+
+        if (g_NtBuildNumber < NT_WIN8_BLUE) {
+            Signature = g_EmpSearchCallbackDatabase;
+            SignatureSize = sizeof(g_EmpSearchCallbackDatabase);
+        }
+        else {
+            Signature = g_EmpSearchCallbackDatabase2;
+            SignatureSize = sizeof(g_EmpSearchCallbackDatabase2);
+        }
+
+        ptrCode = (PBYTE)supFindPattern(
+            (PBYTE)SectionBase,
+            SectionSize,
+            Signature,
+            SignatureSize);
+
+        if (ptrCode == NULL)
+            return 0;
+
+        Index = SignatureSize;
+        Rel = 0;
+
+        do {
+
+            hde64_disasm(ptrCode + Index, &hs);
+            if (hs.flags & F_ERROR)
+                break;
+
+            if (hs.len == 5) {
+
+                //
+                // Find EmpSearchCallbackDatabase.
+                //
+                if (ptrCode[Index] == 0xE8) {
+                    Rel = *(PLONG)(ptrCode + Index + 1);
+                    break;
+                }
+            }
+
+            Index += hs.len;
+
+        } while (Index < 64);
+
+        if (Rel != 0) {
+
+            ptrCode = ptrCode + Index + hs.len + Rel;
+            Index = 0;
+            Rel = 0;
+
+            do {
+
+                hde64_disasm(ptrCode + Index, &hs);
+                if (hs.flags & F_ERROR)
+                    break;
+
+                if (hs.len == 7) {
+
+                    if (ptrCode[Index] == 0x48) {
+                        Rel = *(PLONG)(ptrCode + Index + 3);
+                        break;
+                    }
+                }
+
+                Index += hs.len;
+
+            } while (Index < 32);
+
+        }
+
+        kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
+
+    }
+
+    return kvarAddress;
+}
+
+/*
 * AddRootEntryToList
 *
 * Purpose:
@@ -2817,47 +3265,35 @@ VOID AddEntryToList(
 }
 
 /*
-* AddZeroEntryToList
+* AddEmptyEntryToList
 *
 * Purpose:
 *
-* Adds emptry callback entry to the treelist.
+* Adds empty callback entry to the treelist.
 *
 */
-VOID AddZeroEntryToList(
+VOID AddEmptyEntryToList(
     _In_ HWND TreeList,
     _In_ HTREEITEM RootItem,
-    _In_ ULONG_PTR Function,
     _In_opt_ LPWSTR lpAdditionalInfo
 )
 {
     TL_SUBITEMS_FIXED TreeListSubItems;
     WCHAR szAddress[32];
-    WCHAR szBuffer[MAX_PATH + 1];
 
     RtlSecureZeroMemory(&TreeListSubItems, sizeof(TreeListSubItems));
     TreeListSubItems.Count = 2;
 
-    szAddress[0] = TEXT('0');
-    szAddress[1] = TEXT('x');
-    szAddress[2] = 0;
-    u64tohex(Function, &szAddress[2]);
-    TreeListSubItems.Text[0] = szAddress;
+    szAddress[0] = L'0';
+    szAddress[1] = L'x';
+    u64tohex(0, &szAddress[2]);
 
-    _strcpy(szBuffer, TEXT("Nothing"));
-
-    TreeListSubItems.Text[0] = szBuffer;
-
-    if (Function == 0) {
-        TreeListSubItems.Text[1] = T_CannotQuery;
+    TreeListSubItems.Text[0] = T_EmptyString;
+    if (lpAdditionalInfo) {
+        TreeListSubItems.Text[1] = lpAdditionalInfo;
     }
     else {
-        if (lpAdditionalInfo) {
-            TreeListSubItems.Text[1] = lpAdditionalInfo;
-        }
-        else {
-            TreeListSubItems.Text[1] = T_EmptyString;
-        }
+        TreeListSubItems.Text[1] = T_EmptyString;
     }
 
     supTreeListAddItem(
@@ -2995,16 +3431,14 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPsAltSystemCallHandlers)
 
         for (i = 0; i < MAX_ALT_SYSTEM_CALL_HANDLERS; i++) {
 
-            if (AltSystemCallHandlers[i]) {
-
-                if (AltSystemCallHandlers[i] < g_kdctx.SystemRangeStart)
-                    continue;
+            if (AltSystemCallHandlers[i] > g_kdctx.SystemRangeStart) {
 
                 AddEntryToList(TreeList,
                     RootItem,
                     AltSystemCallHandlers[i],
                     NULL,
                     Modules);
+
             }
         }
     }
@@ -3193,6 +3627,8 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCmCallbacks)
 
     HTREEITEM RootItem;
 
+    WCHAR szCookie[100];
+
     //
     // Add callback root entry to the treelist.
     //
@@ -3213,6 +3649,8 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCmCallbacks)
         return;
     }
 
+    RtlSecureZeroMemory(&szCookie, sizeof(szCookie));
+
     //
     // Walk list entries.
     //
@@ -3227,10 +3665,15 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCmCallbacks)
             break;
         }
 
+        RtlStringCchPrintfSecure(szCookie,
+            RTL_NUMBER_OF(szCookie),
+            TEXT("Cookie: 0x%llX"),
+            CallbackRecord.Cookie);
+
         AddEntryToList(TreeList,
             RootItem,
             (ULONG_PTR)CallbackRecord.Function,
-            NULL,
+            szCookie,
             Modules);
 
         ListEntry.Flink = CallbackRecord.CallbackListEntry.Flink;
@@ -3612,7 +4055,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCallbacks)
     if (g_NtBuildNumber >= NT_WIN10_REDSTONE1)
         ReadSize = sizeof(POP_POWER_SETTING_REGISTRATION_V2);
 
-    __try {
+    do {
 
         //
         // Allocate read buffer with enough size.
@@ -3621,7 +4064,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCallbacks)
         BufferSize = sizeof(POP_POWER_SETTING_REGISTRATION_V1) + sizeof(POP_POWER_SETTING_REGISTRATION_V2);
         Buffer = supHeapAlloc(BufferSize);
         if (Buffer == NULL)
-            __leave;
+            break;
 
         CallbackData.Ref = (PBYTE)Buffer;
 
@@ -3633,7 +4076,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCallbacks)
             &ListEntry,
             sizeof(LIST_ENTRY)))
         {
-            __leave;
+            break;
         }
 
         //
@@ -3689,14 +4132,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCallbacks)
             ListEntry.Flink = CallbackData.Versions.v1->Link.Flink;
         }
 
-    }
-    __finally {
+    } while (FALSE); 
 
-        if (AbnormalTermination())
-            supReportAbnormalTermination(__FUNCTIONW__);
-
-        if (Buffer) supHeapFree(Buffer);
-    }
+    if (Buffer) supHeapFree(Buffer);
 }
 
 /*
@@ -4028,14 +4466,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks)
                             Modules);
 
                     }
-                    else {
 
-                        AddZeroEntryToList(TreeList,
-                            RootItem,
-                            CallbacksData[i],
-                            CallbackName);
-
-                    }
                 }
             }
             supVirtualFree(CallbacksData);
@@ -4101,14 +4532,6 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks)
                             *DataPtr,
                             CallbackName,
                             Modules);
-
-                    }
-                    else {
-
-                        AddZeroEntryToList(TreeList,
-                            RootItem,
-                            0,
-                            CallbackName);
 
                     }
 
@@ -4460,6 +4883,301 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCoalescingCallbacks)
     }
 }
 
+LPWSTR PspPicoProviderNameFromIndex(
+    _In_ SIZE_T Index
+)
+{
+    LPWSTR LxpNames[] = {
+        L"PicoSystemCallDispatch", 
+        L"PicoThreadExit",
+        L"PicoProcessExit",
+        L"PicoDispatchException",
+        L"PicoProcessTerminate",
+        L"PicoWalkUserStack",
+        L"LxpProtectedRanges",
+        L"PicoGetAllocatedProcessImageName"
+    };
+
+    if (Index >= RTL_NUMBER_OF(LxpNames))
+        return T_Unknown;
+
+    return LxpNames[Index];
+}
+
+/*
+* DumpPspPicoProviderRoutines
+*
+* Purpose:
+*
+* Read PspPicoProviderRoutines data from kernel and send them to output window.
+*
+*/
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpPspPicoProviderRoutines)
+{
+    SIZE_T i, c;
+
+    PULONG_PTR picoRoutines;
+    SIZE_T dataSize;
+
+    HTREEITEM RootItem;
+
+    if (!supIsLxssAvailable())
+        return;
+
+    //
+    // Add callback root entry to the treelist.
+    //
+    RootItem = AddRootEntryToList(TreeList, CallbackType);
+    if (RootItem == 0)
+        return;
+
+    dataSize = 0;
+    if (kdReadSystemMemory(KernelVariableAddress,
+        &dataSize,
+        sizeof(dataSize)))
+    {
+        if (dataSize < 2 * sizeof(SIZE_T) ||
+            dataSize > PAGE_SIZE)
+        {
+            return;
+        }
+
+        dataSize -= sizeof(SIZE_T); //exclude size element
+
+        picoRoutines = (PULONG_PTR)supHeapAlloc(ALIGN_UP(dataSize, PULONG_PTR));
+        if (picoRoutines) {
+
+            if (kdReadSystemMemory(KernelVariableAddress + sizeof(SIZE_T),
+                picoRoutines,
+                (ULONG)dataSize))
+            {
+                c = dataSize / sizeof(ULONG_PTR);
+
+                for (i = 0; i < c; i++) {
+                    if (picoRoutines[i] > g_kdctx.SystemRangeStart) {
+                        AddEntryToList(TreeList,
+                            RootItem,
+                            (ULONG_PTR)picoRoutines[i],
+                            PspPicoProviderNameFromIndex(i),
+                            Modules);
+                    }
+                }
+            }
+
+            supHeapFree(picoRoutines);
+        }
+
+    }
+
+}
+
+/*
+* DumpKiNmiCallbackListHead
+*
+* Purpose:
+*
+* Read NMI callback list from kernel and send them to output window.
+*
+*/
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpKiNmiCallbackListHead)
+{
+    ULONG_PTR Next;
+    KNMI_HANDLER_CALLBACK NmiEntry;
+    HTREEITEM RootItem;
+
+    //
+    // Add callback root entry to the treelist.
+    //
+    RootItem = AddRootEntryToList(TreeList, CallbackType);
+    if (RootItem == 0)
+        return;
+
+    //
+    // Read head.
+    //
+    RtlSecureZeroMemory(&NmiEntry, sizeof(NmiEntry));
+
+    if (!kdReadSystemMemory(KernelVariableAddress,
+        (PVOID)&NmiEntry,
+        sizeof(NmiEntry)))
+    {
+        return;
+    }
+
+    //
+    // Walk each entry in single linked list.
+    //
+    Next = (ULONG_PTR)NmiEntry.Next;
+    while (Next) {
+
+        RtlSecureZeroMemory(&NmiEntry, sizeof(NmiEntry));
+
+        if (!kdReadSystemMemory(Next,
+            (PVOID)&NmiEntry,
+            sizeof(NmiEntry)))
+        {
+            break;
+        }
+
+        AddEntryToList(TreeList,
+            RootItem,
+            (ULONG_PTR)NmiEntry.Callback,
+            NULL,
+            Modules);
+
+        Next = (ULONG_PTR)NmiEntry.Next;
+
+    }
+
+}
+
+/*
+* DumpPspSiloMonitorList
+*
+* Purpose:
+*
+* Read Silo monitor callbacks from kernel and send them to output window.
+*
+*/
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpPspSiloMonitorList)
+{
+    LIST_ENTRY ListEntry;
+    ULONG_PTR ListHead = KernelVariableAddress;
+    HTREEITEM RootItem;
+
+    SERVER_SILO_MONITOR SiloMonitor;
+
+    //
+    // Add callback root entry to the treelist.
+    //
+    RootItem = AddRootEntryToList(TreeList, CallbackType);
+    if (RootItem == 0)
+        return;
+
+    ListEntry.Flink = ListEntry.Blink = NULL;
+
+    //
+    // Read head.
+    //
+    if (!kdReadSystemMemory(
+        ListHead,
+        &ListEntry,
+        sizeof(LIST_ENTRY)))
+    {
+        return;
+    }
+
+    //
+    // Walk list entries.
+    //
+    while ((ULONG_PTR)ListEntry.Flink != ListHead) {
+
+        RtlSecureZeroMemory(&SiloMonitor, sizeof(SiloMonitor));
+
+        if (!kdReadSystemMemory(
+            (ULONG_PTR)ListEntry.Flink,
+            &SiloMonitor,
+            sizeof(SiloMonitor)))
+        {
+            break;
+        }
+
+        if (SiloMonitor.CreateCallback != NULL) {
+            AddEntryToList(TreeList,
+                RootItem,
+                (ULONG_PTR)SiloMonitor.CreateCallback,
+                L"CreateCallback",
+                Modules);
+        }
+
+        if (SiloMonitor.TerminateCallback != NULL) {
+            AddEntryToList(TreeList,
+                RootItem,
+                (ULONG_PTR)SiloMonitor.TerminateCallback,
+                L"TerminateCallback",
+                Modules);
+        }
+
+        if (SiloMonitor.ListEntry.Flink == NULL)
+            break;
+
+        ListEntry.Flink = SiloMonitor.ListEntry.Flink;
+    }
+
+}
+
+/*
+* DumpEmpCallbackListHead
+*
+* Purpose:
+*
+* Read Errata Manager callbacks from kernel and send them to output window.
+*
+*/
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpEmpCallbackListHead)
+{
+    SINGLE_LIST_ENTRY Head;
+    LPWSTR GuidString;
+    ULONG_PTR ListHead = KernelVariableAddress, Next, RecordAddress;
+    HTREEITEM RootItem;
+
+    EMP_CALLBACK_DB_RECORD CallbackRecord;
+
+    UNICODE_STRING ConvertedGuid;
+
+    //
+    // Add callback root entry to the treelist.
+    //
+    RootItem = AddRootEntryToList(TreeList, CallbackType);
+    if (RootItem == 0)
+        return;
+
+    //
+    // Read head.
+    //
+    Head.Next = NULL;
+    if (!kdReadSystemMemory(
+        ListHead,
+        &Head,
+        sizeof(SINGLE_LIST_ENTRY)))
+    {
+        return;
+    }
+
+    Next = (ULONG_PTR)Head.Next;
+    while (Next) {
+
+        RtlSecureZeroMemory(&CallbackRecord, sizeof(CallbackRecord));
+        RecordAddress = (ULONG_PTR)Next - FIELD_OFFSET(EMP_CALLBACK_DB_RECORD, List);
+
+        if (!kdReadSystemMemory(RecordAddress, &CallbackRecord, sizeof(CallbackRecord)))
+            break;
+
+        if (NT_SUCCESS(RtlStringFromGUID(&CallbackRecord.CallbackId, &ConvertedGuid)))
+            GuidString = ConvertedGuid.Buffer;
+        else
+            GuidString = NULL;
+
+        if (CallbackRecord.CallbackFunc) {
+            AddEntryToList(TreeList,
+                RootItem,
+                (ULONG_PTR)CallbackRecord.CallbackFunc,
+                GuidString,
+                Modules);
+        }
+        else {
+            AddEmptyEntryToList(TreeList,
+                RootItem,
+                GuidString);
+        }
+
+        if (GuidString)
+            RtlFreeUnicodeString(&ConvertedGuid);
+
+        Next = (ULONG_PTR)CallbackRecord.List.Next;
+    }
+}
+
 /*
 * QueryIopFsListsCallbacks
 *
@@ -4612,19 +5330,19 @@ VOID DisplayCallbacksList(
 
     WCHAR szText[200];
 
-    __try {
+    do {
+
+        if (g_kdctx.NtOsImageMap == NULL) {
+            lpStatusMsg = TEXT("Error, ntoskrnl image is not mapped!");
+            supStatusBarSetText(StatusBar, 1, lpStatusMsg);
+            break;
+        }
 
         Modules = (PRTL_PROCESS_MODULES)supGetLoadedModulesList(NULL);
         if (Modules == NULL) {
             lpStatusMsg = TEXT("Could not allocate memory for modules list!");
             supStatusBarSetText(StatusBar, 1, lpStatusMsg);
-            __leave;
-        }
-
-        if (g_kdctx.NtOsImageMap == NULL) {
-            lpStatusMsg = TEXT("Error, ntoskrnl image is not mapped!");
-            supStatusBarSetText(StatusBar, 1, lpStatusMsg);
-            __leave;
+            break;
         }
 
         //
@@ -4645,12 +5363,12 @@ VOID DisplayCallbacksList(
 
                 if (QueryStatus == STATUS_NOT_FOUND) {
 #ifdef _DEBUG
-                    RtlStringCchPrintfSecure(szText, 
+                    RtlStringCchPrintfSecure(szText,
                         RTL_NUMBER_OF(szText),
                         TEXT("Callback type %ws was not found"),
                         g_CallbacksDispatchTable[i].CallbackType);
 
-                    logAdd(WOBJ_LOG_ENTRY_WARNING, szText);
+                    logAdd(EntryTypeWarning, szText);
 
 #endif
                 }
@@ -4662,7 +5380,7 @@ VOID DisplayCallbacksList(
                         g_CallbacksDispatchTable[i].CallbackType,
                         QueryStatus);
 
-                    logAdd(WOBJ_LOG_ENTRY_ERROR, szText);
+                    logAdd(EntryTypeError, szText);
                     supStatusBarSetText(StatusBar, 1, (LPWSTR)&szText);
                 }
             }
@@ -4675,15 +5393,9 @@ VOID DisplayCallbacksList(
         ultostr(g_CallbacksCount, _strend(szText));
         supStatusBarSetText(StatusBar, 0, (LPWSTR)&szText);
 
-    }
-    __finally {
+    } while (FALSE);
 
-        if (AbnormalTermination())
-            supReportAbnormalTermination(__FUNCTIONW__);
-
-        if (Modules) supHeapFree(Modules);
-    }
-
+    if (Modules) supHeapFree(Modules);
     SetFocus(TreeList);
 }
 
@@ -4774,35 +5486,12 @@ VOID CallbackDialogContentRefresh(
     _In_ BOOL fResetContent
 )
 {
-#ifndef _DEBUG
-    HWND hwndBanner = supDisplayLoadBanner(
-        hwndDlg,
-        TEXT("Processing callbacks list, please wait"),
-        NULL,
-        FALSE);
-#else
     UNREFERENCED_PARAMETER(hwndDlg);
-#endif
-
-    __try {
-
-        if (fResetContent) TreeList_ClearTree(pDlgContext->TreeList);
-
-        g_CallbacksCount = 0;
-
-        supTreeListEnableRedraw(pDlgContext->TreeList, FALSE);
-
-        DisplayCallbacksList(pDlgContext->TreeList, pDlgContext->StatusBar);
-
-    }
-    __finally {
-
-        supTreeListEnableRedraw(pDlgContext->TreeList, TRUE);
-
-#ifndef _DEBUG
-        supCloseLoadBanner(hwndBanner);
-#endif
-    }
+    if (fResetContent) TreeList_ClearTree(pDlgContext->TreeList);
+    g_CallbacksCount = 0;
+    supTreeListEnableRedraw(pDlgContext->TreeList, FALSE);
+    DisplayCallbacksList(pDlgContext->TreeList, pDlgContext->StatusBar);
+    supTreeListEnableRedraw(pDlgContext->TreeList, TRUE);
 }
 
 /*

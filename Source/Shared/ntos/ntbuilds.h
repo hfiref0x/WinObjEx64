@@ -83,4 +83,4 @@
 #define NT_WIN11_22H2           22610
 
 // Windows 11 Active Develepment Branch (23H2)
-#define NTX_WIN11_ADB           25115
+#define NTX_WIN11_ADB           25120

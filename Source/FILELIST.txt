@@ -63,6 +63,10 @@ winobjex64\extras\extrasSL.h
 winobjex64\extras\extrasUSD.c
 winobjex64\extras\extrasUSD.h
 
+* CmControlVector dialog *
+winobjex64\extras\extrasCmOpt.c
+winobjex64\extras\extrasCmOpt.h
+
 * Find Object routines including window dialog procedure *
 winobjex64\findDlg.c
 winobjex64\findDlg.h

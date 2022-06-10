@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.94
 *
-*  DATE:        31 May 2022
+*  DATE:        04 Jun 2022
 *
 *  Common header file for Configuration Manager options dialog.
 *
@@ -20,4 +20,4 @@
 #pragma once
 
 VOID extrasCreateCmOptDialog(
-    _In_ HWND hwndParent);
+    VOID);

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2020
+*  (C) COPYRIGHT AUTHORS, 2019 - 2022
 *
 *  TITLE:       PLUGINMNGR.H
 *
-*  VERSION:     1.87
+*  VERSION:     1.94
 *
-*  DATE:        17 July 2020
+*  DATE:        07 Jun 2022
 *
 *  Common header file for the plugin manager.
 *
@@ -157,16 +157,17 @@ typedef BOOLEAN(CALLBACK* pfnPluginInit)(
     _Inout_ PWINOBJEX_PLUGIN PluginData
     );
 
-VOID PmCreate(_In_ HWND MainWindow);
+VOID PmCreate(_In_ HWND ParentWindow);
 VOID PmDestroy();
 
 VOID PmProcessEntry(
     _In_ HWND ParentWindow,
-    _In_ UINT Id);
+    _In_ UINT Id,
+    _In_opt_ HTREEITEM ObjectTreeItem);
 
 VOID PmBuildPluginPopupMenuByObjectType(
     _In_ HMENU ContextMenu,
     _In_ UCHAR ObjectType);
 
 VOID PmViewPlugins(
-    _In_ HWND ParentWindow);
+    VOID);

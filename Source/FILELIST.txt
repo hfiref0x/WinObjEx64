@@ -18,6 +18,10 @@ winobjex64\drivers\alice.h
 winobjex64\aboutDlg.c
 winobjex64\aboutDlg.h
 
+* System information dialog routines including window dialog procedure *
+winobjex64\sysinfoDlg.c
+winobjex64\sysinfoDlg.h
+
 * Custom access violation exception handler including minidump *
 winobjex64\excepth.c
 winobjex64\excepth.h
@@ -42,6 +46,7 @@ winobjex64\extras\extrasDrivers.h
 * KiServiceTable/W32pServiceTable list *
 winobjex64\extras\extrasSSDT.c
 winobjex64\extras\extrasSSDT.h
+winobjex64\extras\extrasSSDTsup.h
 
 * Pipes and mailslots dialog *
 winobjex64\extras\extrasIPC.c

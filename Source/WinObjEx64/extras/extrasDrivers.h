@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2016 - 2021
+*  (C) COPYRIGHT AUTHORS, 2016 - 2022
 *
 *  TITLE:       EXTRASDRIVERS.H
 *
-*  VERSION:     1.90
+*  VERSION:     1.94
 *
-*  DATE:        11 May 2021
+*  DATE:        04 Jun 2022
 *
 *  Common header file for Drivers dialog.
 *
@@ -18,12 +18,5 @@
 *******************************************************************************/
 #pragma once
 
-typedef enum _DRIVERS_DLG_MODE {
-    DDM_Normal = 0,
-    DDM_Unloaded = 1,
-    DDM_Max
-} DRIVERS_DLG_MODE;
-
 VOID extrasCreateDriversDialog(
-    _In_ HWND hwndParent,
-    _In_ DRIVERS_DLG_MODE dialogMode);
+    _In_ DRIVERS_DLG_MODE Mode);

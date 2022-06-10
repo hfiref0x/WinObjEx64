@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.94
 *
-*  DATE:        31 May 2022
+*  DATE:        04 Jun 2022
 *
 *  Plugin manager.
 *
@@ -20,8 +20,11 @@
 #include "global.h"
 #include "ui.h"
 
-LIST_ENTRY g_PluginsListHead;
+static LIST_ENTRY g_PluginsListHead;
 volatile UINT g_PluginCount = 0;
+
+static HANDLE PmDlgThreadHandle = NULL;
+static FAST_EVENT PmDlgInitializedEvent = FAST_EVENT_INIT;
 
 /*
 * PmpReadSystemMemoryEx
@@ -291,7 +294,7 @@ DWORD WINAPI PmpWorkerThread(
 )
 {
     BOOLEAN PluginInitialized;
-    HWND MainWindow = (HWND)Parameter;
+    HWND ParentWindow = (HWND)Parameter;
     BOOL MenuInitialized = FALSE;
 
     WCHAR szSearchDirectory[1024];
@@ -304,7 +307,7 @@ DWORD WINAPI PmpWorkerThread(
     WIN32_FIND_DATA fdata;
 
     INT cMenu;
-    HMENU hMainMenu = GetMenu(MainWindow), hPluginMenu = NULL, hMenuFile;
+    HMENU hMainMenu = GetMenu(ParentWindow), hPluginMenu = NULL, hMenuFile;
     MENUITEMINFO MenuItem;
 
     WINOBJEX_PLUGIN_INTERNAL* PluginEntry;
@@ -374,7 +377,7 @@ DWORD WINAPI PmpWorkerThread(
                             PluginInitialized = PluginInit(&PluginEntry->Plugin);
                         }
                         __except (WOBJ_EXCEPTION_FILTER_LOG) {
-                            PmpShowInitializationError(MainWindow, GetExceptionCode(), fdata.cFileName);
+                            PmpShowInitializationError(ParentWindow, GetExceptionCode(), fdata.cFileName);
                             PluginInitialized = FALSE;
                         }
 
@@ -419,7 +422,7 @@ DWORD WINAPI PmpWorkerThread(
                                             &MenuItem);
 
                                         if (MenuInitialized)
-                                            DrawMenuBar(MainWindow);
+                                            DrawMenuBar(ParentWindow);
 
                                     }
                                 }
@@ -489,17 +492,13 @@ DWORD WINAPI PmpWorkerThread(
 *
 */
 VOID PmCreate(
-    _In_ HWND MainWindow
+    _In_ HWND ParentWindow
 )
 {
-    DWORD ThreadId;
-
-    HANDLE hThread = CreateThread(NULL,
-        0,
+    HANDLE hThread = supCreateThread(
         (LPTHREAD_START_ROUTINE)PmpWorkerThread,
-        (PVOID)MainWindow,
-        0,
-        &ThreadId);
+        (PVOID)ParentWindow,
+        0);
 
     if (hThread) CloseHandle(hThread);
 }
@@ -602,7 +601,8 @@ VOID PmpFreeObjectData(
 */
 BOOL PmpAllocateObjectData(
     _In_ HWND ParentWindow,
-    _In_ PWINOBJEX_PARAM_OBJECT ObjectPtr
+    _In_ PWINOBJEX_PARAM_OBJECT ObjectPtr,
+    _In_opt_ HTREEITEM ObjectTreeItem
 )
 {
     INT     nSelected;
@@ -633,7 +633,7 @@ BOOL PmpAllocateObjectData(
     }
     else
         if (ParentWindow == g_hwndObjectTree) {
-            if (g_SelectedTreeItem) {
+            if (ObjectTreeItem) {
 
                 RtlSecureZeroMemory(&tvi, sizeof(TV_ITEM));
 
@@ -642,7 +642,7 @@ BOOL PmpAllocateObjectData(
                 tvi.pszText = szBuffer;
                 tvi.cchTextMax = MAX_PATH;
                 tvi.mask = TVIF_TEXT;
-                tvi.hItem = g_SelectedTreeItem;
+                tvi.hItem = ObjectTreeItem;
                 if (TreeView_GetItem(g_hwndObjectTree, &tvi)) {
                     lpObjectName = (LPWSTR)&szBuffer;
                     bNameAllocated = FALSE;
@@ -690,7 +690,8 @@ BOOL PmpAllocateObjectData(
 */
 VOID PmProcessEntry(
     _In_ HWND ParentWindow,
-    _In_ UINT Id
+    _In_ UINT Id,
+    _In_opt_ HTREEITEM ObjectTreeItem
 )
 {
     NTSTATUS ntStatus;
@@ -779,7 +780,7 @@ VOID PmProcessEntry(
             //
             if (PluginEntry->Plugin.Type == ContextPlugin) {
 
-                if (!PmpAllocateObjectData(ParentWindow, &ParamBlock.Object)) {
+                if (!PmpAllocateObjectData(ParentWindow, &ParamBlock.Object, ObjectTreeItem)) {
                     
                     MessageBox(ParentWindow, 
                         TEXT("Cannot allocate memory for plugin data"), 
@@ -1202,7 +1203,7 @@ INT_PTR CALLBACK PmpDialogProc(
     switch (uMsg) {
 
     case WM_INITDIALOG:
-        supCenterWindow(hwndDlg);
+        supCenterWindowSpecifyParent(hwndDlg, g_WinObj.MainWindow);
         PmpEnumerateEntries(hwndDlg);
         break;
 
@@ -1210,18 +1211,69 @@ INT_PTR CALLBACK PmpDialogProc(
 
         if (LOWORD(wParam) == IDCANCEL) {
             DestroyWindow(hwndDlg);
-            g_WinObj.AuxDialogs[wobjPluginViewId] = NULL;
         }
+        break;
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
         break;
 
     case WM_NOTIFY:
         PmpHandleNotify(hwndDlg, lParam);
         break;
 
-    default:
-        return FALSE;
     }
-    return TRUE;
+
+    return FALSE;
+}
+
+/*
+* PmViewPluginsWorkerThread
+*
+* Purpose:
+*
+* Plugins view dialog worker thread.
+*
+*/
+DWORD PmViewPluginsWorkerThread(
+    _In_ PVOID Parameter
+)
+{
+    BOOL bResult;
+    MSG message;
+    HWND hwndDlg;
+
+    UNREFERENCED_PARAMETER(Parameter);
+
+    hwndDlg = CreateDialogParam(g_WinObj.hInstance,
+        MAKEINTRESOURCE(IDD_DIALOG_VIEWPLUGINS),
+        0,
+        &PmpDialogProc,
+        0);
+
+    supSetFastEvent(&PmDlgInitializedEvent);
+
+    do {
+
+        bResult = GetMessage(&message, NULL, 0, 0);
+        if (bResult == -1)
+            break;
+
+        if (!IsDialogMessage(hwndDlg, &message)) {
+            TranslateMessage(&message);
+            DispatchMessage(&message);
+        }
+
+    } while (bResult != 0);
+
+    supResetFastEvent(&PmDlgInitializedEvent);
+
+    if (PmDlgThreadHandle) {
+        NtClose(PmDlgThreadHandle);
+        PmDlgThreadHandle = NULL;
+    }
+
+    return 0;
 }
 
 /*
@@ -1233,13 +1285,13 @@ INT_PTR CALLBACK PmpDialogProc(
 *
 */
 VOID PmViewPlugins(
-    _In_ HWND ParentWindow)
+    VOID
+)
 {
-    ENSURE_DIALOG_UNIQUE(g_WinObj.AuxDialogs[wobjPluginViewId]);
+    if (!PmDlgThreadHandle) {
 
-    g_WinObj.AuxDialogs[wobjPluginViewId] = CreateDialogParam(g_WinObj.hInstance,
-        MAKEINTRESOURCE(IDD_DIALOG_VIEWPLUGINS),
-        ParentWindow,
-        &PmpDialogProc,
-        0);
+        PmDlgThreadHandle = supCreateDialogWorkerThread(PmViewPluginsWorkerThread, NULL, 0);
+        supWaitForFastEvent(&PmDlgInitializedEvent, NULL);
+
+    }
 }

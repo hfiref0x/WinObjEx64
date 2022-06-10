@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTSUP.H
 *
-*  VERSION:     2.11
+*  VERSION:     2.13
 *
-*  DATE:        22 Apr 2022
+*  DATE:        04 Jun 2022
 *
 *  Common header file for the NT API support functions and definitions.
 *
@@ -58,7 +58,7 @@ extern "C" {
 #endif
 
 typedef NTSTATUS(NTAPI* PFN_NTQUERYROUTINE)(
-   _In_ HANDLE ObjectHandle,
+   _In_opt_ HANDLE ObjectHandle,
    _In_ DWORD InformationClass,
    _Out_writes_bytes_(ObjectInformationLength) PVOID ObjectInformation,
    _In_ ULONG ObjectInformationLength,
@@ -196,39 +196,15 @@ BOOL ntsupQueryProcessEntryById(
     _In_ PVOID ProcessList,
     _Out_ PSYSTEM_PROCESSES_INFORMATION* Entry);
 
-NTSTATUS ntsupQueryProcessInformation(
-    _In_ HANDLE ProcessHandle,
-    _In_ PROCESSINFOCLASS ProcessInformationClass,
-    _Out_ PVOID* Buffer,
-    _Out_opt_ PULONG ReturnLength,
-    _In_ PNTSUPMEMALLOC AllocMem,
-    _In_ PNTSUPMEMFREE FreeMem);
-
 NTSTATUS ntsupQueryProcessImageFileNameByProcessId(
     _In_ HANDLE UniqueProcessId,
     _Out_ PUNICODE_STRING ProcessImageFileName,
     _In_ PNTSUPMEMALLOC AllocMem,
     _In_ PNTSUPMEMFREE FreeMem);
 
-NTSTATUS ntsupQueryObjectInformation(
-    _In_ HANDLE ObjectHandle,
-    _In_ OBJECT_INFORMATION_CLASS ObjectInformationClass,
-    _Out_ PVOID* Buffer,
-    _Out_opt_ PULONG ReturnLength,
-    _In_ PNTSUPMEMALLOC AllocMem,
-    _In_ PNTSUPMEMFREE FreeMem);
-
-NTSTATUS ntsupQuerySecurityInformation(
-    _In_ HANDLE ObjectHandle,
-    _In_ SECURITY_INFORMATION SecurityInformationClass,
-    _Out_ PVOID* Buffer,
-    _Out_opt_ PULONG ReturnLength,
-    _In_ PNTSUPMEMALLOC AllocMem,
-    _In_ PNTSUPMEMFREE FreeMem);
-
 NTSTATUS ntsupQuerySystemObjectInformationVariableSize(
     _In_ PFN_NTQUERYROUTINE QueryRoutine,
-    _In_ HANDLE ObjectHandle,
+    _In_opt_ HANDLE ObjectHandle,
     _In_ DWORD InformationClass,
     _Out_ PVOID* Buffer,
     _Out_opt_ PULONG ReturnLength,
@@ -327,6 +303,40 @@ BOOLEAN ntsupIsKdEnabled(
 BOOLEAN ntsupIsObjectExists(
     _In_ LPCWSTR RootDirectory,
     _In_ LPCWSTR ObjectName);
+
+BOOLEAN ntsupUserIsFullAdmin(
+    VOID);
+
+#define ntsupQuerySecurityInformation(\
+     ObjectHandle, SecurityInformationClass, Buffer, ReturnLength, AllocMem, FreeMem) \
+ntsupQuerySystemObjectInformationVariableSize((PFN_NTQUERYROUTINE)NtQuerySecurityObject, \
+     ObjectHandle, SecurityInformationClass, (PVOID*)Buffer, ReturnLength,\
+    (PNTSUPMEMALLOC)AllocMem, (PNTSUPMEMFREE)FreeMem)
+
+#define ntsupQueryTokenInformation(\
+     TokenHandle, TokenInformationClass, Buffer, ReturnLength, AllocMem, FreeMem) \
+ntsupQuerySystemObjectInformationVariableSize((PFN_NTQUERYROUTINE)NtQueryInformationToken, \
+     TokenHandle, TokenInformationClass, (PVOID*)Buffer, ReturnLength,\
+    (PNTSUPMEMALLOC)AllocMem, (PNTSUPMEMFREE)FreeMem)
+
+#define ntsupQueryObjectInformation(\
+     ObjectHandle, ObjectInformationClass, Buffer, ReturnLength, AllocMem, FreeMem) \
+ntsupQuerySystemObjectInformationVariableSize((PFN_NTQUERYROUTINE)NtQueryObject, \
+    ObjectHandle, ObjectInformationClass, (PVOID*)Buffer, ReturnLength, \
+    (PNTSUPMEMALLOC)AllocMem, (PNTSUPMEMFREE)FreeMem)
+
+#define ntsupQueryThreadInformation(\
+    ThreadHandle, ThreadInformationClass, Buffer, ReturnLength, AllocMem, FreeMem) \
+ntsupQuerySystemObjectInformationVariableSize((PFN_NTQUERYROUTINE)NtQueryInformationThread, \
+    ThreadHandle, ThreadInformationClass, (PVOID*)Buffer, ReturnLength, \
+    (PNTSUPMEMALLOC)AllocMem, (PNTSUPMEMFREE)FreeMem)
+
+#define ntsupQueryProcessInformation(\
+    ProcessHandle, ProcessInformationClass, Buffer, ReturnLength, AllocMem, FreeMem)\
+ntsupQuerySystemObjectInformationVariableSize((PFN_NTQUERYROUTINE)NtQueryInformationProcess, \
+    ProcessHandle, ProcessInformationClass, (PVOID*)Buffer, ReturnLength, \
+    (PNTSUPMEMALLOC)AllocMem, (PNTSUPMEMFREE)FreeMem)
+
 
 #ifdef ENABLE_C_EXTERN
 #ifdef __cplusplus

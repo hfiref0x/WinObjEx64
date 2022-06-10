@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2018
+*  (C) COPYRIGHT AUTHORS, 2018 - 2022
 *
 *  TITLE:       EXTRASCALLBACKS.H
 *
-*  VERSION:     1.70
+*  VERSION:     1.94
 *
-*  DATE:        30 Nov 2018
+*  DATE:        04 Jun 2022
 *
 *  Common header file for Callbacks dialog.
 *
@@ -20,4 +20,4 @@
 #pragma once
 
 VOID extrasCreateCallbacksDialog(
-    _In_ HWND hwndParent);
+    VOID);

@@ -4,9 +4,9 @@
 *
 *  TITLE:       SYMPARSER.H
 *
-*  VERSION:     1.17
+*  VERSION:     1.18
 *
-*  DATE:        13 May 2022
+*  DATE:        05 Jun 2022
 *
 *  Header file of DbgHelp wrapper for symbols parser support.
 *
@@ -313,6 +313,7 @@ typedef struct _SYMPARSER {
 typedef struct _SYMCONTEXT {
     DWORD64 ModuleBase;
     HANDLE ProcessHandle;
+    DWORD SymLastError;
     DBGHELP_PTRS DbgHelp;
     SYMPARSER Parser;
 } SYMCONTEXT, * PSYMCONTEXT;

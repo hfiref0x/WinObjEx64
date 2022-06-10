@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.94
 *
-*  DATE:        31 May 2022
+*  DATE:        05 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -22,6 +22,9 @@
 EXTRASCONTEXT PnDlgContext;
 ULONG PNSNumberOfObjects = 0;
 HANDLE PNSObjectsHeap = NULL;
+
+static HANDLE PnDlgThreadHandle = NULL;
+static FAST_EVENT PnDlgInitializedEvent = FAST_EVENT_INIT;
 
 #ifdef _USE_OWN_DRIVER
 #define T_NAMESPACE_QUERY_FAILED TEXT("Unable to list namespaces! Make sure you run this program as Admin.")
@@ -79,52 +82,45 @@ VOID PNDlgShowObjectProperties(
     //
     ENSURE_DIALOG_UNIQUE(g_NamespacePropWindow);
 
-    __try {
+    //
+    //  Get ref to object, failure here is critical.
+    //
+    if (!supGetListViewItemParam(PnDlgContext.ListView, iItem, (PVOID*)&objRef))
+        return;
 
-        //
-        //  Get ref to object, failure here is critical.
-        //
-        if (!supGetListViewItemParam(PnDlgContext.ListView, iItem, (PVOID*)&objRef))
-            return;
+    RtlCopyMemory(&pnsInfo, &objRef->PrivateNamespace, sizeof(OBJREFPNS));
+    RtlSecureZeroMemory(&propNamespace, sizeof(propNamespace));
 
-        RtlCopyMemory(&pnsInfo, &objRef->PrivateNamespace, sizeof(OBJREFPNS));
-        RtlSecureZeroMemory(&propNamespace, sizeof(propNamespace));
+    propNamespace.ObjectAddress = objRef->ObjectAddress;
 
-        propNamespace.ObjectAddress = objRef->ObjectAddress;
-
-        //
-        // Dump boundary descriptor, failure here is critical.
-        //
-        if (!NT_SUCCESS(ObCopyBoundaryDescriptor((OBJECT_NAMESPACE_ENTRY*)pnsInfo.NamespaceLookupEntry,
-            &propNamespace.BoundaryDescriptor,
-            &propNamespace.SizeOfBoundaryDescriptor)))
-        {
-            return;
-        }
-
-        lpName = supGetItemText(PnDlgContext.ListView, iItem, 0, NULL);
-        if (lpName) {
-            lpType = supGetItemText(PnDlgContext.ListView, iItem, 1, NULL);
-            if (lpType) {
-
-                RtlSecureZeroMemory(&propSettings, sizeof(propSettings));
-
-                propSettings.lpObjectName = lpName;
-                propSettings.lpObjectType = lpType;
-                propSettings.NamespaceObject = &propNamespace;
-
-                propCreateDialog(&propSettings);
-
-                supHeapFree(lpType);
-            }
-            supHeapFree(lpName);
-        }
-
-    }
-    __except (WOBJ_EXCEPTION_FILTER_LOG)
+    //
+    // Dump boundary descriptor, failure here is critical.
+    //
+    if (!NT_SUCCESS(ObCopyBoundaryDescriptor((OBJECT_NAMESPACE_ENTRY*)pnsInfo.NamespaceLookupEntry,
+        &propNamespace.BoundaryDescriptor,
+        &propNamespace.SizeOfBoundaryDescriptor)))
     {
         return;
     }
+
+    lpName = supGetItemText(PnDlgContext.ListView, iItem, 0, NULL);
+    if (lpName) {
+        lpType = supGetItemText(PnDlgContext.ListView, iItem, 1, NULL);
+        if (lpType) {
+
+            RtlSecureZeroMemory(&propSettings, sizeof(propSettings));
+
+            propSettings.lpObjectName = lpName;
+            propSettings.lpObjectType = lpType;
+            propSettings.NamespaceObject = &propNamespace;
+
+            propCreateDialog(&propSettings);
+
+            supHeapFree(lpType);
+        }
+        supHeapFree(lpName);
+    }
+
     //
     // propNamespace.BoundaryDescriptor will be freed by propDestroyContext.
     // 
@@ -213,7 +209,7 @@ BOOL CALLBACK PNDlgEnumerateCallback(
     lvItem.pszText = szBuffer;
     ListView_SetItem(PnDlgContext.ListView, &lvItem);
 
-    PNSNumberOfObjects++;
+    PNSNumberOfObjects += 1;
 
     return FALSE;
 }
@@ -227,37 +223,14 @@ BOOL CALLBACK PNDlgEnumerateCallback(
 *
 */
 BOOL PNDlgQueryInfo(
-    _In_ HWND hwndDlg
+    VOID
 )
 {
-#ifndef _DEBUG
-    HWND hwndBanner;
-#endif
-
     PNSNumberOfObjects = 0;
 
-#ifndef _DEBUG
-    hwndBanner = supDisplayLoadBanner(
-        hwndDlg,
-        TEXT("Loading private namespaces information, please wait"),
-        NULL,
-        FALSE);
-#else
-    UNREFERENCED_PARAMETER(hwndDlg);
-#endif
-
-    __try {
-
-        ObEnumeratePrivateNamespaceTable(
-            PNDlgEnumerateCallback,
-            (PVOID)PNSObjectsHeap);
-
-    }
-    __finally {
-#ifndef _DEBUG
-        SendMessage(hwndBanner, WM_CLOSE, 0, 0);
-#endif
-    }
+    ObEnumeratePrivateNamespaceTable(
+        PNDlgEnumerateCallback,
+        (PVOID)PNSObjectsHeap);
 
     return (PNSNumberOfObjects > 0);
 }
@@ -484,102 +457,95 @@ VOID PNDlgShowNamespaceInfo(
     if (iItem == -1)
         return;
 
-    __try {
-
-        if (!supGetListViewItemParam(PnDlgContext.ListView, iItem, (PVOID*)&objRef))
-            return;
-
-        RtlCopyMemory(&pnsInfo, &objRef->PrivateNamespace, sizeof(OBJREFPNS));
-
-        //
-        // Boundary Descriptor Entries.
-        //
-        ntStatus = ObCopyBoundaryDescriptor(
-            (OBJECT_NAMESPACE_ENTRY*)pnsInfo.NamespaceLookupEntry,
-            &BoundaryDescriptor,
-            NULL);
-
-        if (NT_SUCCESS(ntStatus)) {
-
-            //
-            // Namespace root directory.
-            //
-            RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-            szBuffer[0] = L'0';
-            szBuffer[1] = L'x';
-            u64tohex(pnsInfo.NamespaceDirectoryAddress, &szBuffer[2]);
-            SetDlgItemText(hwndDlg, ID_NAMESPACE_ROOT, szBuffer);
-
-            //
-            // Namespace Lookup table entry.
-            //
-            RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-            szBuffer[0] = L'0';
-            szBuffer[1] = L'x';
-            u64tohex(pnsInfo.NamespaceLookupEntry, &szBuffer[2]);
-            SetDlgItemText(hwndDlg, ID_OBJECT_ADDR, szBuffer);
-
-            //
-            // SizeOfBoundaryInformation.
-            //
-            RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-            szBuffer[0] = L'0';
-            szBuffer[1] = L'x';
-            ultohex(pnsInfo.SizeOfBoundaryInformation, &szBuffer[2]);
-            SetDlgItemText(hwndDlg, ID_SIZEOFBOUNDARYINFO, szBuffer);
-
-            //
-            // Boundary Descriptor Address.
-            //
-            BoundaryDescriptorAddress = (ULONG_PTR)RtlOffsetToPointer(
-                pnsInfo.NamespaceLookupEntry,
-                sizeof(OBJECT_NAMESPACE_ENTRY));
-
-            RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-            szBuffer[0] = L'0';
-            szBuffer[1] = L'x';
-            u64tohex(BoundaryDescriptorAddress, &szBuffer[2]);
-            SetDlgItemText(hwndDlg, ID_BDESCRIPTOR_ADDRESS, szBuffer);
-
-            //
-            // Number of entries.
-            //
-            RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-            ultostr(BoundaryDescriptor->Items, &szBuffer[0]);
-            SetDlgItemText(hwndDlg, ID_BDESCRIPTOR_ENTRIES, szBuffer);
-
-            ObEnumerateBoundaryDescriptorEntries(BoundaryDescriptor,
-                PNDlgBoundaryDescriptorCallback,
-                (PVOID)hwndDlg);
-
-            //
-            // Select first SID if present.
-            //
-            nSid = SendDlgItemMessage(hwndDlg, ID_BDESCRIPTOR_SID, CB_GETCOUNT, 0, 0);
-            
-            EnableWindow(GetDlgItem(hwndDlg, ID_BDESCRIPTOR_SID), (nSid > 0) ? TRUE : FALSE);
-            EnableWindow(GetDlgItem(hwndDlg, ID_BDESCRIPTOR_SID_COPY), (nSid > 0) ? TRUE : FALSE);
-
-            SendDlgItemMessage(hwndDlg, ID_BDESCRIPTOR_SID, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
-
-            supHeapFree(BoundaryDescriptor);
-        }
-        else {
-
-            RtlStringCchPrintfSecure(szBuffer, 100,
-                TEXT("%ws, error query PN for %p (NTSTATUS 0x%lX)"),
-                __FUNCTIONW__,
-                (PVOID)pnsInfo.NamespaceLookupEntry,
-                ntStatus);
-
-            logAdd(EntryTypeError, szBuffer);
-        }
-
-    }
-    __except (WOBJ_EXCEPTION_FILTER_LOG)
-    {
+    if (!supGetListViewItemParam(PnDlgContext.ListView, iItem, (PVOID*)&objRef))
         return;
+
+    RtlCopyMemory(&pnsInfo, &objRef->PrivateNamespace, sizeof(OBJREFPNS));
+
+    //
+    // Boundary Descriptor Entries.
+    //
+    ntStatus = ObCopyBoundaryDescriptor(
+        (OBJECT_NAMESPACE_ENTRY*)pnsInfo.NamespaceLookupEntry,
+        &BoundaryDescriptor,
+        NULL);
+
+    if (NT_SUCCESS(ntStatus)) {
+
+        //
+        // Namespace root directory.
+        //
+        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+        szBuffer[0] = L'0';
+        szBuffer[1] = L'x';
+        u64tohex(pnsInfo.NamespaceDirectoryAddress, &szBuffer[2]);
+        SetDlgItemText(hwndDlg, ID_NAMESPACE_ROOT, szBuffer);
+
+        //
+        // Namespace Lookup table entry.
+        //
+        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+        szBuffer[0] = L'0';
+        szBuffer[1] = L'x';
+        u64tohex(pnsInfo.NamespaceLookupEntry, &szBuffer[2]);
+        SetDlgItemText(hwndDlg, ID_OBJECT_ADDR, szBuffer);
+
+        //
+        // SizeOfBoundaryInformation.
+        //
+        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+        szBuffer[0] = L'0';
+        szBuffer[1] = L'x';
+        ultohex(pnsInfo.SizeOfBoundaryInformation, &szBuffer[2]);
+        SetDlgItemText(hwndDlg, ID_SIZEOFBOUNDARYINFO, szBuffer);
+
+        //
+        // Boundary Descriptor Address.
+        //
+        BoundaryDescriptorAddress = (ULONG_PTR)RtlOffsetToPointer(
+            pnsInfo.NamespaceLookupEntry,
+            sizeof(OBJECT_NAMESPACE_ENTRY));
+
+        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+        szBuffer[0] = L'0';
+        szBuffer[1] = L'x';
+        u64tohex(BoundaryDescriptorAddress, &szBuffer[2]);
+        SetDlgItemText(hwndDlg, ID_BDESCRIPTOR_ADDRESS, szBuffer);
+
+        //
+        // Number of entries.
+        //
+        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+        ultostr(BoundaryDescriptor->Items, &szBuffer[0]);
+        SetDlgItemText(hwndDlg, ID_BDESCRIPTOR_ENTRIES, szBuffer);
+
+        ObEnumerateBoundaryDescriptorEntries(BoundaryDescriptor,
+            PNDlgBoundaryDescriptorCallback,
+            (PVOID)hwndDlg);
+
+        //
+        // Select first SID if present.
+        //
+        nSid = SendDlgItemMessage(hwndDlg, ID_BDESCRIPTOR_SID, CB_GETCOUNT, 0, 0);
+
+        EnableWindow(GetDlgItem(hwndDlg, ID_BDESCRIPTOR_SID), (nSid > 0) ? TRUE : FALSE);
+        EnableWindow(GetDlgItem(hwndDlg, ID_BDESCRIPTOR_SID_COPY), (nSid > 0) ? TRUE : FALSE);
+
+        SendDlgItemMessage(hwndDlg, ID_BDESCRIPTOR_SID, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
+
+        supHeapFree(BoundaryDescriptor);
     }
+    else {
+
+        RtlStringCchPrintfSecure(szBuffer, 100,
+            TEXT("%ws, error query PN for %p (NTSTATUS 0x%lX)"),
+            __FUNCTIONW__,
+            (PVOID)pnsInfo.NamespaceLookupEntry,
+            ntStatus);
+
+        logAdd(EntryTypeError, szBuffer);
+    }
+
 }
 
 /*
@@ -707,7 +673,7 @@ VOID PNDialogShowInfo(
         PNDlgResetOutput();
     }
 
-    if (PNDlgQueryInfo(PnDlgContext.hwndDlg)) {
+    if (PNDlgQueryInfo()) {
         ListView_SortItemsEx(PnDlgContext.ListView, &PNListCompareFunc, 0);
     }
     else {
@@ -786,7 +752,21 @@ VOID PNDialogOnClose(
 {
     DestroyWindow(hwndDlg);
     if (PNSObjectsHeap) RtlDestroyHeap(PNSObjectsHeap);
-    g_WinObj.AuxDialogs[wobjPNSDlgId] = NULL;
+}
+
+/*
+* PNDialogOnInit
+*
+* Purpose:
+*
+* Private Namespace Dialog WM_INITDIALOG handler.
+*
+*/
+VOID PNDialogOnInit(
+    _In_ HWND hwndDlg
+)
+{
+    supCenterWindowSpecifyParent(hwndDlg, g_WinObj.MainWindow);
 }
 
 /*
@@ -817,7 +797,7 @@ INT_PTR CALLBACK PNDialogProc(
         break;
 
     case WM_INITDIALOG:
-        supCenterWindow(hwndDlg);
+        PNDialogOnInit(hwndDlg);
         break;
 
     case WM_CONTEXTMENU:
@@ -829,6 +809,10 @@ INT_PTR CALLBACK PNDialogProc(
             (pfnPopupMenuHandler)PNDialogHandlePopup,
             (PVOID)&PnDlgContext);
 
+        break;
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
         break;
 
     case WM_CLOSE:
@@ -877,16 +861,120 @@ INT_PTR CALLBACK PNDialogProc(
 
             break;
 
-        default:
-            break;
         }
 
         break;
-
-    default:
-        return FALSE;
     }
-    return TRUE;
+
+    return FALSE;
+}
+
+/*
+* extrasPNDialogWorkerThread
+*
+* Purpose:
+*
+* Private Namespaces Dialog worker thread.
+*
+*/
+DWORD extrasPNDialogWorkerThread(
+    _In_ PVOID Parameter
+)
+{
+    BOOL bResult;
+    MSG message;
+    HWND hwndDlg;
+    HACCEL acceleratorTable = NULL;
+
+    INT iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
+    LVCOLUMNS_DATA columnData[] =
+    {
+        { L"Name", 280, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  iImage },
+        { L"Type", 100, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE },
+        { L"RootDirectory", 140, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE }
+    };
+
+    UNREFERENCED_PARAMETER(Parameter);
+
+
+    RtlSecureZeroMemory(&PnDlgContext, sizeof(PnDlgContext));
+    
+    hwndDlg = CreateDialogParam(g_WinObj.hInstance, 
+        MAKEINTRESOURCE(IDD_DIALOG_PNAMESPACE),
+        0, 
+        &PNDialogProc, 
+        0);
+
+    if (hwndDlg) {
+
+        PnDlgContext.hwndDlg = hwndDlg;
+        PnDlgContext.ListView = GetDlgItem(PnDlgContext.hwndDlg, ID_NAMESPACELIST);
+        if (PnDlgContext.ListView) {
+
+            PnDlgContext.lvColumnHit = -1;
+            PnDlgContext.lvItemHit = -1;
+
+            //
+            // Set listview imagelist, style flags and theme.
+            //
+            supSetListViewSettings(PnDlgContext.ListView,
+                LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
+                FALSE,
+                TRUE,
+                g_ListViewImages,
+                LVSIL_SMALL);
+
+            //
+            // And columns and remember their count.
+            //
+            PnDlgContext.lvColumnCount = supAddLVColumnsFromArray(
+                PnDlgContext.ListView,
+                columnData,
+                RTL_NUMBER_OF(columnData));
+
+            //
+            // Initial call, nothing to refresh.
+            //
+            PNDialogShowInfo(FALSE);
+        }
+
+    }
+
+    supSetFastEvent(&PnDlgInitializedEvent);
+
+    if (hwndDlg) {
+
+        acceleratorTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
+
+        do {
+
+            bResult = GetMessage(&message, NULL, 0, 0);
+            if (bResult == -1)
+                break;
+
+            if (IsDialogMessage(hwndDlg, &message)) {
+                TranslateAccelerator(hwndDlg, acceleratorTable, &message);
+            }
+            else {
+                TranslateMessage(&message);
+                DispatchMessage(&message);
+            }
+
+        } while (bResult != 0);
+
+    }
+
+    supResetFastEvent(&PnDlgInitializedEvent);
+
+    if (acceleratorTable)
+        DestroyAcceleratorTable(acceleratorTable);
+
+    if (PnDlgThreadHandle) {
+        NtClose(PnDlgThreadHandle);
+        PnDlgThreadHandle = NULL;
+    }
+
+    return 0;
 }
 
 /*
@@ -898,58 +986,14 @@ INT_PTR CALLBACK PNDialogProc(
 *
 */
 VOID extrasCreatePNDialog(
-    _In_ HWND hwndParent
+    VOID
 )
 {
-    INT iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
-    LVCOLUMNS_DATA columnData[] =
-    {
-        { L"Name", 280, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  iImage },
-        { L"Type", 100, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE },
-        { L"RootDirectory", 140, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE }
-    };
+   
+    if (!PnDlgThreadHandle) {
 
-    //
-    // Allow only one dialog.
-    //
-    ENSURE_DIALOG_UNIQUE(g_WinObj.AuxDialogs[wobjPNSDlgId]);
+        PnDlgThreadHandle = supCreateDialogWorkerThread(extrasPNDialogWorkerThread, NULL, 0);
+        supWaitForFastEvent(&PnDlgInitializedEvent, NULL);
 
-    RtlSecureZeroMemory(&PnDlgContext, sizeof(PnDlgContext));
-    PnDlgContext.hwndDlg = CreateDialogParam(g_WinObj.hInstance, MAKEINTRESOURCE(IDD_DIALOG_PNAMESPACE),
-        hwndParent, &PNDialogProc, 0);
-
-    if (PnDlgContext.hwndDlg == NULL)
-        return;
-
-    g_WinObj.AuxDialogs[wobjPNSDlgId] = PnDlgContext.hwndDlg;
-
-    PnDlgContext.ListView = GetDlgItem(PnDlgContext.hwndDlg, ID_NAMESPACELIST);
-    if (PnDlgContext.ListView) {
-
-        PnDlgContext.lvColumnHit = -1;
-        PnDlgContext.lvItemHit = -1;
-
-        //
-        // Set listview imagelist, style flags and theme.
-        //
-        supSetListViewSettings(PnDlgContext.ListView,
-            LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
-            FALSE,
-            TRUE,
-            g_ListViewImages,
-            LVSIL_SMALL);
-
-        //
-        // And columns and remember their count.
-        //
-        PnDlgContext.lvColumnCount = supAddLVColumnsFromArray(
-            PnDlgContext.ListView,
-            columnData,
-            RTL_NUMBER_OF(columnData));
-
-        //
-        // Initial call, nothing to refresh.
-        //
-        PNDialogShowInfo(FALSE);
     }
 }

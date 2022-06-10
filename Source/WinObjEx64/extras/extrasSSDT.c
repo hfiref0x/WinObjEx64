@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.94
 *
-*  DATE:        31 May 2022
+*  DATE:        05 June 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,48 +17,10 @@
 #include "global.h"
 #include "hde/hde64.h"
 #include "extras.h"
-#include "extrasSSDT.h"
 #include "ntos/ntldr.h"
 #include "ksymbols.h"
-
-//
-// Win32kApiSetTable signatures
-//
-
-// lea reg, Win32kApiSetTable
-#define IL_Win32kApiSetTable                    7
-
-//
-// InitializeWin32Call search pattern
-//
-// push rbp
-// push r12
-// push r13
-// push r14
-// push r15
-//
-BYTE g_pbInitializeWin32CallPattern[] = {
-    0x55, 0x41, 0x54, 0x41, 0x55, 0x41, 0x56, 0x41, 0x57
-};
-
-//
-// Win32kApiSetTable adapter patterns
-//
-BYTE Win32kApiSetAdapterPattern1[] = {
-   0x4C, 0x8B, 0x15
-};
-BYTE Win32kApiSetAdapterPattern2[] = {
-   0x48, 0x8B, 0x05 
-};
-BYTE Win32kApiSetAdapterPattern3[] = {
-   0x4C, 0x8B, 0x1D // mov r11, value
-};
-
-W32K_API_SET_LOOKUP_PATTERN W32kApiSetAdapters[] = {
-    { sizeof(Win32kApiSetAdapterPattern1), Win32kApiSetAdapterPattern1 },
-    { sizeof(Win32kApiSetAdapterPattern2), Win32kApiSetAdapterPattern2 },
-    { sizeof(Win32kApiSetAdapterPattern3), Win32kApiSetAdapterPattern3 }
-};
+#include "extrasSSDT.h"
+#include "extrasSSDTsup.h"
 
 //
 // UI part
@@ -78,17 +40,12 @@ W32K_API_SET_LOOKUP_PATTERN W32kApiSetAdapters[] = {
 //
 SDT_TABLE KiServiceTable;
 SDT_TABLE W32pServiceTable;
-
 SYMCONTEXT *W32SymContext;
 
-EXTRASCONTEXT SSTDlgContext[SST_Max];
+static EXTRASCONTEXT SSTDlgContext[SST_Max];
+static HANDLE SdtDlgThreadHandles[SST_Max] = { NULL, NULL };
+static FAST_EVENT SdtDlgInitializedEvents[SST_Max] = { FAST_EVENT_INIT, FAST_EVENT_INIT };
 
-#define KSW_KiServiceTable L"KiServiceTable"
-#define KSW_KiServiceLimit L"KiServiceLimit"
-#define KSW_W32pServiceTable L"W32pServiceTable"
-#define KSW_W32pServiceLimit L"W32pServiceLimit"
-#define KSA_W32pServiceTable "W32pServiceTable"
-#define KSA_W32pServiceLimit "W32pServiceLimit"
 
 VOID SdtListCreate(
     _In_ HWND hwndDlg,
@@ -118,7 +75,9 @@ HMODULE SdtLoadWin32kImage(
 
         if (SymContext) {
             kdLoadSymbolsForNtImage(SymContext,
-                szBuffer);
+                szBuffer,
+                hModule, 
+                0);
 
         }
 
@@ -331,8 +290,12 @@ VOID SdtHandlePopupMenu(
 * Release memory allocated for SDT table globals.
 *
 */
-VOID SdtFreeGlobals()
+BOOL CALLBACK SdtFreeGlobals(
+    _In_opt_ PVOID Context
+)
 {
+    UNREFERENCED_PARAMETER(Context);
+
     if (KiServiceTable.Allocated) {
         supHeapFree(KiServiceTable.Table);
         KiServiceTable.Allocated = FALSE;
@@ -341,6 +304,8 @@ VOID SdtFreeGlobals()
         supHeapFree(W32pServiceTable.Table);
         W32pServiceTable.Allocated = FALSE;
     }
+
+    return TRUE;
 }
 
 /*
@@ -423,6 +388,82 @@ BOOL SdtDlgHandleNotify(
 }
 
 /*
+* SdtDlgOnInit
+*
+* Purpose:
+*
+* KiServiceTable Dialog WM_INITDIALOG handler.
+*
+*/
+VOID SdtDlgOnInit(
+    _In_ HWND hwndDlg,
+    _In_ LPARAM lParam
+)
+{
+    INT iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
+    EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)lParam;
+
+    INT SbParts[] = { 400, -1 };
+    WCHAR szText[100];
+
+    LVCOLUMNS_DATA columnData[] =
+    {
+        { L"Id", 80, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  iImage },
+        { L"Service Name", 280, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE },
+        { L"Address", 130, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE },
+        { L"Module", 220, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE }
+    };
+
+    SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)lParam);
+    supCenterWindowSpecifyParent(hwndDlg, g_WinObj.MainWindow);
+
+    pDlgContext->lvColumnHit = -1;
+    pDlgContext->lvItemHit = -1;
+
+    pDlgContext->hwndDlg = hwndDlg;
+    pDlgContext->StatusBar = GetDlgItem(hwndDlg, ID_EXTRASLIST_STATUSBAR);
+    SendMessage(pDlgContext->StatusBar, SB_SETPARTS, 2, (LPARAM)&SbParts);
+
+    _strcpy(szText, TEXT("Viewing "));
+    if (pDlgContext->DialogMode == SST_Ntos)
+        _strcat(szText, TEXT("ntoskrnl service table"));
+    else
+        _strcat(szText, TEXT("win32k service table"));
+
+    SetWindowText(hwndDlg, szText);
+
+    extrasSetDlgIcon(pDlgContext);
+
+    pDlgContext->ListView = GetDlgItem(hwndDlg, ID_EXTRASLIST);
+    if (pDlgContext->ListView) {
+
+        //
+        // Set listview imagelist, style flags and theme.
+        //
+        supSetListViewSettings(pDlgContext->ListView,
+            LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
+            FALSE,
+            TRUE,
+            g_ListViewImages,
+            LVSIL_SMALL);
+
+        //
+        // And columns and remember their count.
+        //
+        pDlgContext->lvColumnCount = supAddLVColumnsFromArray(
+            pDlgContext->ListView,
+            columnData,
+            RTL_NUMBER_OF(columnData));
+
+        SendMessage(hwndDlg, WM_SIZE, 0, 0);
+
+        supListViewEnableRedraw(pDlgContext->ListView, FALSE);
+        SdtListCreate(pDlgContext->hwndDlg, FALSE, pDlgContext);
+        supListViewEnableRedraw(pDlgContext->ListView, TRUE);
+    }
+}
+
+/*
 * SdtDialogProc
 *
 * Purpose:
@@ -431,13 +472,12 @@ BOOL SdtDlgHandleNotify(
 *
 */
 INT_PTR CALLBACK SdtDialogProc(
-    _In_  HWND hwndDlg,
-    _In_  UINT uMsg,
-    _In_  WPARAM wParam,
-    _In_  LPARAM lParam
+    _In_ HWND hwndDlg,
+    _In_ UINT uMsg,
+    _In_ WPARAM wParam,
+    _In_ LPARAM lParam
 )
 {
-    INT dlgIndex;
     EXTRASCONTEXT* pDlgContext;
 
     if (uMsg == g_WinObj.SettingsChangeMessage) {
@@ -451,8 +491,7 @@ INT_PTR CALLBACK SdtDialogProc(
     switch (uMsg) {
 
     case WM_INITDIALOG:
-        SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)lParam);
-        supCenterWindow(hwndDlg);
+        SdtDlgOnInit(hwndDlg, lParam);
         break;
 
     case WM_GETMINMAXINFO:
@@ -474,27 +513,17 @@ INT_PTR CALLBACK SdtDialogProc(
         }
         break;
 
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+
     case WM_CLOSE:
         pDlgContext = (EXTRASCONTEXT*)RemoveProp(hwndDlg, T_DLGCONTEXT);
         if (pDlgContext) {
-
             extrasRemoveDlgIcon(pDlgContext);
-
-            dlgIndex = 0;
-
-            if (pDlgContext->DialogMode == SST_Ntos)
-                dlgIndex = wobjKSSTDlgId;
-            else if (pDlgContext->DialogMode == SST_Win32k)
-                dlgIndex = wobjW32SSTDlgId;
-
-            if ((dlgIndex == wobjKSSTDlgId) ||
-                (dlgIndex == wobjW32SSTDlgId))
-            {
-                g_WinObj.AuxDialogs[dlgIndex] = NULL;
-            }
-            RtlSecureZeroMemory(pDlgContext, sizeof(EXTRASCONTEXT));
         }
-        return DestroyWindow(hwndDlg);
+        DestroyWindow(hwndDlg);
+        break;
 
     case WM_COMMAND:
 
@@ -561,12 +590,9 @@ INT_PTR CALLBACK SdtDialogProc(
 
         }
         break;
-
-    default:
-        return FALSE;
     }
 
-    return TRUE;
+    return FALSE;
 }
 
 /*
@@ -860,59 +886,50 @@ ULONG_PTR ApiSetExtractReferenceFromAdapter(
     BOOL       bFound;
     PBYTE      ptrCode = ptrFunction;
     ULONG      Index = 0, i;
-    ULONG_PTR  Reference = 0;
     LONG       Rel = 0;
     hde64s     hs;
 
     ULONG      PatternSize;
     PVOID      PatternData;
 
-    __try {
+    do {
+        hde64_disasm((void*)(ptrCode + Index), &hs);
+        if (hs.flags & F_ERROR)
+            break;
 
-        do {
-            hde64_disasm((void*)(ptrCode + Index), &hs);
-            if (hs.flags & F_ERROR)
-                break;
+        if (hs.len == 7) {
 
-            if (hs.len == 7) {
+            bFound = FALSE;
 
-                bFound = FALSE;
+            for (i = 0; i < RTL_NUMBER_OF(W32kApiSetAdapters); i++) {
 
-                for (i = 0; i < RTL_NUMBER_OF(W32kApiSetAdapters); i++) {
+                PatternSize = W32kApiSetAdapters[i].Size;
+                PatternData = W32kApiSetAdapters[i].Data;
 
-                    PatternSize = W32kApiSetAdapters[i].Size;
-                    PatternData = W32kApiSetAdapters[i].Data;
-
-                    if (PatternSize == RtlCompareMemory(&ptrCode[Index],
-                        PatternData,
-                        PatternSize))
-                    {
-                        Rel = *(PLONG)(ptrCode + Index + (hs.len - 4));
-                        bFound = TRUE;
-                        break;
-                    }
-
+                if (PatternSize == RtlCompareMemory(&ptrCode[Index],
+                    PatternData,
+                    PatternSize))
+                {
+                    Rel = *(PLONG)(ptrCode + Index + (hs.len - 4));
+                    bFound = TRUE;
+                    break;
                 }
 
-                if (bFound)
-                    break;
             }
 
-            Index += hs.len;
+            if (bFound)
+                break;
+        }
 
-        } while (Index < 32);
+        Index += hs.len;
 
-        if (Rel == 0)
-            return 0;
+    } while (Index < 32);
 
-        Reference = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-
-    }
-    __except (WOBJ_EXCEPTION_FILTER_LOG) {
+    if (Rel == 0)
         return 0;
-    }
 
-    return Reference;
+
+    return (ULONG_PTR)ptrCode + Index + hs.len + Rel;
 }
 
 /*
@@ -1392,7 +1409,6 @@ BOOL SdtListCreateTableShadow(
     *Status = STATUS_SUCCESS;
 
     __try {
-
 
         //
         // Check if table already built.
@@ -1905,6 +1921,71 @@ VOID SdtListCreate(
 }
 
 /*
+* extrasSSDTDialogWorkerThread
+*
+* Purpose:
+*
+* SSDT Dialog worker thread.
+*
+*/
+DWORD extrasSSDTDialogWorkerThread(
+    _In_ PVOID Parameter
+)
+{
+    HWND hwndDlg;
+    BOOL bResult;
+    MSG message;
+    HACCEL acceleratorTable;
+    HANDLE workerThread;
+    FAST_EVENT fastEvent;
+    EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)Parameter;
+
+    hwndDlg = CreateDialogParam(
+        g_WinObj.hInstance,
+        MAKEINTRESOURCE(IDD_DIALOG_EXTRASLIST),
+        0,
+        &SdtDialogProc,
+        (LPARAM)pDlgContext);
+
+    supAddShutdownCallback(&SdtFreeGlobals, NULL);
+
+    acceleratorTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
+
+    fastEvent = SdtDlgInitializedEvents[pDlgContext->DialogMode];
+
+    supSetFastEvent(&fastEvent);
+
+    do {
+
+        bResult = GetMessage(&message, NULL, 0, 0);
+        if (bResult == -1)
+            break;
+
+        if (IsDialogMessage(hwndDlg, &message)) {
+            TranslateAccelerator(hwndDlg, acceleratorTable, &message);
+        }
+        else {
+            TranslateMessage(&message);
+            DispatchMessage(&message);
+        }
+
+    } while (bResult != 0);
+
+    supResetFastEvent(&fastEvent);
+
+    if (acceleratorTable)
+        DestroyAcceleratorTable(acceleratorTable);
+
+    workerThread = SdtDlgThreadHandles[pDlgContext->DialogMode];
+    if (workerThread) {
+        NtClose(workerThread);
+        SdtDlgThreadHandles[pDlgContext->DialogMode] = NULL;
+    }
+
+    return 0;
+}
+
+/*
 * extrasCreateSSDTDialog
 *
 * Purpose:
@@ -1913,104 +1994,18 @@ VOID SdtListCreate(
 *
 */
 VOID extrasCreateSSDTDialog(
-    _In_ HWND hwndParent,
     _In_ SSDT_DLG_MODE Mode
 )
 {
-    INT         dlgIndex;
-    HWND        hwndDlg;
-
-    EXTRASCONTEXT* pDlgContext;
-
-    INT SbParts[] = { 400, -1 };
-
-    WCHAR szText[100];
-
-    INT iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
-    LVCOLUMNS_DATA columnData[] =
-    {
-        { L"Id", 80, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  iImage },
-        { L"Service Name", 280, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE },
-        { L"Address", 130, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE },
-        { L"Module", 220, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE }
-    };
-
-
-    switch (Mode) {
-    case SST_Ntos:
-        dlgIndex = wobjKSSTDlgId;
-        break;
-    case SST_Win32k:
-        dlgIndex = wobjW32SSTDlgId;
-        break;
-    default:
+    if (Mode < 0 || Mode >= SST_Max)
         return;
 
-    }
+    if (!SdtDlgThreadHandles[Mode]) {
 
-    //
-    // Allow only one dialog.
-    //
-    ENSURE_DIALOG_UNIQUE_WITH_RESTORE(g_WinObj.AuxDialogs[dlgIndex]);
+        RtlSecureZeroMemory(&SSTDlgContext[Mode], sizeof(EXTRASCONTEXT));
+        SSTDlgContext[Mode].DialogMode = Mode;
+        SdtDlgThreadHandles[Mode] = supCreateDialogWorkerThread(extrasSSDTDialogWorkerThread, (PVOID)&SSTDlgContext[Mode], 0);
+        supWaitForFastEvent(&SdtDlgInitializedEvents[Mode], NULL);
 
-    RtlSecureZeroMemory(&SSTDlgContext[Mode], sizeof(EXTRASCONTEXT));
-
-    pDlgContext = &SSTDlgContext[Mode];
-    pDlgContext->DialogMode = Mode;
-    pDlgContext->lvColumnHit = -1;
-    pDlgContext->lvItemHit = -1;
-
-    hwndDlg = CreateDialogParam(
-        g_WinObj.hInstance,
-        MAKEINTRESOURCE(IDD_DIALOG_EXTRASLIST),
-        hwndParent,
-        &SdtDialogProc,
-        (LPARAM)pDlgContext);
-
-    if (hwndDlg == NULL) {
-        return;
-    }
-
-    pDlgContext->hwndDlg = hwndDlg;
-    g_WinObj.AuxDialogs[dlgIndex] = hwndDlg;
-    pDlgContext->StatusBar = GetDlgItem(hwndDlg, ID_EXTRASLIST_STATUSBAR);
-    SendMessage(pDlgContext->StatusBar, SB_SETPARTS, 2, (LPARAM)&SbParts);
-
-    _strcpy(szText, TEXT("Viewing "));
-    if (Mode == SST_Ntos)
-        _strcat(szText, TEXT("ntoskrnl service table"));
-    else
-        _strcat(szText, TEXT("win32k service table"));
-
-    SetWindowText(hwndDlg, szText);
-
-    extrasSetDlgIcon(pDlgContext);
-
-    pDlgContext->ListView = GetDlgItem(hwndDlg, ID_EXTRASLIST);
-    if (pDlgContext->ListView) {
-
-        //
-        // Set listview imagelist, style flags and theme.
-        //
-        supSetListViewSettings(pDlgContext->ListView,
-            LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
-            FALSE,
-            TRUE,
-            g_ListViewImages,
-            LVSIL_SMALL);
-
-        //
-        // And columns and remember their count.
-        //
-        pDlgContext->lvColumnCount = supAddLVColumnsFromArray(
-            pDlgContext->ListView,
-            columnData,
-            RTL_NUMBER_OF(columnData));
-
-        SendMessage(hwndDlg, WM_SIZE, 0, 0);
-
-        supListViewEnableRedraw(pDlgContext->ListView, FALSE);
-        SdtListCreate(pDlgContext->hwndDlg, FALSE, pDlgContext);
-        supListViewEnableRedraw(pDlgContext->ListView, TRUE);
     }
 }

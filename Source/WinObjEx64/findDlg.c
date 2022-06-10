@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       FINDDLG.C
 *
-*  VERSION:     1.92
+*  VERSION:     1.94
 *
-*  DATE:        07 Dec 2021
+*  DATE:        03 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -19,6 +19,9 @@
 
 #define FINDDLG_TRACKSIZE_MIN_X 548
 #define FINDDLG_TRACKSIZE_MIN_Y 230
+
+static HANDLE FindDialogThreadHandle = NULL;
+static FAST_EVENT FindDialogInitializedEvent = FAST_EVENT_INIT;
 
 typedef struct _FINDDLG_CONTEXT {
     //
@@ -61,6 +64,54 @@ typedef struct _FINDDLG_CONTEXT {
 } FINDDLG_CONTEXT, * PFINDDLGCONTEXT;
 
 static FINDDLG_CONTEXT g_FindDlgContext;
+
+/*
+* FindDlgAddTypes
+*
+* Purpose:
+*
+* Enumerate object types and fill combobox with them.
+*
+*/
+VOID FindDlgAddTypes(
+    _In_ HWND hwnd
+)
+{
+    ULONG  i;
+    SIZE_T cbLen;
+    LPWSTR lpType;
+
+    POBTYPE_LIST objectTypesList = g_kdctx.Data->ObjectTypesList;
+    POBTYPE_ENTRY objectEntry;
+
+    SendDlgItemMessage(hwnd, ID_SEARCH_TYPE, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
+
+    if (objectTypesList == NULL) {
+        SendDlgItemMessage(hwnd, ID_SEARCH_TYPE, CB_ADDSTRING, (WPARAM)0, (LPARAM)L"*");
+        SendDlgItemMessage(hwnd, ID_SEARCH_TYPE, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
+        return;
+    }
+
+    for (i = 0; i < objectTypesList->NumberOfTypes; i++) {
+
+        objectEntry = &objectTypesList->Types[i];
+        cbLen = objectEntry->TypeName->MaximumLength + sizeof(UNICODE_NULL);
+        lpType = (LPWSTR)supHeapAlloc(cbLen);
+        if (lpType) {
+
+            _strncpy(lpType,
+                cbLen / sizeof(WCHAR),
+                objectEntry->TypeName->Buffer,
+                objectEntry->TypeName->Length / sizeof(WCHAR));
+
+            SendDlgItemMessage(hwnd, ID_SEARCH_TYPE, CB_ADDSTRING, (WPARAM)0, (LPARAM)lpType);
+            supHeapFree(lpType);
+        }
+    }
+
+    SendDlgItemMessage(hwnd, ID_SEARCH_TYPE, CB_ADDSTRING, (WPARAM)0, (LPARAM)L"*");
+    SendDlgItemMessage(hwnd, ID_SEARCH_TYPE, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
+}
 
 /*
 * FindDlgCompareFunc
@@ -452,176 +503,17 @@ VOID FindDlgHandleSearch(
 }
 
 /*
-* FindDlgProc
+* FindDlgOnInit
 *
 * Purpose:
 *
-* Find Dialog window procedure.
+* WM_INITDIALOG handler.
 *
 */
-INT_PTR CALLBACK FindDlgProc(
-    _In_  HWND hwndDlg,
-    _In_  UINT uMsg,
-    _In_  WPARAM wParam,
-    _In_  LPARAM lParam
+VOID FindDlgOnInit(
+    _In_ HWND hwndDlg
 )
 {
-    if (uMsg == g_WinObj.SettingsChangeMessage) {
-        FindDlgHandleSettingsChange(&g_FindDlgContext);
-        return TRUE;
-    }
-
-    switch (uMsg) {
-
-    case WM_NOTIFY:
-        return FindDlgHandleNotify((LPNMLISTVIEW)lParam);
-
-    case WM_GETMINMAXINFO:
-        if (lParam) {
-            supSetMinMaxTrackSize((PMINMAXINFO)lParam,
-                FINDDLG_TRACKSIZE_MIN_X,
-                FINDDLG_TRACKSIZE_MIN_Y,
-                TRUE);
-        }
-        break;
-
-    case WM_INITDIALOG:
-        supCenterWindow(hwndDlg);
-        FindDlgResize(hwndDlg, &g_FindDlgContext);
-        break;
-
-    case WM_SIZE:
-        FindDlgResize(hwndDlg, &g_FindDlgContext);
-        break;
-
-    case WM_CLOSE:
-        if (g_FindDlgContext.DialogIcon)
-            DestroyIcon(g_FindDlgContext.DialogIcon);
-
-        DestroyWindow(hwndDlg);
-        g_WinObj.AuxDialogs[wobjFindDlgId] = NULL;
-        break;
-
-    case WM_COMMAND:
-
-        switch (GET_WM_COMMAND_ID(wParam, lParam)) {
-        case ID_OBJECT_COPY:
-
-            supListViewCopyItemValueToClipboard(g_FindDlgContext.SearchList,
-                g_FindDlgContext.iSelectedItem,
-                g_FindDlgContext.iColumnHit);
-
-            break;
-
-        case IDCANCEL:
-            SendMessage(hwndDlg, WM_CLOSE, 0, 0);
-            break;
-
-        case ID_SEARCH_FIND:
-            FindDlgHandleSearch(hwndDlg);
-            break;
-
-        default:
-            break;
-        }
-        break;
-
-    case WM_CONTEXTMENU:
-
-        supHandleContextMenuMsgForListView(hwndDlg,
-            wParam,
-            lParam,
-            g_FindDlgContext.SearchList,
-            (pfnPopupMenuHandler)FindDlgHandlePopupMenu,
-            &g_FindDlgContext);
-
-        break;
-
-    default:
-        return FALSE;
-
-    }
-
-    return TRUE;
-}
-
-/*
-* FindDlgAddTypes
-*
-* Purpose:
-*
-* Enumerate object types and fill combobox with them.
-*
-*/
-VOID FindDlgAddTypes(
-    _In_ HWND hwnd
-)
-{
-    ULONG  i;
-    HWND   hComboBox;
-    SIZE_T sz;
-    LPWSTR lpType;
-
-    POBJECT_TYPE_INFORMATION  pObject;
-
-    hComboBox = GetDlgItem(hwnd, ID_SEARCH_TYPE);
-    if (hComboBox == NULL)
-        return;
-
-    SendMessage(hComboBox, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
-
-    if (g_pObjectTypesInfo == NULL) {
-        SendMessage(hComboBox, CB_ADDSTRING, (WPARAM)0, (LPARAM)L"*");
-        SendMessage(hComboBox, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
-        return;
-    }
-
-    __try {
-        //
-        // Type collection available, list it.
-        //
-        //
-        // Warning: older Wine/Staging incorrectly implement memory structure layout for this structure and therefore will crash.            
-        //
-        pObject = OBJECT_TYPES_FIRST_ENTRY(g_pObjectTypesInfo);
-
-        for (i = 0; i < g_pObjectTypesInfo->NumberOfTypes; i++) {
-            sz = pObject->TypeName.MaximumLength + sizeof(UNICODE_NULL);
-            lpType = (LPWSTR)supHeapAlloc(sz);
-            if (lpType) {
-
-                _strncpy(lpType,
-                    sz / sizeof(WCHAR),
-                    pObject->TypeName.Buffer,
-                    pObject->TypeName.Length / sizeof(WCHAR));
-
-                SendMessage(hComboBox, CB_ADDSTRING, (WPARAM)0, (LPARAM)lpType);
-                supHeapFree(lpType);
-            }
-            pObject = OBJECT_TYPES_NEXT_ENTRY(pObject);
-        }
-    }
-    __finally {
-        SendMessage(hComboBox, CB_ADDSTRING, (WPARAM)0, (LPARAM)L"*");
-        SendMessage(hComboBox, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
-        if (AbnormalTermination())
-            supReportAbnormalTermination(__FUNCTIONW__);
-    }
-}
-
-/*
-* FindDlgCreate
-*
-* Purpose:
-*
-* Create and initialize Find Dialog.
-*
-*/
-VOID FindDlgCreate(
-    _In_ HWND hwndParent
-)
-{
-    HWND hwndDlg;
     INT iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
     LVCOLUMNS_DATA columnData[] =
     {
@@ -629,21 +521,6 @@ VOID FindDlgCreate(
         { L"Type", 100, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE }
     };
 
-
-    //
-    // Allow only one search dialog per time.
-    //
-    ENSURE_DIALOG_UNIQUE(g_WinObj.AuxDialogs[wobjFindDlgId]);
-
-    RtlSecureZeroMemory(&g_FindDlgContext, sizeof(g_FindDlgContext));
-
-    hwndDlg = CreateDialogParam(g_WinObj.hInstance, 
-        MAKEINTRESOURCE(IDD_DIALOG_SEARCH), hwndParent, &FindDlgProc, 0);
-
-    if (hwndDlg == NULL)
-        return;
-
-    g_WinObj.AuxDialogs[wobjFindDlgId] = hwndDlg;
     g_FindDlgContext.DialogWindow = hwndDlg;
     g_FindDlgContext.StatusBar = GetDlgItem(hwndDlg, ID_SEARCH_STATUSBAR);
     g_FindDlgContext.iColumnHit = -1;
@@ -685,5 +562,170 @@ VOID FindDlgCreate(
             RTL_NUMBER_OF(columnData));
 
     }
+
     FindDlgAddTypes(hwndDlg);
+    supCenterWindowSpecifyParent(hwndDlg, g_WinObj.MainWindow);
+    FindDlgResize(hwndDlg, &g_FindDlgContext);
+    SetActiveWindow(hwndDlg);
+}
+
+/*
+* FindDlgProc
+*
+* Purpose:
+*
+* Find Dialog window procedure.
+*
+*/
+INT_PTR CALLBACK FindDlgProc(
+    _In_  HWND hwndDlg,
+    _In_  UINT uMsg,
+    _In_  WPARAM wParam,
+    _In_  LPARAM lParam
+)
+{
+    if (uMsg == g_WinObj.SettingsChangeMessage) {
+        FindDlgHandleSettingsChange(&g_FindDlgContext);
+        return TRUE;
+    }
+
+    switch (uMsg) {
+
+    case WM_NOTIFY:
+        return FindDlgHandleNotify((LPNMLISTVIEW)lParam);
+
+    case WM_GETMINMAXINFO:
+        if (lParam) {
+            supSetMinMaxTrackSize((PMINMAXINFO)lParam,
+                FINDDLG_TRACKSIZE_MIN_X,
+                FINDDLG_TRACKSIZE_MIN_Y,
+                TRUE);
+        }
+        break;
+
+    case WM_INITDIALOG:
+        FindDlgOnInit(hwndDlg);
+        break;
+
+    case WM_SIZE:
+        FindDlgResize(hwndDlg, &g_FindDlgContext);
+        break;
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+
+    case WM_CLOSE:
+        if (g_FindDlgContext.DialogIcon)
+            DestroyIcon(g_FindDlgContext.DialogIcon);
+
+        DestroyWindow(hwndDlg);
+        break;
+
+    case WM_COMMAND:
+
+        switch (GET_WM_COMMAND_ID(wParam, lParam)) {
+        case ID_OBJECT_COPY:
+
+            supListViewCopyItemValueToClipboard(g_FindDlgContext.SearchList,
+                g_FindDlgContext.iSelectedItem,
+                g_FindDlgContext.iColumnHit);
+
+            break;
+
+        case IDCANCEL:
+            SendMessage(hwndDlg, WM_CLOSE, 0, 0);
+            break;
+
+        case ID_SEARCH_FIND:
+            FindDlgHandleSearch(hwndDlg);
+            break;
+
+        }
+        break;
+
+    case WM_CONTEXTMENU:
+
+        supHandleContextMenuMsgForListView(hwndDlg,
+            wParam,
+            lParam,
+            g_FindDlgContext.SearchList,
+            (pfnPopupMenuHandler)FindDlgHandlePopupMenu,
+            &g_FindDlgContext);
+
+        break;
+
+    }
+
+    return FALSE;
+}
+
+/*
+* FindpDlgWorkerThread
+*
+* Purpose:
+*
+* Find Dialog thread.
+*
+*/
+DWORD FindpDlgWorkerThread(
+    _In_ PVOID Parameter
+)
+{
+    BOOL bResult;
+    MSG message;
+    HWND hwndDlg;
+
+    UNREFERENCED_PARAMETER(Parameter);
+
+    hwndDlg = CreateDialogParam(g_WinObj.hInstance,
+        MAKEINTRESOURCE(IDD_DIALOG_SEARCH),
+        0,
+        &FindDlgProc,
+        0);
+
+    supSetFastEvent(&FindDialogInitializedEvent);
+
+    do {
+
+        bResult = GetMessage(&message, NULL, 0, 0);
+        if (bResult == -1)
+            break;
+
+        if (!IsDialogMessage(hwndDlg, &message)) {
+            TranslateMessage(&message);
+            DispatchMessage(&message);
+        }
+
+    } while (bResult != 0);
+
+    supResetFastEvent(&FindDialogInitializedEvent);
+
+    if (FindDialogThreadHandle) {
+        NtClose(FindDialogThreadHandle);
+        FindDialogThreadHandle = NULL;
+    }
+    return 0;
+}
+
+/*
+* FindDlgCreate
+*
+* Purpose:
+*
+* Run Find Dialog.
+*
+*/
+VOID FindDlgCreate(
+    VOID
+)
+{
+    if (!FindDialogThreadHandle) {
+
+        RtlSecureZeroMemory(&g_FindDlgContext, sizeof(g_FindDlgContext));
+        FindDialogThreadHandle = supCreateDialogWorkerThread(FindpDlgWorkerThread, NULL, 0);
+        supWaitForFastEvent(&FindDialogInitializedEvent, NULL);
+
+    }
+
 }

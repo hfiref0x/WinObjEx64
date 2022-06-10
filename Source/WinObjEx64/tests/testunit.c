@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.94
 *
-*  DATE:        31 May 2022
+*  DATE:        06 Jun 2022
 *
 *  Test code used while debug.
 *
@@ -128,9 +128,7 @@ VOID TestApiPort(
     VOID
 )
 {
-    DWORD tid;
-    g_TestPortThread = CreateThread(NULL, 0,
-        (LPTHREAD_START_ROUTINE)LPCListener, NULL, 0, &tid);
+    g_TestPortThread = supCreateThread((LPTHREAD_START_ROUTINE)LPCListener, NULL, 0);
 }
 
 VOID TestDebugObject(
@@ -606,8 +604,7 @@ DWORD WINAPI TokenImpersonationThreadProc(PVOID Parameter)
 
 VOID TestThread()
 {
-    DWORD tid;
-    g_TestThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)TokenImpersonationThreadProc, NULL, 0, &tid);
+    g_TestThread = supCreateThread((LPTHREAD_START_ROUTINE)TokenImpersonationThreadProc, NULL, 0);
 }
 
 VOID TestApiSetResolve()
@@ -1202,7 +1199,7 @@ VOID TestStart(
     VOID
 )
 {
-    TestCmControlVector();
+    //TestCmControlVector();
     //TestObCallback();
     TestCall();
     //TestSectionControlArea();

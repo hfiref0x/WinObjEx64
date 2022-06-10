@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.94
 *
-*  DATE:        31 May 2022
+*  DATE:        04 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -18,7 +18,7 @@
 #include "extras.h"
 #include "extrasDrivers.h"
 
-BOOLEAN g_DrvDlgShimsEnabled = FALSE;
+BOOLEAN DrvDlgShimsEnabled = FALSE;
 
 #define ID_DRVLIST_DUMP     40001
 #define ID_DRVLIST_SAVE     40002
@@ -49,11 +49,12 @@ BOOLEAN g_DrvDlgShimsEnabled = FALSE;
 #define DRVLISTDLG_TRACKSIZE_MIN_X 640
 #define DRVLISTDLG_TRACKSIZE_MIN_Y 480
 
-EXTRASCONTEXT g_DriversDlgContext[DDM_Max];
-
+static EXTRASCONTEXT DrvDlgContext[DrvModeMax];
+static HANDLE DrvDlgThreadHandles[DrvModeMax] = { NULL, NULL };
+static FAST_EVENT DrvDlgInitializedEvents[DrvModeMax] = { FAST_EVENT_INIT, FAST_EVENT_INIT };
 static ULONG g_cDrvShimmed = 0;
 
-LPCWSTR g_cryptAlgoIdRef[] = {
+LPCWSTR CryptAlgoIdRef[] = {
     BCRYPT_MD5_ALGORITHM,
     BCRYPT_SHA1_ALGORITHM,
     BCRYPT_SHA256_ALGORITHM,
@@ -116,7 +117,7 @@ VOID DrvListCopyHash(
             else if (MenuId >= ID_CALC_HASH_MD5 && MenuId <= ID_CALC_HASH_SHA512) {
 
                 lpszHash = ComputeHashForFile(&fvi,
-                    g_cryptAlgoIdRef[MenuId - ID_CALC_HASH_MD5],
+                    CryptAlgoIdRef[MenuId - ID_CALC_HASH_MD5],
                     PAGE_SIZE,
                     g_WinObj.Heap,
                     FALSE);
@@ -160,7 +161,7 @@ VOID DrvUpdateStatusBar(
     //
     // Add "shimmed" drivers count for normal dialog mode.
     //
-    if (Context->DialogMode == DDM_Normal) {
+    if (Context->DialogMode == DrvModeNormal) {
         if (g_cDrvShimmed) {
             _strcat(szBuffer, TEXT(", Shimmed: "));
             ultostr(g_cDrvShimmed, _strend(szBuffer));
@@ -173,7 +174,7 @@ VOID DrvUpdateStatusBar(
 
     if (iItem >= 0) {
 
-        if (Context->DialogMode == DDM_Normal)
+        if (Context->DialogMode == DrvModeNormal)
             iSubItem = COLUMN_DRVLIST_DRIVER_NAME;
         else
             iSubItem = COLUMN_DRVLIST_UNLOADED_DRIVER_NAME;
@@ -225,7 +226,7 @@ VOID DrvHandlePopupMenu(
             InsertMenu(hMenu, ++uPos, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
         }
 
-        if (Context->DialogMode == DDM_Normal) {
+        if (Context->DialogMode == DrvModeNormal) {
 
             InsertMenu(hMenu, ++uPos, MF_BYCOMMAND, ID_DRVLIST_PROP, T_PROPERTIES);
             InsertMenu(hMenu, ++uPos, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
@@ -240,7 +241,7 @@ VOID DrvHandlePopupMenu(
         InsertMenu(hMenu, ++uPos, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
         InsertMenu(hMenu, ++uPos, MF_BYCOMMAND, ID_DRVLIST_REFRESH, T_VIEW_REFRESH);
 
-        if (Context->DialogMode == DDM_Normal) {
+        if (Context->DialogMode == DrvModeNormal) {
             //
             // Hashes.
             //
@@ -249,7 +250,7 @@ VOID DrvHandlePopupMenu(
                 RtlStringCchPrintfSecure(szMenuText,
                     MAX_PATH,
                     TEXT("Copy Authenticode %ws hash"),
-                    g_cryptAlgoIdRef[i - ID_CALC_HASH_MD5]);
+                    CryptAlgoIdRef[i - ID_CALC_HASH_MD5]);
                 InsertMenu(hMenu, ++uPos, MF_BYCOMMAND, i, szMenuText);
             }
 
@@ -452,7 +453,7 @@ INT CALLBACK DrvDlgCompareFunc(
     if (pDlgContext == NULL)
         return 0;
 
-    if (pDlgContext->DialogMode == DDM_Normal) {
+    if (pDlgContext->DialogMode == DrvModeNormal) {
 
         switch (pDlgContext->lvColumnToSort) {
         case COLUMN_DRVLIST_LOAD_ORDER: //Load Order
@@ -735,7 +736,7 @@ VOID DrvListDrivers(
         ListView_SetItem(hwndList, &lvitem);
 
         //Shimmed
-        if (g_DrvDlgShimsEnabled) {
+        if (DrvDlgShimsEnabled) {
 
             szBuffer[0] = 0;
 
@@ -765,14 +766,14 @@ VOID DrvListDrivers(
 }
 
 /*
-* DriversHandleNotify
+* DrvDlgHandleNotify
 *
 * Purpose:
 *
 * WM_NOTIFY processing for Driver list dialogs.
 *
 */
-BOOL CALLBACK DriversHandleNotify(
+BOOL CALLBACK DrvDlgHandleNotify(
     _In_ LPNMLISTVIEW NMListView,
     _In_ EXTRASCONTEXT* Context
 )
@@ -835,14 +836,14 @@ BOOL CALLBACK DriversHandleNotify(
 }
 
 /*
-* DriversHandleWMCommand
+* DrvDlgHandleWMCommand
 *
 * Purpose:
 *
 * WM_COMMAND handler.
 *
 */
-VOID DriversHandleWMCommand(
+VOID DrvDlgHandleWMCommand(
     _In_ HWND hwndDlg,
     _In_ WPARAM wParam,
     _In_ LPARAM lParam
@@ -884,7 +885,7 @@ VOID DriversHandleWMCommand(
 
         if (pDlgContext) {
 
-            if (pDlgContext->DialogMode == DDM_Normal)
+            if (pDlgContext->DialogMode == DrvModeNormal)
                 lpFileName = TEXT("Drivers.csv");
             else
                 lpFileName = TEXT("UnloadedDrivers.csv");
@@ -908,7 +909,7 @@ VOID DriversHandleWMCommand(
     case ID_DRVLIST_REFRESH:
         if (pDlgContext) {
 
-            if (pDlgContext->DialogMode == DDM_Normal) {
+            if (pDlgContext->DialogMode == DrvModeNormal) {
 
                 DrvListDrivers(pDlgContext, TRUE);
 
@@ -931,140 +932,28 @@ VOID DriversHandleWMCommand(
         DrvListCopyHash(pDlgContext, LOWORD(wParam));
         break;
 
-    default:
-        break;
     }
 }
 
 /*
-* DriversDialogProc
+* DrvDlgOnInit
 *
 * Purpose:
 *
-* Drivers Dialog window procedure.
+* Drivers Dialog WM_INITDIALOG handler.
 *
 */
-INT_PTR CALLBACK DriversDialogProc(
-    _In_  HWND hwndDlg,
-    _In_  UINT uMsg,
-    _In_  WPARAM wParam,
-    _In_  LPARAM lParam
+VOID DrvDlgOnInit(
+    _In_ HWND hwndDlg,
+    _In_ LPARAM lParam
 )
 {
-    INT dlgIndex;
-    EXTRASCONTEXT* pDlgContext;
-
-    if (uMsg == g_WinObj.SettingsChangeMessage) {
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
-            extrasHandleSettingsChange(pDlgContext);
-            return TRUE;
-        }
-    }
-
-    switch (uMsg) {
-
-    case WM_INITDIALOG:
-        SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)lParam);
-        supCenterWindow(hwndDlg);
-        break;
-
-    case WM_GETMINMAXINFO:
-        if (lParam) {
-            supSetMinMaxTrackSize((PMINMAXINFO)lParam,
-                DRVLISTDLG_TRACKSIZE_MIN_X,
-                DRVLISTDLG_TRACKSIZE_MIN_Y,
-                TRUE);
-        }
-        break;
-
-    case WM_NOTIFY:
-
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
-            return (INT_PTR)DriversHandleNotify(
-                (LPNMLISTVIEW)lParam,
-                pDlgContext);
-        }
-        break;
-
-    case WM_SIZE:
-        extrasSimpleListResize(hwndDlg);
-        break;
-
-    case WM_CLOSE:
-        pDlgContext = (EXTRASCONTEXT*)RemoveProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
-            extrasRemoveDlgIcon(pDlgContext);
-
-            dlgIndex = 0;
-
-            if (pDlgContext->DialogMode == DDM_Normal)
-                dlgIndex = wobjDriversDlgId;
-            else if (pDlgContext->DialogMode == DDM_Unloaded)
-                dlgIndex = wobjUnloadedDriversDlgId;
-
-            if ((dlgIndex == wobjDriversDlgId) ||
-                (dlgIndex == wobjUnloadedDriversDlgId))
-            {
-                g_WinObj.AuxDialogs[dlgIndex] = NULL;
-            }
-
-            if (pDlgContext->DialogMode == DDM_Normal) {
-                kdDestroyShimmedDriversList(&g_kdctx.Data->KseEngineDump);
-            }
-
-            RtlSecureZeroMemory(pDlgContext, sizeof(EXTRASCONTEXT));
-
-        }
-        return DestroyWindow(hwndDlg);
-
-    case WM_COMMAND:
-
-        DriversHandleWMCommand(hwndDlg, wParam, lParam);
-        break;
-
-    case WM_CONTEXTMENU:
-
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
-            supHandleContextMenuMsgForListView(hwndDlg,
-                wParam,
-                lParam,
-                pDlgContext->ListView,
-                (pfnPopupMenuHandler)DrvHandlePopupMenu,
-                pDlgContext);
-        }
-        break;
-
-    default:
-        return FALSE;
-    }
-
-    return TRUE;
-}
-
-/*
-* extrasCreateDriversDialog
-*
-* Purpose:
-*
-* Create and initialize Drivers Dialog.
-*
-*/
-VOID extrasCreateDriversDialog(
-    _In_ HWND hwndParent,
-    _In_ DRIVERS_DLG_MODE dialogMode
-)
-{
-    INT dlgIndex;
     INT iImage = ImageList_GetImageCount(g_ListViewImages) - 1, iColumn;
+    EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)lParam;
 
-    ULONG columnsCount;
-    HWND hwndDlg;
-    EXTRASCONTEXT* pDlgContext;
-    LPWSTR lpCaption;
     LVCOLUMNS_DATA* pvColumnsData;
+    ULONG columnsCount;
+    LPWSTR lpCaption;
 
     LVCOLUMNS_DATA columnDataDrvList[] =
     {
@@ -1082,51 +971,25 @@ VOID extrasCreateDriversDialog(
         { L"CurrentTime", 140, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT, I_IMAGENONE }
     };
 
-    switch (dialogMode) {
-    case DDM_Normal:
-        dlgIndex = wobjDriversDlgId;
-        lpCaption = TEXT("Drivers");
-        pvColumnsData = columnDataDrvList;
-        columnsCount = RTL_NUMBER_OF(columnDataDrvList);
-        break;
-    case DDM_Unloaded:
-        dlgIndex = wobjUnloadedDriversDlgId;
+    SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)lParam);
+    supCenterWindowSpecifyParent(hwndDlg, g_WinObj.MainWindow);
+
+    pDlgContext->hwndDlg = hwndDlg;
+    pDlgContext->lvColumnHit = -1;
+    pDlgContext->lvItemHit = -1;
+
+    switch (pDlgContext->DialogMode) {
+    case DrvModeUnloaded:
         lpCaption = TEXT("Unloaded Drivers");
         pvColumnsData = columnsDataUnloadedDrvList;
         columnsCount = RTL_NUMBER_OF(columnsDataUnloadedDrvList);
         break;
     default:
-        return;
-
+        lpCaption = TEXT("Drivers");
+        pvColumnsData = columnDataDrvList;
+        columnsCount = RTL_NUMBER_OF(columnDataDrvList);
+        break;
     }
-
-    //
-    // Allow only one dialog per mode.
-    //
-    ENSURE_DIALOG_UNIQUE_WITH_RESTORE(g_WinObj.AuxDialogs[dlgIndex]);
-
-    RtlSecureZeroMemory(&g_DriversDlgContext[dialogMode], sizeof(EXTRASCONTEXT));
-
-    pDlgContext = &g_DriversDlgContext[dialogMode];
-    pDlgContext->DialogMode = dialogMode;
-    pDlgContext->lvColumnHit = -1;
-    pDlgContext->lvItemHit = -1;
-
-    hwndDlg = CreateDialogParam(g_WinObj.hInstance,
-        MAKEINTRESOURCE(IDD_DIALOG_EXTRASLIST),
-        hwndParent,
-        &DriversDialogProc,
-        (LPARAM)pDlgContext);
-
-    if (hwndDlg == NULL) {
-        //
-        // Do not free context, it's local.
-        //
-        return;
-    }
-
-    pDlgContext->hwndDlg = hwndDlg;
-    g_WinObj.AuxDialogs[dlgIndex] = hwndDlg;
 
     SetWindowText(hwndDlg, lpCaption);
 
@@ -1160,7 +1023,7 @@ VOID extrasCreateDriversDialog(
 
         pDlgContext->lvColumnCount = iColumn;
 
-        if (dialogMode == DDM_Normal) {
+        if (pDlgContext->DialogMode == DrvModeNormal) {
 
             //
             // Add "Shimmed" column on supported Windows version.
@@ -1177,7 +1040,7 @@ VOID extrasCreateDriversDialog(
                         LVCFMT_CENTER | LVCFMT_BITMAP_ON_RIGHT,
                         TEXT("Shimmed"), 100);
 
-                    g_DrvDlgShimsEnabled = TRUE;
+                    DrvDlgShimsEnabled = TRUE;
                     pDlgContext->lvColumnCount += 1;
                 }
             }
@@ -1193,5 +1056,185 @@ VOID extrasCreateDriversDialog(
 
         SendMessage(hwndDlg, WM_SIZE, 0, 0);
         SetFocus(pDlgContext->ListView);
+    }
+}
+
+/*
+* DrvDlgProc
+*
+* Purpose:
+*
+* Drivers Dialog window procedure.
+*
+*/
+INT_PTR CALLBACK DrvDlgProc(
+    _In_ HWND hwndDlg,
+    _In_ UINT uMsg,
+    _In_ WPARAM wParam,
+    _In_ LPARAM lParam
+)
+{
+    EXTRASCONTEXT* pDlgContext;
+
+    if (uMsg == g_WinObj.SettingsChangeMessage) {
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+            extrasHandleSettingsChange(pDlgContext);
+            return TRUE;
+        }
+    }
+
+    switch (uMsg) {
+
+    case WM_INITDIALOG:
+        DrvDlgOnInit(hwndDlg, lParam);
+        break;
+
+    case WM_GETMINMAXINFO:
+        if (lParam) {
+            supSetMinMaxTrackSize((PMINMAXINFO)lParam,
+                DRVLISTDLG_TRACKSIZE_MIN_X,
+                DRVLISTDLG_TRACKSIZE_MIN_Y,
+                TRUE);
+        }
+        break;
+
+    case WM_NOTIFY:
+
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+            DrvDlgHandleNotify(
+                (LPNMLISTVIEW)lParam,
+                pDlgContext);
+        }
+        break;
+
+    case WM_SIZE:
+        extrasSimpleListResize(hwndDlg);
+        break;
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+
+    case WM_CLOSE:
+        pDlgContext = (EXTRASCONTEXT*)RemoveProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+            extrasRemoveDlgIcon(pDlgContext);
+
+            if (pDlgContext->DialogMode == DrvModeNormal) {
+                kdDestroyShimmedDriversList(&g_kdctx.Data->KseEngineDump);
+            }
+
+        }
+        DestroyWindow(hwndDlg);
+        break;
+
+    case WM_COMMAND:
+
+        DrvDlgHandleWMCommand(hwndDlg, wParam, lParam);
+        break;
+
+    case WM_CONTEXTMENU:
+
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+            supHandleContextMenuMsgForListView(hwndDlg,
+                wParam,
+                lParam,
+                pDlgContext->ListView,
+                (pfnPopupMenuHandler)DrvHandlePopupMenu,
+                pDlgContext);
+        }
+        break;
+    }
+
+    return FALSE;
+}
+
+/*
+* extrasDrvDlgWorkerThread
+*
+* Purpose:
+*
+* Drivers Dialog worker thread.
+*
+*/
+DWORD extrasDrvDlgWorkerThread(
+    _In_ PVOID Parameter
+)
+{
+    HWND hwndDlg;
+    BOOL bResult;
+    MSG message;
+    HACCEL acceleratorTable;
+    HANDLE workerThread;
+    FAST_EVENT fastEvent;
+    EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)Parameter;
+
+    hwndDlg = CreateDialogParam(g_WinObj.hInstance,
+        MAKEINTRESOURCE(IDD_DIALOG_EXTRASLIST),
+        0,
+        &DrvDlgProc,
+        (LPARAM)pDlgContext);
+
+    acceleratorTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
+
+    fastEvent = DrvDlgInitializedEvents[pDlgContext->DialogMode];
+
+    supSetFastEvent(&fastEvent);
+
+    do {
+
+        bResult = GetMessage(&message, NULL, 0, 0);
+        if (bResult == -1)
+            break;
+
+        if (IsDialogMessage(hwndDlg, &message)) {
+            TranslateAccelerator(hwndDlg, acceleratorTable, &message);
+        }
+        else {
+            TranslateMessage(&message);
+            DispatchMessage(&message);
+        }
+
+    } while (bResult != 0);
+
+    supResetFastEvent(&fastEvent);
+
+    if (acceleratorTable)
+        DestroyAcceleratorTable(acceleratorTable);
+
+    workerThread = DrvDlgThreadHandles[pDlgContext->DialogMode];
+    if (workerThread) {
+        NtClose(workerThread);
+        DrvDlgThreadHandles[pDlgContext->DialogMode] = NULL;
+    }
+
+    return 0;
+}
+
+/*
+* extrasCreateDriversDialog
+*
+* Purpose:
+*
+* Run Drivers Dialog worker thread.
+*
+*/
+VOID extrasCreateDriversDialog(
+    _In_ DRIVERS_DLG_MODE Mode
+)
+{
+    if (Mode < 0 || Mode >= DrvModeMax)
+        return;
+
+    if (!DrvDlgThreadHandles[Mode]) {
+
+        RtlSecureZeroMemory(&DrvDlgContext[Mode], sizeof(EXTRASCONTEXT));
+        DrvDlgContext[Mode].DialogMode = Mode;
+        DrvDlgThreadHandles[Mode] = supCreateDialogWorkerThread(extrasDrvDlgWorkerThread, (PVOID)&DrvDlgContext[Mode], 0);
+        supWaitForFastEvent(&DrvDlgInitializedEvents[Mode], NULL);
+
     }
 }

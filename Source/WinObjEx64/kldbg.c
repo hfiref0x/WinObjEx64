@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.94
 *
-*  DATE:        31 May 2022
+*  DATE:        07 Jun 2022
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -2538,6 +2538,27 @@ BOOLEAN kdIoDriverLoaded(
 }
 
 /*
+* kdGetAlpcPortTypeIndex
+*
+* Purpose:
+*
+* Return type index of ALPC Port object.
+*
+*/
+USHORT kdGetAlpcPortTypeIndex()
+{
+    USHORT typeIndex = MAXWORD;
+
+    if (g_kdctx.Data->AlpcPortTypeIndex.Valid == FALSE)
+        supQueryAlpcPortObjectTypeIndex(&g_kdctx.Data->AlpcPortTypeIndex);
+
+    if (g_kdctx.Data->AlpcPortTypeIndex.Valid)
+        typeIndex = g_kdctx.Data->AlpcPortTypeIndex.TypeIndex;
+
+    return typeIndex;
+}
+
+/*
 * kdQueryIopInvalidDeviceRequest
 *
 * Purpose:
@@ -2772,14 +2793,12 @@ BOOL kdReadSystemMemory2(
 */
 BOOL kdLoadSymbolsForNtImage(
     _In_ PSYMCONTEXT SymContext,
-    _In_ LPCWSTR ImageFileName
+    _In_ LPCWSTR ImageFileName,
+    _In_ PVOID ImageBase,
+    _In_ DWORD SizeOfImage
 )
 {
     BOOL bResult = FALSE;
-#ifndef _DEBUG
-    HWND hwndBanner = NULL;
-    WCHAR szText[(64 + MAX_PATH) * 2];
-#endif
 
     if (SymContext == NULL)
         return FALSE;
@@ -2787,28 +2806,17 @@ BOOL kdLoadSymbolsForNtImage(
     if (SymContext->ModuleBase != 0)
         return TRUE;
 
-#ifndef _DEBUG
-    __try {
-        _strcpy(szText, TEXT("Please wait, loading symbols for "));
-        _strcat(szText, ImageFileName);
-        hwndBanner = supDisplayLoadBanner(NULL, szText, TEXT("Load symbols"), TRUE);
-#endif
+    supDisplayLoadBanner(TEXT("Please wait...\r\n"), TEXT("Symbols loading"), TRUE);
 
-        bResult = SymContext->Parser.LoadModule(
-            SymContext,
-            ImageFileName,
-            (DWORD64)0,
-            (DWORD64)0);
+    bResult = SymContext->Parser.LoadModule(
+        SymContext,
+        ImageFileName,
+        (DWORD64)ImageBase,
+        SizeOfImage);
 
-#ifndef _DEBUG
-    }
-    __finally {
-        if (hwndBanner) {
-            Sleep(1000);
-            supCloseLoadBanner(hwndBanner);
-        }
-    }
-#endif
+    Sleep(1000);
+    supCloseLoadBanner();
+
     return bResult;
 }
 
@@ -2857,10 +2865,12 @@ BOOL kdLoadNtKernelImage(
             DONT_RESOLVE_DLL_REFERENCES);
 
         if (Context->NtOsImageMap) {
-
+           
             kdLoadSymbolsForNtImage(
                 (PSYMCONTEXT)g_kdctx.NtOsSymContext,
-                szFileName);
+                szFileName,
+                Context->NtOsImageMap,
+                0);
 
         }
 
@@ -3408,32 +3418,54 @@ PVOID kdQueryCmControlVector(
     _In_ PKLDBGCONTEXT Context
 )
 {
-    PVOID CmControlVector = NULL;
+    ULONG i, Offset;
     ULONG SectionSize;
+    ULONG_PTR PatternValue = 0, TestValue;
+    PVOID CmControlVector = NULL;
     PBYTE SectionBase;
     PBYTE RefPointer;
+    IMAGE_NT_HEADERS* NtHeaders = RtlImageNtHeader(Context->NtOsImageMap);
+    IMAGE_SECTION_HEADER* SectionTableEntry;
 
-    WCHAR szSignature[] = { L'P', L'r', L'o', L't', L'e', L'c', L't', L'i', L'o', L'n', L'M', L'o', L'd', L'e', 0 };
+    WCHAR szSignature[] = L"ProtectionMode";
 
-    SectionBase = (PBYTE)supLookupImageSectionByName(INIT_SECTION,
-        INIT_SECTION_LENGTH,
-        Context->NtOsImageMap,
-        &SectionSize);
+    SectionTableEntry = IMAGE_FIRST_SECTION(NtHeaders);
 
-    if (SectionBase) {
+    for (i = 0; i < NtHeaders->FileHeader.NumberOfSections; i++, SectionTableEntry++) {
 
-        RefPointer = supFindReferenceBySignature(
-            SectionBase,
+        SectionBase = (PBYTE)Context->NtOsImageMap + SectionTableEntry->VirtualAddress;
+        SectionSize = SectionTableEntry->Misc.VirtualSize;
+
+        PatternValue = (ULONG_PTR)supFindPattern(SectionBase,
             SectionSize,
-            (PBYTE)&szSignature,
-            sizeof(szSignature),
-            NULL,
-            NULL);
+            (CONST PBYTE)szSignature,
+            sizeof(szSignature));
 
-        if (RefPointer) {
-            CmControlVector = RefPointer - sizeof(ULONG_PTR);
+        if (PatternValue)
+            break;
+    }
+
+    if (PatternValue == 0)
+        return NULL;
+
+    SectionTableEntry = IMAGE_FIRST_SECTION(NtHeaders);
+
+    for (i = 0; i < NtHeaders->FileHeader.NumberOfSections; i++, SectionTableEntry++) {
+
+        SectionBase = (PBYTE)Context->NtOsImageMap + SectionTableEntry->VirtualAddress;
+        SectionSize = SectionTableEntry->Misc.VirtualSize;
+        for (Offset = 0; Offset < SectionSize - sizeof(ULONG_PTR); Offset++) {
+
+            RefPointer = SectionBase + Offset;
+            TestValue = *(PULONG_PTR)RefPointer;
+            if (TestValue == PatternValue) {
+                CmControlVector = RefPointer - sizeof(ULONG_PTR);
+                break;
+            }
         }
 
+        if (CmControlVector)
+            break;
     }
 
     return CmControlVector;
@@ -3485,10 +3517,10 @@ BOOL kdGetFieldOffsetFromSymbol(
     szLog[0] = 0;
     RtlStringCchPrintfSecure(szLog,
         RTL_NUMBER_OF(szLog),
-        TEXT("%ws: Retrieving offset for symbol \"%ws\" field \"%ws\""),
+        TEXT("%ws: Retrieving field \"%ws\" offset for symbol \"%ws\""),
         __FUNCTIONW__,
-        SymbolName,
-        FieldName);
+        FieldName,
+        SymbolName);
 
     logAdd(EntryTypeInformation, szLog);
 
@@ -3508,9 +3540,11 @@ BOOL kdGetFieldOffsetFromSymbol(
     szLog[0] = 0;
     RtlStringCchPrintfSecure(szLog,
         RTL_NUMBER_OF(szLog),
-        TEXT("%ws: Result %lu, field offset 0x%lX"),
+        TEXT("%ws(%lu): \"%ws->%ws\", offset 0x%lX"),
         __FUNCTIONW__,
         bResult,
+        SymbolName,
+        FieldName,
         *Offset);
 
     logAdd(EntryTypeInformation, szLog);
@@ -3598,9 +3632,10 @@ BOOL kdGetAddressFromSymbolEx(
     szLog[0] = 0;
     RtlStringCchPrintfSecure(szLog,
         RTL_NUMBER_OF(szLog),
-        TEXT("%ws: Result %lu, address 0x%llX"),
+        TEXT("%ws(%lu): \"%ws\" address 0x%llX"),
         __FUNCTIONW__,
         bResult,
+        SymbolName,
         address);
 
     logAdd(EntryTypeInformation, szLog);
@@ -3622,25 +3657,72 @@ BOOL kdGetAddressFromSymbol(
     _Inout_ ULONG_PTR* Address
 )
 {
-    BOOL bResult = FALSE;
-    ULONG_PTR address = 0;
     PSYMCONTEXT symContext = (PSYMCONTEXT)Context->NtOsSymContext;
 
-    *Address = 0;
-
-    bResult = kdGetAddressFromSymbolEx(symContext,
+    return kdGetAddressFromSymbolEx(symContext,
         SymbolName,
         Context->NtOsBase,
         Context->NtOsSize,
-        &address);
+        Address);
 
-    if (bResult) {
+}
 
-        *Address = address;
+/*
+* symCallbackReportEvent
+*
+* Purpose:
+*
+* Add event to the log and output it into optional callback.
+*
+*/
+VOID symCallbackReportEvent(
+    _In_ ULONG ActionCode,
+    _In_ PIMAGEHLP_DEFERRED_SYMBOL_LOAD Action,
+    _In_ PFNSUPSYMCALLBACK UserCallback
+)
+{
+    WCHAR szText[MAX_PATH * 2];
+    WOBJ_ENTRY_TYPE entryType = EntryTypeInformation;
+
+    szText[0] = 0;
+
+    switch (ActionCode) {
+
+    case CBA_DEFERRED_SYMBOL_LOAD_START:
+
+        RtlStringCchPrintfSecure(szText, RTL_NUMBER_OF(szText),
+            TEXT("Loading symbols for 0x%p %ws..."),
+            Action->BaseOfImage,
+            Action->FileName);
+
+        break;
+
+    case CBA_DEFERRED_SYMBOL_LOAD_COMPLETE:
+
+        RtlStringCchPrintfSecure(szText, RTL_NUMBER_OF(szText),
+            TEXT("Loaded symbols for 0x%p %ws"),
+            Action->BaseOfImage,
+            Action->FileName);
+
+        break;
+
+    case CBA_DEFERRED_SYMBOL_LOAD_FAILURE:
+
+        RtlStringCchPrintfSecure(szText, RTL_NUMBER_OF(szText),
+            TEXT("*** ERROR: Could not load symbols for 0x%p %ws..."),
+            Action->BaseOfImage,
+            Action->FileName);
+
+        entryType = EntryTypeError;
+
+        break;
 
     }
 
-    return bResult;
+    logAdd(entryType, szText);
+
+    if (UserCallback)
+        UserCallback(szText);
 }
 
 /*
@@ -3658,22 +3740,18 @@ BOOL CALLBACK symCallbackProc(
     _In_ ULONG64 UserContext
 )
 {
-    PIMAGEHLP_CBA_EVENT pEvent;
-
     UNREFERENCED_PARAMETER(hProcess);
-    UNREFERENCED_PARAMETER(UserContext);
 
     switch (ActionCode) {
 
-    case CBA_EVENT:
-        if (CallbackData) {
-            pEvent = (PIMAGEHLP_CBA_EVENT)CallbackData;
-            if (pEvent->severity == sevInfo) {
-                if (pEvent->desc[0] > 0x20 && pEvent->desc[0] < 0x7f) {
-                    supUpdateLoadBannerText(g_hwndBanner, pEvent->desc, TRUE);
-                }
-            }
-        }
+    case CBA_DEFERRED_SYMBOL_LOAD_START:
+    case CBA_DEFERRED_SYMBOL_LOAD_COMPLETE:
+    case CBA_DEFERRED_SYMBOL_LOAD_FAILURE:
+
+        symCallbackReportEvent(ActionCode, 
+            (PIMAGEHLP_DEFERRED_SYMBOL_LOAD)CallbackData, 
+            (PFNSUPSYMCALLBACK)UserContext);
+
         break;
 
     default:
@@ -3713,18 +3791,18 @@ BOOL symInit(
         if (PathFileExists(szFileName)) {
 
             if (SymGlobalsInit(
-                SYMOPT_DEFERRED_LOADS |
-                SYMOPT_SECURE |
+                SYMOPT_CASE_INSENSITIVE |
+                SYMOPT_UNDNAME |
+                SYMOPT_FAIL_CRITICAL_ERRORS |
                 SYMOPT_EXACT_SYMBOLS |
-                SYMOPT_DEBUG |
-                SYMOPT_FAIL_CRITICAL_ERRORS,
+                SYMOPT_AUTO_PUBLICS,
                 NULL,
                 szFileName,
                 NULL,
                 g_WinObj.szSystemDirectory,
                 g_WinObj.szTempDirectory,
                 (PSYMBOL_REGISTERED_CALLBACK64)symCallbackProc,
-                0))
+                (ULONG64)supSymCallbackReportEvent))
             {
                 g_kdctx.NtOsSymContext = (PVOID)SymParserCreate();
             }
@@ -3756,6 +3834,78 @@ VOID symShutdown()
 }
 
 /*
+* kdCreateObjectTypesList
+*
+* Purpose:
+*
+* Create simple list of system object types.
+*
+*/
+PVOID kdCreateObjectTypesList(
+    VOID
+)
+{
+    ULONG i;
+    OBTYPE_LIST* list;
+    POBJECT_TYPES_INFORMATION pObjectTypes = supGetObjectTypesInfo();
+    POBJECT_TYPE_INFORMATION pObject;
+
+    union {
+        union {
+            POBJECT_TYPE_INFORMATION Object;
+            POBJECT_TYPE_INFORMATION_V2 ObjectV2;
+        } u1;
+        PBYTE Ref;
+    } ObjectTypeEntry;
+
+    if (pObjectTypes == NULL)
+        return NULL;
+
+    list = (OBTYPE_LIST*)supHeapAlloc(
+        sizeof(OBTYPE_LIST) +
+        sizeof(OBTYPE_ENTRY) * pObjectTypes->NumberOfTypes);
+
+    if (list) {
+
+        list->Buffer = pObjectTypes;
+
+        __try {
+
+            pObject = OBJECT_TYPES_FIRST_ENTRY(pObjectTypes);
+
+            for (i = 0; i < pObjectTypes->NumberOfTypes; i++) {
+
+                ObjectTypeEntry.Ref = (PBYTE)pObject;
+
+                if (g_NtBuildNumber >= NT_WIN8_RTM) {
+                    list->Types[i].TypeIndex = ObjectTypeEntry.u1.ObjectV2->TypeIndex;
+                    list->Types[i].TypeName = &ObjectTypeEntry.u1.ObjectV2->TypeName;
+                    list->Types[i].PoolType = ObjectTypeEntry.u1.ObjectV2->PoolType;
+                }
+                else {
+                    list->Types[i].TypeIndex = (i + 2);
+                    list->Types[i].TypeName = &ObjectTypeEntry.u1.Object->TypeName;
+                    list->Types[i].PoolType = ObjectTypeEntry.u1.Object->PoolType;
+                }
+
+                list->NumberOfTypes += 1;
+                pObject = OBJECT_TYPES_NEXT_ENTRY(pObject);
+            }
+
+        }
+        __except (WOBJ_EXCEPTION_FILTER_LOG) {
+            return NULL;
+        }
+
+    }
+    else {
+        supHeapFree(pObjectTypes);
+    }
+
+    return list;
+}
+
+/*
 * kdInit
 *
 * Purpose:
@@ -3781,9 +3931,13 @@ VOID kdInit(
 
     g_kdctx.Data = &g_kdpdata;
 
+    g_kdctx.MitigationFlags.ASLRPolicy = TRUE;
+
     NtpLdrExceptionFilter = (PFNNTLDR_EXCEPT_FILTER)exceptFilterWithLog;
 
     InitializeListHead(&g_kdctx.Data->KseEngineDump.ShimmedDriversDumpListHead);
+
+    g_kdctx.Data->ObjectTypesList = kdCreateObjectTypesList();
 
     //
     // Minimum supported client is windows 7
@@ -3818,15 +3972,26 @@ VOID kdInit(
     //
     ObpFindProcessObjectOffsets(&g_kdctx);
 
-    //
-    // If the current driver provider is WinDbg then check Windows debug mode.
-    // This is required by WinDbg kldbgdrv.
-    //
-    if (WDrvGetActiveProviderType() == wdrvMicrosoft) {
-
+    switch (WDrvGetActiveProviderType())
+    {
+        //
+        // If the current driver provider is WinDbg then check Windows debug mode.
+        // This is required by WinDbg kldbgdrv.
+        //
+    case wdrvMicrosoft:
         if (supIsKdEnabled(NULL, NULL) == FALSE)
             return;
+        break;
 
+    case wdrvWinIo:
+        g_kdctx.MitigationFlags.ImageLoad = TRUE;
+        g_kdctx.MitigationFlags.ExtensionPointDisable = TRUE;
+        g_kdctx.MitigationFlags.Signature = TRUE;
+        g_kdctx.MitigationFlags.ASLRPolicy = TRUE;
+        break;
+
+    default:
+        break;
     }
 
     //
@@ -3874,6 +4039,12 @@ VOID kdShutdown(
     VOID
 )
 {
+    if (g_kdctx.Data->ObjectTypesList) {
+        if (g_kdctx.Data->ObjectTypesList->Buffer)
+            supHeapFree(g_kdctx.Data->ObjectTypesList->Buffer);
+        supHeapFree(g_kdctx.Data->ObjectTypesList);
+    }
+
     WDrvProvRelease(&g_kdctx.DriverContext);
 
     if (g_kdctx.NtOsImageMap) {

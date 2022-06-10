@@ -76,31 +76,7 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 
 #define T_CSV_FILE_FILTER       TEXT("CSV Files\0*.csv\0\0")
 #define T_LIST_EXPORT_SUCCESS   TEXT("List export - OK")
-
-#define T_DRIVER_REQUIRED       TEXT("Support from helper driver is required for this feature.\r\n\r\n\
-If you see this message it can be caused by:\r\n\
-1) Support driver is not loaded or cannot be opened due to insufficient security rights;\r\n\
-2) There is an internal error processing request to the heper driver.")
-
 #define T_RICHEDIT_LIB          TEXT("RICHED32.DLL")
-
-typedef enum _WOBJ_DIALOGS_ID {
-    wobjFindDlgId = 0,
-    wobjIpcPipesDlgId,
-    wobjIpcMailSlotsDlgId,
-    wobjUSDDlgId,
-    wobjPNSDlgId,
-    wobjKSSTDlgId,
-    wobjW32SSTDlgId,
-    wobjPsListDlgId,
-    wobjDriversDlgId,
-    wobjUnloadedDriversDlgId,
-    wobjCallbacksDlgId,
-    wobjSLCacheDlgId,
-    wobjCmOptDlgId,
-    wobjPluginViewId,
-    wobjMaxDlgId
-} WOBJ_DIALOGS_ID;
 
 #define MAX_TEXT_CONVERSION_ULONG64 32
 
@@ -125,15 +101,6 @@ typedef enum _WOBJ_DIALOGS_ID {
 
 // Help
 #define IDMM_HELP   5
-
-//
-// Declared in main.c
-//
-extern HWND g_hwndObjectTree;
-extern HWND g_hwndObjectList;
-extern HIMAGELIST g_ListViewImages;
-extern ATOM g_TreeListAtom;
-extern HTREEITEM g_SelectedTreeItem;
 
 typedef struct _TL_SUBITEMS_FIXED {
     ULONG       ColorFlags;
@@ -205,19 +172,6 @@ typedef struct _PROP_OBJECT_INFO {
         SetActiveWindow(Dialog);            \
         return;                             \
     }                                       \
-}
-
-//
-// If dialog already present - activate/restore it window and return.
-//
-#define ENSURE_DIALOG_UNIQUE_WITH_RESTORE(Dialog) {         \
-    if (Dialog != NULL) {                                   \
-        if (IsIconic(Dialog))                               \
-            ShowWindow(Dialog, SW_RESTORE);                 \
-        else                                                \
-            SetActiveWindow(Dialog);                        \
-        return;                                             \
-    }                                                       \
 }
 
 typedef struct _PROP_DIALOG_CREATE_SETTINGS {
@@ -315,7 +269,8 @@ static LPCWSTR g_szMonths[12] = {
 #define INIT_ERROR_NOLISTWND        10
 #define INIT_ERROR_NOTREEWND        11
 #define INIT_ERROR_NOTLBARWND       12
-#define INIT_ERROR_UNSPECIFIED      13
+#define INIT_ERROR_NOSPLITTERWND    13
+#define INIT_ERROR_UNSPECIFIED      14
 
 #define T_WOBJINIT_NOCRT TEXT("Could not initialize CRT, abort")
 

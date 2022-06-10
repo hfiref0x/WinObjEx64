@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.94
 *
-*  DATE:        31 May 2022
+*  DATE:        04 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -30,6 +30,9 @@
 #define COLUMN_CMOPTLIST_BUFFER                 2
 #define COLUMN_CMOPTLIST_BUFFER_LENGTH          3
 #define COLUM_CMOPTLIST_VALUE_MEMORY            5
+
+static HANDLE CmOptThreadHandle = NULL;
+static FAST_EVENT CmOptInitializedEvent = FAST_EVENT_INIT;
 
 /*
 * CmOptDlgDumpValueToFile
@@ -79,7 +82,7 @@ VOID CmOptDlgDumpValueToFile(
 
         if (variableSize == 0)
             variableSize = sizeof(ULONG);
-        
+
         tempBuffer = (PBYTE)supHeapAlloc(ALIGN_UP_BY(variableSize, PAGE_SIZE));
         if (tempBuffer == NULL)
             break;
@@ -259,7 +262,7 @@ BOOL CALLBACK CmOptDlgHandleNotify(
 
         nImageIndex = ImageList_GetImageCount(g_ListViewImages);
         if (Context->bInverseSort)
-            nImageIndex -= 2; //sort down/up images are always at the end of g_ListViewImages
+            nImageIndex -= 2; //sort down/up images are always at the end of main imagelist
         else
             nImageIndex -= 1;
 
@@ -335,102 +338,7 @@ VOID CmOptDlgHandleWMCommand(
         SendMessage(hwndDlg, WM_CLOSE, 0, 0);
         break;
 
-    default:
-        break;
     }
-}
-
-/*
-* CmOptDlgDialogProc
-*
-* Purpose:
-*
-* CmControlVector Dialog window procedure.
-*
-*/
-INT_PTR CALLBACK CmOptDlgDialogProc(
-    _In_  HWND hwndDlg,
-    _In_  UINT uMsg,
-    _In_  WPARAM wParam,
-    _In_  LPARAM lParam
-)
-{
-    EXTRASCONTEXT* pDlgContext;
-
-    if (uMsg == g_WinObj.SettingsChangeMessage) {
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
-            extrasHandleSettingsChange(pDlgContext);
-        }
-        return TRUE;
-    }
-
-    switch (uMsg) {
-
-    case WM_SIZE:
-        extrasSimpleListResize(hwndDlg);
-        break;
-
-    case WM_INITDIALOG:
-        SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)lParam);
-        supCenterWindow(hwndDlg);
-        break;
-
-    case WM_CLOSE:
-        pDlgContext = (EXTRASCONTEXT*)RemoveProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
-
-            extrasRemoveDlgIcon(pDlgContext);
-
-            g_WinObj.AuxDialogs[wobjCmOptDlgId] = NULL;
-
-            supHeapFree(pDlgContext);
-        }
-        return DestroyWindow(hwndDlg);
-
-    case WM_COMMAND:
-
-        CmOptDlgHandleWMCommand(hwndDlg, wParam, lParam);
-        break;
-
-
-    case WM_GETMINMAXINFO:
-        if (lParam) {
-            supSetMinMaxTrackSize((PMINMAXINFO)lParam,
-                CMOPTDLG_TRACKSIZE_MIN_X,
-                CMOPTDLG_TRACKSIZE_MIN_Y,
-                TRUE);
-        }
-        break;
-
-    case WM_NOTIFY:
-
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
-            return (INT_PTR)CmOptDlgHandleNotify(
-                (LPNMLISTVIEW)lParam,
-                pDlgContext);
-        }
-        break;
-
-    case WM_CONTEXTMENU:
-
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
-            supHandleContextMenuMsgForListView(hwndDlg,
-                wParam,
-                lParam,
-                pDlgContext->ListView,
-                (pfnPopupMenuHandler)CmOptDlgHandlePopupMenu,
-                pDlgContext);
-        }
-        break;
-
-    default:
-        return FALSE;
-    }
-
-    return TRUE;
 }
 
 /*
@@ -464,7 +372,7 @@ VOID CmpOptDlgAddEntry(
 
     CmControlVector.Ref = (PBYTE)pvEntry;
 
-    __try {
+    __try { //rely on undocumented structures
 
         RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
 
@@ -640,23 +548,21 @@ VOID CmOptDlgListOptions(
 }
 
 /*
-* extrasCreateCmOptDialog
+* CmOptDlgOnInit
 *
 * Purpose:
 *
-* Create and initialize CmControlVector Dialog.
+* WM_INITDIALOG handler.
 *
 */
-VOID extrasCreateCmOptDialog(
-    _In_ HWND hwndParent
+VOID CmOptDlgOnInit(
+    _In_ HWND hwndDlg,
+    _In_ LPARAM lParam
 )
 {
-    BOOLEAN         bIoDriverLoaded;
-    HWND            hwndDlg;
-    EXTRASCONTEXT* pDlgContext;
-
+    EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)lParam;
     INT iImage = ImageList_GetImageCount(g_ListViewImages) - 1, iColumn;
-
+    BOOLEAN bIoDriverLoaded;
     LVCOLUMNS_DATA columnDataList[] =
     {
         { L"KeyPath", 200, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT, iImage },
@@ -666,96 +572,238 @@ VOID extrasCreateCmOptDialog(
         { L"Type", 80, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT, I_IMAGENONE }
     };
 
-    //
-    // Allow only one dialog, if it already open - activate it.
-    //
-    ENSURE_DIALOG_UNIQUE_WITH_RESTORE(g_WinObj.AuxDialogs[wobjCmOptDlgId]);
-
-    pDlgContext = (EXTRASCONTEXT*)supHeapAlloc(sizeof(EXTRASCONTEXT));
-    if (pDlgContext == NULL)
-        return;
-
-    hwndDlg = CreateDialogParam(
-        g_WinObj.hInstance,
-        MAKEINTRESOURCE(IDD_DIALOG_EXTRASLIST),
-        hwndParent,
-        &CmOptDlgDialogProc,
-        (LPARAM)pDlgContext);
-
-    if (hwndDlg == NULL) {
-        supHeapFree(pDlgContext);
-        return;
-    }
+    SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)pDlgContext);
 
     pDlgContext->hwndDlg = hwndDlg;
-    g_WinObj.AuxDialogs[wobjCmOptDlgId] = hwndDlg;
     pDlgContext->lvItemHit = -1;
     pDlgContext->lvColumnHit = -1;
 
     extrasSetDlgIcon(pDlgContext);
 
     pDlgContext->StatusBar = GetDlgItem(hwndDlg, ID_EXTRASLIST_STATUSBAR);
-
     pDlgContext->ListView = GetDlgItem(hwndDlg, ID_EXTRASLIST);
-    if (pDlgContext->ListView) {
+    pDlgContext->lvColumnHit = -1;
+    pDlgContext->lvItemHit = -1;
 
-        pDlgContext->lvColumnHit = -1;
-        pDlgContext->lvItemHit = -1;
+    //
+    // Set listview imagelist, style flags and theme.
+    //
+    supSetListViewSettings(pDlgContext->ListView,
+        LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
+        FALSE,
+        TRUE,
+        g_ListViewImages,
+        LVSIL_SMALL);
 
-        //
-        // Set listview imagelist, style flags and theme.
-        //
-        supSetListViewSettings(pDlgContext->ListView,
-            LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
-            FALSE,
-            TRUE,
-            g_ListViewImages,
-            LVSIL_SMALL);
+    //
+    // And columns and remember their count.
+    //
+    iColumn = supAddLVColumnsFromArray(
+        pDlgContext->ListView,
+        columnDataList,
+        RTL_NUMBER_OF(columnDataList));
 
-        //
-        // And columns and remember their count.
-        //
-        iColumn = supAddLVColumnsFromArray(
-            pDlgContext->ListView,
-            columnDataList,
-            RTL_NUMBER_OF(columnDataList));
+    pDlgContext->lvColumnCount = iColumn;
 
-        pDlgContext->lvColumnCount = iColumn;
+    bIoDriverLoaded = kdIoDriverLoaded();
+    pDlgContext->Reserved = bIoDriverLoaded;
 
-        bIoDriverLoaded = kdIoDriverLoaded();
-        pDlgContext->Reserved = bIoDriverLoaded;
+    if (bIoDriverLoaded) {
+        supAddListViewColumn(pDlgContext->ListView,
+            iColumn,
+            iColumn,
+            iColumn,
+            I_IMAGENONE,
+            LVCFMT_CENTER | LVCFMT_BITMAP_ON_RIGHT,
+            TEXT("Value (Memory)"), 80);
 
-        if (bIoDriverLoaded) {
-            supAddListViewColumn(pDlgContext->ListView,
-                iColumn,
-                iColumn,
-                iColumn,
-                I_IMAGENONE,
-                LVCFMT_CENTER | LVCFMT_BITMAP_ON_RIGHT,
-                TEXT("Value (Memory)"), 80);
-
-            pDlgContext->lvColumnCount += 1;
-            iColumn += 1;
-        }
-
-        if (g_NtBuildNumber >= NT_WIN10_REDSTONE4) {
-            supAddListViewColumn(pDlgContext->ListView,
-                iColumn,
-                iColumn,
-                iColumn,
-                I_IMAGENONE,
-                LVCFMT_CENTER | LVCFMT_BITMAP_ON_RIGHT,
-                TEXT("Flags"), 80);
-
-            pDlgContext->lvColumnCount += 1;
-        }
-
-        SetWindowText(hwndDlg, TEXT("CmControlVector (Relative to: \\REGISTRY\\MACHINE\\SYSTEM\\CurrentControlSet\\Control)"));
-
-        CmOptDlgListOptions(pDlgContext);
-
-        SendMessage(hwndDlg, WM_SIZE, 0, 0);
-        SetFocus(pDlgContext->ListView);
+        pDlgContext->lvColumnCount += 1;
+        iColumn += 1;
     }
 
+    if (g_NtBuildNumber >= NT_WIN10_REDSTONE4) {
+        supAddListViewColumn(pDlgContext->ListView,
+            iColumn,
+            iColumn,
+            iColumn,
+            I_IMAGENONE,
+            LVCFMT_CENTER | LVCFMT_BITMAP_ON_RIGHT,
+            TEXT("Flags"), 80);
+
+        pDlgContext->lvColumnCount += 1;
+    }
+
+    SetWindowText(hwndDlg, TEXT("CmControlVector (Relative to: \\REGISTRY\\MACHINE\\SYSTEM\\CurrentControlSet\\Control)"));
+
+    CmOptDlgListOptions(pDlgContext);
+
+    SendMessage(hwndDlg, WM_SIZE, 0, 0);
+    SetFocus(pDlgContext->ListView);
+
+    supCenterWindowSpecifyParent(hwndDlg, g_WinObj.MainWindow);
+}
+
+/*
+* CmOptDlgDialogProc
+*
+* Purpose:
+*
+* CmControlVector Dialog window procedure.
+*
+*/
+INT_PTR CALLBACK CmOptDlgDialogProc(
+    _In_  HWND hwndDlg,
+    _In_  UINT uMsg,
+    _In_  WPARAM wParam,
+    _In_  LPARAM lParam
+)
+{
+    EXTRASCONTEXT* pDlgContext;
+
+    if (uMsg == g_WinObj.SettingsChangeMessage) {
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+            extrasHandleSettingsChange(pDlgContext);
+        }
+        return TRUE;
+    }
+
+    switch (uMsg) {
+
+    case WM_SIZE:
+        extrasSimpleListResize(hwndDlg);
+        break;
+
+    case WM_INITDIALOG:
+        CmOptDlgOnInit(hwndDlg, lParam);
+        break;
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+
+    case WM_CLOSE:
+        pDlgContext = (EXTRASCONTEXT*)RemoveProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+            extrasRemoveDlgIcon(pDlgContext);
+            supHeapFree(pDlgContext);
+        }
+        return DestroyWindow(hwndDlg);
+
+    case WM_COMMAND:
+
+        CmOptDlgHandleWMCommand(hwndDlg, wParam, lParam);
+        break;
+
+    case WM_GETMINMAXINFO:
+        if (lParam) {
+            supSetMinMaxTrackSize((PMINMAXINFO)lParam,
+                CMOPTDLG_TRACKSIZE_MIN_X,
+                CMOPTDLG_TRACKSIZE_MIN_Y,
+                TRUE);
+        }
+        break;
+
+    case WM_NOTIFY:
+
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+            return (INT_PTR)CmOptDlgHandleNotify(
+                (LPNMLISTVIEW)lParam,
+                pDlgContext);
+        }
+        break;
+
+    case WM_CONTEXTMENU:
+
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+            supHandleContextMenuMsgForListView(hwndDlg,
+                wParam,
+                lParam,
+                pDlgContext->ListView,
+                (pfnPopupMenuHandler)CmOptDlgHandlePopupMenu,
+                pDlgContext);
+        }
+        break;
+    }
+
+    return FALSE;
+}
+
+/*
+* extrasCmOptDialogWorkerThread
+*
+* Purpose:
+*
+* CmControlVector Dialog thread.
+*
+*/
+DWORD extrasCmOptDialogWorkerThread(
+    _In_ PVOID Parameter
+)
+{
+    BOOL bResult;
+    MSG message;
+    HWND hwndDlg;
+    EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)Parameter;
+
+    hwndDlg = CreateDialogParam(
+        g_WinObj.hInstance,
+        MAKEINTRESOURCE(IDD_DIALOG_EXTRASLIST),
+        0,
+        &CmOptDlgDialogProc,
+        (LPARAM)pDlgContext);
+
+    supSetFastEvent(&CmOptInitializedEvent);
+
+    do {
+
+        bResult = GetMessage(&message, NULL, 0, 0);
+        if (bResult == -1)
+            break;
+
+        if (!IsDialogMessage(hwndDlg, &message)) {
+            TranslateMessage(&message);
+            DispatchMessage(&message);
+        }
+
+    } while (bResult != 0);
+
+    supResetFastEvent(&CmOptInitializedEvent);
+
+    if (CmOptThreadHandle) {
+        NtClose(CmOptThreadHandle);
+        CmOptThreadHandle = NULL;
+    }
+
+    return 0;
+}
+
+/*
+* extrasCreateCmOptDialog
+*
+* Purpose:
+*
+* Create and initialize CmControlVector Dialog.
+*
+*/
+VOID extrasCreateCmOptDialog(
+    VOID
+)
+{
+    EXTRASCONTEXT* pDlgContext;
+
+    if (!CmOptThreadHandle) {
+
+        pDlgContext = (EXTRASCONTEXT*)supHeapAlloc(sizeof(EXTRASCONTEXT));
+        if (pDlgContext) {
+
+            pDlgContext->tlSubItemHit = -1;
+            CmOptThreadHandle = supCreateDialogWorkerThread(extrasCmOptDialogWorkerThread, pDlgContext , 0);
+            supWaitForFastEvent(&CmOptInitializedEvent, NULL);
+
+        }
+
+    }
 }

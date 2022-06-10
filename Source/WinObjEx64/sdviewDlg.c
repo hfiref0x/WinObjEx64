@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020 - 2021
+*  (C) COPYRIGHT AUTHORS, 2020 - 2022
 *
 *  TITLE:       SDVIEWDLG.C
 *
-*  VERSION:     1.90
+*  VERSION:     1.94
 *
-*  DATE:        11 May 2021
+*  DATE:        07 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -966,6 +966,79 @@ VOID SDViewOnResize(
 }
 
 /*
+* SDViewDialogOnInit
+*
+* Purpose:
+*
+* WM_INITDIALOG handler.
+*
+*/
+VOID SDViewDialogOnInit(
+    _In_ HWND hwndDlg,
+    _In_ LPARAM lParam
+)
+{
+    NTSTATUS ntStatus;
+    HICON hIcon;
+    LPWSTR lpText;
+    SDVIEW_CONTEXT* dlgContext;
+    ENUMCHILDWNDDATA wndData;
+
+    supCenterWindow(hwndDlg);
+    if (lParam == 0)
+        return;
+
+    dlgContext = (SDVIEW_CONTEXT*)lParam;
+    SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)lParam);
+
+    dlgContext->DialogWindow = hwndDlg;
+    dlgContext->AceList = GetDlgItem(hwndDlg, IDC_SDVIEW_LIST);
+    dlgContext->StatusBar = GetDlgItem(hwndDlg, IDC_SDVIEW_STATUSBAR);
+
+    //
+    // Set dialog icon.
+    //
+    hIcon = (HICON)LoadImage(g_WinObj.hInstance,
+        MAKEINTRESOURCE(IDI_ICON_MAIN),
+        IMAGE_ICON,
+        32, 32,
+        0);
+
+    if (hIcon) {
+        SendMessage(hwndDlg, WM_SETICON, (WPARAM)ICON_SMALL, (LPARAM)hIcon);
+        SendMessage(hwndDlg, WM_SETICON, (WPARAM)ICON_BIG, (LPARAM)hIcon);
+        dlgContext->DialogIcon = hIcon;
+    }
+
+    SDViewInitControls(hwndDlg, dlgContext);
+
+
+    //
+    // Dump object security information.
+    //
+    ntStatus = SDViewDumpObjectSecurity(dlgContext);
+    if (NT_SUCCESS(ntStatus)) {
+        SetFocus(dlgContext->AceList);
+    }
+    else {
+        //
+        // On error - hide all child windows and show details of the error.
+        //
+        if (GetWindowRect(hwndDlg, &wndData.Rect)) {
+            wndData.nCmdShow = SW_HIDE;
+            EnumChildWindows(hwndDlg, supCallbackShowChildWindow, (LPARAM)&wndData);
+        }
+        ShowWindow(GetDlgItem(hwndDlg, ID_OBJECTDUMPERROR), SW_SHOW);
+        lpText = supFormatNtError(ntStatus);
+        if (lpText) {
+            SetDlgItemText(hwndDlg, ID_OBJECTDUMPERROR, lpText);
+            LocalFree((HLOCAL)lpText);
+        }
+    }
+
+}
+
+/*
 * SDViewDialogProc
 *
 * Purpose:
@@ -976,8 +1049,8 @@ VOID SDViewOnResize(
 *
 */
 INT_PTR CALLBACK SDViewDialogProc(
-    _In_ HWND   hwndDlg,
-    _In_ UINT   uMsg,
+    _In_ HWND hwndDlg,
+    _In_ UINT uMsg,
     _In_ WPARAM wParam,
     _In_ LPARAM lParam
 )
@@ -987,12 +1060,7 @@ INT_PTR CALLBACK SDViewDialogProc(
     switch (uMsg) {
 
     case WM_INITDIALOG:
-        supCenterWindow(hwndDlg);
-        if (lParam) {
-            dlgContext = (SDVIEW_CONTEXT*)lParam;
-            SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)lParam);
-            SDViewInitControls(hwndDlg, dlgContext);
-        }
+        SDViewDialogOnInit(hwndDlg, lParam);
         break;
 
     case WM_CONTEXTMENU:
@@ -1177,13 +1245,8 @@ VOID SDViewDialogCreate(
     _In_ WOBJ_OBJECT_TYPE ObjectType
 )
 {
-    HICON hIcon;
     HWND hwndDlg;
-    NTSTATUS ntStatus;
     SDVIEW_CONTEXT* SDViewContext;
-    LPWSTR lpText;
-
-    ENUMCHILDWNDDATA wndData;
 
     if (ObjectDirectory == NULL || ObjectName == NULL)
         return;
@@ -1203,49 +1266,8 @@ VOID SDViewDialogCreate(
 
     if (hwndDlg) {
 
-        //
-        // Set dialog icon.
-        //
-        hIcon = (HICON)LoadImage(g_WinObj.hInstance,
-            MAKEINTRESOURCE(IDI_ICON_MAIN),
-            IMAGE_ICON,
-            32, 32,
-            0);
-
-        if (hIcon) {
-            SendMessage(hwndDlg, WM_SETICON, (WPARAM)ICON_SMALL, (LPARAM)hIcon);
-            SendMessage(hwndDlg, WM_SETICON, (WPARAM)ICON_BIG, (LPARAM)hIcon);
-            SDViewContext->DialogIcon = hIcon;
-        }
-
-        SDViewContext->DialogWindow = hwndDlg;
-        SDViewContext->AceList = GetDlgItem(hwndDlg, IDC_SDVIEW_LIST);
-        SDViewContext->StatusBar = GetDlgItem(hwndDlg, IDC_SDVIEW_STATUSBAR);
-
         SDViewSetCaption(hwndDlg, ObjectDirectory, ObjectName, ObjectType);
 
-        //
-        // Dump object security information.
-        //
-        ntStatus = SDViewDumpObjectSecurity(SDViewContext);
-        if (NT_SUCCESS(ntStatus)) {
-            SetFocus(SDViewContext->AceList);
-        }
-        else {
-            //
-            // On error - hide all child windows and show details of the error.
-            //
-            if (GetWindowRect(hwndDlg, &wndData.Rect)) {
-                wndData.nCmdShow = SW_HIDE;
-                EnumChildWindows(hwndDlg, supCallbackShowChildWindow, (LPARAM)&wndData);
-            }
-            ShowWindow(GetDlgItem(hwndDlg, ID_OBJECTDUMPERROR), SW_SHOW);
-            lpText = supFormatNtError(ntStatus);
-            if (lpText) {
-                SetDlgItemText(hwndDlg, ID_OBJECTDUMPERROR, lpText);
-                LocalFree((HLOCAL)lpText);
-            }
-        }
     }
     else {
         supHeapFree(SDViewContext);

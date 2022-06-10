@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.94
 *
-*  DATE:        31 May 2022
+*  DATE:        05 Jun 2022
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -136,6 +136,11 @@ typedef struct _OBHEADER_COOKIE {
     UCHAR Value;
 } OBHEADER_COOKIE, * POBHEADER_COOKIE;
 
+typedef struct _ALPCPORT_TYPE_INDEX {
+    BOOLEAN Valid;
+    USHORT TypeIndex;
+} ALPCPORT_TYPE_INDEX, *PALPCPORT_TYPE_INDEX;
+
 typedef struct _EPROCESS_OFFSET {
     BOOLEAN Valid;
     ULONG OffsetValue;
@@ -151,6 +156,18 @@ typedef struct _KLDBG_SYSTEM_ADDRESS {
     BOOLEAN Valid;
     ULONG_PTR Address;
 } KLDBG_SYSTEM_ADDRESS, * PKLDBG_SYSTEM_ADDRESS;
+
+typedef struct _OBTYPE_ENTRY {
+    PUNICODE_STRING TypeName;
+    ULONG PoolType;
+    ULONG TypeIndex;
+} OBTYPE_ENTRY, * POBTYPE_ENTRY;
+
+typedef struct _OBTYPE_LIST {
+    ULONG NumberOfTypes;
+    PVOID Buffer;
+    OBTYPE_ENTRY Types[ANYSIZE_ARRAY];
+} OBTYPE_LIST, * POBTYPE_LIST;
 
 //
 // KLDBG private data.
@@ -181,6 +198,12 @@ typedef struct _KLDBGPDATA {
     //address of data in mapped ntoskrnl
     PVOID CmControlVector;
 
+    //array of object type information
+    POBTYPE_LIST ObjectTypesList;
+
+    // ALPC Port type index
+    ALPCPORT_TYPE_INDEX AlpcPortTypeIndex;
+
     //EPROCESS specific offsets
     EPROCESS_OFFSET PsUniqueProcessId;  
     EPROCESS_OFFSET PsProcessImageName; 
@@ -197,6 +220,17 @@ typedef struct _KLDBGCONTEXT {
 
     //VHD boot?
     BOOLEAN IsOsDiskVhd;
+
+    union {
+        struct {
+            BOOLEAN Signature : 1;
+            BOOLEAN ImageLoad : 1;
+            BOOLEAN ExtensionPointDisable : 1;
+            BOOLEAN ASLRPolicy : 1;
+            BOOLEAN DynamicCode : 1;
+            BOOLEAN Reserved : 3;
+        } MitigationFlags;
+    };
 
     //index of directory type and root address
     USHORT DirectoryTypeIndex;
@@ -429,6 +463,9 @@ PVOID ObGetCallbackBlockRoutine(
 LPWSTR ObQueryFullNamespacePath(
     _In_ ULONG_PTR ObjectAddress);
 
+PVOID kdCreateObjectTypesList(
+    VOID);
+
 VOID kdReportErrorByFunction(
     _In_ LPCWSTR FunctionName,
     _In_ LPCWSTR ErrorMessage);
@@ -461,7 +498,9 @@ BOOL kdFindKiServiceTable(
 
 BOOL kdLoadSymbolsForNtImage(
     _In_ PSYMCONTEXT SymContext,
-    _In_ LPCWSTR ImageFileName);
+    _In_ LPCWSTR ImageFileName,
+    _In_ PVOID ImageBase,
+    _In_ DWORD SizeOfImage);
 
 BOOL kdReadSystemMemory2(
     _In_opt_ LPCWSTR CallerFunction,
@@ -532,6 +571,8 @@ BOOLEAN kdDumpUnicodeString(
     _Out_ PUNICODE_STRING OutputString,
     _Out_opt_ PVOID* ReferenceBufferPtr,
     _In_ BOOLEAN IsKernelPtr);
+
+USHORT kdGetAlpcPortTypeIndex();
 
 /*
 * ObGetObjectFastReference

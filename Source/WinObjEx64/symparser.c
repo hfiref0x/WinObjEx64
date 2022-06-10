@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT H.E., 2015 - 2021
+*  (C) COPYRIGHT H.E., 2015 - 2022
 *
 *  TITLE:       SYMPARSER.C
 *
-*  VERSION:     1.17
+*  VERSION:     1.18
 *
-*  DATE:        11 Oct 2021
+*  DATE:        05 Jun 2021
 *
 *  DbgHelp wrapper for symbols parser support.
 *
@@ -177,6 +177,7 @@ BOOL SymParserLoadModule(
         NULL,
         0);
 
+    Context->SymLastError = GetLastError();
     Context->ModuleBase = moduleBase;
 
     return (moduleBase != 0);
@@ -194,6 +195,8 @@ BOOL SymParserUnloadModule(
     BOOL bStatus = Context->DbgHelp.SymUnloadModule(
         Context->ProcessHandle,
         Context->ModuleBase);
+
+    Context->SymLastError = GetLastError();
 
     if (bStatus)
         Context->ModuleBase = 0;
@@ -223,6 +226,8 @@ SymBasicType SymParserGetType(
         TI_GET_TYPE,
         (PVOID)&symType);
 
+    Context->SymLastError = GetLastError();
+
     if (Status)
         *Status = bStatus;
 
@@ -250,6 +255,8 @@ SymBasicType SymParserGetBaseType(
         TypeIndex,
         TI_GET_BASETYPE,
         (PVOID)&symBaseType);
+
+    Context->SymLastError = GetLastError();
 
     if (Status)
         *Status = bStatus;
@@ -279,6 +286,8 @@ ULONG SymParserGetTypeId(
         TI_GET_TYPEID,
         (PVOID)&typeId);
 
+    Context->SymLastError = GetLastError();
+
     if (Status)
         *Status = bStatus;
 
@@ -306,6 +315,8 @@ ULONG SymParserGetArrayTypeId(
         TypeIndex,
         TI_GET_ARRAYINDEXTYPEID,
         (PVOID)&typeId);
+
+    Context->SymLastError = GetLastError();
 
     if (Status)
         *Status = bStatus;
@@ -335,6 +346,8 @@ ULONG64 SymParserGetSize(
         TI_GET_LENGTH,
         (PVOID)&symSize);
 
+    Context->SymLastError = GetLastError();
+
     if (Status)
         *Status = bStatus;
 
@@ -362,6 +375,8 @@ ULONG SymParserGetOffset(
         TypeIndex,
         TI_GET_OFFSET,
         (PVOID)&symOffset);
+
+    Context->SymLastError = GetLastError();
 
     if (Status)
         *Status = bStatus;
@@ -391,6 +406,8 @@ ULONG SymParserGetAddressOffset(
         TI_GET_ADDRESSOFFSET,
         (PVOID)&symOffset);
 
+    Context->SymLastError = GetLastError();
+
     if (Status)
         *Status = bStatus;
 
@@ -418,6 +435,8 @@ ULONG SymParserGetBitPosition(
         TypeIndex,
         TI_GET_BITPOSITION,
         (PVOID)&bitPosition);
+
+    Context->SymLastError = GetLastError();
 
     if (Status)
         *Status = bStatus;
@@ -447,6 +466,8 @@ ULONG SymParserGetChildrenCount(
         TI_GET_CHILDRENCOUNT,
         (PVOID)&childCount);
 
+    Context->SymLastError = GetLastError();
+
     if (Status)
         *Status = bStatus;
 
@@ -475,6 +496,8 @@ ULONG SymParserGetTag(
         TI_GET_SYMTAG,
         (PVOID)&symTag);
 
+    Context->SymLastError = GetLastError();
+
     if (Status)
         *Status = bStatus;
 
@@ -502,6 +525,8 @@ LPCWSTR SymParserGetName(
         TypeIndex,
         TI_GET_SYMNAME,
         (PVOID)&lpSymbolName);
+
+    Context->SymLastError = GetLastError();
 
     if (Status)
         *Status = bStatus;
@@ -536,6 +561,7 @@ VARTYPE SymParserGetValue(
         (PVOID)Value);
 
     varResult = Value->vt;
+    Context->SymLastError = GetLastError();
 
     if (Status)
         *Status = bStatus;
@@ -565,6 +591,8 @@ SymUdtKind SymParserGetUDTKind(
         TI_GET_UDTKIND,
         (PVOID)&udtKind);
 
+    Context->SymLastError = GetLastError();
+
     if (Status)
         *Status = bStatus;
 
@@ -593,6 +621,8 @@ ULONG SymParserGetCount(
         TI_GET_COUNT,
         (PVOID)&ulCount);
 
+    Context->SymLastError = GetLastError();
+
     if (Status)
         *Status = bStatus;
 
@@ -620,6 +650,8 @@ ULONG SymParserGetCallingConvention(
         TypeIndex,
         TI_GET_CALLING_CONVENTION,
         (PVOID)&ulCallingConvention);
+
+    Context->SymLastError = GetLastError();
 
     if (Status)
         *Status = bStatus;
@@ -847,6 +879,8 @@ ULONG64 SymParserLookupAddressBySymbol(
             SymbolName,
             symbolInfo);
 
+        Context->SymLastError = GetLastError();
+
         if (bStatus)
             symAddress = symbolInfo->Address;
 
@@ -901,6 +935,8 @@ ULONG SymParserLookupSymbolByAddress(
             SymbolAddress,
             Displacement,
             symbolInfo);
+
+        Context->SymLastError = GetLastError();
 
         if (bStatus) {
 
@@ -969,6 +1005,8 @@ ULONG SymParserGetFieldOffset(
             Context->ModuleBase,
             SymbolName,
             rootSymbolInfo);
+
+        Context->SymLastError = GetLastError();
 
         if (!bStatus)
             break;
@@ -1538,11 +1576,9 @@ BOOL SymGlobalsInit(
 
         if (symOptions == 0) {
             symOptions = SYMOPT_DEFERRED_LOADS |
+                SYMOPT_CASE_INSENSITIVE |
                 SYMOPT_UNDNAME |
-                SYMOPT_OVERWRITE |
-                SYMOPT_SECURE |
-                SYMOPT_EXACT_SYMBOLS |
-                SYMOPT_DEBUG;
+                SYMOPT_AUTO_PUBLICS;
         }
 
         g_SymGlobals.ApiSet.SymSetOptions(symOptions);

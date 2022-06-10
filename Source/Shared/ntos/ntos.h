@@ -5,9 +5,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.196
+*  VERSION:     1.197
 *
-*  DATE:        01 Jun 2022
+*  DATE:        05 Jun 2022
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -1156,6 +1156,10 @@ typedef struct _THREAD_BASIC_INFORMATION {
     LONG BasePriority;
 } THREAD_BASIC_INFORMATION, *PTHREAD_BASIC_INFORMATION;
 
+typedef struct _THREAD_NAME_INFORMATION {
+    UNICODE_STRING ThreadName;
+} THREAD_NAME_INFORMATION, * PTHREAD_NAME_INFORMATION;
+
 typedef struct _PROCESS_EXTENDED_BASIC_INFORMATION {
     SIZE_T Size;
     PROCESS_BASIC_INFORMATION BasicInfo;
@@ -1255,7 +1259,11 @@ typedef enum _PS_MITIGATION_OPTION {
     PS_MITIGATION_OPTION_RESTRICT_INDIRECT_BRANCH_PREDICTION,
     PS_MITIGATION_OPTION_SPECULATIVE_STORE_BYPASS_DISABLE,
     PS_MITIGATION_OPTION_ALLOW_DOWNGRADE_DYNAMIC_CODE_POLICY,
-    PS_MITIGATION_OPTION_CET_SHADOW_STACKS
+    PS_MITIGATION_OPTION_CET_SHADOW_STACKS,
+    PS_MITIGATION_OPTION_USER_CET_SET_CONTEXT_IP_VALIDATION,
+    PS_MITIGATION_OPTION_BLOCK_NON_CET_BINARIES,
+    PS_MITIGATION_OPTION_CET_DYNAMIC_APIS_OUT_OF_PROC_ONLY,
+    PS_MITIGATION_OPTION_REDIRECTION_TRUST
 } PS_MITIGATION_OPTION;
 
 typedef enum _PS_CREATE_STATE {
@@ -1374,6 +1382,23 @@ typedef enum _PS_PROTECTED_SIGNER {
     PsProtectedSignerMax
 } PS_PROTECTED_SIGNER;
 
+#define PS_PROTECTED_SIGNER_MASK 0xFF
+#define PS_PROTECTED_AUDIT_MASK 0x08
+#define PS_PROTECTED_TYPE_MASK 0x07
+
+// from ph2
+#define PsProtectedValue(aSigner, aAudit, aType) ( \
+    (((aSigner) & PS_PROTECTED_SIGNER_MASK) << 4) | \
+    (((aAudit) & PS_PROTECTED_AUDIT_MASK) << 3) | \
+    ((aType) & PS_PROTECTED_TYPE_MASK)\
+    )
+
+#define InitializePsProtection(aProtectionLevelPtr, aSigner, aAudit, aType) { \
+    (aProtectionLevelPtr)->Signer = aSigner; \
+    (aProtectionLevelPtr)->Audit = aAudit; \
+    (aProtectionLevelPtr)->Type = aType; \
+    }
+
 typedef struct _PS_PROTECTION {
     union
     {
@@ -1437,8 +1462,8 @@ typedef enum _PS_ATTRIBUTE_NUM {
 
 #define PS_ATTRIBUTE_PARENT_PROCESS \
     PsAttributeValue(PsAttributeParentProcess, FALSE, TRUE, TRUE)
-#define PS_ATTRIBUTE_DEBUG_PORT \
-    PsAttributeValue(PsAttributeDebugPort, FALSE, TRUE, TRUE)
+#define PS_ATTRIBUTE_DEBUG_OBJECT \
+    PsAttributeValue(PsAttributeDebugObject, FALSE, TRUE, TRUE)
 #define PS_ATTRIBUTE_TOKEN \
     PsAttributeValue(PsAttributeToken, FALSE, TRUE, TRUE)
 #define PS_ATTRIBUTE_CLIENT_ID \
@@ -1468,7 +1493,7 @@ typedef enum _PS_ATTRIBUTE_NUM {
 #define PS_ATTRIBUTE_UMS_THREAD \
     PsAttributeValue(PsAttributeUmsThread, TRUE, TRUE, FALSE)
 #define PS_ATTRIBUTE_MITIGATION_OPTIONS \
-    PsAttributeValue(PsAttributeMitigationOptions, FALSE, TRUE, TRUE)
+    PsAttributeValue(PsAttributeMitigationOptions, FALSE, TRUE, FALSE)
 #define PS_ATTRIBUTE_PROTECTION_LEVEL \
     PsAttributeValue(PsAttributeProtectionLevel, FALSE, TRUE, TRUE)
 #define PS_ATTRIBUTE_SECURE_PROCESS \
@@ -1487,6 +1512,16 @@ typedef enum _PS_ATTRIBUTE_NUM {
     PsAttributeValue(PsAttributeBnoIsolation, FALSE, TRUE, FALSE)
 #define PS_ATTRIBUTE_DESKTOP_APP_POLICY \
     PsAttributeValue(PsAttributeDesktopAppPolicy, FALSE, TRUE, FALSE)
+#define PS_ATTRIBUTE_CHPE \
+    PsAttributeValue(PsAttributeChpe, FALSE, TRUE, TRUE)
+#define PS_ATTRIBUTE_MITIGATION_AUDIT_OPTIONS \
+    PsAttributeValue(PsAttributeMitigationAuditOptions, FALSE, TRUE, FALSE)
+#define PS_ATTRIBUTE_MACHINE_TYPE \
+    PsAttributeValue(PsAttributeMachineType, FALSE, TRUE, TRUE)
+#define PS_ATTRIBUTE_COMPONENT_FILTER \
+    PsAttributeValue(PsAttributeComponentFilter, FALSE, TRUE, FALSE)
+#define PS_ATTRIBUTE_ENABLE_OPTIONAL_XSTATE_FEATURES \
+    PsAttributeValue(PsAttributeEnableOptionalXStateFeatures, TRUE, TRUE, FALSE)
 
 #define RTL_USER_PROC_PARAMS_NORMALIZED     0x00000001
 #define RTL_USER_PROC_PROFILE_USER          0x00000002
@@ -6349,7 +6384,9 @@ typedef struct tagPROCESS_MITIGATION_CONTROL_FLOW_GUARD_POLICY_W10 {
             DWORD EnableControlFlowGuard : 1;
             DWORD EnableExportSuppression : 1;
             DWORD StrictMode : 1;
-            DWORD ReservedFlags : 29;
+            DWORD EnableXfg : 1;
+            DWORD EnableXfgAuditMode : 1;
+            DWORD ReservedFlags : 27;
         } DUMMYSTRUCTNAME;
     } DUMMYUNIONNAME;
 } PROCESS_MITIGATION_CONTROL_FLOW_GUARD_POLICY_W10, *PPROCESS_MITIGATION_CONTROL_FLOW_GUARD_POLICY_W10;
@@ -8952,6 +8989,25 @@ NtRaiseException(
     _In_ PCONTEXT ContextRecord,
     _In_ BOOLEAN FirstChance);
 
+__analysis_noreturn
+NTSYSCALLAPI
+VOID
+NTAPI
+RtlAssert(
+    _In_ PVOID VoidFailedAssertion,
+    _In_ PVOID VoidFileName,
+    _In_ ULONG LineNumber,
+    _In_opt_ PSTR MutableMessage);
+
+#define RTL_ASSERT(exp) \
+    ((!(exp)) ? (RtlAssert((PVOID)#exp, (PVOID)__FILE__, __LINE__, NULL), FALSE) : TRUE)
+#define RTL_ASSERTMSG(msg, exp) \
+    ((!(exp)) ? (RtlAssert((PVOID)#exp, (PVOID)__FILE__, __LINE__, msg), FALSE) : TRUE)
+#define RTL_SOFT_ASSERT(_exp) \
+    ((!(_exp)) ? (DbgPrint("%s(%d): Soft assertion failed\n   Expression: %s\n", __FILE__, __LINE__, #_exp), FALSE) : TRUE)
+#define RTL_SOFT_ASSERTMSG(_msg, _exp) \
+    ((!(_exp)) ? (DbgPrint("%s(%d): Soft assertion failed\n   Expression: %s\n   Message: %s\n", __FILE__, __LINE__, #_exp, (_msg)), FALSE) : TRUE)
+
 /************************************************************************************
 *
 * RTL Security API.
@@ -9689,7 +9745,7 @@ NTSYSAPI
 NTSTATUS
 NTAPI
 RtlSetHeapInformation(
-    _In_ PVOID HeapHandle,
+    _In_opt_ PVOID HeapHandle,
     _In_ HEAP_INFORMATION_CLASS HeapInformationClass,
     _In_opt_ PVOID HeapInformation,
     _In_ SIZE_T HeapInformationLength);

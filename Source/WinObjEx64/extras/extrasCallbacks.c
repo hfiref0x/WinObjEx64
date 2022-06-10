@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.94
 *
-*  DATE:        30 May 2022
+*  DATE:        04 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -21,6 +21,9 @@
 #include "treelist/treelist.h"
 #include "hde/hde64.h"
 #include "ksymbols.h"
+
+static HANDLE SysCbThreadHandle = NULL;
+static FAST_EVENT SysCbInitializedEvent = FAST_EVENT_INIT;
 
 #define CBDLG_TRACKSIZE_MIN_X 640
 #define CBDLG_TRACKSIZE_MIN_Y 480
@@ -5193,62 +5196,48 @@ OBEX_QUERYCALLBACK_ROUTINE(QueryIopFsListsCallbacks)
     UNREFERENCED_PARAMETER(FindRoutine);
     UNREFERENCED_PARAMETER(SystemCallbacksRef);
 
-    __try {
-
-        if ((g_SystemCallbacks.IopCdRomFileSystemQueueHead == 0) ||
-            (g_SystemCallbacks.IopDiskFileSystemQueueHead == 0) ||
-            (g_SystemCallbacks.IopTapeFileSystemQueueHead == 0) ||
-            (g_SystemCallbacks.IopNetworkFileSystemQueueHead == 0))
+    if ((g_SystemCallbacks.IopCdRomFileSystemQueueHead == 0) ||
+        (g_SystemCallbacks.IopDiskFileSystemQueueHead == 0) ||
+        (g_SystemCallbacks.IopTapeFileSystemQueueHead == 0) ||
+        (g_SystemCallbacks.IopNetworkFileSystemQueueHead == 0))
+    {
+        if (!FindIopFileSystemQueueHeads(&g_SystemCallbacks.IopCdRomFileSystemQueueHead,
+            &g_SystemCallbacks.IopDiskFileSystemQueueHead,
+            &g_SystemCallbacks.IopTapeFileSystemQueueHead,
+            &g_SystemCallbacks.IopNetworkFileSystemQueueHead))
         {
-            if (!FindIopFileSystemQueueHeads(&g_SystemCallbacks.IopCdRomFileSystemQueueHead,
-                &g_SystemCallbacks.IopDiskFileSystemQueueHead,
-                &g_SystemCallbacks.IopTapeFileSystemQueueHead,
-                &g_SystemCallbacks.IopNetworkFileSystemQueueHead))
-            {
-                kdReportErrorByFunction(__FUNCTIONW__, TEXT("Could not locate all Iop ListHeads"));
-                return STATUS_NOT_FOUND;
-            }
+            kdReportErrorByFunction(__FUNCTIONW__, TEXT("Could not locate all Iop ListHeads"));
+            return STATUS_NOT_FOUND;
         }
-
-    }
-    __except (WOBJ_EXCEPTION_FILTER_LOG) {
-        return GetExceptionCode();
     }
 
-    __try {
+    if (g_SystemCallbacks.IopDiskFileSystemQueueHead) {
 
-        if (g_SystemCallbacks.IopDiskFileSystemQueueHead) {
-
-            DisplayRoutine(TreeList,
-                TEXT("IoDiskFs"),
-                g_SystemCallbacks.IopDiskFileSystemQueueHead,
-                Modules);
-        }
-        if (g_SystemCallbacks.IopCdRomFileSystemQueueHead) {
-
-            DisplayRoutine(TreeList,
-                TEXT("IoCdRomFs"),
-                g_SystemCallbacks.IopCdRomFileSystemQueueHead,
-                Modules);
-        }
-        if (g_SystemCallbacks.IopNetworkFileSystemQueueHead) {
-
-            DisplayRoutine(TreeList,
-                TEXT("IoNetworkFs"),
-                g_SystemCallbacks.IopNetworkFileSystemQueueHead,
-                Modules);
-        }
-        if (g_SystemCallbacks.IopTapeFileSystemQueueHead) {
-
-            DisplayRoutine(TreeList,
-                TEXT("IoTapeFs"),
-                g_SystemCallbacks.IopTapeFileSystemQueueHead,
-                Modules);
-        }
-
+        DisplayRoutine(TreeList,
+            TEXT("IoDiskFs"),
+            g_SystemCallbacks.IopDiskFileSystemQueueHead,
+            Modules);
     }
-    __except (WOBJ_EXCEPTION_FILTER_LOG) {
-        return GetExceptionCode();
+    if (g_SystemCallbacks.IopCdRomFileSystemQueueHead) {
+
+        DisplayRoutine(TreeList,
+            TEXT("IoCdRomFs"),
+            g_SystemCallbacks.IopCdRomFileSystemQueueHead,
+            Modules);
+    }
+    if (g_SystemCallbacks.IopNetworkFileSystemQueueHead) {
+
+        DisplayRoutine(TreeList,
+            TEXT("IoNetworkFs"),
+            g_SystemCallbacks.IopNetworkFileSystemQueueHead,
+            Modules);
+    }
+    if (g_SystemCallbacks.IopTapeFileSystemQueueHead) {
+
+        DisplayRoutine(TreeList,
+            TEXT("IoTapeFs"),
+            g_SystemCallbacks.IopTapeFileSystemQueueHead,
+            Modules);
     }
 
     return STATUS_SUCCESS;
@@ -5400,14 +5389,14 @@ VOID DisplayCallbacksList(
 }
 
 /*
-* CallbacksDialogHandlePopupMenu
+* SysCbDialogHandlePopupMenu
 *
 * Purpose:
 *
 * Treelist popup construction
 *
 */
-VOID CallbacksDialogHandlePopupMenu(
+VOID SysCbDialogHandlePopupMenu(
     _In_ HWND hwndDlg,
     _In_ EXTRASCONTEXT* pDlgContext, 
     _In_ LPARAM lParam
@@ -5441,14 +5430,14 @@ VOID CallbacksDialogHandlePopupMenu(
 }
 
 /*
-* CallbacksDialogResize
+* SysCbDialogResize
 *
 * Purpose:
 *
 * WM_SIZE handler.
 *
 */
-INT_PTR CallbacksDialogResize(
+INT_PTR SysCbDialogResize(
     _In_ HWND hwndDlg,
     _In_ HWND hwndStatusBar,
     _In_ HWND hwndTreeList
@@ -5473,15 +5462,15 @@ INT_PTR CallbacksDialogResize(
 }
 
 /*
-* CallbackDialogContentRefresh
+* SysCbDialogContentRefresh
 *
 * Purpose:
 *
 * Refresh callback list handler.
 *
 */
-VOID CallbackDialogContentRefresh(
-    _In_  HWND hwndDlg,
+VOID SysCbDialogContentRefresh(
+    _In_ HWND hwndDlg,
     _In_ EXTRASCONTEXT *pDlgContext,
     _In_ BOOL fResetContent
 )
@@ -5495,145 +5484,33 @@ VOID CallbackDialogContentRefresh(
 }
 
 /*
-* CallbacksDialogProc
+* SysCbDialogOnInit
 *
 * Purpose:
 *
-* Callbacks Dialog window procedure.
+* WM_INITDIALOG handler.
 *
 */
-INT_PTR CALLBACK CallbacksDialogProc(
-    _In_  HWND hwndDlg,
-    _In_  UINT uMsg,
-    _In_  WPARAM wParam,
+VOID SysCbDialogOnInit(
+    _In_ HWND hwndDlg,
     _In_  LPARAM lParam
 )
 {
-    EXTRASCONTEXT *pDlgContext;
-
-    switch (uMsg) {
-
-    case WM_INITDIALOG:
-        SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)lParam);
-        supCenterWindow(hwndDlg);
-        break;
-
-    case WM_GETMINMAXINFO:
-        if (lParam) {
-            supSetMinMaxTrackSize((PMINMAXINFO)lParam,
-                CBDLG_TRACKSIZE_MIN_X,
-                CBDLG_TRACKSIZE_MIN_Y,
-                TRUE);
-        }
-        break;
-
-    case WM_SIZE:
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
-            CallbacksDialogResize(hwndDlg, pDlgContext->StatusBar, pDlgContext->TreeList);
-        }
-        break;
-
-    case WM_CLOSE:
-        pDlgContext = (EXTRASCONTEXT*)RemoveProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
-            extrasRemoveDlgIcon(pDlgContext);
-            g_WinObj.AuxDialogs[wobjCallbacksDlgId] = NULL;
-            supHeapFree(pDlgContext);
-        }
-        return DestroyWindow(hwndDlg);
-
-    case WM_COMMAND:
-
-        switch (GET_WM_COMMAND_ID(wParam, lParam)) {
-        case IDCANCEL:
-            SendMessage(hwndDlg, WM_CLOSE, 0, 0);
-            return TRUE;
-        case ID_OBJECT_COPY:
-            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-            if (pDlgContext) {
-
-                supTreeListCopyItemValueToClipboard(pDlgContext->TreeList, 
-                    pDlgContext->tlSubItemHit);
-
-            }
-            break;
-        case ID_VIEW_REFRESH:
-            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-            if (pDlgContext) {
-                CallbackDialogContentRefresh(hwndDlg, pDlgContext, TRUE);
-            }
-            break;
-        default:
-            break;
-        }
-        break;
-
-    case WM_CONTEXTMENU:
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
-            CallbacksDialogHandlePopupMenu(hwndDlg, pDlgContext, lParam);
-        }
-        break;
-
-    }
-
-    return FALSE;
-}
-
-/*
-* extrasCreateCallbacksDialog
-*
-* Purpose:
-*
-* Create and initialize Callbacks Dialog.
-*
-*/
-VOID extrasCreateCallbacksDialog(
-    _In_ HWND hwndParent
-)
-{
-    HWND        hwndDlg;
-
-    HDITEM      hdritem;
-    RECT        rc;
-
+    EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)lParam;
+    RECT rc;
+    HDITEM hdritem;
     INT SbParts[] = { 200, -1 };
 
-    EXTRASCONTEXT  *pDlgContext;
-
-    //
-    // Allow only one dialog.
-    //
-    ENSURE_DIALOG_UNIQUE_WITH_RESTORE(g_WinObj.AuxDialogs[wobjCallbacksDlgId]);
-
-    pDlgContext = (EXTRASCONTEXT*)supHeapAlloc(sizeof(EXTRASCONTEXT));
-    if (pDlgContext == NULL)
-        return;
-
-    pDlgContext->tlSubItemHit = -1;
-
-    hwndDlg = CreateDialogParam(
-        g_WinObj.hInstance,
-        MAKEINTRESOURCE(IDD_DIALOG_CALLBACKS),
-        hwndParent,
-        &CallbacksDialogProc,
-        (LPARAM)pDlgContext);
-
-    if (hwndDlg == NULL) {
-        supHeapFree(pDlgContext);
-        return;
-    }
+    SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)lParam);
 
     pDlgContext->hwndDlg = hwndDlg;
-    g_WinObj.AuxDialogs[wobjCallbacksDlgId] = hwndDlg;
     pDlgContext->StatusBar = GetDlgItem(hwndDlg, ID_EXTRASLIST_STATUSBAR);
     SendMessage(pDlgContext->StatusBar, SB_SETPARTS, 2, (LPARAM)&SbParts);
 
     extrasSetDlgIcon(pDlgContext);
     SetWindowText(hwndDlg, TEXT("System Callbacks"));
 
-    GetClientRect(hwndParent, &rc);
+    GetClientRect(g_WinObj.MainWindow, &rc);
     pDlgContext->TreeList = CreateWindowEx(WS_EX_STATICEDGE, WC_TREELIST, NULL,
         WS_VISIBLE | WS_CHILD | WS_TABSTOP | TLSTYLE_COLAUTOEXPAND | TLSTYLE_LINKLINES, 12, 14,
         rc.right - 24, rc.bottom - 24, hwndDlg, NULL, NULL, NULL);
@@ -5654,8 +5531,192 @@ VOID extrasCreateCallbacksDialog(
         hdritem.pszText = TEXT("Additional Information");
         TreeList_InsertHeaderItem(pDlgContext->TreeList, 2, &hdritem);
 
-        CallbackDialogContentRefresh(hwndDlg, pDlgContext, FALSE);
+        SysCbDialogContentRefresh(hwndDlg, pDlgContext, FALSE);
     }
 
+    supCenterWindowSpecifyParent(hwndDlg, g_WinObj.MainWindow);
     SendMessage(hwndDlg, WM_SIZE, 0, 0);
+}
+
+/*
+* SysCbDialogProc
+*
+* Purpose:
+*
+* Callbacks Dialog window procedure.
+*
+*/
+INT_PTR CALLBACK SysCbDialogProc(
+    _In_ HWND hwndDlg,
+    _In_ UINT uMsg,
+    _In_ WPARAM wParam,
+    _In_ LPARAM lParam
+)
+{
+    EXTRASCONTEXT *pDlgContext;
+
+    switch (uMsg) {
+
+    case WM_INITDIALOG:
+        SysCbDialogOnInit(hwndDlg, lParam);
+        break;
+
+    case WM_GETMINMAXINFO:
+
+        if (lParam) {
+            supSetMinMaxTrackSize((PMINMAXINFO)lParam,
+                CBDLG_TRACKSIZE_MIN_X,
+                CBDLG_TRACKSIZE_MIN_Y,
+                TRUE);
+        }
+        break;
+
+    case WM_SIZE:
+
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+            SysCbDialogResize(hwndDlg, pDlgContext->StatusBar, pDlgContext->TreeList);
+        }
+        break;
+
+    case WM_CLOSE:
+
+        pDlgContext = (EXTRASCONTEXT*)RemoveProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+            extrasRemoveDlgIcon(pDlgContext);
+            supHeapFree(pDlgContext);
+        }
+        DestroyWindow(hwndDlg);
+        break;
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+
+    case WM_COMMAND:
+
+        switch (GET_WM_COMMAND_ID(wParam, lParam)) {
+       
+        case IDCANCEL:
+            SendMessage(hwndDlg, WM_CLOSE, 0, 0);
+            break;
+
+        case ID_OBJECT_COPY:
+
+            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+            if (pDlgContext) {
+
+                supTreeListCopyItemValueToClipboard(pDlgContext->TreeList, 
+                    pDlgContext->tlSubItemHit);
+
+            }
+            break;
+
+        case ID_VIEW_REFRESH:
+
+            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+            if (pDlgContext) {
+                SysCbDialogContentRefresh(hwndDlg, pDlgContext, TRUE);
+            }
+            break;
+
+        }
+        break;
+
+    case WM_CONTEXTMENU:
+
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        if (pDlgContext) {
+            SysCbDialogHandlePopupMenu(hwndDlg, pDlgContext, lParam);
+        }
+        break;
+
+    }
+
+    return FALSE;
+}
+
+/*
+* extrasSysCbDialogWorkerThread
+*
+* Purpose:
+*
+* Callbacks Dialog worker thread.
+*
+*/
+DWORD extrasSysCbDialogWorkerThread(
+    _In_ PVOID Parameter
+)
+{
+    HWND hwndDlg;
+    BOOL bResult;
+    MSG message;
+    EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)Parameter;
+    HACCEL acceleratorTable;
+
+    hwndDlg = CreateDialogParam(
+        g_WinObj.hInstance,
+        MAKEINTRESOURCE(IDD_DIALOG_CALLBACKS),
+        0,
+        &SysCbDialogProc,
+        (LPARAM)pDlgContext);
+
+    acceleratorTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
+
+    supSetFastEvent(&SysCbInitializedEvent);
+
+    do {
+
+        bResult = GetMessage(&message, NULL, 0, 0);
+        if (bResult == -1)
+            break;
+
+        if (IsDialogMessage(hwndDlg, &message)) {
+            TranslateAccelerator(hwndDlg, acceleratorTable, &message);
+        }
+        else {
+            TranslateMessage(&message);
+            DispatchMessage(&message);
+        }
+
+    } while (bResult != 0);
+
+    supResetFastEvent(&SysCbInitializedEvent);
+
+    if (acceleratorTable)
+        DestroyAcceleratorTable(acceleratorTable);
+
+    if (SysCbThreadHandle) {
+        NtClose(SysCbThreadHandle);
+        SysCbThreadHandle = NULL;
+    }
+
+    return 0;
+}
+
+/*
+* extrasCreateCallbacksDialog
+*
+* Purpose:
+*
+* Create and initialize Callbacks Dialog.
+*
+*/
+VOID extrasCreateCallbacksDialog(
+    VOID
+)
+{
+    EXTRASCONTEXT* pDlgContext;
+
+    if (!SysCbThreadHandle) {
+
+        pDlgContext = (EXTRASCONTEXT*)supHeapAlloc(sizeof(EXTRASCONTEXT));
+        if (pDlgContext) {
+            pDlgContext->tlSubItemHit = -1;
+
+            SysCbThreadHandle = supCreateDialogWorkerThread(extrasSysCbDialogWorkerThread, pDlgContext, 0);
+            supWaitForFastEvent(&SysCbInitializedEvent, NULL);
+
+        }
+    }
 }

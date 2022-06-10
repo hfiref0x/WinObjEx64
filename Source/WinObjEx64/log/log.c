@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.94
 *
-*  DATE:        31 May 2022
+*  DATE:        07 Jun 2022
 *
 *  Simplified log.
 *
@@ -18,8 +18,7 @@
 *******************************************************************************/
 #include "global.h"
 
-WOBJ_LOG g_WinObjLog;
-HWND g_hwndLogViewer = NULL;
+static WOBJ_LOG g_WinObjLog;
 
 /*
 * logCreate
@@ -38,6 +37,7 @@ VOID logCreate()
     if (g_WinObjLog.Entries) {
         InitializeCriticalSection(&g_WinObjLog.Lock);
         g_WinObjLog.Initialized = TRUE;
+        logAdd(EntryTypeInformation, TEXT("Program startup, log created"));
     }
 }
 
@@ -184,11 +184,6 @@ BOOL CALLBACK LogViewerAddEntryCallback(
     LPWSTR lpType;
     WCHAR szTime[64];
 
-    FILETIME ConvertedTime;
-    TIME_FIELDS TimeFields;
-
-    RtlSecureZeroMemory(szTime, sizeof(szTime));
-
     switch (Entry->Type) {
     case EntryTypeError:
         lpType = TEXT("Error");
@@ -207,17 +202,8 @@ BOOL CALLBACK LogViewerAddEntryCallback(
         break;
     }
 
-    FileTimeToLocalFileTime((PFILETIME)&Entry->LoggedTime, (PFILETIME)&ConvertedTime);
-    RtlSecureZeroMemory(&TimeFields, sizeof(TimeFields));
-    RtlTimeToTimeFields((PLARGE_INTEGER)&ConvertedTime, (PTIME_FIELDS)&TimeFields);
-
-    RtlStringCchPrintfSecure(szTime, 64,
-        TEXT("%hd:%02hd:%02hd.%03hd"),
-        TimeFields.Hour,
-        TimeFields.Minute,
-        TimeFields.Second,
-        TimeFields.Milliseconds);
-
+    szTime[0] = 0;
+    supPrintTimeToBuffer(&Entry->LoggedTime, szTime, RTL_NUMBER_OF(szTime));
     LogViewerPrintEntry(hwndList, szTime, lpType, Entry->MessageData);
 
     return TRUE; //continue with next entry
@@ -334,20 +320,11 @@ INT_PTR CALLBACK LogViewerDialogProc(
         LogViewerListLog(hwndDlg);
         break;
 
-    case WM_DESTROY:
-        g_hwndLogViewer = NULL;
-        break;
-
-    case WM_CLOSE:
-        DestroyWindow(hwndDlg);
-        break;
-
     case WM_COMMAND:
 
         switch (GET_WM_COMMAND_ID(wParam, lParam)) {
-        case IDOK:
-            SendMessage(hwndDlg, WM_CLOSE, 0, 0);
-            return 1;
+        case IDCANCEL:
+            return EndDialog(hwndDlg, S_OK);
         case ID_OBJECT_COPY:
             LogViewerCopyToClipboard(hwndDlg);
             break;
@@ -373,20 +350,16 @@ INT_PTR CALLBACK LogViewerDialogProc(
 VOID LogViewerShowDialog(
     _In_ HWND hwndParent)
 {
-    if (g_hwndLogViewer != NULL) {
-        SetActiveWindow(g_hwndLogViewer);
-        return;
-    }
-
     if (!supRichEdit32Load()) {
         MessageBox(hwndParent, TEXT("Could not load RichEdit library"), NULL, MB_ICONERROR);
         return;
     }
 
-    g_hwndLogViewer = CreateDialogParam(
+    DialogBoxParam(
         g_WinObj.hInstance,
         MAKEINTRESOURCE(IDD_DIALOG_LOGVIEWER),
         hwndParent,
         (DLGPROC)&LogViewerDialogProc,
         0);
+
 }

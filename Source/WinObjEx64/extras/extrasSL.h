@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019
+*  (C) COPYRIGHT AUTHORS, 2019 - 2022
 *
 *  TITLE:       EXTRASSL.H
 *
-*  VERSION:     1.74
+*  VERSION:     1.94
 *
-*  DATE:        12 May 2019
+*  DATE:        04 Jun 2022
 *
 *  Common header file for Software Licensing Cache dialog.
 *
@@ -19,4 +19,4 @@
 #pragma once
 
 VOID extrasCreateSLCacheDialog(
-    _In_ HWND hwndParent);
+    VOID);

@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     1.93
+*  VERSION:     1.94
 *
-*  DATE:        13 May 2022
+*  DATE:        07 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -4447,7 +4447,6 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpSymbolicLink)
 
     ULONG BufferSize = 0, ObjectVersion = 0;
 
-    TIME_FIELDS	SystemTime;
     TL_SUBITEMS_FIXED subitems;
 
     PRTL_PROCESS_MODULES pModules;
@@ -4463,7 +4462,7 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpSymbolicLink)
         PBYTE Ref;
     } SymbolicLink;
 
-    WCHAR szBuffer[MAX_PATH + 1], szConvert[64];
+    WCHAR szTime[64], szConvert[64];
 
 
     SymLinkDumpBuffer = (PBYTE)ObDumpSymbolicLinkObjectVersionAware(
@@ -4493,24 +4492,8 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpSymbolicLink)
     //
     // Output CreationTime.
     //
-    FileTimeToLocalFileTime((PFILETIME)&SymbolicLink.u1.LinkV1->CreationTime, (PFILETIME)&SymbolicLink.u1.LinkV1->CreationTime);
-    RtlSecureZeroMemory(&SystemTime, sizeof(SystemTime));
-    RtlTimeToTimeFields((PLARGE_INTEGER)&SymbolicLink.u1.LinkV1->CreationTime, (PTIME_FIELDS)&SystemTime);
-
-    if (SystemTime.Month - 1 < 0) SystemTime.Month = 1;
-    if (SystemTime.Month > 12) SystemTime.Month = 12;
-
-    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-
-    RtlStringCchPrintfSecure(szBuffer,
-        MAX_PATH,
-        FORMAT_TIME_DATE_VALUE,
-        SystemTime.Hour,
-        SystemTime.Minute,
-        SystemTime.Second,
-        SystemTime.Day,
-        g_szMonths[SystemTime.Month - 1],
-        SystemTime.Year);
+    szTime[0] = 0;
+    supPrintTimeConverted(&SymbolicLink.u1.LinkV1->CreationTime, szTime, RTL_NUMBER_OF(szTime));
 
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
 
@@ -4521,7 +4504,7 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpSymbolicLink)
 
     subitems.Count = 2;
     subitems.Text[0] = szConvert;
-    subitems.Text[1] = szBuffer;
+    subitems.Text[1] = szTime;
 
     supTreeListAddItem(
         hwndTreeList,

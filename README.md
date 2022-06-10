@@ -154,6 +154,11 @@ WinObjEx64 works only on the following x64 Windows: Windows 7, Windows 8, Window
 		- PsRegisterAltSystemCallHandler
 		- CodeIntegrity SeCiCallbacks
 		- ExRegisterExtension
+		- PoRegisterCoalescingCallback
+		- PsRegisterPicoProvider
+		- KeRegisterNmiCallback
+		- PsRegisterSiloMonitor
+		- EmProviderRegister
 
 - Windows Object Manager private namespace viewer<sup>1</sup>
 	- View basic namespace entry information
@@ -170,6 +175,11 @@ WinObjEx64 works only on the following x64 Windows: Windows 7, Windows 8, Window
 	- Support Win32k import forwarding
 	- Support Win32k ApiSets resolving
 	- Jump to service entry module
+	- Export list to file in CSV format
+
+- CmControlVector viewer<sup>1</sup>
+	- Show dump of Ntoskrnl CmControlVector array
+	- Dump value data from kernel memory to file
 	- Export list to file in CSV format
 
 - Most of list/trees allows to copy object address and/or name to the clipboard

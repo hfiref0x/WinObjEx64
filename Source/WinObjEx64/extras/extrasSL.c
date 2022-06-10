@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSL.C
 *
-*  VERSION:     1.93
+*  VERSION:     1.94
 *
-*  DATE:        11 May 2022
+*  DATE:        04 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -23,6 +23,9 @@ typedef struct _SL_ENUM_CONTEXT {
 } SL_ENUM_CONTEXT, * PSL_ENUM_CONTEXT;
 
 #define T_SLCACHE_READ_FAIL TEXT("Unable to read SL cache!")
+
+static HANDLE SLCacheDlgThreadHandle = NULL;
+static FAST_EVENT SLCacheDlgInitializedEvent = FAST_EVENT_INIT;
 
 UINT g_SLCacheImageIndex;
 
@@ -530,6 +533,84 @@ VOID SLCacheListItems(
 }
 
 /*
+* SLCacheDialogOnInit
+*
+* Purpose:
+*
+* SoftwareLicensingCache Dialog WM_INITDIALOG handler.
+*
+*/
+VOID SLCacheDialogOnInit(
+    _In_  HWND hwndDlg,
+    _In_  LPARAM lParam
+)
+{
+    INT iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
+    PVOID SLCacheData;
+    EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)lParam;
+    LVCOLUMNS_DATA columnData[] =
+    {
+        { L"Name", 450, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  iImage },
+        { L"Type", 120, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE }
+    };
+
+    SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)lParam);
+    supCenterWindowSpecifyParent(hwndDlg, g_WinObj.MainWindow);
+
+    pDlgContext->hwndDlg = hwndDlg;
+    pDlgContext->lvItemHit = -1;
+    pDlgContext->lvColumnHit = -1;
+
+    extrasSetDlgIcon(pDlgContext);
+
+    //
+    // Read and enumerate cache.
+    //
+    SLCacheData = supSLCacheRead();
+    if (SLCacheData) {
+
+        //
+        // Initialize main listview.
+        //
+        pDlgContext->ListView = GetDlgItem(pDlgContext->hwndDlg, ID_SLCACHELIST);
+        if (pDlgContext->ListView) {
+
+            //
+            // Set listview imagelist, style flags and theme.
+            //
+            supSetListViewSettings(pDlgContext->ListView,
+                LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
+                FALSE,
+                TRUE,
+                g_ListViewImages,
+                LVSIL_SMALL);
+
+            //
+            // And columns and remember their count.
+            //
+            pDlgContext->lvColumnCount = supAddLVColumnsFromArray(
+                pDlgContext->ListView,
+                columnData,
+                RTL_NUMBER_OF(columnData));
+
+            SendDlgItemMessage(pDlgContext->hwndDlg, IDC_SLSEARCH,
+                EM_SETLIMITTEXT, (WPARAM)MAX_PATH, (LPARAM)0);
+
+            //
+            // Remember image index.
+            //
+            g_SLCacheImageIndex = ObManagerGetImageIndexByTypeIndex(ObjectTypeToken);
+            pDlgContext->Reserved = (ULONG_PTR)SLCacheData;
+            SLCacheListItems(pDlgContext, NULL, FALSE);
+
+        }
+    }
+    else {
+        SLCacheOnReadFailed(pDlgContext);
+    }
+}
+
+/*
 * SLCacheDialogProc
 *
 * Purpose:
@@ -563,8 +644,11 @@ INT_PTR CALLBACK SLCacheDialogProc(
         return SLCacheDialogHandleNotify(hwndDlg, nhdr);
 
     case WM_INITDIALOG:
-        SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)lParam);
-        supCenterWindow(hwndDlg);
+        SLCacheDialogOnInit(hwndDlg, lParam);
+        break;
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
         break;
 
     case WM_CLOSE:
@@ -572,8 +656,6 @@ INT_PTR CALLBACK SLCacheDialogProc(
         if (pDlgContext) {
 
             extrasRemoveDlgIcon(pDlgContext);
-
-            g_WinObj.AuxDialogs[wobjSLCacheDlgId] = NULL;
 
             //
             // Free SL cache data
@@ -587,6 +669,7 @@ INT_PTR CALLBACK SLCacheDialogProc(
         return DestroyWindow(hwndDlg);
 
     case WM_CONTEXTMENU:
+
         pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
         if (pDlgContext) {
             supHandleContextMenuMsgForListView(hwndDlg,
@@ -646,15 +729,59 @@ INT_PTR CALLBACK SLCacheDialogProc(
             }
             break;
 
-        default:
-            break;
         }
-
-    default:
-        return FALSE;
     }
 
-    return TRUE;
+    return FALSE;
+}
+
+/*
+* extrasSLCacheDialogWorkerThread
+*
+* Purpose:
+*
+* SoftwareLicensingCache Dialog worker thread.
+*
+*/
+DWORD extrasSLCacheDialogWorkerThread(
+    _In_ PVOID Parameter
+)
+{
+    BOOL bResult;
+    MSG message;
+    HWND hwndDlg;
+    EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)Parameter;
+
+    hwndDlg = CreateDialogParam(
+        g_WinObj.hInstance,
+        MAKEINTRESOURCE(IDD_DIALOG_SLCACHE),
+        0,
+        &SLCacheDialogProc,
+        (LPARAM)pDlgContext);
+
+    supSetFastEvent(&SLCacheDlgInitializedEvent);
+
+    do {
+
+        bResult = GetMessage(&message, NULL, 0, 0);
+        if (bResult == -1)
+            break;
+
+        if (!IsDialogMessage(hwndDlg, &message)) {
+            TranslateMessage(&message);
+            DispatchMessage(&message);
+        }
+
+    } while (bResult != 0);
+
+    supResetFastEvent(&SLCacheDlgInitializedEvent);
+
+    if (SLCacheDlgThreadHandle) {
+        NtClose(SLCacheDlgThreadHandle);
+        SLCacheDlgThreadHandle = NULL;
+    }
+
+    return 0;
 }
 
 /*
@@ -666,92 +793,20 @@ INT_PTR CALLBACK SLCacheDialogProc(
 *
 */
 VOID extrasCreateSLCacheDialog(
-    _In_ HWND hwndParent
+    VOID
 )
 {
-    PVOID           SLCacheData;
-
-    HWND            hwndDlg;
     EXTRASCONTEXT* pDlgContext;
 
-    INT iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
-    LVCOLUMNS_DATA columnData[] =
-    {
-        { L"Name", 450, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  iImage },
-        { L"Type", 120, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE }
-    };
+    if (!SLCacheDlgThreadHandle) {
 
-    //
-    // Allow only one dialog, if it already open - activate it.
-    //
-    ENSURE_DIALOG_UNIQUE_WITH_RESTORE(g_WinObj.AuxDialogs[wobjSLCacheDlgId]);
+        pDlgContext = (EXTRASCONTEXT*)supHeapAlloc(sizeof(EXTRASCONTEXT));
+        if (pDlgContext) {
 
-    pDlgContext = (EXTRASCONTEXT*)supHeapAlloc(sizeof(EXTRASCONTEXT));
-    if (pDlgContext == NULL)
-        return;
-
-    hwndDlg = CreateDialogParam(
-        g_WinObj.hInstance,
-        MAKEINTRESOURCE(IDD_DIALOG_SLCACHE),
-        hwndParent,
-        &SLCacheDialogProc,
-        (LPARAM)pDlgContext);
-
-    if (hwndDlg == NULL) {
-        supHeapFree(pDlgContext);
-        return;
-    }
-
-    pDlgContext->hwndDlg = hwndDlg;
-    g_WinObj.AuxDialogs[wobjSLCacheDlgId] = hwndDlg;
-    pDlgContext->lvItemHit = -1;
-    pDlgContext->lvColumnHit = -1;
-
-    extrasSetDlgIcon(pDlgContext);
-
-    //
-    // Read and enumerate cache.
-    //
-    SLCacheData = supSLCacheRead();
-    if (SLCacheData) {
-
-        //
-        // Initialize main listview.
-        //
-        pDlgContext->ListView = GetDlgItem(pDlgContext->hwndDlg, ID_SLCACHELIST);
-        if (pDlgContext->ListView) {
-
-            //
-            // Set listview imagelist, style flags and theme.
-            //
-            supSetListViewSettings(pDlgContext->ListView,
-                LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
-                FALSE,
-                TRUE,
-                g_ListViewImages,
-                LVSIL_SMALL);
-
-            //
-            // And columns and remember their count.
-            //
-            pDlgContext->lvColumnCount = supAddLVColumnsFromArray(
-                pDlgContext->ListView,
-                columnData,
-                RTL_NUMBER_OF(columnData));
-
-            SendDlgItemMessage(pDlgContext->hwndDlg, IDC_SLSEARCH,
-                EM_SETLIMITTEXT, (WPARAM)MAX_PATH, (LPARAM)0);
-
-            //
-            // Remember image index.
-            //
-            g_SLCacheImageIndex = ObManagerGetImageIndexByTypeIndex(ObjectTypeToken);
-            pDlgContext->Reserved = (ULONG_PTR)SLCacheData;
-            SLCacheListItems(pDlgContext, NULL, FALSE);
+            SLCacheDlgThreadHandle = supCreateDialogWorkerThread(extrasSLCacheDialogWorkerThread, pDlgContext, 0);
+            supWaitForFastEvent(&SLCacheDlgInitializedEvent, NULL);
 
         }
-    }
-    else {
-        SLCacheOnReadFailed(pDlgContext);
+
     }
 }

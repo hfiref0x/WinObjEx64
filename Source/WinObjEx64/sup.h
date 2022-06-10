@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.94
 *
-*  DATE:        31 May 2022
+*  DATE:        07 Jun 2022
 *
 *  Common header file for the program support routines.
 *
@@ -28,11 +28,6 @@
 #define IOCTL_PE_OPEN_PROCESS           CTL_CODE(PE_DEVICE_TYPE, 0xF, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 #define INITIAL_BUFFER_SIZE (256) * (1024)
-
-//
-// Defined in sup.c
-//
-extern HWND g_hwndBanner;
 
 typedef struct _SAPIDB {
     LIST_ENTRY ListHead;
@@ -82,6 +77,7 @@ typedef struct _OBEX_THREAD_LOOKUP_ENTRY {
 } OBEX_THREAD_LOOKUP_ENTRY, *POBEX_THREAD_LOOKUP_ENTRY;
 
 typedef struct _ALPCPORT_ENUM_CONTEXT {
+    _In_ USHORT AlpcPortTypeIndex;
     _In_ LPCWSTR ObjectFullName;
     _Out_ HANDLE ObjectHandle;
 } ALPCPORT_ENUM_CONTEXT, * PALPCPORT_ENUM_CONTEXT;
@@ -93,6 +89,37 @@ typedef struct _PS_HANDLE_DUMP_ENUM_CONTEXT {
     _In_ HIMAGELIST ImageList;
     _In_ PVOID ProcessList;
 } PS_HANDLE_DUMP_ENUM_CONTEXT, *PPS_HANDLE_DUMP_ENUM_CONTEXT;
+
+typedef BOOL(CALLBACK* PSUPSHUTDOWNCALLBACK)(
+    _In_opt_ PVOID Context
+    );
+
+typedef struct _SUP_SHUTDOWN_CALLBACK {
+    LIST_ENTRY ListEntry;
+    PSUPSHUTDOWNCALLBACK Callback;
+    PVOID Context;
+} SUP_SHUTDOWN_CALLBACK, PSUP_SHUTDOWN_CALLBACK;
+
+typedef struct _FAST_EVENT {
+    union {
+        ULONG_PTR Value;
+        USHORT Set : 1;
+        USHORT RefCount : 15;
+        UCHAR Reserved;
+        UCHAR AvailableForUse;
+#ifdef _WIN64
+        ULONG Spare;
+#endif
+    };
+    HANDLE EventHandle;
+} FAST_EVENT, * PFAST_EVENT;
+
+#define FAST_EVENT_SET 0x1
+#define FAST_EVENT_SET_SHIFT 0
+#define FAST_EVENT_REFCOUNT_SHIFT 1
+#define FAST_EVENT_REFCOUNT_INC 0x2
+#define FAST_EVENT_REFCOUNT_MASK (((ULONG_PTR)1 << 15) - 1)
+#define FAST_EVENT_INIT { { FAST_EVENT_REFCOUNT_INC }, NULL } 
 
 // return true to stop enumeration
 typedef BOOL(CALLBACK* PENUMERATE_SL_CACHE_VALUE_DESCRIPTORS_CALLBACK)(
@@ -106,12 +133,6 @@ typedef BOOL(CALLBACK* PENUMERATE_HANDLE_DUMP_CALLBACK)(
     _In_opt_ PVOID UserContext
     );
 
-typedef BOOL(CALLBACK* PSUPFINDREF_CALLBACK)(
-    _In_ PBYTE ReferencePointer,
-    _In_ ULONG Offset,
-    _In_opt_ PVOID UserContext
-    );
-
 typedef NTSTATUS(NTAPI* PNTOBJECTOPENPROCEDURE)(
     _Out_ PHANDLE ObjectHandle,
     _In_ ACCESS_MASK DesiredAccess,
@@ -121,6 +142,9 @@ typedef NTSTATUS(CALLBACK* pfnLoadDriverCallback)(
     _In_ PUNICODE_STRING RegistryPath,
     _In_opt_ PVOID Param
     );
+
+typedef VOID(CALLBACK* PFNSUPSYMCALLBACK)(
+    _In_ LPCWSTR EventText);
 
 typedef struct _PROCESS_MITIGATION_POLICIES_ALL {
     PROCESS_MITIGATION_DEP_POLICY DEPPolicy;
@@ -168,7 +192,6 @@ typedef struct _SAPIDBENTRY {
 
 extern SAPIDB g_sapiDB;
 extern SCMDB g_scmDB;
-extern POBJECT_TYPES_INFORMATION g_pObjectTypesInfo;
 
 #define PathFileExists(lpszPath) (GetFileAttributes(lpszPath) != (DWORD)-1)
 
@@ -231,6 +254,12 @@ typedef struct _FILE_VIEW_INFO {
     FILE_EXCLUDE_DATA ExcludeData;
 } FILE_VIEW_INFO, * PFILE_VIEW_INFO;
 
+typedef struct _SUP_BANNER_DATA {
+    LPCWSTR lpText;
+    LPCWSTR lpCaption;
+    BOOL fList;
+} SUP_BANNER_DATA, * PSUP_BANNER_DATA;
+
 //
 // Use shared NTSUP forward.
 //
@@ -248,8 +277,6 @@ typedef struct _FILE_VIEW_INFO {
 #define supOpenDirectory ntsupOpenDirectory
 #define supQueryProcessName ntsupQueryProcessName
 #define supQueryProcessEntryById ntsupQueryProcessEntryById
-#define supQueryProcessInformation ntsupQueryProcessInformation
-#define supQueryObjectInformation ntsupQueryObjectInformation
 #define supWriteBufferToFile ntsupWriteBufferToFile
 #define supQueryVsmProtectionInformation ntsupQueryVsmProtectionInformation
 #define supQueryHVCIState ntsupQueryHVCIState
@@ -264,8 +291,21 @@ typedef struct _FILE_VIEW_INFO {
 #define supListViewEnableRedraw(ListView, fEnable) SendMessage(ListView, WM_SETREDRAW, (WPARAM)fEnable, (LPARAM)0)
 #define supIsLxssAvailable() ntsupIsObjectExists(TEXT("\\Device"), TEXT("Lxss"))
 
-ULONG supConvertFromPteProtectionMask(
-    _In_ ULONG ProtectionMask);
+//
+// NTSUP defines for common information query
+//
+
+#define supQuerySecurityInformation(ObjectHandle, SecurityInformationClass, Buffer, ReturnLength) \
+    ntsupQuerySecurityInformation(ObjectHandle, SecurityInformationClass, Buffer, ReturnLength, supHeapAlloc, supHeapFree)
+
+#define supQueryObjectInformation(ObjectHandle, ObjectInformationClass, Buffer, ReturnLength) \
+    ntsupQueryObjectInformation(ObjectHandle, ObjectInformationClass, Buffer, ReturnLength, supHeapAlloc, supHeapFree)
+
+#define supQueryProcessInformation(ProcessHandle, ProcessInformationClass, Buffer, ReturnLength) \
+    ntsupQueryProcessInformation(ProcessHandle, ProcessInformationClass, Buffer, ReturnLength, supHeapAlloc, supHeapFree)
+
+#define supQueryThreadInformation(ThreadHandle, ThreadInformationClass, Buffer, ReturnLength) \
+    ntsupQueryThreadInformation(ThreadHandle, ThreadInformationClass, Buffer, ReturnLength, supHeapAlloc, supHeapFree)
 
 BOOL supInitMSVCRT(
     VOID);
@@ -326,11 +366,12 @@ void supCopyMemory(
     _In_ const void* src,
     _In_ size_t ccsrc);
 
-BOOLEAN supUserIsFullAdmin(
-    VOID);
-
 VOID supCenterWindow(
     _In_ HWND hwnd);
+
+VOID supCenterWindowSpecifyParent(
+    _In_ HWND hwnd,
+    _In_opt_ HWND parent);
 
 VOID supCenterWindowPerScreen(
     _In_ HWND hwnd);
@@ -339,15 +380,13 @@ VOID supSetWaitCursor(
     _In_ BOOL fSet);
 
 VOID supUpdateLoadBannerText(
-    _In_ HWND hwndBanner,
     _In_ LPCWSTR lpText,
     _In_ BOOL UseList);
 
 VOID supCloseLoadBanner(
-    _In_ HWND hwndBanner);
+    VOID);
 
-HWND supDisplayLoadBanner(
-    _In_opt_ HWND hwndParent,
+VOID supDisplayLoadBanner(
     _In_ LPCWSTR lpMessage,
     _In_opt_ LPCWSTR lpCaption,
     _In_ BOOL UseList);
@@ -356,6 +395,9 @@ HIMAGELIST supLoadImageList(
     _In_ HINSTANCE hInst,
     _In_ UINT FirstId,
     _In_ UINT LastId);
+
+PVOID supGetObjectTypesInfo(
+    VOID);
 
 UINT supGetObjectNameIndexByTypeIndex(
     _In_ PVOID Object,
@@ -410,13 +452,17 @@ VOID supCreateToolbarButtons(
     _In_ HWND hWndToolbar,
     _In_ HIMAGELIST hImageList);
 
+VOID supAddShutdownCallback(
+    _In_ PSUPSHUTDOWNCALLBACK Callback,
+    _In_opt_ PVOID Context);
+
 VOID supInit(
     _In_ BOOLEAN IsFullAdmin);
 
 VOID supShutdown(
     VOID);
 
-PVOID supGetObjectTypesInfo(
+PVOID supCreateObjectTypesList(
     VOID);
 
 VOID supShowProperties(
@@ -449,7 +495,7 @@ BOOL supQuerySectionFileInfo(
 BOOL supQueryTypeInfo(
     _In_ LPCWSTR lpTypeName,
     _Inout_	LPWSTR Buffer,
-    _In_ DWORD ccBuffer);
+    _In_ DWORD cchBuffer);
 
 BOOL supQueryDriverDescription(
     _In_ LPCWSTR lpDriverName,
@@ -535,9 +581,6 @@ BOOL supGetWin32FileName(
     _In_ LPCWSTR FileName,
     _Inout_ LPWSTR Win32FileName,
     _In_ SIZE_T ccWin32FileName);
-
-BOOLEAN supIsWine(
-    VOID);
 
 BOOLEAN supQuerySecureBootState(
     _Out_ PBOOLEAN pbSecureBoot);
@@ -674,6 +717,11 @@ NTSTATUS supOpenProcessEx(
 NTSTATUS supOpenProcessTokenEx(
     _In_ HANDLE ProcessHandle,
     _Out_ PHANDLE TokenHandle);
+
+INT supPrintTimeToBuffer(
+    _In_ PLARGE_INTEGER Time,
+    _In_ WCHAR * lpszBuffer,
+    _In_ SIZE_T cchBuffer);
 
 BOOL supPrintTimeConverted(
     _In_ PLARGE_INTEGER Time,
@@ -814,9 +862,6 @@ NTSTATUS supCreateSystemAdminAccessSD(
 
 VOID supSetProcessMitigationImagesPolicy();
 
-ULONG supGetTimeAsSecondsSince1970(
-    VOID);
-
 BOOL supRichEdit32Load();
 
 VOID supReportAbnormalTermination(
@@ -857,7 +902,7 @@ VOID supJumpToFileListView(
     _In_ INT iFileNameColumn);
 
 VOID supQueryAlpcPortObjectTypeIndex(
-    _In_ PVOID PortGlobal);
+    _In_ PVOID PortIndexData);
 
 BOOL supEnumHandleDump(
     _In_ PSYSTEM_HANDLE_INFORMATION_EX HandleDump,
@@ -882,12 +927,6 @@ NTSTATUS supQueryProcessImageFileNameWin32(
 PSID supGetSidFromAce(
     _In_ PACE_HEADER AceHeader);
 
-NTSTATUS supQuerySecurityInformation(
-    _In_ HANDLE ObjectHandle,
-    _In_ SECURITY_INFORMATION SecurityInformationClass,
-    _Out_ PVOID * Buffer,
-    _Out_opt_ PULONG ReturnLength);
-
 typedef VOID(CALLBACK* pfnPopupMenuHandler)(
     _In_ HWND hwndDlg,
     _In_ LPPOINT lpPoint,
@@ -906,9 +945,6 @@ ULONG supAddLVColumnsFromArray(
     _In_ HWND ListView,
     _In_ PLVCOLUMNS_DATA ColumnsData,
     _In_ ULONG NumberOfColumns);
-
-VOID supShowInitError(
-    _In_ DWORD ErrorType);
 
 wchar_t* supExtractFileName(
     _In_ const wchar_t* lpFullPath);
@@ -993,10 +1029,38 @@ NTSTATUS supCallDriver(
 BOOLEAN supIsLongTermServicingWindows(
     VOID);
 
-PBYTE supFindReferenceBySignature(
-    _In_ PBYTE Buffer,
-    _In_ ULONG BufferSize,
-    _In_ PBYTE Signature,
-    _In_ ULONG SignatureSize,
-    _In_opt_ PSUPFINDREF_CALLBACK Callback,
-    _In_opt_ PVOID CallbackContext);
+HANDLE supCreateThread(
+    _In_ LPTHREAD_START_ROUTINE lpStartAddress,
+    _In_opt_ __drv_aliasesMem LPVOID lpParameter,
+    _In_ DWORD dwCreationFlags);
+
+HANDLE supCreateDialogWorkerThread(
+    _In_ LPTHREAD_START_ROUTINE lpStartAddress,
+    _In_opt_ __drv_aliasesMem LPVOID lpParameter,
+    _In_ DWORD dwCreationFlags);
+
+VOID supInitFastEvent(
+    _In_ PFAST_EVENT Event);
+
+VOID supReferenceFastEvent(
+    _In_ PFAST_EVENT Event);
+
+VOID supDereferenceFastEvent(
+    _In_ PFAST_EVENT Event,
+    _In_opt_ HANDLE EventHandle);
+
+VOID supSetFastEvent(
+    _In_ PFAST_EVENT Event);
+
+BOOLEAN supTestFastEvent(
+    _In_ PFAST_EVENT Event);
+
+VOID supResetFastEvent(
+    _In_ PFAST_EVENT Event);
+
+BOOLEAN supWaitForFastEvent(
+    _In_ PFAST_EVENT Event,
+    _In_opt_ PLARGE_INTEGER Timeout);
+
+VOID CALLBACK supSymCallbackReportEvent(
+    _In_ LPCWSTR EventText);

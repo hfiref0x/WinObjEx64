@@ -1,14 +1,14 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2022
 *
-*  TITLE:       EXTRASPN.H
+*  TITLE:       SYSINFODLG.H
 *
 *  VERSION:     1.94
 *
-*  DATE:        04 Jun 2022
+*  DATE:        06 Jun 2022
 *
-*  Common header file for Extras Private Namespaces dialog.
+*  Common header file for the WinObjEx64 Globals and System Information Dialog.
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -16,7 +16,8 @@
 * PARTICULAR PURPOSE.
 *
 *******************************************************************************/
+
 #pragma once
 
-VOID extrasCreatePNDialog(
-    VOID);
+VOID ShowSysInfoDialog(
+    _In_ HWND hwndParent);

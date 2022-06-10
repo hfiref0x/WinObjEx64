@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.94
 *
-*  DATE:        31 May 2022
+*  DATE:        07 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -125,6 +125,61 @@ VOID extrasRemoveDlgIcon(
 }
 
 /*
+* extrasProcessElevationRequiredDialogs
+*
+* Purpose:
+*
+* Run elevation required dialog.
+* If client is not elevated - request elevation.
+*
+*/
+VOID extrasProcessElevationRequiredDialogs(
+    _In_ WORD DialogId
+)
+{
+    WCHAR szText[200];
+
+    if (g_WinObj.IsWine)
+        return;
+
+    if (g_kdctx.IsFullAdmin == FALSE) {
+        supRunAsAdmin();
+        return;
+    }
+
+    if (!kdConnectDriver()) {      
+
+        RtlStringCchPrintfSecure(szText,
+            RTL_NUMBER_OF(szText),
+            TEXT("Could not connect to driver, feature is unavailable.\nDriver load status: 0x%lX\nDriver open status: 0x%lX"),
+            g_kdctx.DriverContext.LoadStatus,
+            g_kdctx.DriverContext.OpenStatus);
+
+        MessageBox(g_WinObj.MainWindow, 
+            szText, 
+            PROGRAM_NAME, 
+            MB_ICONINFORMATION);
+
+        return;
+    }
+
+    switch (DialogId) {
+    case ID_EXTRAS_PRIVATENAMESPACES:
+        extrasCreatePNDialog();
+        break;
+    case ID_EXTRAS_CALLBACKS:
+        extrasCreateCallbacksDialog();
+        break;
+    case ID_EXTRAS_UNLOADEDDRIVERS:
+        extrasCreateDriversDialog(DrvModeUnloaded);
+        break;
+    case ID_EXTRAS_SSDT:
+        extrasCreateSSDTDialog(SST_Ntos);
+        break;
+    }
+}
+
+/*
 * extrasShowDialogById
 *
 * Purpose:
@@ -133,92 +188,49 @@ VOID extrasRemoveDlgIcon(
 *
 */
 VOID extrasShowDialogById(
-    _In_ HWND ParentWindow,
-    _In_ WORD DialogId)
+    _In_ WORD DialogId
+)
 {
     switch (DialogId) {
 
     case ID_EXTRAS_PIPES:
     case ID_EXTRAS_MAILSLOTS:
         if (DialogId == ID_EXTRAS_MAILSLOTS)
-            extrasCreateIpcDialog(ParentWindow, IpcModeMailSlots);
+            extrasCreateIpcDialog(IpcModeMailSlots);
         else
-            extrasCreateIpcDialog(ParentWindow, IpcModeNamedPipes);
+            extrasCreateIpcDialog(IpcModeNamedPipes);
         break;
 
     case ID_EXTRAS_USERSHAREDDATA:
-        extrasCreateUsdDialog(ParentWindow);
-        break;
-
-    case ID_EXTRAS_PRIVATENAMESPACES:
-        //
-        // Feature require driver usage and not supported in 10586.
-        //
-        if (g_NtBuildNumber != NT_WIN10_THRESHOLD2) {
-            if (kdConnectDriver()) {
-                extrasCreatePNDialog(ParentWindow);
-            }
-            else {
-                MessageBox(ParentWindow, T_DRIVER_REQUIRED, NULL, MB_ICONINFORMATION);
-            }
-        }
+        extrasCreateUsdDialog();
         break;
 
     case ID_EXTRAS_SSDT:
-    case ID_EXTRAS_W32PSERVICETABLE:
-        //
-        // This feature require driver usage.
-        //
-#ifndef _DEBUG
-        if (kdConnectDriver()) {
-#endif
-            if (DialogId == ID_EXTRAS_SSDT)
-                extrasCreateSSDTDialog(ParentWindow, SST_Ntos);
-            else
-                extrasCreateSSDTDialog(ParentWindow, SST_Win32k);
+    case ID_EXTRAS_UNLOADEDDRIVERS:
+    case ID_EXTRAS_PRIVATENAMESPACES:
+    case ID_EXTRAS_CALLBACKS:
+        extrasProcessElevationRequiredDialogs(DialogId);
+        break;
 
-#ifndef _DEBUG
-        }
-#endif
+    case ID_EXTRAS_W32PSERVICETABLE:
+        extrasCreateSSDTDialog(SST_Win32k);
         break;
 
     case ID_EXTRAS_DRIVERS:
-    case ID_EXTRAS_UNLOADEDDRIVERS:
-        //
-        // Unsupported in Wine.
-        // Drivers list is empty or contains user mode dlls/application itself.
-        //
-        if (g_WinObj.IsWine == FALSE) {
-            if (DialogId == ID_EXTRAS_DRIVERS)
-                extrasCreateDriversDialog(ParentWindow, DDM_Normal);
-            else
-                extrasCreateDriversDialog(ParentWindow, DDM_Unloaded);
-        }
+        extrasCreateDriversDialog(DrvModeNormal);
         break;
 
     case ID_EXTRAS_PROCESSLIST:
-        extrasCreatePsListDialog(ParentWindow);
-        break;
-
-    case ID_EXTRAS_CALLBACKS:
-        if (kdConnectDriver()) {
-            extrasCreateCallbacksDialog(ParentWindow);
-        }
-        else {
-            MessageBox(ParentWindow, T_DRIVER_REQUIRED, NULL, MB_ICONINFORMATION);
-        }
+        extrasCreatePsListDialog();
         break;
 
     case ID_EXTRAS_SOFTWARELICENSECACHE:
-        extrasCreateSLCacheDialog(ParentWindow);
+        extrasCreateSLCacheDialog();
         break;
 
     case ID_EXTRAS_CMCONTROLVECTOR:
-        extrasCreateCmOptDialog(ParentWindow);
+        extrasCreateCmOptDialog();
         break;
 
-
-    default:
-        break;
     }
 }

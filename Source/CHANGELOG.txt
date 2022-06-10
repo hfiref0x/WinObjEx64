@@ -1,6 +1,7 @@
 v1.9.4
 added Pico providers, Nmi, SiloMonitor and Errata manager callbacks
 added CmControlVector viewer
+internal rearrange
 
 v1.9.3
 updated SeCiCallbacks search for newest Windows versions

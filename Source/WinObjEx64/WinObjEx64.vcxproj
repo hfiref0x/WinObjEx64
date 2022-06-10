@@ -413,8 +413,8 @@
     <ClCompile Include="props\propType.c" />
     <ClCompile Include="sdviewDlg.c" />
     <ClCompile Include="sup.c" />
+    <ClCompile Include="sysinfoDlg.c" />
     <ClCompile Include="tests\testunit.c" />
-    <ClCompile Include="tinyaes\aes.c" />
     <ClCompile Include="wine.c" />
   </ItemGroup>
   <ItemGroup>
@@ -451,6 +451,7 @@
     <ClInclude Include="extras\extrasPSList.h" />
     <ClInclude Include="extras\extrasSL.h" />
     <ClInclude Include="extras\extrasSSDT.h" />
+    <ClInclude Include="extras\extrasSSDTsup.h" />
     <ClInclude Include="extras\extrasUSD.h" />
     <ClInclude Include="findDlg.h" />
     <ClInclude Include="global.h" />
@@ -486,8 +487,8 @@
     <ClInclude Include="sdviewDlg.h" />
     <ClInclude Include="sup.h" />
     <ClInclude Include="supConsts.h" />
+    <ClInclude Include="sysinfoDlg.h" />
     <ClInclude Include="tests\testunit.h" />
-    <ClInclude Include="tinyaes\aes.h" />
     <ClInclude Include="ui.h" />
     <ClInclude Include="wine.h" />
     <ClInclude Include="winedebug.h" />

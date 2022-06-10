@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTAPI.H
 *
-*  VERSION:     1.93
+*  VERSION:     1.94
 *
-*  DATE:        13 May 2022
+*  DATE:        04 Jun 2022
 *
 *  Windows SDK compatibility header.
 *
@@ -183,3 +183,61 @@ typedef enum DPI_AWARENESS {
 #ifndef NTDDI_WIN10_CU
 #define NTDDI_WIN10_CU 0x0A00000D       /* ABRACADABRA_WIN10_CU */
 #endif
+
+FORCEINLINE LONG_PTR _InterlockedExchangeAddPointer(
+    _Inout_ _Interlocked_operand_ LONG_PTR volatile* Addend,
+    _In_ LONG_PTR Value
+)
+{
+#ifdef _WIN64
+    return (LONG_PTR)_InterlockedExchangeAdd64((PLONG64)Addend, (LONG64)Value);
+#else
+    return (LONG_PTR)_InterlockedExchangeAdd((PLONG)Addend, (LONG)Value);
+#endif
+}
+
+FORCEINLINE LONG_PTR _InterlockedIncrementPointer(
+    _Inout_ _Interlocked_operand_ LONG_PTR volatile* Addend
+)
+{
+#ifdef _WIN64
+    return (LONG_PTR)_InterlockedIncrement64((PLONG64)Addend);
+#else
+    return (LONG_PTR)_InterlockedIncrement((PLONG)Addend);
+#endif
+}
+
+FORCEINLINE LONG_PTR _InterlockedDecrementPointer(
+    _Inout_ _Interlocked_operand_ LONG_PTR volatile* Addend
+)
+{
+#ifdef _WIN64
+    return (LONG_PTR)_InterlockedDecrement64((PLONG64)Addend);
+#else
+    return (LONG_PTR)_InterlockedDecrement((PLONG)Addend);
+#endif
+}
+
+FORCEINLINE BOOLEAN _InterlockedBitTestAndResetPointer(
+    _Inout_ _Interlocked_operand_ LONG_PTR volatile* Base,
+    _In_ LONG_PTR Bit
+)
+{
+#ifdef _WIN64
+    return _interlockedbittestandreset64((PLONG64)Base, (LONG64)Bit);
+#else
+    return _interlockedbittestandreset((PLONG)Base, (LONG)Bit);
+#endif
+}
+
+FORCEINLINE BOOLEAN _InterlockedBitTestAndSetPointer(
+    _Inout_ _Interlocked_operand_ LONG_PTR volatile* Base,
+    _In_ LONG_PTR Bit
+)
+{
+#ifdef _WIN64
+    return _interlockedbittestandset64((PLONG64)Base, (LONG64)Bit);
+#else
+    return _interlockedbittestandset((PLONG)Base, (LONG)Bit);
+#endif
+}

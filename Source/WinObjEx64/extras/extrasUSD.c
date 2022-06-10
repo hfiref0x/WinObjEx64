@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       EXTRASUSD.C
 *
-*  VERSION:     1.92
+*  VERSION:     1.94
 *
-*  DATE:        18 Sep 2021
+*  DATE:        04 Jun 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -20,7 +20,101 @@
 #include "extrasUSD.h"
 #include "treelist/treelist.h"
 
-EXTRASCONTEXT g_UsdDlgContext;
+static EXTRASCONTEXT g_UsdDlgContext;
+static HANDLE UsdDlgThreadHandle = NULL;
+static FAST_EVENT UsdDlgInitializedEvent = FAST_EVENT_INIT;
+
+LPWSTR T_PROCESSOR_FEATURES[] = {
+    L"PF_FLOATING_POINT_PRECISION_ERRATA",
+    L"PF_FLOATING_POINT_EMULATED",
+    L"PF_COMPARE_EXCHANGE_DOUBLE",
+    L"PF_MMX_INSTRUCTIONS_AVAILABLE",
+    L"PF_PPC_MOVEMEM_64BIT_OK",
+    L"PF_ALPHA_BYTE_INSTRUCTIONS",
+    L"PF_XMMI_INSTRUCTIONS_AVAILABLE",
+    L"PF_3DNOW_INSTRUCTIONS_AVAILABLE",
+    L"PF_RDTSC_INSTRUCTION_AVAILABLE",
+    L"PF_PAE_ENABLED",
+    L"PF_XMMI64_INSTRUCTIONS_AVAILABLE",
+    L"PF_SSE_DAZ_MODE_AVAILABLE",
+    L"PF_NX_ENABLED",
+    L"PF_SSE3_INSTRUCTIONS_AVAILABLE",
+    L"PF_COMPARE_EXCHANGE128",
+    L"PF_COMPARE64_EXCHANGE128",
+    L"PF_CHANNELS_ENABLED",
+    L"PF_XSAVE_ENABLED",
+    L"PF_ARM_VFP_32_REGISTERS_AVAILABLE",
+    L"PF_ARM_NEON_INSTRUCTIONS_AVAILABLE",
+    L"PF_SECOND_LEVEL_ADDRESS_TRANSLATION",
+    L"PF_VIRT_FIRMWARE_ENABLED",
+    L"PF_RDWRFSGSBASE_AVAILABLE",
+    L"PF_FASTFAIL_AVAILABLE",
+    L"PF_ARM_DIVIDE_INSTRUCTION_AVAILABLE",
+    L"PF_ARM_64BIT_LOADSTORE_ATOMIC",
+    L"PF_ARM_EXTERNAL_CACHE_AVAILABLE",
+    L"PF_ARM_FMAC_INSTRUCTIONS_AVAILABLE",
+    L"PF_RDRAND_INSTRUCTION_AVAILABLE",
+    L"PF_ARM_V8_INSTRUCTIONS_AVAILABLE",
+    L"PF_ARM_V8_CRYPTO_INSTRUCTIONS_AVAILABLE",
+    L"PF_ARM_V8_CRC32_INSTRUCTIONS_AVAILABLE",
+    L"PF_RDTSCP_INSTRUCTION_AVAILABLE",
+    L"PF_RDPID_INSTRUCTION_AVAILABLE",
+    L"PF_ARM_V81_ATOMIC_INSTRUCTIONS_AVAILABLE",
+    L"PF_MONITORX_INSTRUCTION_AVAILABLE",
+    L"PF_SSSE3_INSTRUCTIONS_AVAILABLE",
+    L"PF_SSE4_1_INSTRUCTIONS_AVAILABLE",
+    L"PF_SSE4_2_INSTRUCTIONS_AVAILABLE",
+    L"PF_AVX_INSTRUCTIONS_AVAILABLE",
+    L"PF_AVX2_INSTRUCTIONS_AVAILABLE",
+    L"PF_AVX512F_INSTRUCTIONS_AVAILABLE",
+};
+
+LPCWSTR T_SharedDataFlagsW7[] = {
+    L"DbgErrorPortPresent",
+    L"DbgElevationEnabled",
+    L"DbgVirtEnabled",
+    L"DbgInstallerDetectEnabled",
+    L"DbgSystemDllRelocated",
+    L"DbgDynProcessorEnabled",
+    L"DbgSEHValidationEnabled"
+};
+
+LPCWSTR T_SharedDataFlags[] = {
+    L"DbgErrorPortPresent",
+    L"DbgElevationEnabled",
+    L"DbgVirtEnabled",
+    L"DbgInstallerDetectEnabled",
+    L"DbgLkgEnabled",
+    L"DbgDynProcessorEnabled",
+    L"DbgConsoleBrokerEnabled",
+    L"DbgSecureBootEnabled",
+    L"DbgMultiSessionSku",
+    L"DbgMultiUsersInSessionSku",
+    L"DbgStateSeparationEnabled"
+};
+
+VALUE_DESC SuiteMasks[] = {
+    { L"ServerNT", VER_SERVER_NT },
+    { L"WorkstationNT", VER_WORKSTATION_NT },
+    { L"SmallBusiness", VER_SUITE_SMALLBUSINESS },
+    { L"Enterprise", VER_SUITE_ENTERPRISE },
+    { L"BackOffice", VER_SUITE_BACKOFFICE },
+    { L"Communications", VER_SUITE_COMMUNICATIONS },
+    { L"Terminal", VER_SUITE_TERMINAL },
+    { L"SmallBussinessRestricted", VER_SUITE_SMALLBUSINESS_RESTRICTED },
+    { L"EmbeddedNT", VER_SUITE_EMBEDDEDNT },
+    { L"DataCenter", VER_SUITE_DATACENTER },
+    { L"SingleUserTS", VER_SUITE_SINGLEUSERTS },
+    { L"Personal", VER_SUITE_PERSONAL },
+    { L"Blade", VER_SUITE_BLADE },
+    { L"EmbeddedRestricted", VER_SUITE_EMBEDDED_RESTRICTED },
+    { L"SecurityAppliance", VER_SUITE_SECURITY_APPLIANCE },
+    { L"StorageServer", VER_SUITE_STORAGE_SERVER },
+    { L"ComputeServer", VER_SUITE_COMPUTE_SERVER },
+    { L"HomeServer", VER_SUITE_WH_SERVER },
+    { L"MultiUserTS", VER_SUITE_MULTIUSERTS }
+};
+
 
 /*
 * UsdDumpSharedRegion
@@ -38,7 +132,7 @@ VOID UsdDumpSharedRegion(
     UINT                i;
     DWORD               mask, cFlags;
 
-    LPCWSTR             *pvSharedFlagsDesc;
+    LPCWSTR* pvSharedFlagsDesc;
 
     HTREEITEM           h_tviRootItem, h_tviSubItem, h_tviLast = NULL;
     LPWSTR              lpType;
@@ -294,7 +388,7 @@ VOID UsdDumpSharedRegion(
         if (h_tviSubItem) {
             h_tviLast = NULL;
             mask = pUserSharedData->SuiteMask;
-            for (i = 0; i < MAX_KNOWN_SUITEMASKS; i++) {
+            for (i = 0; i < RTL_NUMBER_OF(SuiteMasks); i++) {
                 if (mask & SuiteMasks[i].dwValue) {
 
                     RtlSecureZeroMemory(&subitems, sizeof(subitems));
@@ -585,6 +679,22 @@ VOID UsdDialogHandlePopupMenu(
 }
 
 /*
+* UsdDialogOnInit
+*
+* Purpose:
+*
+* WM_INITDIALOG handler.
+*
+*/
+VOID UsdDialogOnInit(
+    _In_ HWND hwndDlg
+)
+{
+    UsdDumpSharedRegion(hwndDlg);
+    supCenterWindowSpecifyParent(hwndDlg, g_WinObj.MainWindow);
+}
+
+/*
 * UsdDialogProc
 *
 * Purpose:
@@ -602,13 +712,16 @@ INT_PTR CALLBACK UsdDialogProc(
     switch (uMsg) {
 
     case WM_INITDIALOG:
-        supCenterWindow(hwndDlg);
+        UsdDialogOnInit(hwndDlg);
+        break;
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
         break;
 
     case WM_CLOSE:
         DestroyWindow(g_UsdDlgContext.TreeList);
         DestroyWindow(hwndDlg);
-        g_WinObj.AuxDialogs[wobjUSDDlgId] = NULL;
         break;
 
     case WM_COMMAND:
@@ -617,7 +730,7 @@ INT_PTR CALLBACK UsdDialogProc(
         case IDCANCEL:
 
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
-            return TRUE;
+            break;
 
         case ID_OBJECT_COPY:
 
@@ -626,8 +739,6 @@ INT_PTR CALLBACK UsdDialogProc(
 
             break;
 
-        default:
-            break;
         }
 
         break;
@@ -636,12 +747,60 @@ INT_PTR CALLBACK UsdDialogProc(
 
         UsdDialogHandlePopupMenu(hwndDlg, lParam);
         break;
-
-    default:
-        return FALSE;
     }
 
-    return TRUE;
+    return FALSE;
+}
+
+/*
+* extrasCreateUsdDialog
+*
+* Purpose:
+*
+* Create and initialize Usd Dialog.
+*
+*/
+DWORD extrasUsdDialogWorkerThread(
+    _In_ PVOID Parameter
+)
+{
+    BOOL bResult;
+    MSG message;
+    HWND hwndDlg;
+
+    UNREFERENCED_PARAMETER(Parameter);
+
+    hwndDlg = CreateDialogParam(g_WinObj.hInstance,
+        MAKEINTRESOURCE(IDD_DIALOG_USD),
+        0,
+        &UsdDialogProc,
+        0);
+
+    g_UsdDlgContext.hwndDlg = hwndDlg;
+
+    supSetFastEvent(&UsdDlgInitializedEvent);
+
+    do {
+
+        bResult = GetMessage(&message, NULL, 0, 0);
+        if (bResult == -1)
+            break;
+
+        if (!IsDialogMessage(hwndDlg, &message)) {
+            TranslateMessage(&message);
+            DispatchMessage(&message);
+        }
+
+    } while (bResult != 0);
+
+    supResetFastEvent(&UsdDlgInitializedEvent);
+
+    if (UsdDlgThreadHandle) {
+        NtClose(UsdDlgThreadHandle);
+        UsdDlgThreadHandle = NULL;
+    }
+
+    return 0;
 }
 
 /*
@@ -653,24 +812,17 @@ INT_PTR CALLBACK UsdDialogProc(
 *
 */
 VOID extrasCreateUsdDialog(
-    _In_ HWND hwndParent
+    VOID
 )
 {
-    //
-    // Allow only one dialog.
-    //
-    ENSURE_DIALOG_UNIQUE(g_WinObj.AuxDialogs[wobjUSDDlgId]);
 
-    RtlSecureZeroMemory(&g_UsdDlgContext, sizeof(g_UsdDlgContext));
-    g_UsdDlgContext.hwndDlg = CreateDialogParam(g_WinObj.hInstance, MAKEINTRESOURCE(IDD_DIALOG_USD),
-        hwndParent, &UsdDialogProc, 0);
+    if (!UsdDlgThreadHandle) {
 
-    if (g_UsdDlgContext.hwndDlg == NULL)
-        return;
+        RtlSecureZeroMemory(&g_UsdDlgContext, sizeof(g_UsdDlgContext));
+        g_UsdDlgContext.tlSubItemHit = -1;
 
-    g_WinObj.AuxDialogs[wobjUSDDlgId] = g_UsdDlgContext.hwndDlg;
+        UsdDlgThreadHandle = supCreateDialogWorkerThread(extrasUsdDialogWorkerThread, NULL, 0);
+        supWaitForFastEvent(&UsdDlgInitializedEvent, NULL);
 
-    g_UsdDlgContext.tlSubItemHit = -1;
-
-    UsdDumpSharedRegion(g_UsdDlgContext.hwndDlg);
+    }
 }

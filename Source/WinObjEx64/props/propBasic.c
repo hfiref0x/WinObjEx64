@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     1.92
+*  VERSION:     1.94
 *
-*  DATE:        19 Nov 2021
+*  DATE:        07 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -268,6 +268,12 @@ VOID propSetProcessMitigationsInfo(
                 }
                 if (Policies.ControlFlowGuardPolicy.StrictMode) {
                     _strcat(szBuffer, TEXT(" (Strict Mode)"));
+                }
+                if (Policies.ControlFlowGuardPolicy.EnableXfg) {
+                    _strcat(szBuffer, TEXT(" (Extended CF Guard)"));
+                }
+                if (Policies.ControlFlowGuardPolicy.EnableXfgAuditMode) {
+                    _strcat(szBuffer, TEXT(" (Extended CF Guard audit)"));
                 }
                 SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
             }
@@ -713,10 +719,8 @@ VOID propSetDefaultInfo(
     //
     ntStatus = supQueryObjectInformation(hObject,
         ObjectTypeInformation,
-        (PVOID*)&TypeInfo,
-        NULL,
-        (PNTSUPMEMALLOC)supHeapAlloc,
-        (PNTSUPMEMFREE)supHeapFree);
+        &TypeInfo,
+        NULL);
 
     if (NT_SUCCESS(ntStatus)) {
 
@@ -1134,17 +1138,17 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryKey)
     if (NT_SUCCESS(status)) {
 
         //Subkeys count
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
         ultostr(kfi.SubKeys, szBuffer);
         SetDlgItemText(hwndDlg, ID_KEYSUBKEYS, szBuffer);
 
         //Values count
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+        szBuffer[0] = 0;
         ultostr(kfi.Values, szBuffer);
         SetDlgItemText(hwndDlg, ID_KEYVALUES, szBuffer);
 
         //LastWrite time
-        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+        szBuffer[0] = 0;
         if (supPrintTimeConverted(&kfi.LastWriteTime, szBuffer, MAX_PATH))
             SetDlgItemText(hwndDlg, ID_KEYLASTWRITE, szBuffer);
     }
@@ -1276,7 +1280,6 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQuerySection)
     if (NT_SUCCESS(status)) {
 
         bSet = FALSE;
-        //RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
         szBuffer[0] = 0;
         if (sbi.AllocationAttributes & SEC_BASED) {
             _strcat(szBuffer, TEXT("Based"));
@@ -1704,10 +1707,8 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryProcess)
 
         if (NT_SUCCESS(supQueryProcessInformation(hObject,
             ProcessImageFileNameWin32,
-            (PVOID*)&pusInformation,
-            NULL,
-            (PNTSUPMEMALLOC)supHeapAlloc,
-            (PNTSUPMEMFREE)supHeapFree)))
+            &pusInformation,
+            NULL)))
         {
             if ((pusInformation->Length) && (pusInformation->MaximumLength)) {
 
@@ -1741,10 +1742,8 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryProcess)
             //
             if (NT_SUCCESS(supQueryProcessInformation(hObject,
                 ProcessCommandLineInformation,
-                (PVOID*)&pusInformation,
-                NULL,
-                (PNTSUPMEMALLOC)supHeapAlloc,
-                (PNTSUPMEMFREE)supHeapFree)))
+                &pusInformation,
+                NULL)))
             {
                 if ((pusInformation->Length) && (pusInformation->MaximumLength)) {
 
@@ -1897,13 +1896,13 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryThread)
     ULONG ulCriticalThread, dummy;
     HANDLE hObject = NULL;
 
-    TIME_FIELDS TimeFields;
-
     WCHAR szBuffer[100];
 
     PSYSTEM_THREAD_INFORMATION Thread;
+    LPWSTR TempBuffer;
 
     PROCESSOR_NUMBER IdealProcessor;
+    THREAD_NAME_INFORMATION *NameInformation;
 
 
     Thread = &Context->UnnamedObjectInfo.ThreadInformation;
@@ -1937,30 +1936,12 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryThread)
         //
         // Kernel/User time.
         //
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-        RtlTimeToTimeFields(&Thread->KernelTime, &TimeFields);
-
-        RtlStringCchPrintfSecure(szBuffer,
-            MAX_PATH,
-            FORMAT_TIME_VALUE_MS,
-            TimeFields.Hour,
-            TimeFields.Minute,
-            TimeFields.Second,
-            TimeFields.Milliseconds);
-
+        szBuffer[0] = 0;
+        supPrintTimeToBuffer(&Thread->KernelTime, szBuffer, RTL_NUMBER_OF(szBuffer));
         SetDlgItemText(hwndDlg, IDC_THREAD_KERNELTIME, szBuffer);
 
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-        RtlTimeToTimeFields(&Thread->UserTime, &TimeFields);
-
-        RtlStringCchPrintfSecure(szBuffer,
-            MAX_PATH,
-            FORMAT_TIME_VALUE_MS,
-            TimeFields.Hour,
-            TimeFields.Minute,
-            TimeFields.Second,
-            TimeFields.Milliseconds);
-
+        szBuffer[0] = 0;
+        supPrintTimeToBuffer(&Thread->UserTime, szBuffer, RTL_NUMBER_OF(szBuffer));
         SetDlgItemText(hwndDlg, IDC_THREAD_USERTIME, szBuffer);
 
         //
@@ -2007,6 +1988,30 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryThread)
             SetDlgItemText(hwndDlg, IDC_THREAD_CRITICAL, 
                 (ulCriticalThread > 0) ? TEXT("Yes") : TEXT("No"));
         }
+
+        //
+        // Thread name.
+        //
+        SetDlgItemText(hwndDlg, IDC_THREAD_NAME, T_CannotQuery);
+
+        if (NT_SUCCESS(supQueryThreadInformation(hObject,
+            ThreadNameInformation, &NameInformation, &dummy)))
+        {
+            if (NameInformation->ThreadName.Length && NameInformation->ThreadName.MaximumLength) {
+
+                TempBuffer = (LPWSTR)supHeapAlloc(NameInformation->ThreadName.Length + sizeof(UNICODE_NULL));
+                if (TempBuffer) {
+                    RtlCopyMemory(TempBuffer, NameInformation->ThreadName.Buffer, NameInformation->ThreadName.Length);
+                    TempBuffer[NameInformation->ThreadName.Length / sizeof(WCHAR)] = 0;
+                    SetDlgItemText(hwndDlg, IDC_THREAD_NAME, TempBuffer);
+                    supHeapFree(TempBuffer);
+                }
+                
+            }
+
+            supHeapFree(NameInformation);
+        }
+
 
         //
         // Query object basic and type info if needed.
@@ -2151,7 +2156,6 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryJob)
     PVOID       ProcessList;
     WCHAR       szProcessName[MAX_PATH + 1];
     WCHAR       szBuffer[MAX_PATH * 2];
-    TIME_FIELDS SystemTime;
 
     JOBOBJECT_BASIC_ACCOUNTING_INFORMATION jbai;
     PJOBOBJECT_BASIC_PROCESS_ID_LIST       pJobProcList;
@@ -2182,51 +2186,42 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryJob)
     if (NT_SUCCESS(status)) {
 
         //Total processes
-        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+        szBuffer[0] = 0;
         ultostr(jbai.TotalProcesses, szBuffer);
         SetDlgItemText(hwndDlg, ID_JOBTOTALPROCS, szBuffer);
 
         //Active processes
-        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+        szBuffer[0] = 0;
         ultostr(jbai.ActiveProcesses, szBuffer);
         SetDlgItemText(hwndDlg, ID_JOBACTIVEPROCS, szBuffer);
 
         //Terminated processes
-        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+        szBuffer[0] = 0;
         ultostr(jbai.TotalTerminatedProcesses, szBuffer);
         SetDlgItemText(hwndDlg, ID_JOBTERMINATEDPROCS, szBuffer);
 
         //Total user time
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-        RtlSecureZeroMemory(&SystemTime, sizeof(SystemTime));
-        RtlTimeToTimeFields(&jbai.TotalUserTime, &SystemTime);
-
-        RtlStringCchPrintfSecure(szBuffer,
-            MAX_PATH,
-            FORMAT_TIME_VALUE_MS,
-            SystemTime.Hour,
-            SystemTime.Minute,
-            SystemTime.Second,
-            SystemTime.Milliseconds);
-
+        szBuffer[0] = 0;
+        supPrintTimeToBuffer(&jbai.TotalUserTime, szBuffer, MAX_PATH);
         SetDlgItemText(hwndDlg, ID_JOBTOTALUMTIME, szBuffer);
 
         //Total kernel time
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-        RtlTimeToTimeFields(&jbai.TotalKernelTime, &SystemTime);
-
-        RtlStringCchPrintfSecure(szBuffer,
-            MAX_PATH,
-            FORMAT_TIME_VALUE_MS,
-            SystemTime.Hour,
-            SystemTime.Minute,
-            SystemTime.Second,
-            SystemTime.Milliseconds);
-
+        szBuffer[0] = 0;
+        supPrintTimeToBuffer(&jbai.TotalKernelTime, szBuffer, MAX_PATH);
         SetDlgItemText(hwndDlg, ID_JOBTOTALKMTIME, szBuffer);
 
+        //This Period Total kernel time
+        szBuffer[0] = 0;
+        supPrintTimeToBuffer(&jbai.ThisPeriodTotalKernelTime, szBuffer, MAX_PATH);
+        SetDlgItemText(hwndDlg, ID_JOBTPTOTALKMTIME, szBuffer);
+
+        //This Period Total user time
+        szBuffer[0] = 0;
+        supPrintTimeToBuffer(&jbai.ThisPeriodTotalUserTime, szBuffer, MAX_PATH);
+        SetDlgItemText(hwndDlg, ID_JOBTPTOTALUMTIME, szBuffer);
+
         //Page faults
-        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+        szBuffer[0] = 0;
         ultostr(jbai.TotalPageFaultCount, szBuffer);
         SetDlgItemText(hwndDlg, ID_JOBTOTALPF, szBuffer);
 
@@ -2298,7 +2293,7 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryJob)
                         RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
 
                         RtlStringCchPrintfSecure(szBuffer,
-                            sizeof(szBuffer) / sizeof(szBuffer[0]),
+                            RTL_NUMBER_OF(szBuffer),
                             TEXT("[0x%I64X:%I64u] %wS"),
                             ProcessId,
                             ProcessId,

@@ -4,9 +4,9 @@
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     1.93
+*  VERSION:     1.94
 *
-*  DATE:        11 May 2022
+*  DATE:        04 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -19,25 +19,6 @@
 #include "winedebug.h"
 
 #define T_ABOUTDLG_ICON_PROP TEXT("aboutDlgIcon")
-
-VALUE_DESC CodeIntegrityValuesList[] = {
-    { L"CODEINTEGRITY_OPTION_ENABLED", CODEINTEGRITY_OPTION_ENABLED },
-    { L"CODEINTEGRITY_OPTION_TESTSIGN", CODEINTEGRITY_OPTION_TESTSIGN },
-    { L"CODEINTEGRITY_OPTION_UMCI_ENABLED", CODEINTEGRITY_OPTION_UMCI_ENABLED },
-    { L"CODEINTEGRITY_OPTION_UMCI_AUDITMODE_ENABLED", CODEINTEGRITY_OPTION_UMCI_AUDITMODE_ENABLED },
-    { L"CODEINTEGRITY_OPTION_UMCI_EXCLUSIONPATHS_ENABLED", CODEINTEGRITY_OPTION_UMCI_EXCLUSIONPATHS_ENABLED },
-    { L"CODEINTEGRITY_OPTION_TEST_BUILD", CODEINTEGRITY_OPTION_TEST_BUILD },
-    { L"CODEINTEGRITY_OPTION_PREPRODUCTION_BUILD", CODEINTEGRITY_OPTION_PREPRODUCTION_BUILD },
-    { L"CODEINTEGRITY_OPTION_DEBUGMODE_ENABLED", CODEINTEGRITY_OPTION_DEBUGMODE_ENABLED },
-    { L"CODEINTEGRITY_OPTION_FLIGHT_BUILD", CODEINTEGRITY_OPTION_FLIGHT_BUILD },
-    { L"CODEINTEGRITY_OPTION_FLIGHTING_ENABLED", CODEINTEGRITY_OPTION_FLIGHTING_ENABLED },
-    { L"CODEINTEGRITY_OPTION_HVCI_KMCI_ENABLED", CODEINTEGRITY_OPTION_HVCI_KMCI_ENABLED },
-    { L"CODEINTEGRITY_OPTION_HVCI_KMCI_AUDITMODE_ENABLED", CODEINTEGRITY_OPTION_HVCI_KMCI_AUDITMODE_ENABLED },
-    { L"CODEINTEGRITY_OPTION_HVCI_KMCI_STRICTMODE_ENABLED", CODEINTEGRITY_OPTION_HVCI_KMCI_STRICTMODE_ENABLED },
-    { L"CODEINTEGRITY_OPTION_HVCI_IUM_ENABLED", CODEINTEGRITY_OPTION_HVCI_IUM_ENABLED },
-    { L"CODEINTEGRITY_OPTION_WHQL_ENFORCEMENT_ENABLED", CODEINTEGRITY_OPTION_WHQL_ENFORCEMENT_ENABLED },
-    { L"CODEINTEGRITY_OPTION_WHQL_AUDITMODE_ENABLED", CODEINTEGRITY_OPTION_WHQL_AUDITMODE_ENABLED }
-};
 
 /*
 * AboutDialogInit
@@ -224,573 +205,35 @@ VOID AboutDialogInit(
 }
 
 /*
-* AddParameterValue
+* AboutDialogOnNotify
 *
 * Purpose:
 *
-* Add text to the multiline richedit tabbed control.
+* WM_NOTIFY handler.
 *
 */
-VOID AddParameterValue(
-    _In_ HWND OutputWindow,
-    _In_ LPCWSTR Parameter,
-    _In_ LPCWSTR Value)
-{
-    LONG StartPos = 0;
-
-    CHARFORMAT CharFormat;
-    CHARRANGE CharRange, SelectedRange;
-
-    CharRange.cpMax = 0x7FFFFFFF;
-    CharRange.cpMin = 0x7FFFFFFF;
-
-    SendMessage(OutputWindow, EM_EXSETSEL, (WPARAM)0, (LPARAM)&CharRange);
-    SendMessage(OutputWindow, EM_EXGETSEL, (WPARAM)0, (LPARAM)&SelectedRange);
-    StartPos = SelectedRange.cpMin;
-
-    RtlSecureZeroMemory(&CharFormat, sizeof(CharFormat));
-    CharFormat.cbSize = sizeof(CharFormat);
-    CharFormat.dwMask = CFM_BOLD;
-    CharFormat.dwEffects = 0;
-
-    SendMessage(OutputWindow, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&CharFormat);
-
-    if (StartPos) {
-        SendMessage(OutputWindow, EM_REPLACESEL, (WPARAM)0, (LPARAM)L"\r\n");
-        StartPos += 1;
-    }
-
-    SendMessage(OutputWindow, EM_REPLACESEL, (WPARAM)0, (LPARAM)Parameter);
-    SendMessage(OutputWindow, EM_REPLACESEL, (WPARAM)0, (LPARAM)L"\t");
-    SendMessage(OutputWindow, EM_REPLACESEL, (WPARAM)0, (LPARAM)Value);
-
-    CharFormat.dwEffects = CFE_BOLD;
-
-    CharRange.cpMin = StartPos;
-    CharRange.cpMax = (LONG)_strlen(Parameter) + StartPos + 1;
-
-    SendMessage(OutputWindow, EM_EXSETSEL, (WPARAM)0, (LPARAM)&CharRange);
-    SendMessage(OutputWindow, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&CharFormat);
-}
-
-/*
-* AddParameterValue64Hex
-*
-* Purpose:
-*
-* Add text to the multiline richedit tabbed control (hex value).
-*
-*/
-VOID AddParameterValue64Hex(
-    _In_ HWND OutputWindow,
-    _In_ LPWSTR Parameter,
-    _In_ ULONG_PTR Value)
-{
-    WCHAR szBuffer[32];
-
-    szBuffer[0] = L'0';
-    szBuffer[1] = L'x';
-    szBuffer[2] = 0;
-    u64tohex(Value, &szBuffer[2]);
-    AddParameterValue(OutputWindow, Parameter, szBuffer);
-}
-
-/*
-* AddParameterValue32Hex
-*
-* Purpose:
-*
-* Add text to the multiline richedit tabbed control (hex value).
-*
-*/
-VOID AddParameterValue32Hex(
-    _In_ HWND OutputWindow,
-    _In_ LPWSTR Parameter,
-    _In_ ULONG Value)
-{
-    WCHAR szBuffer[16];
-
-    szBuffer[0] = L'0';
-    szBuffer[1] = L'x';
-    szBuffer[2] = 0;
-    ultohex(Value, &szBuffer[2]);
-    AddParameterValue(OutputWindow, Parameter, szBuffer);
-}
-
-/*
-* AddParameterValueUlong
-*
-* Purpose:
-*
-* Add text to the multiline richedit tabbed control (ulong value).
-*
-*/
-VOID AddParameterValueUlong(
-    _In_ HWND OutputWindow,
-    _In_ LPWSTR Parameter,
-    _In_ ULONG Value)
-{
-    WCHAR szBuffer[16];
-
-    szBuffer[0] = 0;
-    ultostr(Value, szBuffer);
-    AddParameterValue(OutputWindow, Parameter, szBuffer);
-}
-
-/*
-* AddParameterValueBool
-*
-* Purpose:
-*
-* Add text to the multiline richedit tabbed control (bool value).
-*
-*/
-VOID AddParameterValueBool(
-    _In_ HWND OutputWindow,
-    _In_ LPWSTR Parameter,
-    _In_ BOOL Value)
-{
-    LPWSTR lpValue;
-
-    if (Value == FALSE)
-        lpValue = TEXT("FALSE");
-    else
-        lpValue = TEXT("TRUE");
-
-    AddParameterValue(OutputWindow, Parameter, lpValue);
-}
-
-/*
-* AboutDialogCollectGlobals
-*
-* Purpose:
-*
-* Build globals list (g_kdctx + g_WinObj).
-*
-*/
-VOID AboutDialogCollectGlobals(
-    _In_ HWND hwndDlg,
-    _In_ HWND hwndParent
-)
-{
-    BOOLEAN bCustomSignersAllowed;
-    LPWSTR lpType;
-    ULONG Index, Value, SaveValue;
-
-    WCHAR szBuffer[MAX_PATH * 4];
-    WCHAR szTemp[MAX_PATH];
-
-    SYSTEM_CODEINTEGRITY_INFORMATION CodeIntegrity;
-    SYSTEM_KERNEL_VA_SHADOW_INFORMATION KernelVaShadow;
-    SYSTEM_SPECULATION_CONTROL_INFORMATION SpeculationControl;
-    SYSTEM_VSM_PROTECTION_INFORMATION VsmProtectionInfo;
-    SYSTEM_INFO SystemInfo;
-    ULONG Dummy;
-
-    HKEY hKey;
-    DWORD dwType, cbData, dwValue;
-
-    PARAFORMAT ParaFormat;
-    CHARRANGE CharRange;
-
-    HWND hwndOutput = GetDlgItem(hwndDlg, IDC_GLOBALS);
-
-    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-    RtlSecureZeroMemory(szTemp, sizeof(szTemp));
-
-    //
-    // Prepare RichEdit.
-    //
-    SendMessage(hwndOutput, EM_SETEVENTMASK, (WPARAM)0, (LPARAM)0);
-    SendMessage(hwndOutput, WM_SETREDRAW, (WPARAM)0, (LPARAM)0);
-
-    RtlSecureZeroMemory(&ParaFormat, sizeof(ParaFormat));
-    ParaFormat.cbSize = sizeof(ParaFormat);
-    ParaFormat.cTabCount = 1;
-    ParaFormat.dwMask = PFM_TABSTOPS;
-    ParaFormat.rgxTabs[0] = 3500;
-    SendMessage(hwndOutput, EM_SETPARAFORMAT, (WPARAM)0, (LPARAM)&ParaFormat);
-
-    //
-    // Collect information.
-
-    //
-    //
-    // Generic environment information, WinObjEx64 version.
-    //
-    RtlStringCchPrintfSecure(szBuffer,
-        100,
-        TEXT("%lu.%lu.%lu"),
-        PROGRAM_MAJOR_VERSION,
-        PROGRAM_MINOR_VERSION,
-        PROGRAM_REVISION_NUMBER);
-
-    AddParameterValue(hwndOutput, TEXT("Windows Object Explorer 64"), szBuffer);
-
-    //
-    // OS version.
-    //
-    GetDlgItemText(hwndParent, ID_ABOUT_OSNAME, szBuffer, MAX_PATH);
-    AddParameterValue(hwndOutput, TEXT("System.OS"), szBuffer);
-
-    //
-    // CPU.
-    //
-    if (ERROR_SUCCESS == RegOpenKeyEx(
-        HKEY_LOCAL_MACHINE,
-        TEXT("HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0"),
-        0,
-        KEY_QUERY_VALUE,
-        &hKey))
-    {
-        RtlSecureZeroMemory(szTemp, sizeof(szTemp));
-        szBuffer[0] = 0;
-
-        cbData = 128;
-        dwType = REG_NONE;
-        if (ERROR_SUCCESS == RegQueryValueEx(
-            hKey,
-            TEXT("Identifier"),
-            NULL,
-            &dwType,
-            (LPBYTE)&szTemp,
-            &cbData))
-        {
-            _strcat(szBuffer, szTemp);
-        }
-
-        _strcat(szBuffer, TEXT(", "));
-
-        cbData = 128;
-        dwType = REG_NONE;
-        if (ERROR_SUCCESS == RegQueryValueEx(
-            hKey,
-            TEXT("VendorIdentifier"),
-            NULL,
-            &dwType,
-            (LPBYTE)&szTemp,
-            &cbData))
-        {
-            _strcat(szBuffer, szTemp);
-        }
-
-        _strcat(szBuffer, TEXT(", "));
-
-        cbData = sizeof(DWORD);
-        dwType = REG_NONE;
-        dwValue = 0;
-        if (ERROR_SUCCESS == RegQueryValueEx(
-            hKey,
-            TEXT("~MHz"),
-            NULL,
-            &dwType,
-            (LPBYTE)&dwValue,
-            &cbData))
-        {
-            szTemp[0] = L'~';
-            szTemp[1] = 0;
-            ultostr(dwValue, &szTemp[1]);
-            _strcat(szTemp, TEXT("MHz"));
-            _strcat(szBuffer, szTemp);
-        }
-
-        AddParameterValue(hwndOutput, TEXT("Environment.Processor"), szBuffer);
-
-        RegCloseKey(hKey);
-    }
-
-    GetSystemInfo(&SystemInfo);
-
-    RtlStringCchPrintfSecure(szBuffer,
-        MAX_PATH,
-        TEXT("%lu, Mask 0x%08lX"),
-        SystemInfo.dwNumberOfProcessors,
-        SystemInfo.dwActiveProcessorMask);
-
-    AddParameterValue(hwndOutput, TEXT("Environment.NumberOfProcessors"), szBuffer);
-
-    AddParameterValueBool(hwndOutput, TEXT("Internal.IsFullAdmin"), g_kdctx.IsFullAdmin); //admin privileges available
-    AddParameterValueBool(hwndOutput, TEXT("Internal.IsSecureBoot"), g_kdctx.IsSecureBoot); //secure boot enabled
-    AddParameterValueBool(hwndOutput, TEXT("Internal.IsWine"), g_WinObj.IsWine);
-    AddParameterValueBool(hwndOutput, TEXT("Internal.EnableFullMitigations"), g_WinObj.EnableFullMitigations);
-
-    //
-    // Helper driver state.
-    //
-    AddParameterValue32Hex(hwndOutput, TEXT("Driver.LoadStatus"), g_kdctx.DriverContext.LoadStatus);
-    AddParameterValue32Hex(hwndOutput, TEXT("Driver.OpenStatus"), g_kdctx.DriverContext.OpenStatus);
-    AddParameterValueBool(hwndOutput, TEXT("Driver.IsOurLoad"), g_kdctx.DriverContext.IsOurLoad); //driver was loaded by our program instance
-    
-    switch (WDrvGetActiveProviderType()) {
-    case wdrvAlice:
-        lpType = L"Alice";
-        break;
-    case wdrvRkhDrv5:
-        lpType = L"Rkhdrv5";
-        break;
-    case wdrvWinIo:
-        lpType = L"WinIo";
-        break;
-    case wdrvWinObjEx64:
-        lpType = L"WinObjEx64";
-        break;
-    case wdrvMicrosoft:
-    default:
-        lpType = L"Microsoft";
-        break;
-    }
-    AddParameterValue(hwndOutput, TEXT("Driver.ActiveProvider"), lpType);
-
-    //
-    // Ntoskrnl
-    //
-    AddParameterValue64Hex(hwndOutput, TEXT("Loader.NtOsBase"), (ULONG_PTR)g_kdctx.NtOsBase);
-    AddParameterValue64Hex(hwndOutput, TEXT("Loader.NtOsImageMap"), (ULONG_PTR)g_kdctx.NtOsImageMap);//mapped image address
-    AddParameterValue32Hex(hwndOutput, TEXT("Loader.NtOsSize"), g_kdctx.NtOsSize);//mapped image size
-
-    //
-    // Ntoskrnl symbols
-    //
-    AddParameterValue64Hex(hwndOutput, TEXT("SymContext.ContextBase"), (ULONG_PTR)g_kdctx.NtOsSymContext);
-    if (g_kdctx.NtOsSymContext) {
-        AddParameterValue64Hex(hwndOutput, TEXT("SymContext.ModuleBase"), ((PSYMCONTEXT)g_kdctx.NtOsSymContext)->ModuleBase);
-    }
-
-    //
-    // Directory object
-    //
-    AddParameterValue64Hex(hwndOutput, TEXT("System.DirectoryRootObject"), g_kdctx.DirectoryRootObject); //address of object root directory
-    AddParameterValueUlong(hwndOutput, TEXT("System.DirectoryTypeIndex"), g_kdctx.DirectoryTypeIndex);
-
-    //
-    // Product info
-    //
-    AddParameterValueBool(hwndOutput, TEXT("System.LTSC"), supIsLongTermServicingWindows());
-
-    //
-    // System ranges
-    //
-    AddParameterValue64Hex(hwndOutput, TEXT("System.SystemRangeStart"), (ULONG_PTR)g_kdctx.SystemRangeStart);
-    AddParameterValue64Hex(hwndOutput, TEXT("System.MinimumUserModeAddress"), (ULONG_PTR)g_kdctx.MinimumUserModeAddress);
-    AddParameterValue64Hex(hwndOutput, TEXT("System.MaximumUserModeAddress"), (ULONG_PTR)g_kdctx.MaximumUserModeAddress);
-
-    //
-    // List kldbg data.
-    //
-    AddParameterValueBool(hwndOutput, TEXT("System.ObHeaderCookieValid"), g_kdctx.Data->ObHeaderCookie.Valid);
-    AddParameterValue32Hex(hwndOutput, TEXT("System.ObHeaderCookie"), g_kdctx.Data->ObHeaderCookie.Value);
-
-    AddParameterValueUlong(hwndOutput, TEXT("System.KiServiceLimit"), g_kdctx.Data->KeServiceDescriptorTable.Limit);
-    AddParameterValue64Hex(hwndOutput, TEXT("System.KiServiceTableAddress"), (ULONG_PTR)g_kdctx.Data->KeServiceDescriptorTable.Base);
-    AddParameterValue64Hex(hwndOutput, TEXT("System.IopInvalidDeviceRequest"), (ULONG_PTR)g_kdctx.Data->IopInvalidDeviceRequest);
-    AddParameterValue64Hex(hwndOutput, TEXT("System.PrivateNamespaceLookupTable"), (ULONG_PTR)g_kdctx.Data->PrivateNamespaceLookupTable);
-
-    //
-    // List other data.
-    //
-    if (NT_SUCCESS(supCICustomKernelSignersAllowed(&bCustomSignersAllowed))) {
-        AddParameterValueBool(hwndOutput, TEXT("System.CICustomKernelSignersAllowed"), bCustomSignersAllowed);
-    }
-
-    AddParameterValueUlong(hwndOutput, TEXT("System.DpiValue"), (ULONG)supGetDPIValue(NULL));
-
-    CodeIntegrity.Length = sizeof(CodeIntegrity);
-    CodeIntegrity.CodeIntegrityOptions = 0;
-    if (NT_SUCCESS(NtQuerySystemInformation(
-        SystemCodeIntegrityInformation,
-        &CodeIntegrity,
-        sizeof(CodeIntegrity),
-        &Dummy)))
-    {
-        AddParameterValue32Hex(hwndOutput, TEXT("System.CodeIntegrityOptions"), CodeIntegrity.CodeIntegrityOptions);
-
-        if (CodeIntegrity.CodeIntegrityOptions) {
-
-            for (Index = 0; Index < RTL_NUMBER_OF(CodeIntegrityValuesList); Index++) {
-
-                if (CodeIntegrity.CodeIntegrityOptions & CodeIntegrityValuesList[Index].dwValue) {
-                    AddParameterValue(
-                        hwndOutput,
-                        TEXT("System.CodeIntegrityOption"),
-                        CodeIntegrityValuesList[Index].lpDescription);
-                    CodeIntegrity.CodeIntegrityOptions &= ~CodeIntegrityValuesList[Index].dwValue;
-                }
-            }
-
-            if (CodeIntegrity.CodeIntegrityOptions) {
-                Value = 1;
-                SaveValue = CodeIntegrity.CodeIntegrityOptions;
-                while (SaveValue) {
-                    if (SaveValue & Value) {
-                        AddParameterValue32Hex(hwndOutput, TEXT("System.CodeIntegrityOption(unknown)"), Value);
-                        SaveValue &= ~Value;
-                    }
-                    Value *= 2;
-                }
-            }
-        }
-    }
-
-    KernelVaShadow.Flags = 0;
-    if (NT_SUCCESS(NtQuerySystemInformation(
-        SystemKernelVaShadowInformation,
-        &KernelVaShadow,
-        sizeof(KernelVaShadow),
-        &Dummy)))
-    {
-        AddParameterValue32Hex(hwndOutput, TEXT("System.KvaShadowFlags"), KernelVaShadow.Flags);
-    }
-
-    SpeculationControl.Flags = 0;
-    if (NT_SUCCESS(NtQuerySystemInformation(
-        SystemSpeculationControlInformation,
-        &SpeculationControl,
-        sizeof(SpeculationControl),
-        &Dummy)))
-    {
-        AddParameterValue32Hex(hwndOutput, TEXT("System.SpeculationControlFlags"), SpeculationControl.Flags);
-    }
-
-    AddParameterValue(hwndOutput, TEXT("System.TempDirectory"), g_WinObj.szTempDirectory);
-    AddParameterValue(hwndOutput, TEXT("System.WindowsDirectory"), g_WinObj.szWindowsDirectory);
-    AddParameterValue(hwndOutput, TEXT("System.SystemDirectory"), g_WinObj.szSystemDirectory);
-    AddParameterValue(hwndOutput, TEXT("System.ProgramDirectory"), g_WinObj.szProgramDirectory);
-
-    RtlSecureZeroMemory(&VsmProtectionInfo, sizeof(VsmProtectionInfo));
-    if (NT_SUCCESS(NtQuerySystemInformation(
-        SystemVsmProtectionInformation,
-        &VsmProtectionInfo,
-        sizeof(VsmProtectionInfo),
-        &Dummy)))
-    {
-        AddParameterValueBool(hwndOutput, TEXT("Vsm.DmaProtectionsAvailable"), VsmProtectionInfo.DmaProtectionsAvailable);
-        AddParameterValueBool(hwndOutput, TEXT("Vsm.DmaProtectionsInUse"), VsmProtectionInfo.DmaProtectionsInUse);
-        AddParameterValueBool(hwndOutput, TEXT("Vsm.HardwareMbecAvailable"), VsmProtectionInfo.HardwareMbecAvailable);
-        AddParameterValueBool(hwndOutput, TEXT("Vsm.ApicVirtualizationAvailable"), VsmProtectionInfo.ApicVirtualizationAvailable);
-    }
-
-    //
-    // End work with RichEdit.
-    //
-    SendMessage(hwndOutput, WM_SETREDRAW, (WPARAM)TRUE, (LPARAM)0);
-    InvalidateRect(hwndOutput, NULL, TRUE);
-
-    SendMessage(hwndOutput, EM_SETEVENTMASK, (WPARAM)0, (LPARAM)ENM_SELCHANGE);
-
-    CharRange.cpMax = 0;
-    CharRange.cpMin = 0;
-    SendMessage(hwndOutput, EM_EXSETSEL, (WPARAM)0, (LPARAM)&CharRange);
-
-    SetFocus(hwndOutput);
-}
-
-/*
-* GlobalsCopyToClipboard
-*
-* Purpose:
-*
-* Copy globals to the clipboard.
-*
-*/
-VOID GlobalsCopyToClipboard(
-    _In_ HWND hwndDlg
-)
-{
-    SIZE_T BufferSize;
-    PWCHAR Buffer;
-
-    GETTEXTLENGTHEX gtl;
-    GETTEXTEX gt;
-
-    HWND hwndControl = GetDlgItem(hwndDlg, IDC_GLOBALS);
-
-    gtl.flags = GTL_USECRLF;
-    gtl.codepage = 1200;
-
-    BufferSize = SendMessage(hwndControl, EM_GETTEXTLENGTHEX, (WPARAM)&gtl, 0);
-    if (BufferSize) {
-
-        BufferSize *= sizeof(WCHAR);
-
-        Buffer = (PWCHAR)supHeapAlloc(BufferSize);
-        if (Buffer) {
-
-            gt.flags = GT_USECRLF;
-            gt.cb = (ULONG)BufferSize;
-
-            gt.codepage = 1200;
-            gt.lpDefaultChar = NULL;
-            gt.lpUsedDefChar = NULL;
-            SendMessage(hwndControl, EM_GETTEXTEX, (WPARAM)&gt, (LPARAM)Buffer);
-
-            supClipboardCopy(Buffer, BufferSize);
-
-            supHeapFree(Buffer);
-        }
-    }
-}
-
-/*
-* GlobalsWindowProc
-*
-* Purpose:
-*
-* Globals dialog window procedure.
-*
-*/
-LRESULT CALLBACK GlobalsWindowProc(
-    _In_ HWND hwnd,
-    _In_ UINT uMsg,
-    _In_ WPARAM wParam,
+VOID AboutDialogOnNotify(
+    _In_ HWND   hwndDlg,
     _In_ LPARAM lParam
 )
 {
-    HWND hwndParent = (HWND)lParam;
+    PNMLINK pNMLink;
+    LITEM item;
 
-    switch (uMsg) {
-    case WM_INITDIALOG:
+    switch (((LPNMHDR)lParam)->code) {
+    case NM_CLICK:
+    case NM_RETURN:
 
-        AboutDialogCollectGlobals(hwnd, hwndParent);
-        break;
-
-    case WM_COMMAND:
-        switch (GET_WM_COMMAND_ID(wParam, lParam)) {
-        case IDC_GLOBALS_COPY:
-            GlobalsCopyToClipboard(hwnd);
-            break;
-        case IDCANCEL:
-            return EndDialog(hwnd, S_OK);
-            break;
-        default:
-            break;
+        pNMLink = (PNMLINK)lParam;
+        item = pNMLink->item;
+        if ((((LPNMHDR)lParam)->hwndFrom == GetDlgItem(hwndDlg, IDC_ABOUT_SYSLINK))
+            && (item.iLink == 0))
+        {
+            supShellExecInExplorerProcess(item.szUrl);
         }
 
-    default:
         break;
     }
-    return 0;
-}
-
-/*
-* AboutDialogShowGlobals
-*
-* Purpose:
-*
-* Prepare and show globals window.
-*
-*/
-VOID AboutDialogShowGlobals(
-    _In_ HWND hwndParent
-)
-{
-    if (!supRichEdit32Load())
-        return;
-
-    DialogBoxParam(g_WinObj.hInstance,
-        MAKEINTRESOURCE(IDD_DIALOG_GLOBALS),
-        hwndParent,
-        (DLGPROC)&GlobalsWindowProc,
-        (LPARAM)hwndParent);
 }
 
 /*
@@ -821,6 +264,10 @@ INT_PTR CALLBACK AboutDialogProc(
         AboutDialogInit(hwndDlg);
         break;
 
+    case WM_NOTIFY:
+        AboutDialogOnNotify(hwndDlg, lParam);
+        break;
+
     case WM_COMMAND:
 
         switch (GET_WM_COMMAND_ID(wParam, lParam)) {
@@ -831,16 +278,7 @@ INT_PTR CALLBACK AboutDialogProc(
                 DestroyIcon((HICON)hIcon);
             }
             return EndDialog(hwndDlg, S_OK);
-            break;
-        case IDC_ABOUT_GLOBALS:
-            AboutDialogShowGlobals(hwndDlg);
-            break;
-        default:
-            break;
         }
-
-    default:
-        break;
     }
     return 0;
 }

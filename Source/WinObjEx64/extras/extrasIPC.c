@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASIPC.C
 *
-*  VERSION:     1.93
+*  VERSION:     1.94
 *
-*  DATE:        11 May 2022
+*  DATE:        04 Jun 2022
 *
 *  IPC supported: Pipes, Mailslots
 *
@@ -32,11 +32,14 @@
 
 #define ID_IPCLIST_REFRESH  ID_VIEW_REFRESH
 
-EXTRASCONTEXT IpcDlgContext[IpcMaxMode];
-
 //maximum number of possible pages
 #define EXTRAS_IPC_MAX_PAGE 2
-HPROPSHEETPAGE IpcPages[EXTRAS_IPC_MAX_PAGE];//object, security
+
+static HPROPSHEETPAGE IpcPages[EXTRAS_IPC_MAX_PAGE];//object, security
+static EXTRASCONTEXT IpcDlgContext[EXTRAS_IPC_MAX_PAGE];
+
+static HANDLE IpcDlgThreadHandles[EXTRAS_IPC_MAX_PAGE] = { NULL, NULL };
+static FAST_EVENT IpcDlgInitializedEvents[EXTRAS_IPC_MAX_PAGE] = { FAST_EVENT_INIT, FAST_EVENT_INIT };
 
 /*
 * IpcDisplayError
@@ -48,7 +51,7 @@ HPROPSHEETPAGE IpcPages[EXTRAS_IPC_MAX_PAGE];//object, security
 */
 VOID IpcDisplayError(
     _In_ HWND hwndDlg,
-    _In_ IPC_DIALOG_MODE DialogMode
+    _In_ IPC_DLG_MODE DialogMode
 )
 {
     DWORD dwLastError;
@@ -85,7 +88,7 @@ VOID IpcDisplayError(
 */
 LPWSTR IpcCreateObjectPathWithName(
     _In_ LPWSTR lpObjectName,
-    _In_ IPC_DIALOG_MODE Mode
+    _In_ IPC_DLG_MODE Mode
 )
 {
     LPWSTR lpFullName = NULL, lpRootDirectory = NULL;
@@ -176,7 +179,7 @@ BOOL CALLBACK IpcOpenObjectMethod(
 BOOLEAN IpcVerifyContextParameter(
     _In_ PROP_OBJECT_INFO* Context,
     _In_ HWND hwndDlg,
-    _In_ IPC_DIALOG_MODE DialogMode)
+    _In_ IPC_DLG_MODE DialogMode)
 {
     if (Context == NULL) {
         SetLastError(ERROR_NOT_ENOUGH_MEMORY);
@@ -293,10 +296,10 @@ VOID IpcPipeQueryInfo(
     //open pipe
     hPipe = NULL;
     if (!IpcOpenObjectMethod(Context, &hPipe, GENERIC_READ)) {
-		
+
         // for pipes created with PIPE_ACCESS_INBOUND open mode 
         // https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
-        
+
         if (!IpcOpenObjectMethod(Context, &hPipe, GENERIC_WRITE | FILE_READ_ATTRIBUTES)) {
             IpcDisplayError(hwndDlg, IpcModeNamedPipes);
             return;
@@ -482,7 +485,7 @@ VOID IpcDlgShowProperties(
 
     Context->lpObjectName = supGetItemText(pDlgContext->ListView, iItem, 0, NULL);
     Context->lpCurrentObjectPath = IpcCreateObjectPathWithName(Context->lpObjectName,
-        (IPC_DIALOG_MODE)pDlgContext->DialogMode);
+        (IPC_DLG_MODE)pDlgContext->DialogMode);
     Context->Tag = (ULONG_PTR)pDlgContext;
 
     RtlSecureZeroMemory(&IpcPages, sizeof(IpcPages));
@@ -586,7 +589,7 @@ INT CALLBACK IpcDlgCompareFunc(
 *
 */
 VOID IpcDlgQueryInfo(
-    _In_ IPC_DIALOG_MODE Mode,
+    _In_ IPC_DLG_MODE Mode,
     _In_ BOOL bRefresh,
     _In_ HWND ListView
 )
@@ -617,15 +620,15 @@ VOID IpcDlgQueryInfo(
 
         RtlInitUnicodeString(&uStr, lpObjectRoot);
         InitializeObjectAttributes(&obja, &uStr, OBJ_CASE_INSENSITIVE, NULL, NULL);
-        
+
         status = NtOpenFile(
-            &hObject, 
-            FILE_LIST_DIRECTORY, 
-            &obja, 
+            &hObject,
+            FILE_LIST_DIRECTORY,
+            &obja,
             &iost,
-            FILE_SHARE_VALID_FLAGS, 
+            FILE_SHARE_VALID_FLAGS,
             0);
-        
+
         if (!NT_SUCCESS(status) || (hObject == NULL))
             __leave;
 
@@ -649,9 +652,9 @@ VOID IpcDlgQueryInfo(
                 bRestartScan //RestartScan
             );
 
-            if ( (!NT_SUCCESS(status)) ||
+            if ((!NT_SUCCESS(status)) ||
                 (!NT_SUCCESS(iost.Status)) ||
-                (iost.Information == 0) )
+                (iost.Information == 0))
             {
                 break;
             }
@@ -701,7 +704,7 @@ VOID IpcDlgQueryInfo(
 */
 BOOL IpcDlgHandleNotify(
     _In_ HWND hwndDlg,
-    _In_ LPARAM lParam    
+    _In_ LPARAM lParam
 )
 {
     LVCOLUMN col;
@@ -804,206 +807,45 @@ VOID IpcDlgHandlePopupMenu(
 }
 
 /*
-* IpcDlgProc
+* IpcDlgOnInit
 *
 * Purpose:
 *
-* Ipc objects window procedure.
+* Ipc dialog WM_INITDIALOG handler.
 *
 */
-INT_PTR CALLBACK IpcDlgProc(
+VOID IpcDlgOnInit(
     _In_  HWND hwndDlg,
-    _In_  UINT uMsg,
-    _In_  WPARAM wParam,
     _In_  LPARAM lParam
 )
 {
-    INT dlgIndex, nSelected;
-    EXTRASCONTEXT* pDlgContext;
+    INT iResId = 0;
+    HICON hIcon;
+    SIZE_T sz = 0;
+    LPWSTR lpObjectsRoot = NULL, lpObjectRelativePath = NULL;
+    EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)lParam;
 
-    if (uMsg == g_WinObj.SettingsChangeMessage) {
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_IPCDLGCONTEXT);
-        if (pDlgContext) {
-            extrasHandleSettingsChange(pDlgContext);
-        }
-        return TRUE;
-    }
-
-    switch (uMsg) {
-    case WM_NOTIFY:
-        return IpcDlgHandleNotify(hwndDlg, lParam);
-
-    case WM_INITDIALOG:
-        SetProp(hwndDlg, T_IPCDLGCONTEXT, (HANDLE)lParam);
-        supCenterWindow(hwndDlg);
-        break;
-
-    case WM_CLOSE:
-        pDlgContext = (EXTRASCONTEXT*)RemoveProp(hwndDlg, T_IPCDLGCONTEXT);
-        if (pDlgContext) {
-
-            ImageList_Destroy(pDlgContext->ImageList);
-
-            dlgIndex = 0;
-            if (pDlgContext->DialogMode == IpcModeMailSlots)
-                dlgIndex = wobjIpcMailSlotsDlgId;
-            else if (pDlgContext->DialogMode == IpcModeNamedPipes)
-                dlgIndex = wobjIpcPipesDlgId;
-
-            if ((dlgIndex == wobjIpcMailSlotsDlgId) ||
-                (dlgIndex == wobjIpcPipesDlgId))
-            {
-                g_WinObj.AuxDialogs[dlgIndex] = NULL;
-            }
-
-            RtlSecureZeroMemory(pDlgContext, sizeof(EXTRASCONTEXT));
-        }
-        return DestroyWindow(hwndDlg);
-
-    case WM_COMMAND:
-
-        switch (GET_WM_COMMAND_ID(wParam, lParam)) {
-
-        case IDCANCEL:
-            SendMessage(hwndDlg, WM_CLOSE, 0, 0);
-            break;
-
-        case ID_IPCLIST_REFRESH:
-            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_IPCDLGCONTEXT);
-            if (pDlgContext) {
-
-                supListViewEnableRedraw(pDlgContext->ListView, FALSE);
-
-                IpcDlgQueryInfo((IPC_DIALOG_MODE)pDlgContext->DialogMode, TRUE, pDlgContext->ListView);
-
-                supListViewEnableRedraw(pDlgContext->ListView, TRUE);
-
-            }
-            break;
-
-        case ID_OBJECT_COPY:
-            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_IPCDLGCONTEXT);
-            if (pDlgContext) {
-                supListViewCopyItemValueToClipboard(pDlgContext->ListView,
-                    pDlgContext->lvItemHit,
-                    pDlgContext->lvColumnHit);
-            }
-            break;
-
-        case ID_OBJECT_PROPERTIES:
-
-            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_IPCDLGCONTEXT);
-            if (pDlgContext) {
-                if (ListView_GetSelectedCount(pDlgContext->ListView)) {
-                    nSelected = ListView_GetSelectionMark(pDlgContext->ListView);
-                    if (nSelected >= 0) {
-                        IpcDlgShowProperties(nSelected, pDlgContext);
-                    }
-                }
-            }
-
-            break;
-
-        default:
-            break;
-        }
-
-        break;
-
-    case WM_CONTEXTMENU:
-
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_IPCDLGCONTEXT);
-        if (pDlgContext) {
-            supHandleContextMenuMsgForListView(hwndDlg,
-                wParam,
-                lParam,
-                pDlgContext->ListView,
-                (pfnPopupMenuHandler)IpcDlgHandlePopupMenu,
-                pDlgContext);
-        }
-        break;
-
-    default:
-        return FALSE;
-    }
-
-    return TRUE;
-}
-
-/*
-* extrasCreateIpcDialog
-*
-* Purpose:
-*
-* Create and initialize IPC objects dialog.
-*
-*/
-VOID extrasCreateIpcDialog(
-    _In_ HWND hwndParent,
-    _In_ IPC_DIALOG_MODE Mode
-)
-{
-    INT      ResourceId = 0, dlgIndex;
-    HWND     hwndDlg;
-    HICON    hIcon;
-    SIZE_T   sz = 0;
-    LPWSTR   lpObjectsRoot = NULL, lpObjectRelativePath = NULL;
-
-    EXTRASCONTEXT* pDlgContext;
-
-    switch (Mode) {
-    case IpcModeMailSlots:
-        dlgIndex = wobjIpcMailSlotsDlgId;
-        break;
-    case IpcModeNamedPipes:
-        dlgIndex = wobjIpcPipesDlgId;
-        break;
-    default:
-        return;
-    }
-
-    //
-    // Allow only one dialog, recreate it if exist.
-    //
-    if (g_WinObj.AuxDialogs[dlgIndex]) {
-        SendMessage(g_WinObj.AuxDialogs[dlgIndex], WM_CLOSE, 0, 0);
-    }
-
-    RtlSecureZeroMemory(&IpcDlgContext[Mode], sizeof(EXTRASCONTEXT));
-    pDlgContext = &IpcDlgContext[Mode];
-    pDlgContext->DialogMode = Mode;
-
-    hwndDlg = CreateDialogParam(g_WinObj.hInstance, MAKEINTRESOURCE(IDD_DIALOG_IPCOBJECTS),
-        hwndParent, &IpcDlgProc, (LPARAM)pDlgContext);
-
-    if (hwndDlg == NULL)
-        return;
+    SetProp(hwndDlg, T_IPCDLGCONTEXT, (HANDLE)lParam);
+    supCenterWindowSpecifyParent(hwndDlg, g_WinObj.MainWindow);
 
     pDlgContext->lvColumnHit = -1;
     pDlgContext->lvItemHit = -1;
     pDlgContext->hwndDlg = hwndDlg;
-    g_WinObj.AuxDialogs[dlgIndex] = hwndDlg;
 
-    switch (Mode) {
+    switch (pDlgContext->DialogMode) {
     case IpcModeMailSlots:
-        ResourceId = IDI_ICON_MAILSLOT;
+        iResId = IDI_ICON_MAILSLOT;
         sz = DEVICE_MAILSLOT_LENGTH;
         lpObjectsRoot = DEVICE_MAILSLOT;
         SetWindowText(hwndDlg, TEXT("Mailslots"));
         break;
-    case IpcModeNamedPipes:
-        ResourceId = IDI_ICON_PIPE;
+    default:
+        iResId = IDI_ICON_PIPE;
         sz = DEVICE_NAMED_PIPE_LENGTH;
         lpObjectsRoot = DEVICE_NAMED_PIPE;
         SetWindowText(hwndDlg, TEXT("Pipes"));
         break;
-    default:
-        lpObjectsRoot = NULL;
-        break;
     }
-
-    if (lpObjectsRoot == NULL)
-        return;
 
     lpObjectRelativePath = (LPWSTR)supHeapAlloc(sz + 100);
     if (lpObjectRelativePath) {
@@ -1013,8 +855,6 @@ VOID extrasCreateIpcDialog(
         SetDlgItemText(hwndDlg, ID_IPCROOT, lpObjectRelativePath);
         supHeapFree(lpObjectRelativePath);
     }
-    else
-        return;
 
     //setup dlg listview
     pDlgContext->ListView = GetDlgItem(hwndDlg, ID_IPCOBJECTSLIST);
@@ -1023,7 +863,7 @@ VOID extrasCreateIpcDialog(
         if (pDlgContext->ImageList) {
 
             //set object icon
-            hIcon = (HICON)LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(ResourceId), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
+            hIcon = (HICON)LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(iResId), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR);
             if (hIcon) {
                 ImageList_ReplaceIcon(pDlgContext->ImageList, -1, hIcon);
                 DestroyIcon(hIcon);
@@ -1058,8 +898,207 @@ VOID extrasCreateIpcDialog(
 
         supListViewEnableRedraw(pDlgContext->ListView, FALSE);
 
-        IpcDlgQueryInfo((IPC_DIALOG_MODE)pDlgContext->DialogMode, FALSE, pDlgContext->ListView);
+        IpcDlgQueryInfo((IPC_DLG_MODE)pDlgContext->DialogMode, FALSE, pDlgContext->ListView);
 
         supListViewEnableRedraw(pDlgContext->ListView, TRUE);
     }
+}
+
+/*
+* IpcDlgProc
+*
+* Purpose:
+*
+* Ipc objects window procedure.
+*
+*/
+INT_PTR CALLBACK IpcDlgProc(
+    _In_  HWND hwndDlg,
+    _In_  UINT uMsg,
+    _In_  WPARAM wParam,
+    _In_  LPARAM lParam
+)
+{
+    INT nSelected;
+    EXTRASCONTEXT* pDlgContext;
+
+    if (uMsg == g_WinObj.SettingsChangeMessage) {
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_IPCDLGCONTEXT);
+        if (pDlgContext) {
+            extrasHandleSettingsChange(pDlgContext);
+        }
+        return TRUE;
+    }
+
+    switch (uMsg) {
+    case WM_NOTIFY:
+        return IpcDlgHandleNotify(hwndDlg, lParam);
+
+    case WM_INITDIALOG:
+        IpcDlgOnInit(hwndDlg, lParam);
+        break;
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+
+    case WM_CLOSE:
+        pDlgContext = (EXTRASCONTEXT*)RemoveProp(hwndDlg, T_IPCDLGCONTEXT);
+        if (pDlgContext) {
+            ImageList_Destroy(pDlgContext->ImageList);
+        }
+        DestroyWindow(hwndDlg);
+        break;
+
+    case WM_COMMAND:
+
+        switch (GET_WM_COMMAND_ID(wParam, lParam)) {
+
+        case IDCANCEL:
+            SendMessage(hwndDlg, WM_CLOSE, 0, 0);
+            break;
+
+        case ID_IPCLIST_REFRESH:
+            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_IPCDLGCONTEXT);
+            if (pDlgContext) {
+
+                supListViewEnableRedraw(pDlgContext->ListView, FALSE);
+
+                IpcDlgQueryInfo((IPC_DLG_MODE)pDlgContext->DialogMode, TRUE, pDlgContext->ListView);
+
+                supListViewEnableRedraw(pDlgContext->ListView, TRUE);
+
+            }
+            break;
+
+        case ID_OBJECT_COPY:
+            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_IPCDLGCONTEXT);
+            if (pDlgContext) {
+                supListViewCopyItemValueToClipboard(pDlgContext->ListView,
+                    pDlgContext->lvItemHit,
+                    pDlgContext->lvColumnHit);
+            }
+            break;
+
+        case ID_OBJECT_PROPERTIES:
+
+            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_IPCDLGCONTEXT);
+            if (pDlgContext) {
+                if (ListView_GetSelectedCount(pDlgContext->ListView)) {
+                    nSelected = ListView_GetSelectionMark(pDlgContext->ListView);
+                    if (nSelected >= 0) {
+                        IpcDlgShowProperties(nSelected, pDlgContext);
+                    }
+                }
+            }
+
+            break;
+        }
+
+        break;
+
+    case WM_CONTEXTMENU:
+
+        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_IPCDLGCONTEXT);
+        if (pDlgContext) {
+            supHandleContextMenuMsgForListView(hwndDlg,
+                wParam,
+                lParam,
+                pDlgContext->ListView,
+                (pfnPopupMenuHandler)IpcDlgHandlePopupMenu,
+                pDlgContext);
+        }
+        break;
+
+    }
+
+    return FALSE;
+}
+
+/*
+* extrasIpcDialogWorkerThread
+*
+* Purpose:
+*
+* IPC objects dialog worker thread.
+*
+*/
+DWORD extrasIpcDialogWorkerThread(
+    _In_ PVOID Parameter
+)
+{
+    HWND hwndDlg;
+    BOOL bResult;
+    MSG message;
+    HACCEL acceleratorTable;
+    HANDLE workerThread;
+    FAST_EVENT fastEvent;
+    EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)Parameter;
+
+    hwndDlg = CreateDialogParam(g_WinObj.hInstance,
+        MAKEINTRESOURCE(IDD_DIALOG_IPCOBJECTS),
+        0,
+        &IpcDlgProc,
+        (LPARAM)pDlgContext);
+
+    acceleratorTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
+
+    fastEvent = IpcDlgInitializedEvents[pDlgContext->DialogMode];
+
+    supSetFastEvent(&fastEvent);
+
+    do {
+
+        bResult = GetMessage(&message, NULL, 0, 0);
+        if (bResult == -1)
+            break;
+
+        if (IsDialogMessage(hwndDlg, &message)) {
+            TranslateAccelerator(hwndDlg, acceleratorTable, &message);
+        }
+        else {
+            TranslateMessage(&message);
+            DispatchMessage(&message);
+        }
+
+    } while (bResult != 0);
+
+    supResetFastEvent(&fastEvent);
+
+    if (acceleratorTable)
+        DestroyAcceleratorTable(acceleratorTable);
+
+    workerThread = IpcDlgThreadHandles[pDlgContext->DialogMode];
+    if (workerThread) {
+        NtClose(workerThread);
+        IpcDlgThreadHandles[pDlgContext->DialogMode] = NULL;
+    }
+
+    return 0;
+}
+
+/*
+* extrasCreateIpcDialog
+*
+* Purpose:
+*
+* Run IPC objects dialog worker thread.
+*
+*/
+VOID extrasCreateIpcDialog(
+    _In_ IPC_DLG_MODE Mode
+)
+{
+    if (Mode < 0 || Mode >= IpcMaxMode)
+        return;
+
+    if (!IpcDlgThreadHandles[Mode]) {
+
+        RtlSecureZeroMemory(&IpcDlgContext[Mode], sizeof(EXTRASCONTEXT));
+        IpcDlgContext[Mode].DialogMode = Mode;
+        IpcDlgThreadHandles[Mode] = supCreateDialogWorkerThread(extrasIpcDialogWorkerThread, (PVOID)&IpcDlgContext[Mode], 0);
+        supWaitForFastEvent(&IpcDlgInitializedEvents[Mode], NULL);
+
+    }
+
 }

@@ -4,9 +4,9 @@
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.93
+*  VERSION:     1.94
 *
-*  DATE:        22 Apr 2022
+*  DATE:        02 Jun 2022
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -88,6 +88,7 @@
 #include <setupapi.h>
 #include <shlwapi.h>
 #include <Richedit.h>
+#include <assert.h>
 
 #include "resource.h"
 #include "sdk/extdef.h"
@@ -145,24 +146,32 @@ extern pqsort rtl_qsort;
 #define RtlStringCchPrintfSecure rtl_swprintf_s
 #define RtlQuickSort rtl_qsort
 
-typedef struct _WINOBJ_PORT_GLOBAL {
-    BOOLEAN Initialized;
-    USHORT AlpcPortTypeIndex;
-} WINOBJ_PORT_GLOBAL, * PWINOBJ_PORT_GLOBAL;
-
 typedef struct _WINOBJ_GLOBALS {
     BOOLEAN IsWine;
-    BOOLEAN EnableFullMitigations;
     BOOLEAN ListViewDisplayGrid;
+
+    ATOM MainWindowClassAtom;
+    ATOM TreeListAtom;
+
+    HIMAGELIST ToolBarMenuImages;
+    HIMAGELIST ListViewImages;
+
+    HWND MainWindow;
+    HWND MainWindowStatusBar;
+    HWND MainWindowToolBar;
+    HWND MainWindowSplitter;
+
+    HWND ObjectListView;
+    HWND ObjectTreeView;
+
     UINT SettingsChangeMessage;
     ULONG CurrentDPI;
-    WINOBJ_PORT_GLOBAL AlpcPortTypeInfo;
     HINSTANCE hInstance;
     HANDLE Heap;
     LPWSTR CurrentObjectPath;
     pfnHtmlHelpW HtmlHelpW;
     RTL_OSVERSIONINFOW osver;
-    HWND AuxDialogs[wobjMaxDlgId];
+
     WCHAR szTempDirectory[MAX_PATH + 1]; //not including backslash
     WCHAR szWindowsDirectory[MAX_PATH + 1]; //not including backslash
     WCHAR szSystemDirectory[MAX_PATH + 1]; //not including backslash
@@ -170,3 +179,13 @@ typedef struct _WINOBJ_GLOBALS {
 } WINOBJ_GLOBALS, *PWINOBJ_GLOBALS;
 
 extern WINOBJ_GLOBALS g_WinObj;
+
+#define g_ListViewImages g_WinObj.ListViewImages
+#define g_ToolBarMenuImages g_WinObj.ToolBarMenuImages
+#define g_hwndObjectList g_WinObj.ObjectListView
+#define g_hwndObjectTree g_WinObj.ObjectTreeView
+#define g_hwndMain g_WinObj.MainWindow
+#define g_hwndStatusBar g_WinObj.MainWindowStatusBar
+#define g_hwndToolBar g_WinObj.MainWindowToolBar
+#define g_hwndSplitter g_WinObj.MainWindowSplitter
+

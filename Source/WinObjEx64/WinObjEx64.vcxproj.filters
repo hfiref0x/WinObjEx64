@@ -31,9 +31,6 @@
     <Filter Include="Source Files\drivers">
       <UniqueIdentifier>{da588ca3-321f-4491-adcb-55b1d888e133}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\tinyaes">
-      <UniqueIdentifier>{ae7f1c88-69d2-406e-a44a-9dddafd020c3}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\treelist">
       <UniqueIdentifier>{34095c79-e50f-47a4-9daa-c1f74616bcfe}</UniqueIdentifier>
     </Filter>
@@ -219,9 +216,6 @@
     <ClCompile Include="..\Shared\treelist\treelist.c">
       <Filter>Source Files\treelist</Filter>
     </ClCompile>
-    <ClCompile Include="tinyaes\aes.c">
-      <Filter>Source Files\tinyaes</Filter>
-    </ClCompile>
     <ClCompile Include="log\log.c">
       <Filter>Source Files\log</Filter>
     </ClCompile>
@@ -254,6 +248,9 @@
     </ClCompile>
     <ClCompile Include="extras\extrasCmOpt.c">
       <Filter>Source Files\extras</Filter>
+    </ClCompile>
+    <ClCompile Include="sysinfoDlg.c">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -415,9 +412,6 @@
     <ClInclude Include="..\Shared\ntos\halamd64.h">
       <Filter>Ntos</Filter>
     </ClInclude>
-    <ClInclude Include="tinyaes\aes.h">
-      <Filter>Source Files\tinyaes</Filter>
-    </ClInclude>
     <ClInclude Include="symparser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -465,6 +459,12 @@
     </ClInclude>
     <ClInclude Include="extras\extrasCmOpt.h">
       <Filter>Source Files\extras</Filter>
+    </ClInclude>
+    <ClInclude Include="extras\extrasSSDTsup.h">
+      <Filter>Source Files\extras</Filter>
+    </ClInclude>
+    <ClInclude Include="sysinfoDlg.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

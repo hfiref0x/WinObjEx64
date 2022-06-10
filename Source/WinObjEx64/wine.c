@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2020
+*  (C) COPYRIGHT AUTHORS, 2019 - 2022
 *
 *  TITLE:       WINE.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.94
 *
-*  DATE:        01 Dec 2019
+*  DATE:        07 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -60,7 +60,7 @@ const char* wine_get_version(void)
 #else
 const char* wine_get_version(void)
 {
-    return "4.9";
+    return "6.0";
 }
 #endif
 

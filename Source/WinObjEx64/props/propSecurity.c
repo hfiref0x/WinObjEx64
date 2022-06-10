@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       PROPSECURITY.C
 *
-*  VERSION:     1.90
+*  VERSION:     1.94
 *
-*  DATE:        11 May 2021
+*  DATE:        04 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -503,10 +503,8 @@ HRESULT propSecurityConstructor(
 
         status = supQueryObjectInformation(hObject,
             ObjectTypeInformation,
-            (PVOID*)&TypeInfo,
-            &bytesNeeded,
-            (PNTSUPMEMALLOC)supHeapAlloc,
-            (PNTSUPMEMFREE)supHeapFree);
+            &TypeInfo,
+            &bytesNeeded);
 
         if (!NT_SUCCESS(status)) {
             hResult = HRESULT_FROM_WIN32(RtlNtStatusToDosError(status));

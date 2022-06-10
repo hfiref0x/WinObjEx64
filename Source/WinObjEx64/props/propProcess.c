@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPPROCESS.C
 *
-*  VERSION:     1.93
+*  VERSION:     1.94
 *
-*  DATE:        11 May 2022
+*  DATE:        03 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -141,30 +141,24 @@ VOID ProcessShowProperties(
 
     WCHAR szBuffer[100];
 
-    __try {
-        //
-        // Query process id.
-        //
-        szBuffer[0] = 0;
-        supGetItemText2(hwndListView, iItem, 1, szBuffer, RTL_NUMBER_OF(szBuffer));
-        processId = UlongToHandle(_strtoul(szBuffer));
+    //
+    // Query process id.
+    //
+    szBuffer[0] = 0;
+    supGetItemText2(hwndListView, iItem, 1, szBuffer, RTL_NUMBER_OF(szBuffer));
+    processId = UlongToHandle(_strtoul(szBuffer));
 
-        //
-        // Query process image filename and show shell properties dialog.
-        //
+    //
+    // Query process image filename and show shell properties dialog.
+    //
+    if (NT_SUCCESS(supQueryProcessImageFileNameWin32(processId, &pusFileName))) {
 
-        if (NT_SUCCESS(supQueryProcessImageFileNameWin32(processId, &pusFileName))) {
+        if (pusFileName->Buffer && pusFileName->Length)
+            supShowProperties(hwndDlg, pusFileName->Buffer);
 
-            if (pusFileName->Buffer && pusFileName->Length)
-                supShowProperties(hwndDlg, pusFileName->Buffer);
-
-            supHeapFree(pusFileName);
-        }
-
+        supHeapFree(pusFileName);
     }
-    __except (WOBJ_EXCEPTION_FILTER) {
-        return;
-    }
+
 }
 
 /*
@@ -255,48 +249,41 @@ VOID ProcessQueryInfo(
     HICON           hIcon = NULL;
     PUNICODE_STRING pusFileName = NULL;
 
-    __try {
-        *pProcessIcon = NULL;
-        *pbIs32 = FALSE;
+    *pProcessIcon = NULL;
+    *pbIs32 = FALSE;
 
-        ntStatus = supOpenProcess((HANDLE)ProcessId,
-            PROCESS_QUERY_LIMITED_INFORMATION,
-            &hProcess);
+    ntStatus = supOpenProcess((HANDLE)ProcessId,
+        PROCESS_QUERY_LIMITED_INFORMATION,
+        &hProcess);
+
+    if (NT_SUCCESS(ntStatus)) {
+
+        //
+        // Query if this is wow64 process.
+        //
+        *pbIs32 = supIsProcess32bit(hProcess);
+
+        //
+        // Query process icon, first query win32 imagefilename then parse image resources.
+        //
+        ntStatus = supQueryProcessInformation(hProcess,
+            ProcessImageFileNameWin32,
+            &pusFileName,
+            NULL);
 
         if (NT_SUCCESS(ntStatus)) {
-
-            //
-            // Query if this is wow64 process.
-            //
-            *pbIs32 = supIsProcess32bit(hProcess);
-
-            //
-            // Query process icon, first query win32 imagefilename then parse image resources.
-            //
-            ntStatus = supQueryProcessInformation(hProcess,
-                ProcessImageFileNameWin32,
-                (PVOID*)&pusFileName,
-                NULL,
-                (PNTSUPMEMALLOC)supHeapAlloc,
-                (PNTSUPMEMFREE)supHeapFree);
-
-            if (NT_SUCCESS(ntStatus)) {
-                if (pusFileName->Buffer && pusFileName->Length) {
-                    hIcon = supGetMainIcon(pusFileName->Buffer, 16, 16);
-                    if (hIcon) {
-                        *pProcessIcon = hIcon;
-                    }
+            if (pusFileName->Buffer && pusFileName->Length) {
+                hIcon = supGetMainIcon(pusFileName->Buffer, 16, 16);
+                if (hIcon) {
+                    *pProcessIcon = hIcon;
                 }
-                supHeapFree(pusFileName);
             }
-
-            NtClose(hProcess);
+            supHeapFree(pusFileName);
         }
 
+        NtClose(hProcess);
     }
-    __except (WOBJ_EXCEPTION_FILTER) {
-        return;
-    }
+
 }
 
 /*

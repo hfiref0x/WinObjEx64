@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       PROPDLG.C
 *
-*  VERSION:     1.90
+*  VERSION:     1.94
 *
-*  DATE:        11 May 2021
+*  DATE:        06 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -31,7 +31,7 @@ HWND hPrevFocus;
 
 //maximum number of possible pages, include space reserved for future use
 #define MAX_PAGE 10
-HPROPSHEETPAGE psp[MAX_PAGE];
+HPROPSHEETPAGE PropPages[MAX_PAGE];
 
 //original window procedure of PropertySheet
 WNDPROC PropSheetOriginalWndProc = NULL;
@@ -481,7 +481,7 @@ LRESULT WINAPI PropSheetCustomWndProc(
                 g_DesktopPropWindow = NULL;
             }
             //restore previous focus
-            if (hPrevFocus) {
+            if (hPrevFocus && IsWindow(hPrevFocus)) {
                 SetFocus(hPrevFocus);
             }
             g_PropWindow = NULL;
@@ -575,6 +575,267 @@ VOID propCopyUnnamedObject(
     }
 }
 
+HPROPSHEETPAGE propAddPage(
+    _In_ LPCWSTR pszTitle,
+    _In_ DLGPROC pfnDlgProc,
+    _In_ LPCWSTR pszTemplate,
+    _In_ LPARAM lParam
+)
+{
+    PROPSHEETPAGE propPage;
+
+    RtlSecureZeroMemory(&propPage, sizeof(propPage));
+    propPage.dwSize = sizeof(PROPSHEETPAGE);
+    propPage.dwFlags = PSP_DEFAULT | PSP_USETITLE;
+    propPage.hInstance = g_WinObj.hInstance;
+    propPage.lParam = lParam;
+    propPage.pfnDlgProc = pfnDlgProc;
+    propPage.pszTemplate = pszTemplate;
+    propPage.pszTitle = pszTitle;
+
+    return CreatePropertySheetPage(&propPage);
+}
+
+INT propCreatePages(
+    _In_ PROP_OBJECT_INFO* Context
+)
+{
+    BOOL IsDriverAssisted;
+    INT nPages = 0;
+    LPCWSTR pszTemplate;
+    HPROPSHEETPAGE hSecurityPage;
+
+    IsDriverAssisted = kdConnectDriver();
+
+    nPages = 0;
+    RtlSecureZeroMemory(PropPages, sizeof(PropPages));
+
+    //
+    // Properties: 
+    // Basic->[Object]->[Process]->[Desktops]->[Registry]->Type->[Security]
+    //
+
+    //
+    // Basic Info Page.
+    //
+
+    //
+    // Select dialog for basic info.
+    //
+    switch (Context->TypeIndex) {
+    case ObjectTypeTimer:
+        pszTemplate = MAKEINTRESOURCE(IDD_PROP_TIMER);
+        break;
+    case ObjectTypeMutant:
+        pszTemplate = MAKEINTRESOURCE(IDD_PROP_MUTANT);
+        break;
+    case ObjectTypeSemaphore:
+        pszTemplate = MAKEINTRESOURCE(IDD_PROP_SEMAPHORE);
+        break;
+    case ObjectTypeJob:
+        pszTemplate = MAKEINTRESOURCE(IDD_PROP_JOB);
+        break;
+    case ObjectTypeWinstation:
+        pszTemplate = MAKEINTRESOURCE(IDD_PROP_WINSTATION);
+        break;
+    case ObjectTypeEvent:
+        pszTemplate = MAKEINTRESOURCE(IDD_PROP_EVENT);
+        break;
+    case ObjectTypeSymbolicLink:
+        pszTemplate = MAKEINTRESOURCE(IDD_PROP_SYMLINK);
+        break;
+    case ObjectTypeKey:
+        pszTemplate = MAKEINTRESOURCE(IDD_PROP_KEY);
+        break;
+    case ObjectTypeSection:
+        pszTemplate = MAKEINTRESOURCE(IDD_PROP_SECTION);
+        break;
+    case ObjectTypeDriver:
+        pszTemplate = MAKEINTRESOURCE(IDD_PROP_DRIVER);
+        break;
+    case ObjectTypeDevice:
+        pszTemplate = MAKEINTRESOURCE(IDD_PROP_DEVICE);
+        break;
+    case ObjectTypeIoCompletion:
+        pszTemplate = MAKEINTRESOURCE(IDD_PROP_IOCOMPLETION);
+        break;
+    case ObjectTypePort:
+        pszTemplate = MAKEINTRESOURCE(IDD_PROP_ALPCPORT);
+        break;
+    case ObjectTypeProcess:
+        pszTemplate = MAKEINTRESOURCE(IDD_PROP_PROCESS);
+        break;
+    case ObjectTypeThread:
+        pszTemplate = MAKEINTRESOURCE(IDD_PROP_THREAD);
+        break;
+    case ObjectTypeToken:
+        pszTemplate = MAKEINTRESOURCE(IDD_PROP_TOKEN);
+        break;
+    case ObjectTypeType:
+    default:
+        pszTemplate = MAKEINTRESOURCE(IDD_PROP_BASIC);
+        break;
+    }
+
+    PropPages[nPages++] = propAddPage(
+        TEXT("Basic"),
+        BasicPropDialogProc,
+        pszTemplate,
+        (LPARAM)Context);
+
+    //
+    // Create Objects page for supported types.
+    //
+    if (IsDriverAssisted) {
+        switch (Context->TypeIndex) {
+        case ObjectTypeDirectory:
+        case ObjectTypeDriver:
+        case ObjectTypeDevice:
+        case ObjectTypeEvent:
+        case ObjectTypeMutant:
+        case ObjectTypePort:
+        case ObjectTypeSemaphore:
+        case ObjectTypeTimer:
+        case ObjectTypeIoCompletion:
+        case ObjectTypeFltConnPort:
+        case ObjectTypeType:
+        case ObjectTypeCallback:
+        case ObjectTypeSymbolicLink:
+
+            PropPages[nPages++] = propAddPage(
+                TEXT("Object"),
+                ObjectDumpDialogProc,
+                MAKEINTRESOURCE(IDD_PROP_OBJECTDUMP),
+                (LPARAM)Context);
+
+            break;
+        }
+    }
+
+    //
+    // Create specific page for Process/Thread objects.
+    //
+    if ((Context->TypeIndex == ObjectTypeProcess) ||
+        (Context->TypeIndex == ObjectTypeThread))
+    {
+        PropPages[nPages++] = propAddPage(
+            TEXT("Token"),
+            TokenPageDialogProc,
+            MAKEINTRESOURCE(IDD_DIALOG_TOKEN),
+            (LPARAM)Context);
+    }
+
+    //
+    // Create additional page(s), depending on object type.
+    //
+    switch (Context->TypeIndex) {
+    case ObjectTypeDirectory:
+    case ObjectTypePort:
+    case ObjectTypeFltComnPort:
+    case ObjectTypeFltConnPort:
+    case ObjectTypeEvent:
+    case ObjectTypeMutant:
+    case ObjectTypeSemaphore:
+    case ObjectTypeSection:
+    case ObjectTypeSymbolicLink:
+    case ObjectTypeTimer:
+    case ObjectTypeJob:
+    case ObjectTypeSession:
+    case ObjectTypeIoCompletion:
+    case ObjectTypeMemoryPartition:
+    case ObjectTypeProcess:
+    case ObjectTypeThread:
+    case ObjectTypeWinstation:
+    case ObjectTypeToken:
+
+        PropPages[nPages++] = propAddPage(
+            TEXT("Process"),
+            ProcessListDialogProc,
+            MAKEINTRESOURCE(IDD_PROP_PROCESSLIST),
+            (LPARAM)Context);
+
+        //
+        // Add desktop list for selected desktop, located here because of sheets order.
+        //
+        if (Context->TypeIndex == ObjectTypeWinstation) {
+
+            PropPages[nPages++] = propAddPage(
+                TEXT("Desktops"),
+                DesktopListDialogProc,
+                MAKEINTRESOURCE(IDD_PROP_DESKTOPS),
+                (LPARAM)Context);
+        }
+
+        break;
+    case ObjectTypeDriver:
+        //
+        // Add registry page.
+        //
+        PropPages[nPages++] = propAddPage(
+            TEXT("Registry"),
+            DriverRegistryDialogProc,
+            MAKEINTRESOURCE(IDD_PROP_SERVICE),
+            (LPARAM)Context);
+
+        break;
+    }
+
+    //
+    // Add Section object specific page, driver assistance required.
+    //
+    // This feature implemented only for Windows 10 as structures are too variable.
+    //
+
+    if (g_NtBuildNumber >= NT_WIN10_THRESHOLD1 &&
+        Context->TypeIndex == ObjectTypeSection
+        && IsDriverAssisted)
+    {
+        PropPages[nPages++] = propAddPage(
+            TEXT("Object"),
+            SectionPropertiesDialogProc,
+            MAKEINTRESOURCE(IDD_PROP_OBJECTDUMP),
+            (LPARAM)Context);
+    }
+
+    //
+    // Add ALPC port specific page, driver assistance required.
+    //
+    if (Context->TypeIndex == ObjectTypePort && IsDriverAssisted) {
+
+        PropPages[nPages++] = propAddPage(
+            TEXT("Connections"),
+            AlpcPortListDialogProc,
+            MAKEINTRESOURCE(IDD_PROP_ALPCPORTLIST),
+            (LPARAM)Context);
+    }
+
+    //
+    // Type Info Page.
+    //
+    PropPages[nPages++] = propAddPage(
+        TEXT("Type"),
+        TypePropDialogProc,
+        MAKEINTRESOURCE(IDD_PROP_TYPE),
+        (LPARAM)Context);
+
+    //
+    // Create Security Dialog if available.
+    //
+    hSecurityPage = propSecurityCreatePage(
+        Context,                                            //Context
+        (POPENOBJECTMETHOD)&propOpenCurrentObject,              //OpenObjectMethod
+        (PCLOSEOBJECTMETHOD)&propCloseCurrentObject,            //CloseObjectMethod
+        SI_EDIT_OWNER | SI_EDIT_PERMS |                         //psiFlags
+        SI_ADVANCED | SI_NO_ACL_PROTECT | SI_NO_TREE_APPLY |
+        SI_PAGE_TITLE
+    );
+    if (hSecurityPage != NULL) {
+        PropPages[nPages++] = hSecurityPage;
+    }
+
+    return nPages;
+}
+
 /*
 * propCreateDialog
 *
@@ -589,12 +850,10 @@ VOID propCreateDialog(
     _In_ PROP_DIALOG_CREATE_SETTINGS* Settings
 )
 {
-    BOOL              IsSimpleContext = FALSE, IsDriverAssisted = FALSE;
+    BOOL              IsSimpleContext = FALSE;
     INT               nPages;
-    HWND              hwndDlg;
+    HWND              hwnd, topLevelOwner;
     PROP_OBJECT_INFO* propContext = NULL;
-    HPROPSHEETPAGE    SecurityPage;
-    PROPSHEETPAGE     Page;
     PROPSHEETHEADER   PropHeader;
     WCHAR             szCaption[MAX_PATH * 2];
 
@@ -605,7 +864,6 @@ VOID propCreateDialog(
         return;
 
     IsSimpleContext = (Settings->NamespaceObject != NULL) || (Settings->UnnamedObject != NULL);
-    IsDriverAssisted = kdConnectDriver();
 
     //
     // Allocate context variable, copy name, type, object path.
@@ -644,259 +902,7 @@ VOID propCreateDialog(
         hPrevFocus = GetFocus();
     }
 
-    nPages = 0;
-    RtlSecureZeroMemory(psp, sizeof(psp));
-
-    //
-    // Properties: 
-    // Basic->[Object]->[Process]->[Desktops]->[Registry]->Type->[Security]
-    //
-
-    //
-    // Basic Info Page.
-    //
-    RtlSecureZeroMemory(&Page, sizeof(Page));
-    Page.dwSize = sizeof(PROPSHEETPAGE);
-    Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
-    Page.hInstance = g_WinObj.hInstance;
-
-    //
-    // Select dialog for basic info.
-    //
-    switch (propContext->TypeIndex) {
-    case ObjectTypeTimer:
-        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_TIMER);
-        break;
-    case ObjectTypeMutant:
-        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_MUTANT);
-        break;
-    case ObjectTypeSemaphore:
-        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_SEMAPHORE);
-        break;
-    case ObjectTypeJob:
-        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_JOB);
-        break;
-    case ObjectTypeWinstation:
-        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_WINSTATION);
-        break;
-    case ObjectTypeEvent:
-        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_EVENT);
-        break;
-    case ObjectTypeSymbolicLink:
-        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_SYMLINK);
-        break;
-    case ObjectTypeKey:
-        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_KEY);
-        break;
-    case ObjectTypeSection:
-        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_SECTION);
-        break;
-    case ObjectTypeDriver:
-        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_DRIVER);
-        break;
-    case ObjectTypeDevice:
-        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_DEVICE);
-        break;
-    case ObjectTypeIoCompletion:
-        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_IOCOMPLETION);
-        break;
-    case ObjectTypePort:
-        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_ALPCPORT);
-        break;
-    case ObjectTypeProcess:
-        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_PROCESS);
-        break;
-    case ObjectTypeThread:
-        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_THREAD);
-        break;
-    case ObjectTypeToken:
-        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_TOKEN);
-        break;
-    case ObjectTypeType:
-    default:
-        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_BASIC);
-        break;
-    }
-    Page.pfnDlgProc = BasicPropDialogProc;
-    Page.pszTitle = TEXT("Basic");
-    Page.lParam = (LPARAM)propContext;
-    psp[nPages++] = CreatePropertySheetPage(&Page);
-
-    //
-    // Create Objects page for supported types.
-    //
-    if (IsDriverAssisted) {
-        switch (propContext->TypeIndex) {
-        case ObjectTypeDirectory:
-        case ObjectTypeDriver:
-        case ObjectTypeDevice:
-        case ObjectTypeEvent:
-        case ObjectTypeMutant:
-        case ObjectTypePort:
-        case ObjectTypeSemaphore:
-        case ObjectTypeTimer:
-        case ObjectTypeIoCompletion:
-        case ObjectTypeFltConnPort:
-        case ObjectTypeType:
-        case ObjectTypeCallback:
-        case ObjectTypeSymbolicLink:
-            RtlSecureZeroMemory(&Page, sizeof(Page));
-            Page.dwSize = sizeof(PROPSHEETPAGE);
-            Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
-            Page.hInstance = g_WinObj.hInstance;
-            Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_OBJECTDUMP);
-            Page.pfnDlgProc = ObjectDumpDialogProc;
-            Page.pszTitle = TEXT("Object");
-            Page.lParam = (LPARAM)propContext;
-            psp[nPages++] = CreatePropertySheetPage(&Page);
-            break;
-        }
-    }
-
-    //
-    // Create specific page for Process/Thread objects.
-    //
-    if ((propContext->TypeIndex == ObjectTypeProcess) ||
-        (propContext->TypeIndex == ObjectTypeThread))
-    {
-        RtlSecureZeroMemory(&Page, sizeof(Page));
-        Page.dwSize = sizeof(PROPSHEETPAGE);
-        Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
-        Page.hInstance = g_WinObj.hInstance;
-        Page.pszTemplate = MAKEINTRESOURCE(IDD_DIALOG_TOKEN);
-        Page.pfnDlgProc = TokenPageDialogProc;
-        Page.pszTitle = TEXT("Token");
-        Page.lParam = (LPARAM)propContext;
-        psp[nPages++] = CreatePropertySheetPage(&Page);
-    }
-
-    //
-    // Create additional page(s), depending on object type.
-    //
-    switch (propContext->TypeIndex) {
-    case ObjectTypeDirectory:
-    case ObjectTypePort:
-    case ObjectTypeFltComnPort:
-    case ObjectTypeFltConnPort:
-    case ObjectTypeEvent:
-    case ObjectTypeMutant:
-    case ObjectTypeSemaphore:
-    case ObjectTypeSection:
-    case ObjectTypeSymbolicLink:
-    case ObjectTypeTimer:
-    case ObjectTypeJob:
-    case ObjectTypeSession:
-    case ObjectTypeIoCompletion:
-    case ObjectTypeMemoryPartition:
-    case ObjectTypeProcess:
-    case ObjectTypeThread:
-    case ObjectTypeWinstation:
-    case ObjectTypeToken:
-        RtlSecureZeroMemory(&Page, sizeof(Page));
-        Page.dwSize = sizeof(PROPSHEETPAGE);
-        Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
-        Page.hInstance = g_WinObj.hInstance;
-        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_PROCESSLIST);
-        Page.pfnDlgProc = ProcessListDialogProc;
-        Page.pszTitle = TEXT("Process");
-        Page.lParam = (LPARAM)propContext;
-        psp[nPages++] = CreatePropertySheetPage(&Page);
-
-        //
-        // Add desktop list for selected desktop, located here because of sheets order.
-        //
-        if (propContext->TypeIndex == ObjectTypeWinstation) {
-            RtlSecureZeroMemory(&Page, sizeof(Page));
-            Page.dwSize = sizeof(PROPSHEETPAGE);
-            Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
-            Page.hInstance = g_WinObj.hInstance;
-            Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_DESKTOPS);
-            Page.pfnDlgProc = DesktopListDialogProc;
-            Page.pszTitle = TEXT("Desktops");
-            Page.lParam = (LPARAM)propContext;
-            psp[nPages++] = CreatePropertySheetPage(&Page);
-        }
-
-        break;
-    case ObjectTypeDriver:
-        //
-        // Add registry page.
-        //
-        RtlSecureZeroMemory(&Page, sizeof(Page));
-        Page.dwSize = sizeof(PROPSHEETPAGE);
-        Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
-        Page.hInstance = g_WinObj.hInstance;
-        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_SERVICE);
-        Page.pfnDlgProc = DriverRegistryDialogProc;
-        Page.pszTitle = TEXT("Registry");
-        Page.lParam = (LPARAM)propContext;
-        psp[nPages++] = CreatePropertySheetPage(&Page);
-        break;
-    }
-
-    //
-    // Add Section object specific page, driver assistance required.
-    //
-    // This feature implemented only for Windows 10 as structures are too variable.
-    //
-
-    if (g_NtBuildNumber >= NT_WIN10_THRESHOLD1 && 
-        propContext->TypeIndex == ObjectTypeSection 
-        && IsDriverAssisted) 
-    {
-        RtlSecureZeroMemory(&Page, sizeof(Page));
-        Page.dwSize = sizeof(PROPSHEETPAGE);
-        Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
-        Page.hInstance = g_WinObj.hInstance;
-        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_OBJECTDUMP);
-        Page.pfnDlgProc = SectionPropertiesDialogProc;
-        Page.pszTitle = TEXT("Object");
-        Page.lParam = (LPARAM)propContext;
-        psp[nPages++] = CreatePropertySheetPage(&Page);
-    }
-
-    //
-    // Add ALPC port specific page, driver assistance required.
-    //
-    if (propContext->TypeIndex == ObjectTypePort && IsDriverAssisted) {
-        RtlSecureZeroMemory(&Page, sizeof(Page));
-        Page.dwSize = sizeof(PROPSHEETPAGE);
-        Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
-        Page.hInstance = g_WinObj.hInstance;
-        Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_ALPCPORTLIST);
-        Page.pfnDlgProc = AlpcPortListDialogProc;
-        Page.pszTitle = TEXT("Connections");
-        Page.lParam = (LPARAM)propContext;
-        psp[nPages++] = CreatePropertySheetPage(&Page);
-    }
-
-    //
-    // Type Info Page.
-    //
-    RtlSecureZeroMemory(&Page, sizeof(Page));
-    Page.dwSize = sizeof(PROPSHEETPAGE);
-    Page.dwFlags = PSP_DEFAULT | PSP_USETITLE;
-    Page.hInstance = g_WinObj.hInstance;
-    Page.pszTemplate = MAKEINTRESOURCE(IDD_PROP_TYPE);
-    Page.pfnDlgProc = TypePropDialogProc;
-    Page.pszTitle = TEXT("Type");
-    Page.lParam = (LPARAM)propContext;
-    psp[nPages++] = CreatePropertySheetPage(&Page);
-
-    //
-    // Create Security Dialog if available.
-    //
-    SecurityPage = propSecurityCreatePage(
-        propContext,                                            //Context
-        (POPENOBJECTMETHOD)&propOpenCurrentObject,              //OpenObjectMethod
-        (PCLOSEOBJECTMETHOD)&propCloseCurrentObject,            //CloseObjectMethod
-        SI_EDIT_OWNER | SI_EDIT_PERMS |                         //psiFlags
-        SI_ADVANCED | SI_NO_ACL_PROTECT | SI_NO_TREE_APPLY |
-        SI_PAGE_TITLE
-    );
-    if (SecurityPage != NULL) {
-        psp[nPages++] = SecurityPage;
-    }
+    nPages = propCreatePages(propContext);
 
     //
     // Finally create property sheet.
@@ -918,50 +924,56 @@ VOID propCreateDialog(
         }
     }
 
+    topLevelOwner = Settings->hwndParent;
+
     _strcat(szCaption, TEXT(" Properties"));
     RtlSecureZeroMemory(&PropHeader, sizeof(PropHeader));
     PropHeader.dwSize = sizeof(PropHeader);
-    PropHeader.phpage = psp;
+    PropHeader.phpage = PropPages;
     PropHeader.nPages = nPages;
-    PropHeader.dwFlags = PSH_DEFAULT | PSH_NOCONTEXTHELP | PSH_MODELESS;
     PropHeader.nStartPage = 0;
-    PropHeader.hwndParent = Settings->hwndParent;
+    PropHeader.dwFlags = PSH_NOCONTEXTHELP | PSH_MODELESS | PSH_USEPSTARTPAGE;
+    PropHeader.hwndParent = topLevelOwner;
     PropHeader.hInstance = g_WinObj.hInstance;
     PropHeader.pszCaption = szCaption;
 
-    hwndDlg = (HWND)PropertySheet(&PropHeader);
+    hwnd = (HWND)PropertySheet(&PropHeader);
 
-    if (hwndDlg) {
-
-        if (propContext->ContextType == propPrivateNamespace) {
-            g_NamespacePropWindow = hwndDlg;
-        }
-        else {
-
-            switch (propContext->TypeIndex) {
-            case ObjectTypeProcess:
-            case ObjectTypeThread:
-                g_PsPropWindow = hwndDlg;
-                break;
-            case ObjectTypeToken:
-                g_PsTokenWindow = hwndDlg;
-                break;
-            case ObjectTypeDesktop:
-                g_DesktopPropWindow = hwndDlg;
-                break;
-            default:
-                g_PropWindow = hwndDlg;
-                break;
-            }
-
-        }
-
-        SetProp(hwndDlg, T_PROPCONTEXT, (HANDLE)propContext);
-
-        PropSheetOriginalWndProc = (WNDPROC)GetWindowLongPtr(hwndDlg, GWLP_WNDPROC);
-        if (PropSheetOriginalWndProc) {
-            SetWindowLongPtr(hwndDlg, GWLP_WNDPROC, (LONG_PTR)&PropSheetCustomWndProc);
-        }
-        supCenterWindow(hwndDlg);
+    if (!hwnd) {
+        if (topLevelOwner)
+            EnableWindow(topLevelOwner, TRUE);
+        return;
     }
+
+    if (propContext->ContextType == propPrivateNamespace) {
+        g_NamespacePropWindow = hwnd;
+    }
+    else {
+
+        switch (propContext->TypeIndex) {
+        case ObjectTypeProcess:
+        case ObjectTypeThread:
+            g_PsPropWindow = hwnd;
+            break;
+        case ObjectTypeToken:
+            g_PsTokenWindow = hwnd;
+            break;
+        case ObjectTypeDesktop:
+            g_DesktopPropWindow = hwnd;
+            break;
+        default:
+            g_PropWindow = hwnd;
+            break;
+        }
+
+    }
+
+    SetProp(hwnd, T_PROPCONTEXT, (HANDLE)propContext);
+
+    PropSheetOriginalWndProc = (WNDPROC)GetWindowLongPtr(hwnd, GWLP_WNDPROC);
+    if (PropSheetOriginalWndProc) {
+        SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)&PropSheetCustomWndProc);
+    }
+
+    supCenterWindow(hwnd);
 }

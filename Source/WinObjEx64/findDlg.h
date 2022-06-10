@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       FINDDLG.H
 *
-*  VERSION:     1.52
+*  VERSION:     1.94
 *
-*  DATE:        08 Jan 2018
+*  DATE:        04 Jun 2022
 *
 *  Common header file for the Find Object dialog.
 *
@@ -19,4 +19,4 @@
 #pragma once
 
 VOID FindDlgCreate(
-    _In_ HWND hwndParent);
+    VOID);

@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTSUP.C
 *
-*  VERSION:     2.11
+*  VERSION:     2.13
 *
-*  DATE:        22 Apr 2022
+*  DATE:        05 Jun 2022
 *
 *  Native API support functions.
 *
@@ -562,18 +562,18 @@ BOOLEAN ntsupIsKdEnabled(
         *DebuggerNotPresent = FALSE;
 
     RtlSecureZeroMemory(&kdInfo, sizeof(kdInfo));
-    
+
     ntStatus = NtQuerySystemInformation(
         SystemKernelDebuggerInformation,
-        &kdInfo, 
-        sizeof(kdInfo), 
+        &kdInfo,
+        sizeof(kdInfo),
         &returnLength);
 
     if (NT_SUCCESS(ntStatus)) {
-        
+
         if (DebuggerNotPresent)
             *DebuggerNotPresent = kdInfo.KernelDebuggerNotPresent;
-        
+
         bResult = kdInfo.KernelDebuggerEnabled;
     }
     else {
@@ -1116,7 +1116,7 @@ NTSTATUS ntsupQueryProcessImageFileNameByProcessId(
 */
 NTSTATUS ntsupQuerySystemObjectInformationVariableSize(
     _In_ PFN_NTQUERYROUTINE QueryRoutine,
-    _In_ HANDLE ObjectHandle,
+    _In_opt_ HANDLE ObjectHandle,
     _In_ DWORD InformationClass,
     _Out_ PVOID* Buffer,
     _Out_opt_ PULONG ReturnLength,
@@ -1166,93 +1166,6 @@ NTSTATUS ntsupQuerySystemObjectInformationVariableSize(
     }
 
     return ntStatus;
-}
-
-/*
-* ntsupQueryProcessInformation
-*
-* Purpose:
-*
-* Query process information with variable size.
-* 
-* Returned buffer must be freed with FreeMem after usage.
-*
-*/
-NTSTATUS ntsupQueryProcessInformation(
-    _In_ HANDLE ProcessHandle,
-    _In_ PROCESSINFOCLASS ProcessInformationClass,
-    _Out_ PVOID* Buffer,
-    _Out_opt_ PULONG ReturnLength,
-    _In_ PNTSUPMEMALLOC AllocMem,
-    _In_ PNTSUPMEMFREE FreeMem
-)
-{
-    return ntsupQuerySystemObjectInformationVariableSize(
-        (PFN_NTQUERYROUTINE)NtQueryInformationProcess,
-        ProcessHandle,
-        (DWORD)ProcessInformationClass,
-        Buffer,
-        ReturnLength,
-        AllocMem,
-        FreeMem);
-}
-
-/*
-* ntsupQueryObjectInformation
-*
-* Purpose:
-*
-* Query object information with variable size.
-*
-* Returned buffer must be freed with FreeMem after usage.
-*
-*/
-NTSTATUS ntsupQueryObjectInformation(
-    _In_ HANDLE ObjectHandle,
-    _In_ OBJECT_INFORMATION_CLASS ObjectInformationClass,
-    _Out_ PVOID* Buffer,
-    _Out_opt_ PULONG ReturnLength,
-    _In_ PNTSUPMEMALLOC AllocMem,
-    _In_ PNTSUPMEMFREE FreeMem
-)
-{
-    return ntsupQuerySystemObjectInformationVariableSize(
-        (PFN_NTQUERYROUTINE)NtQueryObject,
-        ObjectHandle,
-        (DWORD)ObjectInformationClass,
-        Buffer,
-        ReturnLength,
-        AllocMem,
-        FreeMem);
-}
-
-/*
-* ntsupQuerySecurityInformation
-*
-* Purpose:
-*
-* Query object security information with variable size.
-*
-* Returned buffer must be freed with FreeMem after usage.
-*
-*/
-NTSTATUS ntsupQuerySecurityInformation(
-    _In_ HANDLE ObjectHandle,
-    _In_ SECURITY_INFORMATION SecurityInformationClass,
-    _Out_ PVOID* Buffer,
-    _Out_opt_ PULONG ReturnLength,
-    _In_ PNTSUPMEMALLOC AllocMem,
-    _In_ PNTSUPMEMFREE FreeMem
-)
-{
-    return ntsupQuerySystemObjectInformationVariableSize(
-        (PFN_NTQUERYROUTINE)NtQuerySecurityObject,
-        ObjectHandle,
-        (DWORD)SecurityInformationClass,
-        Buffer,
-        ReturnLength,
-        AllocMem,
-        FreeMem);
 }
 
 /*
@@ -1341,7 +1254,7 @@ BOOLEAN ntsupQueryHVCIState(
             *pbHVCIEnabled = hvciEnabled;
 
         if (pbHVCIStrictMode)
-            *pbHVCIStrictMode = hvciEnabled &&
+            *pbHVCIStrictMode = (hvciEnabled == TRUE) &&
             (ci.CodeIntegrityOptions & CODEINTEGRITY_OPTION_HVCI_KMCI_STRICTMODE_ENABLED);
 
         if (pbHVCIIUMEnabled)
@@ -2216,62 +2129,55 @@ NTSTATUS NTAPI ntsupEnumSystemObjects(
 
     status = STATUS_UNSUCCESSFUL;
 
-    __try {
-
-        // We can use root directory.
-        if (pwszRootDirectory != NULL) {
-            RtlSecureZeroMemory(&sname, sizeof(sname));
-            RtlInitUnicodeString(&sname, pwszRootDirectory);
-            InitializeObjectAttributes(&attr, &sname, OBJ_CASE_INSENSITIVE, NULL, NULL);
-            status = NtOpenDirectoryObject(&hDirectory, DIRECTORY_QUERY, &attr);
-            if (!NT_SUCCESS(status)) {
-                return status;
-            }
+    // We can use root directory.
+    if (pwszRootDirectory != NULL) {
+        RtlSecureZeroMemory(&sname, sizeof(sname));
+        RtlInitUnicodeString(&sname, pwszRootDirectory);
+        InitializeObjectAttributes(&attr, &sname, OBJ_CASE_INSENSITIVE, NULL, NULL);
+        status = NtOpenDirectoryObject(&hDirectory, DIRECTORY_QUERY, &attr);
+        if (!NT_SUCCESS(status)) {
+            return status;
         }
-        else {
-            if (hRootDirectory == NULL) {
-                return STATUS_INVALID_PARAMETER_2;
-            }
-            hDirectory = hRootDirectory;
-        }
-
-        // Enumerate objects in directory.
-        ctx = 0;
-        do {
-
-            rlen = 0;
-            status = NtQueryDirectoryObject(hDirectory, NULL, 0, TRUE, FALSE, &ctx, &rlen);
-            if (status != STATUS_BUFFER_TOO_SMALL)
-                break;
-
-            objinf = (POBJECT_DIRECTORY_INFORMATION)ntsupHeapAlloc(rlen);
-            if (objinf == NULL)
-                break;
-
-            status = NtQueryDirectoryObject(hDirectory, objinf, rlen, TRUE, FALSE, &ctx, &rlen);
-            if (!NT_SUCCESS(status)) {
-                ntsupHeapFree(objinf);
-                break;
-            }
-
-            CallbackStatus = CallbackProc(objinf, CallbackParam);
-
-            ntsupHeapFree(objinf);
-
-            if (NT_SUCCESS(CallbackStatus)) {
-                status = STATUS_SUCCESS;
-                break;
-            }
-
-        } while (TRUE);
-
-        if (hDirectory != NULL) {
-            NtClose(hDirectory);
-        }
-
     }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
-        status = STATUS_ACCESS_VIOLATION;
+    else {
+        if (hRootDirectory == NULL) {
+            return STATUS_INVALID_PARAMETER_2;
+        }
+        hDirectory = hRootDirectory;
+    }
+
+    // Enumerate objects in directory.
+    ctx = 0;
+    do {
+
+        rlen = 0;
+        status = NtQueryDirectoryObject(hDirectory, NULL, 0, TRUE, FALSE, &ctx, &rlen);
+        if (status != STATUS_BUFFER_TOO_SMALL)
+            break;
+
+        objinf = (POBJECT_DIRECTORY_INFORMATION)ntsupHeapAlloc(rlen);
+        if (objinf == NULL)
+            break;
+
+        status = NtQueryDirectoryObject(hDirectory, objinf, rlen, TRUE, FALSE, &ctx, &rlen);
+        if (!NT_SUCCESS(status)) {
+            ntsupHeapFree(objinf);
+            break;
+        }
+
+        CallbackStatus = CallbackProc(objinf, CallbackParam);
+
+        ntsupHeapFree(objinf);
+
+        if (NT_SUCCESS(CallbackStatus)) {
+            status = STATUS_SUCCESS;
+            break;
+        }
+
+    } while (TRUE);
+
+    if (hDirectory != NULL) {
+        NtClose(hDirectory);
     }
 
     return status;
@@ -2296,6 +2202,74 @@ BOOLEAN ntsupIsObjectExists(
     Param.BufferSize = (ULONG)_strlen(ObjectName);
 
     return NT_SUCCESS(ntsupEnumSystemObjects(RootDirectory, NULL, ntsupDetectObjectCallback, &Param));
+}
+
+/*
+* ntsupUserIsFullAdmin
+*
+* Purpose:
+*
+* Tests if the current user is admin with full access token.
+*
+*/
+BOOLEAN ntsupUserIsFullAdmin(
+    VOID
+)
+{
+    BOOLEAN  bResult = FALSE;
+    HANDLE   hToken = NULL;
+    NTSTATUS status;
+    DWORD    i, Attributes;
+    ULONG    ReturnLength = 0;
+
+    PTOKEN_GROUPS pTkGroups;
+
+    SID_IDENTIFIER_AUTHORITY NtAuthority = SECURITY_NT_AUTHORITY;
+    PSID AdministratorsGroup = NULL;
+
+    hToken = ntsupGetCurrentProcessToken();
+    if (hToken) {
+        if (NT_SUCCESS(RtlAllocateAndInitializeSid(
+            &NtAuthority,
+            2,
+            SECURITY_BUILTIN_DOMAIN_RID,
+            DOMAIN_ALIAS_RID_ADMINS,
+            0, 0, 0, 0, 0, 0,
+            &AdministratorsGroup)))
+        {
+            status = ntsupQueryTokenInformation(hToken,
+                TokenGroups,
+                &pTkGroups,
+                &ReturnLength,
+                (PNTSUPMEMALLOC)ntsupHeapAlloc,
+                (PNTSUPMEMFREE)ntsupHeapFree);
+
+            if (NT_SUCCESS(status)) {
+
+                for (i = 0; i < pTkGroups->GroupCount; i++) {
+
+                    Attributes = pTkGroups->Groups[i].Attributes;
+
+                    if (RtlEqualSid(AdministratorsGroup, pTkGroups->Groups[i].Sid))
+                        if (
+                            (Attributes & SE_GROUP_ENABLED) &&
+                            (!(Attributes & SE_GROUP_USE_FOR_DENY_ONLY))
+                            )
+                        {
+                            bResult = TRUE;
+                            break;
+                        }
+
+                }
+
+                ntsupHeapFree(pTkGroups);
+            }
+            RtlFreeSid(AdministratorsGroup);
+        }
+
+        NtClose(hToken);
+    }
+    return bResult;
 }
 
 #pragma warning(pop)

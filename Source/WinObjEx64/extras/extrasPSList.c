@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPSLIST.C
 *
-*  VERSION:     1.93
+*  VERSION:     1.94
 *
-*  DATE:        13 May 2022
+*  DATE:        06 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -31,8 +31,11 @@
 #define T_IDLE_PROCESS TEXT("Idle")
 #define T_IDLE_PROCESS_LENGTH sizeof(T_IDLE_PROCESS)
 
-EXTRASCONTEXT   PsDlgContext;
-static int      y_splitter_pos = 300, y_capture_pos = 0, y_splitter_max = 0;
+static HANDLE PsListDlgThreadHandle = NULL;
+static FAST_EVENT PsListDlgInitializedEvent = FAST_EVENT_INIT;
+
+static EXTRASCONTEXT PsDlgContext;
+static int y_splitter_pos = 300, y_capture_pos = 0, y_splitter_max = 0;
 
 HANDLE g_PsListWait = NULL;
 HANDLE g_PsListHeap = NULL;
@@ -50,6 +53,48 @@ LIST_ENTRY g_PsListHead;
 #define COLUMN_THREADLIST_STARTADDRESS     4
 #define COLUMN_THREADLIST_MODULE           5
 
+static LPWSTR T_WAITREASON[] = {
+    L"Executive",
+    L"FreePage",
+    L"PageIn",
+    L"PoolAllocation",
+    L"DelayExecution",
+    L"Suspended",
+    L"UserRequest",
+    L"WrExecutive",
+    L"WrFreePage",
+    L"WrPageIn",
+    L"WrPoolAllocation",
+    L"WrDelayExecution",
+    L"WrSuspended",
+    L"WrUserRequest",
+    L"WrEventPair",
+    L"WrQueue",
+    L"WrLpcReceive",
+    L"WrLpcReply",
+    L"WrVirtualMemory",
+    L"WrPageOut",
+    L"WrRendezvous",
+    L"WrKeyedEvent",
+    L"WrTerminated",
+    L"WrProcessInSwap",
+    L"WrCpuRateControl",
+    L"WrCalloutStack",
+    L"WrKernel",
+    L"WrResource",
+    L"WrPushLock",
+    L"WrMutex",
+    L"WrQuantumEnd",
+    L"WrDispatchInt",
+    L"WrPreempted",
+    L"WrYieldExecution",
+    L"WrFastMutex",
+    L"WrGuardedMutex",
+    L"WrRundown",
+    L"WrAlertByThreadId",
+    L"WrDeferredPreempt",
+    L"WrPhysicalFault"
+};
 
 /*
 * PsxAllocateUnnamedObjectEntry
@@ -723,13 +768,7 @@ LPWSTR PsListGetThreadStateAsString(
     if (ThreadState == StateWait) {
 
         _strcpy(StateBuffer, TEXT("Wait:"));
-
-#pragma warning(push)
-#pragma warning (disable: 33010) // No.
-        if (WaitReason < MAX_KNOWN_WAITREASON)
-            lpWaitReason = T_WAITREASON[WaitReason];
-#pragma warning(pop)
-
+        lpWaitReason = T_WAITREASON[WaitReason];
         _strcat(StateBuffer, lpWaitReason);
     }
     else {
@@ -1209,7 +1248,6 @@ VOID CreateObjectList(
     _In_opt_ PVOID ThreadParam
 )
 {
-    DWORD ThreadId;
     HANDLE hThread;
     LPTHREAD_START_ROUTINE lpThreadRoutine;
 
@@ -1224,13 +1262,7 @@ VOID CreateObjectList(
     else
         lpThreadRoutine = (LPTHREAD_START_ROUTINE)CreateProcessListProc;
 
-    hThread = CreateThread(NULL,
-        0,
-        lpThreadRoutine,
-        ThreadParam,
-        0,
-        &ThreadId);
-
+    hThread = supCreateThread(lpThreadRoutine, ThreadParam, 0);
     if (hThread) {
         CloseHandle(hThread);
     }
@@ -1413,7 +1445,6 @@ INT_PTR CALLBACK PsListDialogProc(
 )
 {
     INT dy;
-    UINT uCommandId;
     RECT crc;
     INT mark;
     HWND TreeListControl, FocusWindow;
@@ -1456,11 +1487,14 @@ INT_PTR CALLBACK PsListDialogProc(
     case WM_NOTIFY:
         return PsListHandleNotify(hwndDlg, wParam, lParam);
 
+    case WM_SHOWWINDOW:
+        if (wParam == TRUE)
+            supCenterWindowSpecifyParent(hwndDlg, g_WinObj.MainWindow);
+        break;
+
     case WM_COMMAND:
 
-        uCommandId = GET_WM_COMMAND_ID(wParam, lParam);
-
-        switch (uCommandId) {
+        switch (GET_WM_COMMAND_ID(wParam, lParam)) {
 
         case IDCANCEL:
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
@@ -1512,10 +1546,6 @@ INT_PTR CALLBACK PsListDialogProc(
         default:
             break;
         }
-        break;
-
-    case WM_INITDIALOG:
-        supCenterWindow(hwndDlg);
         break;
 
     case WM_GETMINMAXINFO:
@@ -1574,32 +1604,40 @@ INT_PTR CALLBACK PsListDialogProc(
 
         DestroyWindow(PsDlgContext.TreeList);
         DestroyWindow(hwndDlg);
-        g_WinObj.AuxDialogs[wobjPsListDlgId] = NULL;
         if (g_PsListHeap) {
             RtlDestroyHeap(g_PsListHeap);
             g_PsListHeap = NULL;
         }
         return TRUE;
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
     }
 
     return DefDlgProc(hwndDlg, uMsg, wParam, lParam);
 }
 
 /*
-* extrasCreatePsListDialog
+* extrasPsListDialogWorkerThread
 *
 * Purpose:
 *
-* Create and initialize Process List Dialog.
+* Process List Dialog worker thread.
 *
 */
-VOID extrasCreatePsListDialog(
-    _In_ HWND hwndParent
+DWORD extrasPsListDialogWorkerThread(
+    _In_ PVOID Parameter
 )
 {
-    LONG_PTR    wndStyles;
-    HDITEM      hdritem;
-    WNDCLASSEX  wincls;
+    LONG_PTR wndStyles;
+    HDITEM hdritem;
+    WNDCLASSEX wincls;
+
+    HWND hwndDlg;
+    BOOL bResult;
+    MSG message;
+    HACCEL acceleratorTable = NULL;
 
     INT SbParts[] = { 160, 320, -1 };
 
@@ -1614,10 +1652,7 @@ VOID extrasCreatePsListDialog(
         { L"Module(System threads)", 200, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,  I_IMAGENONE }
     };
 
-    //
-    // Allow only one dialog.
-    //
-    ENSURE_DIALOG_UNIQUE_WITH_RESTORE(g_WinObj.AuxDialogs[wobjPsListDlgId]);
+    UNREFERENCED_PARAMETER(Parameter);
 
     RtlSecureZeroMemory(&wincls, sizeof(wincls));
     wincls.cbSize = sizeof(WNDCLASSEX);
@@ -1633,78 +1668,138 @@ VOID extrasCreatePsListDialog(
     RegisterClassEx(&wincls);
 
     RtlSecureZeroMemory(&PsDlgContext, sizeof(PsDlgContext));
-    PsDlgContext.hwndDlg = CreateDialogParam(
+    
+    hwndDlg = CreateDialogParam(
         g_WinObj.hInstance,
         MAKEINTRESOURCE(IDD_DIALOG_PSLIST),
-        hwndParent,
+        0,
         NULL,
         0);
 
-    if (PsDlgContext.hwndDlg == NULL)
-        return;
+    if (hwndDlg) {
 
-    if (g_kdctx.IsFullAdmin == FALSE) {
-        SetWindowText(PsDlgContext.hwndDlg, TEXT("Processes (Non elevated mode, some information maybe unavailable)"));
-    }
+        PsDlgContext.hwndDlg = hwndDlg;
 
-    g_WinObj.AuxDialogs[wobjPsListDlgId] = PsDlgContext.hwndDlg;
-
-    PsDlgContext.tlSubItemHit = -1;
-
-    PsDlgContext.ListView = GetDlgItem(PsDlgContext.hwndDlg, IDC_PSLIST_LISTVIEW);
-    PsDlgContext.StatusBar = GetDlgItem(PsDlgContext.hwndDlg, IDC_PSLIST_STATUSBAR);
-    PsDlgContext.TreeList = GetDlgItem(PsDlgContext.hwndDlg, IDC_PSLIST_TREELIST);
-
-    SendMessage(PsDlgContext.StatusBar, SB_SETPARTS, 3, (LPARAM)&SbParts);
-
-    if (PsDlgContext.ListView) {
-
-        supSetListViewSettings(PsDlgContext.ListView,
-            LVS_EX_FULLROWSELECT | LVS_EX_LABELTIP | LVS_EX_DOUBLEBUFFER,
-            FALSE,
-            TRUE,
-            g_ListViewImages,
-            LVSIL_SMALL);
-
-        //
-        // And columns and remember their count.
-        //
-        PsDlgContext.lvColumnCount = supAddLVColumnsFromArray(
-            PsDlgContext.ListView,
-            columnData,
-            RTL_NUMBER_OF(columnData));
-    }
-
-    if (PsDlgContext.TreeList) {
-        RtlSecureZeroMemory(&hdritem, sizeof(hdritem));
-        hdritem.mask = HDI_FORMAT | HDI_TEXT | HDI_WIDTH;
-        hdritem.fmt = HDF_LEFT | HDF_BITMAP_ON_RIGHT | HDF_STRING;
-        hdritem.cxy = 300;
-        hdritem.pszText = TEXT("Process");
-        TreeList_InsertHeaderItem(PsDlgContext.TreeList, 0, &hdritem);
-
-        hdritem.cxy = 130;
-        hdritem.pszText = TEXT("Object");
-        TreeList_InsertHeaderItem(PsDlgContext.TreeList, 1, &hdritem);
-
-        hdritem.cxy = 180;
-        hdritem.pszText = TEXT("User");
-        TreeList_InsertHeaderItem(PsDlgContext.TreeList, 2, &hdritem);
-
-        wndStyles = GetWindowLongPtr(PsDlgContext.TreeList, GWL_STYLE);
-        SetWindowLongPtr(PsDlgContext.TreeList, GWL_STYLE, wndStyles | TLSTYLE_LINKLINES);
-    }
-
-    PsListDialogResize();
-
-    g_IsDialogQuit = FALSE;
-    g_IsRefresh = FALSE;
-
-    g_PsListWait = CreateMutex(NULL, FALSE, NULL);
-    if (g_PsListWait) {
-        g_PsListHeap = RtlCreateHeap(HEAP_GROWABLE, NULL, 0, 0, NULL, NULL);
-        if (g_PsListHeap) {
-            CreateObjectList(FALSE, NULL);
+        if (g_kdctx.IsFullAdmin == FALSE) {
+            SetWindowText(PsDlgContext.hwndDlg, TEXT("Processes (Non elevated mode, some information maybe unavailable)"));
         }
+
+        PsDlgContext.tlSubItemHit = -1;
+
+        PsDlgContext.ListView = GetDlgItem(PsDlgContext.hwndDlg, IDC_PSLIST_LISTVIEW);
+        PsDlgContext.StatusBar = GetDlgItem(PsDlgContext.hwndDlg, IDC_PSLIST_STATUSBAR);
+        PsDlgContext.TreeList = GetDlgItem(PsDlgContext.hwndDlg, IDC_PSLIST_TREELIST);
+
+        SendMessage(PsDlgContext.StatusBar, SB_SETPARTS, 3, (LPARAM)&SbParts);
+
+        if (PsDlgContext.ListView) {
+
+            supSetListViewSettings(PsDlgContext.ListView,
+                LVS_EX_FULLROWSELECT | LVS_EX_LABELTIP | LVS_EX_DOUBLEBUFFER,
+                FALSE,
+                TRUE,
+                g_ListViewImages,
+                LVSIL_SMALL);
+
+            //
+            // And columns and remember their count.
+            //
+            PsDlgContext.lvColumnCount = supAddLVColumnsFromArray(
+                PsDlgContext.ListView,
+                columnData,
+                RTL_NUMBER_OF(columnData));
+        }
+
+        if (PsDlgContext.TreeList) {
+            RtlSecureZeroMemory(&hdritem, sizeof(hdritem));
+            hdritem.mask = HDI_FORMAT | HDI_TEXT | HDI_WIDTH;
+            hdritem.fmt = HDF_LEFT | HDF_BITMAP_ON_RIGHT | HDF_STRING;
+            hdritem.cxy = 300;
+            hdritem.pszText = TEXT("Process");
+            TreeList_InsertHeaderItem(PsDlgContext.TreeList, 0, &hdritem);
+
+            hdritem.cxy = 130;
+            hdritem.pszText = TEXT("Object");
+            TreeList_InsertHeaderItem(PsDlgContext.TreeList, 1, &hdritem);
+
+            hdritem.cxy = 180;
+            hdritem.pszText = TEXT("User");
+            TreeList_InsertHeaderItem(PsDlgContext.TreeList, 2, &hdritem);
+
+            wndStyles = GetWindowLongPtr(PsDlgContext.TreeList, GWL_STYLE);
+            SetWindowLongPtr(PsDlgContext.TreeList, GWL_STYLE, wndStyles | TLSTYLE_LINKLINES);
+        }
+
+        PsListDialogResize();
+
+        g_IsDialogQuit = FALSE;
+        g_IsRefresh = FALSE;
+
+        g_PsListWait = CreateMutex(NULL, FALSE, NULL);
+        if (g_PsListWait) {
+            g_PsListHeap = RtlCreateHeap(HEAP_GROWABLE, NULL, 0, 0, NULL, NULL);
+            if (g_PsListHeap) {
+                CreateObjectList(FALSE, NULL);
+            }
+        }
+
     }
+
+    supSetFastEvent(&PsListDlgInitializedEvent);
+
+    if (hwndDlg) {
+
+        acceleratorTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
+
+        do {
+
+            bResult = GetMessage(&message, NULL, 0, 0);
+            if (bResult == -1)
+                break;
+
+            if (IsDialogMessage(hwndDlg, &message)) {
+                TranslateAccelerator(hwndDlg, acceleratorTable, &message);
+            }
+            else {
+                TranslateMessage(&message);
+                DispatchMessage(&message);
+            }
+
+        } while (bResult != 0);
+
+    }
+
+    supResetFastEvent(&PsListDlgInitializedEvent);
+
+    if (acceleratorTable)
+        DestroyAcceleratorTable(acceleratorTable);
+
+    if (PsListDlgThreadHandle) {
+        NtClose(PsListDlgThreadHandle);
+        PsListDlgThreadHandle = NULL;
+    }
+
+    return 0;
+}
+
+/*
+* extrasCreatePsListDialog
+*
+* Purpose:
+*
+* Create and initialize Process List Dialog.
+*
+*/
+VOID extrasCreatePsListDialog(
+    VOID
+)
+{
+
+    if (!PsListDlgThreadHandle) {
+
+        PsListDlgThreadHandle = supCreateDialogWorkerThread(extrasPsListDialogWorkerThread, NULL, 0);
+        supWaitForFastEvent(&PsListDlgInitializedEvent, NULL);
+
+    }
+
 }

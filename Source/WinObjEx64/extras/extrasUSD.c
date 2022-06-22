@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASUSD.C
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        04 Jun 2021
+*  DATE:        19 Jun 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -15,9 +15,8 @@
 *
 *******************************************************************************/
 #include "global.h"
-#include "propObjectDump.h"
+#include "props.h"
 #include "extras.h"
-#include "extrasUSD.h"
 #include "treelist/treelist.h"
 
 static EXTRASCONTEXT g_UsdDlgContext;
@@ -691,7 +690,7 @@ VOID UsdDialogOnInit(
 )
 {
     UsdDumpSharedRegion(hwndDlg);
-    supCenterWindowSpecifyParent(hwndDlg, g_WinObj.MainWindow);
+    supCenterWindowSpecifyParent(hwndDlg, g_hwndMain);
 }
 
 /*

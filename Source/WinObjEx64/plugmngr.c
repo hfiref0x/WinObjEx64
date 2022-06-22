@@ -4,9 +4,9 @@
 *
 *  TITLE:       PLUGMNGR.C
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        04 Jun 2022
+*  DATE:        19 Jun 2022
 *
 *  Plugin manager.
 *
@@ -18,7 +18,6 @@
 *******************************************************************************/
 #define OEMRESOURCE
 #include "global.h"
-#include "ui.h"
 
 static LIST_ENTRY g_PluginsListHead;
 volatile UINT g_PluginCount = 0;
@@ -42,6 +41,34 @@ BOOL PmpReadSystemMemoryEx(
 )
 {
     return kdReadSystemMemory2(NULL, Address, Buffer, BufferSize, NumberOfBytesRead);
+}
+
+/*
+* PmpOpenObjectByType
+*
+* Purpose:
+*
+* Open object by type (plugin version).
+*
+*/
+NTSTATUS PmpOpenObjectByType(
+    _Out_ HANDLE* ObjectHandle,
+    _In_ ULONG TypeIndex,
+    _In_ PUNICODE_STRING ObjectDirectory,
+    _In_ PUNICODE_STRING ObjectName,
+    _In_ ACCESS_MASK DesiredAccess
+)
+{
+    __try {
+        return supOpenNamedObjectByType(ObjectHandle,
+            TypeIndex,
+            ObjectDirectory,
+            ObjectName,
+            DesiredAccess);
+    }
+    __except (WOBJ_EXCEPTION_FILTER_LOG) {
+        return GetExceptionCode();
+    }
 }
 
 /*
@@ -580,15 +607,11 @@ WINOBJEX_PLUGIN_INTERNAL* PmpGetEntryById(
 *
 */
 VOID PmpFreeObjectData(
-    _In_ PWINOBJEX_PARAM_OBJECT ObjectPtr
+    _In_ PWINOBJEX_PARAM_OBJECT ParamObject
 )
 {
-    if (ObjectPtr->ObjectDirectory) {
-        HeapFree(GetProcessHeap(), 0, ObjectPtr->ObjectDirectory);
-    }
-    if (ObjectPtr->ObjectName) {
-        HeapFree(GetProcessHeap(), 0, ObjectPtr->ObjectName);
-    }
+    supFreeDuplicatedUnicodeString(g_obexHeap, &ParamObject->Directory, FALSE);
+    supFreeDuplicatedUnicodeString(g_obexHeap, &ParamObject->Name, FALSE);
 }
 
 /*
@@ -600,84 +623,11 @@ VOID PmpFreeObjectData(
 *
 */
 BOOL PmpAllocateObjectData(
-    _In_ HWND ParentWindow,
-    _In_ PWINOBJEX_PARAM_OBJECT ObjectPtr,
-    _In_opt_ HTREEITEM ObjectTreeItem
+    _In_ PWINOBJEX_PARAM_OBJECT ParamObject
 )
 {
-    INT     nSelected;
-    LPWSTR  lpObjectName = NULL;
-
-    HANDLE  processHeap = GetProcessHeap();
-    BOOL    bNameAllocated = FALSE;
-
-    TV_ITEM tvi;
-    WCHAR szBuffer[MAX_PATH + 1];
-
-    ObjectPtr->ObjectDirectory = NULL;
-    ObjectPtr->ObjectName = NULL;
-    ObjectPtr->Reserved = NULL;
-
-    if (ParentWindow == g_hwndObjectList) {
-
-        //
-        // Query selected index, leave on failure.
-        //
-        nSelected = ListView_GetSelectionMark(g_hwndObjectList);
-        if (nSelected == -1)
-            return FALSE;
-
-        lpObjectName = supGetItemText(g_hwndObjectList, nSelected, 0, NULL);
-        if (lpObjectName) bNameAllocated = TRUE;
-
-    }
-    else
-        if (ParentWindow == g_hwndObjectTree) {
-            if (ObjectTreeItem) {
-
-                RtlSecureZeroMemory(&tvi, sizeof(TV_ITEM));
-
-                szBuffer[0] = 0;
-                RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-                tvi.pszText = szBuffer;
-                tvi.cchTextMax = MAX_PATH;
-                tvi.mask = TVIF_TEXT;
-                tvi.hItem = ObjectTreeItem;
-                if (TreeView_GetItem(g_hwndObjectTree, &tvi)) {
-                    lpObjectName = (LPWSTR)&szBuffer;
-                    bNameAllocated = FALSE;
-                }
-            }
-        }
-        else
-            return FALSE;
-
-    if (lpObjectName == NULL)
-        return FALSE;
-
-    ObjectPtr->ObjectDirectory = (LPWSTR)HeapAlloc(processHeap, HEAP_ZERO_MEMORY,
-        (1 + _strlen(g_WinObj.CurrentObjectPath)) * sizeof(WCHAR));
-
-    if (ObjectPtr->ObjectDirectory) {
-        _strcpy(ObjectPtr->ObjectDirectory, g_WinObj.CurrentObjectPath);
-    }
-    else {
-        return FALSE;
-    }
-
-    ObjectPtr->ObjectName = (LPWSTR)HeapAlloc(processHeap, HEAP_ZERO_MEMORY,
-        (1 + _strlen(lpObjectName)) * sizeof(WCHAR));
-
-    if (ObjectPtr->ObjectName) {
-        _strcpy(ObjectPtr->ObjectName, lpObjectName);
-    }
-    else {
-        HeapFree(processHeap, 0, ObjectPtr->ObjectDirectory);
-        ObjectPtr->ObjectDirectory = NULL;
-        return FALSE;
-    }
-
-    return TRUE;
+    return supGetCurrentObjectPath(FALSE, &ParamObject->Directory) && 
+        supGetCurrentObjectName(&ParamObject->Name);
 }
 
 /*
@@ -690,8 +640,7 @@ BOOL PmpAllocateObjectData(
 */
 VOID PmProcessEntry(
     _In_ HWND ParentWindow,
-    _In_ UINT Id,
-    _In_opt_ HTREEITEM ObjectTreeItem
+    _In_ UINT Id
 )
 {
     NTSTATUS ntStatus;
@@ -780,7 +729,7 @@ VOID PmProcessEntry(
             //
             if (PluginEntry->Plugin.Type == ContextPlugin) {
 
-                if (!PmpAllocateObjectData(ParentWindow, &ParamBlock.Object, ObjectTreeItem)) {
+                if (!PmpAllocateObjectData(&ParamBlock.Object)) {
                     
                     MessageBox(ParentWindow, 
                         TEXT("Cannot allocate memory for plugin data"), 
@@ -800,12 +749,12 @@ VOID PmProcessEntry(
             // 
             ParamBlock.ReadSystemMemoryEx = (pfnReadSystemMemoryEx)&PmpReadSystemMemoryEx;
             ParamBlock.GetInstructionLength = (pfnGetInstructionLength)&kdGetInstructionLength;
-            ParamBlock.OpenNamedObjectByType = (pfnOpenNamedObjectByType)&supOpenNamedObjectByType;
+            ParamBlock.OpenNamedObjectByType = (pfnOpenNamedObjectByType)&PmpOpenObjectByType;
 
             //
             // Version.
             //
-            RtlCopyMemory(&ParamBlock.Version, &g_WinObj.osver, sizeof(RTL_OSVERSIONINFOW));
+            ParamBlock.Version = g_WinObj.osver;
 
             ntStatus = PluginEntry->Plugin.StartPlugin(&ParamBlock);
 
@@ -814,10 +763,9 @@ VOID PmProcessEntry(
                 ultohex((ULONG)ntStatus, _strend(szMessage));
                 MessageBox(ParentWindow, szMessage, NULL, MB_ICONERROR);
             }
-            else {
-                if (PluginEntry->Plugin.Type == ContextPlugin) {
-                    PmpFreeObjectData(&ParamBlock.Object);
-                }
+
+            if (PluginEntry->Plugin.Type == ContextPlugin) {
+                PmpFreeObjectData(&ParamBlock.Object);
             }
 
         }
@@ -1150,8 +1098,6 @@ VOID PmpHandleNotify(
 
         break;
 
-    default:
-        break;
     }
 
 }
@@ -1203,7 +1149,7 @@ INT_PTR CALLBACK PmpDialogProc(
     switch (uMsg) {
 
     case WM_INITDIALOG:
-        supCenterWindowSpecifyParent(hwndDlg, g_WinObj.MainWindow);
+        supCenterWindowSpecifyParent(hwndDlg, g_hwndMain);
         PmpEnumerateEntries(hwndDlg);
         break;
 

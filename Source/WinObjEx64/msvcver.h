@@ -4,9 +4,9 @@
 *
 *  TITLE:       MSVCVER.H
 *
-*  VERSION:     1.93
+*  VERSION:     2.00
 *
-*  DATE:        30 Apr 2022
+*  DATE:        19 Jun 2022
 *
 *  Visual Studio compiler version determination.
 *

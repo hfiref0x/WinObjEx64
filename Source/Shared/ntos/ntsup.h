@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.13
 *
-*  DATE:        04 Jun 2022
+*  DATE:        15 Jun 2022
 *
 *  Common header file for the NT API support functions and definitions.
 *
@@ -100,6 +100,14 @@ PVOID ntsupVirtualAlloc(
 BOOL ntsupVirtualFree(
     _In_ PVOID Memory);
 
+BOOL ntsupVirtualLock(
+    _In_ LPVOID lpAddress,
+    _In_ SIZE_T dwSize);
+
+BOOL ntsupVirtualUnlock(
+    _In_ LPVOID lpAddress,
+    _In_ SIZE_T dwSize);
+
 SIZE_T ntsupWriteBufferToFile(
     _In_ PWSTR lpFileName,
     _In_ PVOID Buffer,
@@ -178,6 +186,13 @@ BOOL ntsupResolveSymbolicLink(
 BOOL ntsupQueryThreadWin32StartAddress(
     _In_ HANDLE ThreadHandle,
     _Out_ PULONG_PTR Win32StartAddress);
+
+_Success_(return)
+NTSTATUS ntsupOpenDirectoryEx(
+    _Out_ PHANDLE DirectoryHandle,
+    _In_opt_ HANDLE RootDirectoryHandle,
+    _In_ PUNICODE_STRING DirectoryName,
+    _In_ ACCESS_MASK DesiredAccess);
 
 NTSTATUS ntsupOpenDirectory(
     _Out_ PHANDLE DirectoryHandle,
@@ -274,12 +289,6 @@ BOOL ntsupGetProcessElevationType(
 NTSTATUS ntsupIsProcessElevated(
     _In_ ULONG ProcessId,
     _Out_ PBOOL Elevated);
-
-ULONG ntsupGetMappedFileName(
-    _In_ PVOID BaseAddress,
-    _Inout_ LPWSTR FileName,
-    _In_ ULONG cchFileName,
-    _Out_ PSIZE_T cbNeeded);
 
 VOID ntsupPurgeSystemCache(
     VOID);

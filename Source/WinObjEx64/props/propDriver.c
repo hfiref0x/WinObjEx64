@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       PROPDRIVER.C
 *
-*  VERSION:     1.90
+*  VERSION:     2.00
 *
-*  DATE:        16 May 2021
+*  DATE:        19 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -15,8 +15,7 @@
 *
 *******************************************************************************/
 #include "global.h"
-#include "supConsts.h"
-#include "propObjectDump.h"
+#include "props.h"
 
 #define REGEDITWNDCLASS           L"RegEdit_RegEdit"
 #define REGEDIT_EXE               L"regedit.exe"
@@ -86,7 +85,7 @@ VOID DriverSetInfo(
 
             schService = OpenService(
                 SchSCManager,
-                Context->lpObjectName,
+                Context->NtObjectName.Buffer,
                 SERVICE_QUERY_CONFIG | SERVICE_QUERY_STATUS | SERVICE_ENUMERATE_DEPENDENTS);
 
             if (schService == NULL)
@@ -114,7 +113,7 @@ VOID DriverSetInfo(
             bResult = QueryServiceConfig(schService, psci, bytesNeeded, &bytesNeeded);
             if (bResult) {
                 //set key name (identical to object name)
-                SetDlgItemText(hwndDlg, IDC_SERVICE_KEYNAME, Context->lpObjectName);
+                SetDlgItemText(hwndDlg, IDC_SERVICE_KEYNAME, Context->NtObjectName.Buffer);
                 //set image path info
                 SetDlgItemText(hwndDlg, IDC_SERVICE_IMAGEPATH, psci->lpBinaryPathName);
                 //set display name
@@ -459,9 +458,13 @@ VOID DriverJumpToKey(
 
     WCHAR             szBuffer[MAX_PATH * 2];
 
+    //
+    // NtObjectName does not require normalization because regedit cannot handle bogus names anyway.
+    //
+
     do {
 
-        sz = _strlen(Context->lpObjectName);
+        sz = _strlen(Context->NtObjectName.Buffer);
         if (sz == 0)
             break;
 
@@ -475,7 +478,7 @@ VOID DriverJumpToKey(
             break;
 
         _strcpy(lpRegPath, PROPDRVREGSERVICESKEY);
-        _strcat(lpRegPath, Context->lpObjectName);
+        _strcat(lpRegPath, Context->NtObjectName.Buffer);
 
         //
         // Start RegEdit.

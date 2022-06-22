@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        07 Jun 2022
+*  DATE:        19 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -33,7 +33,7 @@ typedef VOID(CALLBACK* pfnPropQueryInfoRoutine)(
 //
 VOID propSetBasicInfoEx(
     _In_ HWND hwndDlg,
-    _In_ POBJINFO InfoObject);
+    _In_ POBEX_OBJECT_INFORMATION InfoObject);
 
 /*
 * propSetObjectHeaderAddressInfo
@@ -1048,10 +1048,10 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQuerySymlink)
     NTSTATUS    status;
     ULONG       bytesNeeded;
     HANDLE      hObject = NULL;
-    LPWSTR      lpLinkTarget;
     WCHAR       szBuffer[MAX_PATH + 1];
 
     OBJECT_BASIC_INFORMATION obi;
+    UNICODE_STRING objectName, normalizedName;
 
     SetDlgItemText(hwndDlg, ID_OBJECT_SYMLINK_TARGET, T_CannotQuery);
     SetDlgItemText(hwndDlg, ID_OBJECT_SYMLINK_CREATION, T_CannotQuery);
@@ -1063,15 +1063,24 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQuerySymlink)
         return;
     }
 
-    //
-    // Copy link target from main object list for performance reasons.
-    // Because we don't need to query same data again.
-    //
-    lpLinkTarget = Context->lpDescription;
-    if (lpLinkTarget) {
-        SetDlgItemText(hwndDlg, ID_OBJECT_SYMLINK_TARGET, lpLinkTarget);
-    }
+    if (supCreateObjectPathFromElements(&Context->NtObjectName,
+        &Context->NtObjectPath,
+        &objectName,
+        TRUE))
+    {
+        if (supResolveSymbolicLinkTargetNormalized(
+            hObject,
+            NULL,
+            &objectName,
+            &normalizedName))
+        {
+            SetDlgItemText(hwndDlg, ID_OBJECT_SYMLINK_TARGET, normalizedName.Buffer);
+            supFreeDuplicatedUnicodeString(g_obexHeap, &normalizedName, FALSE);
+        }
 
+        supFreeDuplicatedUnicodeString(g_obexHeap, &objectName, FALSE);
+    }
+  
     //Query Link Creation Time
     RtlSecureZeroMemory(&obi, sizeof(OBJECT_BASIC_INFORMATION));
 
@@ -1435,6 +1444,11 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQuerySection)
                 szBuffer[0] = 0;
                 ultostr(sii.SubSystemMinorVersion, szBuffer);
                 SetDlgItemText(hwndDlg, ID_IMAGE_MNV, szBuffer);
+
+                //Image Flags
+                szBuffer[0] = 0;
+                ultostr(sii.ImageFlags, szBuffer);
+                SetDlgItemText(hwndDlg, ID_IMAGE_FLAGS, szBuffer);
             }
         }
     }
@@ -1507,24 +1521,25 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryWindowStation)
 */
 PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryDriver)
 {
-    LPWSTR lpItemText;
     ENUMCHILDWNDDATA ChildWndData;
+
+    WCHAR szBuffer[MAX_PATH + 1];
 
     UNREFERENCED_PARAMETER(ExtendedInfoAvailable);
 
-    //
-    // For performance reasons instead of query again
-    // we use description from main object list.
-    //
-    lpItemText = Context->lpDescription;
-    if (lpItemText) {
+    RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+    if (supQueryDriverDescription(Context->NtObjectName.Buffer,
+        szBuffer,
+        MAX_PATH))
+    {
         //show hidden controls
         if (GetWindowRect(GetDlgItem(hwndDlg, ID_DRIVERINFO), &ChildWndData.Rect)) {
             ChildWndData.nCmdShow = SW_SHOW;
             EnumChildWindows(hwndDlg, supCallbackShowChildWindow, (LPARAM)&ChildWndData);
         }
-        SetDlgItemText(hwndDlg, ID_DRIVERDISPLAYNAME, lpItemText);
+        SetDlgItemText(hwndDlg, ID_DRIVERDISPLAYNAME, szBuffer);
     }
+
 }
 
 /*
@@ -1537,24 +1552,27 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryDriver)
 */
 PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryDevice)
 {
-    LPWSTR lpItemText;
     ENUMCHILDWNDDATA ChildWndData;
+
+    WCHAR szBuffer[MAX_PATH + 1];
 
     UNREFERENCED_PARAMETER(ExtendedInfoAvailable);
 
-    //
-    // For performance reasons instead of query again
-    // we use description from main object list.
-    //
-    lpItemText = Context->lpDescription;
-    if (lpItemText) {
+    RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+    if (supQueryDeviceDescription(
+        &Context->NtObjectPath,
+        &Context->NtObjectName,
+        szBuffer,
+        MAX_PATH))
+    {
         //show hidden controls
         if (GetWindowRect(GetDlgItem(hwndDlg, ID_DEVICEINFO), &ChildWndData.Rect)) {
             ChildWndData.nCmdShow = SW_SHOW;
             EnumChildWindows(hwndDlg, supCallbackShowChildWindow, (LPARAM)&ChildWndData);
         }
-        SetDlgItemText(hwndDlg, ID_DEVICEDESCRIPTION, lpItemText);
+        SetDlgItemText(hwndDlg, ID_DEVICEDESCRIPTION, szBuffer);
     }
+
 }
 
 /*
@@ -1562,7 +1580,7 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryDevice)
 *
 * Purpose:
 *
-* Set information values for Partition object type
+* Set information values for MemoryPartition object type
 *
 */
 PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryMemoryPartition)
@@ -1575,6 +1593,33 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryMemoryPartition)
     // Open Memory Partition object.
     //
     if (!propOpenCurrentObject(Context, &hObject, MEMORY_PARTITION_QUERY_ACCESS))
+        return;
+
+    //
+    // Query object basic and type info if needed.
+    //
+    propSetDefaultInfo(Context, hwndDlg, hObject);
+    propCloseCurrentObject(Context, hObject);
+}
+
+/*
+* propBasicQueryRegistryTransaction
+*
+* Purpose:
+*
+* Set information values for RegistryTransaction object type
+*
+*/
+PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryRegistryTransaction)
+{
+    HANDLE hObject = NULL;
+
+    UNREFERENCED_PARAMETER(ExtendedInfoAvailable);
+
+    //
+    // Open Registry Transaction object.
+    //
+    if (!propOpenCurrentObject(Context, &hObject, TRANSACTION_QUERY_INFORMATION))
         return;
 
     //
@@ -1905,7 +1950,7 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryThread)
     THREAD_NAME_INFORMATION *NameInformation;
 
 
-    Thread = &Context->UnnamedObjectInfo.ThreadInformation;
+    Thread = &Context->u1.UnnamedObjectInfo.ThreadInformation;
 
     //
     // Open Thread object.
@@ -2710,7 +2755,8 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryDesktop)
     BOOL        bExtendedInfoAvailable;
     HANDLE      hDesktop = NULL;
     ULONG_PTR   ObjectAddress = 0, HeaderAddress = 0, InfoHeaderAddress = 0;
-    OBJINFO     InfoObject;
+
+    OBEX_OBJECT_INFORMATION InfoObject;
 
     UNREFERENCED_PARAMETER(ExtendedInfoAvailable);
 
@@ -2788,7 +2834,7 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryDesktop)
 */
 VOID propSetBasicInfoEx(
     _In_ HWND hwndDlg,
-    _In_ POBJINFO InfoObject
+    _In_ POBEX_OBJECT_INFORMATION InfoObject
 )
 {
     INT     i;
@@ -2852,18 +2898,30 @@ VOID propSetBasicInfo(
     _In_ HWND hwndDlg
 )
 {
-    BOOL     ExtendedInfoAvailable = FALSE, bQueryTrustLabel = FALSE;
-    POBJINFO InfoObject = NULL;
+    BOOL ExtendedInfoAvailable = FALSE, bQueryTrustLabel = FALSE;
+    POBEX_OBJECT_INFORMATION InfoObject = NULL;
 
     pfnPropQueryInfoRoutine propQueryInfoRoutine;
 
-    SetDlgItemText(hwndDlg, ID_OBJECT_NAME, Context->lpObjectName);
-    SetDlgItemText(hwndDlg, ID_OBJECT_TYPE, Context->lpObjectType);
+    UNICODE_STRING usObjectName;
+
+    if (supNormalizeUnicodeStringForDisplay(g_obexHeap,
+        &Context->NtObjectName,
+        &usObjectName))
+    {
+        SetDlgItemText(hwndDlg, ID_OBJECT_NAME, usObjectName.Buffer);
+        supFreeDuplicatedUnicodeString(g_obexHeap, &usObjectName, FALSE);
+    }
+    else {
+        SetDlgItemText(hwndDlg, ID_OBJECT_NAME, Context->NtObjectName.Buffer);
+    }
+
+    SetDlgItemText(hwndDlg, ID_OBJECT_TYPE, Context->TypeDescription->Name);
 
     //
     // Desktops should be parsed differently.
     //
-    if (Context->TypeIndex != ObjectTypeDesktop) {
+    if (Context->ObjectTypeIndex != ObjectTypeDesktop) {
 
         //
         // Dump object information depending on context type.
@@ -2871,15 +2929,16 @@ VOID propSetBasicInfo(
         switch (Context->ContextType) {
 
         case propPrivateNamespace:
-            InfoObject = ObQueryObjectByAddress(Context->NamespaceInfo.ObjectAddress);
+            InfoObject = ObQueryObjectByAddress(Context->u1.NamespaceInfo.ObjectAddress);
             break;
 
         case propUnnamed:
-            InfoObject = ObQueryObjectByAddress(Context->UnnamedObjectInfo.ObjectAddress);
+            InfoObject = ObQueryObjectByAddress(Context->u1.UnnamedObjectInfo.ObjectAddress);
             break;
 
+        case propNormal:
         default:
-            InfoObject = ObQueryObject(Context->lpCurrentObjectPath, Context->lpObjectName);
+            InfoObject = ObQueryObjectInDirectory(&Context->NtObjectName, &Context->NtObjectPath);
             break;
         }
 
@@ -2888,11 +2947,11 @@ VOID propSetBasicInfo(
 
             if (Context->ContextType == propUnnamed) {
 
-                if (Context->UnnamedObjectInfo.ObjectAddress) {
+                if (Context->u1.UnnamedObjectInfo.ObjectAddress) {
                     propSetObjectHeaderAddressInfo(
                         hwndDlg,
-                        Context->UnnamedObjectInfo.ObjectAddress,
-                        (ULONG_PTR)OBJECT_TO_OBJECT_HEADER(Context->UnnamedObjectInfo.ObjectAddress));
+                        Context->u1.UnnamedObjectInfo.ObjectAddress,
+                        (ULONG_PTR)OBJECT_TO_OBJECT_HEADER(Context->u1.UnnamedObjectInfo.ObjectAddress));
                 }
             }
             else {
@@ -2902,7 +2961,7 @@ VOID propSetBasicInfo(
         }
         else {
             //make copy of received dump
-            supCopyMemory(&Context->ObjectInfo, sizeof(OBJINFO), InfoObject, sizeof(OBJINFO));
+            RtlCopyMemory(&Context->ObjectInfo, InfoObject, sizeof(OBEX_OBJECT_INFORMATION));
 
             //
             // Set Object Address, Header Address, NP/PP Charge, RefCount, HandleCount, Attributes.
@@ -2913,7 +2972,7 @@ VOID propSetBasicInfo(
             // Special case for AlpcPort object type.
             // The only information we can get is from driver here as we cannot open port directly.
             // 
-            if (Context->TypeIndex == ObjectTypePort) {
+            if (Context->ObjectTypeIndex == ObjectTypePort) {
                 propBasicQueryAlpcPort(Context, hwndDlg, FALSE);
             }
 
@@ -2927,7 +2986,7 @@ VOID propSetBasicInfo(
     //
     propQueryInfoRoutine = NULL;
 
-    switch (Context->TypeIndex) {
+    switch (Context->ObjectTypeIndex) {
     case ObjectTypeDirectory:
         bQueryTrustLabel = TRUE;
         //if TRUE skip this because directory is basic dialog and basic info already set
@@ -2980,6 +3039,9 @@ VOID propSetBasicInfo(
         break;
     case ObjectTypeMemoryPartition:
         propQueryInfoRoutine = (pfnPropQueryInfoRoutine)propBasicQueryMemoryPartition;
+        break;
+    case ObjectTypeRegistryTransaction:
+        propQueryInfoRoutine = (pfnPropQueryInfoRoutine)propBasicQueryRegistryTransaction;
         break;
     case ObjectTypeProcess:
         propQueryInfoRoutine = (pfnPropQueryInfoRoutine)propBasicQueryProcess;

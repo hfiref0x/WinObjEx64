@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        07 Jun 2022
+*  DATE:        19 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -99,8 +99,8 @@ HTREEITEM propObDumpAddress(
     _In_ COLORREF FontColor
 )
 {
-    TL_SUBITEMS_FIXED  subitems;
-    WCHAR              szValue[DUMP_CONVERSION_LENGTH + 1];
+    TL_SUBITEMS_FIXED subitems;
+    WCHAR szValue[32];
 
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
     subitems.Count = 2;
@@ -151,15 +151,15 @@ HTREEITEM propObDumpAddress(
 VOID propObDumpAddressWithModule(
     _In_ HWND TreeList,
     _In_ HTREEITEM hParent,
-    _In_ LPWSTR lpszName,
+    _In_ LPWSTR Name,
     _In_opt_ PVOID Address,
     _In_ PRTL_PROCESS_MODULES pModules,
     _In_opt_ PVOID SelfDriverBase,
     _In_ ULONG SelfDriverSize
 )
 {
-    TL_SUBITEMS_FIXED   subitems;
-    WCHAR               szValue[DUMP_CONVERSION_LENGTH + 1], szModuleName[MAX_PATH * 2];
+    TL_SUBITEMS_FIXED subitems;
+    WCHAR szValue[32], szModuleName[MAX_PATH * 2];
 
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
     subitems.Count = 2;
@@ -201,7 +201,7 @@ VOID propObDumpAddressWithModule(
         TVIF_TEXT | TVIF_STATE,
         0,
         0,
-        lpszName,
+        Name,
         &subitems);
 }
 
@@ -262,8 +262,8 @@ VOID propObDumpByte(
     _In_ BOOL IsBool
 )
 {
-    TL_SUBITEMS_FIXED   subitems;
-    WCHAR               szValue[DUMP_CONVERSION_LENGTH + 1];
+    TL_SUBITEMS_FIXED subitems;
+    WCHAR szValue[32];
 
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
 
@@ -280,7 +280,7 @@ VOID propObDumpByte(
     else {
 
         RtlStringCchPrintfSecure(szValue,
-            DUMP_CONVERSION_LENGTH,
+            RTL_NUMBER_OF(szValue),
             FORMAT_HEXBYTE,
             Value);
 
@@ -382,7 +382,7 @@ HTREEITEM propObDumpUlong(
 )
 {
     TL_SUBITEMS_FIXED   subitems;
-    WCHAR               szValue[DUMP_CONVERSION_LENGTH + 1];
+    WCHAR               szValue[32];
 
     RtlSecureZeroMemory(&szValue, sizeof(szValue));
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
@@ -399,7 +399,7 @@ HTREEITEM propObDumpUlong(
         if (IsUShort) {
 
             RtlStringCchPrintfSecure(szValue,
-                DUMP_CONVERSION_LENGTH,
+                RTL_NUMBER_OF(szValue),
                 FORMAT_HEXUSHORT,
                 Value);
 
@@ -414,7 +414,7 @@ HTREEITEM propObDumpUlong(
         if (IsUShort) {
 
             RtlStringCchPrintfSecure(szValue,
-                DUMP_CONVERSION_LENGTH,
+                RTL_NUMBER_OF(szValue),
                 FORMAT_USHORT,
                 Value);
 
@@ -463,8 +463,8 @@ HTREEITEM propObDumpLong(
     _In_ COLORREF FontColor
 )
 {
-    TL_SUBITEMS_FIXED   subitems;
-    WCHAR               szValue[DUMP_CONVERSION_LENGTH + 1];
+    TL_SUBITEMS_FIXED subitems;
+    WCHAR szValue[32];
 
     RtlSecureZeroMemory(&szValue, sizeof(szValue));
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
@@ -479,7 +479,7 @@ HTREEITEM propObDumpLong(
 
     if (HexDump) {
         RtlStringCchPrintfSecure(szValue,
-            DUMP_CONVERSION_LENGTH,
+            RTL_NUMBER_OF(szValue),
             FORMAT_HEXLONG, Value);
     }
     else {
@@ -527,8 +527,8 @@ VOID propObDumpUlong64(
     _In_ COLORREF FontColor
 )
 {
-    TL_SUBITEMS_FIXED  subitems;
-    WCHAR              szValue[DUMP_CONVERSION_LENGTH + 1];
+    TL_SUBITEMS_FIXED subitems;
+    WCHAR szValue[32];
 
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
     subitems.Count = 2;
@@ -589,8 +589,8 @@ VOID propObDumpLong64(
     _In_ COLORREF FontColor
 )
 {
-    TL_SUBITEMS_FIXED  subitems;
-    WCHAR              szValue[DUMP_CONVERSION_LENGTH + 1];
+    TL_SUBITEMS_FIXED subitems;
+    WCHAR szValue[32];
 
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
     subitems.Count = 2;
@@ -648,7 +648,7 @@ HTREEITEM propObAddHexValue(
     _In_ BOOL AsPointer
 )
 {
-    WCHAR szValue[DUMP_CONVERSION_LENGTH + 1];
+    WCHAR szValue[32];
     TL_SUBITEMS_FIXED subitems;
 
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
@@ -782,9 +782,9 @@ VOID propObDumpUSHORT(
     _In_ BOOLEAN HexOutput
 )
 {
-    LPCWSTR             lpFormat;
-    TL_SUBITEMS_FIXED   subitems;
-    WCHAR               szValue[DUMP_CONVERSION_LENGTH + 1];
+    LPCWSTR lpFormat;
+    TL_SUBITEMS_FIXED subitems;
+    WCHAR szValue[32];
 
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
     RtlSecureZeroMemory(szValue, sizeof(szValue));
@@ -792,7 +792,7 @@ VOID propObDumpUSHORT(
     lpFormat = (HexOutput) ? FORMAT_HEXUSHORT : FORMAT_USHORT;
 
     RtlStringCchPrintfSecure(szValue,
-        DUMP_CONVERSION_LENGTH,
+        RTL_NUMBER_OF(szValue),
         lpFormat,
         Value);
 
@@ -824,36 +824,20 @@ VOID propObDumpUnicodeStringInternal(
     _In_ LPWSTR StringName,
     _In_opt_ PUNICODE_STRING String,
     _In_opt_ PVOID ReferenceBufferAddress,
-    _In_ BOOLEAN IsKernelPtr
+    _In_ BOOLEAN IsKernelPointer
 )
 {
-    HTREEITEM           h_tviSubItem;
-    TL_SUBITEMS_FIXED   subitems;
-    WCHAR               szValue[DUMP_CONVERSION_LENGTH + 1];
+    BOOL bNormalized = FALSE;
+    HTREEITEM h_tviSubItem;
+    TL_SUBITEMS_FIXED subitems;
+    WCHAR szValue[32];
+    UNICODE_STRING displayString;
 
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
     subitems.Count = 2;
 
-    if (IsKernelPtr) {
-
-        subitems.Text[1] = T_PUNICODE_STRING;
-
-        if (ReferenceBufferAddress == NULL) {
-            subitems.Text[0] = T_NULL;
-        }
-        else {
-            RtlSecureZeroMemory(&szValue, sizeof(szValue));
-            szValue[0] = TEXT('0');
-            szValue[1] = TEXT('x');
-            u64tohex((ULONG_PTR)ReferenceBufferAddress, &szValue[2]);
-            subitems.Text[0] = szValue;
-        }
-
-    }
-    else {
-        subitems.Text[0] = T_EmptyString;
-        subitems.Text[1] = T_UNICODE_STRING;
-    }
+    subitems.Text[0] = T_EmptyString;
+    subitems.Text[1] = (IsKernelPointer) ? T_PUNICODE_STRING : T_UNICODE_STRING;
 
     //
     // Add root node.
@@ -905,23 +889,28 @@ VOID propObDumpUnicodeStringInternal(
         else {
 
             RtlSecureZeroMemory(&szValue, sizeof(szValue));
-            szValue[0] = TEXT('0');
-            szValue[1] = TEXT('x');
-
-            if (IsKernelPtr) {
-                u64tohex((ULONG_PTR)String->Buffer, &szValue[2]);
+            if (ReferenceBufferAddress == NULL) {
+                subitems.Text[0] = T_NULL;
             }
             else {
-                if (ReferenceBufferAddress) {
-                    u64tohex((ULONG_PTR)ReferenceBufferAddress, &szValue[2]);
-                }
-                else {
-                    szValue[0] = 0;
-                }
+                RtlSecureZeroMemory(&szValue, sizeof(szValue));
+                szValue[0] = TEXT('0');
+                szValue[1] = TEXT('x');
+                u64tohex((ULONG_PTR)ReferenceBufferAddress, &szValue[2]);
+                subitems.Text[0] = szValue;
             }
 
-            subitems.Text[0] = szValue;
-            subitems.Text[1] = String->Buffer;
+            bNormalized = supNormalizeUnicodeStringForDisplay(g_obexHeap,
+                String,
+                &displayString);
+            if (bNormalized)
+            {
+                subitems.Text[1] = displayString.Buffer;
+            }
+            else {
+                subitems.Text[1] = String->Buffer;
+            }
+
         }
 
         supTreeListAddItem(
@@ -935,6 +924,8 @@ VOID propObDumpUnicodeStringInternal(
 
     }
 
+    if (bNormalized)
+        supFreeDuplicatedUnicodeString(g_obexHeap, &displayString, FALSE);
 }
 
 /*
@@ -950,7 +941,7 @@ VOID propObDumpUnicodeString(
     _In_ HTREEITEM hParent,
     _In_ LPWSTR StringName,
     _In_ PUNICODE_STRING InputString,
-    _In_ BOOLEAN IsKernelPtr
+    _In_ BOOLEAN IsKernelPointer
 )
 {
     UNICODE_STRING dumpedString;
@@ -960,17 +951,45 @@ VOID propObDumpUnicodeString(
     bDumpOk = kdDumpUnicodeString(InputString,
         &dumpedString,
         &pvRefAddr,
-        IsKernelPtr);
+        IsKernelPointer);
 
     propObDumpUnicodeStringInternal(TreeList,
         hParent,
         StringName,
         &dumpedString,
         pvRefAddr,
-        IsKernelPtr);
+        IsKernelPointer);
 
     if (bDumpOk)
         supHeapFree(dumpedString.Buffer);
+}
+
+/*
+* propDumpQueryFullNamespaceNormalizedPath
+*
+* Purpose:
+*
+* Query full namespace path for object with a normalization for output.
+*
+*/
+_Success_(return)
+BOOL propDumpQueryFullNamespaceNormalizedPath(
+    _In_ ULONG_PTR ObjectAddress,
+    _Out_ PUNICODE_STRING NormalizedPath
+)
+{
+    BOOL bResult = FALSE;
+    UNICODE_STRING objectName;
+
+    if (ObQueryFullNamespacePath(ObjectAddress, &objectName)) {
+
+        bResult = supNormalizeUnicodeStringForDisplay(g_obexHeap,
+            &objectName, NormalizedPath);
+
+        supFreeUnicodeString(g_obexHeap, &objectName);
+    }
+
+    return bResult;
 }
 
 /*
@@ -990,15 +1009,18 @@ VOID propDumpObjectForAddress(
     _In_ LPWSTR lpErrorLiteral
 )
 {
+    BOOL bOkay = FALSE;
     COLORREF bgColor = 0;
     ULONG_PTR objectAddress = (ULONG_PTR)pvObject;
-    LPWSTR lpObjectName = NULL, lpName = NULL;
+    LPWSTR lpName = NULL;
+
+    UNICODE_STRING normalizedName;
 
     if (objectAddress) {
 
-        lpObjectName = ObQueryFullNamespacePath(objectAddress);
-        if (lpObjectName) {
-            lpName = lpObjectName;
+        bOkay = propDumpQueryFullNamespaceNormalizedPath(objectAddress, &normalizedName);
+        if (bOkay) {
+            lpName = normalizedName.Buffer;
         }
         else {
             lpName = lpErrorLiteral;
@@ -1015,8 +1037,8 @@ VOID propDumpObjectForAddress(
         (COLORREF)bgColor,
         (COLORREF)0);
 
-    if (lpObjectName)
-        supHeapFree(lpObjectName);
+    if (bOkay)
+        supFreeUnicodeString(g_obexHeap, &normalizedName);
 }
 
 /*
@@ -1188,14 +1210,18 @@ VOID propObDumpDriverExtension(
         PVOID Ref;
     } DrvExt;
 
+    BOOL bPathAllocated;
+
     HTREEITEM h_tviRootItem;
 
     COLORREF BgColor;
     PDRIVER_OBJECT SelfDriverObject;
-    LPWSTR lpDesc, lpObjectName;
+    LPWSTR lpDesc;
     PVOID DriverExtensionPtr;
     ULONG ObjectSize = 0;
     ULONG ObjectVersion = 0;
+
+    UNICODE_STRING normalizedPath;
 
     DriverExtensionPtr = ObDumpDriverExtensionVersionAware((ULONG_PTR)DriverExtension,
         &ObjectSize,
@@ -1221,7 +1247,7 @@ VOID propObDumpDriverExtension(
             //
             BgColor = 0;
             lpDesc = NULL;
-            lpObjectName = NULL;
+            bPathAllocated = FALSE;
 
             //must be self-ref
             SelfDriverObject = DrvExt.Versions.DriverExtensionCompatible->DriverObject;
@@ -1234,9 +1260,10 @@ VOID propObDumpDriverExtension(
                 //find ref
                 if (SelfDriverObject != NULL) {
 
-                    lpObjectName = ObQueryFullNamespacePath((ULONG_PTR)SelfDriverObject);
-                    if (lpObjectName) {
-                        lpDesc = lpObjectName;
+                    bPathAllocated = propDumpQueryFullNamespaceNormalizedPath(
+                        (ULONG_PTR)SelfDriverObject, &normalizedPath);
+                    if (bPathAllocated) {
+                        lpDesc = normalizedPath.Buffer;
                     }
                     else {
                         //sef-ref not found, notify, could be object outside directory so we don't know it name etc
@@ -1250,11 +1277,13 @@ VOID propObDumpDriverExtension(
             propObDumpAddress(TreeList, h_tviRootItem, T_FIELD_DRIVER_OBJECT,
                 lpDesc, SelfDriverObject, BgColor, 0);
 
-            if (lpObjectName)
-                supHeapFree(lpObjectName);
+            if (bPathAllocated)
+                supFreeDuplicatedUnicodeString(g_obexHeap, &normalizedPath, FALSE);
 
             //AddDevice
-            propObDumpAddressWithModule(TreeList, h_tviRootItem, TEXT("AddDevice"),
+            propObDumpAddressWithModule(TreeList, 
+                h_tviRootItem, 
+                TEXT("AddDevice"),
                 DrvExt.Versions.DriverExtensionCompatible->AddDevice,
                 ModulesList,
                 LoaderEntry->DllBase,
@@ -2762,7 +2791,7 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpSyncObject)
     WCHAR     szValue[MAX_PATH + 1];
 
 
-    switch (Context->TypeIndex) {
+    switch (Context->ObjectTypeIndex) {
 
     case ObjectTypeEvent:
         ObjectSize = sizeof(KEVENT);
@@ -2803,7 +2832,7 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpSyncObject)
     // Object name
     //
     Header = NULL;
-    switch (Context->TypeIndex) {
+    switch (Context->ObjectTypeIndex) {
     case ObjectTypeEvent:
         lpType = T_KEVENT;
         Event = (KEVENT*)Object;
@@ -2914,7 +2943,7 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpSyncObject)
     propObDumpDispatcherHeader(hwndTreeList, h_tviRootItem, Header, lpDescType, lpDesc1, lpDesc2);
 
     //type specific values
-    switch (Context->TypeIndex) {
+    switch (Context->ObjectTypeIndex) {
     case ObjectTypeMutant:
         if (Mutant) {
             propObDumpListEntry(hwndTreeList, h_tviRootItem, L"MutantListEntry", &Mutant->MutantListEntry);
@@ -2967,7 +2996,7 @@ VOID propObDumpObjectTypeFlags(
     LPWSTR lpType;
     TL_SUBITEMS_FIXED TreeListSubitems;
 
-    WCHAR szValue[DUMP_CONVERSION_LENGTH + 1];
+    WCHAR szValue[32];
 
     if (ObjectTypeFlags) {
 
@@ -2983,7 +3012,7 @@ VOID propObDumpObjectTypeFlags(
 
                     RtlSecureZeroMemory(szValue, sizeof(szValue));
                     RtlStringCchPrintfSecure(szValue,
-                        DUMP_CONVERSION_LENGTH,
+                        RTL_NUMBER_OF(szValue),
                         FORMAT_HEXBYTE,
                         ObjectTypeFlags);
 
@@ -3017,18 +3046,18 @@ VOID propObDumpObjectTypeFlags(
 */
 PROP_OBJECT_DUMP_ROUTINE(propObDumpObjectType)
 {
-    BOOL                    bOkay;
-    HTREEITEM               h_tviRootItem, h_tviSubItem, h_tviGenericMapping;
-    UINT                    i;
-    LPWSTR                  lpType = NULL;
-    POBJINFO                CurrentObject = NULL;
-    PVOID                   ObjectTypeInformation = NULL;
-    PRTL_PROCESS_MODULES    ModulesList = NULL;
-    TL_SUBITEMS_FIXED       TreeListSubItems;
-    PVOID                   TypeProcs[MAX_KNOWN_OBJECT_TYPE_PROCEDURES];
-    PVOID                   SelfDriverBase;
-    ULONG                   SelfDriverSize;
+    BOOL bOkay;
+    HTREEITEM h_tviRootItem, h_tviSubItem, h_tviGenericMapping;
+    UINT i;
+    LPWSTR lpType = NULL;
+    PVOID ObjectTypeInformation = NULL;
+    PRTL_PROCESS_MODULES ModulesList = NULL;
+    TL_SUBITEMS_FIXED TreeListSubItems;
+    PVOID TypeProcs[MAX_KNOWN_OBJECT_TYPE_PROCEDURES];
+    PVOID SelfDriverBase;
+    ULONG SelfDriverSize;
 
+    POBEX_OBJECT_INFORMATION CurrentObject = NULL;
     ULONG ObjectSize = 0;
     ULONG ObjectVersion = 0;
 
@@ -3066,7 +3095,10 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpObjectType)
         //
         // Get the reference to the object.
         //
-        CurrentObject = ObQueryObject(T_OBJECTTYPES, Context->lpObjectName);
+        CurrentObject = ObQueryObjectInDirectory(
+            &Context->NtObjectName,
+            ObGetPredefinedUnicodeString(OBP_OBTYPES));
+
         if (CurrentObject == NULL)
             break;
 
@@ -3227,10 +3259,8 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpObjectType)
         //
         RtlSecureZeroMemory(TypeProcs, sizeof(TypeProcs));
 
-        supCopyMemory(
-            &TypeProcs,
-            sizeof(TypeProcs),
-            &ObjectType.Versions.ObjectTypeCompatible->TypeInfo.DumpProcedure,
+        RtlCopyMemory(&TypeProcs, 
+            &ObjectType.Versions.ObjectTypeCompatible->TypeInfo.DumpProcedure, 
             sizeof(TypeProcs));
 
         //assume ntoskrnl first in list and list initialized
@@ -3499,7 +3529,7 @@ VOID propObxDumpFltFilter(
     ULONG objectVersion, objectSize = 0;
     PVOID pvFltObject;
     TL_SUBITEMS_FIXED subitems;
-    WCHAR szValue[MAX_TEXT_CONVERSION_ULONG64 + 1];
+    WCHAR szValue[MAX_TEXT_CONVERSION_ULONG64];
 
     FLT_FILTER_COMPATIBLE compatObject;
 
@@ -4001,7 +4031,7 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpAlpcPort)
     ALPC_PORT_STATE PortState;
     TL_SUBITEMS_FIXED subitems;
 
-    WCHAR szBuffer[DUMP_CONVERSION_LENGTH + 1];
+    WCHAR szValue[32];
 
     union {
         union {
@@ -4050,11 +4080,11 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpAlpcPort)
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
     subitems.Count = 2;
 
-    szBuffer[0] = L'0';
-    szBuffer[1] = L'x';
-    szBuffer[2] = 0;
-    u64tohex((ULONG_PTR)AlpcPort.u1.Port7600->CommunicationInfo, &szBuffer[2]);
-    subitems.Text[0] = szBuffer;
+    szValue[0] = L'0';
+    szValue[1] = L'x';
+    szValue[2] = 0;
+    u64tohex((ULONG_PTR)AlpcPort.u1.Port7600->CommunicationInfo, &szValue[2]);
+    subitems.Text[0] = szValue;
     subitems.Text[1] = TEXT("PALPC_COMMUNICATION_INFO");
 
     h_tviSubItem = supTreeListAddItem(
@@ -4293,8 +4323,6 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpAlpcPort)
     case OBVERSION_ALPCPORT_V4:
         PortState.State = AlpcPort.u1.Port10240->u1.State;
         break;
-    default:
-        break;
     }
 
     for (i = 0; i < RTL_NUMBER_OF(T_ALPC_PORT_STATE); i++) {
@@ -4338,6 +4366,9 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpCallback)
 
     CALLBACK_OBJECT ObjectDump;
     CALLBACK_REGISTRATION CallbackRegistration;
+
+    UNICODE_STRING NormalizedName;
+    LPWSTR ObjectName;
 
     //
     // Read object body.
@@ -4388,6 +4419,14 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpCallback)
     ListHead = Context->ObjectInfo.ObjectAddress + FIELD_OFFSET(CALLBACK_OBJECT, RegisteredCallbacks);
     ListEntry.Flink = ObjectDump.RegisteredCallbacks.Flink;
     Count = 0;
+
+    if (supNormalizeUnicodeStringForDisplay(g_obexHeap, &Context->NtObjectName, &NormalizedName)) {
+        ObjectName = NormalizedName.Buffer;
+    }
+    else {
+        ObjectName = Context->NtObjectName.Buffer;
+    }
+
     while ((ULONG_PTR)ListEntry.Flink != ListHead) {
 
         //
@@ -4410,7 +4449,7 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpCallback)
 
         propObDumpAddressWithModule(hwndTreeList,
             h_tviRootItem,
-            Context->lpObjectName,
+            ObjectName,
             CallbackRegistration.CallbackFunction,
             Modules,
             NULL,
@@ -4425,6 +4464,7 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpCallback)
             TEXT("This object has no registered callbacks or there is an query error."));
     }
 
+    supFreeDuplicatedUnicodeString(g_obexHeap, &NormalizedName, FALSE);
     supHeapFree(Modules);
 }
 
@@ -4600,7 +4640,7 @@ INT_PTR ObjectDumpOnInit(
     pvDlgContext->tlSubItemHit = -1;
     SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)pvDlgContext);
 
-    switch (Context->TypeIndex) {
+    switch (Context->ObjectTypeIndex) {
 
     case ObjectTypeDirectory:
         ObDumpRoutine = (pfnObDumpRoutine)propObDumpDirectoryObject;
@@ -4720,9 +4760,6 @@ VOID ObjectDumpOnWMCommand(
         supTreeListCopyItemValueToClipboard(pvDlgContext->TreeList,
             pvDlgContext->tlSubItemHit);
 
-        break;
-
-    default:
         break;
     }
 }

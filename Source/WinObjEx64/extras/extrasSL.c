@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSL.C
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        04 Jun 2022
+*  DATE:        19 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -117,7 +117,7 @@ LPWSTR xxxSLCacheGetDescriptorDataType(
     _In_ SL_KMEM_CACHE_VALUE_DESCRIPTOR* CacheDescriptor
 )
 {
-    LPWSTR DataType;
+    LPWSTR DataType = NULL;
 
     switch (CacheDescriptor->Type) {
     case SL_DATA_SZ:
@@ -135,11 +135,8 @@ LPWSTR xxxSLCacheGetDescriptorDataType(
     case SL_DATA_SUM:
         DataType = TEXT("SL_DATA_SUM");
         break;
-
-    default:
-        DataType = NULL;
-        break;
     }
+
     return DataType;
 }
 
@@ -249,8 +246,6 @@ VOID SLCacheDialogDisplayDescriptorData(
         EnableWindow(GetDlgItem(hwndDlg, IDC_SLVALUE_VIEWWITH), TRUE);
         break;
 
-    default:
-        break;
     }
 
 }
@@ -297,7 +292,7 @@ VOID SLCacheDialogViewBinaryData(
         TRUE,
         FALSE))
     {
-        supShellExecInExplorerProcess(szFileName);
+        supShellExecInExplorerProcess(szFileName, NULL);
     }
 
 }
@@ -555,7 +550,7 @@ VOID SLCacheDialogOnInit(
     };
 
     SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)lParam);
-    supCenterWindowSpecifyParent(hwndDlg, g_WinObj.MainWindow);
+    supCenterWindowSpecifyParent(hwndDlg, g_hwndMain);
 
     pDlgContext->hwndDlg = hwndDlg;
     pDlgContext->lvItemHit = -1;

@@ -4,9 +4,9 @@
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        04 Jun 2022
+*  DATE:        19 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -16,7 +16,6 @@
 *******************************************************************************/
 #include "global.h"
 #include "msvcver.h"
-#include "winedebug.h"
 
 #define T_ABOUTDLG_ICON_PROP TEXT("aboutDlgIcon")
 
@@ -121,7 +120,7 @@ VOID AboutDialogInit(
     // Fill boot options.
     //   
     if (g_WinObj.IsWine) {
-        wine_ver = (PCHAR)wine_get_version();
+        wine_ver = GetWineVersion();
         wine_str = (PCHAR)supHeapAlloc(_strlen_a(wine_ver) + MAX_PATH);
         if (wine_str) {
             _strcpy_a(wine_str, "Wine ");
@@ -140,7 +139,7 @@ VOID AboutDialogInit(
         //
         // Query KD debugger enabled.
         //
-        if (ntsupIsKdEnabled(NULL, NULL)) {
+        if (supIsKdEnabled(NULL, NULL)) {
             _strcpy(szBuffer, TEXT("Debug, "));
         }
 
@@ -229,7 +228,7 @@ VOID AboutDialogOnNotify(
         if ((((LPNMHDR)lParam)->hwndFrom == GetDlgItem(hwndDlg, IDC_ABOUT_SYSLINK))
             && (item.iLink == 0))
         {
-            supShellExecInExplorerProcess(item.szUrl);
+            supShellExecInExplorerProcess(item.szUrl, NULL);
         }
 
         break;
@@ -262,7 +261,7 @@ INT_PTR CALLBACK AboutDialogProc(
     case WM_INITDIALOG:
         supCenterWindow(hwndDlg);
         AboutDialogInit(hwndDlg);
-        break;
+        return TRUE;
 
     case WM_NOTIFY:
         AboutDialogOnNotify(hwndDlg, lParam);
@@ -270,15 +269,174 @@ INT_PTR CALLBACK AboutDialogProc(
 
     case WM_COMMAND:
 
-        switch (GET_WM_COMMAND_ID(wParam, lParam)) {
-        case IDOK:
-        case IDCANCEL:
+        if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL) {
+
             hIcon = RemoveProp(hwndDlg, T_ABOUTDLG_ICON_PROP);
             if (hIcon) {
                 DestroyIcon((HICON)hIcon);
             }
-            return EndDialog(hwndDlg, S_OK);
+            return EndDialog(hwndDlg, TRUE);
+
         }
+
     }
     return 0;
+}
+
+static HANDLE StatsDialogThreadHandle = NULL;
+static FAST_EVENT StatsDialogInitializedEvent = FAST_EVENT_INIT;
+#define UPDATE_TIMER_ID 1
+
+/*
+* StatsTimerProc
+*
+* Purpose:
+*
+* Statistics timer callback.
+*
+*/
+VOID StatsTimerProc(
+    HWND hwnd,
+    UINT uMsg,
+    UINT_PTR idEvent,
+    DWORD dwTime)
+{
+    UNREFERENCED_PARAMETER(uMsg);
+    UNREFERENCED_PARAMETER(idEvent);
+    UNREFERENCED_PARAMETER(dwTime);
+
+    WCHAR szBuffer[64];
+
+    SetDlgItemInt(hwnd, IDC_STATS_TOTALHEAPALLOC, g_WinObjStats.TotalHeapAlloc, FALSE);
+    SetDlgItemInt(hwnd, IDC_STATS_TOTALHEAPFREE, g_WinObjStats.TotalHeapFree, FALSE);
+    SetDlgItemInt(hwnd, IDC_STATS_TOTALHEAPSCREATED, g_WinObjStats.TotalHeapsCreated, FALSE);
+    SetDlgItemInt(hwnd, IDC_STATS_TOTALHEAPSDESTROYED, g_WinObjStats.TotalHeapsDestroyed, FALSE);
+    SetDlgItemInt(hwnd, IDC_STATS_TOTALTHREADSCREATED, g_WinObjStats.TotalThreadsCreated, FALSE);
+
+    szBuffer[0] = 0;
+    u64tostr(g_WinObjStats.TotalHeapMemoryAllocated, &szBuffer[0]);
+    SetDlgItemText(hwnd, IDC_STATS_TOTALTHEAPMEMORYALLOCATED, szBuffer);
+
+#ifdef _DEBUG
+    ShowWindow(GetDlgItem(hwnd, IDC_STATS_MAXHEAPALLOCATEDSIZE_STATIC), SW_SHOW);
+    ShowWindow(GetDlgItem(hwnd, IDC_STATS_MAXHEAPALLOCATEDSIZE), SW_SHOW);
+    szBuffer[0] = 0;
+    u64tostr(g_WinObjStats.MaxHeapAllocatedBlockSize, &szBuffer[0]);
+    SetDlgItemText(hwnd, IDC_STATS_MAXHEAPALLOCATEDSIZE, szBuffer);
+#endif
+}
+
+/*
+* StatsDialogProc
+*
+* Purpose:
+*
+* Statistics Dialog Window Procedure
+*
+* During WM_INITDIALOG centers window and sets timer callback.
+*
+*/
+INT_PTR CALLBACK StatsDialogProc(
+    _In_ HWND   hwndDlg,
+    _In_ UINT   uMsg,
+    _In_ WPARAM wParam,
+    _In_ LPARAM lParam
+)
+{
+    UNREFERENCED_PARAMETER(lParam);
+
+    switch (uMsg) {
+
+    case WM_INITDIALOG:
+        supCenterWindowSpecifyParent(hwndDlg, g_hwndMain);
+        SetTimer(hwndDlg, UPDATE_TIMER_ID, 1000, (TIMERPROC)StatsTimerProc);
+        break;
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+
+    case WM_CLOSE:
+        KillTimer(hwndDlg, UPDATE_TIMER_ID);
+        return DestroyWindow(hwndDlg);
+
+    case WM_COMMAND:
+
+        switch (GET_WM_COMMAND_ID(wParam, lParam)) {
+        case IDCANCEL:
+        case IDOK:
+            SendMessage(hwndDlg, WM_CLOSE, 0, 0);
+            break;
+        }
+        break;
+    }
+    return 0;
+}
+
+/*
+* StatsDialogWorkerThread
+*
+* Purpose:
+*
+* Worker thread that creates dialog window and processes messages queue.
+*
+*/
+DWORD StatsDialogWorkerThread(
+    _In_ PVOID Parameter
+)
+{
+    BOOL bResult;
+    MSG message;
+    HWND hwndDlg;
+
+    UNREFERENCED_PARAMETER(Parameter);
+
+    hwndDlg = CreateDialogParam(g_WinObj.hInstance,
+        MAKEINTRESOURCE(IDD_DIALOG_STATS),
+        0,
+        (DLGPROC)&StatsDialogProc,
+        0);
+
+    supSetFastEvent(&StatsDialogInitializedEvent);
+
+    do {
+
+        bResult = GetMessage(&message, NULL, 0, 0);
+        if (bResult == -1)
+            break;
+
+        if (!IsDialogMessage(hwndDlg, &message)) {
+            TranslateMessage(&message);
+            DispatchMessage(&message);
+        }
+
+    } while (bResult != 0);
+
+    supResetFastEvent(&StatsDialogInitializedEvent);
+
+    if (StatsDialogThreadHandle) {
+        NtClose(StatsDialogThreadHandle);
+        StatsDialogThreadHandle = NULL;
+    }
+    return 0;
+}
+
+/*
+* ShowStatsDialog
+*
+* Purpose:
+*
+* Create statistics dialog if none present.
+*
+*/
+VOID ShowStatsDialog(
+    VOID
+)
+{
+    if (!StatsDialogThreadHandle) {
+
+        StatsDialogThreadHandle = supCreateThread(StatsDialogWorkerThread, NULL, 0);
+        supWaitForFastEvent(&StatsDialogInitializedEvent, NULL);
+
+    }
 }

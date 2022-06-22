@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       PROPDLG.H
 *
-*  VERSION:     1.90
+*  VERSION:     2.00
 *
-*  DATE:        11 May 2021
+*  DATE:        19 Jun 2022
 *
 *  Common header file for properties dialog.
 *
@@ -18,15 +18,14 @@
 *******************************************************************************/
 #pragma once
 
-//
-// Externs for global properties variables.
-//
-extern HWND g_PropWindow;
-extern HWND g_PsTokenWindow;
-extern HWND g_PsPropWindow;
-extern HWND g_DesktopPropWindow;
-extern HWND g_NamespacePropWindow;
+HWND propGetCommonWindow();
+HWND propGetProcessesWindow();
+HWND propGetThreadsWindow();
+HWND propGetTokenWindow();
+HWND propGetDesktopWindow();
+HWND propGetNamespaceWindow();
 
+_Success_(return)
 BOOL propOpenCurrentObject(
     _In_ PROP_OBJECT_INFO *Context,
     _Out_ PHANDLE phObject,
@@ -37,13 +36,10 @@ BOOL propCloseCurrentObject(
     _In_ HANDLE hObject);
 
 VOID propCreateDialog(
-    _In_ PROP_DIALOG_CREATE_SETTINGS *Settings);
+    _In_ PROP_CONFIG *Config);
 
 PPROP_OBJECT_INFO propContextCreate(
-    _In_opt_ LPWSTR lpObjectName,
-    _In_opt_ LPCWSTR lpObjectType,
-    _In_opt_ LPWSTR lpCurrentObjectPath,
-    _In_opt_ LPWSTR lpDescription);
+    _In_ PROP_CONFIG* Config);
 
 VOID propContextDestroy(
     _In_ PROP_OBJECT_INFO *Context);

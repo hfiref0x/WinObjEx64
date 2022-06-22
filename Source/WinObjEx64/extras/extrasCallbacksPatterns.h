@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASCALLBACKSPATTERNS.H
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        28 May 2022
+*  DATE:        19 Jun 2022
 *
 *  Header with search patterns used by Callbacks dialog routines.
 *

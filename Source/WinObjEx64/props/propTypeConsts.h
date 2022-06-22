@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPTYPECONSTS.H
 *
-*  VERSION:     1.93
+*  VERSION:     2.00
 *
-*  DATE:        24 Mar 2022
+*  DATE:        19 Jun 2022
 *
 *  Consts header file for Type property sheet.
 *

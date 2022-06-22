@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017 - 2021
+*  (C) COPYRIGHT AUTHORS, 2017 - 2022
 *
 *  TITLE:       OBJECTS.C
 *
-*  VERSION:     1.92
+*  VERSION:     2.00
 *
-*  DATE:        03 Oct 2021
+*  DATE:        19 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -214,13 +214,13 @@ INT ObManagerComparerName(
 *
 */
 LPWSTR ObManagerGetNameByIndex(
-    _In_ ULONG TypeIndex
+    _In_ WOBJ_OBJECT_TYPE TypeIndex
 )
 {
     ULONG nIndex;
 
     for (nIndex = 0; nIndex < g_ObjectTypesCount; nIndex++) {
-        if (gpObjectTypes[nIndex]->Index == (WOBJ_OBJECT_TYPE)TypeIndex)
+        if (gpObjectTypes[nIndex]->Index == TypeIndex)
             return gpObjectTypes[nIndex]->Name;
     }
 
@@ -237,17 +237,39 @@ LPWSTR ObManagerGetNameByIndex(
 *
 */
 UINT ObManagerGetImageIndexByTypeIndex(
-    _In_ ULONG TypeIndex
+    _In_ WOBJ_OBJECT_TYPE TypeIndex
 )
 {
-    ULONG nIndex;
+    ULONG i;
 
-    for (nIndex = 0; nIndex < g_ObjectTypesCount; nIndex++) {
-        if (gpObjectTypes[nIndex]->Index == (WOBJ_OBJECT_TYPE)TypeIndex)
-            return gpObjectTypes[nIndex]->ImageIndex;
+    for (i = 0; i < g_ObjectTypesCount; i++) {
+        if (gpObjectTypes[i]->Index == TypeIndex)
+            return gpObjectTypes[i]->ImageIndex;
     }
 
     return ObjectTypeUnknown;
+}
+
+/*
+* ObManagerGetEntryByTypeIndex
+*
+* Purpose:
+*
+* Returns object entry by type index.
+*
+*/
+WOBJ_TYPE_DESC* ObManagerGetEntryByTypeIndex(
+    _In_ WOBJ_OBJECT_TYPE TypeIndex
+)
+{
+    ULONG i;
+
+    for (i = 0; i < g_ObjectTypesCount; i++) {
+        if (gpObjectTypes[i]->Index == TypeIndex)
+            return gpObjectTypes[i];
+    }
+
+    return &g_TypeUnknown;
 }
 
 /*
@@ -296,7 +318,7 @@ WOBJ_TYPE_DESC* ObManagerGetEntryByTypeName(
 * Returns object index of known type.
 *
 */
-UINT ObManagerGetIndexByTypeName(
+WOBJ_OBJECT_TYPE ObManagerGetIndexByTypeName(
     _In_opt_ LPCWSTR lpTypeName
 )
 {

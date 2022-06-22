@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRAS.C
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        07 Jun 2022
+*  DATE:        19 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -16,15 +16,7 @@
 *******************************************************************************/
 #include "global.h"
 #include "extras.h"
-#include "extrasUSD.h"
-#include "extrasPN.h"
-#include "extrasSSDT.h"
-#include "extrasDrivers.h"
-#include "extrasIPC.h"
-#include "extrasPSList.h"
-#include "extrasCallbacks.h"
-#include "extrasSL.h"
-#include "extrasCmOpt.h"
+#include "extrasHandlers.h"
 
 /*
 * extrasHandleSettingsChange
@@ -155,7 +147,7 @@ VOID extrasProcessElevationRequiredDialogs(
             g_kdctx.DriverContext.LoadStatus,
             g_kdctx.DriverContext.OpenStatus);
 
-        MessageBox(g_WinObj.MainWindow, 
+        MessageBox(g_hwndMain,
             szText, 
             PROGRAM_NAME, 
             MB_ICONINFORMATION);

@@ -4,9 +4,9 @@
 *
 *  TITLE:       HASH.H
 *
-*  VERSION:     1.93
+*  VERSION:     2.00
 *
-*  DATE:        13 May 2022
+*  DATE:        19 Jun 2022
 *
 *  Header file for the hash support routines.
 *

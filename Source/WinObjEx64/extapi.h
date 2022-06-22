@@ -1,14 +1,14 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       EXTAPI.H
 *
-*  VERSION:     1.92
+*  VERSION:     2.00
 *
-*  DATE:        30 Oct 2021
+*  DATE:        19 Jun 2022
 *
-*  Header for pre Windows10 missing API.
+*  Header for pre Windows 10+ missing API.
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -32,6 +32,11 @@ typedef NTSTATUS (NTAPI *pfnNtManagePartition)(
     _In_ ULONG PartitionInformationLength
     );
 
+typedef NTSTATUS (NTAPI *pfnNtOpenRegistryTransaction)(
+    _Out_ PHANDLE RegistryHandle,
+    _In_ ACCESS_MASK DesiredAccess,
+    _In_ POBJECT_ATTRIBUTES ObjectAttributes);
+
 typedef BOOL (WINAPI *pfnIsImmersiveProcess)(
     HANDLE hProcess
     );
@@ -48,11 +53,12 @@ typedef UINT (WINAPI *pfnGetDpiForWindow)(
 typedef UINT (WINAPI *pfnGetDpiForSystem)(
     VOID);
 
-#define EXTAPI_ALL_MAPPED 6
+#define EXTAPI_ALL_MAPPED 7
 
 typedef struct _EXTENDED_API_SET {
     ULONG NumberOfAPI;
     pfnNtOpenPartition NtOpenPartition;
+    pfnNtOpenRegistryTransaction NtOpenRegistryTransaction;
     pfnIsImmersiveProcess IsImmersiveProcess;
     pfnGetThreadDpiAwarenessContext GetThreadDpiAwarenessContext;
     pfnGetAwarenessFromDpiAwarenessContext GetAwarenessFromDpiAwarenessContext;

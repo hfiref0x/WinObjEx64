@@ -4,9 +4,9 @@
 *
 *  TITLE:       PLUGINMNGR.H
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        07 Jun 2022
+*  DATE:        19 Jun 2022
 *
 *  Common header file for the plugin manager.
 *
@@ -19,7 +19,7 @@
 
 #pragma once
 
-#define WOBJ_PLUGIN_SYSTEM_VERSION 18712
+#define WOBJ_PLUGIN_SYSTEM_VERSION 20006
 
 //
 // Plugin init routine name.
@@ -58,14 +58,13 @@ typedef UCHAR(CALLBACK* pfnGetInstructionLength)(
 typedef NTSTATUS(*pfnOpenNamedObjectByType)(
     _Out_ HANDLE* ObjectHandle,
     _In_ ULONG TypeIndex,
-    _In_ LPWSTR ObjectDirectory,
-    _In_opt_ LPWSTR ObjectName,
+    _In_ PUNICODE_STRING ObjectDirectory,
+    _In_ PUNICODE_STRING ObjectName,
     _In_ ACCESS_MASK DesiredAccess);
 
 typedef struct _WINOBJEX_PARAM_OBJECT {
-    LPWSTR ObjectName;
-    LPWSTR ObjectDirectory;
-    PVOID Reserved;
+    UNICODE_STRING Name;
+    UNICODE_STRING Directory;
 } WINOBJEX_PARAM_OBJECT, * PWINOBJEX_PARAM_OBJECT;
 
 typedef struct _WINOBJEX_PARAM_BLOCK {
@@ -162,8 +161,7 @@ VOID PmDestroy();
 
 VOID PmProcessEntry(
     _In_ HWND ParentWindow,
-    _In_ UINT Id,
-    _In_opt_ HTREEITEM ObjectTreeItem);
+    _In_ UINT Id);
 
 VOID PmBuildPluginPopupMenuByObjectType(
     _In_ HMENU ContextMenu,

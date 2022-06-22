@@ -394,6 +394,9 @@
     <ClCompile Include="hash.c" />
     <ClCompile Include="hde\hde64.c" />
     <ClCompile Include="kldbg.c" />
+    <ClCompile Include="sup\sup.c" />
+    <ClCompile Include="sup\sync.c" />
+    <ClCompile Include="sup\wine.c" />
     <ClCompile Include="symparser.c" />
     <ClCompile Include="list.c" />
     <ClCompile Include="log\log.c" />
@@ -412,10 +415,8 @@
     <ClCompile Include="props\propToken.c" />
     <ClCompile Include="props\propType.c" />
     <ClCompile Include="sdviewDlg.c" />
-    <ClCompile Include="sup.c" />
     <ClCompile Include="sysinfoDlg.c" />
     <ClCompile Include="tests\testunit.c" />
-    <ClCompile Include="wine.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc">
@@ -435,25 +436,14 @@
     <ClInclude Include="..\Shared\ntuser\ntuser.h" />
     <ClInclude Include="..\Shared\sdk\extdef.h" />
     <ClInclude Include="..\Shared\treelist\treelist.h" />
-    <ClInclude Include="aboutDlg.h" />
     <ClInclude Include="drivers\wdbgdrv.h" />
     <ClInclude Include="drivers\wdrvprv.h" />
     <ClInclude Include="drivers\winio.h" />
     <ClInclude Include="excepth.h" />
     <ClInclude Include="extapi.h" />
     <ClInclude Include="extras\extras.h" />
-    <ClInclude Include="extras\extrasCallbacks.h" />
     <ClInclude Include="extras\extrasCallbacksPatterns.h" />
-    <ClInclude Include="extras\extrasCmOpt.h" />
-    <ClInclude Include="extras\extrasDrivers.h" />
-    <ClInclude Include="extras\extrasIPC.h" />
-    <ClInclude Include="extras\extrasPN.h" />
-    <ClInclude Include="extras\extrasPSList.h" />
-    <ClInclude Include="extras\extrasSL.h" />
-    <ClInclude Include="extras\extrasSSDT.h" />
-    <ClInclude Include="extras\extrasSSDTsup.h" />
-    <ClInclude Include="extras\extrasUSD.h" />
-    <ClInclude Include="findDlg.h" />
+    <ClInclude Include="extras\extrasHandlers.h" />
     <ClInclude Include="global.h" />
     <ClInclude Include="hash.h" />
     <ClInclude Include="hde\hde64.h" />
@@ -461,6 +451,10 @@
     <ClInclude Include="hde\table64.h" />
     <ClInclude Include="kldbg.h" />
     <ClInclude Include="ksymbols.h" />
+    <ClInclude Include="props\propCommon.h" />
+    <ClInclude Include="props\props.h" />
+    <ClInclude Include="sup\sup.h" />
+    <ClInclude Include="sup\wine.h" />
     <ClInclude Include="symparser.h" />
     <ClInclude Include="list.h" />
     <ClInclude Include="log\log.h" />
@@ -468,30 +462,14 @@
     <ClInclude Include="objects.h" />
     <ClInclude Include="kldbg_patterns.h" />
     <ClInclude Include="plugmngr.h" />
-    <ClInclude Include="props\propAlpcPort.h" />
-    <ClInclude Include="props\propBasic.h" />
     <ClInclude Include="props\propBasicConsts.h" />
-    <ClInclude Include="props\propDesktop.h" />
     <ClInclude Include="props\propDlg.h" />
-    <ClInclude Include="props\propDriver.h" />
-    <ClInclude Include="props\propObjectDump.h" />
     <ClInclude Include="props\propObjectDumpConsts.h" />
-    <ClInclude Include="props\propProcess.h" />
-    <ClInclude Include="props\propSection.h" />
-    <ClInclude Include="props\propSecurity.h" />
     <ClInclude Include="props\propSecurityConsts.h" />
-    <ClInclude Include="props\propToken.h" />
-    <ClInclude Include="props\propType.h" />
     <ClInclude Include="props\propTypeConsts.h" />
     <ClInclude Include="resource.h" />
-    <ClInclude Include="sdviewDlg.h" />
-    <ClInclude Include="sup.h" />
-    <ClInclude Include="supConsts.h" />
-    <ClInclude Include="sysinfoDlg.h" />
     <ClInclude Include="tests\testunit.h" />
     <ClInclude Include="ui.h" />
-    <ClInclude Include="wine.h" />
-    <ClInclude Include="winedebug.h" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="rsrc\100.ico" />

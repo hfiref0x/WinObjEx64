@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       PROPOBJECTDUMPCONSTS.H
 *
-*  VERSION:     1.92
+*  VERSION:     2.00
 *
-*  DATE:        19 Sep 2021
+*  DATE:        19 Jun 2022
 *
 *  Consts header file for structured object dumps.
 *
@@ -23,8 +23,6 @@
 #define CLR_WARN 0x5050ff //red
 #define CLR_INVL 0xa9a9a9 //silver
 #define CLR_LGRY 0xd3d3d3 //light grey
-
-#define DUMP_CONVERSION_LENGTH 99
 
 #define FORMAT_HEXBYTE      L"0x%02X"
 #define FORMAT_HEXUSHORT    L"0x%04X"

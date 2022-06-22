@@ -4,9 +4,9 @@
 *
 *  TITLE:       SDVIEWDLG.C
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        07 Jun 2022
+*  DATE:        19 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -15,10 +15,14 @@
 *
 *******************************************************************************/
 #include "global.h"
-#include "sdviewDlg.h"
 
 #define SDVIEWDLG_TRACKSIZE_MIN_X 480
 #define SDVIEWDLG_TRACKSIZE_MIN_Y 320
+
+HWND SDViewDialogWindow = NULL;
+static HANDLE SDViewDialogThreadHandle = NULL;
+static FAST_EVENT SDViewDialogInitializedEvent = FAST_EVENT_INIT;
+static FAST_EVENT SDViewDialogFinalizedEvent;
 
 //
 // SDView Dialog context structure.
@@ -36,9 +40,9 @@ typedef struct _SDVIEW_CONTEXT {
     //
     // Viewed object data.
     //
-    LPWSTR Directory;
-    LPWSTR Name;
     WOBJ_OBJECT_TYPE Type;
+    UNICODE_STRING NtObjectDirectory;
+    UNICODE_STRING NtObjectName;
 
     //
     // ListView selection.
@@ -51,7 +55,6 @@ typedef struct _SDVIEW_CONTEXT {
     //
     RECT WindowRect;
     RECT ListRect;
-    RECT ButtonRect;
 } SDVIEW_CONTEXT, * PSDVIEW_CONTEXT;
 
 //
@@ -89,15 +92,13 @@ typedef VOID(CALLBACK* pfnAceOutputCallback)(
 *
 */
 VOID FreeSDViewContext(
-    _In_ SDVIEW_CONTEXT* SdViewContext
+    _In_ SDVIEW_CONTEXT* Context
 )
 {
-    if (SdViewContext->Name)
-        supHeapFree(SdViewContext->Name);
-    if (SdViewContext->Directory)
-        supHeapFree(SdViewContext->Directory);
+    supFreeDuplicatedUnicodeString(g_obexHeap, &Context->NtObjectDirectory, FALSE);
+    supFreeDuplicatedUnicodeString(g_obexHeap, &Context->NtObjectName, FALSE);
 
-    supHeapFree(SdViewContext);
+    supHeapFree(Context);
 }
 
 /*
@@ -109,47 +110,26 @@ VOID FreeSDViewContext(
 *
 */
 SDVIEW_CONTEXT* AllocateSDViewContext(
-    _In_ LPWSTR ObjectDirectory,
-    _In_opt_ LPWSTR ObjectName,
     _In_ WOBJ_OBJECT_TYPE ObjectType
 )
 {
     SDVIEW_CONTEXT* ctx;
-    SIZE_T nLen, nNameLen = 0;
-
-    nLen = _strlen(ObjectDirectory);
-    if (nLen == 0)
-        return NULL;
-
-    if (ObjectName) {
-        nNameLen = _strlen(ObjectName);
-        if (nNameLen == 0)
-            return NULL;
-    }
 
     ctx = (SDVIEW_CONTEXT*)supHeapAlloc(sizeof(SDVIEW_CONTEXT));
     if (ctx == NULL)
         return NULL;
 
-    ctx->Directory = (LPWSTR)supHeapAlloc((1 + nLen) * sizeof(WCHAR));
-    if (ctx->Directory == NULL) {
-        FreeSDViewContext(ctx);
+    ctx->Type = ObjectType;
+ 
+    if (!supGetCurrentObjectPath(FALSE, &ctx->NtObjectDirectory)) {
+        supHeapFree(ctx);
         return NULL;
     }
 
-    _strcpy(ctx->Directory, ObjectDirectory);
-
-    ctx->Type = ObjectType;
-
-    if (ObjectName) {
-
-        ctx->Name = (LPWSTR)supHeapAlloc((1 + nNameLen) * sizeof(WCHAR));
-        if (ctx->Name == NULL) {
-            FreeSDViewContext(ctx);
-            return NULL;
-        }
-
-        _strcpy(ctx->Name, ObjectName);
+    if (!supGetCurrentObjectName(&ctx->NtObjectName)) {
+        supFreeDuplicatedUnicodeString(g_obexHeap, &ctx->NtObjectDirectory, FALSE);
+        supHeapFree(ctx);
+        return NULL;
     }
 
     return ctx;
@@ -744,8 +724,8 @@ NTSTATUS SDViewDumpObjectSecurity(
 
         ntStatus = supOpenNamedObjectByType(&hObject,
             Context->Type,
-            Context->Directory,
-            Context->Name,
+            &Context->NtObjectDirectory,
+            &Context->NtObjectName,
             READ_CONTROL);
 
         if (!NT_SUCCESS(ntStatus))
@@ -841,7 +821,10 @@ VOID SDViewInitControls(
     INT i;
     HWND aclList = GetDlgItem(hwndDlg, IDC_SDVIEW_LIST);
     HWND sidOwner = GetDlgItem(hwndDlg, IDC_SDVIEW_OWNER);
-    HWND okButton = GetDlgItem(hwndDlg, IDOK);
+
+    UNICODE_STRING objectName, normalizedName;
+    LPWSTR caption;
+    ULONG captionLength;
 
     //
     // Set listview style flags and theme.
@@ -879,8 +862,35 @@ VOID SDViewInitControls(
 
     GetClientRect(hwndDlg, &Context->WindowRect);
     GetWindowRect(aclList, &Context->ListRect);
-    GetWindowRect(okButton, &Context->ButtonRect);
-    ScreenToClient(hwndDlg, (LPPOINT)&Context->ButtonRect);
+
+    //
+    // Set dialog caption.
+    //
+    if (supCreateObjectPathFromElements(&Context->NtObjectName,
+        &Context->NtObjectDirectory,
+        &objectName,
+        TRUE))
+    {
+        if (supNormalizeUnicodeStringForDisplay(g_obexHeap, &objectName, &normalizedName)) {
+
+            captionLength = normalizedName.Length + MAX_PATH;
+            caption = (LPWSTR)supHeapAlloc(captionLength);
+            if (caption) {
+
+                RtlStringCchPrintfSecure(caption,
+                    captionLength / sizeof(WCHAR),
+                    TEXT("Security Descriptor: %ws"),
+                    normalizedName.Buffer);
+
+                SetWindowText(hwndDlg, caption);
+
+                supHeapFree(caption);
+            }
+            supFreeUnicodeString(g_obexHeap, &normalizedName);
+        }
+
+        supFreeUnicodeString(g_obexHeap, &objectName);
+    }
 }
 
 /*
@@ -939,7 +949,6 @@ VOID SDViewOnResize(
 )
 {
     HWND hwndList = GetDlgItem(hwndDlg, IDC_SDVIEW_LIST);
-    HWND hwndButton = GetDlgItem(hwndDlg, IDOK);
     WORD dlgWidth = LOWORD(lParam), dlgHeight = HIWORD(lParam);
 
     INT dx, dy;
@@ -951,15 +960,6 @@ VOID SDViewOnResize(
         dlgWidth - dx - Context->ListRect.left,
         dlgHeight - dy - Context->ListRect.top,
         SWP_NOMOVE);
-
-    dx = Context->WindowRect.right - Context->ButtonRect.left;
-    dy = Context->WindowRect.bottom - Context->ButtonRect.top;
-
-    SetWindowPos(hwndButton, NULL,
-        dlgWidth - dx,
-        dlgHeight - dy,
-        0, 0,
-        SWP_NOSIZE);
 
     SendMessage(Context->StatusBar, WM_SIZE, 0, 0);
     RedrawWindow(hwndDlg, NULL, 0, RDW_ERASE | RDW_INVALIDATE | RDW_ERASENOW);
@@ -984,10 +984,8 @@ VOID SDViewDialogOnInit(
     SDVIEW_CONTEXT* dlgContext;
     ENUMCHILDWNDDATA wndData;
 
-    supCenterWindow(hwndDlg);
-    if (lParam == 0)
-        return;
-
+    SDViewDialogWindow = hwndDlg;
+    supCenterWindowSpecifyParent(hwndDlg, g_hwndMain);
     dlgContext = (SDVIEW_CONTEXT*)lParam;
     SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)lParam);
 
@@ -1011,7 +1009,6 @@ VOID SDViewDialogOnInit(
     }
 
     SDViewInitControls(hwndDlg, dlgContext);
-
 
     //
     // Dump object security information.
@@ -1085,6 +1082,11 @@ INT_PTR CALLBACK SDViewDialogProc(
         }
         break;
 
+    case WM_DESTROY:
+        SDViewDialogWindow = NULL;
+        PostQuitMessage(0);
+        break;
+
     case WM_CLOSE:
         dlgContext = (SDVIEW_CONTEXT*)RemoveProp(hwndDlg, T_DLGCONTEXT);
         if (dlgContext) {
@@ -1108,7 +1110,6 @@ INT_PTR CALLBACK SDViewDialogProc(
 
         switch (GET_WM_COMMAND_ID(wParam, lParam)) {
         case IDCANCEL:
-        case IDOK:
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
             break;
 
@@ -1120,8 +1121,6 @@ INT_PTR CALLBACK SDViewDialogProc(
                     dlgContext->iColumnHit);
             }
             break;
-        default:
-            break;
 
         }
     default:
@@ -1132,102 +1131,53 @@ INT_PTR CALLBACK SDViewDialogProc(
 }
 
 /*
-* SDViewSetCaptionTextFormatted
+* SDViewDialogWorkerThread
 *
 * Purpose:
 *
-* Set dialog window caption text.
+* Create and initialize ViewSecurityDescriptor Dialog.
 *
 */
-VOID SDViewSetCaptionTextFormatted(
-    _In_ HWND DialogWindow,
-    _In_ LPWSTR ObjectDirectory,
-    _In_opt_ LPWSTR ObjectName
+DWORD SDViewDialogWorkerThread(
+    _In_ PVOID Parameter
 )
 {
-    LPWSTR lpText;
-    SIZE_T cch, l;
+    BOOL bResult;
+    MSG message;
+    HWND hwnd;
+    SDVIEW_CONTEXT* context = (SDVIEW_CONTEXT*)Parameter;
 
-    cch = MAX_PATH + _strlen(ObjectDirectory);
-    if (ObjectName) cch += _strlen(ObjectName);
+    hwnd = CreateDialogParam(g_WinObj.hInstance,
+        MAKEINTRESOURCE(IDD_DIALOG_SDVIEW),
+        0,
+        (DLGPROC)&SDViewDialogProc,
+        (LPARAM)context);
 
-    lpText = (LPWSTR)supHeapAlloc(cch * sizeof(WCHAR));
-    if (lpText) {
+    supSetFastEvent(&SDViewDialogInitializedEvent);
 
-        _strcpy(lpText, TEXT("Security Descriptor ("));
-        _strcat(lpText, ObjectDirectory);
-        l = _strlen(ObjectDirectory);
-        if (ObjectDirectory[l - 1] != L'\\') {
-            _strcat(lpText, TEXT("\\"));
-        }
-        if (ObjectName) {
-            _strcat(lpText, ObjectName);
-        }
-        _strcat(lpText, TEXT(")"));
-        SetWindowText(DialogWindow, lpText);
-        supHeapFree(lpText);
-    }
-}
+    do {
 
-/*
-* SDViewSetCaption
-*
-* Purpose:
-*
-* Format and set dialog window caption text as "Security Descriptor (ObjectDirectory\ObjectName)".
-*
-*/
-VOID SDViewSetCaption(
-    _In_ HWND DialogWindow,
-    _In_ LPWSTR ObjectDirectory,
-    _In_ LPWSTR ObjectName,
-    _In_ WOBJ_OBJECT_TYPE ObjectType
-)
-{
-    SIZE_T i, l, rdirLen, ldirSz;
-    LPWSTR SingleDirName, ParentDir;
+        bResult = GetMessage(&message, NULL, 0, 0);
+        if (bResult == -1)
+            break;
 
-
-    if (ObjectType == ObjectTypeDirectory) {
-
-        //
-        // Root case.
-        //
-        if (_strcmpi(ObjectName, KM_OBJECTS_ROOT_DIRECTORY) == 0) {
-            SDViewSetCaptionTextFormatted(DialogWindow, ObjectDirectory, NULL);
-            return;
+        if (!IsDialogMessage(hwnd, &message)) {
+            TranslateMessage(&message);
+            DispatchMessage(&message);
         }
 
+    } while (bResult != 0);
+
+    supResetFastEvent(&SDViewDialogInitializedEvent);
+
+    if (SDViewDialogThreadHandle) {
+        NtClose(SDViewDialogThreadHandle);
+        SDViewDialogThreadHandle = NULL;
     }
 
-    //
-    // Extract parent directory name, handle self case.
-    //
-    l = 0;
-    rdirLen = _strlen(ObjectDirectory);
-    for (i = 0; i < rdirLen; i++) {
-        if (ObjectDirectory[i] == L'\\')
-            l = i + 1;
-    }
+    supSetFastEvent(&SDViewDialogFinalizedEvent);
 
-    SingleDirName = &ObjectDirectory[l];
-
-    if (_strcmpi(SingleDirName, ObjectName) == 0) {
-
-        ldirSz = rdirLen * sizeof(WCHAR) + sizeof(UNICODE_NULL);
-        ParentDir = (LPWSTR)supHeapAlloc(ldirSz);
-        if (ParentDir) {
-            if (l == 1) l++;
-            supCopyMemory(ParentDir, ldirSz, ObjectDirectory, (l - 1) * sizeof(WCHAR));
-            SDViewSetCaptionTextFormatted(DialogWindow, ParentDir, ObjectName);
-            supHeapFree(ParentDir);
-        }
-
-    }
-    else {
-        SDViewSetCaptionTextFormatted(DialogWindow, ObjectDirectory, ObjectName);
-    }
-
+    return 0;
 }
 
 /*
@@ -1235,41 +1185,26 @@ VOID SDViewSetCaption(
 *
 * Purpose:
 *
-* Create and initialize ViewSecurityDescriptor Dialog.
+* Create dialog worker thread.
 *
 */
 VOID SDViewDialogCreate(
-    _In_ HWND ParentWindow,
-    _In_ LPWSTR ObjectDirectory,
-    _In_ LPWSTR ObjectName,
     _In_ WOBJ_OBJECT_TYPE ObjectType
 )
 {
-    HWND hwndDlg;
-    SDVIEW_CONTEXT* SDViewContext;
+    SDVIEW_CONTEXT* context;
 
-    if (ObjectDirectory == NULL || ObjectName == NULL)
-        return;
-
-    SDViewContext = AllocateSDViewContext(ObjectDirectory,
-        ObjectName,
-        ObjectType);
-
-    if (SDViewContext == NULL)
-        return;
-
-    hwndDlg = CreateDialogParam(g_WinObj.hInstance,
-        MAKEINTRESOURCE(IDD_DIALOG_SDVIEW),
-        ParentWindow,
-        (DLGPROC)&SDViewDialogProc,
-        (LPARAM)SDViewContext);
-
-    if (hwndDlg) {
-
-        SDViewSetCaption(hwndDlg, ObjectDirectory, ObjectName, ObjectType);
-
+    if (SDViewDialogThreadHandle) {
+        PostMessage(SDViewDialogWindow, WM_CLOSE, 0, 0);
+        supWaitForFastEvent(&SDViewDialogFinalizedEvent, NULL);
     }
-    else {
-        supHeapFree(SDViewContext);
+
+    context = AllocateSDViewContext(ObjectType);
+    if (context) {
+
+        supInitFastEvent(&SDViewDialogFinalizedEvent);
+        SDViewDialogThreadHandle = supCreateDialogWorkerThread(SDViewDialogWorkerThread, context, 0);
+        supWaitForFastEvent(&SDViewDialogInitializedEvent, NULL);
+
     }
 }

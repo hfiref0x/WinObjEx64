@@ -4,9 +4,9 @@
 *
 *  TITLE:       SYSINFODLG.C
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        07 Jun 2022
+*  DATE:        19 Jun 2022
 * 
 *  System Information Dialog.
 *
@@ -199,6 +199,8 @@ VOID SysInfoCollectInformation(
     HKEY hKey;
     DWORD dwType, cbData, dwValue;
 
+    OBEX_CONFIG* obConfig = supGetParametersBlock();
+
     PARAFORMAT ParaFormat;
     CHARRANGE CharRange;
 
@@ -241,7 +243,7 @@ VOID SysInfoCollectInformation(
     //
     RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
     if (g_WinObj.IsWine) {
-        lpWineVersion = (PCHAR)wine_get_version();
+        lpWineVersion = (PCHAR)GetWineVersion();
         RtlSecureZeroMemory(szWineVer, sizeof(szWineVer));
         if (0 == MultiByteToWideChar(CP_ACP, 0, lpWineVersion, (INT)_strlen_a(lpWineVersion),
             szWineVer, RTL_NUMBER_OF(szWineVer)))
@@ -345,6 +347,15 @@ VOID SysInfoCollectInformation(
     AddParameterValueBool(hwndOutput, TEXT("Internal.IsFullAdmin"), g_kdctx.IsFullAdmin); //admin privileges available
     AddParameterValueBool(hwndOutput, TEXT("Internal.IsSecureBoot"), g_kdctx.IsSecureBoot); //secure boot enabled
     AddParameterValueBool(hwndOutput, TEXT("Internal.IsWine"), g_WinObj.IsWine);
+    AddParameterValue32Hex(hwndOutput, TEXT("Internal.NameNormalizationSymbol"), (ULONG)g_ObNameNormalizationSymbol);
+
+    if (obConfig->SymbolsDbgHelpDllValid) {
+        AddParameterValue(hwndOutput, TEXT("Parameters.SymbolsDbgHelpDll"), obConfig->szSymbolsDbgHelpDll);
+    }
+    if (obConfig->SymbolsPathValid) {
+        AddParameterValue(hwndOutput, TEXT("Parameters.SymbolsPath"), obConfig->szSymbolsPath);
+    }
+
     AddParameterValueBool(hwndOutput, TEXT("MitigationFlags.ASLRPolicy"), g_kdctx.MitigationFlags.ASLRPolicy);
     AddParameterValueBool(hwndOutput, TEXT("MitigationFlags.DynamicCode"), g_kdctx.MitigationFlags.DynamicCode);
     AddParameterValueBool(hwndOutput, TEXT("MitigationFlags.ExtensionPointDisable"), g_kdctx.MitigationFlags.ExtensionPointDisable);
@@ -376,7 +387,7 @@ VOID SysInfoCollectInformation(
         lpType = L"Microsoft";
         break;
     }
-    AddParameterValue(hwndOutput, TEXT("Driver.ActiveProvider"), lpType);
+    AddParameterValue(hwndOutput, TEXT("Driver.SelectedProvider"), lpType);
 
     //
     // Ntoskrnl
@@ -394,12 +405,6 @@ VOID SysInfoCollectInformation(
     }
 
     //
-    // Directory object
-    //
-    AddParameterValue64Hex(hwndOutput, TEXT("System.DirectoryRootObject"), g_kdctx.DirectoryRootObject); //address of object root directory
-    AddParameterValueUlong(hwndOutput, TEXT("System.DirectoryTypeIndex"), g_kdctx.DirectoryTypeIndex);
-
-    //
     // Product info
     //
     AddParameterValueBool(hwndOutput, TEXT("System.LTSC"), supIsLongTermServicingWindows());
@@ -411,17 +416,31 @@ VOID SysInfoCollectInformation(
     AddParameterValue64Hex(hwndOutput, TEXT("System.MinimumUserModeAddress"), (ULONG_PTR)g_kdctx.MinimumUserModeAddress);
     AddParameterValue64Hex(hwndOutput, TEXT("System.MaximumUserModeAddress"), (ULONG_PTR)g_kdctx.MaximumUserModeAddress);
 
-    //
-    // List kldbg data.
-    //
-    AddParameterValueBool(hwndOutput, TEXT("System.ObHeaderCookieValid"), g_kdctx.Data->ObHeaderCookie.Valid);
-    AddParameterValue32Hex(hwndOutput, TEXT("System.ObHeaderCookie"), g_kdctx.Data->ObHeaderCookie.Value);
+    if (g_kdctx.IsFullAdmin) {
 
-    AddParameterValueUlong(hwndOutput, TEXT("System.KiServiceLimit"), g_kdctx.Data->KeServiceDescriptorTable.Limit);
-    AddParameterValue64Hex(hwndOutput, TEXT("System.KiServiceTableAddress"), (ULONG_PTR)g_kdctx.Data->KeServiceDescriptorTable.Base);
-    AddParameterValue64Hex(hwndOutput, TEXT("System.IopInvalidDeviceRequest"), (ULONG_PTR)g_kdctx.Data->IopInvalidDeviceRequest);
-    AddParameterValue64Hex(hwndOutput, TEXT("System.PrivateNamespaceLookupTable"), (ULONG_PTR)g_kdctx.Data->PrivateNamespaceLookupTable);
+        //
+        // List kldbg data if there is something to show since this data fetched dynamically during usage.
+        //
+        AddParameterValueBool(hwndOutput, TEXT("System.ObHeaderCookieValid"), g_kdctx.Data->ObHeaderCookie.Valid);
+        AddParameterValue32Hex(hwndOutput, TEXT("System.ObHeaderCookie"), g_kdctx.Data->ObHeaderCookie.Value);
+        AddParameterValueUlong(hwndOutput, TEXT("System.DirectoryTypeIndex"), g_kdctx.DirectoryTypeIndex);
 
+        if (g_kdctx.DirectoryRootObject)
+            AddParameterValue64Hex(hwndOutput, TEXT("System.DirectoryRootObject"), g_kdctx.DirectoryRootObject);
+
+        if (g_kdctx.Data->KeServiceDescriptorTable.Limit)
+            AddParameterValueUlong(hwndOutput, TEXT("System.KiServiceLimit"), g_kdctx.Data->KeServiceDescriptorTable.Limit);
+
+        if (g_kdctx.Data->KeServiceDescriptorTable.Base)
+            AddParameterValue64Hex(hwndOutput, TEXT("System.KiServiceTableAddress"), (ULONG_PTR)g_kdctx.Data->KeServiceDescriptorTable.Base);
+
+        if (g_kdctx.Data->IopInvalidDeviceRequest)
+            AddParameterValue64Hex(hwndOutput, TEXT("System.IopInvalidDeviceRequest"), (ULONG_PTR)g_kdctx.Data->IopInvalidDeviceRequest);
+
+        if (g_kdctx.Data->PrivateNamespaceLookupTable)
+            AddParameterValue64Hex(hwndOutput, TEXT("System.PrivateNamespaceLookupTable"), (ULONG_PTR)g_kdctx.Data->PrivateNamespaceLookupTable);
+
+    }
     //
     // List other data.
     //
@@ -585,10 +604,11 @@ LRESULT CALLBACK SysInfoDialogProc(
     UNREFERENCED_PARAMETER(lParam);
 
     switch (uMsg) {
-    case WM_INITDIALOG:
-
-        SysInfoCollectInformation(hwnd);
-        break;
+    case WM_SHOWWINDOW:
+        if (LOWORD(wParam)) {
+            SysInfoCollectInformation(hwnd);
+        }
+        return TRUE;
 
     case WM_COMMAND:
         switch (GET_WM_COMMAND_ID(wParam, lParam)) {
@@ -615,8 +635,10 @@ VOID ShowSysInfoDialog(
     _In_ HWND hwndParent
 )
 {
-    if (!supRichEdit32Load())
+    if (!supRichEdit32Load()) {
+        MessageBox(hwndParent, TEXT("Could not load RichEdit library"), NULL, MB_ICONERROR);
         return;
+    }
 
     DialogBoxParam(g_WinObj.hInstance,
         MAKEINTRESOURCE(IDD_DIALOG_GLOBALS),

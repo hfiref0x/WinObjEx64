@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       PROPTYPE.C
 *
-*  VERSION:     1.92
+*  VERSION:     2.00
 *
-*  DATE:        07 Dec 2021
+*  DATE:        19 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -531,83 +531,61 @@ VOID propSetTypeListView(
 * Used if object dumped info not available (restricted user, no driver etc).
 *
 */
+_Success_(return)
 BOOL propQueryTypeInfo(
-    _In_ LPWSTR lpObjectType,
-    _Inout_ POBJECT_TYPE_COMPATIBLE pObjectTypeDump
+    _In_ PUNICODE_STRING ObjectType,
+    _Out_ POBJECT_TYPE_COMPATIBLE Information
 )
 {
     BOOL     bResult = FALSE;
     ULONG    i;
-    SIZE_T   sz;
-    LPWSTR   lpType;
 
     POBJECT_TYPES_INFORMATION pObjectTypes = NULL;
     POBJECT_TYPE_INFORMATION  pObject;
 
-    if (lpObjectType == NULL)
-        return bResult;
+    pObjectTypes = (POBJECT_TYPES_INFORMATION)supGetObjectTypesInfo();
+    if (pObjectTypes == NULL)
+        return FALSE;
+
+    pObject = OBJECT_TYPES_FIRST_ENTRY(pObjectTypes);
 
     __try {
 
-        do {
-            pObjectTypes = (POBJECT_TYPES_INFORMATION)supGetObjectTypesInfo();
-            if (pObjectTypes == NULL) {
+        //
+        // Warning: older Wine/Staging incorrectly implement memory structure layout for this structure and therefore will crash.            
+        //
+        for (i = 0; i < pObjectTypes->NumberOfTypes; i++) {
+
+            if (RtlEqualUnicodeString(ObjectType, &pObject->TypeName, TRUE)) {
+                Information->TotalNumberOfHandles = pObject->TotalNumberOfHandles;
+                Information->TotalNumberOfObjects = pObject->TotalNumberOfObjects;
+                Information->TypeInfo.InvalidAttributes = pObject->InvalidAttributes;
+                Information->TypeInfo.GenericMapping = pObject->GenericMapping;
+                Information->TypeInfo.ValidAccessMask = pObject->ValidAccessMask;
+                Information->TypeInfo.DefaultNonPagedPoolCharge = pObject->DefaultNonPagedPoolCharge;
+                Information->TypeInfo.DefaultPagedPoolCharge = pObject->DefaultPagedPoolCharge;
+                Information->HighWaterNumberOfHandles = pObject->HighWaterNumberOfHandles;
+                Information->HighWaterNumberOfObjects = pObject->HighWaterNumberOfObjects;
+                Information->TypeInfo.PoolType = (POOL_TYPE)pObject->PoolType;
+                if (pObject->SecurityRequired) {
+                    SET_BIT(Information->TypeInfo.ObjectTypeFlags, 3);
+                }
+                if (pObject->MaintainHandleCount) {
+                    SET_BIT(Information->TypeInfo.ObjectTypeFlags, 4);
+                }
+                bResult = TRUE;
                 break;
             }
-
-            //
-            // Warning: older Wine/Staging incorrectly implement memory structure layout for this structure and therefore will crash.            
-            //
-
-            pObject = OBJECT_TYPES_FIRST_ENTRY(pObjectTypes);
-
-            for (i = 0; i < pObjectTypes->NumberOfTypes; i++) {
-
-                sz = (pObject->TypeName.MaximumLength) + sizeof(UNICODE_NULL);
-                lpType = (LPWSTR)supHeapAlloc(sz);
-                if (lpType) {
-                    _strncpy(lpType,
-                        sz / sizeof(WCHAR),
-                        pObject->TypeName.Buffer,
-                        pObject->TypeName.Length / sizeof(WCHAR));
-
-                    if (_strcmpi(lpType, lpObjectType) == 0) {
-                        pObjectTypeDump->TotalNumberOfHandles = pObject->TotalNumberOfHandles;
-                        pObjectTypeDump->TotalNumberOfObjects = pObject->TotalNumberOfObjects;
-                        pObjectTypeDump->TypeInfo.InvalidAttributes = pObject->InvalidAttributes;
-                        pObjectTypeDump->TypeInfo.GenericMapping = pObject->GenericMapping;
-                        pObjectTypeDump->TypeInfo.ValidAccessMask = pObject->ValidAccessMask;
-                        pObjectTypeDump->TypeInfo.DefaultNonPagedPoolCharge = pObject->DefaultNonPagedPoolCharge;
-                        pObjectTypeDump->TypeInfo.DefaultPagedPoolCharge = pObject->DefaultPagedPoolCharge;
-                        pObjectTypeDump->HighWaterNumberOfHandles = pObject->HighWaterNumberOfHandles;
-                        pObjectTypeDump->HighWaterNumberOfObjects = pObject->HighWaterNumberOfObjects;
-                        pObjectTypeDump->TypeInfo.PoolType = (POOL_TYPE)pObject->PoolType;
-                        if (pObject->SecurityRequired) {
-                            SET_BIT(pObjectTypeDump->TypeInfo.ObjectTypeFlags, 3);
-                        }
-                        if (pObject->MaintainHandleCount) {
-                            SET_BIT(pObjectTypeDump->TypeInfo.ObjectTypeFlags, 4);
-                        }
-                        bResult = TRUE;
-                    }
-                    supHeapFree(lpType);
-                    if (bResult) {
-                        break;
-                    }
-                }
-                pObject = OBJECT_TYPES_NEXT_ENTRY(pObject);
-            }
-        } while (FALSE);
-
-        if (pObjectTypes) {
-            supHeapFree(pObjectTypes);
+            pObject = OBJECT_TYPES_NEXT_ENTRY(pObject);
         }
+
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {
         supReportAbnormalTermination(__FUNCTIONW__);
         return FALSE;
     }
 
+    supHeapFree(pObjectTypes);
     return bResult;
 }
 
@@ -625,25 +603,27 @@ VOID propSetTypeInfo(
     _In_ HWND hwndDlg
 )
 {
-    BOOL                       bOkay;
-    WOBJ_OBJECT_TYPE           RealTypeIndex;
-    INT                        i;
-    POBJINFO                   pObject = NULL;
-    LPCWSTR                    lpTypeDescription = NULL;
-    OBJECT_TYPE_COMPATIBLE     ObjectTypeDump;
-    WCHAR                      szConvertBuffer[64];
-    WCHAR                      szType[MAX_PATH * 2];
+    BOOL bOkay;
+    WOBJ_OBJECT_TYPE RealTypeIndex;
+    INT i;
+    LPCWSTR lpTypeDescription = NULL;
+    OBJECT_TYPE_COMPATIBLE ObjectTypeDump;
+    WCHAR szConvertBuffer[64];
+    WCHAR szType[MAX_PATH * 2];
+
+    POBEX_OBJECT_INFORMATION pObject = NULL;
+    UNICODE_STRING usName;
+
+    lpTypeDescription = Context->TypeDescription->Name;
 
     RealTypeIndex = Context->ShadowTypeDescription->Index;
-    if ((RealTypeIndex > ObjectTypeUnknown)) {
+    if (RealTypeIndex > ObjectTypeUnknown) {
         RealTypeIndex = ObjectTypeUnknown;
     }
 
     //if type is not known set it description to it type name
-    if (RealTypeIndex == ObjectTypeUnknown) {
-        lpTypeDescription = Context->lpObjectType;
-    }
-    else {
+    if (RealTypeIndex != ObjectTypeUnknown) {
+
         //set description
         RtlSecureZeroMemory(&szType, sizeof(szType));
         if (LoadString(
@@ -653,9 +633,6 @@ VOID propSetTypeInfo(
             (MAX_PATH * sizeof(WCHAR)) - sizeof(UNICODE_NULL)))
         {
             lpTypeDescription = szType;
-        }
-        else {
-            lpTypeDescription = Context->lpObjectType;
         }
 
     }
@@ -671,19 +648,22 @@ VOID propSetTypeInfo(
     //
     bOkay = FALSE;
     RtlSecureZeroMemory(&ObjectTypeDump, sizeof(ObjectTypeDump));
-    if (Context->IsType) {
+    if (Context->ObjectTypeIndex == ObjectTypeType) {
 
         //query object by name, thus were giving us proper object type dump
-        pObject = ObQueryObject(T_OBJECTTYPES, Context->lpObjectName);
+        pObject = ObQueryObjectInDirectory(
+            &Context->NtObjectName,
+            ObGetPredefinedUnicodeString(OBP_OBTYPES));
 
         //cannot query, no driver or other error, try second method
         if (pObject == NULL) {
-            bOkay = propQueryTypeInfo(Context->lpObjectName, &ObjectTypeDump);
+            bOkay = propQueryTypeInfo(&Context->NtObjectName, &ObjectTypeDump);
         }
 
         //if type is not known set it description to it type name
-        if (RealTypeIndex == ObjectTypeUnknown)
-            lpTypeDescription = Context->lpObjectName;
+        if (RealTypeIndex == ObjectTypeUnknown) {
+            lpTypeDescription = Context->NtObjectName.Buffer;
+        }
         else {
             //set description
             RtlSecureZeroMemory(&szType, sizeof(szType));
@@ -696,7 +676,7 @@ VOID propSetTypeInfo(
                 lpTypeDescription = szType;
             }
             else {
-                lpTypeDescription = Context->lpObjectType;
+                lpTypeDescription = Context->TypeDescription->Name;
             }
         }
     }
@@ -705,13 +685,16 @@ VOID propSetTypeInfo(
         //
         // Query object type object.
         //
-        pObject = ObQueryObject(T_OBJECTTYPES, Context->lpObjectType);
+        pObject = ObQueryObjectInDirectory(
+            &Context->NtObjectName,
+            ObGetPredefinedUnicodeString(OBP_OBTYPES));
 
         //
         // If we cannot query because of no driver or other error, try second method.
         //
         if (pObject == NULL) {
-            bOkay = propQueryTypeInfo(Context->lpObjectType, &ObjectTypeDump);
+            RtlInitUnicodeString(&usName, Context->TypeDescription->Name);
+            bOkay = propQueryTypeInfo(&usName, &ObjectTypeDump);
         }
 
     }

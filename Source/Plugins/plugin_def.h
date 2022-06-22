@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2021
+*  (C) COPYRIGHT AUTHORS, 2019 - 2022
 *
 *  TITLE:       PLUGIN_DEF.H
 *
-*  VERSION:     1.10
+*  VERSION:     1.11
 *
-*  DATE:        01 Oct 2021
+*  DATE:        19 Jun 2022
 *
 *  Common header file for the plugin subsystem definitions.
 *
@@ -19,7 +19,7 @@
 
 #pragma once
 
-#define WOBJ_PLUGIN_SYSTEM_VERSION 18712
+#define WOBJ_PLUGIN_SYSTEM_VERSION 20006
 
 //
 // Plugin text consts, must include terminating 0.
@@ -49,14 +49,13 @@ typedef UCHAR(CALLBACK* pfnGetInstructionLength)(
 typedef NTSTATUS(*pfnOpenNamedObjectByType)(
     _Out_ HANDLE* ObjectHandle,
     _In_ ULONG TypeIndex,
-    _In_ LPWSTR ObjectDirectory,
-    _In_opt_ LPWSTR ObjectName,
+    _In_ PUNICODE_STRING ObjectDirectory,
+    _In_ PUNICODE_STRING ObjectName,
     _In_ ACCESS_MASK DesiredAccess);
 
 typedef struct _WINOBJEX_PARAM_OBJECT {
-    LPWSTR ObjectName;
-    LPWSTR ObjectDirectory;
-    PVOID Reserved;
+    UNICODE_STRING Name;
+    UNICODE_STRING Directory;
 } WINOBJEX_PARAM_OBJECT, * PWINOBJEX_PARAM_OBJECT;
 
 typedef struct _WINOBJEX_PARAM_BLOCK {

@@ -4,9 +4,9 @@
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        31 May 2022
+*  DATE:        19 Jun 2022
 *
 *  Common header file for the user interface.
 *
@@ -47,9 +47,9 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
     _In_ DWORD_PTR dwData
     );
 
-#define PROGRAM_MAJOR_VERSION       1
-#define PROGRAM_MINOR_VERSION       9
-#define PROGRAM_REVISION_NUMBER     4
+#define PROGRAM_MAJOR_VERSION       2
+#define PROGRAM_MINOR_VERSION       0
+#define PROGRAM_REVISION_NUMBER     0
 #define PROGRAM_BUILD_NUMBER        2206
 
 #ifdef _USE_OWN_DRIVER
@@ -61,6 +61,9 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 #define WINOBJEX64_WNDCLASS     L"WinObjEx64Class"
 #define WINOBJEX64_PSLISTCLASS  L"WinObjEx64PsListClass"
 
+#define T_COPY_OBJECT_NAME      L"Copy Name"
+#define T_COPY_OBJECT_NAME_BIN  L"Copy Name (Binary)"
+
 #define T_PROPERTIES            L"Properties...\tEnter"
 #define T_GOTOLINKTARGET        L"Go To Link Target\tCtrl+->"
 #define T_VIEWSD                L"View Security Descriptor..."
@@ -68,7 +71,6 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 #define T_RUNASSYSTEM           L"R&un as LocalSystem"
 #define T_EXPORTTOFILE          L"Export List"
 #define T_JUMPTOFILE            L"Jump to File"
-#define T_DUMPDRIVER            L"Dump Driver"
 #define T_VIEW_REFRESH          L"Refresh\tF5"
 #define T_VIEW_PLUGINS          L"View Plugins"
 #define T_EMPTY                 L" "
@@ -103,95 +105,19 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 #define IDMM_HELP   5
 
 typedef struct _TL_SUBITEMS_FIXED {
+    ULONG       Count;
     ULONG       ColorFlags;
     COLORREF    BgColor;
     COLORREF    FontColor;
     PVOID       UserParam;
-    ULONG       Count;
+    LPTSTR      CustomTooltip;
     LPTSTR      Text[2];
 } TL_SUBITEMS_FIXED, *PTL_SUBITEMS_FIXED;
-
-//
-// Property Dialogs
-//
-
-//Variable typedefs
-
-typedef enum _PROP_CONTEXT_TYPE {
-    propNormal = 0,
-    propPrivateNamespace = 1,
-    propUnnamed = 2,
-    propMax = 3
-} PROP_CONTEXT_TYPE;
-
-typedef struct _PROP_NAMESPACE_INFO {
-    ULONG Reserved;
-    ULONG SizeOfBoundaryDescriptor;
-    OBJECT_BOUNDARY_DESCRIPTOR *BoundaryDescriptor;
-    ULONG_PTR ObjectAddress;
-} PROP_NAMESPACE_INFO, *PPROP_NAMESPACE_INFO;
-
-typedef struct _PROP_UNNAMED_OBJECT_INFO {
-    ULONG_PTR ObjectAddress;
-    CLIENT_ID ClientId;
-    SYSTEM_THREAD_INFORMATION ThreadInformation;
-    UNICODE_STRING ImageName;
-    BOOL IsThreadToken;
-} PROP_UNNAMED_OBJECT_INFO, *PPROP_UNNAMED_OBJECT_INFO;
-
-typedef struct _PROP_PORT_OBJECT {
-    BOOL IsAllocated;
-    HANDLE ReferenceHandle;
-} PROP_PORT_OBJECT, * PPROP_PORT_OBJECT;
-
-typedef struct _PROP_OBJECT_INFO {
-    PROP_CONTEXT_TYPE ContextType;
-    BOOL IsType; //TRUE if selected object is an object type
-    UINT TypeIndex;
-    DWORD ObjectFlags;//object specific flags
-    LPWSTR lpObjectName;
-    LPWSTR lpObjectType;
-    LPWSTR lpCurrentObjectPath;
-    LPWSTR lpDescription; //description from main list (3rd column)
-    ULONG_PTR Tag;
-    WOBJ_TYPE_DESC *TypeDescription;
-    WOBJ_TYPE_DESC *ShadowTypeDescription; //valid only for types, same as TypeDescription for everything else.
-    HICON ObjectIcon;
-    HICON ObjectTypeIcon;
-    OBJINFO ObjectInfo; //object dump related structures
-    PROP_NAMESPACE_INFO NamespaceInfo;
-    PROP_UNNAMED_OBJECT_INFO UnnamedObjectInfo;
-    PROP_PORT_OBJECT PortObjectInfo;
-} PROP_OBJECT_INFO, *PPROP_OBJECT_INFO;
-
-//
-// If dialog already present - activate it window and return.
-//
-#define ENSURE_DIALOG_UNIQUE(Dialog) {      \
-    if (Dialog != NULL) {                   \
-        SetActiveWindow(Dialog);            \
-        return;                             \
-    }                                       \
-}
-
-typedef struct _PROP_DIALOG_CREATE_SETTINGS {
-    HWND hwndParent;
-    LPWSTR lpObjectName;
-    LPCWSTR lpObjectType;
-    LPWSTR lpDescription;
-    PROP_NAMESPACE_INFO *NamespaceObject;
-    PROP_UNNAMED_OBJECT_INFO *UnnamedObject;
-} PROP_DIALOG_CREATE_SETTINGS, *PPROP_DIALOG_CREATE_SETTINGS;
 
 typedef struct _VALUE_DESC {
     LPWSTR lpDescription;
     DWORD dwValue;
 } VALUE_DESC, *PVALUE_DESC;
-
-typedef struct _WINSTA_DESC {
-    LPCWSTR lpszWinSta;
-    LPCWSTR lpszDesc;
-} WINSTA_DESC, * PWINSTA_DESC;
 
 typedef struct _LVCOLUMNS_DATA {
     LPWSTR Name;
@@ -240,22 +166,6 @@ typedef struct _LVCOLUMNS_DATA {
 // prop used by ipc dialogs
 #define T_IPCDLGCONTEXT     TEXT("IpcDlgContext")
 
-//Calendar
-static LPCWSTR g_szMonths[12] = {
-    L"Jan",
-    L"Feb",
-    L"Mar",
-    L"Apr",
-    L"May",
-    L"Jun",
-    L"Jul",
-    L"Aug",
-    L"Sep",
-    L"Oct",
-    L"Nov",
-    L"Dec"
-};
-
 #define INIT_NO_ERROR               0
 #define INIT_ERROR_NOCRT            1
 #define INIT_ERROR_NOHEAP           2
@@ -295,3 +205,24 @@ static LPCWSTR g_szMonths[12] = {
 #define T_ERRSHADOW_TABLE_NOT_FOUND TEXT("W32pServiceTable was not found in win32k module")
 #define T_ERRSHADOW_APISETMAP_NOT_FOUND TEXT("ApiSetSchema map was not found")
 #define T_ERRSHADOW_APISET_VER_UNKNOWN TEXT("ApiSetSchema version is unknown")
+
+//
+// Common Dialog handlers.
+//
+VOID FindDlgCreate(
+    VOID);
+
+VOID ShowSysInfoDialog(
+    _In_ HWND hwndParent);
+
+VOID SDViewDialogCreate(
+    _In_ WOBJ_OBJECT_TYPE ObjectType);
+
+INT_PTR CALLBACK AboutDialogProc(
+    _In_ HWND hwndDlg,
+    _In_ UINT uMsg,
+    _In_ WPARAM wParam,
+    _In_ LPARAM lParam);
+
+VOID ShowStatsDialog(
+    VOID);

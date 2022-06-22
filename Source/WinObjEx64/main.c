@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        07 Jun 2022
+*  DATE:        19 Jun 2022
 *
 *  Program entry point and main window handler.
 *
@@ -18,10 +18,6 @@
 *******************************************************************************/
 #define OEMRESOURCE
 #include "global.h"
-#include "aboutDlg.h"
-#include "findDlg.h"
-#include "sdviewDlg.h"
-#include "sysinfoDlg.h"
 #include "treelist/treelist.h"
 #include "props/propDlg.h"
 #include "extras/extras.h"
@@ -42,6 +38,9 @@ BOOL bMainWndSortInverse = FALSE;
 // Global UI variables.
 //
 WINOBJ_GLOBALS g_WinObj;
+
+// Global stats
+WINOBJ_STATS g_WinObjStats;
 
 /*
 * guiExtrasDisableAdminFeatures
@@ -71,6 +70,7 @@ VOID guiExtrasDisableAdminFeatures(
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_CALLBACKS, FALSE, &mii);
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_DRIVERS, FALSE, &mii);
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_UNLOADEDDRIVERS, FALSE, &mii);
+        SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_PRIVATENAMESPACES, FALSE, &mii);
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_SOFTWARELICENSECACHE, FALSE, &mii);
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_SSDT, FALSE, &mii);
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_W32PSERVICETABLE, FALSE, &mii);
@@ -82,15 +82,6 @@ VOID guiExtrasDisableAdminFeatures(
     // Elevated launch.
     //
     if (g_kdctx.IsFullAdmin) {
-        //
-        // These features require driver usage.
-        //
-        /*if (FALSE == kdIoDriverLoaded()) {
-            SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_SSDT, FALSE, &mii);
-            SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_PRIVATENAMESPACES, FALSE, &mii);
-            SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_CALLBACKS, FALSE, &mii);
-            SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_UNLOADEDDRIVERS, FALSE, &mii);
-        }*/
 
         //
         // This feature is not supported in Windows 10 10586.
@@ -143,49 +134,6 @@ INT CALLBACK MainWindowObjectListCompareFunc(
 }
 
 /*
-* MainWindowHandleObjectTreeProp
-*
-* Purpose:
-*
-* Object Tree properties per selected item.
-*
-*/
-VOID MainWindowHandleObjectTreeProp(
-    _In_ HWND hwnd
-)
-{
-    TV_ITEM tvi;
-    WCHAR szBuffer[MAX_PATH + 1];
-    PROP_DIALOG_CREATE_SETTINGS propSettings;
-
-    //
-    // Only one object properties dialog at the same time allowed.
-    //
-    ENSURE_DIALOG_UNIQUE(g_PropWindow);
-
-    if (ObjectTreeSelectedItem == NULL)
-        return;
-
-    RtlSecureZeroMemory(&tvi, sizeof(TV_ITEM));
-
-    szBuffer[0] = 0;
-    RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-    tvi.pszText = szBuffer;
-    tvi.cchTextMax = MAX_PATH;
-    tvi.mask = TVIF_TEXT;
-    tvi.hItem = ObjectTreeSelectedItem;
-    if (TreeView_GetItem(g_hwndObjectTree, &tvi)) {
-
-        RtlSecureZeroMemory(&propSettings, sizeof(propSettings));
-        propSettings.hwndParent = hwnd;
-        propSettings.lpObjectName = szBuffer;
-        propSettings.lpObjectType = OBTYPE_NAME_DIRECTORY;
-
-        propCreateDialog(&propSettings);
-    }
-}
-
-/*
 * MainWindowHandleObjectViewSD
 *
 * Purpose:
@@ -194,106 +142,157 @@ VOID MainWindowHandleObjectTreeProp(
 *
 */
 VOID MainWindowHandleObjectViewSD(
-    _In_ HWND hwndParent,
     _In_ BOOL fList
 )
 {
-    LVITEM lvi;
-    TV_ITEM tvi;
-    WOBJ_OBJECT_TYPE wobjType;
-    WCHAR szBuffer[MAX_PATH + 1];
-
-    szBuffer[0] = 0;
+    OBEX_ITEM* objRef;
+    WOBJ_OBJECT_TYPE wobjType = ObjectTypeUnknown;
 
     if (fList) {
 
-        RtlSecureZeroMemory(&lvi, sizeof(LVITEM));
-        lvi.mask = LVIF_PARAM | LVIF_TEXT;
-        lvi.iItem = ListView_GetSelectionMark(g_hwndObjectList);
-        lvi.pszText = szBuffer;
-        lvi.cchTextMax = MAX_PATH;
+        if (supGetListViewItemParam(g_hwndObjectList,
+            ListView_GetSelectionMark(g_hwndObjectList),
+            (PVOID)&objRef))
+        {
 
-        if (!ListView_GetItem(g_hwndObjectList, &lvi))
-            return;
+            if (objRef)
+                wobjType = objRef->TypeIndex;
 
-        wobjType = (WOBJ_OBJECT_TYPE)lvi.lParam;
+        }
 
     }
     else {
-
-        RtlSecureZeroMemory(&tvi, sizeof(TV_ITEM));
-        tvi.pszText = szBuffer;
-        tvi.cchTextMax = MAX_PATH;
-        tvi.mask = TVIF_TEXT;
-        tvi.hItem = ObjectTreeSelectedItem;
-
-        if (!TreeView_GetItem(g_hwndObjectTree, &tvi))
-            return;
-
         wobjType = ObjectTypeDirectory;
     }
 
-    SDViewDialogCreate(hwndParent,
-        g_WinObj.CurrentObjectPath,
-        szBuffer,
-        wobjType);
+    SDViewDialogCreate(wobjType);
 
 }
 
 /*
-* MainWindowHandleObjectListProp
+* MainWindowCopyObjectName
 *
 * Purpose:
 *
-* Object List properties per selected item.
+* Handler for Copy Name / Copy Name (Bin) menu.
 *
 */
-VOID MainWindowHandleObjectListProp(
+VOID MainWindowCopyObjectName(
+    _In_ UINT ControlId
+)
+{
+    INT nSelected;
+    OBEX_ITEM* objRef = NULL;
+    HWND hwndFocus;
+
+    UNICODE_STRING normalizedName;
+
+    hwndFocus = GetFocus();
+    if (hwndFocus != g_hwndObjectList &&
+        hwndFocus != g_hwndObjectTree)
+    {
+        return;
+    }
+
+    if (hwndFocus == g_hwndObjectList) {
+        
+        nSelected = ListView_GetSelectionMark(g_hwndObjectList);
+        if (nSelected >= 0) {
+            if (!supGetListViewItemParam(g_hwndObjectList, nSelected, &objRef))
+                return;
+        }
+
+    }
+    else {
+
+        if (ObjectTreeSelectedItem) {
+            if (!supGetTreeViewItemParam(g_hwndObjectTree, ObjectTreeSelectedItem, &objRef))
+                return;
+        }
+
+    }
+
+    if (objRef == NULL)
+        return;
+
+    if (ControlId == ID_OBJECT_COPY_NAME) {
+        if (supNormalizeUnicodeStringForDisplay(g_obexHeap,
+            &objRef->Name,
+            &normalizedName))
+        {
+            supClipboardCopy(normalizedName.Buffer, normalizedName.Length);
+            supFreeDuplicatedUnicodeString(g_obexHeap, &normalizedName, FALSE);
+        }
+    }
+    else {
+        supClipboardCopyUnicodeStringRaw(&objRef->Name);
+    }
+}
+
+/*
+* MainWindowShowObjectProperties
+*
+* Purpose:
+*
+* Display properties dialog for a selected item.
+*
+*/
+VOID MainWindowShowObjectProperties(
     _In_ HWND hwnd
 )
 {
-    INT     nSelected;
-    LPWSTR  lpItemText, lpType, lpDesc = NULL;
+    INT nSelected;
+    HWND hwndFocus;
+    OBEX_ITEM* objRef = NULL;
+    PROP_CONFIG propConfig;
+    UNICODE_STRING objectPath;
 
-    PROP_DIALOG_CREATE_SETTINGS propSettings;
+    hwndFocus = GetFocus();
+    if (hwndFocus != g_hwndObjectList &&
+        hwndFocus != g_hwndObjectTree)
+    {
+        return;
+    }
+
+    //
+    // Get current object path.
+    //
+    if (!supGetCurrentObjectPath(FALSE, &objectPath))
+        return;
 
     //
     // Only one object properties dialog allowed at same time.
     //
-    if (g_PropWindow != NULL)
-        return;
+    supCloseKnownPropertiesDialog(propGetCommonWindow());
 
-    //
-    // Query selected index, leave on failure.
-    //
-    nSelected = ListView_GetSelectionMark(g_hwndObjectList);
-    if (nSelected == -1)
-        return;
+    if (hwndFocus == g_hwndObjectList) {
 
-    lpItemText = supGetItemText(g_hwndObjectList, nSelected, 0, NULL);
-    if (lpItemText) {
-        lpType = supGetItemText(g_hwndObjectList, nSelected, 1, NULL);
-        if (lpType) {
-
-            //lpDesc is not important, we can work if it NULL
-            lpDesc = supGetItemText(g_hwndObjectList, nSelected, 2, NULL);
-
-            RtlSecureZeroMemory(&propSettings, sizeof(propSettings));
-
-            propSettings.hwndParent = hwnd;
-            propSettings.lpObjectName = lpItemText;
-            propSettings.lpObjectType = lpType;
-            propSettings.lpDescription = lpDesc;
-
-            propCreateDialog(&propSettings);
-
-            if (lpDesc) {
-                supHeapFree(lpDesc);
-            }
-            supHeapFree(lpType);
+        //
+        // Query selected index, leave on failure.
+        //
+        nSelected = ListView_GetSelectionMark(g_hwndObjectList);
+        if (nSelected >= 0) {
+            supGetListViewItemParam(g_hwndObjectList, nSelected, &objRef);
         }
-        supHeapFree(lpItemText);
+
     }
+    else {
+
+        if (ObjectTreeSelectedItem) {
+            supGetTreeViewItemParam(g_hwndObjectTree, ObjectTreeSelectedItem, &objRef);
+        }
+    }
+
+    if (objRef) {
+        RtlSecureZeroMemory(&propConfig, sizeof(propConfig));
+        propConfig.hwndParent = hwnd;
+        propConfig.ObjectTypeIndex = objRef->TypeIndex;
+        propConfig.NtObjectName = &objRef->Name;
+        propConfig.NtObjectPath = &objectPath;
+        propCreateDialog(&propConfig);
+    }
+
+    supFreeUnicodeString(g_obexHeap, &objectPath);
 }
 
 /*
@@ -308,8 +307,8 @@ VOID MainWindowOnRefresh(
     VOID
 )
 {
-    LPWSTR CurrentPath = NULL;
-    SIZE_T len;
+    BOOL bOkay;
+    UNICODE_STRING currentPath, normalizedPath;
 
     supSetWaitCursor(TRUE);
 
@@ -319,17 +318,20 @@ VOID MainWindowOnRefresh(
     supCreateSCMSnapshot(SERVICE_DRIVER, NULL);
     sapiCreateSetupDBSnapshot();
 
-    len = _strlen(g_WinObj.CurrentObjectPath);
-    CurrentPath = (LPWSTR)supHeapAlloc((len + 1) * sizeof(WCHAR));
-    if (CurrentPath)
-        _strcpy(CurrentPath, g_WinObj.CurrentObjectPath);
+    bOkay = supGetCurrentObjectPath(TRUE, &currentPath);
 
     TreeView_DeleteAllItems(g_hwndObjectTree);
-    ListObjectDirectoryTree(L"\\", NULL, NULL);
+    ListObjectDirectoryTree(ObGetPredefinedUnicodeString(OBP_ROOT), NULL, NULL);
 
-    if (CurrentPath) {
-        ListToObject(CurrentPath);
-        supHeapFree(CurrentPath);
+    if (bOkay) {
+        if (supNormalizeUnicodeStringForDisplay(g_obexHeap,
+            &currentPath,
+            &normalizedPath))
+        {
+            ListToObject(normalizedPath.Buffer);
+            supFreeDuplicatedUnicodeString(g_obexHeap, &normalizedPath, FALSE);
+        }
+        supFreeDuplicatedUnicodeString(g_obexHeap, &currentPath, FALSE);
     }
 
     supSetWaitCursor(FALSE);
@@ -385,6 +387,63 @@ VOID MainWindowOnDisplayGridChange(
 }
 
 /*
+* MainWindowHandleGotoLinkTarget
+*
+* Purpose:
+*
+* Resolve symbolic link target and select it in winobjex window.
+*
+*/
+VOID MainWindowHandleGotoLinkTarget(
+    VOID
+)
+{
+    UNICODE_STRING linkName, linkTarget, normalizedLinkTarget;
+
+    if (!supGetCurrentObjectPath(TRUE, &linkName))
+        return;
+
+    // Global??
+    if (RtlEqualUnicodeString(&linkName,
+        ObGetPredefinedUnicodeString(OBP_GLOBAL),
+        TRUE))
+    {
+        ListToObject(KM_OBJECTS_ROOT_DIRECTORY);
+    }
+
+    if (supResolveSymbolicLinkTarget(NULL, NULL, &linkName, &linkTarget)) {
+
+        //
+        // Check against \\GLOBAL??
+        //
+        if (RtlEqualUnicodeString(&linkTarget,
+            ObGetPredefinedUnicodeString(OBP_GLOBALNAMESPACE),
+            TRUE))
+        {
+            // DosDevices
+            ListToObject(L"\\GLOBAL??");
+        }
+        else {
+
+            //
+            // Usual link, prepare it for output and do the listing.
+            //
+            if (supNormalizeUnicodeStringForDisplay(g_obexHeap,
+                &linkTarget,
+                &normalizedLinkTarget))
+            {
+                ListToObject(normalizedLinkTarget.Buffer);
+                supFreeDuplicatedUnicodeString(g_obexHeap, &normalizedLinkTarget, FALSE);
+            }
+        }
+
+        supFreeDuplicatedUnicodeString(g_obexHeap, &linkTarget, FALSE);
+    }
+
+    supFreeDuplicatedUnicodeString(g_obexHeap, &linkName, FALSE);
+}
+
+/*
 * MainWindowHandleWMCommand
 *
 * Purpose:
@@ -397,9 +456,7 @@ LRESULT MainWindowHandleWMCommand(
     _In_ WPARAM wParam
 )
 {
-    LPWSTR lpItemText;
-    HWND   hwndFocus;
-    WORD   ControlId = LOWORD(wParam);
+    WORD ControlId = LOWORD(wParam);
 
     switch (ControlId) {
 
@@ -421,45 +478,21 @@ LRESULT MainWindowHandleWMCommand(
         break;
 
     case ID_OBJECT_PROPERTIES:
-        hwndFocus = GetFocus();
-        if (hwndFocus == g_hwndObjectList) {
-            MainWindowHandleObjectListProp(hwnd);
-        }
-        if (hwndFocus == g_hwndObjectTree) {
-            MainWindowHandleObjectTreeProp(hwnd);
-        }
+        MainWindowShowObjectProperties(hwnd);
+        break;
+
+    case ID_OBJECT_COPY_NAME:
+    case ID_OBJECT_COPY_NAME_BINARY:
+        MainWindowCopyObjectName(ControlId);
         break;
 
     case ID_OBJECT_GOTOLINKTARGET:
-        lpItemText = supGetItemText(g_hwndObjectList,
-            ListView_GetSelectionMark(g_hwndObjectList), 2, NULL);
 
-        if (lpItemText) {
-            if (_strcmpi(lpItemText, L"\\??") == 0) {
-                ListToObject(L"\\GLOBAL??");
-            }
-            else {
-                ListToObject(lpItemText);
-            }
-            supHeapFree(lpItemText);
-        }
-        else {
-            lpItemText = supGetItemText(g_hwndObjectList,
-                ListView_GetSelectionMark(g_hwndObjectList), 0, NULL);
-
-            if (lpItemText) {
-                if ((_strcmpi(lpItemText, L"GLOBALROOT") == 0) &&
-                    (_strcmpi(g_WinObj.CurrentObjectPath, L"\\GLOBAL??") == 0))
-                {
-                    ListToObject(L"\\");
-                }
-                supHeapFree(lpItemText);
-            }
-        }
+        MainWindowHandleGotoLinkTarget();
         break;
 
     case ID_VIEW_SECURITYDESCRIPTOR:
-        MainWindowHandleObjectViewSD(hwnd, (GetFocus() == g_hwndObjectList));
+        MainWindowHandleObjectViewSD((GetFocus() == g_hwndObjectList));
         break;
 
     case ID_FIND_FINDOBJECT:
@@ -503,6 +536,10 @@ LRESULT MainWindowHandleWMCommand(
         extrasShowDialogById(ControlId);
         break;
 
+    case ID_HELP_STATISTICS:
+        ShowStatsDialog();
+        break;
+
     case ID_HELP_ABOUT:
 
         DialogBoxParam(
@@ -526,109 +563,13 @@ LRESULT MainWindowHandleWMCommand(
         ShowSysInfoDialog(hwnd);
         break;
 
-    default:
-        break;
     }
 
     if ((ControlId >= ID_MENU_PLUGINS) && (ControlId < ID_MENU_PLUGINS_MAX)) {
-        PmProcessEntry(GetFocus(), ControlId, ObjectTreeSelectedItem);
+        PmProcessEntry(GetFocus(), ControlId);
     }
 
     return FALSE;
-}
-
-/*
-* MainWindowTreeViewSelChanged
-*
-* Purpose:
-*
-* Tree List TVN_ITEMEXPANDED, TVN_SELCHANGED handler.
-*
-*/
-VOID MainWindowTreeViewSelChanged(
-    _In_ LPNMTREEVIEWW trhdr
-)
-{
-    HTREEITEM       treeItem, treeRoot;
-    TVITEMEX        tvexItem;
-    POE_LIST_ITEM   objectListItem = NULL, prevObjectListItem = NULL;
-    SIZE_T          objectPathLength = 1; // size of empty string buffer in characters
-    WCHAR           szTreeItemText[MAX_PATH + 1];
-
-    if (trhdr == NULL)
-        return;
-
-    if (!trhdr->itemNew.hItem)
-        return;
-
-    if (g_WinObj.CurrentObjectPath != NULL)
-        supHeapFree(g_WinObj.CurrentObjectPath);
-
-    RtlSecureZeroMemory(&tvexItem, sizeof(tvexItem));
-
-    treeRoot = TreeView_GetRoot(trhdr->hdr.hwndFrom);
-
-    //
-    // Build the path from bottom to top and counting string buffer size.
-    //
-    for (treeItem = trhdr->itemNew.hItem; treeItem != treeRoot;
-        treeItem = TreeView_GetParent(trhdr->hdr.hwndFrom, treeItem))
-    {
-        RtlSecureZeroMemory(&szTreeItemText, sizeof(szTreeItemText));
-        tvexItem.mask = TVIF_HANDLE | TVIF_TEXT;
-        tvexItem.hItem = treeItem;
-        tvexItem.pszText = szTreeItemText;
-        tvexItem.cchTextMax = MAX_PATH;
-        TreeView_GetItem(trhdr->hdr.hwndFrom, &tvexItem);
-
-        objectPathLength += _strlen(szTreeItemText) + 1; //+1 for '\'
-
-        objectListItem = (POE_LIST_ITEM)supHeapAlloc(sizeof(OE_LIST_ITEM));
-        if (objectListItem) {
-            objectListItem->Prev = prevObjectListItem;
-            objectListItem->TreeItem = treeItem;
-        }
-        prevObjectListItem = objectListItem;
-    }
-
-    if (objectListItem == NULL) {
-        g_WinObj.CurrentObjectPath = (LPWSTR)supHeapAlloc(2 * sizeof(WCHAR));
-        if (g_WinObj.CurrentObjectPath) {
-            g_WinObj.CurrentObjectPath[0] = L'\\';
-            g_WinObj.CurrentObjectPath[1] = 0;
-        }
-        return;
-    }
-
-    objectListItem = prevObjectListItem;
-    g_WinObj.CurrentObjectPath = (LPWSTR)supHeapAlloc(objectPathLength * sizeof(WCHAR));
-    if (g_WinObj.CurrentObjectPath) {
-
-        objectPathLength = 0;
-
-        //
-        // Building the final string.
-        //
-        while (objectListItem != NULL) {
-
-            RtlSecureZeroMemory(&szTreeItemText, sizeof(szTreeItemText));
-            tvexItem.mask = TVIF_HANDLE | TVIF_TEXT;
-            tvexItem.hItem = objectListItem->TreeItem;
-            tvexItem.pszText = szTreeItemText;
-            tvexItem.cchTextMax = MAX_PATH;
-            TreeView_GetItem(trhdr->hdr.hwndFrom, &tvexItem);
-
-            g_WinObj.CurrentObjectPath[objectPathLength] = L'\\';
-            objectPathLength++;
-            _strcpy(g_WinObj.CurrentObjectPath + objectPathLength, szTreeItemText);
-            objectPathLength += _strlen(szTreeItemText);
-
-            prevObjectListItem = objectListItem->Prev;
-            supHeapFree(objectListItem);
-            objectListItem = prevObjectListItem;
-        }
-    }
-    return;
 }
 
 /*
@@ -679,15 +620,19 @@ VOID MainWindowHandleTreePopupMenu(
 )
 {
     HMENU hMenu;
+    UINT uPosition = 0;
 
     hMenu = CreatePopupMenu();
     if (hMenu) {
-        InsertMenu(hMenu, 0, MF_BYCOMMAND, ID_OBJECT_PROPERTIES, T_PROPERTIES);
+        InsertMenu(hMenu, uPosition++, MF_BYCOMMAND, ID_OBJECT_COPY_NAME, T_COPY_OBJECT_NAME);
+        InsertMenu(hMenu, uPosition++, MF_BYCOMMAND, ID_OBJECT_COPY_NAME_BINARY, T_COPY_OBJECT_NAME_BIN);
+        InsertMenu(hMenu, uPosition++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+        InsertMenu(hMenu, uPosition++, MF_BYCOMMAND, ID_OBJECT_PROPERTIES, T_PROPERTIES);
 
         supSetMenuIcon(hMenu, ID_OBJECT_PROPERTIES,
             ImageList_ExtractIcon(g_WinObj.hInstance, g_ToolBarMenuImages, 0));
 
-        MainWindowPopupMenuInsertViewSD(hMenu, 1);
+        MainWindowPopupMenuInsertViewSD(hMenu, uPosition++);
 
         PmBuildPluginPopupMenuByObjectType(hMenu, ObjectTypeDirectory);
 
@@ -719,6 +664,9 @@ VOID MainWindowHandleObjectPopupMenu(
     hMenu = CreatePopupMenu();
     if (hMenu == NULL) return;
 
+    InsertMenu(hMenu, uPosition++, MF_BYCOMMAND, ID_OBJECT_COPY_NAME, T_COPY_OBJECT_NAME);
+    InsertMenu(hMenu, uPosition++, MF_BYCOMMAND, ID_OBJECT_COPY_NAME_BINARY, T_COPY_OBJECT_NAME_BIN);
+    InsertMenu(hMenu, uPosition++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
     InsertMenu(hMenu, uPosition++, MF_BYCOMMAND, ID_OBJECT_PROPERTIES, T_PROPERTIES);
 
     supSetMenuIcon(hMenu, ID_OBJECT_PROPERTIES,
@@ -726,9 +674,6 @@ VOID MainWindowHandleObjectPopupMenu(
 
     objType = supObjectListGetObjectType(hwndlv, iItem);
 
-    //
-    // Only supOpenNamedObjectByType supported types.
-    //
     switch (objType) {
 
         //
@@ -768,8 +713,6 @@ VOID MainWindowHandleObjectPopupMenu(
         MainWindowPopupMenuInsertViewSD(hMenu, uPosition);
         break;
 
-    default:
-        break;
     }
 
     EnableMenuItem(GetSubMenu(GetMenu(hwnd), IDMM_OBJECT), ID_OBJECT_GOTOLINKTARGET, uGotoSymLinkEnable);
@@ -800,55 +743,78 @@ LRESULT MainWindowHandleWMNotify(
     LPTOOLTIPTEXT   lpttt;
     LPNMLISTVIEW    lvn;
     LPNMTREEVIEW    lpnmTreeView;
-    LPWSTR          str;
-    SIZE_T          lcp;
     LVITEM          lvitem;
-    TVHITTESTINFO   hti;
+    TVHITTESTINFO   tvhti;
+    LVHITTESTINFO   lvhti;
     POINT           pt;
-    WCHAR           szItemString[MAX_PATH + 1];
+
+    OBEX_ITEM *objRef;
 
     if (hdr) {
 
+        //
+        // TreeList notify.
+        //
         if (hdr->hwndFrom == g_hwndObjectTree) {
             switch (hdr->code) {
             case TVN_ITEMEXPANDED:
             case TVN_SELCHANGED:
                 SetFocus(g_hwndObjectTree);
                 supSetWaitCursor(TRUE);
-                MainWindowTreeViewSelChanged((LPNMTREEVIEWW)lParam);
-                SendMessage(g_hwndStatusBar, WM_SETTEXT, 0, (LPARAM)g_WinObj.CurrentObjectPath);
+                lpnmTreeView = (LPNMTREEVIEW)lParam;
+                if (lpnmTreeView) {
+                    ObjectTreeSelectedItem = lpnmTreeView->itemNew.hItem;
 
-                ListObjectsInDirectory(g_WinObj.CurrentObjectPath);
+                    supBuildCurrentObjectList((OBEX_ITEM*)lpnmTreeView->itemNew.lParam);
+                    ListCurrentDirectoryObjects(ObjectTreeSelectedItem);
 
-                ListView_SortItemsEx(g_hwndObjectList, &MainWindowObjectListCompareFunc, g_SortColumn);
+                    supDisplayCurrentObjectPath(g_hwndStatusBar, NULL, TRUE);
+
+                    ListView_SortItemsEx(g_hwndObjectList, &MainWindowObjectListCompareFunc, g_SortColumn);
+                }
 
                 supSetGotoLinkTargetToolButtonState(hwnd, 0, 0, TRUE, FALSE);
 
                 supSetWaitCursor(FALSE);
-
-                lpnmTreeView = (LPNMTREEVIEW)lParam;
-                if (lpnmTreeView) {
-                    ObjectTreeSelectedItem = lpnmTreeView->itemNew.hItem;
-                }
+            
                 break;
 
             case NM_RCLICK:
                 GetCursorPos(&pt);
-                hti.pt = pt;
-                ScreenToClient(hdr->hwndFrom, &hti.pt);
-                if (TreeView_HitTest(hdr->hwndFrom, &hti) &&
-                    (hti.flags & (TVHT_ONITEM | TVHT_ONITEMRIGHT))) {
-                    ObjectTreeSelectedItem = hti.hItem;
+                tvhti.pt = pt;
+                ScreenToClient(hdr->hwndFrom, &tvhti.pt);
+                if (TreeView_HitTest(hdr->hwndFrom, &tvhti) &&
+                    (tvhti.flags & (TVHT_ONITEM | TVHT_ONITEMRIGHT)))
+                {
+                    ObjectTreeSelectedItem = tvhti.hItem;
                     TreeView_SelectItem(g_hwndObjectTree, ObjectTreeSelectedItem);
-                    SendMessage(g_hwndStatusBar, WM_SETTEXT, 0, (LPARAM)g_WinObj.CurrentObjectPath);
+
+                    if (supGetTreeViewItemParam(g_hwndObjectTree, ObjectTreeSelectedItem, &objRef))
+                        supBuildCurrentObjectList(objRef);
+                    
+                    supDisplayCurrentObjectPath(g_hwndStatusBar, NULL, TRUE);
+
                     supSetGotoLinkTargetToolButtonState(hwnd, 0, 0, TRUE, FALSE);
-                    MainWindowHandleTreePopupMenu(hwnd, &pt);
+                }
+                break;
+
+            case NM_DBLCLK:
+                GetCursorPos(&pt);
+                tvhti.pt = pt;
+                ScreenToClient(hdr->hwndFrom, &tvhti.pt);
+                if (TreeView_HitTest(hdr->hwndFrom, &tvhti) &&
+                    (tvhti.flags & (TVHT_ONITEM | TVHT_ONITEMRIGHT)))
+                {
+                    MainWindowShowObjectProperties(hwnd);
                 }
                 break;
             }
 
         }
 
+        //
+        // ListView notify.
+        //
         if (hdr->hwndFrom == g_hwndObjectList) {
             switch (hdr->code) {
             case NM_SETFOCUS:
@@ -866,27 +832,13 @@ LRESULT MainWindowHandleWMNotify(
                 if ((lvn->uNewState & LVIS_SELECTED) &&
                     !(lvn->uOldState & LVIS_SELECTED))
                 {
-                    RtlSecureZeroMemory(&szItemString, sizeof(szItemString));
-                    ListView_GetItemText(g_hwndObjectList, lvn->iItem, 0, szItemString, MAX_PATH);
-                    lcp = _strlen(g_WinObj.CurrentObjectPath);
-                    if (lcp) {
-                        str = (LPWSTR)supHeapAlloc((lcp + sizeof(szItemString) + 4) * sizeof(WCHAR));
-                        if (str) {
-
-                            _strcpy(str, g_WinObj.CurrentObjectPath);
-
-                            if ((str[0] == L'\\') && (str[1] == 0)) {
-                                _strcpy(str + lcp, szItemString);
-                            }
-                            else {
-                                str[lcp] = L'\\';
-                                _strcpy(str + lcp + 1, szItemString);
-                            }
-                            SendMessage(g_hwndStatusBar, WM_SETTEXT, 0, (LPARAM)str);
-                            supHeapFree(str);
-                        }
-                        supSetGotoLinkTargetToolButtonState(hwnd, g_hwndObjectList, lvn->iItem, FALSE, FALSE);
+                    if (supGetListViewItemParam(g_hwndObjectList, lvn->iItem, &objRef)) {
+                        supBuildCurrentObjectList(objRef);
                     }
+
+                    supDisplayCurrentObjectPath(g_hwndStatusBar, NULL, TRUE);
+                    supSetGotoLinkTargetToolButtonState(hwnd, g_hwndObjectList, lvn->iItem, FALSE, FALSE);
+
                 }
                 break;
 
@@ -910,12 +862,34 @@ LRESULT MainWindowHandleWMNotify(
 
                 break;
 
-            case NM_DBLCLK:
-                MainWindowHandleObjectListProp(hwnd);
+            case NM_RCLICK:
+                GetCursorPos(&pt);
+                lvhti.pt = pt;
+                lvhti.iItem = -1;
+                ScreenToClient(hdr->hwndFrom, &lvhti.pt);
+                ListView_HitTest(hdr->hwndFrom, &lvhti);
+                if (lvhti.flags & LVHT_ONITEM) {
+                    lvn = (LPNMLISTVIEW)lParam;
+                    if (supGetListViewItemParam(g_hwndObjectList, lvn->iItem, &objRef)) {
+                        supBuildCurrentObjectList(objRef);
+                    }
+
+                    supDisplayCurrentObjectPath(g_hwndStatusBar, NULL, TRUE);
+                    supSetGotoLinkTargetToolButtonState(hwnd, g_hwndObjectList, lvn->iItem, FALSE, FALSE);
+                }
                 break;
 
-            default:
+            case NM_DBLCLK:
+                GetCursorPos(&pt);
+                lvhti.pt = pt;
+                lvhti.iItem = -1;
+                ScreenToClient(hdr->hwndFrom, &lvhti.pt);
+                ListView_HitTest(hdr->hwndFrom, &lvhti);
+                if (lvhti.flags & LVHT_ONITEM) {
+                    MainWindowShowObjectProperties(hwnd);
+                }
                 break;
+
             }
         }
 
@@ -935,9 +909,6 @@ LRESULT MainWindowHandleWMNotify(
                 lpttt->hinst = g_WinObj.hInstance;
                 lpttt->lpszText = MAKEINTRESOURCE(lpttt->hdr.idFrom);
                 lpttt->uFlags |= TTF_DI_SETITEM;
-                break;
-
-            default:
                 break;
 
             }
@@ -985,6 +956,68 @@ VOID MainWindowResizeHandler(
 }
 
 /*
+* MainWindowOnContextMenu
+*
+* Purpose:
+*
+* Main window WM_CONTEXTMENU handler.
+*
+*/
+VOID MainWindowOnContextMenu(
+    _In_ HWND hwnd,
+    _In_ HWND hwndFrom,
+    _In_ LPARAM lParam
+)
+{
+    RECT crc;
+    TVHITTESTINFO tvhti;
+    LVHITTESTINFO lvhti;
+    POINT pt;
+
+    if (hwndFrom == g_hwndObjectTree) {
+
+        GetCursorPos(&pt);
+        tvhti.pt = pt;
+        ScreenToClient(g_hwndObjectTree, &tvhti.pt);
+        if (TreeView_HitTest(g_hwndObjectTree, &tvhti) &&
+            (tvhti.flags & (TVHT_ONITEM | TVHT_ONITEMRIGHT)))
+        {
+            RtlSecureZeroMemory(&crc, sizeof(crc));
+
+            TreeView_GetItemRect(g_hwndObjectTree,
+                TreeView_GetSelection(g_hwndObjectTree), &crc, TRUE);
+
+            crc.top = crc.bottom;
+            ClientToScreen(g_hwndObjectTree, (LPPOINT)&crc);
+            MainWindowHandleTreePopupMenu(hwnd, (LPPOINT)&crc);
+        }
+
+    }
+    else if (hwndFrom == g_hwndObjectList) {
+
+        GetCursorPos(&pt);
+        lvhti.pt = pt;
+        lvhti.iItem = -1;
+        ScreenToClient(g_hwndObjectList, &lvhti.pt);
+        ListView_HitTest(g_hwndObjectList, &lvhti);
+        if (lvhti.flags & LVHT_ONITEM) {
+            if (lParam == MAKELPARAM(-1, -1)) 
+            {
+                RtlSecureZeroMemory(&crc, sizeof(crc));
+
+                ListView_GetItemRect(g_hwndObjectList, lvhti.iItem, &crc, TRUE);
+                crc.top = crc.bottom;
+                ClientToScreen(g_hwndObjectList, (LPPOINT)&crc);
+            }
+            else
+                GetCursorPos((LPPOINT)&crc);
+
+            MainWindowHandleObjectPopupMenu(hwnd, g_hwndObjectList, lvhti.iItem, (LPPOINT)&crc);
+        }
+    }
+}
+
+/*
 * MainWindowProc
 *
 * Purpose:
@@ -999,40 +1032,14 @@ LRESULT CALLBACK MainWindowProc(
     _In_ LPARAM lParam
 )
 {
-    INT                 mark;
-    LONG                NewSplitterPos;
-    RECT                ToolBarRect, crc;
-    LPDRAWITEMSTRUCT    pds;
+    LONG NewSplitterPos;
+    RECT ToolBarRect;
+    LPDRAWITEMSTRUCT pds;
     LPMEASUREITEMSTRUCT pms;
 
     switch (uMsg) {
     case WM_CONTEXTMENU:
-
-        RtlSecureZeroMemory(&crc, sizeof(crc));
-
-        if ((HWND)wParam == g_hwndObjectTree) {
-
-            TreeView_GetItemRect(g_hwndObjectTree,
-                TreeView_GetSelection(g_hwndObjectTree), &crc, TRUE);
-
-            crc.top = crc.bottom;
-            ClientToScreen(g_hwndObjectTree, (LPPOINT)&crc);
-            MainWindowHandleTreePopupMenu(hwnd, (LPPOINT)&crc);
-        }
-
-        if ((HWND)wParam == g_hwndObjectList) {
-            mark = ListView_GetSelectionMark(g_hwndObjectList);
-
-            if (lParam == MAKELPARAM(-1, -1)) {
-                ListView_GetItemRect(g_hwndObjectList, mark, &crc, TRUE);
-                crc.top = crc.bottom;
-                ClientToScreen(g_hwndObjectList, (LPPOINT)&crc);
-            }
-            else
-                GetCursorPos((LPPOINT)&crc);
-
-            MainWindowHandleObjectPopupMenu(hwnd, g_hwndObjectList, mark, (LPPOINT)&crc);
-        }
+        MainWindowOnContextMenu(hwnd, (HWND)wParam, lParam);
         break;
 
     case WM_COMMAND:
@@ -1119,12 +1126,16 @@ BOOL MainWindowDlgMsgHandler(
     _In_ LPMSG lpMsg
 )
 {
-    if (g_DesktopPropWindow != NULL)       
-        if (PropSheet_IsDialogMessage(g_DesktopPropWindow, lpMsg))
+    HWND hwnd;
+    
+    hwnd = propGetDesktopWindow();
+    if (hwnd != NULL)
+        if (PropSheet_IsDialogMessage(hwnd, lpMsg))
             return TRUE;
     
-    if (g_PropWindow != NULL)
-        if (PropSheet_IsDialogMessage(g_PropWindow, lpMsg))
+    hwnd = propGetCommonWindow();
+    if (hwnd != NULL)
+        if (PropSheet_IsDialogMessage(hwnd, lpMsg))
             return TRUE;
 
     return FALSE;
@@ -1167,14 +1178,10 @@ DWORD guiInitGlobals(
         //
         // Create dedicated heap.
         //
-        Globals->Heap = RtlCreateHeap(HEAP_GROWABLE, NULL, 0, 0, NULL, NULL);
+        Globals->Heap = supCreateHeap(HEAP_GROWABLE, TRUE);
         if (Globals->Heap == NULL) {
             dwResult = INIT_ERROR_NOHEAP;
             break;
-        }
-
-        if (IsWine == FALSE) {
-            RtlSetHeapInformation(Globals->Heap, HeapEnableTerminationOnCorruption, NULL, 0);
         }
 
         //
@@ -1219,7 +1226,7 @@ DWORD guiInitGlobals(
 
     if (dwResult != INIT_NO_ERROR) {
         if (Globals->Heap)
-            RtlDestroyHeap(Globals->Heap);
+            supDestroyHeap(Globals->Heap);
     }
 
     return dwResult;
@@ -1595,7 +1602,7 @@ DWORD guiCreateMainWindowAndComponents(
             WC_TREEVIEW,
             NULL,
             WS_VISIBLE | WS_CHILD | WS_TABSTOP |
-            TVS_DISABLEDRAGDROP | TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT,
+            TVS_DISABLEDRAGDROP | TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT | TVS_TRACKSELECT,
             0,
             0,
             0,
@@ -1892,10 +1899,12 @@ UINT WinObjExMain()
     UINT result = ERROR_SUCCESS;
     DWORD initResult;
 
+    RtlSecureZeroMemory(&g_WinObjStats, sizeof(g_WinObjStats));
+
     logCreate();
 
     bIsFullAdmin = ntsupUserIsFullAdmin();
-    bIsWine = (is_wine() == 1);
+    bIsWine = (IsWine() == 1);
     if (bIsWine) bIsFullAdmin = FALSE; // On Wine drop admin related features as they require driver.
 
     if (!InitMSVCRT()) {
@@ -1942,7 +1951,7 @@ UINT WinObjExMain()
 
         guiCreateObjectListColumns();
 
-        ListObjectDirectoryTree(KM_OBJECTS_ROOT_DIRECTORY, NULL, NULL);
+        ListObjectDirectoryTree(ObGetPredefinedUnicodeString(OBP_ROOT), NULL, NULL);
 
         TreeView_SelectItem(g_hwndObjectTree, TreeView_GetRoot(g_hwndObjectTree));
         SetFocus(g_hwndObjectTree);
@@ -1957,6 +1966,7 @@ UINT WinObjExMain()
     //
     // Do not move anywhere.
     //
+    ListHeapDestroy();
     supShutdown();
     logFree();
 
@@ -1978,6 +1988,7 @@ UINT WinObjExMain()
 void main()
 {
     __security_init_cookie();
+    SetUnhandledExceptionFilter((LPTOP_LEVEL_EXCEPTION_FILTER)exceptFilterUnhandled);
     ExitProcess(WinObjExMain());
 }
 #else
@@ -1994,6 +2005,7 @@ int CALLBACK WinMain(
     UNREFERENCED_PARAMETER(lpCmdLine);
     UNREFERENCED_PARAMETER(nCmdShow);
 
+    SetUnhandledExceptionFilter((LPTOP_LEVEL_EXCEPTION_FILTER)exceptFilterUnhandled);
     ExitProcess(WinObjExMain());
 }
 #endif

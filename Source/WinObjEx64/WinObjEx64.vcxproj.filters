@@ -43,6 +43,9 @@
     <Filter Include="Hde">
       <UniqueIdentifier>{b8b6096c-f90d-41f3-a643-a53ee0fae82b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\sup">
+      <UniqueIdentifier>{ef3c4ca0-1364-4947-a6d6-091b33037c05}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="aboutDlg.c">
@@ -61,9 +64,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="main.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="sup.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="hde\hde64.c">
@@ -128,9 +128,6 @@
     </ClCompile>
     <ClCompile Include="props\propToken.c">
       <Filter>Source Files\props</Filter>
-    </ClCompile>
-    <ClCompile Include="wine.c">
-      <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="extras\extrasSL.c">
       <Filter>Source Files\extras</Filter>
@@ -252,6 +249,15 @@
     <ClCompile Include="sysinfoDlg.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="sup\sup.c">
+      <Filter>Source Files\sup</Filter>
+    </ClCompile>
+    <ClCompile Include="sup\sync.c">
+      <Filter>Source Files\sup</Filter>
+    </ClCompile>
+    <ClCompile Include="sup\wine.c">
+      <Filter>Source Files\sup</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc">
@@ -259,13 +265,7 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="aboutDlg.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="excepth.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="findDlg.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="global.h">
@@ -278,12 +278,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="resource.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="sup.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="supConsts.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ui.h">
@@ -310,64 +304,19 @@
     <ClInclude Include="msvcver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="wine.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="extras\extras.h">
       <Filter>Source Files\extras</Filter>
     </ClInclude>
-    <ClInclude Include="extras\extrasCallbacks.h">
-      <Filter>Source Files\extras</Filter>
-    </ClInclude>
-    <ClInclude Include="extras\extrasDrivers.h">
-      <Filter>Source Files\extras</Filter>
-    </ClInclude>
-    <ClInclude Include="extras\extrasIPC.h">
-      <Filter>Source Files\extras</Filter>
-    </ClInclude>
-    <ClInclude Include="extras\extrasPN.h">
-      <Filter>Source Files\extras</Filter>
-    </ClInclude>
-    <ClInclude Include="extras\extrasPSList.h">
-      <Filter>Source Files\extras</Filter>
-    </ClInclude>
-    <ClInclude Include="extras\extrasSSDT.h">
-      <Filter>Source Files\extras</Filter>
-    </ClInclude>
-    <ClInclude Include="extras\extrasUSD.h">
-      <Filter>Source Files\extras</Filter>
-    </ClInclude>
-    <ClInclude Include="props\propBasic.h">
-      <Filter>Source Files\props</Filter>
-    </ClInclude>
     <ClInclude Include="props\propBasicConsts.h">
-      <Filter>Source Files\props</Filter>
-    </ClInclude>
-    <ClInclude Include="props\propDesktop.h">
       <Filter>Source Files\props</Filter>
     </ClInclude>
     <ClInclude Include="props\propDlg.h">
       <Filter>Source Files\props</Filter>
     </ClInclude>
-    <ClInclude Include="props\propDriver.h">
-      <Filter>Source Files\props</Filter>
-    </ClInclude>
-    <ClInclude Include="props\propObjectDump.h">
-      <Filter>Source Files\props</Filter>
-    </ClInclude>
     <ClInclude Include="props\propObjectDumpConsts.h">
       <Filter>Source Files\props</Filter>
     </ClInclude>
-    <ClInclude Include="props\propProcess.h">
-      <Filter>Source Files\props</Filter>
-    </ClInclude>
-    <ClInclude Include="props\propSecurity.h">
-      <Filter>Source Files\props</Filter>
-    </ClInclude>
     <ClInclude Include="props\propSecurityConsts.h">
-      <Filter>Source Files\props</Filter>
-    </ClInclude>
-    <ClInclude Include="props\propType.h">
       <Filter>Source Files\props</Filter>
     </ClInclude>
     <ClInclude Include="props\propTypeConsts.h">
@@ -375,12 +324,6 @@
     </ClInclude>
     <ClInclude Include="kldbg_patterns.h">
       <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="props\propToken.h">
-      <Filter>Source Files\props</Filter>
-    </ClInclude>
-    <ClInclude Include="extras\extrasSL.h">
-      <Filter>Source Files\extras</Filter>
     </ClInclude>
     <ClInclude Include="plugmngr.h">
       <Filter>Header Files</Filter>
@@ -406,9 +349,6 @@
     <ClInclude Include="extras\extrasCallbacksPatterns.h">
       <Filter>Source Files\extras</Filter>
     </ClInclude>
-    <ClInclude Include="winedebug.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\Shared\ntos\halamd64.h">
       <Filter>Ntos</Filter>
     </ClInclude>
@@ -420,15 +360,6 @@
     </ClInclude>
     <ClInclude Include="..\Shared\ntos\ntsup.h">
       <Filter>Ntos</Filter>
-    </ClInclude>
-    <ClInclude Include="sdviewDlg.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="props\propAlpcPort.h">
-      <Filter>Source Files\props</Filter>
-    </ClInclude>
-    <ClInclude Include="props\propSection.h">
-      <Filter>Source Files\props</Filter>
     </ClInclude>
     <ClInclude Include="ksymbols.h">
       <Filter>Header Files</Filter>
@@ -457,14 +388,20 @@
     <ClInclude Include="..\Shared\sdk\extdef.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="extras\extrasCmOpt.h">
-      <Filter>Source Files\extras</Filter>
+    <ClInclude Include="props\propCommon.h">
+      <Filter>Source Files\props</Filter>
     </ClInclude>
-    <ClInclude Include="extras\extrasSSDTsup.h">
-      <Filter>Source Files\extras</Filter>
+    <ClInclude Include="sup\sup.h">
+      <Filter>Source Files\sup</Filter>
     </ClInclude>
-    <ClInclude Include="sysinfoDlg.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="sup\wine.h">
+      <Filter>Source Files\sup</Filter>
+    </ClInclude>
+    <ClInclude Include="props\props.h">
+      <Filter>Source Files\props</Filter>
+    </ClInclude>
+    <ClInclude Include="extras\extrasHandlers.h">
+      <Filter>Source Files\extras</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

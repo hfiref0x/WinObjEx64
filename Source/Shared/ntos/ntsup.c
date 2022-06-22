@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.13
 *
-*  DATE:        05 Jun 2022
+*  DATE:        15 Jun 2022
 *
 *  Native API support functions.
 *
@@ -101,6 +101,44 @@ PVOID ntsupVirtualAlloc(
     _In_ SIZE_T Size)
 {
     return ntsupVirtualAllocEx(Size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+}
+
+/*
+* ntsupVirtualLock
+*
+* Purpose:
+*
+* Wrapper for NtLockVirtualMemory.
+*
+*/
+BOOL ntsupVirtualLock(
+    _In_ LPVOID lpAddress,
+    _In_ SIZE_T dwSize
+)
+{
+    return (NT_SUCCESS(NtLockVirtualMemory(NtCurrentProcess(), 
+        &lpAddress, 
+        &dwSize, 
+        MAP_PROCESS)));
+}
+
+/*
+* ntsupVirtualUnlock
+*
+* Purpose:
+*
+* Wrapper for NtUnlockVirtualMemory.
+*
+*/
+BOOL ntsupVirtualUnlock(
+    _In_ LPVOID lpAddress,
+    _In_ SIZE_T dwSize
+)
+{
+    return (NT_SUCCESS(NtUnlockVirtualMemory(NtCurrentProcess(), 
+        &lpAddress, 
+        &dwSize, 
+        MAP_PROCESS)));
 }
 
 /*
@@ -929,6 +967,38 @@ BOOL ntsupQueryThreadWin32StartAddress(
 }
 
 /*
+* ntsupOpenDirectoryEx
+*
+* Purpose:
+*
+* Open directory handle with DIRECTORY_QUERY access, with root directory support.
+*
+*/
+_Success_(return)
+NTSTATUS ntsupOpenDirectoryEx(
+    _Out_ PHANDLE DirectoryHandle,
+    _In_opt_ HANDLE RootDirectoryHandle,
+    _In_ PUNICODE_STRING DirectoryName,
+    _In_ ACCESS_MASK DesiredAccess
+)
+{
+    NTSTATUS          ntStatus;
+    HANDLE            directoryHandle = NULL;
+    OBJECT_ATTRIBUTES objectAttrbutes;
+
+    InitializeObjectAttributes(&objectAttrbutes,
+        DirectoryName, OBJ_CASE_INSENSITIVE, RootDirectoryHandle, NULL);
+
+    ntStatus = NtOpenDirectoryObject(&directoryHandle,
+        DesiredAccess,
+        &objectAttrbutes);
+
+    *DirectoryHandle = directoryHandle;
+
+    return ntStatus;
+}
+
+/*
 * ntsupOpenDirectory
 *
 * Purpose:
@@ -943,26 +1013,10 @@ NTSTATUS ntsupOpenDirectory(
     _In_ ACCESS_MASK DesiredAccess
 )
 {
-    NTSTATUS          ntStatus;
-    HANDLE            directoryHandle = NULL;
-    UNICODE_STRING    usDirectory;
-    OBJECT_ATTRIBUTES objectAttrbutes;
+    UNICODE_STRING usName;
 
-    *DirectoryHandle = NULL;
-
-    RtlInitUnicodeString(&usDirectory, DirectoryName);
-    InitializeObjectAttributes(&objectAttrbutes,
-        &usDirectory, OBJ_CASE_INSENSITIVE, RootDirectoryHandle, NULL);
-
-    ntStatus = NtOpenDirectoryObject(&directoryHandle,
-        DesiredAccess,
-        &objectAttrbutes);
-
-    if (NT_SUCCESS(ntStatus)) {
-        *DirectoryHandle = directoryHandle;
-    }
-
-    return ntStatus;
+    RtlInitUnicodeString(&usName, DirectoryName);
+    return ntsupOpenDirectoryEx(DirectoryHandle, RootDirectoryHandle, &usName, DesiredAccess);
 }
 
 /*
@@ -1848,112 +1902,6 @@ NTSTATUS ntsupIsProcessElevated(
     }
 
     return ntStatus;
-}
-
-/*
-* ntsupGetMappedFileName
-*
-* Purpose:
-*
-* Checks whether the specified address is within a memory-mapped file.
-* If so, the function returns the name of the memory-mapped file.
-*
-*/
-ULONG ntsupGetMappedFileName(
-    _In_ PVOID BaseAddress,
-    _Inout_ LPWSTR FileName,
-    _In_ ULONG cchFileName,
-    _Out_ PSIZE_T cbNeeded
-)
-{
-    OBJECT_NAME_INFORMATION* objectNameInfo;
-    NTSTATUS ntStatus;
-    SIZE_T returnedLength = 0;
-    ULONG errorCode, copyLength = 0;
-    HANDLE processHeap = NtCurrentPeb()->ProcessHeap;
-
-    *cbNeeded = 0;
-
-    if (cchFileName == 0) {
-        RtlSetLastWin32Error(ERROR_INSUFFICIENT_BUFFER);
-        return 0;
-    }
-
-    //
-    // Don't be like MS authors and ask actual size.
-    //
-    ntStatus = NtQueryVirtualMemory(
-        NtCurrentProcess(),
-        BaseAddress,
-        MemoryMappedFilenameInformation,
-        NULL,
-        0,
-        &returnedLength);
-
-    if (ntStatus != STATUS_INFO_LENGTH_MISMATCH) {
-        RtlSetLastWin32Error(RtlNtStatusToDosError(ntStatus));
-        return 0;
-    }
-
-    //
-    // Allocate required buffer.
-    //
-    objectNameInfo = (OBJECT_NAME_INFORMATION*)RtlAllocateHeap(
-        processHeap,
-        HEAP_ZERO_MEMORY,
-        returnedLength);
-
-    if (objectNameInfo == NULL) {
-        RtlSetLastWin32Error(ERROR_NOT_ENOUGH_MEMORY);
-        return 0;
-    }
-
-    //
-    // Query information.
-    //
-    ntStatus = NtQueryVirtualMemory(
-        NtCurrentProcess(),
-        BaseAddress,
-        MemoryMappedFilenameInformation,
-        objectNameInfo,
-        returnedLength,
-        &returnedLength);
-
-    if (NT_SUCCESS(ntStatus)) {
-
-        //
-        // Copy filename.
-        //
-        copyLength = objectNameInfo->Name.Length >> 1;
-        if (cchFileName > copyLength + 1) {
-            errorCode = ERROR_SUCCESS;
-        }
-        else {
-            *cbNeeded = ((SIZE_T)copyLength + 1) * sizeof(WCHAR);
-            copyLength = cchFileName - 1;
-            errorCode = ERROR_INSUFFICIENT_BUFFER;
-        }
-
-        RtlSetLastWin32Error(errorCode);
-
-        if (copyLength) {
-
-            RtlCopyMemory(
-                FileName,
-                objectNameInfo->Name.Buffer,
-                copyLength * sizeof(WCHAR));
-
-            FileName[copyLength] = 0;
-
-        }
-
-    }
-    else {
-        RtlSetLastWin32Error(RtlNtStatusToDosError(ntStatus));
-    }
-
-    RtlFreeHeap(processHeap, 0, objectNameInfo);
-    return copyLength;
 }
 
 /*

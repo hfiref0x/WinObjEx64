@@ -4,9 +4,9 @@
 *
 *  TITLE:       LOG.C
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        07 Jun 2022
+*  DATE:        19 Jun 2022
 *
 *  Simplified log.
 *
@@ -318,7 +318,7 @@ INT_PTR CALLBACK LogViewerDialogProc(
     case WM_INITDIALOG:
         supCenterWindow(hwndDlg);
         LogViewerListLog(hwndDlg);
-        break;
+        return TRUE;
 
     case WM_COMMAND:
 
@@ -328,13 +328,8 @@ INT_PTR CALLBACK LogViewerDialogProc(
         case ID_OBJECT_COPY:
             LogViewerCopyToClipboard(hwndDlg);
             break;
-
-        default:
-            break;
         }
 
-    default:
-        break;
     }
     return 0;
 }

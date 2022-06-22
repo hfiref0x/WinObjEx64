@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASCMOPT.C
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        04 Jun 2022
+*  DATE:        19 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -242,9 +242,7 @@ BOOL CALLBACK CmOptDlgHandleNotify(
     _In_ EXTRASCONTEXT* Context
 )
 {
-    BOOL bHandled = TRUE;
     INT nImageIndex;
-
 
     if (NMListView->hdr.idFrom != ID_EXTRASLIST)
         return FALSE;
@@ -272,14 +270,10 @@ BOOL CALLBACK CmOptDlgHandleNotify(
             Context->lvColumnToSort,
             nImageIndex);
 
-        break;
-
-    default:
-        bHandled = FALSE;
-        break;
+        return TRUE;
     }
 
-    return bHandled;
+    return FALSE;
 }
 
 /*
@@ -640,7 +634,7 @@ VOID CmOptDlgOnInit(
     SendMessage(hwndDlg, WM_SIZE, 0, 0);
     SetFocus(pDlgContext->ListView);
 
-    supCenterWindowSpecifyParent(hwndDlg, g_WinObj.MainWindow);
+    supCenterWindowSpecifyParent(hwndDlg, g_hwndMain);
 }
 
 /*

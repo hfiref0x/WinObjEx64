@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPSECURITY.C
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        04 Jun 2022
+*  DATE:        19 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -15,9 +15,92 @@
 *
 *******************************************************************************/
 #include "global.h"
-#include "propDlg.h"
-#include "propSecurity.h"
 #include "propSecurityConsts.h"
+
+typedef struct _ObjectSecurityVtbl ObjectSecurityVtbl, * PObjectSecurityVtbl;
+
+//class
+typedef struct _IObjectSecurity {
+    ObjectSecurityVtbl* lpVtbl;
+    ULONG RefCount;
+    ULONG psiFlags;
+    ULONG dwAccessMax;
+    GENERIC_MAPPING GenericMapping;
+    ACCESS_MASK ValidAccessMask;
+    HINSTANCE hInstance;
+    PROP_OBJECT_INFO* ObjectContext;
+    PSI_ACCESS AccessTable;//dynamically allocated access table
+    POPENOBJECTMETHOD OpenObjectMethod;
+    PCLOSEOBJECTMETHOD CloseObjectMethod;
+} IObjectSecurity, * PIObjectSecurity;
+
+
+//Vtbl prototypes
+
+typedef HRESULT(STDMETHODCALLTYPE* pQueryInterface)(
+    _In_ IObjectSecurity* This,
+    _In_ REFIID riid,
+    _Out_ void** ppvObject);
+
+typedef ULONG(STDMETHODCALLTYPE* pAddRef)(
+    _In_ IObjectSecurity* This);
+
+typedef ULONG(STDMETHODCALLTYPE* pRelease)(
+    _In_ IObjectSecurity* This);
+
+// *** ISecurityInformation methods ***
+typedef HRESULT(STDMETHODCALLTYPE* pGetObjectInformation)(
+    _In_ IObjectSecurity* This,
+    _Out_ PSI_OBJECT_INFO pObjectInfo);
+
+typedef HRESULT(STDMETHODCALLTYPE* pGetSecurity)(
+    _In_ IObjectSecurity* This,
+    _In_ SECURITY_INFORMATION RequestedInformation,
+    _Out_ PSECURITY_DESCRIPTOR* ppSecurityDescriptor,
+    _In_ BOOL fDefault);
+
+typedef HRESULT(STDMETHODCALLTYPE* pSetSecurity)(
+    _In_ IObjectSecurity* This,
+    _In_ SECURITY_INFORMATION SecurityInformation,
+    _In_ PSECURITY_DESCRIPTOR pSecurityDescriptor);
+
+typedef HRESULT(STDMETHODCALLTYPE* pGetAccessRights)(
+    _In_ IObjectSecurity* This,
+    _In_ const GUID* pguidObjectType,
+    _In_ DWORD dwFlags,
+    _Out_ PSI_ACCESS* ppAccess,
+    _Out_ ULONG* pcAccesses,
+    _Out_ ULONG* piDefaultAccess);
+
+typedef HRESULT(STDMETHODCALLTYPE* pMapGeneric)(
+    _In_ IObjectSecurity* This,
+    _In_ const GUID* pguidObjectType,
+    _In_ UCHAR* pAceFlags,
+    _In_ ACCESS_MASK* pMask);
+
+typedef HRESULT(STDMETHODCALLTYPE* pGetInheritTypes)(
+    _In_ IObjectSecurity* This,
+    _Out_ PSI_INHERIT_TYPE* ppInheritTypes,
+    _Out_ ULONG* pcInheritTypes);
+
+typedef HRESULT(STDMETHODCALLTYPE* pPropertySheetPageCallback)(
+    _In_ IObjectSecurity* This,
+    _In_ HWND hwnd,
+    _In_ UINT uMsg,
+    _In_ SI_PAGE_TYPE uPage);
+
+typedef struct _ObjectSecurityVtbl {
+    pQueryInterface             QueryInterface;
+    pAddRef                     AddRef;
+    pRelease                    Release;
+    pGetObjectInformation       GetObjectInformation;
+    pGetSecurity                GetSecurity;
+    pSetSecurity                SetSecurity;
+    pGetAccessRights            GetAccessRights;
+    pMapGeneric                 MapGeneric;
+    pGetInheritTypes            GetInheritTypes;
+    pPropertySheetPageCallback  PropertySheetPageCallback;
+} ObjectSecurityVtbl, * PObjectSecurityVtbl;
 
 /*
 * propSecurityObjectSupported
@@ -28,34 +111,41 @@
 *
 */
 BOOL propSecurityObjectSupported(
-    _In_ UINT nTypeIndex
+    _In_ WOBJ_OBJECT_TYPE nTypeIndex
 )
 {
-    if ((nTypeIndex != ObjectTypePort) &&
-        (nTypeIndex != ObjectTypeFile) &&
-        (nTypeIndex != ObjectTypeDirectory) &&
-        (nTypeIndex != ObjectTypeDevice) &&
-        (nTypeIndex != ObjectTypeSection) &&
-        (nTypeIndex != ObjectTypeEvent) &&
-        (nTypeIndex != ObjectTypeEventPair) &&
-        (nTypeIndex != ObjectTypeMutant) &&
-        (nTypeIndex != ObjectTypeDesktop) &&
-        (nTypeIndex != ObjectTypeKey) &&
-        (nTypeIndex != ObjectTypeSemaphore) &&
-        (nTypeIndex != ObjectTypeSymbolicLink) &&
-        (nTypeIndex != ObjectTypeTimer) &&
-        (nTypeIndex != ObjectTypeWinstation) &&
-        (nTypeIndex != ObjectTypeIoCompletion) &&
-        (nTypeIndex != ObjectTypeJob) &&
-        (nTypeIndex != ObjectTypeSession) &&
-        (nTypeIndex != ObjectTypeMemoryPartition) &&
-        (nTypeIndex != ObjectTypeProcess) &&
-        (nTypeIndex != ObjectTypeThread) &&
-        (nTypeIndex != ObjectTypeToken))
-    {
-        return FALSE;
+    WOBJ_OBJECT_TYPE SecuritySupportedTypes[] = {
+        ObjectTypeDesktop,
+        ObjectTypeDevice,
+        ObjectTypeDirectory,
+        ObjectTypeEvent,
+        ObjectTypeEventPair,
+        ObjectTypeFile,
+        ObjectTypeIoCompletion,
+        ObjectTypeJob,
+        ObjectTypeKey,
+        ObjectTypeMemoryPartition,
+        ObjectTypeMutant,
+        ObjectTypePort,
+        ObjectTypeProcess,
+        ObjectTypeRegistryTransaction,
+        ObjectTypeSection,
+        ObjectTypeSemaphore,
+        ObjectTypeSession,
+        ObjectTypeSymbolicLink,
+        ObjectTypeThread,
+        ObjectTypeTimer,
+        ObjectTypeToken,
+        ObjectTypeWinstation
+    };
+
+    UINT i;
+    for (i = 0; i < RTL_NUMBER_OF(SecuritySupportedTypes); i++) {
+        if (SecuritySupportedTypes[i] == nTypeIndex)
+            return TRUE;
     }
-    return TRUE;
+
+    return FALSE;
 }
 
 /*
@@ -72,7 +162,7 @@ PSI_ACCESS propGetAccessTable(
 {
     SI_ACCESS* AccessTable = NULL;
 
-    switch (This->ObjectContext->TypeIndex) {
+    switch (This->ObjectContext->ObjectTypeIndex) {
 
     case ObjectTypeDirectory:
         This->dwAccessMax = MAX_KNOWN_DIRECTORY_ACCESS_VALUE;
@@ -168,6 +258,11 @@ PSI_ACCESS propGetAccessTable(
     case ObjectTypePort:
         This->dwAccessMax = MAX_KNOWN_PORT_ACCESS_VALUE;
         AccessTable = (PSI_ACCESS)&PortAccessValues;
+        break;
+
+    case ObjectTypeRegistryTransaction:
+        This->dwAccessMax = MAX_KNOWN_TRANSACTION_ACCESS_VALUE;
+        AccessTable = (PSI_ACCESS)&TransactionAccessValues;
         break;
     }
 
@@ -296,7 +391,7 @@ HRESULT STDMETHODCALLTYPE GetObjectInformation(
     pObjectInfo->dwFlags = This->psiFlags;
     pObjectInfo->hInstance = This->hInstance;
     pObjectInfo->pszPageTitle = TEXT("Security");
-    pObjectInfo->pszObjectName = This->ObjectContext->lpObjectName;
+    pObjectInfo->pszObjectName = This->ObjectContext->NtObjectName.Buffer;
     return S_OK;
 }
 
@@ -533,30 +628,31 @@ HRESULT propSecurityConstructor(
 
         //copy object specific access table if it present
         if (TypeAccessTable && This->dwAccessMax) {
-            supCopyMemory(This->AccessTable,
-                Size,
+
+            RtlCopyMemory(This->AccessTable,
                 TypeAccessTable,
-                (This->dwAccessMax * sizeof(SI_ACCESS)));
+                This->dwAccessMax * sizeof(SI_ACCESS));
+
         }
 
         if (This->ValidAccessMask & DELETE) {
-            supCopyMemory(&This->AccessTable[This->dwAccessMax++], sizeof(SI_ACCESS),
+            RtlCopyMemory(&This->AccessTable[This->dwAccessMax++],
                 &GeneralAccessValues[0], sizeof(SI_ACCESS));
         }
         if (This->ValidAccessMask & READ_CONTROL) {
-            supCopyMemory(&This->AccessTable[This->dwAccessMax++], sizeof(SI_ACCESS),
+            RtlCopyMemory(&This->AccessTable[This->dwAccessMax++],
                 &GeneralAccessValues[1], sizeof(SI_ACCESS));
         }
         if (This->ValidAccessMask & WRITE_DAC) {
-            supCopyMemory(&This->AccessTable[This->dwAccessMax++], sizeof(SI_ACCESS),
+            RtlCopyMemory(&This->AccessTable[This->dwAccessMax++],
                 &GeneralAccessValues[2], sizeof(SI_ACCESS));
         }
         if (This->ValidAccessMask & WRITE_OWNER) {
-            supCopyMemory(&This->AccessTable[This->dwAccessMax++], sizeof(SI_ACCESS),
+            RtlCopyMemory(&This->AccessTable[This->dwAccessMax++],
                 &GeneralAccessValues[3], sizeof(SI_ACCESS));
         }
         if (This->ValidAccessMask & SYNCHRONIZE) {
-            supCopyMemory(&This->AccessTable[This->dwAccessMax++], sizeof(SI_ACCESS),
+            RtlCopyMemory(&This->AccessTable[This->dwAccessMax++],
                 &GeneralAccessValues[4], sizeof(SI_ACCESS));
         }
         hResult = S_OK;
@@ -564,7 +660,7 @@ HRESULT propSecurityConstructor(
     } while (FALSE);
 
     //cleanup
-    This->CloseObjectMethod(Context, hObject);
+    if (hObject) This->CloseObjectMethod(Context, hObject);
     if (TypeInfo) {
         supHeapFree(TypeInfo);
     }
@@ -598,15 +694,7 @@ HPROPSHEETPAGE propSecurityCreatePage(
 {
     IObjectSecurity* psi;
 
-    if (
-        (Context == NULL) ||
-        (OpenObjectMethod == NULL) //OpenObjectMethod is required
-        )
-    {
-        return NULL;
-    }
-
-    if (!propSecurityObjectSupported(Context->TypeIndex)) {
+    if (!propSecurityObjectSupported(Context->ObjectTypeIndex)) {
         return NULL;
     }
 

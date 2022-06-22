@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020 - 2021
+*  (C) COPYRIGHT AUTHORS, 2020 - 2022
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.00
+*  VERSION:     1.10
 *
-*  DATE:        01 Oct 2021
+*  DATE:        11 Jun 2022
 *
 *  WinObjEx64 ImageScope plugin.
 *
@@ -32,49 +32,15 @@ volatile DWORD g_PluginState = PLUGIN_RUNNING;
 WINOBJEX_PLUGIN* g_Plugin = NULL;
 volatile LONG m_RefCount = 0;
 
-VOID PmpCopyObjectData(
+BOOL PmpCopyObjectData(
     _In_ WINOBJEX_PARAM_OBJECT* Source,
     _In_ WINOBJEX_PARAM_OBJECT* Dest
 )
 {
-    SIZE_T Size;
-
-    if (Source->ObjectDirectory) {
-
-        Size = (1 + _strlen(Source->ObjectDirectory)) * sizeof(WCHAR);
-
-        Dest->ObjectDirectory = (LPWSTR)supHeapAlloc(Size);
-        if (Dest->ObjectDirectory) {
-            _strcpy(Dest->ObjectDirectory, Source->ObjectDirectory);
-        }
-        else {
-            return;
-        }
-
-    }
-    else {
-        return;
-    }
-
-    if (Source->ObjectName) {
-
-        Size = (1 + _strlen(Source->ObjectName)) * sizeof(WCHAR);
-
-        Dest->ObjectName = (LPWSTR)supHeapAlloc(Size);
-        if (Dest->ObjectName) {
-            _strcpy(Dest->ObjectName, Source->ObjectName);
-        }
-        else {
-            supHeapFree(Dest->ObjectDirectory);
-            Dest->ObjectDirectory = NULL;
-        }
-
-    }
-    else {
-        supHeapFree(Dest->ObjectDirectory);
-        Dest->ObjectDirectory = NULL;
-    }
-
+    HANDLE HeapHandle = NtCurrentPeb()->ProcessHeap;
+    
+    return supDuplicateUnicodeString(HeapHandle, &Dest->Directory, &Source->Directory) &&
+        supDuplicateUnicodeString(HeapHandle, &Dest->Name, &Source->Name);
 }
 
 /*
@@ -94,14 +60,11 @@ VOID PluginFreeGlobalResources(
         Context->SectionAddress = NULL;
     }
 
-    if (Context->ParamBlock.Object.ObjectDirectory) {
-        supHeapFree(Context->ParamBlock.Object.ObjectDirectory);
-        Context->ParamBlock.Object.ObjectDirectory = NULL;
-    }
-    if (Context->ParamBlock.Object.ObjectName) {
-        supHeapFree(Context->ParamBlock.Object.ObjectName);
-        Context->ParamBlock.Object.ObjectName = NULL;
-    }
+    supFreeDuplicatedUnicodeString(NtCurrentPeb()->ProcessHeap, 
+        &Context->ParamBlock.Object.Directory, TRUE);
+
+    supFreeDuplicatedUnicodeString(NtCurrentPeb()->ProcessHeap, 
+        &Context->ParamBlock.Object.Name, TRUE);
 
     if (g_Plugin->StateChangeCallback)
         g_Plugin->StateChangeCallback(g_Plugin, PluginStopped, NULL);
@@ -188,12 +151,9 @@ NTSTATUS CALLBACK StartPlugin(
         &Context->ParamBlock.Object,
         sizeof(WINOBJEX_PARAM_OBJECT));
 
-    PmpCopyObjectData(
+    if (!PmpCopyObjectData(
         &ParamBlock->Object,
-        &Context->ParamBlock.Object);
-
-    if ((Context->ParamBlock.Object.ObjectDirectory == NULL) ||
-        (Context->ParamBlock.Object.ObjectName == NULL))
+        &Context->ParamBlock.Object))
     {
         supHeapFree(Context);
         return STATUS_MEMORY_NOT_ALLOCATED;
@@ -202,8 +162,8 @@ NTSTATUS CALLBACK StartPlugin(
     Status = Context->ParamBlock.OpenNamedObjectByType(
         &SectionHandle,
         ObjectTypeSection,
-        Context->ParamBlock.Object.ObjectDirectory,
-        Context->ParamBlock.Object.ObjectName,
+        &Context->ParamBlock.Object.Directory,
+        &Context->ParamBlock.Object.Name,
         SECTION_QUERY | SECTION_MAP_READ);
 
     if (!NT_SUCCESS(Status)) {
@@ -312,6 +272,7 @@ BOOLEAN CALLBACK PluginInit(
         return FALSE;
 
     __try {
+
         //
         // Set plugin name to be displayed in WinObjEx64 UI.
         //
@@ -349,7 +310,7 @@ BOOLEAN CALLBACK PluginInit(
         PluginData->SupportMultipleInstances = TRUE;
 
         PluginData->MajorVersion = 1;
-        PluginData->MinorVersion = 0;
+        PluginData->MinorVersion = 1;
 
         //
         // Set plugin type.

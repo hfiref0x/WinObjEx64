@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       TREELIST.H
 *
-*  VERSION:     1.34
+*  VERSION:     1.35
 *
-*  DATE:        16 Sept 2021
+*  DATE:        10 Jun 2022
 *
 *  Tree-List custom control header file.
 *
@@ -47,11 +47,12 @@
 #define TLSTYLE_LINKLINES       0x02
 
 typedef struct _TL_SUBITEMS {
+    ULONG       Count;
     ULONG       ColorFlags;
     COLORREF    BgColor;
     COLORREF    FontColor;
     PVOID       UserParam;
-    ULONG       Count;
+    LPTSTR      CustomTooltip;
     LPTSTR      Text[1];
 } TL_SUBITEMS, *PTL_SUBITEMS;
 

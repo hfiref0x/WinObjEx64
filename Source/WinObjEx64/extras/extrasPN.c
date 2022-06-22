@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPN.C
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        05 Jun 2022
+*  DATE:        19 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -16,7 +16,6 @@
 *******************************************************************************/
 #include "global.h"
 #include "extras.h"
-#include "extrasPN.h"
 #include "propDlg.h"
 
 EXTRASCONTEXT PnDlgContext;
@@ -47,7 +46,7 @@ static FAST_EVENT PnDlgInitializedEvent = FAST_EVENT_INIT;
 VOID PNDlgResetOutput()
 {
     SetDlgItemText(PnDlgContext.hwndDlg, ID_NAMESPACE_ROOT, T_EmptyString);
-    SetDlgItemText(PnDlgContext.hwndDlg, ID_OBJECT_ADDR, T_EmptyString);
+    SetDlgItemText(PnDlgContext.hwndDlg, ID_NAMESPACE_ADDR, T_EmptyString);
     SetDlgItemText(PnDlgContext.hwndDlg, ID_SIZEOFBOUNDARYINFO, T_EmptyString);
     SetDlgItemText(PnDlgContext.hwndDlg, ID_BDESCRIPTOR_ADDRESS, T_EmptyString);
     SetDlgItemText(PnDlgContext.hwndDlg, ID_BDESCRIPTOR_NAME, T_EmptyString);
@@ -70,17 +69,15 @@ VOID PNDlgShowObjectProperties(
     _In_ INT iItem
 )
 {
-    LPWSTR              lpType, lpName;
-    POBJREF             objRef = NULL;
-
-    OBJREFPNS           pnsInfo;
+    POBJREF objRef = NULL;
+    OBJREFPNS pnsInfo;
     PROP_NAMESPACE_INFO propNamespace;
-    PROP_DIALOG_CREATE_SETTINGS propSettings;
+    PROP_CONFIG propConfig;
 
     //
     // Only one namespace object properties dialog at the same time allowed.
     //
-    ENSURE_DIALOG_UNIQUE(g_NamespacePropWindow);
+    supCloseKnownPropertiesDialog(propGetNamespaceWindow());
 
     //
     //  Get ref to object, failure here is critical.
@@ -88,7 +85,7 @@ VOID PNDlgShowObjectProperties(
     if (!supGetListViewItemParam(PnDlgContext.ListView, iItem, (PVOID*)&objRef))
         return;
 
-    RtlCopyMemory(&pnsInfo, &objRef->PrivateNamespace, sizeof(OBJREFPNS));
+    pnsInfo = objRef->PrivateNamespace;
     RtlSecureZeroMemory(&propNamespace, sizeof(propNamespace));
 
     propNamespace.ObjectAddress = objRef->ObjectAddress;
@@ -103,23 +100,14 @@ VOID PNDlgShowObjectProperties(
         return;
     }
 
-    lpName = supGetItemText(PnDlgContext.ListView, iItem, 0, NULL);
-    if (lpName) {
-        lpType = supGetItemText(PnDlgContext.ListView, iItem, 1, NULL);
-        if (lpType) {
+    RtlSecureZeroMemory(&propConfig, sizeof(propConfig));
 
-            RtlSecureZeroMemory(&propSettings, sizeof(propSettings));
-
-            propSettings.lpObjectName = lpName;
-            propSettings.lpObjectType = lpType;
-            propSettings.NamespaceObject = &propNamespace;
-
-            propCreateDialog(&propSettings);
-
-            supHeapFree(lpType);
-        }
-        supHeapFree(lpName);
-    }
+    propConfig.ContextType = propPrivateNamespace;
+    propConfig.NtObjectName = &objRef->Name;
+    propConfig.ObjectTypeIndex = objRef->ObjectTypeIndex;
+    propConfig.u1.NamespaceObject = &propNamespace;
+    propConfig.hwndParent = PnDlgContext.hwndDlg;
+    propCreateDialog(&propConfig);
 
     //
     // propNamespace.BoundaryDescriptor will be freed by propDestroyContext.
@@ -171,31 +159,42 @@ BOOL CALLBACK PNDlgEnumerateCallback(
     _In_opt_ PVOID Context
 )
 {
-    INT     lvItemIndex;
-    UINT    ConvertedTypeIndex;
-    LPCWSTR TypeName;
+    BOOL bNeedFree;
+    INT  lvItemIndex;
+    WOBJ_OBJECT_TYPE objectTypeIndex;
 
-    LVITEM  lvItem;
-    WCHAR   szBuffer[MAX_PATH + 1];
+    LVITEM lvItem;
+    WCHAR szBuffer[MAX_PATH + 1];
+
+    UNICODE_STRING objectName;
+    WOBJ_TYPE_DESC* typeDesc;
 
     UNREFERENCED_PARAMETER(Context);
 
-    ConvertedTypeIndex = supGetObjectNameIndexByTypeIndex((PVOID)Entry->ObjectAddress, Entry->TypeIndex);
-    TypeName = ObManagerGetNameByIndex(ConvertedTypeIndex);
+    bNeedFree = supNormalizeUnicodeStringForDisplay(PNSObjectsHeap,
+        &Entry->Name,
+        &objectName);
+
+    if (!bNeedFree)
+        objectName = Entry->Name;
+
+    objectTypeIndex = supGetObjectNameIndexByTypeIndex((PVOID)Entry->ObjectAddress, Entry->TypeIndex);
+    typeDesc = ObManagerGetEntryByTypeIndex(objectTypeIndex);
+    Entry->ObjectTypeIndex = objectTypeIndex;
 
     //Name
     RtlSecureZeroMemory(&lvItem, sizeof(lvItem));
     lvItem.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM;
     lvItem.iItem = MAXINT;
-    lvItem.iImage = ObManagerGetImageIndexByTypeIndex(ConvertedTypeIndex);
-    lvItem.pszText = Entry->ObjectName;
+    lvItem.iImage = typeDesc->ImageIndex;
+    lvItem.pszText = objectName.Buffer;
     lvItem.lParam = (LPARAM)Entry;
     lvItemIndex = ListView_InsertItem(PnDlgContext.ListView, &lvItem);
 
     //Type
     lvItem.mask = LVIF_TEXT;
     lvItem.iSubItem = 1;
-    lvItem.pszText = (LPWSTR)TypeName;
+    lvItem.pszText = typeDesc->Name;
     lvItem.iItem = lvItemIndex;
     ListView_SetItem(PnDlgContext.ListView, &lvItem);
 
@@ -210,6 +209,12 @@ BOOL CALLBACK PNDlgEnumerateCallback(
     ListView_SetItem(PnDlgContext.ListView, &lvItem);
 
     PNSNumberOfObjects += 1;
+
+    if (bNeedFree) {
+        supFreeDuplicatedUnicodeString(PNSObjectsHeap,
+            &objectName,
+            FALSE);
+    }
 
     return FALSE;
 }
@@ -423,8 +428,6 @@ BOOL CALLBACK PNDlgBoundaryDescriptorCallback(
         SetDlgItemText(hwndDlg, ID_INTEGRITYLABEL, szBuffer);
         break;
 
-    default:
-        break;
     }
     return FALSE;
 }
@@ -460,7 +463,7 @@ VOID PNDlgShowNamespaceInfo(
     if (!supGetListViewItemParam(PnDlgContext.ListView, iItem, (PVOID*)&objRef))
         return;
 
-    RtlCopyMemory(&pnsInfo, &objRef->PrivateNamespace, sizeof(OBJREFPNS));
+    pnsInfo = objRef->PrivateNamespace;
 
     //
     // Boundary Descriptor Entries.
@@ -488,7 +491,7 @@ VOID PNDlgShowNamespaceInfo(
         szBuffer[0] = L'0';
         szBuffer[1] = L'x';
         u64tohex(pnsInfo.NamespaceLookupEntry, &szBuffer[2]);
-        SetDlgItemText(hwndDlg, ID_OBJECT_ADDR, szBuffer);
+        SetDlgItemText(hwndDlg, ID_NAMESPACE_ADDR, szBuffer);
 
         //
         // SizeOfBoundaryInformation.
@@ -603,8 +606,6 @@ VOID PNDlgHandleNotify(
             PNDlgShowObjectProperties(pListView->iItem);
             break;
 
-        default:
-            break;
         }
     }
 
@@ -647,10 +648,10 @@ VOID PNDialogCreateDataHeap(
 )
 {
     if (bRefresh) {
-        if (PNSObjectsHeap) RtlDestroyHeap(PNSObjectsHeap);
+        if (PNSObjectsHeap) supDestroyHeap(PNSObjectsHeap);
     }
-    PNSObjectsHeap = RtlCreateHeap(HEAP_GROWABLE, NULL, 0, 0, NULL, NULL);
-    if (PNSObjectsHeap) RtlSetHeapInformation(PNSObjectsHeap, HeapEnableTerminationOnCorruption, NULL, 0);
+
+    PNSObjectsHeap = supCreateHeap(HEAP_GROWABLE, TRUE);
 }
 
 /*
@@ -690,6 +691,8 @@ VOID PNDialogShowInfo(
             SetDlgItemText(PnDlgContext.hwndDlg, ID_PNAMESPACESINFO, T_NAMESPACE_QUERY_FAILED);
         }
     }
+
+    SetFocus(PnDlgContext.ListView);
 }
 
 /*
@@ -750,8 +753,8 @@ VOID PNDialogOnClose(
     _In_ HWND hwndDlg
 )
 {
+    if (PNSObjectsHeap) supDestroyHeap(PNSObjectsHeap);
     DestroyWindow(hwndDlg);
-    if (PNSObjectsHeap) RtlDestroyHeap(PNSObjectsHeap);
 }
 
 /*
@@ -766,7 +769,7 @@ VOID PNDialogOnInit(
     _In_ HWND hwndDlg
 )
 {
-    supCenterWindowSpecifyParent(hwndDlg, g_WinObj.MainWindow);
+    supCenterWindowSpecifyParent(hwndDlg, g_hwndMain);
 }
 
 /*
@@ -870,6 +873,28 @@ INT_PTR CALLBACK PNDialogProc(
 }
 
 /*
+* PNSubDlgMsgHandler
+*
+* Purpose:
+*
+* Check window message against existing properties dialog.
+*
+*/
+BOOL PNSubDlgMsgHandler(
+    _In_ LPMSG lpMsg
+)
+{
+    HWND hwnd;
+
+    hwnd = propGetNamespaceWindow();
+    if (hwnd != NULL)
+        if (PropSheet_IsDialogMessage(hwnd, lpMsg))
+            return TRUE;
+
+    return FALSE;
+}
+
+/*
 * extrasPNDialogWorkerThread
 *
 * Purpose:
@@ -951,6 +976,9 @@ DWORD extrasPNDialogWorkerThread(
             bResult = GetMessage(&message, NULL, 0, 0);
             if (bResult == -1)
                 break;
+
+            if (PNSubDlgMsgHandler(&message))
+                continue;
 
             if (IsDialogMessage(hwndDlg, &message)) {
                 TranslateAccelerator(hwndDlg, acceleratorTable, &message);

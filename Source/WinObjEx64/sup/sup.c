@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        05 Jun 2022
+*  DATE:        19 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -16,9 +16,14 @@
 *******************************************************************************/
 #include "global.h"
 #include "treelist/treelist.h"
+#include "props/propTypeConsts.h"
 
 LIST_ENTRY supShutdownListHead;
 CRITICAL_SECTION supShutdownListLock;
+
+HANDLE ObjectPathHeap = NULL;
+
+OBEX_CONFIG g_LoadedParametersBlock;
 
 //
 // Setup info/SCM database.
@@ -26,14 +31,7 @@ CRITICAL_SECTION supShutdownListLock;
 SAPIDB g_sapiDB;
 SCMDB g_scmDB;
 
-HWND g_hwndBanner = NULL;
-
-//#define _PROFILE_MEMORY_USAGE_
-
-
-#ifdef _PROFILE_MEMORY_USAGE_
-ULONG g_cHeapAlloc = 0;
-#endif
+HWND BannerWindow = NULL;
 
 int __cdecl supxHandlesLookupCallback(
     void const* first,
@@ -44,6 +42,127 @@ int __cdecl supxHandlesLookupCallback2(
     void const* second);
 
 /*
+* supCreateHeap
+*
+* Purpose:
+*
+* Wrapper around RtlCreateHeap with statistics support.
+*
+*/
+HANDLE supCreateHeap(
+    _In_ ULONG HeapFlags,
+    _In_ BOOL TerminateOnCorruption
+)
+{
+    HANDLE heapHandle;
+
+    heapHandle = RtlCreateHeap(HeapFlags, NULL, 0, 0, NULL, NULL);
+    if (heapHandle == NULL)
+        return NULL;
+
+    if (TerminateOnCorruption && g_WinObj.IsWine == FALSE) {
+        RtlSetHeapInformation(heapHandle, HeapEnableTerminationOnCorruption, NULL, 0);
+    }
+
+    OBEX_STATS_INC(TotalHeapsCreated);
+
+    return heapHandle;
+}
+
+/*
+* supDestroyHeap
+*
+* Purpose:
+*
+* Wrapper around RtlDestroyHeap with statistics support.
+*
+*/
+BOOL supDestroyHeap(
+    _In_ HANDLE HeapHandle
+)
+{
+    BOOL bResult;
+
+    bResult = (RtlDestroyHeap(HeapHandle) == NULL);
+    if (bResult)
+        OBEX_STATS_INC(TotalHeapsDestroyed);
+
+    return bResult;
+}
+
+/*
+* supHeapAllocEx
+*
+* Purpose:
+*
+* Wrapper for RtlAllocateHeap with statistics support.
+*
+*/
+FORCEINLINE PVOID supHeapAllocEx(
+    _In_ HANDLE Heap,
+    _In_ SIZE_T Size
+)
+{
+    PVOID Buffer;
+
+#ifdef _DEBUG
+    ULONG64 MaxHeapAllocatedBlockSize;
+#endif
+
+    Buffer = RtlAllocateHeap(Heap, HEAP_ZERO_MEMORY, Size);
+
+    if (Buffer) {
+
+        OBEX_STATS_INC(TotalHeapAlloc);
+        OBEX_STATS_INC64(TotalHeapMemoryAllocated, Size);
+
+#ifdef _DEBUG
+        MaxHeapAllocatedBlockSize = g_WinObjStats.MaxHeapAllocatedBlockSize;
+
+        while (1) {
+
+            if (Size <= MaxHeapAllocatedBlockSize)
+                break;
+
+            MaxHeapAllocatedBlockSize = InterlockedCompareExchange64(
+                (LONG64*)&g_WinObjStats.MaxHeapAllocatedBlockSize,
+                (LONG64)Size,
+                (LONG64)MaxHeapAllocatedBlockSize);
+
+        }
+#endif
+    }
+
+    return Buffer;
+}
+
+/*
+* supHeapFreeEx
+*
+* Purpose:
+*
+* Wrapper for RtlFreeHeap with statistics support.
+*
+*/
+FORCEINLINE BOOL supHeapFreeEx(
+    _In_ HANDLE Heap,
+    _In_ PVOID Memory
+)
+{
+    BOOL Result;
+
+    Result = RtlFreeHeap(Heap, 0, Memory);
+
+    if (Result) {
+
+        OBEX_STATS_INC(TotalHeapFree);
+
+    }
+
+    return Result;
+}
+
+/*
 * supHeapAlloc
 *
 * Purpose:
@@ -51,47 +170,11 @@ int __cdecl supxHandlesLookupCallback2(
 * Wrapper for RtlAllocateHeap with WinObjEx heap.
 *
 */
-#ifndef _PROFILE_MEMORY_USAGE_
 FORCEINLINE PVOID supHeapAlloc(
     _In_ SIZE_T Size)
 {
-    return RtlAllocateHeap(g_WinObj.Heap, HEAP_ZERO_MEMORY, Size);
+    return supHeapAllocEx(g_obexHeap, Size);
 }
-#else
-PVOID supHeapAlloc(
-    _In_ SIZE_T Size)
-{
-    LONG x;
-    DWORD LastError;
-    PVOID Buffer = NULL;
-    WCHAR szBuffer[100];
-
-    Buffer = RtlAllocateHeap(g_WinObj.Heap, HEAP_ZERO_MEMORY, Size);
-    LastError = GetLastError();
-
-    if (Buffer) {
-
-        x = InterlockedIncrement((PLONG)&g_cHeapAlloc);
-
-        RtlStringCchPrintfSecure(szBuffer, 100,
-            L"supHeapAlloc, block %p with size %llu, g_cHeapAlloc %x\r\n",
-            Buffer, Size, x);
-
-        OutputDebugString(szBuffer);
-    }
-    else {
-
-        RtlStringCchPrintfSecure(szBuffer, 100,
-            L"Allocation, block size %llu, FAILED\r\n",
-            Size);
-
-        OutputDebugString(szBuffer);
-    }
-
-    SetLastError(LastError);
-    return Buffer;
-}
-#endif
 
 /*
 * supHeapFree
@@ -101,47 +184,11 @@ PVOID supHeapAlloc(
 * Wrapper for RtlFreeHeap with WinObjEx heap.
 *
 */
-#ifndef _PROFILE_MEMORY_USAGE_
 FORCEINLINE BOOL supHeapFree(
     _In_ PVOID Memory)
 {
-    return RtlFreeHeap(g_WinObj.Heap, 0, Memory);
+    return supHeapFreeEx(g_obexHeap, Memory);
 }
-#else
-BOOL supHeapFree(
-    _In_ PVOID Memory)
-{
-    LONG x;
-    BOOL bSuccess;
-    DWORD LastError;
-    WCHAR szBuffer[100];
-
-    bSuccess = RtlFreeHeap(g_WinObj.Heap, 0, Memory);
-    LastError = GetLastError();
-
-    if (bSuccess) {
-
-        x = InterlockedDecrement((PLONG)&g_cHeapAlloc);
-
-        RtlStringCchPrintfSecure(szBuffer, 100,
-            L"supHeapFree, block %p, g_cHeapAlloc %x\r\n",
-            Memory, x);
-
-        OutputDebugString(szBuffer);
-    }
-    else {
-
-        RtlStringCchPrintfSecure(szBuffer, 100,
-            L"supHeapFree, block %p, FAILED\r\n",
-            Memory);
-
-        OutputDebugString(szBuffer);
-    }
-
-    SetLastError(LastError);
-    return bSuccess;
-}
-#endif
 
 /*
 * supGetDPIValue
@@ -328,7 +375,7 @@ VOID supClipboardCopy(
         if (hglbCopy != NULL) {
             lptstrCopy = (LPWSTR)GlobalLock(hglbCopy);
             if (lptstrCopy) {
-                supCopyMemory(lptstrCopy, dwSize, lpText, cbText);
+                RtlCopyMemory(lptstrCopy, lpText, cbText);
             }
             GlobalUnlock(hglbCopy);
             if (!SetClipboardData(CF_UNICODETEXT, hglbCopy))
@@ -614,37 +661,237 @@ HICON supGetMainIcon(
 }
 
 /*
-* supCopyMemory
+* supFreeUnicodeString
 *
 * Purpose:
 *
-* Copies bytes between buffers.
-*
-* dest - Destination buffer
-* cbdest - Destination buffer size in bytes
-* src - Source buffer
-* cbsrc - Source buffer size in bytes
+* Release memory allocated for string.
 *
 */
-void supCopyMemory(
-    _Inout_ void* dest,
-    _In_ size_t cbdest,
-    _In_ const void* src,
-    _In_ size_t cbsrc
+_Success_(return)
+BOOL supFreeUnicodeString(
+    _In_ HANDLE HeapHandle,
+    _Inout_ PUNICODE_STRING String
 )
 {
-    char* d = (char*)dest;
-    char* s = (char*)src;
-
-    if ((dest == 0) || (src == 0) || (cbdest == 0))
-        return;
-    if (cbdest < cbsrc)
-        cbsrc = cbdest;
-
-    while (cbsrc > 0) {
-        *d++ = *s++;
-        cbsrc--;
+    if (String->Buffer) {
+        return supHeapFreeEx(HeapHandle, String->Buffer);
     }
+    return FALSE;
+}
+
+/*
+* supFreeDuplicatedUnicodeString
+*
+* Purpose:
+*
+* Release memory allocated for duplicated string.
+*
+*/
+_Success_(return)
+BOOL supFreeDuplicatedUnicodeString(
+    _In_ HANDLE HeapHandle,
+    _Inout_ PUNICODE_STRING DuplicatedString,
+    _In_ BOOL DoZeroMemory
+)
+{
+    BOOL bResult = FALSE;
+    if (DuplicatedString->Buffer) {
+        bResult = supHeapFreeEx(HeapHandle, DuplicatedString->Buffer);
+        if (DoZeroMemory) {
+            DuplicatedString->Buffer = NULL;
+            DuplicatedString->Length = DuplicatedString->MaximumLength = 0;
+        }
+    }
+    return bResult;
+}
+
+/*
+* supDuplicateUnicodeString
+*
+* Purpose:
+*
+* Duplicate existing UNICODE_STRING to another without RtlDuplicateUnicodeString.
+* 
+* Note: Use supFreeDuplicatedUnicodeString to release allocated memory.
+*
+*/
+_Success_(return)
+BOOL supDuplicateUnicodeString(
+    _In_ HANDLE HeapHandle,
+    _Out_ PUNICODE_STRING DestinationString,
+    _In_ PUNICODE_STRING SourceString
+)
+{
+    USHORT maxLength = SourceString->MaximumLength;
+    PWCHAR strBuffer;
+
+    if (maxLength == 0 || maxLength < SourceString->Length)
+        return FALSE;
+
+    strBuffer = (PWCHAR)supHeapAllocEx(HeapHandle, (SIZE_T)maxLength);
+    if (strBuffer) {
+        DestinationString->Buffer = strBuffer;
+        DestinationString->MaximumLength = maxLength;
+        RtlCopyUnicodeString(DestinationString, SourceString);
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+/*
+* supCreateObjectPathFromElements
+*
+* Purpose:
+*
+* Build object path with provided directory and name.
+*
+* Note: Use supFreeDuplicatedUnicodeString to release allocated memory.
+*
+*/
+_Success_(return)
+BOOL supCreateObjectPathFromElements(
+    _In_ PUNICODE_STRING ObjectName,
+    _In_ PUNICODE_STRING DirectoryName,
+    _Out_ PUNICODE_STRING ObjectPath,
+    _In_ BOOLEAN NullTerminate
+)
+{
+    BOOL bResult = FALSE, bIsRootDirectory;
+    PWSTR nameBuffer, string = NULL;
+    ULONG memIO;
+    USHORT bufferLength;
+
+    //
+    // Must be valid strings.
+    //
+    if (ObjectName->Length == 0 ||
+        DirectoryName->Length == 0)
+    {
+        return FALSE;
+    }
+
+    bIsRootDirectory = supIsRootDirectory(DirectoryName);
+    memIO = ObjectName->Length + DirectoryName->Length;
+
+    if (!bIsRootDirectory)
+        memIO += sizeof(OBJ_NAME_PATH_SEPARATOR);
+
+    if (NullTerminate)
+        memIO += sizeof(UNICODE_NULL);
+
+    nameBuffer = (PWSTR)supHeapAlloc(memIO);
+    string = nameBuffer;
+
+    if (string) {
+
+        RtlCopyMemory(string, DirectoryName->Buffer, DirectoryName->Length);
+        string = (PWSTR)RtlOffsetToPointer(string, DirectoryName->Length);
+
+        if (!supIsRootDirectory(ObjectName)) {
+
+            if (!bIsRootDirectory)
+                *string++ = OBJ_NAME_PATH_SEPARATOR;
+
+            RtlCopyMemory(string, ObjectName->Buffer, ObjectName->Length);
+            string = (PWSTR)RtlOffsetToPointer(string, ObjectName->Length);
+
+        }
+
+        if (NullTerminate)
+            *string++ = UNICODE_NULL;
+
+        bResult = TRUE;
+    }
+
+    bufferLength = (USHORT)((ULONG_PTR)string - (ULONG_PTR)nameBuffer);
+    ObjectPath->Buffer = nameBuffer;
+    if (NullTerminate)
+        ObjectPath->Length = (USHORT)(bufferLength - sizeof(UNICODE_NULL));
+    else
+        ObjectPath->Length = (USHORT)bufferLength;
+
+    ObjectPath->MaximumLength = (USHORT)memIO;
+
+    return bResult;
+}
+
+/*
+* supCreateObjectPathFromCurrentPath
+*
+* Purpose:
+*
+* Build string that include current directory and object name.
+*
+*/
+_Success_(return)
+BOOL supCreateObjectPathFromCurrentPath(
+    _In_ PUNICODE_STRING ObjectName,
+    _Out_ PUNICODE_STRING ObjectPath,
+    _In_ BOOLEAN NullTerminate
+)
+{
+    USHORT bufferLength;
+    BOOL bResult = FALSE, bIsRootDirectory;
+    PWSTR nameBuffer, string = NULL;
+    ULONG memIO;
+    UNICODE_STRING currentPath;
+
+    if (ObjectName->Length == 0)
+        return FALSE;
+
+    //
+    // If ObjectName is root, return root.
+    //
+    if (supIsRootDirectory(ObjectName)) {
+        return supDuplicateUnicodeString(g_obexHeap, ObjectPath, ObjectName);
+    }
+
+    if (!supGetCurrentObjectPath(TRUE, &currentPath))
+        return FALSE;
+
+    bIsRootDirectory = supIsRootDirectory(&currentPath);
+
+    memIO = ObjectName->Length + currentPath.Length;
+
+    if (!bIsRootDirectory)
+        memIO += sizeof(OBJ_NAME_PATH_SEPARATOR);
+
+    if (NullTerminate)
+        memIO += sizeof(UNICODE_NULL);
+
+    nameBuffer = (PWSTR)supHeapAlloc(memIO);
+    string = nameBuffer;
+
+    if (string) {
+
+        RtlCopyMemory(string, currentPath.Buffer, currentPath.Length);
+        string = (PWSTR)RtlOffsetToPointer(string, currentPath.Length);
+
+        if (!bIsRootDirectory)
+            *string++ = OBJ_NAME_PATH_SEPARATOR;
+
+        RtlCopyMemory(string, ObjectName->Buffer, ObjectName->Length);
+        string = (PWSTR)RtlOffsetToPointer(string, ObjectName->Length);
+
+        if (NullTerminate)
+            *string++ = UNICODE_NULL;
+
+        bResult = TRUE;
+    }
+
+    bufferLength = (USHORT)((ULONG_PTR)string - (ULONG_PTR)nameBuffer);
+    ObjectPath->Buffer = nameBuffer;
+    if (NullTerminate)
+        ObjectPath->Length = (USHORT)(bufferLength - sizeof(UNICODE_NULL));
+    else
+        ObjectPath->Length = (USHORT)bufferLength;
+
+    ObjectPath->MaximumLength = (USHORT)memIO;
+
+    supFreeDuplicatedUnicodeString(g_obexHeap, &currentPath, FALSE);
+    return bResult;
 }
 
 /*
@@ -675,8 +922,8 @@ VOID CALLBACK supSymCallbackReportEvent(
     _In_ LPCWSTR EventText
 )
 {
-    SendDlgItemMessage(g_hwndBanner, IDC_LOADING_MSG, EM_REPLACESEL, (WPARAM)0, (LPARAM)EventText);
-    SendDlgItemMessage(g_hwndBanner, IDC_LOADING_MSG, EM_REPLACESEL, (WPARAM)0, (LPARAM)(LPWSTR)L"\r\n");
+    SendDlgItemMessage(BannerWindow, IDC_LOADING_MSG, EM_REPLACESEL, (WPARAM)0, (LPARAM)EventText);
+    SendDlgItemMessage(BannerWindow, IDC_LOADING_MSG, EM_REPLACESEL, (WPARAM)0, (LPARAM)(LPWSTR)L"\r\n");
 }
 
 /*
@@ -703,29 +950,21 @@ INT_PTR CALLBACK supxLoadBannerDialog(
 
         if (lParam) {
             pvData = (SUP_BANNER_DATA*)lParam;
-
-            if (pvData->fList) {
-                SendDlgItemMessage(hwndDlg, IDC_LOADING_MSG, EM_SETLIMITTEXT, 0, 0);
-                supCenterWindowPerScreen(hwndDlg);
-                if (pvData->lpCaption) SetWindowText(hwndDlg, pvData->lpCaption);
-                SendDlgItemMessage(hwndDlg, IDC_LOADING_MSG, EM_REPLACESEL, (WPARAM)0, (LPARAM)pvData->lpText);
-            }
-            else {
-                supCenterWindow(hwndDlg);
-                SetDlgItemText(hwndDlg, IDC_LOADING_MSG, (LPWSTR)pvData->lpText);
-            }
-
+            SendDlgItemMessage(hwndDlg, IDC_LOADING_MSG, EM_SETLIMITTEXT, 0, 0);
+            supCenterWindowPerScreen(hwndDlg);
+            if (pvData->lpCaption) SetWindowText(hwndDlg, pvData->lpCaption);
+            SendDlgItemMessage(hwndDlg, IDC_LOADING_MSG, EM_REPLACESEL, (WPARAM)0, (LPARAM)pvData->lpText);
         }
-        break;
+        return TRUE;
 
     case WM_CLOSE:
         DestroyWindow(hwndDlg);
-        g_hwndBanner = NULL;
+        BannerWindow = NULL;
         break;
 
     }
 
-    return 0;
+    return FALSE;
 }
 
 /*
@@ -741,13 +980,13 @@ VOID supUpdateLoadBannerText(
     _In_ BOOL UseList
 )
 {
-    if (g_hwndBanner) {
+    if (BannerWindow) {
         if (UseList) {
-            SendDlgItemMessage(g_hwndBanner, IDC_LOADING_MSG, EM_REPLACESEL, (WPARAM)0, (LPARAM)lpText);
-            SendDlgItemMessage(g_hwndBanner, IDC_LOADING_MSG, EM_REPLACESEL, (WPARAM)0, (LPARAM)(LPWSTR)L"\r\n");
+            SendDlgItemMessage(BannerWindow, IDC_LOADING_MSG, EM_REPLACESEL, (WPARAM)0, (LPARAM)lpText);
+            SendDlgItemMessage(BannerWindow, IDC_LOADING_MSG, EM_REPLACESEL, (WPARAM)0, (LPARAM)(LPWSTR)L"\r\n");
         }
         else {
-            SetDlgItemText(g_hwndBanner, IDC_LOADING_MSG, lpText);
+            SetDlgItemText(BannerWindow, IDC_LOADING_MSG, lpText);
         }
     }
 
@@ -763,26 +1002,24 @@ VOID supUpdateLoadBannerText(
 */
 VOID supDisplayLoadBanner(
     _In_ LPCWSTR lpMessage,
-    _In_opt_ LPCWSTR lpCaption,
-    _In_ BOOL UseList
+    _In_opt_ LPCWSTR lpCaption
 )
 {
     SUP_BANNER_DATA bannerData;
 
-    bannerData.fList = UseList;
     bannerData.lpText = lpMessage;
     bannerData.lpCaption = lpCaption;
 
-    g_hwndBanner = CreateDialogParam(
+    BannerWindow = CreateDialogParam(
         g_WinObj.hInstance,
-        bannerData.fList ? MAKEINTRESOURCE(IDD_DIALOG_LOADLIST) : MAKEINTRESOURCE(IDD_DIALOG_LOAD),
+        MAKEINTRESOURCE(IDD_DIALOG_LOADLIST),
         0,
         supxLoadBannerDialog,
         (LPARAM)&bannerData);
 
-    if (g_hwndBanner) {
+    if (BannerWindow) {
         supSetWaitCursor(TRUE);
-        SetCapture(g_hwndBanner);
+        SetCapture(BannerWindow);
     }
 }
 
@@ -798,10 +1035,10 @@ VOID supCloseLoadBanner(
     VOID
 )
 {
-    if (g_hwndBanner) {
+    if (BannerWindow) {
         supSetWaitCursor(FALSE);
         ReleaseCapture();
-        SendMessage(g_hwndBanner, WM_CLOSE, 0, 0);
+        SendMessage(BannerWindow, WM_CLOSE, 0, 0);
     }
 }
 
@@ -949,8 +1186,8 @@ PVOID supGetLoadedModulesList(
 {
     return ntsupGetLoadedModulesListEx(FALSE,
         ReturnLength,
-        supHeapAlloc,
-        supHeapFree);
+        (PNTSUPMEMALLOC)supHeapAlloc,
+        (PNTSUPMEMFREE)supHeapFree);
 }
 
 /*
@@ -969,8 +1206,8 @@ PVOID supGetLoadedModulesList2(
 {
     return ntsupGetLoadedModulesListEx(TRUE,
         ReturnLength,
-        supHeapAlloc,
-        supHeapFree);
+        (PNTSUPMEMALLOC)supHeapAlloc,
+        (PNTSUPMEMFREE)supHeapFree);
 }
 
 /*
@@ -1187,7 +1424,7 @@ HIMAGELIST supLoadImageList(
 * Known type names listed in objects.c, objects.h
 *
 */
-UINT supGetObjectNameIndexByTypeIndex(
+WOBJ_OBJECT_TYPE supGetObjectNameIndexByTypeIndex(
     _In_ PVOID Object,
     _In_ UCHAR TypeIndex
 )
@@ -1310,7 +1547,7 @@ VOID supJumpToFile(
             _strcpy(szExplorer, g_WinObj.szWindowsDirectory);
             _strcat(szExplorer, TEXT("\\explorer.exe"));
 
-            supShellExecInExplorerProcessEx(szExplorer, lpCommand);
+            supShellExecInExplorerProcess(szExplorer, lpCommand);
             supHeapFree(lpCommand);
         }
 
@@ -1330,6 +1567,8 @@ WOBJ_OBJECT_TYPE supObjectListGetObjectType(
     _In_ INT iItem
 )
 {
+    OBEX_ITEM* objectReference;
+
     LVITEM lvItem;
 
     lvItem.mask = LVIF_PARAM;
@@ -1338,7 +1577,11 @@ WOBJ_OBJECT_TYPE supObjectListGetObjectType(
     lvItem.lParam = 0;
     ListView_GetItem(hwndList, &lvItem);
 
-    return (WOBJ_OBJECT_TYPE)lvItem.lParam;
+    objectReference = (OBEX_ITEM*)lvItem.lParam;
+    if (objectReference)
+        return objectReference->TypeIndex;
+
+    return ObjectTypeUnknown;
 }
 
 /*
@@ -1357,7 +1600,7 @@ VOID supSetGotoLinkTargetToolButtonState(
     _In_ BOOL bForceEnable
 )
 {
-    UINT  uEnable = MF_BYCOMMAND | MF_GRAYED;
+    UINT uEnable = MF_BYCOMMAND | MF_GRAYED;
 
     if (bForce) {
         if (bForceEnable)
@@ -1741,6 +1984,28 @@ VOID supxSetProcessMitigationPolicies()
 }
 
 /*
+* supxFreeCurrentObjectList
+*
+* Purpose:
+*
+* Destroy object path heap.
+*
+* Must be called once during program shutdown once
+*
+*/
+BOOL supxFreeCurrentObjectList(
+    _In_ PVOID Unused
+)
+{
+    UNREFERENCED_PARAMETER(Unused);
+
+    if (ObjectPathHeap)
+        supDestroyHeap(ObjectPathHeap);
+
+    return TRUE;
+}
+
+/*
 * supInit
 *
 * Purpose:
@@ -1786,6 +2051,7 @@ VOID supInit(
     // Remember current DPI value.
     // 
     g_WinObj.CurrentDPI = supGetDPIValue(NULL);
+    supAddShutdownCallback(supxFreeCurrentObjectList, NULL);
 }
 
 /*
@@ -2039,8 +2305,8 @@ BOOL sapiQueryDeviceProperty(
     if (PropertyBufferSize)
         *PropertyBufferSize = 0;
 
-    dataSize = (1 + MAX_PATH) * sizeof(WCHAR);
-    lpProperty = (LPWSTR)RtlAllocateHeap(SnapshotHeap, HEAP_ZERO_MEMORY, dataSize);
+    dataSize = (MAX_PATH * sizeof(WCHAR)) + sizeof(UNICODE_NULL);
+    lpProperty = (LPWSTR)supHeapAllocEx(SnapshotHeap, dataSize);
     if (lpProperty == NULL)
         return FALSE;
 
@@ -2054,9 +2320,9 @@ BOOL sapiQueryDeviceProperty(
 
     if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
 
-        RtlFreeHeap(SnapshotHeap, 0, lpProperty);
+        supHeapFreeEx(SnapshotHeap, lpProperty);
         dataSize = returnLength;
-        lpProperty = (LPWSTR)RtlAllocateHeap(SnapshotHeap, HEAP_ZERO_MEMORY, dataSize);
+        lpProperty = (LPWSTR)supHeapAllocEx(SnapshotHeap, dataSize);
         if (lpProperty) {
 
             result = SetupDiGetDeviceRegistryProperty(hDevInfo,
@@ -2073,7 +2339,7 @@ BOOL sapiQueryDeviceProperty(
 
     if (!result) {
         if (lpProperty) {
-            RtlFreeHeap(SnapshotHeap, 0, lpProperty);
+            supHeapFreeEx(SnapshotHeap, lpProperty);
             lpProperty = NULL;
         }
         dataSize = 0;
@@ -2104,14 +2370,11 @@ BOOL sapiCreateSetupDBSnapshot(
     HANDLE          Heap;
     HDEVINFO        hDevInfo;
 
-    Heap = RtlCreateHeap(HEAP_GROWABLE, NULL, 0, 0, NULL, NULL);
+    Heap = supCreateHeap(HEAP_GROWABLE, TRUE);
     if (Heap == NULL) {
         return FALSE;
     }
 
-    if (g_WinObj.IsWine == FALSE) {
-        RtlSetHeapInformation(Heap, HeapEnableTerminationOnCorruption, NULL, 0);
-    }
     g_sapiDB.HeapHandle = Heap;
 
     hDevInfo = SetupDiGetClassDevs(NULL, NULL, NULL, DIGCF_PRESENT | DIGCF_ALLCLASSES);
@@ -2124,7 +2387,7 @@ BOOL sapiCreateSetupDBSnapshot(
 
         for (i = 0; SetupDiEnumDeviceInfo(hDevInfo, i, &DeviceInfoData); i++) {
 
-            Entry = (PSAPIDBENTRY)RtlAllocateHeap(Heap, HEAP_ZERO_MEMORY, sizeof(SAPIDBENTRY));
+            Entry = (PSAPIDBENTRY)supHeapAllocEx(Heap, sizeof(SAPIDBENTRY));
             if (Entry == NULL) {
                 bFailed = TRUE;
                 break;
@@ -2161,7 +2424,7 @@ BOOL sapiCreateSetupDBSnapshot(
     }
 
     if (bFailed) {
-        RtlDestroyHeap(Heap);
+        supDestroyHeap(Heap);
         RtlSecureZeroMemory(&g_sapiDB, sizeof(g_sapiDB));
     }
     return bResult;
@@ -2180,7 +2443,7 @@ VOID sapiFreeSnapshot(
 )
 {
     EnterCriticalSection(&g_sapiDB.Lock);
-    RtlDestroyHeap(g_sapiDB.HeapHandle);
+    supDestroyHeap(g_sapiDB.HeapHandle);
     g_sapiDB.HeapHandle = NULL;
     g_sapiDB.ListHead.Blink = NULL;
     g_sapiDB.ListHead.Flink = NULL;
@@ -2223,49 +2486,47 @@ BOOL WINAPI supCallbackShowChildWindow(
 BOOL supQueryWinstationDescription(
     _In_ LPCWSTR lpWindowStationName,
     _Inout_ LPWSTR Buffer,
-    _In_ DWORD ccBuffer //size of buffer in chars
+    _In_ DWORD cchBuffer //size of buffer in chars
 )
 {
     BOOL    bFound = FALSE;
-    LPCWSTR lpType;
+    LPCWSTR lpType = T_UnknownType;
 
-    ULONG entryId;
+    ULONG i;
 
-    if (lpWindowStationName == NULL) {
-        SetLastError(ERROR_INVALID_NAME);
+    struct {
+        LPCWSTR lpszWinSta;
+        LPCWSTR lpszDesc;
+    } lpWinstationDescriptions[] = {
+        { T_WINSTA_SYSTEM, L"System" },
+        { T_WINSTA_ANONYMOUS, L"Anonymous" },
+        { T_WINSTA_LOCALSERVICE, L"Local Service" },
+        { T_WINSTA_NETWORK_SERVICE, L"Network Service" }
+    };
+
+    if (lpWindowStationName == NULL ||
+        cchBuffer < MAX_PATH)
+    {
         return bFound;
     }
 
-    if ((Buffer == NULL) || (ccBuffer < MAX_PATH)) {
-        SetLastError(ERROR_INSUFFICIENT_BUFFER);
-        return bFound;
-    }
+    for (i = 0; i < RTL_NUMBER_OF(lpWinstationDescriptions); i++) {
 
-    lpType = NULL;
+        bFound = (_strstri(lpWindowStationName,
+            lpWinstationDescriptions[i].lpszWinSta) != NULL);
 
-    for (entryId = 0; entryId < MAX_KNOWN_WINSTA_DESCRIPTIONS; entryId++) {
-
-        if (_strstri(lpWindowStationName,
-            g_WinstaDescArray[entryId].lpszWinSta) != NULL)
-        {
-            lpType = g_WinstaDescArray[entryId].lpszDesc;
-            bFound = TRUE;
+        if (bFound) {
+            lpType = lpWinstationDescriptions[i].lpszDesc;
             break;
         }
 
     }
-
-    if (lpType == NULL)
-        lpType = T_UnknownType;
 
     _strcpy(Buffer, lpType);
     _strcat(Buffer, TEXT(" logon session"));
 
     return bFound;
 }
-
-#include "props\propDlg.h"
-#include "props\propTypeConsts.h"
 
 /*
 * supQueryTypeInfo
@@ -2278,7 +2539,7 @@ BOOL supQueryWinstationDescription(
 *
 */
 BOOL supQueryTypeInfo(
-    _In_ LPCWSTR lpTypeName,
+    _In_ PUNICODE_STRING TypeName,
     _Inout_ LPWSTR Buffer,
     _In_ DWORD cchBuffer //size of buffer in chars
 )
@@ -2303,10 +2564,8 @@ BOOL supQueryTypeInfo(
 
         objectEntry = &objectTypesList->Types[i];
 
-        if (_strncmpi(objectEntry->TypeName->Buffer,
-            lpTypeName,
-            objectEntry->TypeName->Length / sizeof(WCHAR)) == 0)
-        {
+        if (RtlEqualUnicodeString(objectEntry->TypeName, TypeName, TRUE)) {
+
             for (nPool = 0; nPool < MAX_KNOWN_POOL_TYPES; nPool++) {
                 if (objectEntry->PoolType == a_PoolTypes[nPool].dwValue) {
                     _strncpy(Buffer,
@@ -2337,71 +2596,70 @@ BOOL supQueryTypeInfo(
 *
 */
 BOOL supQueryDeviceDescription(
-    _In_ LPCWSTR lpDeviceName,
+    _In_opt_ PUNICODE_STRING Path,
+    _In_ PUNICODE_STRING Name,
     _Inout_ LPWSTR Buffer,
-    _In_ DWORD ccBuffer //size of buffer in chars
+    _In_ DWORD cchBuffer //size of buffer in chars
 )
 {
-    BOOL         bResult, bIsRoot;
-    SIZE_T       Length;
-    LPWSTR       lpFullDeviceName = NULL;
+    BOOL         bResult;
     PLIST_ENTRY  Entry;
     PSAPIDBENTRY Item;
+    SIZE_T       deviceLength;
+
+    UNICODE_STRING deviceName;
 
     bResult = FALSE;
 
-    if ((ccBuffer < MAX_PATH) || (Buffer == NULL)) {
-        SetLastError(ERROR_INSUFFICIENT_BUFFER);
-        return bResult;
+    RtlInitEmptyUnicodeString(&deviceName, NULL, 0);
+
+    if (Path == NULL) {
+        if (!supCreateObjectPathFromCurrentPath(Name, &deviceName, TRUE))
+            return FALSE;
+    }
+    else {
+        if (!supCreateObjectPathFromElements(Name, Path, &deviceName, TRUE))
+            return FALSE;
     }
 
+    EnterCriticalSection(&g_sapiDB.Lock);
+
     //
-    // Build full device path.
+    // Enumerate devices.
     //
-    Length = (4 + _strlen(lpDeviceName) + _strlen(g_WinObj.CurrentObjectPath)) * sizeof(WCHAR);
-    lpFullDeviceName = (LPWSTR)supHeapAlloc(Length);
-    if (lpFullDeviceName != NULL) {
+    Entry = g_sapiDB.ListHead.Flink;
+    while (Entry && Entry != &g_sapiDB.ListHead) {
 
-        // create full path device name for comparison
-        _strcpy(lpFullDeviceName, g_WinObj.CurrentObjectPath);
-        bIsRoot = (_strcmpi(g_WinObj.CurrentObjectPath, L"\\") == 0);
-        if (bIsRoot == FALSE) {
-            _strcat(lpFullDeviceName, L"\\");
-        }
-        _strcat(lpFullDeviceName, lpDeviceName);
+        Item = CONTAINING_RECORD(Entry, SAPIDBENTRY, ListEntry);
+        if (Item->lpDeviceName != NULL) {
 
-        EnterCriticalSection(&g_sapiDB.Lock);
+            //
+            // lpDeviceName expects to be zero terminated.
+            //
+            deviceLength = _strlen(deviceName.Buffer);
 
-        //
-        // Enumerate devices.
-        //
-        Entry = g_sapiDB.ListHead.Flink;
-        while (Entry && Entry != &g_sapiDB.ListHead) {
+            if (_strncmpi(deviceName.Buffer, Item->lpDeviceName, deviceLength) == 0) {
 
-            Item = CONTAINING_RECORD(Entry, SAPIDBENTRY, ListEntry);
-            if (Item->lpDeviceName != NULL) {
-                if (_strcmpi(lpFullDeviceName, Item->lpDeviceName) == 0) {
-                    if (Item->lpDeviceDesc != NULL) {
+                if (Item->lpDeviceDesc != NULL) {
 
-                        _strncpy(
-                            Buffer,
-                            ccBuffer,
-                            Item->lpDeviceDesc,
-                            _strlen(Item->lpDeviceDesc));
+                    _strncpy(
+                        Buffer,
+                        cchBuffer,
+                        Item->lpDeviceDesc,
+                        _strlen(Item->lpDeviceDesc));
 
-                    }
-                    bResult = TRUE;
-                    break;
                 }
+                bResult = TRUE;
+                break;
             }
-
-            Entry = Entry->Flink;
         }
 
-        LeaveCriticalSection(&g_sapiDB.Lock);
-
-        supHeapFree(lpFullDeviceName);
+        Entry = Entry->Flink;
     }
+
+    LeaveCriticalSection(&g_sapiDB.Lock);
+
+    supFreeDuplicatedUnicodeString(g_obexHeap, &deviceName, FALSE);
     return bResult;
 }
 
@@ -2418,7 +2676,7 @@ BOOL supQueryDeviceDescription(
 BOOL supQueryDriverDescription(
     _In_ LPCWSTR lpDriverName,
     _Inout_ LPWSTR Buffer,
-    _In_ DWORD ccBuffer //size of buffer in chars
+    _In_ DWORD cchBuffer //size of buffer in chars
 )
 {
     BOOL    bResult;
@@ -2439,11 +2697,6 @@ BOOL supQueryDriverDescription(
     LPENUM_SERVICE_STATUS_PROCESS pInfo = NULL;
 
     bResult = FALSE;
-
-    if ((ccBuffer < MAX_PATH) || (Buffer == NULL)) {
-        SetLastError(ERROR_INSUFFICIENT_BUFFER);
-        return bResult;
-    }
 
     //
     // First attempt - look in SCM database.
@@ -2472,7 +2725,7 @@ BOOL supQueryDriverDescription(
                 continue;
 
             sz = _strlen(lpDisplayName);
-            _strncpy(Buffer, ccBuffer, lpDisplayName, sz);
+            _strncpy(Buffer, cchBuffer, lpDisplayName, sz);
             bResult = TRUE;
             break;
         }
@@ -2546,7 +2799,7 @@ BOOL supQueryDriverDescription(
                 dwSize = 0;
                 bResult = VerQueryValue(vinfo, szBuffer, (LPVOID*)&lpDisplayName, (PUINT)&dwSize);
                 if (bResult) {
-                    _strncpy(Buffer, ccBuffer, lpDisplayName, dwSize);
+                    _strncpy(Buffer, cchBuffer, lpDisplayName, dwSize);
                 }
 
             }
@@ -2721,12 +2974,6 @@ BOOL supQuerySectionFileInfo(
     WCHAR                       szQueryBlock[MAX_PATH + 1];
 
     bResult = FALSE;
-
-    if ((ccBuffer < MAX_PATH) || (Buffer == NULL)) {
-        SetLastError(ERROR_INSUFFICIENT_BUFFER);
-        return bResult;
-    }
-
     vinfo = NULL;
     hSection = NULL;
 
@@ -2789,76 +3036,6 @@ BOOL supQuerySectionFileInfo(
     if (hSection) NtClose(hSection);
     if (vinfo) supHeapFree(vinfo);
     return bResult;
-}
-
-/*
-* supOpenDirectoryForObject
-*
-* Purpose:
-*
-* Open directory for given object, handle self case.
-*
-*/
-NTSTATUS supOpenDirectoryForObject(
-    _Out_ PHANDLE DirectoryHandle,
-    _In_ LPCWSTR lpObjectName,
-    _In_ LPCWSTR lpDirectory
-)
-{
-    BOOL   needFree = FALSE;
-    NTSTATUS ntStatus;
-    SIZE_T i, l, rdirLen, ldirSz;
-    LPWSTR singleDirName, lookupDirName;
-
-    *DirectoryHandle = NULL;
-
-    if (lpObjectName == NULL)
-        return STATUS_INVALID_PARAMETER_2;
-    if (lpDirectory == NULL)
-        return STATUS_INVALID_PARAMETER_3;
-
-    lookupDirName = (LPWSTR)lpDirectory;
-
-    //
-    // 1) Check if object is directory self
-    // Extract directory name and compare (case insensitive) with object name
-    // Else go to 3
-    //
-    l = 0;
-    rdirLen = _strlen(lookupDirName);
-    for (i = 0; i < rdirLen; i++) {
-        if (lookupDirName[i] == TEXT('\\'))
-            l = i + 1;
-    }
-
-    singleDirName = &lookupDirName[l];
-    if (_strcmpi(singleDirName, lpObjectName) == 0) {
-        //
-        //  2) If we are looking for directory, move search directory up
-        //  e.g. lpDirectory = \ObjectTypes, lpObjectName = ObjectTypes then lpDirectory = \ 
-        //
-        ldirSz = rdirLen * sizeof(WCHAR) + sizeof(UNICODE_NULL);
-        lookupDirName = (LPWSTR)supHeapAlloc(ldirSz);
-        if (lookupDirName == NULL)
-            return STATUS_INSUFFICIENT_RESOURCES;
-
-        needFree = TRUE;
-
-        //special case for root 
-        if (l == 1) l++;
-
-        supCopyMemory(lookupDirName, ldirSz, lpDirectory, (l - 1) * sizeof(WCHAR));
-    }
-    //
-    // 3) Open directory
-    //
-    ntStatus = supOpenDirectory(DirectoryHandle, NULL, lookupDirName, DIRECTORY_QUERY);
-
-    if (needFree) {
-        supHeapFree(lookupDirName);
-    }
-
-    return ntStatus;
 }
 
 /*
@@ -3255,14 +3432,12 @@ HWINSTA supOpenWindowStationFromContext(
 {
     HWINSTA hObject = NULL;
     UNICODE_STRING CurrentWinstaDir;
-    UNICODE_STRING WinstaDir;
 
     DWORD LastError = ERROR_ACCESS_DENIED;
 
     if (supxGetWindowStationName(&CurrentWinstaDir)) {
-        RtlInitUnicodeString(&WinstaDir, Context->lpCurrentObjectPath);
-        if (RtlEqualUnicodeString(&WinstaDir, &CurrentWinstaDir, TRUE)) {
-            hObject = OpenWindowStation(Context->lpObjectName, fInherit, dwDesiredAccess);
+        if (RtlEqualUnicodeString(&Context->NtObjectPath, &CurrentWinstaDir, TRUE)) {
+            hObject = OpenWindowStation(Context->NtObjectName.Buffer, fInherit, dwDesiredAccess);
             LastError = GetLastError();
         }
         RtlFreeUnicodeString(&CurrentWinstaDir);
@@ -3984,7 +4159,7 @@ INT supGetMaxOfTwoUlongFromHex(
     INT       nResult;
     LPWSTR    lpItem1 = NULL, lpItem2 = NULL;
     ULONG     ad1, ad2;
-    WCHAR     szText[MAX_TEXT_CONVERSION_ULONG64 + 1];
+    WCHAR     szText[MAX_TEXT_CONVERSION_ULONG64];
 
     RtlSecureZeroMemory(&szText, sizeof(szText));
 
@@ -4035,7 +4210,7 @@ INT supGetMaxOfTwoU64FromHex(
     INT       nResult;
     LPWSTR    lpItem1 = NULL, lpItem2 = NULL;
     ULONG_PTR ad1, ad2;
-    WCHAR     szText[MAX_TEXT_CONVERSION_ULONG64 + 1];
+    WCHAR     szText[MAX_TEXT_CONVERSION_ULONG64];
 
     RtlSecureZeroMemory(&szText, sizeof(szText));
 
@@ -4086,7 +4261,7 @@ INT supGetMaxOfTwoLongFromString(
     INT       nResult;
     LPWSTR    lpItem1 = NULL, lpItem2 = NULL;
     LONG_PTR  value1, value2;
-    WCHAR     szText[MAX_TEXT_CONVERSION_ULONG64 + 1];
+    WCHAR     szText[MAX_TEXT_CONVERSION_ULONG64];
 
     RtlSecureZeroMemory(&szText, sizeof(szText));
 
@@ -4137,7 +4312,7 @@ INT supGetMaxOfTwoULongFromString(
     INT       nResult;
     LPWSTR    lpItem1 = NULL, lpItem2 = NULL;
     ULONG_PTR value1, value2;
-    WCHAR     szText[MAX_TEXT_CONVERSION_ULONG64 + 1];
+    WCHAR     szText[MAX_TEXT_CONVERSION_ULONG64];
 
     RtlSecureZeroMemory(&szText, sizeof(szText));
 
@@ -4274,6 +4449,35 @@ Done:
 }
 
 /*
+* supOpenLinkedToken
+*
+* Purpose:
+*
+* Query token linked token handle.
+*
+*/
+NTSTATUS supOpenLinkedToken(
+    _In_ HANDLE TokenHandle,
+    _Out_ PHANDLE LinkedTokenHandle
+)
+{
+    ULONG rLen;
+    NTSTATUS ntStatus;
+    TOKEN_LINKED_TOKEN linkedToken;
+
+    ntStatus = NtQueryInformationToken(
+        TokenHandle,
+        TokenLinkedToken,
+        &linkedToken,
+        sizeof(TOKEN_LINKED_TOKEN),
+        &rLen);
+
+    *LinkedTokenHandle = linkedToken.LinkedToken;
+
+    return ntStatus;
+}
+
+/*
 * supOpenTokenByParam
 *
 * Purpose:
@@ -4374,6 +4578,39 @@ NTSTATUS supOpenDeviceObjectEx(
         0);
 }
 
+BOOL supxCanOpenObjectType(
+    _In_ UINT nTypeIndex
+)
+{
+    UINT SupportedNamedTypes[] = {
+        ObjectTypeDirectory,
+        ObjectTypeDevice,
+        ObjectTypeEvent,
+        ObjectTypeEventPair,
+        ObjectTypeIoCompletion,
+        ObjectTypeJob,
+        ObjectTypeKey,
+        ObjectTypeKeyedEvent,
+        ObjectTypeMutant,
+        ObjectTypeMemoryPartition,
+        ObjectTypePort,
+        ObjectTypeRegistryTransaction,
+        ObjectTypeSemaphore,
+        ObjectTypeTimer,
+        ObjectTypeSymbolicLink,
+        ObjectTypeSection,
+        ObjectTypeSession
+    };
+
+    UINT i;
+    for (i = 0; i < RTL_NUMBER_OF(SupportedNamedTypes); i++) {
+        if (SupportedNamedTypes[i] == nTypeIndex)
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
 /*
 * supOpenNamedObjectByType
 *
@@ -4381,43 +4618,23 @@ NTSTATUS supOpenDeviceObjectEx(
 *
 * Open object of supported type and return handle to it.
 *
-* Supported types are:
-*
-*  Directory (ObjectName parameter then should be NULL)
-*  Device
-*  Mutant
-*  Key
-*  KeyedEvent
-*  Semaphore
-*  Timer
-*  Event
-*  EventPair
-*  SymbolicLink
-*  IoCompletion
-*  Section
-*  Job
-*  Session
-*  MemoryPartition
-*  AlpcPort
+* Supported types are list in SupportedNamedTypes array.
 *
 */
 NTSTATUS supOpenNamedObjectByType(
     _Out_ HANDLE* ObjectHandle,
     _In_ ULONG TypeIndex,
-    _In_ LPCWSTR ObjectDirectory,
-    _In_ LPCWSTR ObjectName,
+    _In_ PUNICODE_STRING ObjectDirectory,
+    _In_ PUNICODE_STRING ObjectName,
     _In_ ACCESS_MASK DesiredAccess
 )
 {
-    OBJECT_ATTRIBUTES obja;
-    UNICODE_STRING ustr;
     HANDLE rootHandle = NULL, objectHandle = NULL;
     NTSTATUS ntStatus = STATUS_UNSUCCESSFUL;
-
-    LPWSTR objectFullName = NULL;
-    SIZE_T cchObjectFullName;
-
     PNTOBJECTOPENPROCEDURE ObjectOpenProcedure = NULL;
+
+    UNICODE_STRING portName;
+    OBJECT_ATTRIBUTES obja;
 
     *ObjectHandle = NULL;
 
@@ -4427,57 +4644,28 @@ NTSTATUS supOpenNamedObjectByType(
     if (ObjectName == NULL)
         return STATUS_INVALID_PARAMETER_4;
 
-    if ((TypeIndex != ObjectTypeDirectory) &&
-        (TypeIndex != ObjectTypeDevice) &&
-        (TypeIndex != ObjectTypeEvent) &&
-        (TypeIndex != ObjectTypeEventPair) &&
-        (TypeIndex != ObjectTypeIoCompletion) &&
-        (TypeIndex != ObjectTypeJob) &&
-        (TypeIndex != ObjectTypeKey) &&
-        (TypeIndex != ObjectTypeKeyedEvent) &&
-        (TypeIndex != ObjectTypeMutant) &&
-        (TypeIndex != ObjectTypeMemoryPartition) &&
-        (TypeIndex != ObjectTypePort) &&
-        (TypeIndex != ObjectTypeSemaphore) &&
-        (TypeIndex != ObjectTypeTimer) &&
-        (TypeIndex != ObjectTypeSymbolicLink) &&
-        (TypeIndex != ObjectTypeSection) &&
-        (TypeIndex != ObjectTypeSession))
-    {
+    if (!supxCanOpenObjectType(TypeIndex))
         return STATUS_NOT_SUPPORTED;
-    }
 
     //
     // Special ALPC port case.
     //
     if (TypeIndex == ObjectTypePort) {
 
-        //
-        // Build full object name.
-        //
-        cchObjectFullName = 4 + _strlen(ObjectDirectory) +
-            _strlen(ObjectName) +
-            sizeof(UNICODE_NULL);
-
-        objectFullName = (LPWSTR)supHeapAlloc(cchObjectFullName * sizeof(WCHAR));
-        if (objectFullName) {
-
-            RtlStringCchPrintfSecure(objectFullName,
-                cchObjectFullName,
-                L"%s\\%s",
-                ObjectDirectory,
-                ObjectName);
-
+        RtlInitEmptyUnicodeString(&portName, NULL, 0);
+        if (supCreateObjectPathFromElements(ObjectName,
+            ObjectDirectory,
+            &portName,
+            TRUE))
+        {
             //
             // Open port by name.
             //
             ntStatus = supOpenPortObjectByName(ObjectHandle,
                 DesiredAccess,
-                NULL,
-                objectFullName);
+                &portName);
 
-            supHeapFree(objectFullName);
-
+            supHeapFree(portName.Buffer);
         }
 
         return ntStatus;
@@ -4490,24 +4678,20 @@ NTSTATUS supOpenNamedObjectByType(
 
         //
         // If this is root, then root rootHandle = NULL.
-        //       
-        if (_strcmpi(ObjectName, KM_OBJECTS_ROOT_DIRECTORY) != 0) {
-
-            ntStatus = supOpenDirectoryForObject(
-                &rootHandle,
-                ObjectName,
-                ObjectDirectory);
-
-            if (!NT_SUCCESS(ntStatus)) {
+        //
+        if (!supIsRootDirectory(ObjectName)) {
+            //
+            // Otherwise open directory that keep this object.
+            //
+            ntStatus = supOpenDirectoryEx(&rootHandle, NULL, ObjectDirectory, DIRECTORY_QUERY);
+            if (!NT_SUCCESS(ntStatus))
                 return ntStatus;
-            }
-
         }
 
         //
         // Open object in directory.
         //
-        ntStatus = supOpenDirectory(&objectHandle, rootHandle, ObjectName, DesiredAccess);
+        ntStatus = supOpenDirectoryEx(&objectHandle, rootHandle, ObjectName, DesiredAccess);
 
         if (rootHandle)
             NtClose(rootHandle);
@@ -4519,13 +4703,10 @@ NTSTATUS supOpenNamedObjectByType(
     //
     // Open directory which object belongs.
     //
-    RtlInitUnicodeString(&ustr, ObjectDirectory);
-    InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
-
-    supOpenDirectoryForObject(&rootHandle, ObjectName, ObjectDirectory);
-
-    RtlInitUnicodeString(&ustr, ObjectName);
-    obja.RootDirectory = rootHandle;
+    ntStatus = supOpenDirectoryEx(&rootHandle, NULL, ObjectDirectory, DIRECTORY_QUERY);
+    if (!NT_SUCCESS(ntStatus)) {
+        return ntStatus;
+    }
 
     //
     // Select open object procedure.
@@ -4588,6 +4769,11 @@ NTSTATUS supOpenNamedObjectByType(
             ObjectOpenProcedure = (PNTOBJECTOPENPROCEDURE)g_ExtApiSet.NtOpenPartition;
         }
         break;
+    case ObjectTypeRegistryTransaction:
+        if (g_ExtApiSet.NtOpenRegistryTransaction) {
+            ObjectOpenProcedure = (PNTOBJECTOPENPROCEDURE)g_ExtApiSet.NtOpenRegistryTransaction;
+        }
+        break;
     default:
         ObjectOpenProcedure = NULL;
         break;
@@ -4603,6 +4789,8 @@ NTSTATUS supOpenNamedObjectByType(
         //
         // Open object of the given type.
         //
+        InitializeObjectAttributes(&obja, ObjectName, OBJ_CASE_INSENSITIVE, rootHandle, NULL);
+
         ntStatus = ObjectOpenProcedure(
             &objectHandle,
             DesiredAccess,
@@ -4748,9 +4936,7 @@ BOOL supxEnumAlpcPortsCallback(
             pusObjectName = (PUNICODE_STRING)pBuffer;
             if (pusObjectName->Buffer && pusObjectName->Length) {
 
-                if (0 == _strcmpi(enumContext->ObjectFullName,
-                    pusObjectName->Buffer))
-                {
+                if (RtlEqualUnicodeString(enumContext->ObjectName, pusObjectName, TRUE)) {
                     enumContext->ObjectHandle = objectHandle;
                     bStopEnum = TRUE;
                     break;
@@ -4790,8 +4976,7 @@ BOOL supxEnumAlpcPortsCallback(
 NTSTATUS supOpenPortObjectByName(
     _Out_ PHANDLE ObjectHandle,
     _In_ ACCESS_MASK DesiredAccess,
-    _Out_opt_ PHANDLE ReferenceHandle,
-    _In_ LPCWSTR ObjectName
+     _In_ PUNICODE_STRING ObjectName
 )
 {
     USHORT alpcPortTypeIndex;
@@ -4801,8 +4986,6 @@ NTSTATUS supOpenPortObjectByName(
 
     if (ObjectHandle)
         *ObjectHandle = NULL;
-    if (ReferenceHandle)
-        *ReferenceHandle = NULL;
 
     do {
 
@@ -4829,7 +5012,7 @@ NTSTATUS supOpenPortObjectByName(
         // Walk handle table looking for our named port.
         //
         enumContext.AlpcPortTypeIndex = alpcPortTypeIndex;
-        enumContext.ObjectFullName = ObjectName;
+        enumContext.ObjectName = ObjectName;
         enumContext.ObjectHandle = NULL;
 
         if (supEnumHandleDump(pHandles,
@@ -4849,10 +5032,7 @@ NTSTATUS supOpenPortObjectByName(
                     0,
                     0);
 
-                if (ReferenceHandle)
-                    *ReferenceHandle = enumContext.ObjectHandle;
-                else
-                    NtClose(enumContext.ObjectHandle);
+                NtClose(enumContext.ObjectHandle);
 
             }
             else {
@@ -4876,7 +5056,7 @@ NTSTATUS supOpenPortObjectByName(
 *
 * Purpose:
 *
-* Open handle for ALPC port object type with handle duplication using WinObjEx64 property context.
+* Open handle for ALPC port object type.
 *
 */
 NTSTATUS supOpenPortObjectFromContext(
@@ -4886,73 +5066,26 @@ NTSTATUS supOpenPortObjectFromContext(
 )
 {
     NTSTATUS ntStatus = STATUS_UNSUCCESSFUL;
-    HANDLE refHandle = NULL;
-    LPWSTR objectFullName = NULL;
-    SIZE_T cchObjectFullName;
+
+    UNICODE_STRING portName;
 
     *ObjectHandle = NULL;
 
-    /*
-    Context->PortObjectInfo.IsAllocated = TRUE;
-    Context->PortObjectInfo.ReferenceHandle = TestGetPortHandle();
-    */
-
-    if (Context->PortObjectInfo.IsAllocated) {
-
-        ntStatus = NtDuplicateObject(NtCurrentProcess(),
-            Context->PortObjectInfo.ReferenceHandle,
-            NtCurrentProcess(),
-            ObjectHandle,
+    RtlInitEmptyUnicodeString(&portName, NULL, 0);
+    if (supCreateObjectPathFromElements(
+        &Context->NtObjectName,
+        &Context->NtObjectPath,
+        &portName,
+        TRUE))
+    {
+        ntStatus = supOpenPortObjectByName(ObjectHandle,
             DesiredAccess,
-            0,
-            0);
+            &portName);
 
+        supHeapFree(portName.Buffer);
     }
     else {
-
-        do {
-
-            //
-            // Build full object name.
-            //
-            cchObjectFullName = 4 + _strlen(Context->lpCurrentObjectPath) +
-                _strlen(Context->lpObjectName) +
-                sizeof(UNICODE_NULL);
-
-            objectFullName = (LPWSTR)supHeapAlloc(cchObjectFullName * sizeof(WCHAR));
-            if (objectFullName) {
-
-                RtlStringCchPrintfSecure(objectFullName,
-                    cchObjectFullName,
-                    L"%s\\%s",
-                    Context->lpCurrentObjectPath,
-                    Context->lpObjectName);
-
-                //
-                // Open port by name.
-                //
-                ntStatus = supOpenPortObjectByName(ObjectHandle,
-                    DesiredAccess,
-                    &refHandle,
-                    objectFullName);
-
-                if (NT_SUCCESS(ntStatus)) {
-
-                    //
-                    // Save handle as reference.
-                    //
-                    Context->PortObjectInfo.ReferenceHandle = refHandle;
-                    Context->PortObjectInfo.IsAllocated = TRUE;
-                }
-
-                supHeapFree(objectFullName);
-            }
-            else {
-                ntStatus = STATUS_INSUFFICIENT_RESOURCES;
-            }
-
-        } while (FALSE);
-
+        ntStatus = STATUS_INSUFFICIENT_RESOURCES;
     }
 
     return ntStatus;
@@ -4988,7 +5121,7 @@ HANDLE supOpenObjectFromContext(
             &hPrivateNamespace,
             MAXIMUM_ALLOWED,
             &objaNamespace,
-            Context->NamespaceInfo.BoundaryDescriptor);
+            Context->u1.NamespaceInfo.BoundaryDescriptor);
 
         if (!NT_SUCCESS(ntStatus)) {
             *Status = ntStatus;
@@ -5005,14 +5138,14 @@ HANDLE supOpenObjectFromContext(
     // Open object of common type.
     //
 
-    switch (Context->TypeIndex) {
+    switch (Context->ObjectTypeIndex) {
 
     case ObjectTypeProcess:
 
         if (Context->ContextType == propUnnamed) {
 
             ntStatus = supOpenProcessEx(
-                Context->UnnamedObjectInfo.ClientId.UniqueProcess,
+                Context->u1.UnnamedObjectInfo.ClientId.UniqueProcess,
                 PROCESS_ALL_ACCESS,
                 &hObject);
 
@@ -5030,7 +5163,7 @@ HANDLE supOpenObjectFromContext(
                 &hObject,
                 DesiredAccess,
                 ObjectAttributes,
-                &Context->UnnamedObjectInfo.ClientId);
+                &Context->u1.UnnamedObjectInfo.ClientId);
 
         }
         else
@@ -5043,10 +5176,10 @@ HANDLE supOpenObjectFromContext(
         if (Context->ContextType == propUnnamed) {
 
             ntStatus = supOpenTokenByParam(
-                &Context->UnnamedObjectInfo.ClientId,
+                &Context->u1.UnnamedObjectInfo.ClientId,
                 ObjectAttributes,
                 DesiredAccess,
-                Context->UnnamedObjectInfo.IsThreadToken,
+                Context->u1.UnnamedObjectInfo.IsThreadToken,
                 &hObject);
 
         }
@@ -5187,6 +5320,20 @@ HANDLE supOpenObjectFromContext(
 
         break;
 
+    case ObjectTypeRegistryTransaction:
+
+        if (g_ExtApiSet.NtOpenRegistryTransaction) {
+
+            ntStatus = g_ExtApiSet.NtOpenRegistryTransaction(
+                &hObject,
+                DesiredAccess,
+                ObjectAttributes);
+        }
+        else
+            ntStatus = STATUS_PROCEDURE_NOT_FOUND;
+
+        break;
+
     default:
         ntStatus = STATUS_OBJECTID_NOT_FOUND;
         break;
@@ -5222,7 +5369,7 @@ BOOL supCloseObjectFromContext(
 
     else {
 
-        switch (Context->TypeIndex) {
+        switch (Context->ObjectTypeIndex) {
         case ObjectTypeWinstation:
             bResult = CloseWindowStation((HWINSTA)hObject);
             break;
@@ -5624,6 +5771,20 @@ BOOL supPrintTimeConverted(
 {
     FILETIME ConvertedTime = { 0, 0 };
     TIME_FIELDS TimeFields = { 0, 0, 0, 0, 0, 0, 0, 0 };
+    LPCWSTR lpszMonths[12] = {
+        L"Jan",
+        L"Feb",
+        L"Mar",
+        L"Apr",
+        L"May",
+        L"Jun",
+        L"Jul",
+        L"Aug",
+        L"Sep",
+        L"Oct",
+        L"Nov",
+        L"Dec"
+    };
 
     if (FileTimeToLocalFileTime((PFILETIME)Time, (PFILETIME)&ConvertedTime)) {
         RtlTimeToTimeFields((PLARGE_INTEGER)&ConvertedTime, (PTIME_FIELDS)&TimeFields);
@@ -5639,13 +5800,42 @@ BOOL supPrintTimeConverted(
             TimeFields.Minute,
             TimeFields.Second,
             TimeFields.Day,
-            g_szMonths[TimeFields.Month - 1],
+            lpszMonths[TimeFields.Month - 1],
             TimeFields.Year);
 
         return TRUE;
     }
 
     return FALSE;
+}
+
+/*
+* supGetTreeViewItemParam
+*
+* Purpose:
+*
+* Return TreeView item associated parameter.
+*
+*/
+_Success_(return)
+BOOL supGetTreeViewItemParam(
+    _In_ HWND hwndTreeView,
+    _In_ HTREEITEM hTreeItem,
+    _Out_ PVOID* outParam
+)
+{
+    TV_ITEM tvi;
+
+    RtlSecureZeroMemory(&tvi, sizeof(TV_ITEM));
+
+    tvi.mask = TVIF_PARAM;
+    tvi.hItem = hTreeItem;
+    if (!TreeView_GetItem(hwndTreeView, &tvi))
+        return FALSE;
+
+    *outParam = (PVOID)tvi.lParam;
+
+    return TRUE;
 }
 
 /*
@@ -5656,6 +5846,7 @@ BOOL supPrintTimeConverted(
 * Return ListView item associated parameter.
 *
 */
+_Success_(return)
 BOOL supGetListViewItemParam(
     _In_ HWND hwndListView,
     _In_ INT itemIndex,
@@ -5663,8 +5854,6 @@ BOOL supGetListViewItemParam(
 )
 {
     LVITEM lvItem;
-
-    *outParam = NULL;
 
     lvItem.mask = LVIF_PARAM;
     lvItem.iItem = itemIndex;
@@ -6008,8 +6197,8 @@ PSUP_HANDLE_DUMP supHandlesCreateFilteredAndSortedList(
     handleDump = (PSYSTEM_HANDLE_INFORMATION_EX)ntsupGetSystemInfoEx(
         SystemExtendedHandleInformation,
         &returnLength,
-        supHeapAlloc,
-        supHeapFree);
+        (PNTSUPMEMALLOC)supHeapAlloc,
+        (PNTSUPMEMFREE)supHeapFree);
 
     if (handleDump == NULL)
         return NULL;
@@ -6501,7 +6690,7 @@ HRESULT supxGetShellDispatchFromView(IShellView * psv, REFIID riid, void** ppv)
 }
 
 /*
-* supShellExecInExplorerProcessEx
+* supShellExecInExplorerProcess
 *
 * Purpose:
 *
@@ -6509,7 +6698,7 @@ HRESULT supxGetShellDispatchFromView(IShellView * psv, REFIID riid, void** ppv)
 * making it run with IL of Windows Explorer and not WinObjEx64.
 *
 */
-HRESULT supShellExecInExplorerProcessEx(
+HRESULT supShellExecInExplorerProcess(
     _In_ PCWSTR pszFile,
     _In_opt_ PCWSTR pszArguments
 )
@@ -6613,21 +6802,6 @@ HRESULT supShellExecInExplorerProcessEx(
 }
 
 /*
-* supShellExecInExplorerProcess
-*
-* Purpose:
-*
-* Run ShellExecute from Windows Explorer process through shell interfaces
-* making it run with IL of Windows Explorer and not WinObjEx64.
-*
-*/
-HRESULT WINAPI supShellExecInExplorerProcess(
-    _In_ PCWSTR pszFile)
-{
-    return supShellExecInExplorerProcessEx(pszFile, NULL);
-}
-
-/*
 * supLoadIconForObjectType
 *
 * Purpose:
@@ -6668,30 +6842,6 @@ BOOLEAN supLoadIconForObjectType(
     }
 
     return FALSE;
-}
-
-/*
-* supDestroyIconForObjectType
-*
-* Purpose:
-*
-* Destroy icon used to represent object (or its type) which properties is currently viewed.
-*
-*/
-VOID supDestroyIconForObjectType(
-    _In_ PROP_OBJECT_INFO * Context
-)
-{
-    if (Context->IsType) {
-        if (Context->ObjectTypeIcon) {
-            DestroyIcon(Context->ObjectTypeIcon);
-            Context->ObjectTypeIcon = NULL;
-        }
-    }
-    if (Context->ObjectIcon) {
-        DestroyIcon(Context->ObjectIcon);
-        Context->ObjectIcon = NULL;
-    }
 }
 
 /*
@@ -7408,7 +7558,7 @@ VOID supQueryAlpcPortObjectTypeIndex(
 
         sdLength = SECURITY_DESCRIPTOR_MIN_LENGTH +
             (ULONG)sizeof(ACL) +
-            2 * (ULONG)sizeof(ACCESS_ALLOWED_ACE) +
+            (ULONG)(2 * sizeof(ACCESS_ALLOWED_ACE)) +
             RtlLengthSid(SeWorldSid) +
             RtlLengthSid(SeRestrictedSid) +
             8;
@@ -8803,12 +8953,20 @@ HANDLE supCreateThread(
     _In_ DWORD dwCreationFlags
 )
 {
-    return CreateThread(NULL,
+    HANDLE threadHandle;
+    
+    threadHandle = CreateThread(NULL,
         0,
         lpStartAddress,
         lpParameter,
         dwCreationFlags,
         NULL);
+
+    if (threadHandle) {
+        OBEX_STATS_INC(TotalThreadsCreated);
+    }
+
+    return threadHandle;
 }
 
 /*
@@ -8845,176 +9003,653 @@ HANDLE supCreateDialogWorkerThread(
 }
 
 /*
+* supGetCurrentObjectPath
+*
+* Purpose:
+*
+* Build full path to current object.
+*
+* If IncludeName is FALSE then result path does not 
+* include object name except for root directory.
+*
+* e.g.
+* For \\              result will be \\
+* For \\ABC           result will be \\
+* For \\ABC\\DEF      result will be \\ABC
+*
+* If IncludeName is TRUE then result path *will* 
+* include object name
 * 
-* Fast events, taken from ph2
-* 
+* e.g.
+* For \\              result will be \\
+* For \\ABC           result will be \\ABC
+* For \\ABC\\DEF      result will be \\ABC\\DEF
 */
-
-/*
-* supInitFastEvent
-*
-* Purpose:
-*
-* Initialize fast event.
-*
-*/
-VOID supInitFastEvent(
-    _In_ PFAST_EVENT Event
+_Success_(return != FALSE)
+BOOL supGetCurrentObjectPath(
+    _In_ BOOLEAN IncludeName,
+    _Out_ PUNICODE_STRING ObjectPath
 )
 {
-    Event->Value = FAST_EVENT_REFCOUNT_INC;
-    Event->EventHandle = NULL;
-}
+    OBEX_PATH_ELEMENT* ObjectPathEntry;
+    PLIST_ENTRY Head, Entry, FinalEntry, ObjectRootEntry = NULL;
 
-/*
-* supReferenceFastEvent
-*
-* Purpose:
-*
-* Make a reference for fast event.
-*
-*/
-VOID supReferenceFastEvent(
-    _In_ PFAST_EVENT Event
-)
-{
-    _InterlockedExchangeAddPointer((PLONG_PTR)&Event->Value, FAST_EVENT_REFCOUNT_INC);
-}
+    ULONG NameInfoSize, BufferLength;
+    PWCH StringBuffer, ObjectName;
 
-/*
-* supDereferenceFastEvent
-*
-* Purpose:
-*
-* Remove reference from fast event.
-*
-*/
-VOID supDereferenceFastEvent(
-    _In_ PFAST_EVENT Event,
-    _In_opt_ HANDLE EventHandle
-)
-{
-    ULONG_PTR value;
+    PUNICODE_STRING String;
 
-    value = _InterlockedExchangeAddPointer((PLONG_PTR)&Event->Value, -FAST_EVENT_REFCOUNT_INC);
-    if (((value >> FAST_EVENT_REFCOUNT_SHIFT) & FAST_EVENT_REFCOUNT_MASK) - 1 == 0)
-    {
-        if (EventHandle)
-        {
-            NtClose(EventHandle);
-            Event->EventHandle = NULL;
-        }
-    }
-}
+    RtlInitEmptyUnicodeString(ObjectPath, NULL, 0);
 
-/*
-* supSetFastEvent
-*
-* Purpose:
-*
-* Set event to signaled state.
-*
-*/
-VOID supSetFastEvent(
-    _In_ PFAST_EVENT Event
-)
-{
-    HANDLE eventHandle;
-    if (!_InterlockedBitTestAndSetPointer((PLONG_PTR)&Event->Value, FAST_EVENT_SET_SHIFT)) {
-        eventHandle = Event->EventHandle;
-
-        if (eventHandle)
-        {
-            NtSetEvent(eventHandle, NULL);
-        }
-    }
-}
-
-/*
-* supTestFastEvent
-*
-* Purpose:
-*
-* Returns fast even state.
-*
-*/
-BOOLEAN supTestFastEvent(
-    _In_ PFAST_EVENT Event
-)
-{
-    return (BOOLEAN)Event->Set;
-}
-
-/*
-* supResetFastEvent
-*
-* Purpose:
-*
-* Perform fast even manual reset.
-*
-*/
-VOID supResetFastEvent(
-    _In_ PFAST_EVENT Event
-)
-{
-    if (Event == NULL)
-        return;
-
-    if (supTestFastEvent(Event))
-        Event->Value = FAST_EVENT_REFCOUNT_INC;
-}
-
-/*
-* supWaitForFastEvent
-*
-* Purpose:
-*
-* Do the wait for event, if event object not allocated - allocate it.
-*
-*/
-BOOLEAN supWaitForFastEvent(
-    _In_ PFAST_EVENT Event,
-    _In_opt_ PLARGE_INTEGER Timeout
-)
-{
-    BOOLEAN result;
-    ULONG_PTR value;
-    HANDLE eventHandle;
-
-    value = Event->Value;
-    if (value & FAST_EVENT_SET)
-        return TRUE;
-
-    if (Timeout && Timeout->QuadPart == 0)
+    if (IsListEmpty(&g_ObjectPathListHead))
         return FALSE;
 
-    supReferenceFastEvent(Event);
-    eventHandle = Event->EventHandle;
+    NameInfoSize = sizeof(UNICODE_NULL);
 
-    if (eventHandle == NULL) {
+    Head = &g_ObjectPathListHead;
+    Entry = Head->Blink;             // Beginning of path
 
-        NtCreateEvent(&eventHandle, EVENT_ALL_ACCESS, NULL, NotificationEvent, FALSE);
-        assert(eventHandle);
+    if (IncludeName) {
+        FinalEntry = Head;
+    }
+    else {
+        FinalEntry = Head->Flink;    // Current object name
+    }
 
-        if (NULL != _InterlockedCompareExchangePointer(
-            &Event->EventHandle,
-            eventHandle,
-            NULL))
-        {
-            NtClose(eventHandle);
-            eventHandle = Event->EventHandle;
+    ObjectRootEntry = Entry;
+    while ((Entry) && (Entry != FinalEntry)) {
+
+        ObjectPathEntry = CONTAINING_RECORD(Entry, OBEX_PATH_ELEMENT, ListEntry);
+        NameInfoSize += ObjectPathEntry->Name.Length;
+
+        //
+        // If not last and first then add separator size.
+        //
+        if ((Entry != ObjectRootEntry) && (Entry->Blink != FinalEntry))
+            NameInfoSize += sizeof(OBJ_NAME_PATH_SEPARATOR);
+
+        Entry = Entry->Blink;
+    }
+
+    //
+    // If this is root then leave.
+    //
+    if (NameInfoSize == sizeof(UNICODE_NULL)) {
+        return supDuplicateUnicodeString(g_obexHeap, ObjectPath, ObGetPredefinedUnicodeString(OBP_ROOT));
+    }
+
+    ObjectName = (PWCH)supHeapAlloc(NameInfoSize);
+    if (ObjectName == NULL)
+        return FALSE;
+
+    StringBuffer = ObjectName;
+
+    Head = &g_ObjectPathListHead;
+    Entry = Head->Blink;             // Beginning of path
+
+    if (IncludeName) {
+        FinalEntry = Head;
+    }
+    else {
+        FinalEntry = Head->Flink;    // Current object name
+    }
+
+    ObjectRootEntry = Entry;
+    while ((Entry) && (Entry != FinalEntry)) {
+
+        ObjectPathEntry = CONTAINING_RECORD(Entry, OBEX_PATH_ELEMENT, ListEntry);
+
+        String = &ObjectPathEntry->Name;
+
+        RtlCopyMemory(StringBuffer, String->Buffer, String->Length);
+        StringBuffer = (PWCH)((PCH)StringBuffer + String->Length);
+
+        //
+        // If not last and first then add separator.
+        //
+        if ((Entry != ObjectRootEntry) && (Entry->Blink != FinalEntry))
+            *StringBuffer++ = OBJ_NAME_PATH_SEPARATOR;
+
+        Entry = Entry->Blink;
+    }
+
+    *StringBuffer++ = UNICODE_NULL;
+
+    BufferLength = (USHORT)((ULONG_PTR)StringBuffer - (ULONG_PTR)ObjectName);
+    ObjectPath->Buffer = ObjectName;
+    ObjectPath->Length = (USHORT)(BufferLength - sizeof(UNICODE_NULL));
+    ObjectPath->MaximumLength = (USHORT)BufferLength;
+
+    return TRUE;
+}
+
+/*
+* supGetCurrentObjectName
+*
+* Purpose:
+*
+* Return name of currently selected object.
+*
+*/
+_Success_(return)
+BOOL supGetCurrentObjectName(
+    _Out_ PUNICODE_STRING ObjectName
+)
+{
+    OBEX_PATH_ELEMENT* entry = NULL;
+    LIST_ENTRY* listEntry, * head;
+
+    RtlInitEmptyUnicodeString(ObjectName, NULL, 0);
+
+    if (IsListEmpty(&g_ObjectPathListHead))
+        return FALSE;
+
+    head = &g_ObjectPathListHead;
+    listEntry = head->Flink;
+    if (listEntry) {
+        entry = CONTAINING_RECORD(listEntry, OBEX_PATH_ELEMENT, ListEntry);
+        return supDuplicateUnicodeString(g_obexHeap, ObjectName, &entry->Name);
+    }
+
+    return FALSE;
+}
+
+/*
+* supBuildCurrentObjectList
+*
+* Purpose:
+*
+* Create list of current object path elements including name.
+*
+*/
+VOID supBuildCurrentObjectList(
+    _In_ PVOID ListHead
+)
+{
+    OBEX_ITEM* nextItem;
+    OBEX_PATH_ELEMENT* entry = NULL;
+
+    if (ObjectPathHeap)
+        supDestroyHeap(ObjectPathHeap);
+
+    ObjectPathHeap = supCreateHeap(HEAP_GROWABLE, TRUE);
+    if (ObjectPathHeap == NULL)
+        return;
+
+    InitializeListHead(&g_ObjectPathListHead);
+
+    nextItem = (OBEX_ITEM*)ListHead;
+    while (nextItem) {
+        entry = (OBEX_PATH_ELEMENT*)supHeapAllocEx(ObjectPathHeap, sizeof(OBEX_PATH_ELEMENT));
+        if (entry) {
+            entry->TypeIndex = nextItem->TypeIndex;
+            supDuplicateUnicodeString(ObjectPathHeap, &entry->Name, &nextItem->Name);
+            supDuplicateUnicodeString(ObjectPathHeap, &entry->TypeName, &nextItem->TypeName);
+            InsertTailList(&g_ObjectPathListHead, &entry->ListEntry);
+        }
+        nextItem = nextItem->Prev;
+    }
+
+}
+
+/*
+* supNormalizeUnicodeStringForDisplay
+*
+* Purpose:
+*
+* Create a copy of unicode string, friendly for output.
+*
+*/
+_Success_(return)
+BOOL supNormalizeUnicodeStringForDisplay(
+    _In_ HANDLE HeapHandle,
+    _In_ PUNICODE_STRING SourceString,
+    _Out_ PUNICODE_STRING NormalizedString
+)
+{
+    PWCH stringBuffer, src, dst;
+    ULONG i;
+
+    stringBuffer = (PWCH)supHeapAllocEx(HeapHandle, 
+        SourceString->Length + sizeof(UNICODE_NULL));
+    
+    if (stringBuffer) {
+
+        dst = stringBuffer;
+        src = SourceString->Buffer;
+
+        i = SourceString->Length / sizeof(WCHAR);
+        while (i--) {
+
+            if (*src == 0)
+                *dst = g_ObNameNormalizationSymbol;
+            else
+                *dst = *src;
+
+            src++;
+            dst++;
+        }
+
+        *dst = UNICODE_NULL;
+
+        RtlInitUnicodeString(NormalizedString, stringBuffer);
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+/*
+* supDisplayCurrentObjectPath
+*
+* Purpose:
+*
+* Output current object path to the control.
+*
+*/
+VOID supDisplayCurrentObjectPath(
+    _In_ HWND hwnd,
+    _In_opt_ PUNICODE_STRING Path,
+    _In_ BOOLEAN NormalizePath
+)
+{
+    BOOL bNeedFree = FALSE;
+    UNICODE_STRING us, ns;
+
+    if (Path) {
+        us = *Path;
+    }
+    else {
+        if (!supGetCurrentObjectPath(TRUE, &us))
+            return;
+
+        bNeedFree = TRUE;
+    }
+
+    if (NormalizePath) {
+        if (supNormalizeUnicodeStringForDisplay(g_obexHeap, &us, &ns)) {
+
+            SendMessage(hwnd, WM_SETTEXT, 0, (LPARAM)ns.Buffer);
+
+            supFreeUnicodeString(g_obexHeap, &ns);
+        }
+    }
+    else {
+        SendMessage(hwnd, WM_SETTEXT, 0, (LPARAM)us.Buffer);
+    }
+
+    if (bNeedFree)
+        supFreeDuplicatedUnicodeString(g_obexHeap, &us, FALSE);
+
+}
+
+/*
+* supResolveSymbolicLinkTarget
+*
+* Purpose:
+*
+* Resolve symbolic link target and copy it to the supplied buffer.
+*
+* Return FALSE on error.
+*
+*/
+_Success_(return)
+BOOL supResolveSymbolicLinkTarget(
+    _In_opt_ HANDLE LinkHandle,
+    _In_opt_ HANDLE RootDirectoryHandle,
+    _In_ PUNICODE_STRING LinkName,
+    _Out_ PUNICODE_STRING LinkTarget
+)
+{
+    BOOL bResult = FALSE;
+    HANDLE hObject = NULL;
+    ULONG rLen = 0;
+    NTSTATUS ntStatus;
+    UNICODE_STRING linkTarget;
+    OBJECT_ATTRIBUTES obja;
+    PWCH stringBuffer;
+
+    if (LinkHandle == NULL) {
+        //
+        // There is no handle, open it.
+        //
+        InitializeObjectAttributes(&obja, LinkName, OBJ_CASE_INSENSITIVE, RootDirectoryHandle, NULL);
+        if (!NT_SUCCESS(NtOpenSymbolicLinkObject(&hObject, SYMBOLIC_LINK_QUERY, &obja)))
+            return FALSE;
+    }
+    else {
+        hObject = LinkHandle;
+    }
+
+    RtlInitEmptyUnicodeString(&linkTarget, NULL, 0);
+    ntStatus = NtQuerySymbolicLinkObject(hObject, &linkTarget, &rLen);
+
+    if (ntStatus == STATUS_BUFFER_TOO_SMALL ||
+        ntStatus == STATUS_BUFFER_OVERFLOW)
+    {
+        stringBuffer = (PWCH)supHeapAlloc(rLen + sizeof(UNICODE_NULL));
+        if (stringBuffer) {
+
+            linkTarget.Buffer = stringBuffer;
+            linkTarget.Length = 0;
+            linkTarget.MaximumLength = (USHORT)rLen;
+
+            ntStatus = NtQuerySymbolicLinkObject(hObject, &linkTarget, &rLen);
+            if (NT_SUCCESS(ntStatus)) {
+                *LinkTarget = linkTarget;
+                bResult = TRUE;
+            }
+            else {
+                supHeapFree(stringBuffer);
+            }
+
         }
 
     }
 
-    if (!(Event->Value & FAST_EVENT_SET)) {
-        result = (NtWaitForSingleObject(eventHandle, FALSE, Timeout) == STATUS_WAIT_0);
-    }
-    else {
-        result = TRUE;
+    //
+    // If there is no input handle close what we opened.
+    //
+    if (LinkHandle == NULL) {
+        if (hObject) NtClose(hObject);
     }
 
-    supDereferenceFastEvent(Event, eventHandle);
+    return bResult;
+}
 
-    return result;
+/*
+* supResolveSymbolicLinkTargetNormalized
+*
+* Purpose:
+*
+* Resolve symbolic link target in a GUI friendly output form.
+*
+* Return FALSE on error.
+*
+*/
+_Success_(return)
+BOOL supResolveSymbolicLinkTargetNormalized(
+    _In_opt_ HANDLE LinkHandle,
+    _In_opt_ HANDLE RootDirectoryHandle,
+    _In_ PUNICODE_STRING LinkName,
+    _Out_ PUNICODE_STRING NormalizedLinkTarget
+)
+{
+    BOOL bResult;
+    UNICODE_STRING linkTarget;
+
+    if (!supResolveSymbolicLinkTarget(
+        LinkHandle,
+        RootDirectoryHandle,
+        LinkName,
+        &linkTarget))
+    {
+        return FALSE;
+    }
+
+    bResult = supNormalizeUnicodeStringForDisplay(g_obexHeap, &linkTarget, NormalizedLinkTarget);
+
+    supFreeDuplicatedUnicodeString(g_obexHeap, &linkTarget, FALSE);
+
+    return bResult;
+}
+
+/*
+* supClipboardCopyUnicodeStringRaw
+*
+* Purpose:
+*
+* Copy UNICODE_STRING buffer to the clipboard as C array.
+*
+*/
+VOID supClipboardCopyUnicodeStringRaw(
+    _In_ PUNICODE_STRING String
+)
+{
+    BYTE* src, * end;
+    PWCH copyBuffer, dst;
+    SIZE_T length;
+    BYTE x;
+
+    //
+    // '0', 'x', ',', ' ', 'A', 'B' = 6 * sizeof(WCHAR)
+    //
+    length = 100 + ((SIZE_T)String->Length * 12);
+    copyBuffer = (PWCH)supHeapAlloc(length);
+    if (copyBuffer == NULL)
+        return;
+
+    _strcpy(copyBuffer, TEXT("unsigned char data["));
+    ultostr(String->Length, _strend(copyBuffer));
+    dst = _strcat(copyBuffer, TEXT("] = {"));
+
+    src = (BYTE*)String->Buffer;
+    end = (BYTE*)RtlOffsetToPointer(String->Buffer, String->Length);
+    while (src < end) {
+
+        *dst++ = '0';
+        *dst++ = 'x';
+        x = *src++;
+
+        *dst++ = nibbletoh(x >> 4, TRUE);
+        *dst++ = nibbletoh(x & 15, TRUE);
+
+        if (src != end) {
+            *dst++ = ',';
+            *dst++ = ' ';
+        }
+    }
+
+    *dst++ = 0;
+    _strcat(copyBuffer, TEXT("}; "));
+
+    supClipboardCopy(copyBuffer, _strlen(copyBuffer) * sizeof(WCHAR));
+    supHeapFree(copyBuffer);
+}
+
+/*
+* supFindUnicodeStringSubString
+*
+* Purpose:
+*
+* Return offset to substring if found and ULLONG_MAX instead.
+* 
+* Case Insensitive.
+*
+*/
+SIZE_T supFindUnicodeStringSubString(
+    _In_ PUNICODE_STRING String,
+    _In_ PUNICODE_STRING SubString
+)
+{
+    SIZE_T length1;
+    SIZE_T length2;
+    UNICODE_STRING string1;
+    UNICODE_STRING string2;
+    WCHAR c;
+    SIZE_T i;
+
+    if (SubString == NULL)
+        return 0;
+
+    length1 = String->Length / sizeof(WCHAR);
+    length2 = SubString->Length / sizeof(WCHAR);
+
+    if (length2 > length1)
+        return ULLONG_MAX;
+
+    if (length2 == 0)
+        return 0;
+
+    string1.Buffer = String->Buffer;
+    string1.Length = SubString->Length - sizeof(WCHAR);
+    string2.Buffer = SubString->Buffer;
+    string2.Length = SubString->Length - sizeof(WCHAR);
+
+    c = RtlUpcaseUnicodeChar(*string2.Buffer++);
+
+    for (i = length1 - length2 + 1; i != 0; i--) {
+        if (RtlUpcaseUnicodeChar(*string1.Buffer++) == c &&
+            RtlEqualUnicodeString(&string1, &string2, TRUE))
+        {
+            return (ULONG_PTR)(string1.Buffer - String->Buffer - 1);
+        }
+    }
+
+    return ULLONG_MAX;
+}
+
+/*
+* supImageFixSections
+*
+* Purpose:
+*
+* Fix sections after dump.
+*
+*/
+BOOL supImageFixSections(
+    _In_ LPVOID Buffer
+)
+{
+    PIMAGE_DOS_HEADER idh = NULL;
+    PIMAGE_FILE_HEADER fh1 = NULL;
+    PIMAGE_NT_HEADERS ImageHeaders = NULL;
+    PIMAGE_SECTION_HEADER Section = NULL;
+    DWORD vaddr, secalign, vsize, part;
+    WORD i, c;
+
+    __try {
+
+        idh = (PIMAGE_DOS_HEADER)Buffer;
+        fh1 = (PIMAGE_FILE_HEADER)((ULONG_PTR)Buffer + ((PIMAGE_DOS_HEADER)Buffer)->e_lfanew + sizeof(DWORD));
+        if (fh1->Machine != IMAGE_FILE_MACHINE_AMD64) {
+            return FALSE;
+        }
+        
+        ImageHeaders = (PIMAGE_NT_HEADERS)((PBYTE)Buffer + idh->e_lfanew);
+        Section = IMAGE_FIRST_SECTION(ImageHeaders);
+        secalign = ImageHeaders->OptionalHeader.SectionAlignment;
+        c = ImageHeaders->FileHeader.NumberOfSections;
+
+        vaddr = Section->VirtualAddress;
+        for (i = 0; i < c; i++) {
+
+            //recalculate virtual size/address for each section
+            vsize = Section->Misc.VirtualSize;
+            part = vsize % secalign;
+            if (part != 0) {
+                vsize = vsize + secalign - part;
+            }
+            Section->SizeOfRawData = vsize;
+            Section->PointerToRawData = vaddr;
+            vaddr += vsize;
+            Section = (PIMAGE_SECTION_HEADER)((PBYTE)Section + sizeof(IMAGE_SECTION_HEADER));
+        }
+
+    }
+    __except (WOBJ_EXCEPTION_FILTER_LOG) {
+        return FALSE;
+    }
+    return TRUE;
+}
+
+/*
+* supCloseKnownPropertiesDialog
+*
+* Purpose:
+*
+* Send WM_CLOSE to known properties dialog if it present.
+*
+*/
+VOID supCloseKnownPropertiesDialog(
+    _In_opt_ HWND hwndDlg
+)
+{
+    if (hwndDlg)
+        SendMessage(hwndDlg, WM_CLOSE, 0, 0);
+}
+
+/*
+* supReadObexConfiguration
+*
+* Purpose:
+*
+* Reads program configuration data from registry if present.
+*
+*/
+_Success_(return)
+BOOL supReadObexConfiguration(
+    _Out_ POBEX_CONFIG Configuration
+)
+{
+    HKEY hKey;
+    DWORD data = 0, cbData, dwType;
+    WCHAR szBuffer[MAX_PATH + 1];
+    WCHAR symbol;
+
+    INT i;
+    WCHAR szValidSymbols[] = {
+        '!', '"', '#', '$', '%', '\'',
+        '(', ')','*', '+',  '-', '.',
+        ':', ';', '<', '>', '=', '?',
+        '@', ']', '[', '^', '_', '`',
+        '{', '}', '~' };
+
+    Configuration->SymbolsPathValid = FALSE;
+    Configuration->SymbolsDbgHelpDllValid = FALSE;
+    Configuration->szNormalizationSymbol = OBJ_NAME_NORMALIZATION_SYMBOL;
+
+    if (ERROR_SUCCESS == RegOpenKeyEx(HKEY_CURRENT_USER, supObexConfiguration, 0, KEY_READ, &hKey)) {
+
+        cbData = sizeof(DWORD);
+        dwType = REG_DWORD;
+        if (ERROR_SUCCESS == RegQueryValueEx(hKey, supObexNormalizationSymbol,
+            NULL, &dwType, (LPBYTE)&data, &cbData))
+        {
+            if (dwType == REG_DWORD && cbData == sizeof(DWORD)) {
+                symbol = (WCHAR)data;
+                for (i = 0; i < RTL_NUMBER_OF(szValidSymbols); i++) {
+                    if (szValidSymbols[i] == symbol) {
+                        Configuration->szNormalizationSymbol = symbol;
+                        break;
+                    }
+                }
+            }
+        }
+
+        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+        cbData = MAX_PATH * sizeof(WCHAR);
+        dwType = REG_SZ;
+        if (ERROR_SUCCESS == RegQueryValueEx(hKey, supObexSymPath,
+            NULL, &dwType, (LPBYTE)&szBuffer, &cbData))
+        {
+            if (dwType == REG_SZ && cbData > sizeof(UNICODE_NULL)) {
+                _strcpy(Configuration->szSymbolsPath, szBuffer);
+                Configuration->SymbolsPathValid = TRUE;
+            }
+        }
+
+        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+        cbData = MAX_PATH * sizeof(WCHAR);
+        dwType = REG_SZ;
+        if (ERROR_SUCCESS == RegQueryValueEx(hKey, supObexSymDbgHelpDll,
+            NULL, &dwType, (LPBYTE)&szBuffer, &cbData))
+        {
+            if (dwType == REG_SZ && cbData > sizeof(UNICODE_NULL)) {
+                _strcpy(Configuration->szSymbolsDbgHelpDll, szBuffer);
+                Configuration->SymbolsDbgHelpDllValid = TRUE;
+            }
+        }
+
+        RegCloseKey(hKey);
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+POBEX_CONFIG supGetParametersBlock(
+    VOID)
+{
+    return &g_LoadedParametersBlock;
 }

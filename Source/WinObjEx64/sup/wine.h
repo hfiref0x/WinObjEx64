@@ -1,14 +1,14 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2018 - 2022
 *
-*  TITLE:       ABOUTDLG.H
+*  TITLE:       WINE.H
 *
-*  VERSION:     1.52
+*  VERSION:     2.00
 *
-*  DATE:        08 Jan 2018
+*  DATE:        19 Jun 2022
 *
-*  Common header file for the About Dialog.
+*  Wine/Wine staging support header file.
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -16,10 +16,8 @@
 * PARTICULAR PURPOSE.
 *
 *******************************************************************************/
+
 #pragma once
 
-INT_PTR CALLBACK AboutDialogProc(
-    _In_ HWND hwndDlg,
-    _In_ UINT uMsg,
-    _In_ WPARAM wParam,
-    _In_ LPARAM lParam);
+PCHAR GetWineVersion(VOID);
+BOOLEAN IsWine(VOID);

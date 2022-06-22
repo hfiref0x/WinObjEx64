@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDESKTOP.C
 *
-*  VERSION:     1.93
+*  VERSION:     2.00
 *
-*  DATE:        11 May 2022
+*  DATE:        19 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -37,30 +37,28 @@ BOOL CALLBACK DesktopListEnumProc(
     _In_ LPARAM lParam
 )
 {
-    BOOL   bSucc;
-    INT	   nIndex;
-    DWORD  bytesNeeded, dwDesktopHeapSize;
+    BOOL bSucc;
+    INT	nIndex;
+    DWORD bytesNeeded, dwDesktopHeapSize;
     LPWSTR lpName, StringSid;
-    PSID   pSID;
+    PSID pSID;
     SIZE_T sz;
-    HDESK  hDesktop;
+    HDESK hDesktop;
     LVITEM lvitem;
-    WCHAR  szBuffer[MAX_PATH];
+    WCHAR szHeap[64];
 
     DLG_ENUM_CALLBACK_CONTEXT* enumParam = (DLG_ENUM_CALLBACK_CONTEXT*)lParam;
     if (enumParam == NULL) {
         return FALSE;
     }
 
-    // Desktop\\Object+0
-    sz = (3 + _strlen(lpszDesktop) + _strlen(enumParam->ObjectContext->lpObjectName)) * sizeof(WCHAR);
+    // Object
+    sz = (1 + _strlen(lpszDesktop)) * sizeof(WCHAR);
     lpName = (LPWSTR)supHeapAlloc(sz);
     if (lpName == NULL)
         return 0;
 
-    _strcpy(lpName, enumParam->ObjectContext->lpObjectName);
-    _strcat(lpName, TEXT("\\"));
-    _strcat(lpName, lpszDesktop);
+    _strcpy(lpName, lpszDesktop);
 
     //Name
     RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
@@ -126,10 +124,10 @@ BOOL CALLBACK DesktopListEnumProc(
             &bytesNeeded))
         {
             if (dwDesktopHeapSize) {
-                RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-                ultostr(dwDesktopHeapSize / 1024, szBuffer);
-                _strcat(szBuffer, TEXT(" Mb"));
-                lvitem.pszText = szBuffer;
+                szHeap[0] = 0;
+                ultostr(dwDesktopHeapSize / 1024, szHeap);
+                _strcat(szHeap, TEXT(" Mb"));
+                lvitem.pszText = szHeap;
             }
             else {
                 lvitem.pszText = T_EmptyString;
@@ -296,15 +294,15 @@ VOID DesktopListShowProperties(
 )
 {
     EXTRASCONTEXT* pDlgContext;
-    SIZE_T ItemTextSize, i, l;
-    LPWSTR lpName, lpItemText;
+    LPWSTR lpName;
+    UNICODE_STRING usObjectName;
 
-    PROP_DIALOG_CREATE_SETTINGS propSettings;
+    PROP_CONFIG propConfig;
 
     //
     // Allow only one dialog at same time.
     //
-    ENSURE_DIALOG_UNIQUE(g_DesktopPropWindow);
+    supCloseKnownPropertiesDialog(propGetDesktopWindow());
 
     //
     // A very basic support for this type.
@@ -313,28 +311,24 @@ VOID DesktopListShowProperties(
     pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
     if (pDlgContext) {
 
-        ItemTextSize = 0;
-        lpItemText = supGetItemText(
+        lpName = supGetItemText(
             pDlgContext->ListView,
             ListView_GetSelectionMark(pDlgContext->ListView),
             0,
-            &ItemTextSize);
+            NULL);
 
-        if (lpItemText) {
-            l = 0;
-            for (i = 0; i < ItemTextSize / sizeof(WCHAR); i++)
-                if (lpItemText[i] == L'\\')
-                    l = i + 1;
-            lpName = &lpItemText[l];
+        if (lpName) {
 
-            RtlSecureZeroMemory(&propSettings, sizeof(propSettings));
-            propSettings.hwndParent = hwndDlg;
-            propSettings.lpObjectName = lpName;
-            propSettings.lpObjectType = OBTYPE_NAME_DESKTOP;
+            RtlInitUnicodeString(&usObjectName, lpName);
 
-            propCreateDialog(&propSettings);
+            RtlSecureZeroMemory(&propConfig, sizeof(propConfig));
+            propConfig.hwndParent = hwndDlg;
+            propConfig.NtObjectName = &usObjectName;
+            propConfig.ObjectTypeIndex = ObjectTypeDesktop;
 
-            supHeapFree(lpItemText);
+            propCreateDialog(&propConfig);
+
+            supHeapFree(lpName);
         }
     }
 }

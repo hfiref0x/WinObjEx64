@@ -177,9 +177,9 @@ WinObjEx64 works only on the following x64 Windows: Windows 7, Windows 8, Window
 	- Jump to service entry module
 	- Export list to file in CSV format
 
-- CmControlVector viewer<sup>1</sup>
+- CmControlVector viewer
 	- Show dump of Ntoskrnl CmControlVector array
-	- Dump value data from kernel memory to file
+	- Dump value data from kernel memory to file<sup>1</sup>
 	- Export list to file in CSV format
 
 - Most of list/trees allows to copy object address and/or name to the clipboard
@@ -234,7 +234,7 @@ In order to build from source you need Microsoft Visual Studio 2015 and later ve
  
 # What is new
 
-[Whats New in 1.9.0](https://github.com/hfiref0x/WinObjEx64/blob/master/Compiled/WHATSNEW_190.md)
+[Whats New in 2.0.0](https://github.com/hfiref0x/WinObjEx64/blob/master/Compiled/WHATSNEW_200.md)
 
 [Complete changelog](https://github.com/hfiref0x/WinObjEx64/blob/master/Source/CHANGELOG.txt)
 

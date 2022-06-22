@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASIPC.C
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        04 Jun 2022
+*  DATE:        19 Jun 2022
 *
 *  IPC supported: Pipes, Mailslots
 *
@@ -18,9 +18,8 @@
 *******************************************************************************/
 #include "global.h"
 #include "extras.h"
-#include "extrasIPC.h"
 #include "propDlg.h"
-#include "propSecurity.h"
+#include "props.h"
 
 //mailslot root
 #define DEVICE_MAILSLOT          L"\\Device\\Mailslot\\"
@@ -94,10 +93,6 @@ LPWSTR IpcCreateObjectPathWithName(
     LPWSTR lpFullName = NULL, lpRootDirectory = NULL;
     SIZE_T sz;
 
-    if (lpObjectName == NULL) {
-        return NULL;
-    }
-
     sz = (1 + _strlen(lpObjectName)) * sizeof(WCHAR);
 
     switch (Mode) {
@@ -109,9 +104,8 @@ LPWSTR IpcCreateObjectPathWithName(
         sz += DEVICE_MAILSLOT_LENGTH;
         lpRootDirectory = DEVICE_MAILSLOT;
         break;
-    default:
-        break;
     }
+
     if (lpRootDirectory) {
         lpFullName = (LPWSTR)supHeapAlloc(sz);
         if (lpFullName == NULL) {
@@ -120,6 +114,7 @@ LPWSTR IpcCreateObjectPathWithName(
         _strcpy(lpFullName, lpRootDirectory);
         _strcat(lpFullName, lpObjectName);
     }
+
     return lpFullName;
 }
 
@@ -132,30 +127,21 @@ LPWSTR IpcCreateObjectPathWithName(
 *
 */
 BOOL CALLBACK IpcOpenObjectMethod(
-    _In_	PROP_OBJECT_INFO* Context,
-    _Inout_ PHANDLE	phObject,
-    _In_	ACCESS_MASK	DesiredAccess
+    _In_ PROP_OBJECT_INFO* Context,
+    _Inout_ PHANDLE phObject,
+    _In_ ACCESS_MASK DesiredAccess
 )
 {
     BOOL                bResult = FALSE;
     HANDLE              hObject;
     NTSTATUS            status;
     OBJECT_ATTRIBUTES   obja;
-    UNICODE_STRING      uStr;
     IO_STATUS_BLOCK     iost;
 
-    if (
-        (Context == NULL) ||
-        (phObject == NULL)
-        )
-    {
-        return bResult;
-    }
     *phObject = NULL;
 
-    RtlInitUnicodeString(&uStr, Context->lpCurrentObjectPath);
-    InitializeObjectAttributes(&obja, &uStr, OBJ_CASE_INSENSITIVE, NULL, NULL);
     hObject = NULL;
+    InitializeObjectAttributes(&obja, &Context->NtObjectPath, OBJ_CASE_INSENSITIVE, NULL, NULL);
 
     status = NtOpenFile(&hObject, DesiredAccess, &obja, &iost,
         FILE_SHARE_VALID_FLAGS, FILE_NON_DIRECTORY_FILE);
@@ -166,37 +152,6 @@ BOOL CALLBACK IpcOpenObjectMethod(
     SetLastError(RtlNtStatusToDosError(status));
     bResult = (NT_SUCCESS(status) && (hObject != NULL));
     return bResult;
-}
-
-/*
-* IpcVerifyContextParameter
-*
-* Purpose:
-*
-* Sanity check of PROP_OBJECT_INFO context.
-*
-*/
-BOOLEAN IpcVerifyContextParameter(
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ HWND hwndDlg,
-    _In_ IPC_DLG_MODE DialogMode)
-{
-    if (Context == NULL) {
-        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
-        IpcDisplayError(hwndDlg, DialogMode);
-        return FALSE;
-    }
-    if (
-        (Context->lpObjectName == NULL) ||
-        (Context->lpCurrentObjectPath == NULL)
-        )
-    {
-        SetLastError(ERROR_OBJECT_NOT_FOUND);
-        IpcDisplayError(hwndDlg, DialogMode);
-        return FALSE;
-    }
-
-    return TRUE;
 }
 
 /*
@@ -219,12 +174,6 @@ VOID IpcMailslotQueryInfo(
 
     FILE_MAILSLOT_QUERY_INFORMATION fmqi;
 
-    //
-    // Verify context.
-    //
-    if (!IpcVerifyContextParameter(Context, hwndDlg, IpcModeMailSlots))
-        return;
-
     hMailslot = NULL;
     if (!IpcOpenObjectMethod(Context, &hMailslot, GENERIC_READ)) {
         //on error display last win32 error
@@ -232,7 +181,10 @@ VOID IpcMailslotQueryInfo(
         return;
     }
 
-    SetDlgItemText(hwndDlg, ID_MAILSLOT_FULLPATH, Context->lpCurrentObjectPath);
+    supDisplayCurrentObjectPath(
+        GetDlgItem(hwndDlg, ID_MAILSLOT_FULLPATH), 
+        &Context->NtObjectPath, 
+        FALSE);
 
     RtlSecureZeroMemory(&fmqi, sizeof(fmqi));
     status = NtQueryInformationFile(hMailslot, &iost, &fmqi, sizeof(fmqi), FileMailslotQueryInformation);
@@ -281,17 +233,13 @@ VOID IpcPipeQueryInfo(
     LPWSTR                      lpType;
     HANDLE                      hPipe;
     NTSTATUS                    status;
-    WCHAR                       szBuffer[MAX_PATH];
+    WCHAR                       szBuffer[64];
     IO_STATUS_BLOCK             iost;
     FILE_PIPE_LOCAL_INFORMATION fpli;
 
-    //
-    // Verify context.
-    //
-    if (!IpcVerifyContextParameter(Context, hwndDlg, IpcModeNamedPipes))
-        return;
-
-    SetDlgItemText(hwndDlg, ID_PIPE_FULLPATH, Context->lpCurrentObjectPath);
+    supDisplayCurrentObjectPath(GetDlgItem(hwndDlg, ID_PIPE_FULLPATH), 
+        &Context->NtObjectPath, 
+        FALSE);
 
     //open pipe
     hPipe = NULL;
@@ -401,7 +349,7 @@ INT_PTR CALLBACK IpcTypeDialogProc(
             SetProp(hwndDlg, T_PROPCONTEXT, (HANDLE)pSheet->lParam);
             Context = (PROP_OBJECT_INFO*)pSheet->lParam;
             if (Context) {
-                pDlgContext = (EXTRASCONTEXT*)Context->Tag;
+                pDlgContext = (EXTRASCONTEXT*)Context->ExtrasContext;
                 if (pDlgContext) {
 
                     hIcon = ImageList_GetIcon(pDlgContext->ImageList,
@@ -425,7 +373,7 @@ INT_PTR CALLBACK IpcTypeDialogProc(
         if (wParam) {
             Context = (PROP_OBJECT_INFO*)GetProp(hwndDlg, T_PROPCONTEXT);
             if (Context) {
-                pDlgContext = (EXTRASCONTEXT*)Context->Tag;
+                pDlgContext = (EXTRASCONTEXT*)Context->ExtrasContext;
                 if (pDlgContext) {
                     switch (pDlgContext->DialogMode) {
                     case IpcModeMailSlots:
@@ -433,8 +381,6 @@ INT_PTR CALLBACK IpcTypeDialogProc(
                         break;
                     case IpcModeNamedPipes:
                         IpcPipeQueryInfo(Context, hwndDlg);
-                        break;
-                    default:
                         break;
                     }
                 }
@@ -446,7 +392,7 @@ INT_PTR CALLBACK IpcTypeDialogProc(
     case WM_DESTROY:
         Context = (PROP_OBJECT_INFO*)RemoveProp(hwndDlg, T_PROPCONTEXT);
         if (Context) {
-            pDlgContext = (EXTRASCONTEXT*)Context->Tag;
+            pDlgContext = (EXTRASCONTEXT*)Context->ExtrasContext;
             if (pDlgContext) {
                 DestroyIcon(pDlgContext->ObjectIcon);
                 pDlgContext->ObjectIcon = NULL;
@@ -472,21 +418,35 @@ VOID IpcDlgShowProperties(
     _In_ EXTRASCONTEXT* pDlgContext
 )
 {
-    INT                 nPages = 0;
+    INT nPages = 0;
     PROP_OBJECT_INFO* Context;
-    HPROPSHEETPAGE      SecurityPage = NULL;
-    PROPSHEETPAGE       Page;
-    PROPSHEETHEADER     PropHeader;
-    WCHAR               szCaption[MAX_PATH];
+    HPROPSHEETPAGE SecurityPage = NULL;
+    PROPSHEETPAGE Page;
+    PROPSHEETHEADER PropHeader;
+    WCHAR szCaption[MAX_PATH];
+    PROP_CONFIG propConfig;
 
-    Context = propContextCreate(NULL, OBTYPE_NAME_FILE, NULL, NULL);
+    LPWSTR objectName, objectPathCombined;
+    UNICODE_STRING objectPathNt;
+
+    RtlSecureZeroMemory(&propConfig, sizeof(propConfig));
+    propConfig.ContextType = propNormal;
+    propConfig.ObjectTypeIndex = ObjectTypeFile;
+
+    objectName = supGetItemText(pDlgContext->ListView, iItem, 0, NULL);
+    objectPathCombined = IpcCreateObjectPathWithName(objectName,
+        (IPC_DLG_MODE)pDlgContext->DialogMode);
+
+    RtlInitUnicodeString(&objectPathNt, objectPathCombined);
+    propConfig.NtObjectPath = &objectPathNt;
+
+    Context = propContextCreate(&propConfig);
     if (Context == NULL)
         return;
 
-    Context->lpObjectName = supGetItemText(pDlgContext->ListView, iItem, 0, NULL);
-    Context->lpCurrentObjectPath = IpcCreateObjectPathWithName(Context->lpObjectName,
-        (IPC_DLG_MODE)pDlgContext->DialogMode);
-    Context->Tag = (ULONG_PTR)pDlgContext;
+    Context->ExtrasContext = (PVOID)pDlgContext;
+
+    supHeapFree(objectName);
 
     RtlSecureZeroMemory(&IpcPages, sizeof(IpcPages));
     //
@@ -826,7 +786,7 @@ VOID IpcDlgOnInit(
     EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)lParam;
 
     SetProp(hwndDlg, T_IPCDLGCONTEXT, (HANDLE)lParam);
-    supCenterWindowSpecifyParent(hwndDlg, g_WinObj.MainWindow);
+    supCenterWindowSpecifyParent(hwndDlg, g_hwndMain);
 
     pDlgContext->lvColumnHit = -1;
     pDlgContext->lvItemHit = -1;

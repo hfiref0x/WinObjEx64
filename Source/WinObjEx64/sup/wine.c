@@ -4,9 +4,9 @@
 *
 *  TITLE:       WINE.C
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        07 Jun 2022
+*  DATE:        19 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,10 +17,14 @@
 
 #include "global.h"
 #include "ntos/ntldr.h"
-#include "winedebug.h"
+
+#define _WINE_DEBUG_MODE
+#undef _WINE_DEBUG_MODE
+
+typedef char* (__cdecl* pwine_get_version)(void);
 
 /*
-* wine_get_version
+* GetWineVersion
 *
 * Purpose:
 *
@@ -30,7 +34,9 @@
 *
 */
 #ifndef _WINE_DEBUG_MODE
-const char* wine_get_version(void)
+PCHAR GetWineVersion(
+    VOID
+)
 {
     pwine_get_version pfn = NULL;
     HMODULE hmod;
@@ -58,7 +64,7 @@ const char* wine_get_version(void)
     return NULL;
 }
 #else
-const char* wine_get_version(void)
+PCHAR WineGetVersion(void)
 {
     return "6.0";
 }
@@ -66,18 +72,20 @@ const char* wine_get_version(void)
 
 
 /*
-* is_wine
+* IsWine
 *
 * Purpose:
 *
 * Query if there is a Wine layer enabled.
 *
 */
-int is_wine(void)
+BOOLEAN IsWine(
+    VOID
+)
 {
-    CONST CHAR* szWine;
+    PCHAR lpWine;
 
-    szWine = wine_get_version();
+    lpWine = GetWineVersion();
 
-    return (szWine != NULL);
+    return (lpWine != NULL);
 }

@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        04 Jun 2022
+*  DATE:        19 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -16,14 +16,15 @@
 *******************************************************************************/
 #include "global.h"
 #include "extras.h"
-#include "extrasDrivers.h"
 
 BOOLEAN DrvDlgShimsEnabled = FALSE;
 
-#define ID_DRVLIST_DUMP     40001
-#define ID_DRVLIST_SAVE     40002
-#define ID_DRVLIST_PROP     ID_OBJECT_PROPERTIES
-#define ID_DRVLIST_REFRESH  ID_VIEW_REFRESH
+#define ID_DRVLIST_REFRESH   ID_VIEW_REFRESH
+#define ID_DRVLIST_PROP      ID_OBJECT_PROPERTIES
+#define ID_DRVLIST_DUMP      40005
+#define ID_DRVLIST_DUMPFIXED 40006
+#define ID_DRVLIST_SAVE      40007
+
 
 #define ID_CALC_HASH_MD5            6000
 #define ID_CALC_HASH_SHA1           6001
@@ -45,6 +46,8 @@ BOOLEAN DrvDlgShimsEnabled = FALSE;
 #define COLUMN_DRVLIST_UNLOADED_END_ADDRESS     2
 #define COLUMN_DRVLIST_UNLOADED_CURRENT_TIME    3
 
+#define T_DUMPDRIVER       L"Dump Driver (Raw)"
+#define T_DUMPDRIVER_FIXED L"Dump Driver (Fix Sections)"
 
 #define DRVLISTDLG_TRACKSIZE_MIN_X 640
 #define DRVLISTDLG_TRACKSIZE_MIN_Y 480
@@ -110,7 +113,7 @@ VOID DrvListCopyHash(
                 lpszHash = ComputeHashForFile(&fvi,
                     (MenuId == ID_CALC_HASH_PAGE_SHA1) ? BCRYPT_SHA1_ALGORITHM : BCRYPT_SHA256_ALGORITHM,
                     PAGE_SIZE,
-                    g_WinObj.Heap,
+                    g_obexHeap,
                     TRUE);
 
             }
@@ -119,7 +122,7 @@ VOID DrvListCopyHash(
                 lpszHash = ComputeHashForFile(&fvi,
                     CryptAlgoIdRef[MenuId - ID_CALC_HASH_MD5],
                     PAGE_SIZE,
-                    g_WinObj.Heap,
+                    g_obexHeap,
                     FALSE);
             }
 
@@ -232,6 +235,7 @@ VOID DrvHandlePopupMenu(
             InsertMenu(hMenu, ++uPos, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
             if (kdConnectDriver()) {
                 InsertMenu(hMenu, ++uPos, MF_BYCOMMAND, ID_DRVLIST_DUMP, T_DUMPDRIVER);
+                InsertMenu(hMenu, ++uPos, MF_BYCOMMAND, ID_DRVLIST_DUMPFIXED, T_DUMPDRIVER_FIXED);
             }
             InsertMenu(hMenu, ++uPos, MF_BYCOMMAND, ID_JUMPTOFILE, T_JUMPTOFILE);
 
@@ -320,6 +324,244 @@ VOID DrvListViewProperties(
     }
 }
 
+static HANDLE DumpDialogThreadHandle = NULL;
+static HANDLE DumpWorkerThread = NULL;
+static FAST_EVENT DumpDialogInitializedEvent = FAST_EVENT_INIT;
+volatile LONG TerminateDumpOperation = FALSE;
+HWND DumpWorkerWindow = NULL;
+
+typedef struct _OBEX_DRVDUMP {
+    _In_ BOOL FixSections;
+    _In_ ULONG DumpSize;
+    _In_ ULONG_PTR DumpAddress;
+    _In_ PBYTE Buffer;
+    _In_ HWND ParentWindow;
+    _Out_ ULONG ReadSize;
+    _Out_ NTSTATUS DumpStatus;
+    _In_ WCHAR FileName[MAX_PATH * 2];
+} OBEX_DRVDUMP, * POBEX_DRVDUMP;
+
+DWORD DrvDumpThread(
+    _In_ PVOID Parameter
+)
+{
+    OBEX_DRVDUMP* dumpInfo = (POBEX_DRVDUMP)Parameter;
+
+    PBYTE buffer;
+    ULONG_PTR dumpAddress;
+    ULONG totalSize = dumpInfo->DumpSize, readBytes = 0, i, remainingBytes, memIO = 0;
+
+    for (i = 0,
+        buffer = dumpInfo->Buffer,
+        dumpAddress = dumpInfo->DumpAddress;
+        (i < (totalSize / PAGE_SIZE));
+        i++,
+        dumpAddress += PAGE_SIZE,
+        buffer = (PBYTE)RtlOffsetToPointer(buffer, PAGE_SIZE))
+    {
+
+        if (TerminateDumpOperation) {
+            dumpInfo->DumpStatus = STATUS_CANCELLED;
+            return ERROR_CANCELLED;
+        }
+
+        kdReadSystemMemoryEx(dumpAddress, buffer, PAGE_SIZE, &memIO);
+        readBytes = InterlockedAdd((LONG*)&dumpInfo->ReadSize, memIO);
+    }
+
+    remainingBytes = totalSize % PAGE_SIZE;
+    if (remainingBytes) {
+        kdReadSystemMemoryEx(dumpAddress, buffer, remainingBytes, &memIO);
+        readBytes = InterlockedAdd((LONG*)&dumpInfo->ReadSize, memIO);
+    }
+
+    if (readBytes == 0) {
+        dumpInfo->DumpStatus = STATUS_UNSUCCESSFUL;
+    }
+    else if (readBytes != totalSize) {
+        dumpInfo->DumpStatus = STATUS_PARTIAL_COPY;
+    }
+    else {
+        dumpInfo->DumpStatus = STATUS_SUCCESS;
+    }
+
+    NtClose(DumpWorkerThread);
+    DumpWorkerThread = NULL;
+
+    PostMessage(dumpInfo->ParentWindow, WM_CLOSE, (WPARAM)0, (LPARAM)0);
+    return ERROR_SUCCESS;
+}
+
+VOID DumpTerminateWorker(
+    VOID
+)
+{
+    if (DumpWorkerThread) {
+        _InterlockedExchange((LONG*)&TerminateDumpOperation, TRUE);
+        if (WaitForSingleObject(DumpWorkerThread, 20*1000) == WAIT_TIMEOUT) {
+            TerminateThread(DumpWorkerThread, ERROR_CANCELLED);
+            NtClose(DumpWorkerThread);
+            DumpWorkerThread = NULL;
+        }
+    }
+}
+
+#define DUMP_PROP L"dumpProp"
+
+VOID DumpUpdateTimerProc(
+    HWND hwnd,
+    UINT uMsg,
+    UINT_PTR idEvent,
+    DWORD dwTime)
+{
+    UNREFERENCED_PARAMETER(uMsg);
+    UNREFERENCED_PARAMETER(idEvent);
+    UNREFERENCED_PARAMETER(dwTime);
+
+    OBEX_DRVDUMP* dumpInfo;
+    HWND hwndProgress = GetDlgItem(hwnd, IDC_PROGRESS);
+    WCHAR szBuffer[100];
+
+    dumpInfo = (OBEX_DRVDUMP*)GetProp(hwnd, DUMP_PROP);
+
+    if (dumpInfo) {
+
+        szBuffer[0] = 0;
+
+        RtlStringCchPrintfSecure(szBuffer,
+            RTL_NUMBER_OF(szBuffer),
+            TEXT("Reading %lu (%lu Kb) of %lu (%lu Kb)"),
+            dumpInfo->ReadSize,
+            dumpInfo->ReadSize / 1024,
+            dumpInfo->DumpSize,
+            dumpInfo->DumpSize / 1024);
+
+        SetWindowText(hwndProgress, szBuffer);
+    }
+}
+
+INT_PTR CALLBACK DrvDumpProgressDialogProc(
+    _In_ HWND   hwndDlg,
+    _In_ UINT   uMsg,
+    _In_ WPARAM wParam,
+    _In_ LPARAM lParam
+)
+{
+    OBEX_DRVDUMP* dumpInfo;
+
+    switch (uMsg) {
+
+    case WM_INITDIALOG:
+        dumpInfo = (POBEX_DRVDUMP)lParam;
+        if (dumpInfo) {
+            SetProp(hwndDlg, DUMP_PROP, (HANDLE)dumpInfo);
+            supCenterWindowSpecifyParent(hwndDlg, dumpInfo->ParentWindow);
+            dumpInfo->ParentWindow = hwndDlg;
+            _InterlockedExchange((LONG*)&TerminateDumpOperation, FALSE);
+            SetTimer(hwndDlg, 1, 300, DumpUpdateTimerProc);
+            DumpWorkerThread = supCreateThread(DrvDumpThread, (PVOID)dumpInfo, 0);
+        }
+        break;
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+
+    case WM_COMMAND:
+
+        switch (GET_WM_COMMAND_ID(wParam, lParam)) {
+        case IDCANCEL:
+            RemoveProp(hwndDlg, DUMP_PROP);
+            DumpTerminateWorker();
+            KillTimer(hwndDlg, 1);
+            return DestroyWindow(hwndDlg);
+        }
+    }
+    return 0;
+}
+
+DWORD DumpDialogWorkerThread(
+    _In_ PVOID Parameter
+)
+{
+    BOOL bResult;
+    MSG message;
+    OBEX_DRVDUMP* dumpInfo = (POBEX_DRVDUMP)Parameter;
+    HWND hwndDlg, hwndParent = dumpInfo->ParentWindow;
+
+    SIZE_T bytesIO;
+    WCHAR szBuffer[100];
+
+    hwndDlg = CreateDialogParam(g_WinObj.hInstance,
+        MAKEINTRESOURCE(IDD_DIALOG_PROGRESS),
+        0,
+        (DLGPROC)&DrvDumpProgressDialogProc,
+        (LPARAM)dumpInfo);
+
+    DumpWorkerWindow = hwndDlg;
+
+    SetWindowText(hwndDlg, TEXT("Driver dump"));
+
+    supSetFastEvent(&DumpDialogInitializedEvent);
+
+    do {
+
+        bResult = GetMessage(&message, NULL, 0, 0);
+        if (bResult == -1)
+            break;
+
+        if (!IsDialogMessage(hwndDlg, &message)) {
+            TranslateMessage(&message);
+            DispatchMessage(&message);
+        }
+
+    } while (bResult != 0);
+
+    if (NT_SUCCESS(dumpInfo->DumpStatus) || (dumpInfo->DumpStatus == STATUS_PARTIAL_COPY)) {
+
+        if (dumpInfo->FixSections)
+            supImageFixSections(dumpInfo->Buffer);
+
+        bytesIO = supWriteBufferToFile(dumpInfo->FileName, dumpInfo->Buffer,
+            (SIZE_T)dumpInfo->DumpSize, FALSE, FALSE);
+
+        RtlStringCchPrintfSecure(szBuffer, RTL_NUMBER_OF(szBuffer),
+            TEXT("Read %lu (%lu Kb), Write %lu (%lu Kb), Requested %lu (%lu Kb)"),
+            dumpInfo->ReadSize,
+            dumpInfo->ReadSize / 1024,
+            bytesIO,
+            bytesIO / 1024,
+            dumpInfo->DumpSize,
+            dumpInfo->DumpSize / 1024);
+
+    }
+    else if (dumpInfo->DumpStatus == STATUS_CANCELLED) {
+        _strcpy(szBuffer, TEXT("Operation cancelled by user"));
+    }
+    else {
+        _strcpy(szBuffer, TEXT("Error while dumping memory"));
+    }
+
+    supStatusBarSetText(
+        GetDlgItem(hwndParent, ID_EXTRASLIST_STATUSBAR),
+        1,
+        szBuffer);
+
+    if (dumpInfo->Buffer) {
+        supHeapFree(dumpInfo->Buffer);
+        supHeapFree(dumpInfo);
+    }
+
+    supResetFastEvent(&DumpDialogInitializedEvent);
+
+    if (DumpDialogThreadHandle) {
+        NtClose(DumpDialogThreadHandle);
+        DumpDialogThreadHandle = NULL;
+    }
+
+    return 0;
+}
+
 /*
 * DrvDumpDriver
 *
@@ -329,31 +571,36 @@ VOID DrvListViewProperties(
 *
 */
 VOID DrvDumpDriver(
-    _In_ EXTRASCONTEXT* Context
+    _In_ EXTRASCONTEXT* Context,
+    _In_ BOOL FixSections
 )
 {
-    BOOL      bSuccess = FALSE;
-    INT       iPos;
-    ULONG     ImageSize;
-    SIZE_T    sz;
-    LPWSTR    lpDriverName = NULL;
-    PVOID     DumpedDrv = NULL;
-    ULONG_PTR ImageBase = 0;
-    WCHAR     szBuffer[MAX_PATH * 2], szDriverDumpInfo[MAX_TEXT_CONVERSION_ULONG64 + 1];
+    INT nSelected;
+    SIZE_T sz;
+    LPWSTR lpDriverName = NULL;
+    WCHAR szBuffer[MAX_PATH * 2], szDriverDumpInfo[MAX_TEXT_CONVERSION_ULONG64];
+    OBEX_DRVDUMP* DumpInfo;
+    ULONG_PTR dumpAddress;
+    ULONG dumpSize;
+
+    if (DumpDialogThreadHandle) {
+        return;
+    }
 
     do {
+
         //
         // Remember selected index.
         //
-        iPos = ListView_GetNextItem(Context->ListView, -1, LVNI_SELECTED);
-        if (iPos < 0)
+        nSelected = ListView_GetNextItem(Context->ListView, -1, LVNI_SELECTED);
+        if (nSelected < 0)
             break;
 
         //
         // Query selected driver name.
         //
         sz = 0;
-        lpDriverName = supGetItemText(Context->ListView, iPos, 1, &sz);
+        lpDriverName = supGetItemText(Context->ListView, nSelected, 1, &sz);
         if (lpDriverName == NULL)
             break;
 
@@ -372,13 +619,13 @@ VOID DrvDumpDriver(
         RtlSecureZeroMemory(szDriverDumpInfo, sizeof(szDriverDumpInfo));
         supGetItemText2(
             Context->ListView,
-            iPos,
+            nSelected,
             COLUMN_DRVLIST_DRIVER_ADDRESS,
             szDriverDumpInfo,
             MAX_TEXT_CONVERSION_ULONG64);
 
-        ImageBase = hextou64(&szDriverDumpInfo[2]);
-        if (ImageBase < g_kdctx.SystemRangeStart)
+        dumpAddress = hextou64(&szDriverDumpInfo[2]);
+        if (dumpAddress < g_kdctx.SystemRangeStart)
             break;
 
         //
@@ -387,46 +634,33 @@ VOID DrvDumpDriver(
         RtlSecureZeroMemory(szDriverDumpInfo, sizeof(szDriverDumpInfo));
         supGetItemText2(
             Context->ListView,
-            iPos,
+            nSelected,
             COLUMN_DRVLIST_SIZE,
             szDriverDumpInfo,
             MAX_TEXT_CONVERSION_ULONG64);
 
-        ImageSize = _strtoul(szDriverDumpInfo);
-        if (ImageSize == 0)
+        dumpSize = _strtoul(szDriverDumpInfo);
+        if (dumpSize == 0)
             break;
 
-        //
-        // Allocate buffer for dump and read kernel memory.
-        //
-        DumpedDrv = supVirtualAlloc((SIZE_T)ImageSize);
-        if (DumpedDrv) {
+        DumpInfo = (OBEX_DRVDUMP*)supHeapAlloc(sizeof(OBEX_DRVDUMP));
+        if (DumpInfo == NULL)
+            break;
 
-            supSetWaitCursor(TRUE);
+        DumpInfo->Buffer = supHeapAlloc(dumpSize);
+        if (DumpInfo->Buffer == NULL) {
+            supHeapFree(DumpInfo);
+            break;
+        }
+        DumpInfo->FixSections = FixSections;
+        _strcpy(DumpInfo->FileName, szBuffer);
+        DumpInfo->DumpAddress = dumpAddress;
+        DumpInfo->DumpSize = dumpSize;
+        DumpInfo->ParentWindow = Context->hwndDlg;
 
-            //
-            // Ignore read errors during dump.
-            //
-            bSuccess = kdReadSystemMemory(ImageBase, DumpedDrv, ImageSize);
-            supSetWaitCursor(FALSE);
-
-            if (supWriteBufferToFile(szBuffer, DumpedDrv, ImageSize, FALSE, FALSE) == ImageSize)
-                _strcpy(szBuffer, TEXT("Driver saved to disk"));
-            else
-                _strcpy(szBuffer, TEXT("Driver save to disk error"));
-
-            //
-            // Free allocated buffer.
-            //
-            supVirtualFree(DumpedDrv);
-
-            _strcat(szBuffer, TEXT(", kernel memory read was "));
-            if (bSuccess)
-                _strcat(szBuffer, TEXT("successful"));
-            else
-                _strcat(szBuffer, TEXT("partially successful"));
-
-            supStatusBarSetText(Context->StatusBar, 1, (LPWSTR)&szBuffer);
+        DumpDialogThreadHandle = supCreateThread(DumpDialogWorkerThread, (PVOID)DumpInfo, 0);
+        if (DumpDialogThreadHandle) {
+            supWaitForFastEvent(&DumpDialogInitializedEvent, NULL);
         }
 
     } while (FALSE);
@@ -591,8 +825,8 @@ VOID DrvListUnloadedDrivers(
     _In_ BOOLEAN bRefresh
 )
 {
-    HWND    hwndList = Context->ListView;
-    WCHAR  szBuffer[100];
+    HWND hwndList = Context->ListView;
+    WCHAR szBuffer[100];
 
     if (bRefresh) {
         ListView_DeleteAllItems(hwndList);
@@ -631,14 +865,14 @@ VOID DrvListDrivers(
     _In_ BOOLEAN bRefresh
 )
 {
-    INT    lvItemIndex;
-    ULONG  i;
+    INT lvItemIndex;
+    ULONG i;
 
-    PCHAR  lpDriverName;
-    HWND   hwndList = Context->ListView;
+    PCHAR lpDriverName;
+    HWND hwndList = Context->ListView;
 
     LVITEM lvitem;
-    WCHAR  szBuffer[MAX_PATH + 1];
+    WCHAR szBuffer[MAX_PATH + 1];
 
     RTL_PROCESS_MODULES* pModulesList = NULL;
     PRTL_PROCESS_MODULE_INFORMATION pModule;
@@ -778,7 +1012,6 @@ BOOL CALLBACK DrvDlgHandleNotify(
     _In_ EXTRASCONTEXT* Context
 )
 {
-    BOOL bHandled = TRUE;
     INT nImageIndex;
 
 
@@ -828,11 +1061,10 @@ BOOL CALLBACK DrvDlgHandleNotify(
 
         break;
     default:
-        bHandled = FALSE;
-        break;
+        return FALSE;
     }
 
-    return bHandled;
+    return TRUE;
 }
 
 /*
@@ -872,7 +1104,10 @@ VOID DrvDlgHandleWMCommand(
         break;
 
     case ID_DRVLIST_DUMP:
-        DrvDumpDriver(pDlgContext);
+        DrvDumpDriver(pDlgContext, FALSE);
+        break;
+    case ID_DRVLIST_DUMPFIXED:
+        DrvDumpDriver(pDlgContext, TRUE);
         break;
 
     case ID_JUMPTOFILE:
@@ -972,7 +1207,7 @@ VOID DrvDlgOnInit(
     };
 
     SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)lParam);
-    supCenterWindowSpecifyParent(hwndDlg, g_WinObj.MainWindow);
+    supCenterWindowSpecifyParent(hwndDlg, g_hwndMain);
 
     pDlgContext->hwndDlg = hwndDlg;
     pDlgContext->lvColumnHit = -1;
@@ -1126,6 +1361,10 @@ INT_PTR CALLBACK DrvDlgProc(
                 kdDestroyShimmedDriversList(&g_kdctx.Data->KseEngineDump);
             }
 
+        }
+        if (DumpWorkerWindow) {
+            SendMessage(DumpWorkerWindow, WM_CLOSE, 0, 0);
+            DumpWorkerWindow = NULL;
         }
         DestroyWindow(hwndDlg);
         break;

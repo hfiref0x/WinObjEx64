@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2021
+*  (C) COPYRIGHT AUTHORS, 2021 - 2022
 *
 *  TITLE:       PROPSECTION.C
 *
-*  VERSION:     1.92
+*  VERSION:     2.00
 *
-*  DATE:        17 Sep 2021
+*  DATE:        19 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -15,10 +15,9 @@
 *
 *******************************************************************************/
 #include "global.h"
-#include "propDlg.h"
 #include "extras.h"
+#include "props.h"
 #include "propObjectDumpConsts.h"
-#include "propObjectDump.h"
 
 #define COLUMN_SECTION_VIEW_OBJECT   0
 #define COLUMN_SECTION_VIEW_ADDRESS  1
@@ -730,8 +729,6 @@ VOID SectionPropertiesCreate(
                     lpError = TEXT("Object flags are not supported.");
                     break;
 
-                default:
-                    break;
                 }
                 supObDumpShowError(hwndDlg, lpError);
             }
@@ -787,9 +784,6 @@ INT_PTR CALLBACK SectionPropertiesDialogProc(
                 supTreeListCopyItemValueToClipboard(pDlgContext->TreeList,
                     pDlgContext->tlSubItemHit);
             }
-            break;
-
-        default:
             break;
         }
 

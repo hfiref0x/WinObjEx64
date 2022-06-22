@@ -4,9 +4,9 @@
 *
 *  TITLE:       FINDDLG.C
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        03 Jun 2022
+*  DATE:        19 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -15,7 +15,6 @@
 *
 *******************************************************************************/
 #include "global.h"
-#include "findDlg.h"
 
 #define FINDDLG_TRACKSIZE_MIN_X 548
 #define FINDDLG_TRACKSIZE_MIN_Y 230
@@ -143,27 +142,40 @@ INT CALLBACK FindDlgCompareFunc(
 *
 */
 VOID FindDlgAddListItem(
-    _In_ HWND	hList,
-    _In_ LPWSTR	ObjectName,
-    _In_ LPWSTR	TypeName
+    _In_ HWND hList,
+    _In_ PUNICODE_STRING ObjectName,
+    _In_ PUNICODE_STRING TypeName
 )
 {
-    INT     lvItemIndex;
-    LVITEM  lvItem;
+    BOOL bNeedFree = FALSE;
+    INT lvItemIndex;
+    LVITEM lvItem;
+    LPWSTR lpName;
+
+    UNICODE_STRING normalizedString;
+
+    bNeedFree = supNormalizeUnicodeStringForDisplay(g_obexHeap, ObjectName, &normalizedString);
+    if (bNeedFree)
+        lpName = normalizedString.Buffer;
+    else
+        lpName = ObjectName->Buffer;
 
     RtlSecureZeroMemory(&lvItem, sizeof(lvItem));
 
     lvItem.mask = LVIF_TEXT | LVIF_IMAGE;
-    lvItem.pszText = ObjectName;
-    lvItem.iImage = ObManagerGetImageIndexByTypeName(TypeName);
+    lvItem.pszText = lpName;
+    lvItem.iImage = ObManagerGetImageIndexByTypeName(TypeName->Buffer);
     lvItem.iItem = MAXINT;
     lvItemIndex = ListView_InsertItem(hList, &lvItem);
 
     lvItem.mask = LVIF_TEXT;
     lvItem.iSubItem = 1;
-    lvItem.pszText = TypeName;
+    lvItem.pszText = TypeName->Buffer;
     lvItem.iItem = lvItemIndex;
     ListView_SetItem(hList, &lvItem);
+
+    if (bNeedFree)
+        supFreeDuplicatedUnicodeString(g_obexHeap, &normalizedString, FALSE);
 }
 
 /*
@@ -437,10 +449,12 @@ VOID FindDlgHandleSearch(
     _In_ HWND hwndDlg
 )
 {
-    WCHAR           searchString[MAX_PATH + 1], typeName[MAX_PATH + 1];
-    LPWSTR          pnameStr = (LPWSTR)searchString, ptypeStr = (LPWSTR)typeName;
-    PFO_LIST_ITEM   flist, plist;
-    ULONG           cci;
+    WCHAR searchString[MAX_PATH + 1], typeName[MAX_PATH + 1];
+    PFO_LIST_ITEM flist, plist;
+    ULONG cci;
+
+    UNICODE_STRING usName, usType;
+    PUNICODE_STRING pusName = &usName, pusType = &usType;
 
     supSetWaitCursor(TRUE);
     EnableWindow(GetDlgItem(hwndDlg, ID_SEARCH_FIND), FALSE);
@@ -461,12 +475,21 @@ VOID FindDlgHandleSearch(
 
     flist = NULL;
 
-    if (searchString[0] == 0)
-        pnameStr = NULL;
-    if (typeName[0] == L'*')
-        ptypeStr = 0;
+    if (searchString[0] == 0) {
+        pusName = NULL;
+    }
+    else {
+        RtlInitUnicodeString(&usName, searchString);
+    }
+    if (typeName[0] == L'*') {
+        pusType = NULL;
+    }
+    else {
+        RtlInitUnicodeString(&usType, typeName);
+    }
 
-    FindObject(KM_OBJECTS_ROOT_DIRECTORY, pnameStr, ptypeStr, &flist);
+    FindObject(ObGetPredefinedUnicodeString(OBP_ROOT), 
+        pusName, pusType, &flist);
 
     //
     // Disable listview redraw
@@ -475,7 +498,7 @@ VOID FindDlgHandleSearch(
 
     cci = 0;
     while (flist != NULL) {
-        FindDlgAddListItem(g_FindDlgContext.SearchList, flist->ObjectName, flist->ObjectType);
+        FindDlgAddListItem(g_FindDlgContext.SearchList, &flist->ObjectName, &flist->ObjectType);
         plist = flist->Prev;
         supHeapFree(flist);
         flist = plist;
@@ -564,7 +587,7 @@ VOID FindDlgOnInit(
     }
 
     FindDlgAddTypes(hwndDlg);
-    supCenterWindowSpecifyParent(hwndDlg, g_WinObj.MainWindow);
+    supCenterWindowSpecifyParent(hwndDlg, g_hwndMain);
     FindDlgResize(hwndDlg, &g_FindDlgContext);
     SetActiveWindow(hwndDlg);
 }

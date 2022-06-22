@@ -16,11 +16,9 @@ winobjex64\drivers\alice.h
 
 * About dialog routines including window dialog procedure *
 winobjex64\aboutDlg.c
-winobjex64\aboutDlg.h
 
 * System information dialog routines including window dialog procedure *
 winobjex64\sysinfoDlg.c
-winobjex64\sysinfoDlg.h
 
 * Custom access violation exception handler including minidump *
 winobjex64\excepth.c
@@ -29,6 +27,7 @@ winobjex64\excepth.h
 * Extras menu handler *
 winobjex64\extras\extras.c
 winobjex64\extras\extras.h
+winobjex64\extras\extrasHandlers.h
 
 * Windows 7/8/8.1 missing API support *
 winobjex64\extapi.c
@@ -36,45 +35,34 @@ winobjex64\extapi.h
 
 * Windows kernel callbacks list *
 winobjex64\extas\extrasCallbacks.c
-winobjex64\extras\extrasCallbacks.h
 winobjex64\extras\extrasCallbacksPatterns.h
 
 * Drivers list *
 winobjex64\extras\extrasDrivers.c
-winobjex64\extras\extrasDrivers.h
 
 * KiServiceTable/W32pServiceTable list *
 winobjex64\extras\extrasSSDT.c
-winobjex64\extras\extrasSSDT.h
-winobjex64\extras\extrasSSDTsup.h
 
 * Pipes and mailslots dialog *
 winobjex64\extras\extrasIPC.c
-winobjex64\extras\extrasIPC.h
 
 * Windows Private Namespaces dialog *
 winobjex64\extras\extrasPN.c
-winobjex64\extras\extrasPN.h
 
 * Process list dialog *
 winobjex64\extras\extrasPSList.c
-winobjex64\extras\extrasPSList.h
 
 * Software Licensing Cache dialog *
 winobjex64\extras\extrasSL.c
-winobjex64\extras\extrasSL.h
 
 * UserSharedData dialog *
 winobjex64\extras\extrasUSD.c
-winobjex64\extras\extrasUSD.h
 
 * CmControlVector dialog *
 winobjex64\extras\extrasCmOpt.c
-winobjex64\extras\extrasCmOpt.h
 
 * Find Object routines including window dialog procedure *
 winobjex64\findDlg.c
-winobjex64\findDlg.h
 
 * Authenticode hash support *
 winobjex64\hash.c
@@ -122,64 +110,55 @@ winobjex64\symparser.h
 
 * Property sheet for ALPC Port information *
 winobjex64\props\propAlpcPort.c
-winobjex64\props\propAlpcPort.h
 
 * Property sheet "Basic" handlers, including window procedures and consts *
 winobjex64\props\propBasic.c
-winobjex64\props\propBasic.h
 winobjex64\props\propBasicConsts.h
 
 * Property sheet "Desktop" handlers *
 winobjex64\props\propDesktop.c
-winobjex64\props\propDesktop.h
 
 * "Properties" property sheet creation and window procedures, all sheets created here *
 winobjex64\props\propDlg.c
 winobjex64\props\propDlg.h
+winobjex64\props\propCommon.h
+winobjex64\props\props.h
 
-* Dumping and decoding kernel objects for "Object" property sheet *
-winobjex64\props\propDriver.c - property sheet "Driver" handlers, including window procedures
-winobjex64\props\propDriver.h
+* Property sheet "Driver" handlers *
+winobjex64\props\propDriver.c
+
+* Dumping and decoding kernel objects for "Object" property sheet and constants*
 winobjex64\props\propObjectDump.c 
-winobjex64\props\propObjectDump.h
-
-* Kernel object string converted constants *
 winobjex64\props\propObjectDumpConsts.h
 
 * Property sheet "Process" handler, window procedure *
 winobjex64\props\propProcess.c
-winobjex64\props\propProcess.h
 
 * Property sheet for Section object dump information *
 winobjex64\props\propSection.c
-winobjex64\props\propSection.h
 
-* "Security" property sheet handler and ISecurityInformation implementation *
+* "Security" property sheet handler and ISecurityInformation implementation and constants *
 winobjex64\props\propSecurity.c
-winobjex64\props\propSecurity.h
-
-* Object type access values, generic mappings here *
 winobjex64\props\propSecurityConsts.h
 
 * Property sheet "Token" handler, window procedure *
 winobjex64\props\propToken.c
-winobjex64\props\propToken.h
 
-* Property sheet "Type" handlers, including window procedure for "Procedures" sheet *
+* Property sheet "Type" handlers, including window procedure for "Procedures" sheet and constants*
 winobjex64\props\propType.c
-winobjex64\props\propType.h
-
-* Known object access rights converted to strings listed here *
 winobjex64\props\propTypeConsts.h
 
 * "View Security Descriptor" dialog routines including window procedure *
 winobjex64\sdviewDlg.c
-winobjex64\sdviewDlg.h
 
 * Support api set and consts *
-winobjex64\sup.c
-winobjex64\sup.h
-winobjex64\supConsts.h
+winobjex64\sup\sup.c
+winobjex64\sup\sup.h
+winobjex64\sup\sync.c
+
+* Wine support header file *
+winobjex64\sup\wine.c
+winobjex64\sup\wine.h
 
 * All objects test code here *
 winobjex64\tests\testunit.c
@@ -188,10 +167,6 @@ winobjex64\tests\testunit.h
 * systreeview32 combined with sysheader32 control *
 shared\treelist\treelist.c
 shared\treelist\treelist.h
-
-* Wine support header file *
-winobjex64\wine.h
-winobjex64\wine.c
 
 * Global include file *
 winobjex64\global.h

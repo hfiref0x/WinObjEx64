@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        07 Jun 2022
+*  DATE:        19 Jun 2022
 *
 *  Common header file for the program support routines.
 *
@@ -18,16 +18,56 @@
 *******************************************************************************/
 #pragma once
 
-#include <cfgmgr32.h>
-#include <setupapi.h>
-
 #define T_DEVICE_PROCEXP152 L"\\Device\\ProcExp152"
 #define PE_DEVICE_TYPE 0x8335
 
 #define IOCTL_PE_OPEN_PROCESS_TOKEN     CTL_CODE(PE_DEVICE_TYPE, 0x3, METHOD_BUFFERED, FILE_ANY_ACCESS)
 #define IOCTL_PE_OPEN_PROCESS           CTL_CODE(PE_DEVICE_TYPE, 0xF, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
+#define T_SECUREBOOTSTATEKEY        L"System\\CurrentControlSet\\Control\\SecureBoot\\State"
+#define T_SECUREBOOTSTATEVALUE      L"UEFISecureBootEnabled"
+
+#define T_VERSION_TRANSLATION       L"\\VarFileInfo\\Translation"
+#define FORMAT_VERSION_DESCRIPTION  L"\\StringFileInfo\\%04x%04x\\FileDescription"
+#define HHCTRLOCXKEY                L"CLSID\\{ADB880A6-D8FF-11CF-9377-00AA003B7A11}\\InprocServer32"
+#define T_OBJECT_TYPES              L"ObjectTypes"
+
+#define FORMAT_TIME_DATE_VALUE      L"%02hd:%02hd:%02hd, %02hd %ws %04hd"
+#define FORMAT_TIME_VALUE           L"%I64u:%02hd:%02hd"
+#define FORMAT_TIME_VALUE_MS        L"%hd:%02hd:%02hd.%03hd"
+#define T_FORMATTED_ATTRIBUTE       L"           0x"
+
+#define HHCTRLOCX                   L"hhctrl.ocx"
+
+#define T_WINSTA_SYSTEM L"-0x0-3e7$"
+#define T_WINSTA_ANONYMOUS L"-0x0-3e6$"
+#define T_WINSTA_LOCALSERVICE L"-0x0-3e5$"
+#define T_WINSTA_NETWORK_SERVICE L"-0x0-3e4$"
+
+#define supServicesRegPath          L"System\\CurrentControlSet\\Services\\"
+#define supServicesRegPathSize      sizeof(supServicesRegPath) - sizeof(WCHAR)
+
+#define supObexConfiguration        L"Software\\WinObjEx64"
+#define supObexSymPath              L"SymPath"
+#define supObexSymDbgHelpDll        L"SymDbgHelpDll"
+#define supObexNormalizationSymbol  L"NormalizationSymbol"
+
+// All relatives to supObexConfiguration
+typedef struct _OBEX_CONFIG {
+    BOOLEAN SymbolsPathValid;
+    BOOLEAN SymbolsDbgHelpDllValid;
+    WCHAR szNormalizationSymbol;                 //supObexNormalizationSymbol
+    WCHAR szSymbolsPath[MAX_PATH + 1];           //supObexSymbolsPath
+    WCHAR szSymbolsDbgHelpDll[MAX_PATH + 1];     //supObexSymbolsDbgHelpDll
+} OBEX_CONFIG, * POBEX_CONFIG;
+
 #define INITIAL_BUFFER_SIZE (256) * (1024)
+
+#define GET_BIT(Integer, Bit) (((Integer) >> (Bit)) & 0x1)
+#define SET_BIT(Integer, Bit) ((Integer) |= 1 << (Bit))
+#define CLEAR_BIT(Integer, Bit) ((Integer) &= ~(1 << (Bit)))
+
+#define PathFileExists(lpszPath) (GetFileAttributes(lpszPath) != (DWORD)-1)
 
 typedef struct _SAPIDB {
     LIST_ENTRY ListHead;
@@ -78,7 +118,7 @@ typedef struct _OBEX_THREAD_LOOKUP_ENTRY {
 
 typedef struct _ALPCPORT_ENUM_CONTEXT {
     _In_ USHORT AlpcPortTypeIndex;
-    _In_ LPCWSTR ObjectFullName;
+    _In_ PUNICODE_STRING ObjectName;
     _Out_ HANDLE ObjectHandle;
 } ALPCPORT_ENUM_CONTEXT, * PALPCPORT_ENUM_CONTEXT;
 
@@ -90,6 +130,11 @@ typedef struct _PS_HANDLE_DUMP_ENUM_CONTEXT {
     _In_ PVOID ProcessList;
 } PS_HANDLE_DUMP_ENUM_CONTEXT, *PPS_HANDLE_DUMP_ENUM_CONTEXT;
 
+typedef struct _WINSTA_DESC {
+    LPCWSTR lpszWinSta;
+    LPCWSTR lpszDesc;
+} WINSTA_DESC, * PWINSTA_DESC;
+
 typedef BOOL(CALLBACK* PSUPSHUTDOWNCALLBACK)(
     _In_opt_ PVOID Context
     );
@@ -99,27 +144,6 @@ typedef struct _SUP_SHUTDOWN_CALLBACK {
     PSUPSHUTDOWNCALLBACK Callback;
     PVOID Context;
 } SUP_SHUTDOWN_CALLBACK, PSUP_SHUTDOWN_CALLBACK;
-
-typedef struct _FAST_EVENT {
-    union {
-        ULONG_PTR Value;
-        USHORT Set : 1;
-        USHORT RefCount : 15;
-        UCHAR Reserved;
-        UCHAR AvailableForUse;
-#ifdef _WIN64
-        ULONG Spare;
-#endif
-    };
-    HANDLE EventHandle;
-} FAST_EVENT, * PFAST_EVENT;
-
-#define FAST_EVENT_SET 0x1
-#define FAST_EVENT_SET_SHIFT 0
-#define FAST_EVENT_REFCOUNT_SHIFT 1
-#define FAST_EVENT_REFCOUNT_INC 0x2
-#define FAST_EVENT_REFCOUNT_MASK (((ULONG_PTR)1 << 15) - 1)
-#define FAST_EVENT_INIT { { FAST_EVENT_REFCOUNT_INC }, NULL } 
 
 // return true to stop enumeration
 typedef BOOL(CALLBACK* PENUMERATE_SL_CACHE_VALUE_DESCRIPTORS_CALLBACK)(
@@ -170,10 +194,6 @@ typedef struct _PROCESS_MITIGATION_POLICY_RAW_DATA {
     ULONG Value;
 } PROCESS_MITIGATION_POLICY_RAW_DATA, *PPROCESS_MITIGATION_POLICY_RAW_DATA;
 
-#define GET_BIT(Integer, Bit) (((Integer) >> (Bit)) & 0x1)
-#define SET_BIT(Integer, Bit) ((Integer) |= 1 << (Bit))
-#define CLEAR_BIT(Integer, Bit) ((Integer) &= ~(1 << (Bit)))
-
 typedef struct _ENUMCHILDWNDDATA {
     RECT Rect;
     INT nCmdShow;
@@ -189,11 +209,6 @@ typedef struct _SAPIDBENTRY {
     LPWSTR lpDeviceName;
     LPWSTR lpDeviceDesc;
 } SAPIDBENTRY, *PSAPIDBENTRY;
-
-extern SAPIDB g_sapiDB;
-extern SCMDB g_scmDB;
-
-#define PathFileExists(lpszPath) (GetFileAttributes(lpszPath) != (DWORD)-1)
 
 typedef struct tagVERBLOCK {
     WORD wTotLen;
@@ -257,8 +272,78 @@ typedef struct _FILE_VIEW_INFO {
 typedef struct _SUP_BANNER_DATA {
     LPCWSTR lpText;
     LPCWSTR lpCaption;
-    BOOL fList;
 } SUP_BANNER_DATA, * PSUP_BANNER_DATA;
+
+//
+// Fast event
+//
+typedef struct _FAST_EVENT {
+    union {
+        ULONG_PTR Value;
+        USHORT Set : 1;
+        USHORT RefCount : 15;
+        UCHAR Reserved;
+        UCHAR AvailableForUse;
+#ifdef _WIN64
+        ULONG Spare;
+#endif
+    };
+    HANDLE EventHandle;
+} FAST_EVENT, * PFAST_EVENT;
+
+#define FAST_EVENT_SET 0x1
+#define FAST_EVENT_SET_SHIFT 0
+#define FAST_EVENT_REFCOUNT_SHIFT 1
+#define FAST_EVENT_REFCOUNT_INC 0x2
+#define FAST_EVENT_REFCOUNT_MASK (((ULONG_PTR)1 << 15) - 1)
+#define FAST_EVENT_INIT { { FAST_EVENT_REFCOUNT_INC }, NULL } 
+
+VOID supInitFastEvent(
+    _In_ PFAST_EVENT Event);
+
+VOID supReferenceFastEvent(
+    _In_ PFAST_EVENT Event);
+
+VOID supDereferenceFastEvent(
+    _In_ PFAST_EVENT Event,
+    _In_opt_ HANDLE EventHandle);
+
+VOID supSetFastEvent(
+    _In_ PFAST_EVENT Event);
+
+BOOLEAN supTestFastEvent(
+    _In_ PFAST_EVENT Event);
+
+VOID supResetFastEvent(
+    _In_ PFAST_EVENT Event);
+
+BOOLEAN supWaitForFastEvent(
+    _In_ PFAST_EVENT Event,
+    _In_opt_ PLARGE_INTEGER Timeout);
+
+//
+// Heap memory allocations
+//
+HANDLE supCreateHeap(
+    _In_ ULONG HeapFlags,
+    _In_ BOOL TerminateOnCorruption);
+
+BOOL supDestroyHeap(
+    _In_ HANDLE HeapHandle);
+
+PVOID supHeapAllocEx(
+    _In_ HANDLE Heap,
+    _In_ SIZE_T Size);
+
+BOOL supHeapFreeEx(
+    _In_ HANDLE Heap,
+    _In_ PVOID Memory);
+
+PVOID supHeapAlloc(
+    _In_ SIZE_T Size);
+
+BOOL supHeapFree(
+    _In_ PVOID Memory);
 
 //
 // Use shared NTSUP forward.
@@ -274,7 +359,7 @@ typedef struct _SUP_BANNER_DATA {
 #define supQueryUserModeAccessibleRange ntsupQueryUserModeAccessibleRange
 #define supIsProcess32bit ntsupIsProcess32bit
 #define supQueryThreadWin32StartAddress ntsupQueryThreadWin32StartAddress
-#define supOpenDirectory ntsupOpenDirectory
+#define supOpenDirectoryEx ntsupOpenDirectoryEx
 #define supQueryProcessName ntsupQueryProcessName
 #define supQueryProcessEntryById ntsupQueryProcessEntryById
 #define supWriteBufferToFile ntsupWriteBufferToFile
@@ -307,22 +392,33 @@ typedef struct _SUP_BANNER_DATA {
 #define supQueryThreadInformation(ThreadHandle, ThreadInformationClass, Buffer, ReturnLength) \
     ntsupQueryThreadInformation(ThreadHandle, ThreadInformationClass, Buffer, ReturnLength, supHeapAlloc, supHeapFree)
 
+FORCEINLINE BOOLEAN supUnicodeStringValid(
+    _In_ PUNICODE_STRING SourceString
+)
+{
+    if (SourceString == NULL)
+        return FALSE;
+
+    if (((SourceString->Length % sizeof(WCHAR)) != 0) ||
+        ((SourceString->MaximumLength % sizeof(WCHAR)) != 0) ||
+        (SourceString->Length > SourceString->MaximumLength) ||
+        (SourceString->MaximumLength > (UNICODE_STRING_MAX_CHARS * sizeof(WCHAR))))
+    {
+        return FALSE;
+    }
+    else if ((SourceString->Buffer == NULL) &&
+        ((SourceString->Length != 0) || (SourceString->MaximumLength != 0)))
+    {
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+#define supIsRootDirectory(DirectoryName) RtlEqualUnicodeString(ObGetPredefinedUnicodeString(OBP_ROOT), DirectoryName, TRUE)
+
 BOOL supInitMSVCRT(
     VOID);
-
-#ifndef _DEBUG
-FORCEINLINE PVOID supHeapAlloc(
-    _In_ SIZE_T Size);
-
-FORCEINLINE BOOL supHeapFree(
-    _In_ PVOID Memory);
-#else
-PVOID supHeapAlloc(
-    _In_ SIZE_T Size);
-
-BOOL supHeapFree(
-    _In_ PVOID Memory);
-#endif
 
 VOID supTreeListEnableRedraw(
     _In_ HWND TreeList,
@@ -360,11 +456,45 @@ HICON supGetMainIcon(
     _In_ INT cx,
     _In_ INT cy);
 
-void supCopyMemory(
-    _Inout_ void* dest,
-    _In_ size_t ccdest,
-    _In_ const void* src,
-    _In_ size_t ccsrc);
+_Success_(return)
+BOOL supNormalizeUnicodeStringForDisplay(
+    _In_ HANDLE HeapHandle,
+    _In_ PUNICODE_STRING SourceString,
+    _Out_ PUNICODE_STRING NormalizedString);
+
+_Success_(return)
+BOOL supFreeUnicodeString(
+    _In_ HANDLE HeapHandle,
+    _Inout_ PUNICODE_STRING String);
+
+_Success_(return)
+BOOL supFreeDuplicatedUnicodeString(
+    _In_ HANDLE HeapHandle,
+    _Inout_ PUNICODE_STRING DuplicatedString,
+    _In_ BOOL DoZeroMemory);
+
+_Success_(return)
+BOOL supDuplicateUnicodeString(
+    _In_ HANDLE HeapHandle,
+    _Out_ PUNICODE_STRING DestinationString,
+    _In_ PUNICODE_STRING SourceString);
+
+_Success_(return)
+BOOL supCreateObjectPathFromElements(
+    _In_ PUNICODE_STRING ObjectName,
+    _In_ PUNICODE_STRING DirectoryName,
+    _Out_ PUNICODE_STRING ObjectPath,
+    _In_ BOOLEAN NullTerminate);
+
+_Success_(return)
+BOOL supCreateObjectPathFromCurrentPath(
+    _In_ PUNICODE_STRING ObjectName,
+    _Out_ PUNICODE_STRING ObjectPath,
+    _In_ BOOLEAN NullTerminate);
+
+SIZE_T supFindUnicodeStringSubString(
+    _In_ PUNICODE_STRING String,
+    _In_ PUNICODE_STRING SubString);
 
 VOID supCenterWindow(
     _In_ HWND hwnd);
@@ -388,8 +518,7 @@ VOID supCloseLoadBanner(
 
 VOID supDisplayLoadBanner(
     _In_ LPCWSTR lpMessage,
-    _In_opt_ LPCWSTR lpCaption,
-    _In_ BOOL UseList);
+    _In_opt_ LPCWSTR lpCaption);
 
 HIMAGELIST supLoadImageList(
     _In_ HINSTANCE hInst,
@@ -399,7 +528,7 @@ HIMAGELIST supLoadImageList(
 PVOID supGetObjectTypesInfo(
     VOID);
 
-UINT supGetObjectNameIndexByTypeIndex(
+WOBJ_OBJECT_TYPE supGetObjectNameIndexByTypeIndex(
     _In_ PVOID Object,
     _In_ UCHAR TypeIndex);
 
@@ -493,24 +622,25 @@ BOOL supQuerySectionFileInfo(
     _In_ DWORD ccBuffer);
 
 BOOL supQueryTypeInfo(
-    _In_ LPCWSTR lpTypeName,
-    _Inout_	LPWSTR Buffer,
-    _In_ DWORD cchBuffer);
+    _In_ PUNICODE_STRING TypeName,
+    _Inout_ LPWSTR Buffer,
+    _In_ DWORD cchhBuffer);
 
 BOOL supQueryDriverDescription(
     _In_ LPCWSTR lpDriverName,
     _Inout_	LPWSTR Buffer,
-    _In_ DWORD ccBuffer);
+    _In_ DWORD cchBuffer);
 
 BOOL supQueryDeviceDescription(
-    _In_ LPCWSTR lpDeviceName,
+    _In_opt_ PUNICODE_STRING Path,
+    _In_ PUNICODE_STRING Name,
     _Inout_	LPWSTR Buffer,
     _In_ DWORD ccBuffer);
 
 BOOL supQueryWinstationDescription(
     _In_ LPCWSTR lpWindowStationName,
     _Inout_	LPWSTR Buffer,
-    _In_ DWORD ccBuffer);
+    _In_ DWORD cchBuffer);
 
 PVOID supGetTokenInfo(
     _In_ HANDLE TokenHandle,
@@ -536,11 +666,6 @@ NTSTATUS supOpenDeviceObjectEx(
     _Out_ PHANDLE ObjectHandle,
     _In_ ACCESS_MASK DesiredAccess,
     _In_ POBJECT_ATTRIBUTES ObjectAttributes);
-
-NTSTATUS supOpenDirectoryForObject(
-    _Out_ PHANDLE DirectoryHandle,
-    _In_ LPCWSTR lpObjectName,
-    _In_ LPCWSTR lpDirectory);
 
 BOOL supDumpSyscallTableConverted(
     _In_ ULONG_PTR ServiceTableAddress,
@@ -656,8 +781,8 @@ INT supGetMaxCompareTwoFixedStrings(
 NTSTATUS supOpenNamedObjectByType(
     _Out_ HANDLE* ObjectHandle,
     _In_ ULONG TypeIndex,
-    _In_ LPCWSTR ObjectDirectory,
-    _In_ LPCWSTR ObjectName,
+    _In_ PUNICODE_STRING ObjectDirectory,
+    _In_ PUNICODE_STRING ObjectName,
     _In_ ACCESS_MASK DesiredAccess);
 
 HANDLE supOpenObjectFromContext(
@@ -728,6 +853,13 @@ BOOL supPrintTimeConverted(
     _In_ WCHAR* lpszBuffer,
     _In_ SIZE_T cchBuffer);
 
+_Success_(return)
+BOOL supGetTreeViewItemParam(
+    _In_ HWND hwndTreeView,
+    _In_ HTREEITEM hTreeItem,
+    _Out_ PVOID * outParam);
+
+_Success_(return)
 BOOL supGetListViewItemParam(
     _In_ HWND hwndListView,
     _In_ INT itemIndex,
@@ -793,12 +925,9 @@ BOOLEAN supSLCacheEnumerate(
     _In_opt_ PENUMERATE_SL_CACHE_VALUE_DESCRIPTORS_CALLBACK Callback,
     _In_opt_ PVOID Context);
 
-HRESULT supShellExecInExplorerProcessEx(
+HRESULT supShellExecInExplorerProcess(
     _In_ PCWSTR pszFile,
     _In_opt_ PCWSTR pszArguments);
-
-HRESULT WINAPI supShellExecInExplorerProcess(
-    _In_ PCWSTR pszFile);
 
 VOID supShowNtStatus(
     _In_ HWND hWnd,
@@ -814,8 +943,9 @@ BOOLEAN supLoadIconForObjectType(
     _In_ HIMAGELIST ImageList,
     _In_ BOOLEAN IsShadow);
 
-VOID supDestroyIconForObjectType(
-    _In_ PROP_OBJECT_INFO * Context);
+NTSTATUS supOpenLinkedToken(
+    _In_ HANDLE TokenHandle,
+    _Out_ PHANDLE LinkedTokenHandle);
 
 NTSTATUS supOpenTokenByParam(
     _In_ CLIENT_ID * ClientId,
@@ -912,8 +1042,7 @@ BOOL supEnumHandleDump(
 NTSTATUS supOpenPortObjectByName(
     _Out_ PHANDLE ObjectHandle,
     _In_ ACCESS_MASK DesiredAccess,
-    _Out_opt_ PHANDLE ReferenceHandle,
-    _In_ LPCWSTR ObjectName);
+    _In_ PUNICODE_STRING ObjectName);
 
 NTSTATUS supOpenPortObjectFromContext(
     _Out_ PHANDLE ObjectHandle,
@@ -1039,28 +1168,52 @@ HANDLE supCreateDialogWorkerThread(
     _In_opt_ __drv_aliasesMem LPVOID lpParameter,
     _In_ DWORD dwCreationFlags);
 
-VOID supInitFastEvent(
-    _In_ PFAST_EVENT Event);
-
-VOID supReferenceFastEvent(
-    _In_ PFAST_EVENT Event);
-
-VOID supDereferenceFastEvent(
-    _In_ PFAST_EVENT Event,
-    _In_opt_ HANDLE EventHandle);
-
-VOID supSetFastEvent(
-    _In_ PFAST_EVENT Event);
-
-BOOLEAN supTestFastEvent(
-    _In_ PFAST_EVENT Event);
-
-VOID supResetFastEvent(
-    _In_ PFAST_EVENT Event);
-
-BOOLEAN supWaitForFastEvent(
-    _In_ PFAST_EVENT Event,
-    _In_opt_ PLARGE_INTEGER Timeout);
-
 VOID CALLBACK supSymCallbackReportEvent(
     _In_ LPCWSTR EventText);
+
+VOID supBuildCurrentObjectList(
+    _In_ PVOID ListHead);
+
+_Success_(return != FALSE)
+BOOL supGetCurrentObjectPath(
+    _In_ BOOLEAN IncludeName,
+    _Out_ PUNICODE_STRING ObjectPath);
+
+_Success_(return)
+BOOL supGetCurrentObjectName(
+    _Out_ PUNICODE_STRING ObjectName);
+
+VOID supDisplayCurrentObjectPath(
+    _In_ HWND hwnd,
+    _In_opt_ PUNICODE_STRING Path,
+    _In_ BOOLEAN NormalizePath);
+
+_Success_(return)
+BOOL supResolveSymbolicLinkTarget(
+    _In_opt_ HANDLE LinkHandle,
+    _In_opt_ HANDLE RootDirectoryHandle,
+    _In_ PUNICODE_STRING LinkName,
+    _Out_ PUNICODE_STRING LinkTarget);
+
+_Success_(return)
+BOOL supResolveSymbolicLinkTargetNormalized(
+    _In_opt_ HANDLE LinkHandle,
+    _In_opt_ HANDLE RootDirectoryHandle,
+    _In_ PUNICODE_STRING LinkName,
+    _Out_ PUNICODE_STRING NormalizedLinkTarget);
+
+VOID supClipboardCopyUnicodeStringRaw(
+    _In_ PUNICODE_STRING String);
+
+BOOL supImageFixSections(
+    _In_ LPVOID Buffer);
+
+VOID supCloseKnownPropertiesDialog(
+    _In_opt_ HWND hwndDlg);
+
+_Success_(return)
+BOOL supReadObexConfiguration(
+    _Out_ POBEX_CONFIG Configuration);
+
+POBEX_CONFIG supGetParametersBlock(
+    VOID);

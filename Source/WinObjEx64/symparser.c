@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.18
 *
-*  DATE:        05 Jun 2021
+*  DATE:        20 Jun 2021
 *
 *  DbgHelp wrapper for symbols parser support.
 *
@@ -1415,7 +1415,7 @@ PSYMCONTEXT SymParserCreate(
     Context = (PSYMCONTEXT)supHeapAlloc(sizeof(SYMCONTEXT));
     if (Context) {
 
-        RtlCopyMemory(&Context->DbgHelp, &g_SymGlobals.ApiSet, sizeof(DBGHELP_PTRS));
+        Context->DbgHelp = g_SymGlobals.ApiSet;
         Context->ProcessHandle = g_SymGlobals.ProcessHandle;
         Context->ModuleBase = 0;
 
@@ -1489,7 +1489,7 @@ BOOL SymGlobalsInit(
     HMODULE hDbg = NULL;
     LPWSTR locaDbgHelplPath = NULL;
     SIZE_T nLen;
-    WCHAR szWinPath[MAX_PATH + 1];
+    WCHAR szWinPath[MAX_PATH * 2];
 
     RtlSecureZeroMemory(&g_SymGlobals, sizeof(g_SymGlobals));
 
@@ -1501,19 +1501,6 @@ BOOL SymGlobalsInit(
         SetLastError(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
-
-    nLen = _strlen(lpSystemPath);
-    if (nLen > MAX_PATH) {
-        SetLastError(ERROR_INVALID_PARAMETER);
-        return FALSE;
-    }
-
-    RtlSecureZeroMemory(&szWinPath, sizeof(szWinPath));
-
-    _strncpy(szWinPath,
-        MAX_PATH,
-        lpSystemPath,
-        nLen);
 
     nLen = _strlen(lpTempPath);
     if (nLen > MAX_PATH) {
@@ -1530,8 +1517,23 @@ BOOL SymGlobalsInit(
 
     }
     else {
+
+        nLen = _strlen(lpSystemPath);
+        if (nLen > MAX_PATH) {
+            SetLastError(ERROR_INVALID_PARAMETER);
+            return FALSE;
+        }
+
+        RtlSecureZeroMemory(&szWinPath, sizeof(szWinPath));
+
+        _strncpy(szWinPath,
+            MAX_PATH,
+            lpSystemPath,
+            nLen);
+
         supPathAddBackSlash(szWinPath);
         _strcat(szWinPath, DEFAULT_DLL);
+
         locaDbgHelplPath = szWinPath;
     }
 

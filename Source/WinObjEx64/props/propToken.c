@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPTOKEN.C
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        31 May 2022
+*  DATE:        19 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -182,7 +182,7 @@ VOID TokenPageListInfo(
 
     WCHAR szBuffer[MAX_PATH], szPrivName[MAX_PATH + 1];
 
-    if (Context->TypeIndex == ObjectTypeProcess) {
+    if (Context->ObjectTypeIndex == ObjectTypeProcess) {
         DesiredAccessLv1 = PROCESS_QUERY_INFORMATION;
         DesiredAccessLv2 = PROCESS_QUERY_LIMITED_INFORMATION;
     }
@@ -202,7 +202,7 @@ VOID TokenPageListInfo(
         return;
     }
 
-    if (Context->TypeIndex == ObjectTypeProcess) {
+    if (Context->ObjectTypeIndex == ObjectTypeProcess) {
 
         Status = supOpenProcessTokenEx(ObjectHandle, &TokenHandle);
         if (!NT_SUCCESS(Status))
@@ -466,7 +466,7 @@ VOID TokenPageShowAdvancedProperties(
 {
     OBJECT_ATTRIBUTES ObjectAttributes = RTL_INIT_OBJECT_ATTRIBUTES((PUNICODE_STRING)NULL, 0);
     PROP_UNNAMED_OBJECT_INFO TokenObject;
-    PROP_DIALOG_CREATE_SETTINGS propSettings;
+    PROP_CONFIG propConfig;
 
     LPWSTR FormatStringTokenProcess = TEXT("Process Token, PID:%llu");
     LPWSTR FormatStringTokenThread = TEXT("Thread Token, PID:%llu, TID:%llu");
@@ -474,10 +474,12 @@ VOID TokenPageShowAdvancedProperties(
     HANDLE TokenHandle = NULL;
     WCHAR szFakeName[MAX_PATH + 1];
 
+    UNICODE_STRING usObjectName;
+
     //
     // Only one token properties dialog at the same time allowed.
     //
-    ENSURE_DIALOG_UNIQUE(g_PsTokenWindow);
+    supCloseKnownPropertiesDialog(propGetTokenWindow());
 
     RtlSecureZeroMemory(&TokenObject, sizeof(PROP_UNNAMED_OBJECT_INFO));
 
@@ -502,7 +504,7 @@ VOID TokenPageShowAdvancedProperties(
         NtClose(TokenHandle);
     }
 
-    RtlSecureZeroMemory(&propSettings, sizeof(propSettings));
+    RtlSecureZeroMemory(&propConfig, sizeof(propConfig));
 
     if (TokenObject.IsThreadToken) {
 
@@ -521,13 +523,16 @@ VOID TokenPageShowAdvancedProperties(
             TokenObject.ClientId.UniqueProcess);
 
     }
+    
+    RtlInitUnicodeString(&usObjectName, szFakeName);
 
-    propSettings.hwndParent = hwndDlg;
-    propSettings.lpObjectName = szFakeName;
-    propSettings.lpObjectType = OBTYPE_NAME_TOKEN;
-    propSettings.UnnamedObject = &TokenObject;
+    propConfig.hwndParent = hwndDlg;
+    propConfig.NtObjectName = &usObjectName;
+    propConfig.ObjectTypeIndex = ObjectTypeToken;
+    propConfig.ContextType = propUnnamed;
+    propConfig.u1.UnnamedObject = &TokenObject;
 
-    propCreateDialog(&propSettings);
+    propCreateDialog(&propConfig);
 }
 
 /*
@@ -602,8 +607,7 @@ INT_PTR TokenPageDialogOnCommand(
         TokenPageShowAdvancedProperties(hwndDlg);
         Result = 1;
         break;
-    default:
-        break;
+
     }
 
     return Result;
@@ -633,11 +637,11 @@ INT_PTR TokenPageDialogOnInit(
         //
         SetProp(hwndDlg,
             T_TOKEN_PROP_CID_PID,
-            Context->UnnamedObjectInfo.ClientId.UniqueProcess);
+            Context->u1.UnnamedObjectInfo.ClientId.UniqueProcess);
 
         SetProp(hwndDlg,
             T_TOKEN_PROP_CID_TID,
-            Context->UnnamedObjectInfo.ClientId.UniqueThread);
+            Context->u1.UnnamedObjectInfo.ClientId.UniqueThread);
 
         SetProp(hwndDlg,
             T_TOKEN_PROP_TYPE,
@@ -696,7 +700,8 @@ INT_PTR CALLBACK TokenPageDialogProc(
         break;
 
     default:
-        return 0;
+        return FALSE;
     }
-    return 1;
+
+    return TRUE;
 }

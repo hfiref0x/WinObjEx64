@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2021
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       TREELIST.C
 *
-*  VERSION:     1.34
+*  VERSION:     1.35
 *
-*  DATE:        16 Sept 2021
+*  DATE:        10 Jun 2022
 *
 *  TreeList control.
 *
@@ -517,9 +517,6 @@ LRESULT CALLBACK TreeListHookProc(
                 if (!TreeView_GetItemRect(hwnd, (HTREEITEM)hdr->lParam, &rc, TRUE))
                     break;
 
-                if ((subid == 0) && (rc.right < hr.right - 1)) // is tooltip from the first column?
-                    break;
-
                 privateBuffer = (LPTSTR)GetWindowLongPtr(BaseWindow, TL_TOOLTIPSBUFFER_SLOT);
                 privateBuffer[0] = 0;
 
@@ -530,21 +527,34 @@ LRESULT CALLBACK TreeListHookProc(
                 itemex.hItem = (HTREEITEM)hdr->lParam;
                 TreeView_GetItem(hwnd, &itemex);
 
-                if ((subid > 0) && (itemex.lParam != 0)) {
-                    subitems = (PTL_SUBITEMS)itemex.lParam;
+                subitems = (PTL_SUBITEMS)itemex.lParam;
 
+                if (subid == 0) // is tooltip from the first column?
+                {
+                    if (subitems)
+                        if (subitems->CustomTooltip)
+                        {
+                            SendMessage(hdr->hdr.hwndFrom, TTM_SETMAXTIPWIDTH, 0, 1024);
+                            _strncpy(privateBuffer, MAX_PATH, subitems->CustomTooltip, MAX_PATH);
+                            hdr->lpszText = privateBuffer;
+                            break;
+                        }
+
+                    if (rc.right < hr.right - 1) // no overflow
+                        break;
+                }
+
+                if ((subid > 0) && (subitems != 0)) {   
                     rc.left = hr.left + 3;
                     rc.right = hr.right - 3;
 
+                    /*fake DrawText for calculating bounding rectangle*/
                     dc = GetDC(hwnd);
                     SelectObject(dc, (HGDIOBJ)SendMessage(hwnd, WM_GETFONT, 0, 0));
-
-                    /*fake DrawText for calculating bounding rectangle*/
                     DrawText(dc, subitems->Text[subid - 1], -1, &rc, DT_VCENTER | DT_SINGLELINE | DT_CALCRECT);
-
                     ReleaseDC(hwnd, dc);
 
-                    if (rc.right < hr.right - 2)
+                    if (rc.right < hr.right - 2) // no overflow
                         break;
 
                     _strncpy(privateBuffer, MAX_PATH, subitems->Text[subid - 1], MAX_PATH);
@@ -586,22 +596,25 @@ PTL_SUBITEMS PackSubitems(HANDLE hHeap, IN PTL_SUBITEMS Subitems)
     for (i = 0; i < Subitems->Count; i++)
         strings_size += (_strlen(Subitems->Text[i]) + 1) * sizeof(TCHAR);
 
+    strings_size += (_strlen(Subitems->CustomTooltip) + 1) * sizeof(TCHAR);
+
     newsubitems = (PTL_SUBITEMS)HeapAlloc(hHeap, 0, header_size + strings_size);
     if (!newsubitems)
         return NULL;
 
     strings = (LPTSTR)((PBYTE)newsubitems + header_size);
-
-    newsubitems->UserParam = Subitems->UserParam;
-    newsubitems->ColorFlags = Subitems->ColorFlags;
-    newsubitems->BgColor = Subitems->BgColor;
-    newsubitems->FontColor = Subitems->FontColor;
-    newsubitems->Count = Subitems->Count;
+    *newsubitems = *Subitems;
 
     for (i = 0; i < Subitems->Count; i++) {
         newsubitems->Text[i] = strings;
-        _strcpy(newsubitems->Text[i], Subitems->Text[i]);
+        _strcpy(strings, Subitems->Text[i]);
         strings += _strlen(Subitems->Text[i]) + 1;
+    }
+
+    if (Subitems->CustomTooltip != NULL)
+    {
+        newsubitems->CustomTooltip = strings;
+        _strcpy(strings, Subitems->CustomTooltip);
     }
 
     return newsubitems;

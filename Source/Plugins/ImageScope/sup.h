@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.02
+*  VERSION:     1.10
 *
-*  DATE:        11 May 2022
+*  DATE:        15 Jun 2022
 *
 *  Common header file for the plugin support routines.
 *
@@ -97,3 +97,17 @@ BOOL supListViewCopyItemValueToClipboard(
     _In_ HWND hwndListView,
     _In_ INT iItem,
     _In_ INT iSubItem);
+
+_Success_(return)
+BOOL supFreeDuplicatedUnicodeString(
+    _In_ HANDLE HeapHandle,
+    _Inout_ PUNICODE_STRING DuplicatedString,
+    _In_ BOOL DoZeroMemory);
+
+_Success_(return)
+BOOL supDuplicateUnicodeString(
+    _In_ HANDLE HeapHandle,
+    _Out_ PUNICODE_STRING DestinationString,
+    _In_ PUNICODE_STRING SourceString);
+
+

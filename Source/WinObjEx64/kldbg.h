@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        05 Jun 2022
+*  DATE:        19 Jun 2022
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -97,11 +97,16 @@
 
 #define NT_REG_PREP             L"\\Registry\\Machine"
 #define DRIVER_REGKEY           L"%wS\\System\\CurrentControlSet\\Services\\%wS"
+#define OBTYPES_DIRECTORY       L"\\ObjectTypes"
+#define OB_GLOBALROOT           L"\\GLOBAL??\\GLOBALROOT"
+#define OB_GLOBALNAMESPACE      L"\\??"
 
 #define OBJECT_SHIFT 8
 
 #define KM_OBJECTS_ROOT_DIRECTORY  L"\\"
 #define OBJ_NAME_PATH_SEPARATOR L'\\'
+
+#define OBJ_NAME_NORMALIZATION_SYMBOL L'?'
 
 #define MM_SYSTEM_RANGE_START_7 0xFFFF080000000000
 #define MM_SYSTEM_RANGE_START_8 0xFFFF800000000000
@@ -121,6 +126,15 @@ typedef ULONG_PTR *PUTable;
 #define OBP_ERROR_NAME_LITERAL_SIZE (sizeof(OBP_ERROR_NAME_LITERAL) - sizeof(UNICODE_NULL))
 #define OBP_ERROR_NONAME_LITERAL L"<noname>"
 #define OBP_ERROR_NONAME_LITERAL_SIZE (sizeof(OBP_ERROR_NONAME_LITERAL) - sizeof(UNICODE_NULL))
+
+//
+// Predefined strings
+//
+#define OBP_ROOT            0
+#define OBP_DIRECTORY       1
+#define OBP_OBTYPES         2 
+#define OBP_GLOBAL          3
+#define OBP_GLOBALNAMESPACE 4  
 
 //enum with information flags used by ObGetObjectHeaderOffset
 typedef enum _OBJ_HEADER_INFO_FLAG {
@@ -267,14 +281,12 @@ typedef struct _KLDBG {
     DWORD BufferSize;
 }KLDBG, *PKLDBG;
 
-typedef struct _OBJINFO {
-    LIST_ENTRY ListEntry;
-    LPWSTR ObjectName;
+typedef struct _OBEX_OBJECT_INFORMATION {
     ULONG_PTR HeaderAddress;
     ULONG_PTR ObjectAddress;
     OBJECT_HEADER_QUOTA_INFO ObjectQuotaHeader;
     OBJECT_HEADER ObjectHeader;
-} OBJINFO, *POBJINFO;
+} OBEX_OBJECT_INFORMATION, * POBEX_OBJECT_INFORMATION;
 
 typedef struct _OBJREFPNS {
     ULONG SizeOfBoundaryInformation;
@@ -284,10 +296,11 @@ typedef struct _OBJREFPNS {
 
 typedef struct _OBJREF {
     LIST_ENTRY ListEntry;
-    LPWSTR ObjectName;
+    UNICODE_STRING Name;
     ULONG_PTR HeaderAddress;
     ULONG_PTR ObjectAddress;
     UCHAR TypeIndex;
+    WOBJ_OBJECT_TYPE ObjectTypeIndex;
     OBJREFPNS PrivateNamespace;
 } OBJREF, *POBJREF;
 
@@ -353,10 +366,34 @@ typedef struct _NOTIFICATION_CALLBACKS {
 //
 extern NOTIFICATION_CALLBACKS g_SystemCallbacks;
 
+//
+// Normalization symbol
+// (defined in kldbg.c)
+//
+extern WCHAR g_ObNameNormalizationSymbol;
+
 typedef struct _W32K_API_SET_LOOKUP_PATTERN {
     ULONG Size;
     PVOID Data;
 } W32K_API_SET_LOOKUP_PATTERN, *PW32K_API_SET_LOOKUP_PATTERN;
+
+typedef struct _W32K_API_SET_TABLE_HOST {
+    PWCHAR HostName;
+    PCHAR TableName;
+    PCHAR TableSizeName;
+    ULONG HostEntriesCount;
+} W32K_API_SET_TABLE_HOST, * PW32K_API_SET_TABLE_HOST;
+
+typedef struct _W32K_API_SET_TABLE_ENTRY {
+    PVOID HostEntriesArray;
+    W32K_API_SET_TABLE_HOST* Host;
+} W32K_API_SET_TABLE_ENTRY, * PW32K_API_SET_TABLE_ENTRY;
+
+typedef struct _W32K_API_SET_TABLE_ENTRY_V2 {
+    PVOID HostEntriesArray;
+    W32K_API_SET_TABLE_HOST* Host;
+    W32K_API_SET_TABLE_HOST* AliasHost;
+} W32K_API_SET_TABLE_ENTRY_V2, * PW32K_API_SET_TABLE_ENTRY_V2;
 
 // return true to stop enumeration
 typedef BOOL(CALLBACK* PENUMERATE_PRIVATE_NAMESPACE_CALLBACK)(
@@ -375,6 +412,9 @@ typedef BOOL(CALLBACK* PENUMERATE_UNLOADED_DRIVERS_CALLBACK)(
     _In_ PUNLOADED_DRIVERS Entry,
     _In_opt_ PVOID Context
     );
+
+PUNICODE_STRING ObGetPredefinedUnicodeString(
+    _In_ ULONG Index);
 
 NTSTATUS ObIsValidUnicodeString(
     _In_ PCUNICODE_STRING SourceString);
@@ -436,11 +476,7 @@ PVOID ObDumpFltFilterObjectVersionAware(
     _Out_ PULONG Size,
     _Out_ PULONG Version);
 
-POBJINFO ObQueryObject(
-    _In_ LPWSTR lpDirectory,
-    _In_ LPWSTR lpObjectName);
-
-POBJINFO ObQueryObjectByAddress(
+POBEX_OBJECT_INFORMATION ObQueryObjectByAddress(
     _In_ ULONG_PTR ObjectAddress);
 
 BOOL ObGetProcessImageFileName(
@@ -457,11 +493,29 @@ BOOL ObHeaderToNameInfoAddress(
     _Inout_ PULONG_PTR HeaderInfoAddress,
     _In_    OBJ_HEADER_INFO_FLAG InfoFlag);
 
+_Success_(return)
+BOOL ObQueryNameStringFromAddress(
+    _In_ HANDLE HeapHandle,
+    _In_ ULONG_PTR NameInfoAddress,
+    _Out_ PUNICODE_STRING NameString);
+
+_Success_(return)
+BOOL ObGetObjectAddressForDirectory(
+    _In_ PUNICODE_STRING DirectoryName,
+    _Out_ PULONG_PTR lpRootAddress,
+    _Out_opt_ PUSHORT lpTypeIndex);
+
+POBEX_OBJECT_INFORMATION ObQueryObjectInDirectory(
+    _In_ PUNICODE_STRING ObjectName,
+    _In_ PUNICODE_STRING DirectoryName);
+
 PVOID ObGetCallbackBlockRoutine(
     _In_ PVOID CallbackBlock);
 
-LPWSTR ObQueryFullNamespacePath(
-    _In_ ULONG_PTR ObjectAddress);
+_Success_(return)
+BOOL ObQueryFullNamespacePath(
+    _In_ ULONG_PTR ObjectAddress,
+    _Out_ PUNICODE_STRING Path);
 
 PVOID kdCreateObjectTypesList(
     VOID);
@@ -566,11 +620,12 @@ BOOL kdGetAddressFromSymbolEx(
     _In_ ULONG_PTR ImageSize,
     _Inout_ ULONG_PTR* Address);
 
+_Success_(return)
 BOOLEAN kdDumpUnicodeString(
     _In_ PUNICODE_STRING InputString,
     _Out_ PUNICODE_STRING OutputString,
-    _Out_opt_ PVOID* ReferenceBufferPtr,
-    _In_ BOOLEAN IsKernelPtr);
+    _Out_opt_ PVOID* ReferenceStringBuffer,
+    _In_ BOOLEAN IsKernelPointer);
 
 USHORT kdGetAlpcPortTypeIndex();
 

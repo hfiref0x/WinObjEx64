@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020 - 2021
+*  (C) COPYRIGHT AUTHORS, 2020 - 2022
 *
 *  TITLE:       UI.C
 *
-*  VERSION:     1.01
+*  VERSION:     1.10
 *
-*  DATE:        01 Oct 2021
+*  DATE:        11 Jun 2021
 *
 *  WinObjEx64 ImageScope UI.
 *
@@ -393,8 +393,8 @@ VOID SectionDumpStructs(
         ntStatus = Context->ParamBlock.OpenNamedObjectByType(
             &sectionHandle,
             ObjectTypeSection,
-            Context->ParamBlock.Object.ObjectDirectory,
-            Context->ParamBlock.Object.ObjectName,
+            &Context->ParamBlock.Object.Directory,
+            &Context->ParamBlock.Object.Name,
             SECTION_QUERY);
 
         if (!NT_SUCCESS(ntStatus))
@@ -1466,9 +1466,8 @@ BOOL RunUI(
     INT i;
     INITCOMMONCONTROLSEX icex;
 
-    BOOL rv, mAlloc = FALSE;
+    BOOL rv;
     MSG msg1;
-    SIZE_T sz;
     LPWSTR lpTitle;
     WCHAR szClassName[100];
 
@@ -1494,23 +1493,7 @@ BOOL RunUI(
         TEXT("%wsWndClass"),
         g_Plugin->Name);
 
-    sz = (MAX_PATH +
-        _strlen(Context->ParamBlock.Object.ObjectDirectory) +
-        _strlen(Context->ParamBlock.Object.ObjectName)) * sizeof(WCHAR);
-
-    lpTitle = supHeapAlloc(sz);
-    if (lpTitle) {
-
-        StringCchPrintf(lpTitle,
-            sz / sizeof(WCHAR),
-            TEXT("Viewing :: %ws\\%ws"),
-            Context->ParamBlock.Object.ObjectDirectory,
-            Context->ParamBlock.Object.ObjectName);
-
-        mAlloc = TRUE;
-    }
-    else
-        lpTitle = IMAGESCOPE_WNDTITLE;
+     lpTitle = IMAGESCOPE_WNDTITLE;
 
     //
     // Create main window.
@@ -1528,9 +1511,6 @@ BOOL RunUI(
         NULL,
         g_ThisDLL,
         NULL);
-
-    if (mAlloc)
-        supHeapFree(lpTitle);
 
     if (Context->MainWindow == 0) {
         kdDebugPrint("Could not create main window, err = %lu\r\n", GetLastError());

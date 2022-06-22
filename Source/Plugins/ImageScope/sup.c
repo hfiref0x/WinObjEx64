@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.02
+*  VERSION:     1.10
 *
-*  DATE:        11 May 2022
+*  DATE:        15 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -619,6 +619,66 @@ BOOL supListViewCopyItemValueToClipboard(
             EmptyClipboard();
             CloseClipboard();
         }
+    }
+
+    return FALSE;
+}
+
+/*
+* supFreeDuplicatedUnicodeString
+*
+* Purpose:
+*
+* Release memory allocated for duplicated string.
+*
+*/
+_Success_(return)
+BOOL supFreeDuplicatedUnicodeString(
+    _In_ HANDLE HeapHandle,
+    _Inout_ PUNICODE_STRING DuplicatedString,
+    _In_ BOOL DoZeroMemory
+)
+{
+    BOOL bResult = FALSE;
+    if (DuplicatedString->Buffer) {
+        bResult = RtlFreeHeap(HeapHandle, 0, DuplicatedString->Buffer);
+        if (DoZeroMemory) {
+            DuplicatedString->Buffer = NULL;
+            DuplicatedString->Length = DuplicatedString->MaximumLength = 0;
+        }
+    }
+    return bResult;
+}
+
+/*
+* supDuplicateUnicodeString
+*
+* Purpose:
+*
+* Duplicate existing UNICODE_STRING to another without RtlDuplicateUnicodeString.
+*
+* Note: Use supFreeDuplicatedUnicodeString to release allocated memory.
+*
+*/
+_Success_(return)
+BOOL supDuplicateUnicodeString(
+    _In_ HANDLE HeapHandle,
+    _Out_ PUNICODE_STRING DestinationString,
+    _In_ PUNICODE_STRING SourceString
+)
+{
+    USHORT maxLength = SourceString->MaximumLength;
+    PWCHAR strBuffer;
+
+    if (maxLength == 0 || maxLength < SourceString->Length)
+        return FALSE;
+
+    strBuffer = (PWCHAR)RtlAllocateHeap(HeapHandle, HEAP_ZERO_MEMORY, (SIZE_T)maxLength);
+    if (strBuffer) {
+        DestinationString->Buffer = strBuffer;
+        DestinationString->MaximumLength = maxLength;
+        RtlCopyUnicodeString(DestinationString, SourceString);
+        return TRUE;
     }
 
     return FALSE;

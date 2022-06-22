@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPALPCPORT.C
 *
-*  VERSION:     1.93
+*  VERSION:     2.00
 *
-*  DATE:        11 May 2021
+*  DATE:        19 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -15,7 +15,6 @@
 *
 *******************************************************************************/
 #include "global.h"
-#include "propDlg.h"
 #include "extras.h"
 
 #define COLUMN_ALPCLIST_SERVER_PORT         0
@@ -138,9 +137,6 @@ VOID AlpcPortListHandleWMCommand(
         }
 
         break;
-
-    default:
-        break;
     }
 }
 
@@ -195,8 +191,6 @@ BOOL AlpcPortListHandleNotify(
         }
         break;
 
-    default:
-        break;
     }
 
     return FALSE;

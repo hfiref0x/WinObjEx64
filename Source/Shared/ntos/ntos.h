@@ -5,9 +5,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.197
+*  VERSION:     1.198
 *
-*  DATE:        05 Jun 2022
+*  DATE:        12 Jun 2022
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -12989,7 +12989,7 @@ NtCreateResourceManager(
     _In_ HANDLE TmHandle,
     _In_opt_ LPGUID ResourceManagerGuid,
     _In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
-    _In_opt_ ULONG CreateOptions,
+    _In_ ULONG CreateOptions,
     _In_opt_ PUNICODE_STRING Description);
 
 NTSYSAPI
@@ -13035,8 +13035,8 @@ NtCreateTransactionManager(
     _In_ ACCESS_MASK DesiredAccess,
     _In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
     _In_opt_ PUNICODE_STRING LogFileName,
-    _In_opt_ ULONG CreateOptions,
-    _In_opt_ ULONG CommitStrength);
+    _In_ ULONG CreateOptions,
+    _In_ ULONG CommitStrength);
 
 NTSYSAPI
 NTSTATUS
@@ -13047,7 +13047,7 @@ NtOpenTransactionManager(
     _In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
     _In_opt_ PUNICODE_STRING LogFileName,
     _In_opt_ LPGUID TmIdentity,
-    _In_opt_ ULONG OpenOptions);
+    _In_ ULONG OpenOptions);
 
 /************************************************************************************
 *
@@ -13555,6 +13555,9 @@ NtProtectVirtualMemory(
     _Inout_ PSIZE_T RegionSize,
     _In_ ULONG NewProtect,
     _Out_ PULONG OldProtect);
+
+#define MAP_PROCESS 1L
+#define MAP_SYSTEM  2L
 
 NTSYSAPI
 NTSTATUS

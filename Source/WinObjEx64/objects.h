@@ -4,9 +4,9 @@
 *
 *  TITLE:       OBJECTS.H
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        31 May 2022
+*  DATE:        19 Jun 2022
 *
 *  Header file for internal Windows object types handling.
 *
@@ -20,6 +20,7 @@
 
 //
 // Object Type Indexes Used By Program Only 
+//
 // NOT RELATED TO REAL OBJECTS INDEXES
 // ObjectTypeUnknown and ObjectTypeMax always end this list
 //
@@ -222,17 +223,19 @@ HIMAGELIST ObManagerLoadImageList(
     VOID);
 
 UINT ObManagerGetImageIndexByTypeIndex(
-    _In_ ULONG TypeIndex);
+    _In_ WOBJ_OBJECT_TYPE TypeIndex);
 
 UINT ObManagerGetImageIndexByTypeName(
     _In_opt_ LPCWSTR lpTypeName);
 
-
-UINT ObManagerGetIndexByTypeName(
+WOBJ_OBJECT_TYPE ObManagerGetIndexByTypeName(
     _In_opt_ LPCWSTR lpTypeName);
 
 LPWSTR ObManagerGetNameByIndex(
-    _In_ ULONG TypeIndex);
+    _In_ WOBJ_OBJECT_TYPE TypeIndex);
+
+WOBJ_TYPE_DESC* ObManagerGetEntryByTypeIndex(
+    _In_ WOBJ_OBJECT_TYPE TypeIndex);
 
 WOBJ_TYPE_DESC *ObManagerGetEntryByTypeName(
     _In_opt_ LPCWSTR lpTypeName);

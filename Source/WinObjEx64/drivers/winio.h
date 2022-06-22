@@ -4,9 +4,9 @@
 *
 *  TITLE:       WINIO.H
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        01 Jun 2022
+*  DATE:        19 Jun 2022
 *
 *  Common header file for the WINIO Driver Helper support.
 *

@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASCALLBACKS.C
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        04 Jun 2022
+*  DATE:        19 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -16,7 +16,6 @@
 *******************************************************************************/
 #include "global.h"
 #include "extras.h"
-#include "extrasCallbacks.h"
 #include "extras/extrasCallbacksPatterns.h"
 #include "treelist/treelist.h"
 #include "hde/hde64.h"
@@ -215,16 +214,16 @@ OBEX_CALLBACK_DISPATCH_ENTRY g_CallbacksDispatchTable[] = {
         &g_SystemCallbacks.IopNotifyLastChanceShutdownQueueHead
     },
     {
-        0, L"ObProcess",
+        ObjectTypeProcess, L"ObProcess",
         QueryCallbackGeneric, DumpObCallbacks, FindObjectTypeCallbackListHeadByType,
         &g_SystemCallbacks.ObProcessCallbackHead },
     {
-        1, L"ObThread",
+        ObjectTypeThread, L"ObThread",
         QueryCallbackGeneric, DumpObCallbacks, FindObjectTypeCallbackListHeadByType,
         &g_SystemCallbacks.ObThreadCallbackHead
     },
     {
-        2, L"ObDesktop", 
+        ObjectTypeDesktop, L"ObDesktop", 
         QueryCallbackGeneric, DumpObCallbacks, FindObjectTypeCallbackListHeadByType,
         &g_SystemCallbacks.ObDesktopCallbackHead
     },
@@ -1290,9 +1289,6 @@ BOOL FindIopFileSystemQueueHeads(
                             case 3:
                                 *IopTapeFileSystemQueueHead = kvarAddress;
                                 break;
-
-                            default:
-                                break;
                             }
                             Count += 1;
                             if (Count == 4)
@@ -1341,9 +1337,6 @@ BOOL FindIopFileSystemQueueHeads(
 
                             case 3:
                                 *IopTapeFileSystemQueueHead = kvarAddress;
-                                break;
-
-                            default:
                                 break;
                             }
                             Count += 1;
@@ -1713,12 +1706,13 @@ OBEX_FINDCALLBACK_ROUTINE(FindSeFileSystemNotifyRoutinesHead)
 */
 OBEX_FINDCALLBACK_ROUTINE(FindObjectTypeCallbackListHeadByType)
 {
-    ULONG Type = (ULONG)QueryFlags;
     ULONG_PTR ListHead = 0;
     ULONG ObjectSize, ObjectVersion = 0, CallbackListOffset = 0;
     LPWSTR TypeName = NULL;
-    POBJINFO CurrentObject = NULL;
+    POBEX_OBJECT_INFORMATION CurrentObject = NULL;
     PVOID ObjectTypeInformation = NULL;
+
+    UNICODE_STRING usName;
 
     union {
         union {
@@ -1730,25 +1724,31 @@ OBEX_FINDCALLBACK_ROUTINE(FindObjectTypeCallbackListHeadByType)
         PVOID Ref;
     } ObjectType;
 
-    switch (Type) {
-    case 0: //PsProcessType
+    switch ((WOBJ_OBJECT_TYPE)(ULONG)QueryFlags) {
+    case ObjectTypeProcess: //PsProcessType
         TypeName = TEXT("Process");
         break;
-    case 1: //PsThreadType
+    case ObjectTypeThread: //PsThreadType
         TypeName = TEXT("Thread");
         break;
-    case 2:
+    case ObjectTypeDesktop:
         //ExDesktopObjectType
         TypeName = TEXT("Desktop");
         break;
     default:
+        //
+        // We cannot process this object type.
+        //
         return 0;
     }
 
     //
     // Get the reference to the object.
     //
-    CurrentObject = ObQueryObject(T_OBJECTTYPES, TypeName);
+    RtlInitUnicodeString(&usName, TypeName);
+    CurrentObject = ObQueryObjectInDirectory(&usName,
+        ObGetPredefinedUnicodeString(OBP_OBTYPES));
+    
     if (CurrentObject == NULL)
         return 0;
 
@@ -5510,7 +5510,7 @@ VOID SysCbDialogOnInit(
     extrasSetDlgIcon(pDlgContext);
     SetWindowText(hwndDlg, TEXT("System Callbacks"));
 
-    GetClientRect(g_WinObj.MainWindow, &rc);
+    GetClientRect(g_hwndMain, &rc);
     pDlgContext->TreeList = CreateWindowEx(WS_EX_STATICEDGE, WC_TREELIST, NULL,
         WS_VISIBLE | WS_CHILD | WS_TABSTOP | TLSTYLE_COLAUTOEXPAND | TLSTYLE_LINKLINES, 12, 14,
         rc.right - 24, rc.bottom - 24, hwndDlg, NULL, NULL, NULL);
@@ -5534,7 +5534,7 @@ VOID SysCbDialogOnInit(
         SysCbDialogContentRefresh(hwndDlg, pDlgContext, FALSE);
     }
 
-    supCenterWindowSpecifyParent(hwndDlg, g_WinObj.MainWindow);
+    supCenterWindowSpecifyParent(hwndDlg, g_hwndMain);
     SendMessage(hwndDlg, WM_SIZE, 0, 0);
 }
 

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017 - 2021
+*  (C) COPYRIGHT AUTHORS, 2017 - 2022
 *
 *  TITLE:       EXTAPI.C
 *
-*  VERSION:     1.92
+*  VERSION:     2.00
 *
-*  DATE:        30 Oct 2021
+*  DATE:        19 Jun 2022
 *
 *  Support unit for pre Windows 10 missing APIs.
 *
@@ -39,14 +39,24 @@ NTSTATUS ExApiSetInit(
 
     RtlSecureZeroMemory(&g_ExtApiSet, sizeof(g_ExtApiSet));
 
-    //
-    // New Partition API introduced in Windows 10.
-    //
+
     hNtdll = GetModuleHandle(TEXT("ntdll.dll"));
     if (hNtdll) {
+        //
+        // New Partition API introduced in Windows 10 TH1.
+        //
         g_ExtApiSet.NtOpenPartition = (pfnNtOpenPartition)GetProcAddress(hNtdll, "NtOpenPartition");
 
         if (g_ExtApiSet.NtOpenPartition) {
+            g_ExtApiSet.NumberOfAPI += 1;
+        }
+
+        //
+        // Available since Windows 10 REDSTONE 1.
+        //
+        g_ExtApiSet.NtOpenRegistryTransaction = (pfnNtOpenRegistryTransaction)GetProcAddress(hNtdll, "NtOpenRegistryTransaction");
+
+        if (g_ExtApiSet.NtOpenRegistryTransaction) {
             g_ExtApiSet.NumberOfAPI += 1;
         }
     }

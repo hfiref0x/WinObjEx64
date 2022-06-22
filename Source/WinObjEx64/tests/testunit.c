@@ -4,9 +4,9 @@
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        06 Jun 2022
+*  DATE:        19 Jun 2022
 *
 *  Test code used while debug.
 *
@@ -26,32 +26,187 @@
 #pragma warning(pop)
 #include <aclapi.h>
 
-HANDLE g_TestIoCompletion = NULL, g_TestTransaction = NULL;
 HANDLE g_TestNamespace = NULL, g_TestMutex = NULL;
 HANDLE g_TestMailslot = NULL;
-HANDLE g_DebugObject = NULL;
-HANDLE g_TestJob = NULL;
-HDESK g_TestDesktop = NULL;
 HANDLE g_TestThread = NULL;
 HANDLE g_TestPortThread = NULL;
 HANDLE g_PortHandle;
 PVOID g_MappedSection = NULL;
 HANDLE g_SectionVaTest = NULL;
+HANDLE g_ResourceManager = NULL;
+HANDLE g_TestJob = NULL;
 
 typedef struct _LPC_USER_MESSAGE {
     PORT_MESSAGE	Header;
     BYTE			Data[128];
-} LPC_USER_MESSAGE, *PLPC_USER_MESSAGE;
+} LPC_USER_MESSAGE, * PLPC_USER_MESSAGE;
 
 typedef struct _QUERY_REQUEST {
     ULONG	Data;
-} QUERY_REQUEST, *PQUERY_REQUEST;
+} QUERY_REQUEST, * PQUERY_REQUEST;
 
 #define WOBJEX_TEST_PORT L"\\Rpc Control\\WinObjEx_ServiceTestPort48429"
 
 HANDLE TestGetPortHandle()
 {
     return g_PortHandle;
+}
+
+typedef NTSTATUS (NTAPI* pfnNtCreateRegistryTransaction)(
+    _Out_ PHANDLE Handle,
+    _In_ ACCESS_MASK DesiredAccess, //generic + TRANSACTION_*
+    _In_ POBJECT_ATTRIBUTES ObjectAttributes,
+    _In_ DWORD Flags);
+
+VOID TestRegistryTransaction()
+{
+    NTSTATUS ntStatus;
+    HANDLE hObject;
+    OBJECT_ATTRIBUTES obja;
+    UNICODE_STRING usName;
+    pfnNtCreateRegistryTransaction NtCreateRegistryTransaction;
+    HMODULE hNtdll;
+    
+    hNtdll = GetModuleHandle(L"ntdll.dll");
+    if (hNtdll) {
+
+        NtCreateRegistryTransaction = (pfnNtCreateRegistryTransaction)GetProcAddress(hNtdll, "NtCreateRegistryTransaction");
+        if (NtCreateRegistryTransaction != NULL) {
+
+            RtlInitUnicodeString(&usName, L"\\RPC Control\\TestRegTransaction");
+            InitializeObjectAttributes(&obja, &usName, OBJ_CASE_INSENSITIVE, NULL, NULL);
+            ntStatus = NtCreateRegistryTransaction(&hObject, TRANSACTION_ALL_ACCESS, &obja, 0);
+            if (NT_SUCCESS(ntStatus)) {
+                __nop();
+            }
+
+        }
+
+    }
+}
+
+VOID TestCreateBogusObjects()
+{
+    HANDLE        hTimer = NULL, hDirectory = NULL, hObject = NULL;
+    LARGE_INTEGER liDueTime;
+    LPWSTR lpName;
+    SIZE_T l, i;
+    OBJECT_ATTRIBUTES obja;
+    UNICODE_STRING usName, usObject;
+
+    WCHAR szBuffer[MAX_PATH + 1];
+
+    liDueTime.QuadPart = -1000000000000LL;
+
+    lpName = (LPWSTR)supHeapAlloc(UNICODE_STRING_MAX_BYTES);
+    if (lpName) {
+        _strcpy(lpName, L"\\BaseNamedObjects\\BogusLongName");
+        l = _strlen(lpName);
+        for (i = l; i < UNICODE_STRING_MAX_CHARS - l - 1; i++)
+            lpName[i] = L't';
+
+        RtlInitUnicodeString(&usName, lpName);
+        InitializeObjectAttributes(&obja, &usName, OBJ_CASE_INSENSITIVE, NULL, NULL);
+
+        NtCreateTimer(&hTimer, TIMER_ALL_ACCESS, &obja, NotificationTimer);
+        if (hTimer) {
+            SetWaitableTimer(hTimer, &liDueTime, 0, NULL, NULL, 0);
+        }
+
+        supHeapFree(lpName);
+    }
+
+    _strcpy(szBuffer, L"\\BaseNamedObjects\\BogusEmbeddedNull");
+    l = _strlen(szBuffer);
+    szBuffer[l++] = 0;
+    szBuffer[l++] = L't';
+    szBuffer[l++] = L'e';
+    szBuffer[l++] = L's';
+    szBuffer[l++] = L't';
+
+    l *= 2;
+
+    usName.Buffer = szBuffer;
+    usName.Length = (USHORT)l;
+    usName.MaximumLength = usName.Length + sizeof(UNICODE_NULL);
+
+    InitializeObjectAttributes(&obja, &usName, OBJ_CASE_INSENSITIVE, NULL, NULL);
+
+    NtCreateTimer(&hTimer, TIMER_ALL_ACCESS, &obja, NotificationTimer);
+    if (hTimer) SetWaitableTimer(hTimer, &liDueTime, 0, NULL, NULL, 0);
+
+    _strcpy(szBuffer, L"\\RPC Control\\BogusEmbeddedNull");
+    l = _strlen(szBuffer);
+    szBuffer[l++] = 0;
+    szBuffer[l++] = L't';
+    szBuffer[l++] = L'e';
+    szBuffer[l++] = L's';
+    szBuffer[l++] = L't';
+
+    l *= 2;
+
+    usName.Buffer = szBuffer;
+    usName.Length = (USHORT)l;
+    usName.MaximumLength = usName.Length + sizeof(UNICODE_NULL);
+    if (NT_SUCCESS(NtCreateDirectoryObject(&hDirectory, DIRECTORY_ALL_ACCESS, &obja))) {
+        RtlInitUnicodeString(&usName, L"SomeTimer");
+        obja.RootDirectory = hDirectory;
+        if (NT_SUCCESS(NtCreateTimer(&hTimer, TIMER_ALL_ACCESS,
+            &obja, NotificationTimer)))
+        {
+            if (hTimer) SetWaitableTimer(hTimer, &liDueTime, 0, NULL, NULL, 0);
+        }
+    }
+
+    _strcpy(szBuffer, L"SurpriseDirectory");
+    l = _strlen(szBuffer);
+    szBuffer[l++] = 0;
+    szBuffer[l++] = L't';
+    szBuffer[l++] = L'e';
+    szBuffer[l++] = L's';
+    szBuffer[l++] = L't';
+    szBuffer[l++] = 0;
+    szBuffer[l++] = L'h';
+    szBuffer[l++] = L'a';
+    szBuffer[l++] = 0;
+    szBuffer[l++] = 0;
+    szBuffer[l++] = L'h';
+    szBuffer[l++] = L'a';
+    l *= 2;
+
+    usName.Buffer = szBuffer;
+    usName.Length = (USHORT)l;
+    usName.MaximumLength = usName.Length + sizeof(UNICODE_NULL);
+    obja.RootDirectory = hDirectory;
+    if (NT_SUCCESS(NtCreateDirectoryObject(&hDirectory, DIRECTORY_ALL_ACCESS, &obja))) {
+        RtlInitUnicodeString(&usObject, L"SurpriseTimer");
+        obja.RootDirectory = hDirectory;
+        obja.ObjectName = &usObject;
+        if (NT_SUCCESS(NtCreateTimer(&hTimer, TIMER_ALL_ACCESS,
+            &obja, NotificationTimer)))
+        {
+            if (hTimer) SetWaitableTimer(hTimer, &liDueTime, 0, NULL, NULL, 0);
+
+            RtlInitUnicodeString(&usObject, L"\\RPC Control\\TestLink");
+            InitializeObjectAttributes(&obja, &usObject, OBJ_CASE_INSENSITIVE, NULL, NULL);
+
+            _strcpy(szBuffer, L"\\RPC Control\\BogusEmbeddedNull");
+            l = _strlen(szBuffer);
+            szBuffer[l++] = 0;
+            szBuffer[l++] = L't';
+            szBuffer[l++] = L'e';
+            szBuffer[l++] = L's';
+            szBuffer[l++] = L't';
+            l *= 2;
+
+            usName.Length = (USHORT)l;
+            usName.MaximumLength = usName.Length + sizeof(UNICODE_NULL);
+
+            NtCreateSymbolicLinkObject(&hObject, SYMBOLIC_LINK_ALL_ACCESS, &obja, &usName);
+
+        }
+    }
+
 }
 
 DWORD WINAPI LPCListener(LPVOID lpThreadParameter)
@@ -135,14 +290,15 @@ VOID TestDebugObject(
     VOID
 )
 {
+    HANDLE hObject = NULL;
     NTSTATUS status;
     OBJECT_ATTRIBUTES obja;
     UNICODE_STRING    ustr = RTL_CONSTANT_STRING(L"\\BaseNamedObjects\\TestDebugObject");
 
     InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
-    status = NtCreateDebugObject(&g_DebugObject, DEBUG_ALL_ACCESS, &obja, 0);
+    status = NtCreateDebugObject(&hObject, DEBUG_ALL_ACCESS, &obja, 0);
     if (NT_SUCCESS(status)) {
-        Beep(0, 0);
+        __nop();
     }
 }
 
@@ -238,7 +394,6 @@ VOID TestPartition(
     VOID
 )
 {
-    NTSTATUS status;
     HANDLE TargetHandle = NULL;
     OBJECT_ATTRIBUTES obja;
     UNICODE_STRING    ustr = RTL_CONSTANT_STRING(L"\\KernelObjects\\MemoryPartition0");
@@ -246,11 +401,8 @@ VOID TestPartition(
     if (g_ExtApiSet.NtOpenPartition != NULL) {
 
         InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
-        status = g_ExtApiSet.NtOpenPartition(&TargetHandle, MEMORY_PARTITION_QUERY_ACCESS, &obja);
-        if (NT_SUCCESS(status)) {
-            __nop();
-            NtClose(TargetHandle);
-        }
+        g_ExtApiSet.NtOpenPartition(&TargetHandle, MEMORY_PARTITION_QUERY_ACCESS, &obja);
+
     }
 }
 
@@ -258,12 +410,13 @@ VOID TestIoCompletion(
     VOID
 )
 {
+    HANDLE hCompletion = NULL;
     OBJECT_ATTRIBUTES obja;
     UNICODE_STRING    ustr = RTL_CONSTANT_STRING(L"\\BaseNamedObjects\\TestIoCompletion");
 
     //IoCompletion
     InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
-    NtCreateIoCompletion(&g_TestIoCompletion, IO_COMPLETION_ALL_ACCESS, &obja, 100);
+    NtCreateIoCompletion(&hCompletion, IO_COMPLETION_ALL_ACCESS, &obja, 100);
 }
 
 VOID TestTimer(
@@ -282,16 +435,52 @@ VOID TestTimer(
 
 }
 
+VOID TestTransactionResourceManager(
+    VOID
+)
+{
+    HANDLE hObject = NULL;
+    OBJECT_ATTRIBUTES obja;
+    UNICODE_STRING usName;
+    GUID tmp;
+
+    InitializeObjectAttributes(&obja, NULL, OBJ_CASE_INSENSITIVE, NULL, NULL);
+
+    if (NT_SUCCESS(NtCreateTransactionManager(&hObject,
+        TRANSACTIONMANAGER_ALL_ACCESS,
+        &obja,
+        NULL,
+        TRANSACTION_MANAGER_VOLATILE,
+        0)))
+    {
+        if (S_OK == CoCreateGuid(&tmp)) {
+            RtlInitUnicodeString(&usName, L"\\BaseNamedObjects\\TestRm");
+            obja.ObjectName = &usName;
+            if (NT_SUCCESS(NtCreateResourceManager(&g_ResourceManager,
+                RESOURCEMANAGER_ALL_ACCESS,
+                hObject,
+                &tmp,
+                &obja,
+                RESOURCE_MANAGER_VOLATILE,
+                NULL)))
+            {
+                __nop();
+            }
+        }
+    }
+}
+
 VOID TestTransaction(
     VOID
 )
 {
+    HANDLE hObject;
     OBJECT_ATTRIBUTES obja;
     UNICODE_STRING    ustr = RTL_CONSTANT_STRING(L"\\BaseNamedObjects\\TestTransaction");
 
     //TmTx
     InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
-    NtCreateTransaction(&g_TestTransaction, TRANSACTION_ALL_ACCESS, &obja, NULL, NULL, 0, 0, 0, NULL, NULL);
+    NtCreateTransaction(&hObject, TRANSACTION_ALL_ACCESS, &obja, NULL, NULL, 0, 0, 0, NULL, NULL);
 }
 
 VOID TestPrivateNamespace(
@@ -441,7 +630,7 @@ VOID TestException(
     _In_ BOOL bNaked
 )
 {
-    if (bNaked) 
+    if (bNaked)
         *(PBYTE)(NULL) = 0;
     else {
 
@@ -452,30 +641,6 @@ VOID TestException(
         {
             __nop();
         }
-    }
-}
-
-#include "ui.h"
-
-VOID TestWinsta(
-    VOID
-)
-{
-    NTSTATUS Status;
-    HWINSTA hWinsta;
-    PROP_OBJECT_INFO Context;
-
-    //Context.lpCurrentObjectPath = L"\\Windows\\WindowStations";
-    Context.lpCurrentObjectPath = L"\\Sessions\\1\\Windows\\WindowStations";
-    Context.lpObjectName = L"Winsta0";
-
-    hWinsta = OpenWindowStation(L"WinSta0", FALSE, WINSTA_ALL_ACCESS);
-    //hWinsta = supOpenWindowStationFromContext(&Context, FALSE, READ_CONTROL);
-    if (hWinsta) {
-        CloseWindowStation(hWinsta);
-        Status = RtlGetLastNtStatus();
-        if (NT_SUCCESS(Status))
-            Beep(0, 0);
     }
 }
 
@@ -555,7 +720,7 @@ VOID TestPsObjectSecurity(
         }
 
         if (dwErr != ERROR_SUCCESS)
-            Beep(0, 0);
+            __nop();
 
         supHeapFree(EmptyDacl);
     }
@@ -565,15 +730,16 @@ VOID TestDesktop(
     VOID
 )
 {
+    HANDLE hDesktop;
     DWORD LastError = 0;
 
-    g_TestDesktop = CreateDesktop(TEXT("TestDesktop"), NULL, NULL, 0,
+    hDesktop = CreateDesktop(TEXT("TestDesktop"), NULL, NULL, 0,
         DESKTOP_CREATEWINDOW | DESKTOP_SWITCHDESKTOP, NULL);
 
-    if (g_TestDesktop == NULL) {
+    if (hDesktop == NULL) {
         LastError = GetLastError();
         if (LastError != 0)
-            Beep(0, 0);
+            __nop();
     }
 }
 
@@ -587,7 +753,7 @@ DWORD WINAPI TokenImpersonationThreadProc(PVOID Parameter)
 
     if (OpenProcessToken(GetCurrentProcess(), TOKEN_ALL_ACCESS, &hToken)) {
         if (!ImpersonateLoggedOnUser(hToken))
-            Beep(0, 0);
+            __nop();
         CloseHandle(hToken);
     }
 
@@ -598,7 +764,7 @@ DWORD WINAPI TokenImpersonationThreadProc(PVOID Parameter)
     } while (i < 1000);
 
     if (!RevertToSelf())
-        Beep(0, 0);
+        __nop();
     ExitThread(0);
 }
 
@@ -685,12 +851,12 @@ VOID TestApiSetResolve()
 }
 
 BOOL CALLBACK EnumerateSLValueDescriptorCallback(
-    _In_ SL_KMEM_CACHE_VALUE_DESCRIPTOR *CacheDescriptor,
+    _In_ SL_KMEM_CACHE_VALUE_DESCRIPTOR* CacheDescriptor,
     _In_opt_ PVOID Context
 )
 {
-    WCHAR *EntryName;
-    CHAR *EntryType;
+    WCHAR* EntryName;
+    CHAR* EntryType;
 
     UNREFERENCED_PARAMETER(Context);
 
@@ -889,7 +1055,7 @@ VOID TestShadowDirectory()
     RtlInitUnicodeString(&ustr, L"\\BaseNamedObjects");
     InitializeObjectAttributes(&dirObja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
     ntStatus = NtOpenDirectoryObject(&shadowDirHandle, DIRECTORY_QUERY | DIRECTORY_TRAVERSE, &dirObja);
-    
+
     if (NT_SUCCESS(ntStatus)) {
 
         //
@@ -915,7 +1081,7 @@ VOID TestShadowDirectory()
                 obja.RootDirectory = NULL;
                 ntStatus = NtOpenMutant(&testHandle2, MUTANT_ALL_ACCESS, &obja);
                 if (NT_SUCCESS(ntStatus)) {
-                    Beep(0, 0);
+                    __nop();
                 }
             }
         }
@@ -927,14 +1093,15 @@ VOID TestAlpcPortOpen()
 {
     HANDLE hObject = NULL;
     NTSTATUS ntStatus;
+    UNICODE_STRING usName;
 
-    ntStatus = supOpenPortObjectByName(&hObject, 
+    RtlInitUnicodeString(&usName, WOBJEX_TEST_PORT);
+
+    ntStatus = supOpenPortObjectByName(&hObject,
         PORT_ALL_ACCESS,
-        NULL, 
-        WOBJEX_TEST_PORT);
+        &usName);
 
     if (NT_SUCCESS(ntStatus)) {
-        Beep(0, 0);
         NtClose(hObject);
     }
     else {
@@ -971,7 +1138,7 @@ VOID TestSymbols()
     SYM_CHILD* pSymChild;
 
     WCHAR* pStrEnd;
-    WCHAR* pOutput; 
+    WCHAR* pOutput;
 
     if (!kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext))
         return;
@@ -1098,10 +1265,10 @@ VOID TestSessions()
     DWORD sessionsCount, i;
     WTS_SESSION_INFO* pSessions;
 
-    if (WTSEnumerateSessions(WTS_CURRENT_SERVER_HANDLE, 
-        0, 
-        1, 
-        &pSessions, 
+    if (WTSEnumerateSessions(WTS_CURRENT_SERVER_HANDLE,
+        0,
+        1,
+        &pSessions,
         &sessionsCount))
     {
         for (i = 0; i < sessionsCount; i++) {
@@ -1155,7 +1322,7 @@ VOID TestObCallback()
         HANDLE Pid2;
         BYTE Spare[392];
     } request;
-    
+
     NTSTATUS ntStatus;
     DWORD procId1 = 3448;
 
@@ -1199,16 +1366,19 @@ VOID TestStart(
     VOID
 )
 {
+    TestCall();
+    TestRegistryTransaction();
+    //TestTransactionResourceManager();
+    TestCreateBogusObjects();
     //TestCmControlVector();
     //TestObCallback();
-    TestCall();
     //TestSectionControlArea();
     //TestSymbols();
     //TestSectionImage();
     //TestShadowDirectory();
     //TestPsObjectSecurity();
     //TestLicenseCache();
-    TestApiSetResolve();
+    //TestApiSetResolve();
     //TestDesktop();
     //TestApiPort();
     //TestAlpcPortOpen();
@@ -1217,10 +1387,9 @@ VOID TestStart(
     //TestPartition();
     //TestPrivateNamespace();
     //TestIoCompletion();
-    TestTimer();
+    //TestTimer();
     //TestTransaction();
-    //TestWinsta();
-    TestSessions();
+    //TestSessions();
     //TestThread();
     //PreHashTypes();
     //TestJob();
@@ -1230,10 +1399,6 @@ VOID TestStop(
     VOID
 )
 {
-    if (g_DebugObject) NtClose(g_DebugObject);
-    if (g_TestIoCompletion) NtClose(g_TestIoCompletion);
-    if (g_TestTransaction) NtClose(g_TestTransaction);
-
     if (g_TestMutex != NULL) {
         CloseHandle(g_TestMutex);
     }
@@ -1247,9 +1412,7 @@ VOID TestStop(
         TerminateJobObject(g_TestJob, 0);
         NtClose(g_TestJob);
     }
-    if (g_TestDesktop) {
-        CloseDesktop(g_TestDesktop);
-    }
+
     if (g_TestThread) {
         TerminateThread(g_TestThread, 0);
         CloseHandle(g_TestThread);

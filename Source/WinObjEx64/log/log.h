@@ -4,9 +4,9 @@
 *
 *  TITLE:       LOG.H
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        31 May 2022
+*  DATE:        19 Jun 2022
 *
 *  Header file for simplified log support.
 *

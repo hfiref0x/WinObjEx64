@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPDLG.C
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        06 Jun 2022
+*  DATE:        19 Jun 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -15,19 +15,10 @@
 *
 *******************************************************************************/
 #include "global.h"
-#include "propAlpcPort.h"
-#include "propBasic.h"
-#include "propDesktop.h"
-#include "propDriver.h"
-#include "propObjectDump.h"
-#include "propProcess.h"
-#include "propSection.h"
-#include "propSecurity.h"
-#include "propToken.h"
-#include "propType.h"
+#include "props.h"
 
 //previously focused window
-HWND hPrevFocus;
+HWND PreviousFocus = NULL;
 
 //maximum number of possible pages, include space reserved for future use
 #define MAX_PAGE 10
@@ -37,11 +28,42 @@ HPROPSHEETPAGE PropPages[MAX_PAGE];
 WNDPROC PropSheetOriginalWndProc = NULL;
 
 //handle to the PropertySheet window
-HWND g_PropWindow = NULL;
-HWND g_PsPropWindow = NULL;
-HWND g_PsTokenWindow = NULL;
-HWND g_DesktopPropWindow = NULL;
-HWND g_NamespacePropWindow = NULL;
+HWND CommonPropWindow = NULL;
+HWND ProcessesPropWindow = NULL;
+HWND ThreadsPropWindow = NULL;
+HWND TokenPropWindow = NULL;
+HWND DesktopPropWindow = NULL;
+HWND NamespacePropWindow = NULL;
+
+HWND propGetCommonWindow()
+{
+    return CommonPropWindow;
+}
+
+HWND propGetProcessesWindow()
+{
+    return ProcessesPropWindow;
+}
+
+HWND propGetThreadsWindow()
+{
+    return ThreadsPropWindow;
+}
+
+HWND propGetTokenWindow()
+{
+    return TokenPropWindow;
+}
+
+HWND propGetDesktopWindow()
+{
+    return DesktopPropWindow;
+}
+
+HWND propGetNamespaceWindow()
+{
+    return NamespacePropWindow;
+}
 
 /*
 * propCloseCurrentObject
@@ -60,6 +82,33 @@ BOOL propCloseCurrentObject(
 }
 
 /*
+* propIsUnsupportedTypeForOpen
+*
+* Purpose:
+*
+* Filter object opening by type as we cannot open everything.
+*
+*/
+BOOL propIsUnsupportedTypeForOpen(
+    _In_ WOBJ_OBJECT_TYPE TypeIndex
+)
+{
+    WOBJ_OBJECT_TYPE propUnsupportedTypes[] = {
+        ObjectTypeUnknown,
+        ObjectTypeFltConnPort,
+        ObjectTypeFltComnPort,
+        ObjectTypeWaitablePort
+    };
+
+    ULONG i;
+    for (i = 0; i < RTL_NUMBER_OF(propUnsupportedTypes); i++)
+        if (TypeIndex == propUnsupportedTypes[i])
+            return TRUE;
+
+    return FALSE;
+}
+
+/*
 * propOpenCurrentObject
 *
 * Purpose:
@@ -67,66 +116,52 @@ BOOL propCloseCurrentObject(
 * Opens currently viewed object depending on type
 *
 */
+_Success_(return)
 BOOL propOpenCurrentObject(
     _In_ PROP_OBJECT_INFO* Context,
     _Out_ PHANDLE phObject,
     _In_ ACCESS_MASK DesiredAccess
 )
 {
-    BOOL                bResult;
-    HANDLE              hObject, hDirectory;
-    NTSTATUS            status;
-    UNICODE_STRING      ustr;
-    OBJECT_ATTRIBUTES   obja;
+    BOOL bResult;
+    HANDLE hObject, hDirectory;
+    NTSTATUS status;
+    OBJECT_ATTRIBUTES obja;
 
     bResult = FALSE;
-
-    *phObject = NULL;
 
     //
     // Filter unsupported types.
     //
-    if (
-        (Context->TypeIndex == ObjectTypeUnknown) ||
-        (Context->TypeIndex == ObjectTypeFltConnPort) ||
-        (Context->TypeIndex == ObjectTypeFltComnPort) ||
-        (Context->TypeIndex == ObjectTypeWaitablePort)
-        )
-    {
+    if (propIsUnsupportedTypeForOpen(Context->ObjectTypeIndex)) {
         SetLastError(ERROR_UNSUPPORTED_TYPE);
-        return bResult;
+        return FALSE;
     }
 
     //
     // Handle window station type.
     //
-    if (Context->TypeIndex == ObjectTypeWinstation) {
+    if (Context->ObjectTypeIndex == ObjectTypeWinstation) {
         hObject = supOpenWindowStationFromContext(Context, FALSE, DesiredAccess); //WINSTA_READATTRIBUTES for query
         bResult = (hObject != NULL);
         if (bResult) {
             *phObject = hObject;
-            SetLastError(ERROR_SUCCESS);
         }
-        else {
-            SetLastError(ERROR_ACCESS_DENIED);
-        }
+
         return bResult;
     }
 
     //
     // Handle desktop type.
     //
-    if (Context->TypeIndex == ObjectTypeDesktop) {
-        if (Context->lpObjectName == NULL) {
-            SetLastError(ERROR_INVALID_PARAMETER);
-            return bResult;
-        }
-        hObject = OpenDesktop(Context->lpObjectName, 0, FALSE, DesiredAccess); //DESKTOP_READOBJECTS for query
+    if (Context->ObjectTypeIndex == ObjectTypeDesktop) {
+
+        hObject = OpenDesktop(Context->NtObjectName.Buffer, 0, FALSE, DesiredAccess); //DESKTOP_READOBJECTS for query
         bResult = (hObject != NULL);
         if (bResult) {
             *phObject = hObject;
-            SetLastError(ERROR_SUCCESS);
         }
+
         return bResult;
     }
 
@@ -155,13 +190,10 @@ BOOL propOpenCurrentObject(
     // Namespace objects must be handled in a special way.
     //
     if (Context->ContextType == propPrivateNamespace) {
-        if (Context->lpObjectName == NULL) {
-            SetLastError(ERROR_INVALID_PARAMETER);
-            return bResult;
-        }
 
-        RtlInitUnicodeString(&ustr, Context->lpObjectName);
-        InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, NULL, NULL);
+        InitializeObjectAttributes(&obja, &Context->NtObjectName, 
+            OBJ_CASE_INSENSITIVE, NULL, NULL);
+
         hObject = supOpenObjectFromContext(
             Context,
             &obja,
@@ -176,14 +208,6 @@ BOOL propOpenCurrentObject(
         return bResult;
     }
 
-    if ((Context->lpObjectName == NULL) ||
-        (Context->lpCurrentObjectPath == NULL)
-        )
-    {
-        SetLastError(ERROR_INVALID_PARAMETER);
-        return bResult;
-    }
-
     hDirectory = NULL;
 
     if (DesiredAccess == 0) {
@@ -193,16 +217,16 @@ BOOL propOpenCurrentObject(
     //
     // Handle directory type.
     //
-    if (Context->TypeIndex == ObjectTypeDirectory) {
+    if (Context->ObjectTypeIndex == ObjectTypeDirectory) {
 
         //
         // If this is root, then root hDirectory = NULL.
         //
-        if (_strcmpi(Context->lpObjectName, KM_OBJECTS_ROOT_DIRECTORY) != 0) {
+        if (!supIsRootDirectory(&Context->NtObjectName)) {
             //
             // Otherwise open directory that keep this object.
             //
-            supOpenDirectoryForObject(&hDirectory, Context->lpObjectName, Context->lpCurrentObjectPath);
+            supOpenDirectoryEx(&hDirectory, NULL, &Context->NtObjectPath, DIRECTORY_QUERY);
             if (hDirectory == NULL) {
                 SetLastError(ERROR_OBJECT_NOT_FOUND);
                 return bResult;
@@ -213,8 +237,9 @@ BOOL propOpenCurrentObject(
         // Open object in directory.
         //
 
-        status = supOpenDirectory(&hObject, hDirectory, 
-            Context->lpObjectName, 
+        status = supOpenDirectoryEx(&hObject, 
+            hDirectory, 
+            &Context->NtObjectName, 
             DesiredAccess);
 
         if (!NT_SUCCESS(status)) {
@@ -237,14 +262,13 @@ BOOL propOpenCurrentObject(
     //
     // Open directory which current object belongs.
     //
-    supOpenDirectoryForObject(&hDirectory, Context->lpObjectName, Context->lpCurrentObjectPath);
+    supOpenDirectoryEx(&hDirectory, NULL, &Context->NtObjectPath, DIRECTORY_QUERY);
     if (hDirectory == NULL) {
         SetLastError(ERROR_OBJECT_NOT_FOUND);
         return bResult;
     }
 
-    RtlInitUnicodeString(&ustr, Context->lpObjectName);
-    InitializeObjectAttributes(&obja, &ustr, OBJ_CASE_INSENSITIVE, hDirectory, NULL);
+    InitializeObjectAttributes(&obja, &Context->NtObjectName, OBJ_CASE_INSENSITIVE, hDirectory, NULL);
 
     status = STATUS_UNSUCCESSFUL;
     hObject = NULL;
@@ -277,97 +301,92 @@ BOOL propOpenCurrentObject(
 *
 */
 PPROP_OBJECT_INFO propContextCreate(
-    _In_opt_ LPWSTR lpObjectName,
-    _In_opt_ LPCWSTR lpObjectType,
-    _In_opt_ LPWSTR lpCurrentObjectPath,
-    _In_opt_ LPWSTR lpDescription
+    _In_ PROP_CONFIG* Config
 )
 {
-    BOOL              bSelectedObject = FALSE, bSelectedDirectory = FALSE;
-    PROP_OBJECT_INFO* Context;
+    PROP_OBJECT_INFO* propContext;
 
-    __try {
-        //
-        // Allocate context structure.
-        //
-        Context = (PROP_OBJECT_INFO*)supHeapAlloc(sizeof(PROP_OBJECT_INFO));
-        if (Context == NULL)
-            return NULL;
+    union {
+        PVOID Ref;
+        union {
+            PROP_NAMESPACE_INFO* NamespaceObject;
+            PROP_UNNAMED_OBJECT_INFO* UnnamedObject;
+        };
+    } ObjectRef;
 
-        Context->TypeDescription = ObManagerGetEntryByTypeName(lpObjectType);
+    //
+    // Allocate context structure.
+    //
+    propContext = (PROP_OBJECT_INFO*)supHeapAlloc(sizeof(PROP_OBJECT_INFO));
+    if (propContext == NULL)
+        return NULL;
 
+    propContext->ObjectTypeIndex = Config->ObjectTypeIndex;
+
+    //
+    // Copy object name if given.
+    //
+    if (Config->NtObjectName) {
+        supDuplicateUnicodeString(g_obexHeap, &propContext->NtObjectName, Config->NtObjectName);
+    }
+
+    //
+    // Copy object path if given because dialog is modeless.
+    //
+    if (Config->NtObjectPath) {
+        supDuplicateUnicodeString(g_obexHeap, &propContext->NtObjectPath, Config->NtObjectPath);
+    }
+
+    propContext->TypeDescription = ObManagerGetEntryByTypeIndex(propContext->ObjectTypeIndex);
+
+    //
+    // Check if object is Type object.
+    // Type objects handled differently.
+    //
+    if (propContext->ObjectTypeIndex == ObjectTypeType) {
+        propContext->ShadowTypeDescription = ObManagerGetEntryByTypeName(propContext->NtObjectName.Buffer);
+    }
+    else {
         //
         // Use the same type descriptor by default for shadow.
         //
-        Context->ShadowTypeDescription = Context->TypeDescription;
+        propContext->ShadowTypeDescription = propContext->TypeDescription;
+    }
 
-        //
-        // Copy object name if given.
-        //
-        if (lpObjectName) {
+    //
+    // Remember namespace or unnamed object info.
+    // Always last.
+    //
+    ObjectRef.Ref = Config->ObjectData;
 
-            Context->lpObjectName = (LPWSTR)supHeapAlloc((1 + _strlen(lpObjectName)) * sizeof(WCHAR));
-            if (Context->lpObjectName) {
-                _strcpy(Context->lpObjectName, lpObjectName);
-                bSelectedObject = (_strcmpi(Context->lpObjectName, TEXT("ObjectTypes")) == 0);
-            }
-        }
+    if (Config->ContextType == propPrivateNamespace) {
 
-        //
-        // Copy object type if given.
-        //
-        if (lpObjectType) {
-            Context->lpObjectType = (LPWSTR)supHeapAlloc((1 + _strlen(lpObjectType)) * sizeof(WCHAR));
-            if (Context->lpObjectType) {
-                _strcpy(Context->lpObjectType, lpObjectType);
-            }
-            Context->TypeIndex = ObManagerGetIndexByTypeName(lpObjectType);
-        }
-        else {
-            Context->TypeIndex = ObjectTypeUnknown;
-        }
-
-        //
-        // Copy CurrentObjectPath if given, as it can change because dialog is modeless.
-        //
-        if (lpCurrentObjectPath) {
-            Context->lpCurrentObjectPath = (LPWSTR)supHeapAlloc((1 + _strlen(lpCurrentObjectPath)) * sizeof(WCHAR));
-            if (Context->lpCurrentObjectPath) {
-                _strcpy(Context->lpCurrentObjectPath, lpCurrentObjectPath);
-                bSelectedDirectory = (_strcmpi(Context->lpCurrentObjectPath, T_OBJECTTYPES) == 0);
-            }
-        }
-
-        //
-        // Copy object description, could be NULL.
-        //
-        if (lpDescription) {
-            Context->lpDescription = (LPWSTR)supHeapAlloc((1 + _strlen(lpDescription)) * sizeof(WCHAR));
-            if (Context->lpDescription) {
-                _strcpy(Context->lpDescription, lpDescription);
-            }
-        }
-
-        //
-        // Check if object is Type object.
-        // Type objects handled differently.
-        //
-        if ((bSelectedObject == FALSE) && (bSelectedDirectory != FALSE)) {
-            Context->IsType = TRUE;
-            //
-            // Query actual type index for case when user will browse Type object info.
-            //
-            if (Context->lpObjectName) {
-                Context->ShadowTypeDescription = ObManagerGetEntryByTypeName(Context->lpObjectName);
-            }
-
-        }
+        propContext->ContextType = propPrivateNamespace;
+        propContext->u1.NamespaceInfo = *ObjectRef.NamespaceObject;
 
     }
-    __except (WOBJ_EXCEPTION_FILTER_LOG) {
-        return NULL;
+    else if (Config->ContextType == propUnnamed) {
+
+        propContext->ContextType = propUnnamed;
+        //
+        // Copy generic data.
+        //
+        propContext->u1.UnnamedObjectInfo.ObjectAddress = ObjectRef.UnnamedObject->ObjectAddress;
+        propContext->u1.UnnamedObjectInfo.ClientId = ObjectRef.UnnamedObject->ClientId;
+        if (propContext->ObjectTypeIndex == ObjectTypeThread) {
+            propContext->u1.UnnamedObjectInfo.ThreadInformation = ObjectRef.UnnamedObject->ThreadInformation;
+        }
+
+        //
+        // Copy image name if present.
+        //
+        supDuplicateUnicodeString(g_obexHeap,
+            &propContext->u1.UnnamedObjectInfo.ImageName,
+            &ObjectRef.UnnamedObject->ImageName);
+
     }
-    return Context;
+
+    return propContext;
 }
 
 /*
@@ -382,50 +401,68 @@ VOID propContextDestroy(
     _In_ PROP_OBJECT_INFO* Context
 )
 {
-    __try {
-
-        //free associated icons
-        supDestroyIconForObjectType(Context);
-
-        //free name
-        if (Context->lpObjectName) {
-            supHeapFree(Context->lpObjectName);
+    //free associated icons
+    if (Context->ObjectTypeIndex == ObjectTypeType) {
+        if (Context->ObjectTypeIcon) {
+            DestroyIcon(Context->ObjectTypeIcon);
         }
-        //free type
-        if (Context->lpObjectType) {
-            supHeapFree(Context->lpObjectType);
-        }
-        //free currentobjectpath
-        if (Context->lpCurrentObjectPath) {
-            supHeapFree(Context->lpCurrentObjectPath);
-        }
-        //free description
-        if (Context->lpDescription) {
-            supHeapFree(Context->lpDescription);
-        }
-        //free boundary descriptor
-        if (Context->ContextType == propPrivateNamespace) {
-            if (Context->NamespaceInfo.BoundaryDescriptor) {
-                supHeapFree(Context->NamespaceInfo.BoundaryDescriptor);
-            }
-        }
-        //free unnamed object info
-        if (Context->ContextType == propUnnamed) {
-            if (Context->UnnamedObjectInfo.ImageName.Buffer)
-                supHeapFree(Context->UnnamedObjectInfo.ImageName.Buffer);
-        }
-
-        if (Context->PortObjectInfo.IsAllocated) {
-            if (Context->PortObjectInfo.ReferenceHandle)
-                NtClose(Context->PortObjectInfo.ReferenceHandle);
-        }
-
-        //free context itself
-        supHeapFree(Context);
-
     }
-    __except (WOBJ_EXCEPTION_FILTER) {
-        return;
+    if (Context->ObjectIcon) {
+        DestroyIcon(Context->ObjectIcon);
+    }
+
+    //free boundary descriptor
+    if (Context->ContextType == propPrivateNamespace) {
+        if (Context->u1.NamespaceInfo.BoundaryDescriptor) {
+            supHeapFree(Context->u1.NamespaceInfo.BoundaryDescriptor);
+        }
+    }
+    else  if (Context->ContextType == propUnnamed) {
+        //free unnamed object info
+        supFreeDuplicatedUnicodeString(g_obexHeap, &Context->u1.UnnamedObjectInfo.ImageName, FALSE);
+    }
+
+    supFreeDuplicatedUnicodeString(g_obexHeap, &Context->NtObjectName, FALSE);
+    supFreeDuplicatedUnicodeString(g_obexHeap, &Context->NtObjectPath, FALSE);
+
+    //free context itself
+    supHeapFree(Context);
+}
+
+VOID propSetSharedHwnd(
+    _In_ HWND hwnd
+)
+{
+    if (hwnd == TokenPropWindow) {
+        TokenPropWindow = NULL;
+    }
+    else if (hwnd == ProcessesPropWindow) {
+        if (TokenPropWindow) {
+            TokenPropWindow = NULL;
+        }
+        if (ThreadsPropWindow) {
+            ThreadsPropWindow = NULL;
+        }
+        ProcessesPropWindow = NULL;
+    }
+    else if (hwnd == ThreadsPropWindow) {
+        ThreadsPropWindow = NULL;
+    }
+    else if (hwnd == NamespacePropWindow) {
+        NamespacePropWindow = NULL;
+    }
+    else if (hwnd == DesktopPropWindow) {
+        DesktopPropWindow = NULL;
+    }
+    if (hwnd == CommonPropWindow) {
+        if (DesktopPropWindow) {
+            DesktopPropWindow = NULL;
+        }
+        //restore previous focus
+        if (PreviousFocus && IsWindow(PreviousFocus)) {
+            SetFocus(PreviousFocus);
+        }
+        CommonPropWindow = NULL;
     }
 }
 
@@ -464,30 +501,8 @@ LRESULT WINAPI PropSheetCustomWndProc(
         break;
 
     case WM_CLOSE:
-        if (hwnd == g_PsTokenWindow) {
-            g_PsTokenWindow = NULL;
-        }
-        else if (hwnd == g_PsPropWindow) {
-            g_PsPropWindow = NULL;
-        }
-        else if (hwnd == g_NamespacePropWindow) {
-            g_NamespacePropWindow = NULL;
-        }
-        else if (hwnd == g_DesktopPropWindow) {
-            g_DesktopPropWindow = NULL;
-        }
-        if (hwnd == g_PropWindow) {
-            if (g_DesktopPropWindow) {
-                g_DesktopPropWindow = NULL;
-            }
-            //restore previous focus
-            if (hPrevFocus && IsWindow(hPrevFocus)) {
-                SetFocus(hPrevFocus);
-            }
-            g_PropWindow = NULL;
-        }
-
-        return DestroyWindow(hwnd);
+        propSetSharedHwnd(hwnd);
+        DestroyWindow(hwnd);
         break;
 
     case WM_COMMAND:
@@ -496,83 +511,10 @@ LRESULT WINAPI PropSheetCustomWndProc(
             return TRUE;
         }
         break;
-    default:
-        break;
+
     }
+
     return CallWindowProc(PropSheetOriginalWndProc, hwnd, Msg, wParam, lParam);
-}
-
-/*
-* propCopyNamespaceObject
-*
-* Purpose:
-*
-* Copy namespace object to the properties context.
-*
-*/
-VOID propCopyNamespaceObject(
-    _In_ PROP_OBJECT_INFO* DestinationContext,
-    _In_ PROP_NAMESPACE_INFO* NamespaceObject
-)
-{
-    DestinationContext->ContextType = propPrivateNamespace;
-
-    RtlCopyMemory(
-        &DestinationContext->NamespaceInfo,
-        NamespaceObject,
-        sizeof(PROP_NAMESPACE_INFO));
-}
-
-/*
-* propCopyUnnamedObject
-*
-* Purpose:
-*
-* Copy unnamed object to the properties context.
-*
-*/
-VOID propCopyUnnamedObject(
-    _In_ PROP_OBJECT_INFO* DestinationContext,
-    _In_ PROP_UNNAMED_OBJECT_INFO* SourceObject
-)
-{
-    PVOID CopyBuffer;
-    SIZE_T CopySize;
-
-    DestinationContext->ContextType = propUnnamed;
-
-    //
-    // Copy generic data.
-    //
-    DestinationContext->UnnamedObjectInfo.ObjectAddress = SourceObject->ObjectAddress;
-
-    RtlCopyMemory(&DestinationContext->UnnamedObjectInfo.ClientId,
-        &SourceObject->ClientId,
-        sizeof(CLIENT_ID));
-
-    if (DestinationContext->TypeIndex == ObjectTypeThread) {
-
-        RtlCopyMemory(&DestinationContext->UnnamedObjectInfo.ThreadInformation,
-            &SourceObject->ThreadInformation,
-            sizeof(SYSTEM_THREAD_INFORMATION));
-    }
-
-    //
-    // Copy image name if present.
-    //
-    CopySize = SourceObject->ImageName.MaximumLength;
-    if (CopySize) {
-        CopyBuffer = supHeapAlloc(CopySize);
-        if (CopyBuffer) {
-
-            DestinationContext->UnnamedObjectInfo.ImageName.MaximumLength = (USHORT)CopySize;
-            DestinationContext->UnnamedObjectInfo.ImageName.Buffer = (PWSTR)CopyBuffer;
-
-            RtlCopyUnicodeString(&DestinationContext->UnnamedObjectInfo.ImageName,
-                &SourceObject->ImageName);
-
-        }
-    }
 }
 
 HPROPSHEETPAGE propAddPage(
@@ -622,7 +564,7 @@ INT propCreatePages(
     //
     // Select dialog for basic info.
     //
-    switch (Context->TypeIndex) {
+    switch (Context->ObjectTypeIndex) {
     case ObjectTypeTimer:
         pszTemplate = MAKEINTRESOURCE(IDD_PROP_TIMER);
         break;
@@ -687,7 +629,7 @@ INT propCreatePages(
     // Create Objects page for supported types.
     //
     if (IsDriverAssisted) {
-        switch (Context->TypeIndex) {
+        switch (Context->ObjectTypeIndex) {
         case ObjectTypeDirectory:
         case ObjectTypeDriver:
         case ObjectTypeDevice:
@@ -715,8 +657,8 @@ INT propCreatePages(
     //
     // Create specific page for Process/Thread objects.
     //
-    if ((Context->TypeIndex == ObjectTypeProcess) ||
-        (Context->TypeIndex == ObjectTypeThread))
+    if ((Context->ObjectTypeIndex == ObjectTypeProcess) ||
+        (Context->ObjectTypeIndex == ObjectTypeThread))
     {
         PropPages[nPages++] = propAddPage(
             TEXT("Token"),
@@ -728,7 +670,7 @@ INT propCreatePages(
     //
     // Create additional page(s), depending on object type.
     //
-    switch (Context->TypeIndex) {
+    switch (Context->ObjectTypeIndex) {
     case ObjectTypeDirectory:
     case ObjectTypePort:
     case ObjectTypeFltComnPort:
@@ -743,6 +685,7 @@ INT propCreatePages(
     case ObjectTypeSession:
     case ObjectTypeIoCompletion:
     case ObjectTypeMemoryPartition:
+    case ObjectTypeRegistryTransaction:
     case ObjectTypeProcess:
     case ObjectTypeThread:
     case ObjectTypeWinstation:
@@ -757,7 +700,9 @@ INT propCreatePages(
         //
         // Add desktop list for selected desktop, located here because of sheets order.
         //
-        if (Context->TypeIndex == ObjectTypeWinstation) {
+        //  WinStation->Basic->Process->[Desktops]->Security
+        //
+        if (Context->ObjectTypeIndex == ObjectTypeWinstation) {
 
             PropPages[nPages++] = propAddPage(
                 TEXT("Desktops"),
@@ -787,7 +732,7 @@ INT propCreatePages(
     //
 
     if (g_NtBuildNumber >= NT_WIN10_THRESHOLD1 &&
-        Context->TypeIndex == ObjectTypeSection
+        Context->ObjectTypeIndex == ObjectTypeSection
         && IsDriverAssisted)
     {
         PropPages[nPages++] = propAddPage(
@@ -800,7 +745,7 @@ INT propCreatePages(
     //
     // Add ALPC port specific page, driver assistance required.
     //
-    if (Context->TypeIndex == ObjectTypePort && IsDriverAssisted) {
+    if (Context->ObjectTypeIndex == ObjectTypePort && IsDriverAssisted) {
 
         PropPages[nPages++] = propAddPage(
             TEXT("Connections"),
@@ -822,10 +767,10 @@ INT propCreatePages(
     // Create Security Dialog if available.
     //
     hSecurityPage = propSecurityCreatePage(
-        Context,                                            //Context
-        (POPENOBJECTMETHOD)&propOpenCurrentObject,              //OpenObjectMethod
-        (PCLOSEOBJECTMETHOD)&propCloseCurrentObject,            //CloseObjectMethod
-        SI_EDIT_OWNER | SI_EDIT_PERMS |                         //psiFlags
+        Context,                                             //Context
+        (POPENOBJECTMETHOD)&propOpenCurrentObject,           //OpenObjectMethod
+        (PCLOSEOBJECTMETHOD)&propCloseCurrentObject,         //CloseObjectMethod
+        SI_EDIT_OWNER | SI_EDIT_PERMS |                      //psiFlags
         SI_ADVANCED | SI_NO_ACL_PROTECT | SI_NO_TREE_APPLY |
         SI_PAGE_TITLE
     );
@@ -847,59 +792,29 @@ INT propCreatePages(
 *
 */
 VOID propCreateDialog(
-    _In_ PROP_DIALOG_CREATE_SETTINGS* Settings
+    _In_ PROP_CONFIG* Config
 )
 {
-    BOOL              IsSimpleContext = FALSE;
-    INT               nPages;
-    HWND              hwnd, topLevelOwner;
+    INT nPages;
+    HWND hwnd, topLevelOwner;
     PROP_OBJECT_INFO* propContext = NULL;
-    PROPSHEETHEADER   PropHeader;
-    WCHAR             szCaption[MAX_PATH * 2];
-
-    //
-    // Mutual exclusion situation.
-    //
-    if ((Settings->NamespaceObject != NULL) && (Settings->UnnamedObject != NULL))
-        return;
-
-    IsSimpleContext = (Settings->NamespaceObject != NULL) || (Settings->UnnamedObject != NULL);
+    PROPSHEETHEADER PropHeader;
+    WOBJ_TYPE_DESC* typeEntry;
+    WCHAR szCaption[MAX_PATH * 2];
 
     //
     // Allocate context variable, copy name, type, object path.
     //
-    propContext = propContextCreate(
-        Settings->lpObjectName,
-        Settings->lpObjectType,
-        (IsSimpleContext) ? NULL : g_WinObj.CurrentObjectPath,
-        (IsSimpleContext) ? NULL : Settings->lpDescription);
-
+    propContext = propContextCreate(Config);
     if (propContext == NULL)
         return;
-
-
-    //
-    // Remember namespace or unnamed object info.
-    //
-    if (Settings->NamespaceObject) {
-
-        propCopyNamespaceObject(propContext,
-            Settings->NamespaceObject);
-
-    }
-    else if (Settings->UnnamedObject) {
-
-        propCopyUnnamedObject(propContext,
-            Settings->UnnamedObject);
-
-    }
 
     //
     // Remember previously focused window.
     // Except special types: Desktop.
     //
-    if (propContext->TypeIndex != ObjectTypeDesktop) {
-        hPrevFocus = GetFocus();
+    if (propContext->ObjectTypeIndex != ObjectTypeDesktop) {
+        PreviousFocus = GetFocus();
     }
 
     nPages = propCreatePages(propContext);
@@ -907,24 +822,25 @@ VOID propCreateDialog(
     //
     // Finally create property sheet.
     //
-    if (propContext->IsType) {
-        if (Settings->lpObjectName) {
-            _strncpy(szCaption, MAX_PATH, Settings->lpObjectName, _strlen(Settings->lpObjectName));
-        }
-        else {
-            _strcpy(szCaption, TEXT("Unknown Object"));
-        }
+    if (propContext->ObjectTypeIndex == ObjectTypeType) {
+
+       _strncpy(szCaption, 
+           MAX_PATH, 
+           propContext->NtObjectName.Buffer, 
+           propContext->NtObjectName.Length / sizeof(WCHAR));
+
     }
     else {
-        if (Settings->lpObjectType) {
-            _strncpy(szCaption, MAX_PATH, Settings->lpObjectType, _strlen(Settings->lpObjectType));
+        typeEntry = propContext->TypeDescription;
+        if (typeEntry->Index != ObjectTypeUnknown) {
+            _strncpy(szCaption, MAX_PATH, typeEntry->Name, _strlen(typeEntry->Name));
         }
         else {
             _strcpy(szCaption, TEXT("Unknown Type"));
         }
     }
 
-    topLevelOwner = Settings->hwndParent;
+    topLevelOwner = Config->hwndParent;
 
     _strcat(szCaption, TEXT(" Properties"));
     RtlSecureZeroMemory(&PropHeader, sizeof(PropHeader));
@@ -942,27 +858,31 @@ VOID propCreateDialog(
     if (!hwnd) {
         if (topLevelOwner)
             EnableWindow(topLevelOwner, TRUE);
+        
+        propContextDestroy(propContext);
         return;
     }
 
     if (propContext->ContextType == propPrivateNamespace) {
-        g_NamespacePropWindow = hwnd;
+        NamespacePropWindow = hwnd;
     }
     else {
 
-        switch (propContext->TypeIndex) {
+        switch (propContext->ObjectTypeIndex) {
         case ObjectTypeProcess:
+            ProcessesPropWindow = hwnd;
+            break;
         case ObjectTypeThread:
-            g_PsPropWindow = hwnd;
+            ThreadsPropWindow = hwnd;
             break;
         case ObjectTypeToken:
-            g_PsTokenWindow = hwnd;
+            TokenPropWindow = hwnd;
             break;
         case ObjectTypeDesktop:
-            g_DesktopPropWindow = hwnd;
+            DesktopPropWindow = hwnd;
             break;
         default:
-            g_PropWindow = hwnd;
+            CommonPropWindow = hwnd;
             break;
         }
 
@@ -975,5 +895,4 @@ VOID propCreateDialog(
         SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)&PropSheetCustomWndProc);
     }
 
-    supCenterWindow(hwnd);
 }

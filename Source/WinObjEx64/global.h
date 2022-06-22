@@ -4,9 +4,9 @@
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     1.94
+*  VERSION:     2.00
 *
-*  DATE:        02 Jun 2022
+*  DATE:        19 Jun 2022
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -88,20 +88,21 @@
 #include <setupapi.h>
 #include <shlwapi.h>
 #include <Richedit.h>
+#include <Aclui.h>
+#include <Aclapi.h>
 #include <assert.h>
 
 #include "resource.h"
 #include "sdk/extdef.h"
-#include "wine.h"
 
 #include "minirtl/minirtl.h"
 #include "minirtl/rtltypes.h"
 
-#include "ntos\ntos.h"
-#include "ntos\ntalpc.h"
-#include "ntos\ntsup.h"
-#include "ntos\ntbuilds.h"
-#include "ntuser\ntuser.h"
+#include "ntos/ntos.h"
+#include "ntos/ntalpc.h"
+#include "ntos/ntsup.h"
+#include "ntos/ntbuilds.h"
+#include "ntuser/ntuser.h"
 
 #define _NTDEF_
 #include <ntsecapi.h>
@@ -109,18 +110,19 @@
 
 #include "symparser.h"
 #include "objects.h"
-#include "drivers\wdrvprv.h"
+#include "drivers/wdrvprv.h"
+#include "log/log.h"
 #include "kldbg.h"
+#include "propCommon.h"
 #include "ui.h"
-#include "sup.h"
-#include "supConsts.h"
+#include "sup/sup.h"
+#include "sup/wine.h"
+#include "hash.h"
+#include "extapi.h"
 #include "list.h"
 #include "excepth.h"
-#include "extapi.h"
 #include "plugmngr.h"
-#include "hash.h"
-#include "log\log.h"
-#include "tests\testunit.h"
+#include "tests/testunit.h"
 
 #if defined(__cplusplus)
 #include <malloc.h>
@@ -146,6 +148,23 @@ extern pqsort rtl_qsort;
 #define RtlStringCchPrintfSecure rtl_swprintf_s
 #define RtlQuickSort rtl_qsort
 
+typedef struct _WINOBJ_STATS {
+    ULONG TotalHeapAlloc;
+    ULONG TotalHeapFree;
+    ULONG TotalHeapsCreated;
+    ULONG TotalHeapsDestroyed;
+    ULONG TotalThreadsCreated;
+    ULONG64 TotalHeapMemoryAllocated;
+#ifdef _DEBUG
+    ULONG64 MaxHeapAllocatedBlockSize;
+#endif
+} WINOBJ_STATS, *PWINOBJ_STATS;
+
+extern WINOBJ_STATS g_WinObjStats;
+
+#define OBEX_STATS_INC(Name) (_InterlockedIncrement((LONG*)&g_WinObjStats.Name))
+#define OBEX_STATS_INC64(Name, Value) (_InlineInterlockedAdd64((LONG64*)&g_WinObjStats.Name, Value))
+
 typedef struct _WINOBJ_GLOBALS {
     BOOLEAN IsWine;
     BOOLEAN ListViewDisplayGrid;
@@ -168,7 +187,9 @@ typedef struct _WINOBJ_GLOBALS {
     ULONG CurrentDPI;
     HINSTANCE hInstance;
     HANDLE Heap;
-    LPWSTR CurrentObjectPath;
+    
+    LIST_ENTRY ObjectPathListHead;
+
     pfnHtmlHelpW HtmlHelpW;
     RTL_OSVERSIONINFOW osver;
 
@@ -180,11 +201,26 @@ typedef struct _WINOBJ_GLOBALS {
 
 extern WINOBJ_GLOBALS g_WinObj;
 
+//
+// Shared heap
+//
+#define g_obexHeap g_WinObj.Heap
+
+//
+// Current object path list
+//
+#define g_ObjectPathListHead g_WinObj.ObjectPathListHead
+
 #define g_ListViewImages g_WinObj.ListViewImages
 #define g_ToolBarMenuImages g_WinObj.ToolBarMenuImages
 #define g_hwndObjectList g_WinObj.ObjectListView
 #define g_hwndObjectTree g_WinObj.ObjectTreeView
+
+//
+// Main program window
+//
 #define g_hwndMain g_WinObj.MainWindow
+
 #define g_hwndStatusBar g_WinObj.MainWindowStatusBar
 #define g_hwndToolBar g_WinObj.MainWindowToolBar
 #define g_hwndSplitter g_WinObj.MainWindowSplitter

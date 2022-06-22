@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2020
+*  (C) COPYRIGHT AUTHORS, 2015 - 2022
 *
 *  TITLE:       EXCEPTH.C
 *
-*  VERSION:     1.85
+*  VERSION:     2.00
 *
-*  DATE:        05 Mar 2020
+*  DATE:        19 Jun 2022
 *
 *  Exception handler routines.
 *
@@ -35,44 +35,43 @@ pfnMiniDumpWriteDump pMiniDumpWriteDump;
 *
 * Purpose:
 *
-* Writes minidump information to the specified file.
+* Writes minidump information to the file.
 *
 */
 BOOL exceptWriteDump(
     _In_ EXCEPTION_POINTERS* ExceptionPointers,
-    _In_ ULONGLONG IdFile
+    _In_ LPCWSTR lpFileName
 )
 {
-    BOOL    bResult;
+    BOOL bResult;
     HMODULE hDbgHelp;
-    HANDLE  hFile;
-    WCHAR   szFileName[MAX_PATH * 2]; //-V1072
+    HANDLE hFile;
+    WCHAR szFileName[MAX_PATH * 2];
+    UINT cch;
 
     MINIDUMP_EXCEPTION_INFORMATION mdei;
 
     bResult = FALSE;
     hDbgHelp = GetModuleHandle(TEXT("dbghelp.dll"));
     if (hDbgHelp == NULL) {
+
         RtlSecureZeroMemory(szFileName, sizeof(szFileName));
-        _strcpy(szFileName, g_WinObj.szSystemDirectory);
+        cch = GetSystemDirectory(szFileName, MAX_PATH);
+        if (cch == 0 || cch > MAX_PATH)
+            return FALSE;
+
         _strcat(szFileName, TEXT("\\dbghelp.dll"));
 
         hDbgHelp = LoadLibraryEx(szFileName, 0, 0);
         if (hDbgHelp == NULL)
-            return bResult;
+            return FALSE;
     }
 
     pMiniDumpWriteDump = (pfnMiniDumpWriteDump)GetProcAddress(hDbgHelp, "MiniDumpWriteDump");
     if (pMiniDumpWriteDump == NULL)
-        return bResult;
+        return FALSE;
 
-    RtlSecureZeroMemory(szFileName, sizeof(szFileName));
-    _strcpy(szFileName, g_WinObj.szTempDirectory);
-    _strcat(szFileName, TEXT("\\wobjex"));
-    u64tostr(IdFile, _strend(szFileName));
-    _strcat(szFileName, TEXT(".dmp"));
-
-    hFile = CreateFile(szFileName, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
+    hFile = CreateFile(lpFileName, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
     if (hFile != INVALID_HANDLE_VALUE) {
         mdei.ThreadId = GetCurrentThreadId();
         mdei.ExceptionPointers = ExceptionPointers;
@@ -92,11 +91,12 @@ BOOL exceptWriteDump(
 *
 */
 VOID exceptShowException(
-    _In_ EXCEPTION_POINTERS* ExceptionPointers
+    _In_ EXCEPTION_POINTERS* ExceptionPointers,
+    _In_ BOOL LastChance
 )
 {
-    WCHAR     szMessage[MAX_PATH * 2];
-    ULONGLONG IdFile;
+    WCHAR szFileName[300];
+    WCHAR szMessage[1000];
 
     RtlSecureZeroMemory(&szMessage, sizeof(szMessage));
     _strcpy(szMessage, TEXT("Sorry, exception occurred at address: \r\n0x"));
@@ -113,18 +113,46 @@ VOID exceptShowException(
         }
         u64tohex(ExceptionPointers->ExceptionRecord->ExceptionInformation[1], _strend(szMessage));
     }
-    IdFile = GetTickCount64();
 
-    if (exceptWriteDump(ExceptionPointers, IdFile)) {
-        _strcat(szMessage, TEXT("\r\n\nMinidump wobjex"));
-        u64tostr(IdFile, _strend(szMessage));
-        _strcat(szMessage, TEXT(".dmp is in %TEMP% directory"));
+    RtlSecureZeroMemory(szFileName, sizeof(szFileName));
+    GetCurrentDirectory(MAX_PATH, szFileName);
+    _strcat(szFileName, TEXT("\\WinObjEx64."));
+    ultostr(GetCurrentProcessId(), _strend(szFileName));
+    _strcat(szFileName, TEXT("."));
+    ultostr(GetCurrentThreadId(), _strend(szFileName));
+    _strcat(szFileName, TEXT(".dmp"));
+
+    if (exceptWriteDump(ExceptionPointers, szFileName)) {
+
+        _strcat(szMessage, TEXT("\r\n\nMinidump saved to "));
+        _strcat(szMessage, szFileName);
+
     }
     else {
-        _strcat(szMessage, TEXT("\r\n\nThere is an error while saving minidump."));
+        _strcat(szMessage, TEXT("\r\nAnd there is an error while saving minidump :("));
     }
-    _strcat(szMessage, TEXT("\r\n\nPlease report this to the developers, thanks"));
-    MessageBox(GetForegroundWindow(), szMessage, NULL, MB_ICONERROR);
+    if (LastChance) 
+        _strcat(szMessage, TEXT("\r\n\nThe program will be terminated."));
+
+    MessageBox(0, szMessage, NULL, MB_ICONERROR);
+}
+
+/*
+* exceptFilterUnhandled
+*
+* Purpose:
+*
+* Default exception filter, processing AV with minidump if available.
+*
+*/
+INT exceptFilterUnhandled(
+    _In_ struct _EXCEPTION_POINTERS* ExceptionInfo
+)
+{
+    WDrvProvRelease(&g_kdctx.DriverContext);
+    exceptShowException(ExceptionInfo, TRUE);
+    RtlExitUserProcess(ExceptionInfo->ExceptionRecord->ExceptionCode);
+    return EXCEPTION_EXECUTE_HANDLER;
 }
 
 /*
@@ -141,7 +169,7 @@ INT exceptFilter(
 )
 {
     if (ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {
-        exceptShowException(ExceptionPointers);
+        exceptShowException(ExceptionPointers, FALSE);
         return EXCEPTION_EXECUTE_HANDLER;
     }
     else {

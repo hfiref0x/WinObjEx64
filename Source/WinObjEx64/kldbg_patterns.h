@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2021
+*  (C) COPYRIGHT AUTHORS, 2019 - 2022
 *
 *  TITLE:       KLDBG_PATTERNS.H
 *
-*  VERSION:     1.90
+*  VERSION:     2.00
 *
-*  DATE:        11 May 2021
+*  DATE:        19 Jun 2022
 *
 *  Header with search patterns used by KLDBG.
 *

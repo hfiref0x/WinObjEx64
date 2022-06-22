@@ -1,7 +1,21 @@
-v1.9.4
+v2.0.0
+added entirely new handling of object names to support embedded nulls
 added Pico providers, Nmi, SiloMonitor and Errata manager callbacks
 added CmControlVector viewer
-internal rearrange
+added Copy Name/Copy Name (Binary) commands to the main window popup menus
+added program statistics (see Help->Statistics)
+added legend window description for process list
+added ability to fix image sections for dumped drivers
+added RegistryTransaction object view and access rights
+moved "Globals" from about box to the View->System Information and rearranged it output
+drivers dump operation can now be cancelled
+fix display of PUNICODE_STRING dump
+fix ALPC Port type objects sometimes unable to open while they can be opened
+plugin sdk updated to accommodate new named objects handling 
+imagescope plugin updated to accomodate plugin sdk changes
+elevation required features in "extras" will now request elevation instead of just been disabled
+help file updated with drivers and symbols usage
+internal rearrange and minor UI changes
 
 v1.9.3
 updated SeCiCallbacks search for newest Windows versions

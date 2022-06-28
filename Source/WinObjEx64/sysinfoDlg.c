@@ -181,6 +181,7 @@ VOID SysInfoCollectInformation(
 )
 {
     BOOLEAN bCustomSignersAllowed;
+    BOOLEAN bKdEnabled = FALSE, bKdAllowed = FALSE, bKdNotPresent = FALSE;
     LPWSTR lpType;
     ULONG Index, Value, SaveValue;
 
@@ -195,6 +196,9 @@ VOID SysInfoCollectInformation(
     SYSTEM_VSM_PROTECTION_INFORMATION VsmProtectionInfo;
     SYSTEM_INFO SystemInfo;
     ULONG Dummy;
+
+    FIRMWARE_TYPE fmType;
+    LPWSTR lpFmType;
 
     HKEY hKey;
     DWORD dwType, cbData, dwValue;
@@ -408,6 +412,39 @@ VOID SysInfoCollectInformation(
     // Product info
     //
     AddParameterValueBool(hwndOutput, TEXT("System.LTSC"), supIsLongTermServicingWindows());
+
+    //
+    // KD state
+    //
+    bKdEnabled = supIsKdEnabled(&bKdAllowed, &bKdNotPresent);
+    AddParameterValueBool(hwndOutput, TEXT("System.KdEnabled"), bKdEnabled);
+    AddParameterValueBool(hwndOutput, TEXT("System.KdAllowed"), bKdAllowed);
+    AddParameterValueBool(hwndOutput, TEXT("System.KdNotPresent"), bKdNotPresent);
+
+    //
+    // Firmware type
+    //
+    fmType = g_kdctx.Data->FirmwareType;
+    switch (fmType) {
+
+    case FirmwareTypeBios:
+        lpFmType = TEXT("BIOS");
+        break;
+
+    case FirmwareTypeUefi:
+        lpFmType = TEXT("UEFI");
+        break;
+
+    default:
+        lpFmType = TEXT("Unknown");
+        break;
+    }
+    AddParameterValue(hwndOutput, TEXT("System.FirmwareType"), lpFmType);
+
+    //
+    // Is OS Disk VHD?
+    //
+    AddParameterValueBool(hwndOutput, TEXT("System.IsOsDiskVhd"), g_kdctx.IsOsDiskVhd);
 
     //
     // System ranges

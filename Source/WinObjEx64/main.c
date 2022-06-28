@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.00
 *
-*  DATE:        19 Jun 2022
+*  DATE:        26 Jun 2022
 *
 *  Program entry point and main window handler.
 *
@@ -709,6 +709,7 @@ VOID MainWindowHandleObjectPopupMenu(
     case ObjectTypeSemaphore:
     case ObjectTypeSession:
     case ObjectTypeTimer:
+    case ObjectTypeRegistryTransaction:
 
         MainWindowPopupMenuInsertViewSD(hMenu, uPosition);
         break;

@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.00
 *
-*  DATE:        19 Jun 2022
+*  DATE:        07 Aug 2022
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -3860,7 +3860,7 @@ PVOID kdCreateObjectTypesList(
 {
     ULONG i;
     OBTYPE_LIST* list;
-    POBJECT_TYPES_INFORMATION pObjectTypes = supGetObjectTypesInfo();
+    POBJECT_TYPES_INFORMATION pObjectTypes = (POBJECT_TYPES_INFORMATION)supGetObjectTypesInfo();
     POBJECT_TYPE_INFORMATION pObject;
 
     union {
@@ -3967,7 +3967,7 @@ VOID kdInit(
 
     InitializeListHead(&g_kdctx.Data->KseEngineDump.ShimmedDriversDumpListHead);
 
-    g_kdctx.Data->ObjectTypesList = kdCreateObjectTypesList();
+    g_kdctx.Data->ObjectTypesList = (POBTYPE_LIST)kdCreateObjectTypesList();
 
     //
     // Minimum supported client is windows 7

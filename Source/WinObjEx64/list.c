@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.00
 *
-*  DATE:        19 Jun 2022
+*  DATE:        07 Aug 2022
 * 
 *  Program main object listing and search logic.
 *
@@ -61,7 +61,7 @@ POBEX_ITEM AllocateObjectItem(
 {
     POBEX_ITEM item;
 
-    item = supHeapAllocEx(HeapHandle, sizeof(OBEX_ITEM));
+    item = (OBEX_ITEM*)supHeapAllocEx(HeapHandle, sizeof(OBEX_ITEM));
     if (item) {
         item->Prev = Parent;
         item->TypeIndex = TypeIndex;
@@ -633,7 +633,7 @@ VOID ListCurrentDirectoryObjects(
 
         if (supGetTreeViewItemParam(g_hwndObjectTree,
             ViewRootHandle,
-            &objRef))
+            (PVOID*)&objRef))
         {
             xxxListCurrentDirectoryObjects(ListObjectsHeap, objRef);
         }

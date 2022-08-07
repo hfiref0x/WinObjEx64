@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.00
 *
-*  DATE:        19 Jun 2022
+*  DATE:        07 Aug 2022
 *
 *  Plugin manager.
 *
@@ -976,7 +976,7 @@ VOID PmpListSupportedObjectTypes(
 
         for (i = 0; i < PLUGIN_MAX_SUPPORTED_OBJECT_ID; i++)
             if (Plugin->SupportedObjectsIds[i] != ObjectTypeNone) {
-                lpObjectType = ObManagerGetNameByIndex(Plugin->SupportedObjectsIds[i]);
+                lpObjectType = ObManagerGetNameByIndex((WOBJ_OBJECT_TYPE)Plugin->SupportedObjectsIds[i]);
                 SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)lpObjectType);
             }
 

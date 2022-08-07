@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.00
 *
-*  DATE:        26 Jun 2022
+*  DATE:        07 Aug 2022
 *
 *  Program entry point and main window handler.
 *
@@ -152,7 +152,7 @@ VOID MainWindowHandleObjectViewSD(
 
         if (supGetListViewItemParam(g_hwndObjectList,
             ListView_GetSelectionMark(g_hwndObjectList),
-            (PVOID)&objRef))
+            (PVOID*)&objRef))
         {
 
             if (objRef)
@@ -198,7 +198,7 @@ VOID MainWindowCopyObjectName(
         
         nSelected = ListView_GetSelectionMark(g_hwndObjectList);
         if (nSelected >= 0) {
-            if (!supGetListViewItemParam(g_hwndObjectList, nSelected, &objRef))
+            if (!supGetListViewItemParam(g_hwndObjectList, nSelected, (PVOID*)&objRef))
                 return;
         }
 
@@ -206,7 +206,7 @@ VOID MainWindowCopyObjectName(
     else {
 
         if (ObjectTreeSelectedItem) {
-            if (!supGetTreeViewItemParam(g_hwndObjectTree, ObjectTreeSelectedItem, &objRef))
+            if (!supGetTreeViewItemParam(g_hwndObjectTree, ObjectTreeSelectedItem, (PVOID*)&objRef))
                 return;
         }
 
@@ -272,14 +272,14 @@ VOID MainWindowShowObjectProperties(
         //
         nSelected = ListView_GetSelectionMark(g_hwndObjectList);
         if (nSelected >= 0) {
-            supGetListViewItemParam(g_hwndObjectList, nSelected, &objRef);
+            supGetListViewItemParam(g_hwndObjectList, nSelected, (PVOID*)&objRef);
         }
 
     }
     else {
 
         if (ObjectTreeSelectedItem) {
-            supGetTreeViewItemParam(g_hwndObjectTree, ObjectTreeSelectedItem, &objRef);
+            supGetTreeViewItemParam(g_hwndObjectTree, ObjectTreeSelectedItem, (PVOID*)&objRef);
         }
     }
 
@@ -790,7 +790,7 @@ LRESULT MainWindowHandleWMNotify(
                     ObjectTreeSelectedItem = tvhti.hItem;
                     TreeView_SelectItem(g_hwndObjectTree, ObjectTreeSelectedItem);
 
-                    if (supGetTreeViewItemParam(g_hwndObjectTree, ObjectTreeSelectedItem, &objRef))
+                    if (supGetTreeViewItemParam(g_hwndObjectTree, ObjectTreeSelectedItem, (PVOID*)&objRef))
                         supBuildCurrentObjectList(objRef);
                     
                     supDisplayCurrentObjectPath(g_hwndStatusBar, NULL, TRUE);
@@ -833,7 +833,7 @@ LRESULT MainWindowHandleWMNotify(
                 if ((lvn->uNewState & LVIS_SELECTED) &&
                     !(lvn->uOldState & LVIS_SELECTED))
                 {
-                    if (supGetListViewItemParam(g_hwndObjectList, lvn->iItem, &objRef)) {
+                    if (supGetListViewItemParam(g_hwndObjectList, lvn->iItem, (PVOID*)&objRef)) {
                         supBuildCurrentObjectList(objRef);
                     }
 
@@ -871,7 +871,7 @@ LRESULT MainWindowHandleWMNotify(
                 ListView_HitTest(hdr->hwndFrom, &lvhti);
                 if (lvhti.flags & LVHT_ONITEM) {
                     lvn = (LPNMLISTVIEW)lParam;
-                    if (supGetListViewItemParam(g_hwndObjectList, lvn->iItem, &objRef)) {
+                    if (supGetListViewItemParam(g_hwndObjectList, lvn->iItem, (PVOID*)&objRef)) {
                         supBuildCurrentObjectList(objRef);
                     }
 

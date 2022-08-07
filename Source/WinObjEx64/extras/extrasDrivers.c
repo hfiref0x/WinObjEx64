@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.00
 *
-*  DATE:        19 Jun 2022
+*  DATE:        07 Aug 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -647,7 +647,7 @@ VOID DrvDumpDriver(
         if (DumpInfo == NULL)
             break;
 
-        DumpInfo->Buffer = supHeapAlloc(dumpSize);
+        DumpInfo->Buffer = (PBYTE)supHeapAlloc(dumpSize);
         if (DumpInfo->Buffer == NULL) {
             supHeapFree(DumpInfo);
             break;

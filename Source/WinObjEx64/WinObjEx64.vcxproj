@@ -130,7 +130,7 @@
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <AssemblerOutput>All</AssemblerOutput>
-      <CompileAs>CompileAsC</CompileAs>
+      <CompileAs>CompileAsCpp</CompileAs>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalIncludeDirectories>$(SolutionDir)\Shared;$(ProjectDir);$(ProjectDir)\props;$(ProjectDir)\extras</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -205,7 +205,7 @@
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalIncludeDirectories>$(SolutionDir)\Shared;$(ProjectDir);$(ProjectDir)\props;$(ProjectDir)\extras</AdditionalIncludeDirectories>
-      <CompileAs>CompileAsC</CompileAs>
+      <CompileAs>CompileAsCpp</CompileAs>
       <EnablePREfast>true</EnablePREfast>
       <ControlFlowGuard>Guard</ControlFlowGuard>
     </ClCompile>

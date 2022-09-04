@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTSUP.C
 *
-*  VERSION:     2.13
+*  VERSION:     2.14
 *
-*  DATE:        15 Jun 2022
+*  DATE:        07 Aug 2022
 *
 *  Native API support functions.
 *
@@ -172,18 +172,19 @@ BOOL ntsupVirtualFree(
 *
 * Purpose:
 *
-* Create new file and write buffer to it.
+* Create new file (or open existing) and write buffer to it.
 *
 */
 SIZE_T ntsupWriteBufferToFile(
-    _In_ PWSTR lpFileName,
+    _In_ PCWSTR FileName,
     _In_ PVOID Buffer,
     _In_ SIZE_T Size,
     _In_ BOOL Flush,
-    _In_ BOOL Append
+    _In_ BOOL Append,
+    _Out_opt_ NTSTATUS* Result
 )
 {
-    NTSTATUS           ntStatus;
+    NTSTATUS           ntStatus = STATUS_UNSUCCESSFUL;
     ACCESS_MASK        desiredAccess = FILE_WRITE_ACCESS | SYNCHRONIZE;
     DWORD              dwFlag = FILE_OVERWRITE_IF;
     ULONG              blockSize, remainingSize;
@@ -197,8 +198,14 @@ SIZE_T ntsupWriteBufferToFile(
     UNICODE_STRING     ntFileName;
     IO_STATUS_BLOCK    ioStatus;
 
-    if (RtlDosPathNameToNtPathName_U(lpFileName, &ntFileName, NULL, NULL) == FALSE)
+    if (Result)
+        *Result = STATUS_UNSUCCESSFUL;
+
+    if (RtlDosPathNameToNtPathName_U(FileName, &ntFileName, NULL, NULL) == FALSE) {
+        if (Result)
+            *Result = STATUS_INVALID_PARAMETER_1;
         return 0;
+    }
 
     if (Append) {
         desiredAccess |= FILE_READ_ACCESS;
@@ -259,6 +266,7 @@ SIZE_T ntsupWriteBufferToFile(
             NtClose(hFile);
         }
         RtlFreeUnicodeString(&ntFileName);
+        if (Result) *Result = ntStatus;
     }
     return bytesWritten;
 }

@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTSUP.H
 *
-*  VERSION:     2.13
+*  VERSION:     2.14
 *
-*  DATE:        15 Jun 2022
+*  DATE:        07 Aug 2022
 *
 *  Common header file for the NT API support functions and definitions.
 *
@@ -109,11 +109,12 @@ BOOL ntsupVirtualUnlock(
     _In_ SIZE_T dwSize);
 
 SIZE_T ntsupWriteBufferToFile(
-    _In_ PWSTR lpFileName,
+    _In_ PCWSTR FileName,
     _In_ PVOID Buffer,
     _In_ SIZE_T Size,
     _In_ BOOL Flush,
-    _In_ BOOL Append);
+    _In_ BOOL Append,
+    _Out_opt_ NTSTATUS* Result);
 
 PVOID ntsupFindModuleEntryByName(
     _In_ PRTL_PROCESS_MODULES pModulesList,
@@ -176,6 +177,12 @@ PVOID ntsupGetSystemInfoEx(
 PVOID ntsupGetSystemInfo(
     _In_ SYSTEM_INFORMATION_CLASS SystemInformationClass,
     _Out_opt_ PULONG ReturnLength);
+
+NTSTATUS NTAPI ntsupEnumSystemObjects(
+    _In_opt_ LPCWSTR pwszRootDirectory,
+    _In_opt_ HANDLE hRootDirectory,
+    _In_ PENUMOBJECTSCALLBACK CallbackProc,
+    _In_opt_ PVOID CallbackParam);
 
 BOOL ntsupResolveSymbolicLink(
     _In_opt_ HANDLE RootDirectoryHandle,

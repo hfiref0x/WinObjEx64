@@ -90,12 +90,6 @@ VOID guiExtrasDisableAdminFeatures(
             SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_PRIVATENAMESPACES, FALSE, &mii);
         }
 
-        //
-        // This feature is only supported starting from Windows 10 14393 (RS1).
-        //
-        if (g_NtBuildNumber < NT_WIN10_REDSTONE1) {
-            SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_W32PSERVICETABLE, FALSE, &mii);
-        }
     }
     else {
         //
@@ -109,6 +103,13 @@ VOID guiExtrasDisableAdminFeatures(
             supSetMenuIcon(hExtrasSubMenu, ID_EXTRAS_UNLOADEDDRIVERS, hIcon);
         }
 
+    }
+
+    //
+    // This feature is only supported starting from Windows 10 14393 (RS1).
+    //
+    if (g_NtBuildNumber < NT_WIN10_REDSTONE1) {
+        SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_W32PSERVICETABLE, FALSE, &mii);
     }
 }
 

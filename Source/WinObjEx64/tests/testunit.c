@@ -1371,7 +1371,7 @@ VOID TestStart(
     //TestTransactionResourceManager();
     TestCreateBogusObjects();
     //TestCmControlVector();
-    //TestObCallback();
+    TestObCallback();
     //TestSectionControlArea();
     //TestSymbols();
     //TestSectionImage();

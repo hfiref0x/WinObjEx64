@@ -107,7 +107,8 @@ VOID CmOptDlgDumpValueToFile(
                     tempBuffer,
                     bytesRead,
                     FALSE,
-                    FALSE));
+                    FALSE, 
+                    NULL));
 
             }
         }

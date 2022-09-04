@@ -290,7 +290,8 @@ VOID SLCacheDialogViewBinaryData(
         (PVOID)DataPtr,
         (SIZE_T)CacheDescriptor->DataLength,
         TRUE,
-        FALSE))
+        FALSE,
+        NULL))
     {
         supShellExecInExplorerProcess(szFileName, NULL);
     }

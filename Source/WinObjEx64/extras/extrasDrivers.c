@@ -523,7 +523,7 @@ DWORD DumpDialogWorkerThread(
             supImageFixSections(dumpInfo->Buffer);
 
         bytesIO = supWriteBufferToFile(dumpInfo->FileName, dumpInfo->Buffer,
-            (SIZE_T)dumpInfo->DumpSize, FALSE, FALSE);
+            (SIZE_T)dumpInfo->DumpSize, FALSE, FALSE, NULL);
 
         RtlStringCchPrintfSecure(szBuffer, RTL_NUMBER_OF(szBuffer),
             TEXT("Read %lu (%lu Kb), Write %lu (%lu Kb), Requested %lu (%lu Kb)"),

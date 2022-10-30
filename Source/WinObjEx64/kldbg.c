@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.00
 *
-*  DATE:        07 Aug 2022
+*  DATE:        25 Oct 2022
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -750,6 +750,7 @@ PVOID ObDumpSymbolicLinkObjectVersionAware(
     case NT_WIN10_20H2:
     case NT_WIN10_21H1:
     case NT_WIN10_21H2:
+    case NT_WIN10_22H2:
         objectSize = sizeof(OBJECT_SYMBOLIC_LINK_V4);
         objectVersion = OBVERSION_OBJECT_SYMBOLIC_LINK_V4;
         break;

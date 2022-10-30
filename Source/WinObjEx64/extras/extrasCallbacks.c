@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.00
 *
-*  DATE:        19 Jun 2022
+*  DATE:        25 Oct 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -37,7 +37,7 @@ static FAST_EVENT SysCbInitializedEvent = FAST_EVENT_INIT;
 #define CBT_SIZE_FE_V1        0xF8
 #define CBT_SIZE_CO_V1        0x100
 #define CBT_SIZE_NI_V1        0xF8
-#define CBT_SIZE_CU_V1        0xF8
+#define CBT_SIZE_CU_V1        0x100
 
 typedef struct _CBT_MAPPING {
     ULONG Build;
@@ -61,6 +61,7 @@ CBT_MAPPING g_CbtMapping[] = {
 
     { NT_WIN10_21H2, NTDDI_WIN10_VB, CBT_SIZE_VB_V1 },
     { NT_WIN10_21H2, NTDDI_WIN10_VB, CBT_SIZE_VB_V2 },
+    { NT_WIN10_22H2, NTDDI_WIN10_VB, CBT_SIZE_VB_V2 },
 
     { NT_WINSRV_21H1, NTDDI_WIN10_FE, CBT_SIZE_FE_V1 },
 
@@ -345,7 +346,8 @@ static const WCHAR *CiCallbackNames[] = {
     L"CiDeleteCodeIntegrityOriginClaimForFileObject",//29
     L"CiHvciReportMmIncompatibility",//30
     L"CiCompareExistingSePool",//31
-    L"CiSetCachedOriginClaim"//32
+    L"CiSetCachedOriginClaim",//32,
+    L"CipIsDeveloperModeEnabled"//33
 };
 
 typedef enum _CiNameIds {
@@ -381,7 +383,8 @@ typedef enum _CiNameIds {
     Id_CiDeleteCodeIntegrityOriginClaimForFileObject,
     Id_CiHvciReportMmIncompatibility,
     Id_CiCompareExistingSePool,
-    Id_CiSetCachedOriginClaim
+    Id_CiSetCachedOriginClaim,
+    Id_CipIsDeveloperModeEnabled
 } CiNameIds;
 
 //
@@ -565,7 +568,7 @@ static const BYTE CiCallbackIndexes_Win10RS4_21H2[] = {
 };
 
 //
-// Windows 10 21H2 updated
+// Windows 10 21H2 updated / 22H2
 //
 static const BYTE CiCallbackIndexes_Win1021H2_V2[] = {
     Id_CiSetFileCache,
@@ -635,7 +638,7 @@ static const BYTE CiCallbacksIndexes_WinSrv21H2[] = {
 //
 // Windows 11 21H2
 //
-static const BYTE CiCallbackIndexes_Win11[] = {
+static const BYTE CiCallbackIndexes_Win11_21H1[] = {
     Id_CiSetFileCache,
     Id_CiGetFileCache,
     Id_CiQueryInformation,
@@ -669,9 +672,9 @@ static const BYTE CiCallbackIndexes_Win11[] = {
 };
 
 //
-// Windows 11 Next
+// Windows 11 22H2
 //
-static const BYTE CiCallbackIndexes_Win11_Next[] = {
+static const BYTE CiCallbackIndexes_Win11_22H2[] = {
     Id_CiSetFileCache,
     Id_CiGetFileCache,
     Id_CiQueryInformation,
@@ -700,7 +703,8 @@ static const BYTE CiCallbackIndexes_Win11_Next[] = {
     Id_CiDeleteCodeIntegrityOriginClaimForFileObject,
     Id_CiHvciReportMmIncompatibility,
     Id_CiCompareExistingSePool,
-    Id_CiSetCachedOriginClaim
+    Id_CiSetCachedOriginClaim,
+    Id_CipIsDeveloperModeEnabled
 };
 
 /*
@@ -769,6 +773,7 @@ LPWSTR GetCiRoutineNameFromIndex(
     case NT_WIN10_20H2:
     case NT_WIN10_21H1:
     case NT_WIN10_21H2:
+    case NT_WIN10_22H2:
         
         switch (CiCallbacksSize) {
         case CBT_SIZE_VB_V2:
@@ -790,15 +795,15 @@ LPWSTR GetCiRoutineNameFromIndex(
         break;
 
     case NT_WIN11_21H2:
-        Indexes = CiCallbackIndexes_Win11;
-        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win11);
+        Indexes = CiCallbackIndexes_Win11_21H1;
+        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win11_21H1);
         break;
 
     case NT_WIN11_22H2:
     case NTX_WIN11_ADB:
     default:
-        Indexes = CiCallbackIndexes_Win11_Next;
-        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win11_Next);
+        Indexes = CiCallbackIndexes_Win11_22H2;
+        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win11_22H2);
         break;
     }
 

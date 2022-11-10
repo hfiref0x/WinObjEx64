@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.00
 *
-*  DATE:        19 Jun 2022
+*  DATE:        09 Nov 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1536,7 +1536,7 @@ VOID supJumpToFile(
 
     if (FAILED(hr)) {
 
-        sz = MAX_PATH + _strlen(g_WinObj.szWindowsDirectory);
+        sz = MAX_PATH + _strlen(g_WinObj.szWindowsDirectory) + _strlen(lpFilePath);
 
         lpCommand = (LPWSTR)supHeapAlloc(sz * sizeof(WCHAR));
         if (lpCommand) {
@@ -3193,7 +3193,8 @@ BOOL supxConvertFileName(
                 //
                 // Match device name.
                 //
-                bFound = (_strncmpi(NtFileName, szName, nLen) == 0);
+                bFound = ((_strncmpi(NtFileName, szName, nLen) == 0)
+                    && *(NtFileName + nLen) == L'\\');
 
                 if (bFound) {
 

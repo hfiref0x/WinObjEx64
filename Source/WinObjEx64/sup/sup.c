@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.01
 *
-*  DATE:        09 Nov 2022
+*  DATE:        01 Dec 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -3168,7 +3168,7 @@ BOOL supxConvertFileName(
     // Query array of logical disk drive strings.
     //
     szTemp[0] = 0;
-    if (GetLogicalDriveStrings(CONVERT_NTNAME_BUFFER_SIZE - 1, szTemp) == 0)
+    if (GetLogicalDriveStrings(RTL_NUMBER_OF(szTemp), szTemp) == 0)
         return FALSE;
 
     pszTemp = szTemp;
@@ -3201,7 +3201,6 @@ BOOL supxConvertFileName(
                     //
                     // Build output name.
                     //
-
                     RtlStringCchPrintfSecure(
                         DosFileName,
                         ccDosFileName,
@@ -3232,63 +3231,69 @@ BOOL supxConvertFileName(
 *
 * Query filename by handle.
 *
-* Input buffer must be at least MAX_PATH length.
-*
 */
-BOOL supGetWin32FileName(
-    _In_ LPCWSTR FileName,
-    _Inout_ LPWSTR Win32FileName,
-    _In_ SIZE_T ccWin32FileName
+LPWSTR supGetWin32FileName(
+    _In_ LPCWSTR NtFileName
 )
 {
     BOOL                bResult = FALSE;
+    LPWSTR              lpWin32Name = NULL;
     NTSTATUS            ntStatus = STATUS_UNSUCCESSFUL;
     HANDLE              hFile = NULL;
-    UNICODE_STRING      NtFileName;
+    UNICODE_STRING      usNtFileName;
     OBJECT_ATTRIBUTES   obja;
     IO_STATUS_BLOCK     iost;
+    ULONG               size;
 
     BYTE* Buffer = NULL;
 
-    if ((Win32FileName == NULL) || (ccWin32FileName < MAX_PATH)) {
-        SetLastError(ERROR_INSUFFICIENT_BUFFER);
-        return FALSE;
-    }
+    RtlInitUnicodeString(&usNtFileName, NtFileName);
+    InitializeObjectAttributes(&obja, &usNtFileName, OBJ_CASE_INSENSITIVE, 0, NULL);
 
-    RtlInitUnicodeString(&NtFileName, FileName);
-    InitializeObjectAttributes(&obja, &NtFileName, OBJ_CASE_INSENSITIVE, 0, NULL);
+    do {
 
-    ntStatus = NtCreateFile(&hFile,
-        SYNCHRONIZE,
-        &obja,
-        &iost,
-        NULL,
-        0,
-        FILE_SHARE_VALID_FLAGS,
-        FILE_OPEN,
-        FILE_SYNCHRONOUS_IO_NONALERT | FILE_NON_DIRECTORY_FILE,
-        NULL, 0);
+        ntStatus = NtCreateFile(&hFile,
+            SYNCHRONIZE,
+            &obja,
+            &iost,
+            NULL,
+            0,
+            FILE_SHARE_VALID_FLAGS,
+            FILE_OPEN,
+            FILE_SYNCHRONOUS_IO_NONALERT | FILE_NON_DIRECTORY_FILE,
+            NULL, 0);
 
-    if (NT_SUCCESS(ntStatus)) {
+        if (!NT_SUCCESS(ntStatus))
+            break;
 
         ntStatus = supQueryObjectInformation(hFile,
             ObjectNameInformation,
             &Buffer,
             NULL);
 
-        if (NT_SUCCESS(ntStatus)) {
+        if (!NT_SUCCESS(ntStatus))
+            break;
 
-            bResult = supxConvertFileName(((POBJECT_NAME_INFORMATION)Buffer)->Name.Buffer,
-                Win32FileName,
-                ccWin32FileName);
+        size = UNICODE_STRING_MAX_CHARS * sizeof(WCHAR);
+        lpWin32Name = (LPWSTR)supHeapAlloc(size);
 
-            supHeapFree(Buffer);
-        }
+        if (lpWin32Name == NULL)
+            break;
 
-        NtClose(hFile);
+        bResult = supxConvertFileName(((POBJECT_NAME_INFORMATION)Buffer)->Name.Buffer,
+            lpWin32Name,
+            size / sizeof(WCHAR));
+
+    } while (FALSE);
+
+    if (Buffer) supHeapFree(Buffer);
+    if (hFile) NtClose(hFile);
+    if (bResult == FALSE && lpWin32Name) {
+        supHeapFree(lpWin32Name);
+        lpWin32Name = NULL;
     }
 
-    return bResult;
+    return lpWin32Name;
 }
 
 /*
@@ -7489,7 +7494,7 @@ VOID supJumpToFileListView(
         if (iPos < 0)
             break;
 
-        lpConvertedName = (LPWSTR)supHeapAlloc(UNICODE_STRING_MAX_CHARS);
+        lpConvertedName = (LPWSTR)supHeapAlloc(UNICODE_STRING_MAX_BYTES);
         if (lpConvertedName == NULL)
             break;
 
@@ -7498,18 +7503,15 @@ VOID supJumpToFileListView(
         if (lpDriverName == NULL)
             break;
 
-        if (supGetWin32FileName(
-            lpDriverName,
-            lpConvertedName,
-            UNICODE_STRING_MAX_CHARS))
-        {
+        lpConvertedName = supGetWin32FileName(lpDriverName);
+        if (lpConvertedName) {
             supJumpToFile(lpConvertedName);
+            supHeapFree(lpConvertedName);
         }
 
     } while (FALSE);
 
     if (lpDriverName) supHeapFree(lpDriverName);
-    if (lpConvertedName) supHeapFree(lpConvertedName);
 }
 
 /*

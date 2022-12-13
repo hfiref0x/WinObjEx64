@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPTOKEN.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.01
 *
-*  DATE:        19 Jun 2022
+*  DATE:        01 Dec 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -169,7 +169,7 @@ VOID TokenPageListInfo(
     NTSTATUS Status;
     LPWSTR ErrMsg = NULL, ElementName, UserAndDomain, pString;
     HANDLE ObjectHandle = NULL;
-    HANDLE TokenHandle = NULL;
+    HANDLE TokenHandle = NULL, LinkedTokenHandle = NULL;
     ACCESS_MASK DesiredAccessLv1, DesiredAccessLv2;
 
     PTOKEN_PRIVILEGES pTokenPrivs;
@@ -178,6 +178,7 @@ VOID TokenPageListInfo(
     PTOKEN_GROUPS pTokenGroups;
     PTOKEN_APPCONTAINER_INFORMATION pTokenAppContainer;
     TOKEN_ELEVATION TokenElv;
+    TOKEN_ELEVATION_TYPE TokenElevType;
     TOKEN_STATISTICS TokenStats;
 
     WCHAR szBuffer[MAX_PATH], szPrivName[MAX_PATH + 1];
@@ -317,8 +318,33 @@ VOID TokenPageListInfo(
         if (NT_SUCCESS(NtQueryInformationToken(TokenHandle, TokenElevation,
             (PVOID)&TokenElv, sizeof(TokenElv), &r)))
         {
-            ElementName = (TokenElv.TokenIsElevated > 0) ? TEXT("Yes") : TEXT("No");
-            SetDlgItemText(hwndDlg, IDC_TOKEN_ELEVATED, ElementName);
+            if (TokenElv.TokenIsElevated) {
+                _strcpy(szBuffer, TEXT("Yes"));
+                if (NT_SUCCESS(NtQueryInformationToken(TokenHandle, TokenElevationType,
+                    &TokenElevType, sizeof(TokenElevType), &r)))
+                {
+                    switch (TokenElevType) {
+                    case TokenElevationTypeDefault:
+                        _strcat(szBuffer, TEXT(" (Default)")); // User is not using a split token, so they cannot elevate.
+                        break;
+                    case TokenElevationTypeFull: // User has a split token, and the process is running elevated.
+                        _strcat(szBuffer, TEXT(" (Full)"));
+                        break;
+                    case TokenElevationTypeLimited: // User has a split token, but the process is not running elevated.
+                        _strcat(szBuffer, TEXT(" (Limited)"));
+                        break;
+                    default:
+                        _strcat(szBuffer, TEXT(" (Unknown)"));
+                        break;
+                    }
+
+                }
+            }
+            else                 
+                _strcpy(szBuffer, TEXT("No"));
+
+
+            SetDlgItemText(hwndDlg, IDC_TOKEN_ELEVATED, szBuffer);
         }
 
         //
@@ -442,6 +468,13 @@ VOID TokenPageListInfo(
             SetDlgItemText(hwndDlg, IDC_TOKEN_AUTHID, szBuffer);
         }
 
+        //
+        // Linked token.
+        //
+        Status = supOpenLinkedToken(TokenHandle, &LinkedTokenHandle);
+        if (NT_SUCCESS(Status)) NtClose(LinkedTokenHandle);
+        EnableWindow(GetDlgItem(hwndDlg, IDC_TOKEN_LINKED), NT_SUCCESS(Status));
+
         NtClose(TokenHandle);
     }
     else {
@@ -450,7 +483,93 @@ VOID TokenPageListInfo(
 
         TokenPageShowError(hwndDlg, ErrMsg);
     }
+
     NtClose(ObjectHandle);
+}
+
+/*
+* TokenPageShowLinkedTokenProperties
+*
+* Purpose:
+*
+* Show properties of selected linked token object.
+*
+*/
+VOID TokenPageShowLinkedTokenProperties(
+    _In_ HWND hwndDlg
+)
+{
+    NTSTATUS Status;
+    HANDLE TokenHandle, LinkedTokenHandle;
+    PROP_UNNAMED_OBJECT_INFO TokenObject, LinkedTokenObject;
+    OBJECT_ATTRIBUTES ObjectAttributes = RTL_INIT_OBJECT_ATTRIBUTES((PUNICODE_STRING)NULL, 0);
+
+    LPWSTR FormatStringLinkedTokenProcess = TEXT("Linked Token, PID:%llu");
+
+    UNICODE_STRING usObjectName;
+    PROP_CONFIG propConfig;
+
+    WCHAR szBuffer[MAX_PATH + 1];
+
+    RtlSecureZeroMemory(&TokenObject, sizeof(PROP_UNNAMED_OBJECT_INFO));
+
+    TokenObject.ClientId.UniqueProcess =
+        GetProp(hwndDlg, T_TOKEN_PROP_CID_PID);
+
+    TokenObject.ClientId.UniqueThread =
+        GetProp(hwndDlg, T_TOKEN_PROP_CID_TID);
+
+    TokenObject.IsThreadToken =
+        (BOOL)HandleToULong(GetProp(hwndDlg, T_TOKEN_PROP_TYPE));
+
+    Status = supOpenTokenByParam(&TokenObject.ClientId,
+        &ObjectAttributes,
+        TOKEN_QUERY,
+        TokenObject.IsThreadToken,
+        &TokenHandle);
+
+    if (NT_SUCCESS(Status)) {
+
+        Status = supOpenLinkedToken(TokenHandle, &LinkedTokenHandle);
+        if (NT_SUCCESS(Status)) {
+
+            RtlSecureZeroMemory(&LinkedTokenObject, sizeof(LinkedTokenObject));
+            LinkedTokenObject.ClientId = TokenObject.ClientId;
+
+            supQueryObjectFromHandle(LinkedTokenHandle, &LinkedTokenObject.ObjectAddress, NULL);
+
+            RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+
+            RtlStringCchPrintfSecure(szBuffer,
+                MAX_PATH,
+                FormatStringLinkedTokenProcess,
+                LinkedTokenObject.ClientId.UniqueProcess);
+
+            RtlInitUnicodeString(&usObjectName, szBuffer);
+
+            RtlSecureZeroMemory(&propConfig, sizeof(propConfig));
+
+            propConfig.hwndParent = hwndDlg;
+            propConfig.NtObjectName = &usObjectName;
+            propConfig.ObjectTypeIndex = ObjectTypeToken;
+            propConfig.ContextType = propUnnamed;
+            propConfig.u1.UnnamedObject = &LinkedTokenObject;
+
+            propCreateDialog(&propConfig);
+
+            NtClose(LinkedTokenHandle);
+        }
+        else {
+            RtlStringCchPrintfSecure(szBuffer, MAX_PATH, TEXT("Unable to open linked token, NTSTATUS: 0x%lX"), Status);
+            TokenPageShowError(hwndDlg, szBuffer);
+        }
+        NtClose(TokenHandle);
+    }
+    else {
+        RtlStringCchPrintfSecure(szBuffer, MAX_PATH, TEXT("Unable to open token, NTSTATUS: 0x%lX"), Status);
+        TokenPageShowError(hwndDlg, szBuffer);
+    }
+
 }
 
 /*
@@ -605,6 +724,11 @@ INT_PTR TokenPageDialogOnCommand(
         break;
     case IDC_TOKEN_ADVANCED:
         TokenPageShowAdvancedProperties(hwndDlg);
+        Result = 1;
+        break;
+
+    case IDC_TOKEN_LINKED:
+        TokenPageShowLinkedTokenProperties(hwndDlg);
         Result = 1;
         break;
 

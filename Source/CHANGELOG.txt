@@ -1,3 +1,7 @@
+v2.0.1
+recent win10/win11 compatibility improvements
+token properties dialog changes
+
 v2.0.0
 added entirely new handling of object names to support embedded nulls
 added Pico providers, Nmi, SiloMonitor and Errata manager callbacks

@@ -4,9 +4,9 @@
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.01
 *
-*  DATE:        19 Jun 2022
+*  DATE:        03 Dec 2022
 *
 *  Test code used while debug.
 *
@@ -1366,12 +1366,12 @@ VOID TestStart(
     VOID
 )
 {
-    TestCall();
-    TestRegistryTransaction();
+ //   TestCall();
+ //   TestRegistryTransaction();
     //TestTransactionResourceManager();
-    TestCreateBogusObjects();
+ //   TestCreateBogusObjects();
     //TestCmControlVector();
-    TestObCallback();
+ //   TestObCallback();
     //TestSectionControlArea();
     //TestSymbols();
     //TestSectionImage();
@@ -1391,7 +1391,7 @@ VOID TestStart(
     //TestTransaction();
     //TestSessions();
     //TestThread();
-    //PreHashTypes();
+    PreHashTypes();
     //TestJob();
 }
 

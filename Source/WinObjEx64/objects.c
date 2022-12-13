@@ -4,9 +4,9 @@
 *
 *  TITLE:       OBJECTS.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.01
 *
-*  DATE:        19 Jun 2022
+*  DATE:        03 Dec 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -28,7 +28,7 @@ WOBJ_TYPE_DESC g_TypeComposition = { L"Composition", 0xf009caea, ObjectTypeCompo
 WOBJ_TYPE_DESC g_TypeController = { L"Controller", 0x38a0df3c, ObjectTypeController, IDI_ICON_CONTROLLER, IDS_DESC_CONTROLLER };
 WOBJ_TYPE_DESC g_TypeCoreMessaging = { L"CoreMessaging", 0x86bcebe5, ObjectTypeCoreMessaging, IDI_ICON_COREMESSAGING, IDS_DESC_COREMESSAGING };
 WOBJ_TYPE_DESC g_TypeCoverageSampler = { L"CoverageSampler", 0xb6a0f960, ObjectTypeCoverageSampler, IDI_ICON_COVERAGESAMPLER, IDS_DESC_COVERAGESAMPLER };
-WOBJ_TYPE_DESC g_TypeCpuPartition = { L"CpuPartition", 0xafdf1c82, ObjectTypeCpuPartition, IDI_ICON_CPUPARTITION, IDI_DESC_CPUPARTITION };
+WOBJ_TYPE_DESC g_TypeCpuPartition = { L"CpuPartition", 0xafdf1c82, ObjectTypeCpuPartition, IDI_ICON_CPUPARTITION, IDS_DESC_CPUPARTITION };
 WOBJ_TYPE_DESC g_TypeDebugObject = { L"DebugObject", 0x8282e52, ObjectTypeDebugObject, IDI_ICON_DEBUGOBJECT, IDS_DESC_DEBUGOBJECT };
 WOBJ_TYPE_DESC g_TypeDesktop = { OBTYPE_NAME_DESKTOP, 0xd1ffc79c, ObjectTypeDesktop, IDI_ICON_DESKTOP, IDS_DESC_DESKTOP };
 WOBJ_TYPE_DESC g_TypeDevice = { L"Device", OBTYPE_HASH_DEVICE, ObjectTypeDevice, IDI_ICON_DEVICE, IDS_DESC_DEVICE };
@@ -74,6 +74,7 @@ WOBJ_TYPE_DESC g_TypePsSiloContextNonPaged = { L"PsSiloContextNonPaged", 0xe2c39
 WOBJ_TYPE_DESC g_TypePsSiloContextPaged = { L"PsSiloContextPaged", 0x8f91f0a2, ObjectTypePsSiloContextPaged, IDI_ICON_PSSILOCONTEXT, IDS_DESC_PSSILOCONTEXT };
 WOBJ_TYPE_DESC g_TypeRawInputManager = { L"RawInputManager", 0xf28870cb, ObjectTypeRawInputManager, IDI_ICON_RAWINPUTMANAGER, IDS_DESC_RAW_INPUT_MANAGER };
 WOBJ_TYPE_DESC g_TypeRegistryTransaction = { L"RegistryTransaction", 0xba530c61, ObjectTypeRegistryTransaction, IDI_ICON_KEY, IDS_DESC_REGISTRY_TRANSACTION };
+WOBJ_TYPE_DESC g_TypeSchedulerSharedData = { L"SchedulerSharedData", 0xa4930ca, ObjectTypeSchedulerSharedData, IDI_ICON_SCHEDULERSHAREDDATA, IDS_DESC_SCHEDULERSHAREDDATA };
 WOBJ_TYPE_DESC g_TypeSection = { L"Section", OBTYPE_HASH_SECTION, ObjectTypeSection, IDI_ICON_SECTION, IDS_DESC_SECTION };
 WOBJ_TYPE_DESC g_TypeSemaphore = { L"Semaphore", 0x33b553e4, ObjectTypeSemaphore, IDI_ICON_SEMAPHORE, IDS_DESC_SEMAPHORE };
 WOBJ_TYPE_DESC g_TypeSession = { L"Session", 0xcd4f9c96, ObjectTypeSession, IDI_ICON_SESSION, IDS_DESC_SESSION };
@@ -155,6 +156,7 @@ static WOBJ_TYPE_DESC* gpObjectTypes[] = {
     &g_TypePsSiloContextPaged,
     &g_TypeRawInputManager,
     &g_TypeRegistryTransaction,
+    &g_TypeSchedulerSharedData,
     &g_TypeSection,
     &g_TypeSemaphore,
     &g_TypeSession,

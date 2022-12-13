@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     2.00
+*  VERSION:     2.01
 *
-*  DATE:        19 Jun 2022
+*  DATE:        01 Dec 2022
 *
 *  Common header file for the program support routines.
 *
@@ -367,6 +367,7 @@ BOOL supHeapFree(
 #define supQueryHVCIState ntsupQueryHVCIState
 #define supLookupImageSectionByName ntsupLookupImageSectionByName
 #define supFindPattern ntsupFindPattern
+#define supFindPatternEx ntsupFindPatternEx
 #define supOpenProcess ntsupOpenProcess
 #define supOpenThread ntsupOpenThread
 #define supCICustomKernelSignersAllowed ntsupCICustomKernelSignersAllowed
@@ -702,10 +703,8 @@ HICON supGetStockIcon(
     _In_ SHSTOCKICONID siid,
     _In_ UINT uFlags);
 
-BOOL supGetWin32FileName(
-    _In_ LPCWSTR FileName,
-    _Inout_ LPWSTR Win32FileName,
-    _In_ SIZE_T ccWin32FileName);
+LPWSTR supGetWin32FileName(
+    _In_ LPCWSTR NtFileName);
 
 BOOLEAN supQuerySecureBootState(
     _Out_ PBOOLEAN pbSecureBoot);

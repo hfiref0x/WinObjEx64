@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTSUP.H
 *
-*  VERSION:     2.14
+*  VERSION:     2.16
 *
-*  DATE:        07 Aug 2022
+*  DATE:        01 Dec 2022
 *
 *  Common header file for the NT API support functions and definitions.
 *
@@ -82,6 +82,22 @@ typedef struct _OBJSCANPARAM {
 typedef NTSTATUS(NTAPI* PENUMOBJECTSCALLBACK)(
     _In_ POBJECT_DIRECTORY_INFORMATION Entry, 
     _In_opt_ PVOID CallbackParam);
+
+typedef BOOL(CALLBACK* pfnPatternSearchCallback)(
+    _In_ PBYTE Buffer,
+    _In_ ULONG PatternSize,
+    _In_opt_ PVOID CallbackContext
+    );
+
+typedef struct _PATTERN_SEARCH_PARAMS {
+    PBYTE Buffer;
+    DWORD BufferSize;
+    PBYTE Pattern;
+    DWORD PatternSize;
+    PBYTE Mask;
+    pfnPatternSearchCallback Callback;
+    PVOID CallbackContext;
+} PATTERN_SEARCH_PARAMS, * PPATTERN_SEARCH_PARAMS;
 
 PVOID ntsupHeapAlloc(
     _In_ SIZE_T Size);
@@ -255,6 +271,9 @@ PVOID ntsupFindPattern(
     _In_ SIZE_T BufferSize,
     _In_ CONST PBYTE Pattern,
     _In_ SIZE_T PatternSize);
+
+DWORD ntsupFindPatternEx(
+    _In_ PATTERN_SEARCH_PARAMS * SearchParams);
 
 NTSTATUS ntsupOpenProcess(
     _In_ HANDLE UniqueProcessId,

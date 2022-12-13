@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.01
 *
-*  DATE:        07 Aug 2022
+*  DATE:        01 Dec 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -80,8 +80,7 @@ VOID DrvListCopyHash(
 {
     INT         mark;
     NTSTATUS    ntStatus;
-    LPWSTR      lpItem, lpszHash = NULL;
-    WCHAR       szBuffer[MAX_PATH + 1];
+    LPWSTR      lpItem, lpszHash = NULL, lpWin32Name;
 
     FILE_VIEW_INFO fvi;
 
@@ -98,12 +97,13 @@ VOID DrvListCopyHash(
     if (lpItem == NULL)
         return;
 
-    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-    if (supGetWin32FileName(lpItem, szBuffer, MAX_PATH)) {
+    lpWin32Name = supGetWin32FileName(lpItem);
+
+    if (lpWin32Name) {
 
         RtlSecureZeroMemory(&fvi, sizeof(fvi));
 
-        fvi.FileName = szBuffer;
+        fvi.FileName = lpWin32Name;
 
         ntStatus = HashLoadFile(&fvi, FALSE);
         if (NT_SUCCESS(ntStatus)) {
@@ -131,6 +131,8 @@ VOID DrvListCopyHash(
         else {
             supShowNtStatus(Context->hwndDlg, TEXT("Error loading file, NTSTATUS: "), ntStatus);
         }
+
+        supHeapFree(lpWin32Name);
     }
 
     supHeapFree(lpItem);
@@ -303,9 +305,8 @@ VOID DrvListViewProperties(
     _In_ EXTRASCONTEXT* Context
 )
 {
-    LPWSTR  lpItem;
+    LPWSTR  lpItem, lpWin32Name;
     INT     mark;
-    WCHAR   szBuffer[MAX_PATH + 1];
 
     if (ListView_GetSelectedCount(Context->ListView)) {
         mark = ListView_GetSelectionMark(Context->ListView);
@@ -315,9 +316,11 @@ VOID DrvListViewProperties(
                 COLUMN_DRVLIST_MODULE_NAME, NULL);
 
             if (lpItem) {
-                RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-                if (supGetWin32FileName(lpItem, szBuffer, MAX_PATH))
-                    supShowProperties(Context->hwndDlg, szBuffer);
+                lpWin32Name = supGetWin32FileName(lpItem);
+                if (lpWin32Name) {
+                    supShowProperties(Context->hwndDlg, lpWin32Name);
+                    supHeapFree(lpWin32Name);
+                }
                 supHeapFree(lpItem);
             }
         }

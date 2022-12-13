@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.01
 *
-*  DATE:        19 June 2022
+*  DATE:        01 Dec 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -61,19 +61,6 @@ SYMCONTEXT* W32SymContext;
 //
 
 //
-// InitializeWin32Call search pattern
-//
-// push rbp
-// push r12
-// push r13
-// push r14
-// push r15
-//
-BYTE g_pbInitializeWin32CallPattern[] = {
-    0x55, 0x41, 0x54, 0x41, 0x55, 0x41, 0x56, 0x41, 0x57
-};
-
-//
 // Win32kApiSetTable adapter patterns
 //
 BYTE Win32kApiSetAdapterPattern1[] = {
@@ -96,7 +83,6 @@ static EXTRASCONTEXT SSTDlgContext[SST_Max];
 static HANDLE SdtDlgThreadHandles[SST_Max] = { NULL, NULL };
 static FAST_EVENT SdtDlgInitializedEvents[SST_Max] = { FAST_EVENT_INIT, FAST_EVENT_INIT };
 
-
 /*
 * SdtLoadWin32kImage
 *
@@ -115,7 +101,7 @@ HMODULE SdtLoadWin32kImage(
     _strcpy(szBuffer, g_WinObj.szSystemDirectory);
     _strcat(szBuffer, TEXT("\\win32k.sys"));
     hModule = LoadLibraryEx(szBuffer, NULL, DONT_RESOLVE_DLL_REFERENCES);
-
+    
     if (hModule) {
 
         if (SymContext) {
@@ -129,6 +115,70 @@ HMODULE SdtLoadWin32kImage(
     }
 
     return hModule;
+}
+
+typedef struct _SDT_SEARCH_CONTEXT {
+    PBYTE Result;
+} SDT_SEARCH_CONTEXT, * PSDT_SEARCH_CONTEXT;
+
+BOOL CALLBACK SearchPatternCallback(
+    _In_ PBYTE Buffer,
+    _In_ ULONG PatternSize,
+    _In_ PVOID CallbackContext
+)
+{
+    UNREFERENCED_PARAMETER(PatternSize);
+
+    PSDT_SEARCH_CONTEXT context = (PSDT_SEARCH_CONTEXT)CallbackContext;
+    context->Result = Buffer;
+
+    return TRUE;
+}
+
+/*
+* SdtFindInitializeWin32kCall
+*
+* Purpose:
+*
+* Locate prologue of win32k!InitializeWin32kCall.
+*
+*/
+PBYTE SdtFindInitializeWin32kCall(
+    _In_ PVOID SectionBase,
+    _In_ ULONG SectionSize
+)
+{
+    PBYTE result = NULL;
+    PATTERN_SEARCH_PARAMS params;
+    SDT_SEARCH_CONTEXT scontext;
+
+    BYTE pbOldPattern[] = { 0x55, 0x41, 0x54, 0x41, 0x55, 0x41, 0x56, 0x41, 0x57 };
+    BYTE pbPattern[] = { 0x48, 0x89, 0x5C, 0x24, 0x10, 0x48, 0x89, 0x6C, 0x24, 0x18, 0x48, 0x89, 0x7C, 0x24, 0x20 };
+    BYTE pbMask[] = { 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x00, 0x11, 0x11, 0x11, 0x11, 0x00, 0x11, 0x11 };
+
+    //
+    // Pre 19045.
+    //
+    result = (PBYTE)supFindPattern((PBYTE)SectionBase,
+        SectionSize,
+        pbOldPattern,
+        sizeof(pbOldPattern));
+
+    if (result)
+        return result;
+
+    scontext.Result = NULL;
+    params.Buffer = (PBYTE)SectionBase;
+    params.BufferSize = SectionSize;
+    params.Callback = SearchPatternCallback;
+    params.CallbackContext = &scontext;
+    params.Pattern = pbPattern;
+    params.PatternSize = sizeof(pbPattern);
+    params.Mask = pbMask;
+    if (supFindPatternEx(&params))
+        result = scontext.Result;
+
+    return result;
 }
 
 /*
@@ -182,13 +232,12 @@ ULONG_PTR SdtQueryWin32kApiSetTable(
         //
         // Locate InitializeWin32Call body.
         //
-        ptrCode = (PBYTE)supFindPattern((PBYTE)SectionBase,
-            SectionSize,
-            g_pbInitializeWin32CallPattern,
-            sizeof(g_pbInitializeWin32CallPattern));
+        ptrCode = SdtFindInitializeWin32kCall(SectionBase,
+            SectionSize);
 
-        if (ptrCode == NULL)
+        if (ptrCode == NULL) {
             return 0;
+        }
 
         Index = 0;
         instructionLength = 0;
@@ -202,8 +251,9 @@ ULONG_PTR SdtQueryWin32kApiSetTable(
             // lea reg, Win32kApiSetTable
             if (hs.len == 7) {
 
-                if ((ptrCode[Index] == 0x4C) &&
-                    (ptrCode[Index + 1] == 0x8D))
+                if ((ptrCode[Index] == 0x4C || ptrCode[Index] == 0x48) &&
+                    (ptrCode[Index + 1] == 0x8D) &&
+                    (ptrCode[Index + 2] == 0x05 || ptrCode[Index+2] == 0x2D))
                 {
                     relativeValue = *(PLONG)(ptrCode + Index + (hs.len - 4));
                     instructionLength = hs.len;
@@ -1692,13 +1742,12 @@ BOOL SdtDlgHandleNotify(
 {
     INT nImageIndex, iSelectionMark;
     LPNMLISTVIEW pListView = (LPNMLISTVIEW)lParam;
-    LPWSTR lpItem;
+    LPWSTR lpItem, lpWin32Name;
     HWND hwndListView;
 
     EXTRASCONTEXT* pDlgContext;
 
     EXTRASCALLBACK CallbackParam;
-    WCHAR szBuffer[MAX_PATH + 1];
 
     if (pListView == NULL)
         return FALSE;
@@ -1741,9 +1790,11 @@ BOOL SdtDlgHandleNotify(
         if (iSelectionMark >= 0) {
             lpItem = supGetItemText(hwndListView, iSelectionMark, 3, NULL);
             if (lpItem) {
-                RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-                if (supGetWin32FileName(lpItem, szBuffer, MAX_PATH))
-                    supShowProperties(hwndDlg, szBuffer);
+                lpWin32Name = supGetWin32FileName(lpItem);
+                if (lpWin32Name) {
+                    supShowProperties(hwndDlg, lpWin32Name);
+                    supHeapFree(lpWin32Name);
+                }
                 supHeapFree(lpItem);
             }
         }

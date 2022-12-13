@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTSUP.C
 *
-*  VERSION:     2.14
+*  VERSION:     2.16
 *
-*  DATE:        07 Aug 2022
+*  DATE:        01 Dec 2022
 *
 *  Native API support functions.
 *
@@ -1439,6 +1439,77 @@ PVOID ntsupFindPattern(
     } while (BufferSize > 0);
 
     return NULL;
+}
+
+/*
+* ntsupFindPatternEx
+*
+* Purpose:
+*
+* Lookup pattern in buffer with specified mask.
+*
+*/
+DWORD ntsupFindPatternEx(
+    _In_ PATTERN_SEARCH_PARAMS* SearchParams
+)
+{
+    PBYTE   p;
+    DWORD   c, i, n;
+    BOOLEAN found;
+    BYTE    low, high;
+
+    DWORD   bufferSize;
+
+    if (SearchParams == NULL)
+        return 0;
+
+    if ((SearchParams->PatternSize == 0) || (SearchParams->PatternSize > SearchParams->BufferSize))
+        return 0;
+
+    bufferSize = SearchParams->BufferSize - SearchParams->PatternSize;
+
+    for (n = 0, p = SearchParams->Buffer, c = 0; c <= bufferSize; ++p, ++c)
+    {
+        found = 1;
+        for (i = 0; i < SearchParams->PatternSize; ++i)
+        {
+            low = p[i] & 0x0f;
+            high = p[i] & 0xf0;
+
+            if (SearchParams->Mask[i] & 0xf0)
+            {
+                if (high != (SearchParams->Pattern[i] & 0xf0))
+                {
+                    found = 0;
+                    break;
+                }
+            }
+
+            if (SearchParams->Mask[i] & 0x0f)
+            {
+                if (low != (SearchParams->Pattern[i] & 0x0f))
+                {
+                    found = 0;
+                    break;
+                }
+            }
+
+        }
+
+        if (found) {
+
+            if (SearchParams->Callback(p,
+                SearchParams->PatternSize,
+                SearchParams->CallbackContext))
+            {
+                return n + 1;
+            }
+
+            n++;
+        }
+    }
+
+    return n;
 }
 
 /*

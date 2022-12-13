@@ -597,7 +597,7 @@ VOID propSetProcessTrustLabelInfo(
     // Re-open current object as we need READ_CONTROL.
     //
     if (!propOpenCurrentObject(Context, &hObject, READ_CONTROL)) {
-        SetDlgItemText(hwndDlg, ID_OBJECT_TRUSTLABEL, T_EmptyString);
+        ShowWindow(GetDlgItem(hwndDlg, ID_OBJECT_TRUSTLABEL), SW_HIDE);
         return;
     }
 
@@ -627,6 +627,7 @@ VOID propSetProcessTrustLabelInfo(
             _strcat(szBuffer, lpLevel);
 
             ShowWindow(GetDlgItem(hwndDlg, ID_PTL_CAPTION), SW_SHOW);
+            ShowWindow(GetDlgItem(hwndDlg, ID_OBJECT_TRUSTLABEL), SW_SHOW);
             SetDlgItemText(hwndDlg, ID_OBJECT_TRUSTLABEL, szBuffer);
             bFail = FALSE;
         }
@@ -635,8 +636,8 @@ VOID propSetProcessTrustLabelInfo(
     propCloseCurrentObject(Context, hObject);
 
     if (bFail) {
+        ShowWindow(GetDlgItem(hwndDlg, ID_OBJECT_TRUSTLABEL), SW_HIDE);
         ShowWindow(GetDlgItem(hwndDlg, ID_PTL_CAPTION), SW_HIDE);
-        SetDlgItemText(hwndDlg, ID_OBJECT_TRUSTLABEL, T_EmptyString);
     }
 }
 

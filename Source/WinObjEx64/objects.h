@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.01
 *
-*  DATE:        03 Dec 2022
+*  DATE:        18 Dec 2022
 *
 *  Header file for internal Windows object types handling.
 *
@@ -82,25 +82,27 @@ typedef enum _WOBJ_OBJECT_TYPE {
     ObjectTypeRegistryTransaction = 54,
     ObjectTypeDmaAdapter = 55,
     ObjectTypeDmaDomain = 56,
-    ObjectTypeUnknown = 57,
-    ObjectTypeActivationObject = ObjectTypeUnknown,
-    ObjectTypeActivityReference = ObjectTypeUnknown,
-    ObjectTypeCoreMessaging = ObjectTypeUnknown,
-    ObjectTypeCoverageSampler = ObjectTypeUnknown,
+    ObjectTypeCoverageSampler = 57, //NI
+    ObjectTypeActivationObject = 58, //NI
+    ObjectTypeActivityReference = 59, //NI
+    ObjectTypeCoreMessaging = 60, //NI
+    ObjectTypeRawInputManager = 61, //NI
+    ObjectTypeWaitCompletionPacket = 62, //NI
+    ObjectTypeIoCompletionReserve = 63, 
+    ObjectTypeUserApcReserve = 64, //NI
+    ObjectTypeIoRing = 65, //NI
+    ObjectTypeTerminal = 66, //NI
+    ObjectTypeTerminalEventQueue = 67, //NI
+    ObjectTypeEnergyTracker = 68, //NI
+    ObjectTypeUnknown = 69,
     ObjectTypeEtwSessionDemuxEntry = ObjectTypeUnknown,
-    ObjectTypeIoCompletionReserve = ObjectTypeUnknown,
     ObjectTypeNdisCmState = ObjectTypeUnknown,
     ObjectTypePsSiloContextNonPaged = ObjectTypeUnknown,
     ObjectTypePsSiloContextPaged = ObjectTypeUnknown,
-    ObjectTypeRawInputManager = ObjectTypeUnknown,
-    ObjectTypeUserApcReserve = ObjectTypeUnknown,
     ObjectTypeVirtualKey = ObjectTypeUnknown,
     ObjectTypeVRegConfigurationContext = ObjectTypeUnknown,
-    ObjectTypeWaitCompletionPacket = ObjectTypeUnknown,
-    ObjectTypeEnergyTracker = ObjectTypeUnknown,
     ObjectTypeProcessStateChange = ObjectTypeUnknown,
     ObjectTypeThreadStateChange = ObjectTypeUnknown,
-    ObjectTypeIoRing = ObjectTypeUnknown,
     ObjectTypeCpuPartition = ObjectTypeUnknown,
     ObjectTypeSchedulerSharedData = ObjectTypeUnknown,
     ObjectTypeMax
@@ -159,36 +161,30 @@ typedef struct _WOBJ_TYPE_DESC {
 #define UNUSED_IDI_ICON IDI_ICON_UNKNOWN
 #define UNUSED_IDS_DESC IDS_DESC_UNKNOWN
 
+#define IDI_ICON_IORING UNUSED_IDI_ICON
 #define IDI_ICON_ACTIVATIONOBJECT UNUSED_IDI_ICON
-#define IDS_DESC_ACTIVATIONOBJECT UNUSED_IDS_DESC
-
 #define IDI_ICON_ACTIVITYREFERENCE UNUSED_IDI_ICON
-#define IDS_DESC_ACTIVITYREFERENCE UNUSED_IDS_DESC
-
 #define IDI_ICON_COREMESSAGING UNUSED_IDI_ICON
-#define IDS_DESC_COREMESSAGING UNUSED_IDS_DESC
-
 #define IDI_ICON_COVERAGESAMPLER UNUSED_IDI_ICON
-#define IDS_DESC_COVERAGESAMPLER UNUSED_IDS_DESC
+#define IDI_ICON_RAWINPUTMANAGER UNUSED_IDI_ICON
+#define IDI_ICON_WAITCOMPLETIONPACKET UNUSED_IDI_ICON
+#define IDI_ICON_IOCOMPLETION_RESERVE UNUSED_IDI_ICON
+#define IDI_ICON_USERAPCRESERVE UNUSED_IDI_ICON
+#define IDI_ICON_ENERGYTRACKER UNUSED_IDI_ICON
+
+#define IDI_ICON_TERMINAL UNUSED_IDI_ICON
+#define IDI_ICON_TERMINALEVENTQUEUE UNUSED_IDI_ICON
 
 #define IDI_ICON_ETWSESSIONDEMUXENTRY UNUSED_IDI_ICON
 #define IDS_DESC_ETWSESSIONDEMUXENTRY UNUSED_IDS_DESC
-
-#define IDI_ICON_IOCOMPLETION_RESERVE UNUSED_IDI_ICON
-#define IDS_DESC_IOCOMPLETION_RESERVE UNUSED_IDS_DESC
 
 #define IDI_ICON_NDISCMSTATE UNUSED_IDI_ICON
 #define IDS_DESC_NDISCMSTATE UNUSED_IDS_DESC
 
 #define IDI_ICON_PSSILOCONTEXT UNUSED_IDI_ICON
-#define IDS_DESC_PSSILOCONTEXTNP UNUSED_IDS_DESC
 #define IDS_DESC_PSSILOCONTEXT UNUSED_IDS_DESC
 
-#define IDI_ICON_RAWINPUTMANAGER UNUSED_IDI_ICON
-#define IDS_DESC_RAW_INPUT_MANAGER UNUSED_IDS_DESC
-
-#define IDI_ICON_USERAPCRESERVE UNUSED_IDI_ICON
-#define IDS_DESC_USERAPCRESERVE UNUSED_IDS_DESC
+#define IDS_DESC_PSSILOCONTEXTNP UNUSED_IDS_DESC
 
 #define IDI_ICON_VIRTUALKEY UNUSED_IDI_ICON
 #define IDS_DESC_VIRTUALKEY UNUSED_IDS_DESC
@@ -196,20 +192,11 @@ typedef struct _WOBJ_TYPE_DESC {
 #define IDI_ICON_VREGCFGCTX UNUSED_IDI_ICON
 #define IDS_DESC_VREGCFGCTX UNUSED_IDS_DESC
 
-#define IDI_ICON_WAITCOMPLETIONPACKET UNUSED_IDI_ICON
-#define IDS_DESC_WAITCOMPLETIONPACKET UNUSED_IDS_DESC
-
-#define IDI_ICON_ENERGYTRACKER UNUSED_IDI_ICON
-#define IDS_DESC_ENERGYTRACKER UNUSED_IDS_DESC
-
 #define IDI_ICON_PROCESSSTATECHANGE UNUSED_IDI_ICON
 #define IDS_DESC_PROCESSSTATECHANGE UNUSED_IDS_DESC
 
 #define IDI_ICON_THREADSTATECHANGE UNUSED_IDI_ICON
 #define IDS_DESC_THREADSTATECHANGE UNUSED_IDS_DESC
-
-#define IDI_ICON_IORING UNUSED_IDI_ICON
-#define IDS_DESC_IORING UNUSED_IDS_DESC
 
 #define IDI_ICON_CPUPARTITION UNUSED_IDI_ICON
 #define IDS_DESC_CPUPARTITION UNUSED_IDS_DESC

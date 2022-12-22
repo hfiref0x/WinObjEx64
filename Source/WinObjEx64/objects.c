@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.01
 *
-*  DATE:        03 Dec 2022
+*  DATE:        18 Dec 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -24,7 +24,7 @@ WOBJ_TYPE_DESC g_TypeActivityReference = { L"ActivityReference", 0x44db295c, Obj
 WOBJ_TYPE_DESC g_TypeAdapter = { L"Adapter", 0x5b4bfe0f, ObjectTypeAdapter, IDI_ICON_ADAPTER, IDS_DESC_ADAPTER };
 WOBJ_TYPE_DESC g_TypePort = { L"ALPC Port", 0xfc99f003, ObjectTypePort, IDI_ICON_PORT, IDS_DESC_PORT };
 WOBJ_TYPE_DESC g_TypeCallback = { L"Callback", 0xd619e0a5, ObjectTypeCallback, IDI_ICON_CALLBACK, IDS_DESC_CALLBACK };
-WOBJ_TYPE_DESC g_TypeComposition = { L"Composition", 0xf009caea, ObjectTypeComposition, IDI_ICON_COMPOSITION, IDS_DESC_COMPOSITION };
+WOBJ_TYPE_DESC g_TypeComposition = { L"Composition", 0xf009caea, ObjectTypeComposition, IDI_ICON_DXOBJECT, IDS_DESC_COMPOSITION };
 WOBJ_TYPE_DESC g_TypeController = { L"Controller", 0x38a0df3c, ObjectTypeController, IDI_ICON_CONTROLLER, IDS_DESC_CONTROLLER };
 WOBJ_TYPE_DESC g_TypeCoreMessaging = { L"CoreMessaging", 0x86bcebe5, ObjectTypeCoreMessaging, IDI_ICON_COREMESSAGING, IDS_DESC_COREMESSAGING };
 WOBJ_TYPE_DESC g_TypeCoverageSampler = { L"CoverageSampler", 0xb6a0f960, ObjectTypeCoverageSampler, IDI_ICON_COVERAGESAMPLER, IDS_DESC_COVERAGESAMPLER };
@@ -56,7 +56,7 @@ WOBJ_TYPE_DESC g_TypeFile = { OBTYPE_NAME_FILE, 0xecfd8b1c, ObjectTypeFile, IDI_
 WOBJ_TYPE_DESC g_TypeFilterCommunicationPort = { L"FilterCommunicationPort", 0x7849195f, ObjectTypeFltComnPort, IDI_ICON_FLTCOMMPORT, IDS_DESC_FLT_COMM_PORT };
 WOBJ_TYPE_DESC g_TypeFilterConnectionPort = { L"FilterConnectionPort", 0x4598bf7, ObjectTypeFltConnPort, IDI_ICON_FLTCONNPORT, IDS_DESC_FLT_CONN_PORT };
 WOBJ_TYPE_DESC g_TypeIoCompletion = { L"IoCompletion", 0xbc81c342, ObjectTypeIoCompletion, IDI_ICON_IOCOMPLETION, IDS_DESC_IOCOMPLETION };
-WOBJ_TYPE_DESC g_TypeIoCompletionReserve = { L"IoCompletionReserve", 0xca6e211a, ObjectTypeIoCompletionReserve, IDI_ICON_IOCOMPLETION_RESERVE, IDS_DESC_IOCOMPLETION_RESERVE };
+WOBJ_TYPE_DESC g_TypeIoCompletionReserve = { L"IoCompletionReserve", 0xca6e211a, ObjectTypeIoCompletionReserve, IDI_ICON_IOCOMPLETION, IDS_DESC_IOCOMPLETIONRESERVE };
 WOBJ_TYPE_DESC g_TypeIoRing = { L"IoRing", 0xe17640f6, ObjectTypeIoRing, IDI_ICON_IORING, IDS_DESC_IORING };
 WOBJ_TYPE_DESC g_TypeIRTimer = { L"IRTimer", 0xc161a6dc, ObjectTypeIRTimer, IDI_ICON_IRTIMER, IDS_DESC_IRTIMER };
 WOBJ_TYPE_DESC g_TypeJob = { L"Job", 0x24df96fd, ObjectTypeJob, IDI_ICON_JOB, IDS_DESC_JOB };
@@ -72,13 +72,15 @@ WOBJ_TYPE_DESC g_TypeProcessStateChange = { L"ProcessStateChange", 0x6fd57b92, O
 WOBJ_TYPE_DESC g_TypeProfile = { L"Profile", 0xfe82aac9, ObjectTypeProfile, IDI_ICON_PROFILE, IDS_DESC_PROFILE };
 WOBJ_TYPE_DESC g_TypePsSiloContextNonPaged = { L"PsSiloContextNonPaged", 0xe2c391fb, ObjectTypePsSiloContextNonPaged, IDI_ICON_PSSILOCONTEXT, IDS_DESC_PSSILOCONTEXTNP };
 WOBJ_TYPE_DESC g_TypePsSiloContextPaged = { L"PsSiloContextPaged", 0x8f91f0a2, ObjectTypePsSiloContextPaged, IDI_ICON_PSSILOCONTEXT, IDS_DESC_PSSILOCONTEXT };
-WOBJ_TYPE_DESC g_TypeRawInputManager = { L"RawInputManager", 0xf28870cb, ObjectTypeRawInputManager, IDI_ICON_RAWINPUTMANAGER, IDS_DESC_RAW_INPUT_MANAGER };
+WOBJ_TYPE_DESC g_TypeRawInputManager = { L"RawInputManager", 0xf28870cb, ObjectTypeRawInputManager, IDI_ICON_RAWINPUTMANAGER, IDS_DESC_RAWINPUTMANAGER };
 WOBJ_TYPE_DESC g_TypeRegistryTransaction = { L"RegistryTransaction", 0xba530c61, ObjectTypeRegistryTransaction, IDI_ICON_KEY, IDS_DESC_REGISTRY_TRANSACTION };
 WOBJ_TYPE_DESC g_TypeSchedulerSharedData = { L"SchedulerSharedData", 0xa4930ca, ObjectTypeSchedulerSharedData, IDI_ICON_SCHEDULERSHAREDDATA, IDS_DESC_SCHEDULERSHAREDDATA };
 WOBJ_TYPE_DESC g_TypeSection = { L"Section", OBTYPE_HASH_SECTION, ObjectTypeSection, IDI_ICON_SECTION, IDS_DESC_SECTION };
 WOBJ_TYPE_DESC g_TypeSemaphore = { L"Semaphore", 0x33b553e4, ObjectTypeSemaphore, IDI_ICON_SEMAPHORE, IDS_DESC_SEMAPHORE };
 WOBJ_TYPE_DESC g_TypeSession = { L"Session", 0xcd4f9c96, ObjectTypeSession, IDI_ICON_SESSION, IDS_DESC_SESSION };
 WOBJ_TYPE_DESC g_TypeSymbolicLink = { L"SymbolicLink", OBTYPE_HASH_SYMBOLIC_LINK, ObjectTypeSymbolicLink, IDI_ICON_SYMLINK, IDS_DESC_SYMLINK };
+WOBJ_TYPE_DESC g_TypeTerminal = { L"Terminal", 0x17fd8d1c, ObjectTypeTerminal, IDI_ICON_TERMINAL, IDS_DESC_TERMINAL };
+WOBJ_TYPE_DESC g_TypeTerminalEventQueue = { L"TerminalEventQueue", 0x87c5d493, ObjectTypeTerminalEventQueue, IDI_ICON_TERMINALEVENTQUEUE, IDS_DESC_TERMINALEVENTQUEUE };
 WOBJ_TYPE_DESC g_TypeThread = { OBTYPE_NAME_THREAD, 0xc8bcac4a, ObjectTypeThread, IDI_ICON_THREAD, IDS_DESC_THREAD };
 WOBJ_TYPE_DESC g_TypeThreadStateChange = { L"ThreadStateChange", 0x88afedd7, ObjectTypeThreadStateChange, IDI_ICON_THREADSTATECHANGE, IDS_DESC_THREADSTATECHANGE };
 WOBJ_TYPE_DESC g_TypeTimer = { L"Timer", 0x94ec7de5, ObjectTypeTimer, IDI_ICON_TIMER, IDS_DESC_TIMER };
@@ -161,6 +163,8 @@ static WOBJ_TYPE_DESC* gpObjectTypes[] = {
     &g_TypeSemaphore,
     &g_TypeSession,
     &g_TypeSymbolicLink,
+    &g_TypeTerminal,
+    &g_TypeTerminalEventQueue,
     &g_TypeThread,
     &g_TypeThreadStateChange,
     &g_TypeTimer,

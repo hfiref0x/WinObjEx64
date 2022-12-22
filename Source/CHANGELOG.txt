@@ -1,6 +1,7 @@
 v2.0.1
 recent win10/win11 compatibility improvements
 token properties dialog changes
+added and updated some object type descriptions (from Windows Internals 7ed book)
 
 v2.0.0
 added entirely new handling of object names to support embedded nulls

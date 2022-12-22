@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPSECURITY.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.01
 *
-*  DATE:        19 Jun 2022
+*  DATE:        18 Dec 2022
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -231,6 +231,7 @@ PSI_ACCESS propGetAccessTable(
         break;
 
     case ObjectTypeIoCompletion:
+    case ObjectTypeIoCompletionReserve:
         This->dwAccessMax = MAX_KNOWN_IOCOMPLETION_ACCESS_VALUE;
         AccessTable = (PSI_ACCESS)&IoCompletionAccessValues;
         break;

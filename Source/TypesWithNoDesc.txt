@@ -1,20 +1,12 @@
-ActivationObject - 19H1, win32k managed object
-ActivityReference - new RS2 object
-CoreMessagining - new RS1 object, win32k managed object
-CoverageSampler - new RS4 object, ETW
 CpuPartition - new Win11 object, unnamed objects
 EtwSessionDemuxEntry - new Win10 object
-IoCompletionReserve - same as IoCompletion except using reserve process allocated memory
-IoRing - new 21H2 object, circular buffer used to queue multiple I/O operations simultaneously
 NetworkNamespace - managed by NDIS.sys (renamed to NdisCmState in RS1)
 ProcessStateChange - new 21H1 object
 ThreadStateChange - new 21H1 object
 PsSiloContextNonPaged - new RS1 object
 PsSiloContextPaged - new RS1 object
-RawInputManager - win32k managed object
+SchedulerSharedData - new win11 22h2+ object, unnamed objects
 Silo (r3 interface removed in 10240 release, object removed in TH2 builds)
-UserApcReserve - same as NtQueueApc except using reserve process allocated memory
 VirtualKey - new RS1 object (not present in RS2)
 VRegConfigurationContext - new RS1 object
-WaitCompletionPacket
 

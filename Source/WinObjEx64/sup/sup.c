@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2023
 *
 *  TITLE:       SUP.C
 *
 *  VERSION:     2.01
 *
-*  DATE:        01 Dec 2022
+*  DATE:        01 Mar 2023
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,6 +17,50 @@
 #include "global.h"
 #include "treelist/treelist.h"
 #include "props/propTypeConsts.h"
+
+#ifndef OBEX_DEFINE_GUID
+#define OBEX_DEFINE_GUID(name, l, w1, w2, b1, b2, b3, b4, b5, b6, b7, b8) \
+     EXTERN_C const GUID DECLSPEC_SELECTANY name \
+                = { l, w1, w2, { b1, b2,  b3,  b4,  b5,  b6,  b7,  b8 } }  
+#endif
+
+OBEX_DEFINE_GUID(ShimDriverScope, 0xBC04AB45, 0xEA7E, 0x4A11, 0xA7, 0xBB, 0x97, 0x76, 0x15, 0xF4, 0xCA, 0xAE);
+OBEX_DEFINE_GUID(ShimVersionLie1, 0x3E28B2D1, 0xE633, 0x408C, 0x8E, 0x9B, 0x2A, 0xFA, 0x6F, 0x47, 0xFC, 0xC3);
+OBEX_DEFINE_GUID(ShimVersionLie2, 0x47712F55, 0xBD93, 0x43FC, 0x92, 0x48, 0xB9, 0xA8, 0x37, 0x10, 0x06, 0x6E);
+OBEX_DEFINE_GUID(ShimVersionLie3, 0x21C4FB58, 0xD477, 0x4839, 0xA7, 0xEA, 0xAD, 0x69, 0x18, 0xFB, 0xC5, 0x18);
+OBEX_DEFINE_GUID(ShimSkipDriverUnload, 0x3E8C2CA6, 0x34E2, 0x4DE6, 0x8A, 0x1E, 0x96, 0x92, 0xDD, 0x3E, 0x31, 0x6B);
+OBEX_DEFINE_GUID(ShimZeroPool, 0x6B847429, 0xC430, 0x4682, 0xB5, 0x5F, 0xFD, 0x11, 0xA7, 0xB5, 0x54, 0x65);
+OBEX_DEFINE_GUID(ShimClearPCIDBits, 0xB4678DFF, 0xBD3E, 0x46C9, 0x92, 0x3B, 0xB5, 0x73, 0x34, 0x83, 0xB0, 0xB3);
+OBEX_DEFINE_GUID(ShimKaspersky, 0xB4678DFF, 0xCC3E, 0x46C9, 0x92, 0x3B, 0xB5, 0x73, 0x34, 0x83, 0xB0, 0xB3);
+OBEX_DEFINE_GUID(ShimMemcpy, 0x8A2517C1, 0x35D6, 0x4CA8, 0x9E, 0xC8, 0x98, 0xA1, 0x27, 0x62, 0x89, 0x1B);
+OBEX_DEFINE_GUID(ShimKernelPadSectionsOverride, 0x4F55C0DB, 0x73D3, 0x43F2, 0x97, 0x23, 0x8A, 0x9C, 0x7F, 0x79, 0xD3, 0x9D);
+OBEX_DEFINE_GUID(ShimNdisVersionLie, 0x49691313, 0x1362, 0x4E75, 0x8C, 0x2A, 0x2D, 0xD7, 0x29, 0x28, 0xEB, 0xA5);
+OBEX_DEFINE_GUID(ShimSrb, 0x434ABAFD, 0x08FA, 0x4C3D, 0xA8, 0x8D, 0xD0, 0x9A, 0x88, 0xE2, 0xAB, 0x17);
+OBEX_DEFINE_GUID(ShimDeviceId, 0x0332EC62, 0x865A, 0x4A39, 0xB4, 0x8F, 0xCD, 0xA6, 0xE8, 0x55, 0xF4, 0x23);
+OBEX_DEFINE_GUID(ShimATADeviceId, 0x26665D57, 0x2158, 0x4E4B, 0xA9, 0x59, 0xC9, 0x17, 0xD0, 0x3A, 0x0D, 0x7E);
+OBEX_DEFINE_GUID(ShimBluetoothFilterPower, 0x6AD90DAD, 0xC144, 0x4E9D, 0xA0, 0xCF, 0xAE, 0x9F, 0xCB, 0x90, 0x1E, 0xBD);
+OBEX_DEFINE_GUID(ShimUsbConexant, 0xFD8FD62E, 0x4D94, 0x4FC7, 0x8A, 0x68, 0xBF, 0xF7, 0x86, 0x5A, 0x70, 0x6B);
+OBEX_DEFINE_GUID(ShimNokiaPCSuite, 0x7DD60997, 0x651F, 0x4ECB, 0xB8, 0x93, 0xBE, 0xC8, 0x05, 0x0F, 0x3B, 0xD7);
+
+SUP_SHIM_INFO KsepShimInformation[] = {
+    { L"DriverScope", (GUID*)&ShimDriverScope, L"ETW event logger", L"ntos" },
+    { L"VersionLie",  (GUID*)&ShimVersionLie1, L"Reports previous version of OS", L"ntos" },
+    { L"VersionLie",  (GUID*)&ShimVersionLie2, L"Reports previous version of OS", L"ntos" },
+    { L"VersionLie",  (GUID*)&ShimVersionLie3, L"Reports previous version of OS", L"ntos" },
+    { L"SkipDriverUnload", (GUID*)&ShimSkipDriverUnload, L"Replace driver unload with ETW hook", L"ntos" },
+    { L"ZeroPool", (GUID*)&ShimZeroPool, L"ExAllocatePool hook that forces zeroes allocation", L"ntos" },
+    { L"ClearPCIDBits", (GUID*)&ShimClearPCIDBits, L"Clear PCID bits for some ISV", L"ntos" },
+    { L"Kaspersky", (GUID*)&ShimKaspersky, L"Kaspersky driver forced bugfix", L"ntos" },
+    { L"memcpy", (GUID*)&ShimMemcpy, L"memcpy hook to \"safer\" variant", L"ntos" },
+    { L"KernelPadSectionsOverride", (GUID*)&ShimKernelPadSectionsOverride, L"Blocks drivers discardable section disposal", L"ntos" },
+    { L"NdisVersionLie", (GUID*)&ShimNdisVersionLie, L"Reports NDIS version 6.40", L"ndis" },
+    { L"SrbShim", (GUID*)&ShimSrb, L"SCSI request IOCTL_STORAGE_QUERY_PROPERTY compatibility hook", L"storport" },
+    { L"DeviceIdShim", (GUID*)&ShimDeviceId, L"RAID compatibility shim", L"storport" },
+    { L"ATADeviceIdShim", (GUID*)&ShimATADeviceId, L"SATA compatibility shim", L"storport" },
+    { L"BluetoothFilterPowerShim", (GUID*)&ShimBluetoothFilterPower, L"Bluetooth filter driver compatibility shim", L"bthport" },
+    { L"UsbConexantShim", (GUID*)&ShimUsbConexant, L"USB modem compatibility shim", L"usbd" },
+    { L"NokiaShim", (GUID*)&ShimNokiaPCSuite, L"Nokia PC Suite compatibility shim", L"usbd" }
+};
 
 LIST_ENTRY supShutdownListHead;
 CRITICAL_SECTION supShutdownListLock;
@@ -7249,11 +7293,14 @@ BOOLEAN supIsFileImageSection(
 */
 BOOLEAN supIsDriverShimmed(
     _In_ PKSE_ENGINE_DUMP KseEngineDump,
-    _In_ PVOID DriverBaseAddress)
+    _In_ PVOID DriverBaseAddress,
+    _Out_opt_ GUID* ShimGUID)
 {
     PLIST_ENTRY Entry, NextEntry, ListHead;
     KSE_SHIMMED_DRIVER* ShimmedDriver;
 
+    if (ShimGUID)
+        *ShimGUID = GUID_NULL;
 
     if (KseEngineDump->Valid == FALSE)
         return FALSE;
@@ -7270,11 +7317,44 @@ BOOLEAN supIsDriverShimmed(
         Entry = NextEntry, NextEntry = Entry->Flink)
     {
         ShimmedDriver = CONTAINING_RECORD(Entry, KSE_SHIMMED_DRIVER, ListEntry);
-        if (DriverBaseAddress == ShimmedDriver->DriverBaseAddress)
+        if (DriverBaseAddress == ShimmedDriver->DriverBaseAddress) {
+            
+            if (ShimGUID) {
+                if (ShimmedDriver->ShimGuid)
+                    kdReadSystemMemory((ULONG_PTR)ShimmedDriver->ShimGuid,
+                    ShimGUID,
+                    sizeof(GUID));
+            }
+            
             return TRUE;
+        }
     }
 
     return FALSE;
+}
+
+/*
+* supGetDriverShimInformation
+*
+* Purpose:
+*
+* Return TRUE if driver shimmed by KSE.
+*
+*/
+SUP_SHIM_INFO* supGetDriverShimInformation(
+    _In_ GUID ShimGuid
+)
+{
+    ULONG i;
+
+    for (i = 0; i < RTL_NUMBER_OF(KsepShimInformation); i++) {
+        if (sizeof(GUID) == RtlCompareMemory(
+            (PVOID)KsepShimInformation[i].Guid,
+            (PVOID)&ShimGuid,
+            sizeof(GUID))) return &KsepShimInformation[i];
+    }
+
+    return NULL;
 }
 
 size_t supxEscStrlen(wchar_t* s)

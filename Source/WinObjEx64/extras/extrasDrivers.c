@@ -875,7 +875,10 @@ VOID DrvListDrivers(
     HWND hwndList = Context->ListView;
 
     LVITEM lvitem;
-    WCHAR szBuffer[MAX_PATH + 1];
+    WCHAR szBuffer[MAX_PATH * 2];
+
+    GUID shimGUID;
+    SUP_SHIM_INFO *shimInfo;
 
     RTL_PROCESS_MODULES* pModulesList = NULL;
     PRTL_PROCESS_MODULE_INFORMATION pModule;
@@ -979,10 +982,24 @@ VOID DrvListDrivers(
 
             if (supIsDriverShimmed(
                 &g_kdctx.Data->KseEngineDump,
-                pModule->ImageBase))
+                pModule->ImageBase,
+                &shimGUID))
             {
                 g_cDrvShimmed += 1;
-                _strcpy(szBuffer, TEXT("Yes"));
+
+                shimInfo = supGetDriverShimInformation(shimGUID);
+                if (shimInfo) {
+
+                    RtlStringCchPrintfSecure(szBuffer,
+                        RTL_NUMBER_OF(szBuffer),
+                        L"%ws: %ws",
+                        shimInfo->KseShimName,
+                        shimInfo->OwnerModule);
+
+                }
+                else {
+                    _strcpy(szBuffer, TEXT("Yes"));
+                }
             }
 
             lvitem.iSubItem = 5;

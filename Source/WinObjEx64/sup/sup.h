@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2023
 *
 *  TITLE:       SUP.H
 *
 *  VERSION:     2.01
 *
-*  DATE:        01 Dec 2022
+*  DATE:        01 Mar 2023
 *
 *  Common header file for the program support routines.
 *
@@ -320,6 +320,13 @@ VOID supResetFastEvent(
 BOOLEAN supWaitForFastEvent(
     _In_ PFAST_EVENT Event,
     _In_opt_ PLARGE_INTEGER Timeout);
+
+typedef struct _SUP_SHIM_INFO {
+    LPCWSTR KseShimName;
+    GUID *Guid;
+    LPCWSTR Description;
+    LPCWSTR OwnerModule;
+} SUP_SHIM_INFO, * PSUP_SHIM_INFO;
 
 //
 // Heap memory allocations
@@ -1014,7 +1021,11 @@ BOOLEAN supIsFileImageSection(
 
 BOOLEAN supIsDriverShimmed(
     _In_ PKSE_ENGINE_DUMP KseEngineDump,
-    _In_ PVOID DriverBaseAddress);
+    _In_ PVOID DriverBaseAddress,
+    _Out_opt_ GUID* ShimGUID);
+
+SUP_SHIM_INFO* supGetDriverShimInformation(
+    _In_ GUID ShimGuid);
 
 BOOL supListViewExportToFile(
     _In_ LPCWSTR FileName,

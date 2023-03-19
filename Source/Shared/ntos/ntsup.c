@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2011 - 2022 UGN/HE
+*  (C) COPYRIGHT AUTHORS, 2011 - 2023 UGN/HE
 *
 *  TITLE:       NTSUP.C
 *
-*  VERSION:     2.16
+*  VERSION:     2.17
 *
-*  DATE:        01 Dec 2022
+*  DATE:        06 Feb 2023
 *
 *  Native API support functions.
 *
@@ -341,7 +341,7 @@ BOOL ntsupFindModuleEntryByAddress(
 * Find Module Name for given Address.
 *
 */
-BOOL ntsupFindModuleNameByAddress(
+PVOID ntsupFindModuleNameByAddress(
     _In_ PRTL_PROCESS_MODULES pModulesList,
     _In_ PVOID Address,
     _Inout_	LPWSTR Buffer,
@@ -356,7 +356,7 @@ BOOL ntsupFindModuleNameByAddress(
     if ((Buffer == NULL) ||
         (ccBuffer == 0))
     {
-        return FALSE;
+        return NULL;
     }
 
     modulesCount = pModulesList->NumberOfModules;
@@ -383,14 +383,14 @@ BOOL ntsupFindModuleNameByAddress(
 
                 RtlFreeUnicodeString(&usConvertedName);
 
-                return TRUE;
+                return &pModulesList->Modules[i];
             }
             else {
-                return FALSE;
+                return NULL;
             }
         }
     }
-    return FALSE;
+    return NULL;
 }
 
 /*

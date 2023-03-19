@@ -1,12 +1,12 @@
 /************************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2011 - 2022 UGN/HE
+*  (C) COPYRIGHT AUTHORS, 2011 - 2023 UGN/HE
 *
 *  TITLE:       NTSUP.H
 *
-*  VERSION:     2.16
+*  VERSION:     2.17
 *
-*  DATE:        01 Dec 2022
+*  DATE:        06 Feb 2023
 *
 *  Common header file for the NT API support functions and definitions.
 *
@@ -141,7 +141,7 @@ BOOL ntsupFindModuleEntryByAddress(
     _In_ PVOID Address,
     _Out_ PULONG ModuleIndex);
 
-BOOL ntsupFindModuleNameByAddress(
+PVOID ntsupFindModuleNameByAddress(
     _In_ PRTL_PROCESS_MODULES pModulesList,
     _In_ PVOID Address,
     _Inout_	LPWSTR Buffer,

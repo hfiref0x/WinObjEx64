@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2022
+*  (C) COPYRIGHT AUTHORS, 2019 - 2023
 *
 *  TITLE:       EXTRASPSLIST.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.01
 *
-*  DATE:        19 Jun 2022
+*  DATE:        06 Feb 2023
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1110,7 +1110,7 @@ DWORD WINAPI CreateThreadListProc(
                 //
                 szBuffer[0] = 0;
                 if (startAddress > g_kdctx.SystemRangeStart && pModules) {
-                    if (!ntsupFindModuleNameByAddress(
+                    if (NULL == ntsupFindModuleNameByAddress(
                         pModules,
                         (PVOID)startAddress,
                         szBuffer,

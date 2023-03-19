@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.01
 *
-*  DATE:        01 Mar 2023
+*  DATE:        10 Mar 2023
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -41,6 +41,7 @@ OBEX_DEFINE_GUID(ShimATADeviceId, 0x26665D57, 0x2158, 0x4E4B, 0xA9, 0x59, 0xC9, 
 OBEX_DEFINE_GUID(ShimBluetoothFilterPower, 0x6AD90DAD, 0xC144, 0x4E9D, 0xA0, 0xCF, 0xAE, 0x9F, 0xCB, 0x90, 0x1E, 0xBD);
 OBEX_DEFINE_GUID(ShimUsbConexant, 0xFD8FD62E, 0x4D94, 0x4FC7, 0x8A, 0x68, 0xBF, 0xF7, 0x86, 0x5A, 0x70, 0x6B);
 OBEX_DEFINE_GUID(ShimNokiaPCSuite, 0x7DD60997, 0x651F, 0x4ECB, 0xB8, 0x93, 0xBE, 0xC8, 0x05, 0x0F, 0x3B, 0xD7);
+OBEX_DEFINE_GUID(ShimCetCompat, 0x31971B07, 0x71A4, 0x480A, 0x87, 0xA9, 0xD9, 0xD2, 0x76, 0x99, 0xA0, 0x7E);
 
 SUP_SHIM_INFO KsepShimInformation[] = {
     { L"DriverScope", (GUID*)&ShimDriverScope, L"ETW event logger", L"ntos" },
@@ -59,7 +60,8 @@ SUP_SHIM_INFO KsepShimInformation[] = {
     { L"ATADeviceIdShim", (GUID*)&ShimATADeviceId, L"SATA compatibility shim", L"storport" },
     { L"BluetoothFilterPowerShim", (GUID*)&ShimBluetoothFilterPower, L"Bluetooth filter driver compatibility shim", L"bthport" },
     { L"UsbConexantShim", (GUID*)&ShimUsbConexant, L"USB modem compatibility shim", L"usbd" },
-    { L"NokiaShim", (GUID*)&ShimNokiaPCSuite, L"Nokia PC Suite compatibility shim", L"usbd" }
+    { L"NokiaShim", (GUID*)&ShimNokiaPCSuite, L"Nokia PC Suite compatibility shim", L"usbd" },
+    { L"UserCetBasicModeAllowRetTargetNotCetCompat", (GUID*)&ShimCetCompat, L"CET compatibility shim", L"ntos"}
 };
 
 LIST_ENTRY supShutdownListHead;

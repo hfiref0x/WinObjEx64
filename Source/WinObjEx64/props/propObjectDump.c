@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2023
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.01
 *
-*  DATE:        19 Jun 2022
+*  DATE:        06 Feb 2023
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -141,25 +141,28 @@ HTREEITEM propObDumpAddress(
 }
 
 /*
-* propObDumpAddressWithModule
+* propObDumpAddressWithModuleEx
 *
 * Purpose:
 *
-* Dump given Address to the treelist with module check.
+* Dump given Address to the treelist with module check, add offset to output if required.
 *
 */
-VOID propObDumpAddressWithModule(
+VOID propObDumpAddressWithModuleEx(
     _In_ HWND TreeList,
     _In_ HTREEITEM hParent,
     _In_ LPWSTR Name,
     _In_opt_ PVOID Address,
     _In_ PRTL_PROCESS_MODULES pModules,
     _In_opt_ PVOID SelfDriverBase,
-    _In_ ULONG SelfDriverSize
+    _In_ ULONG SelfDriverSize,
+    _In_ BOOL AddOffset
 )
 {
     TL_SUBITEMS_FIXED subitems;
-    WCHAR szValue[32], szModuleName[MAX_PATH * 2];
+    WCHAR szValue[32], szOffset[64], szModuleName[MAX_PATH * 2];
+    PRTL_PROCESS_MODULE_INFORMATION moduleEntry;
+    ULONG_PTR offset;
 
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
     subitems.Count = 2;
@@ -184,7 +187,18 @@ VOID propObDumpAddressWithModule(
                 subitems.BgColor = CLR_HOOK;
             }
         }
-        if (ntsupFindModuleNameByAddress(pModules, Address, _strend(szModuleName), MAX_PATH)) {
+
+        moduleEntry = (PRTL_PROCESS_MODULE_INFORMATION)ntsupFindModuleNameByAddress(pModules, 
+            Address, 
+            _strend(szModuleName), 
+            MAX_PATH);
+
+        if (NULL != moduleEntry) {
+            if (AddOffset) {
+                offset = (ULONG_PTR)Address - (ULONG_PTR)moduleEntry->ImageBase;
+                RtlStringCchPrintfSecure(szOffset, RTL_NUMBER_OF(szOffset), L"+0x%lX", offset);
+                _strcat(szModuleName, szOffset);
+            }
             subitems.Text[1] = szModuleName;
         }
         else {
@@ -204,6 +218,9 @@ VOID propObDumpAddressWithModule(
         Name,
         &subitems);
 }
+
+#define propObDumpAddressWithModule(TreeList, hParent, Name, Address, pModules, SelfDriverBase, SelfDriverSize) \
+    propObDumpAddressWithModuleEx(TreeList, hParent, Name, Address, pModules, SelfDriverBase, SelfDriverSize, FALSE)
 
 /*
 * propObDumpPushLock
@@ -1551,13 +1568,14 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpDriverObject)
         }
 
         //DRIVER_OBJECT->MajorFunction[i]
-        propObDumpAddressWithModule(hwndTreeList,
+        propObDumpAddressWithModuleEx(hwndTreeList,
             h_tviSubItem,
             T_IRP_MJ_FUNCTION[i],
             drvObject.MajorFunction[i],
             pModules,
             ldrEntry.DllBase,
-            ldrEntry.SizeOfImage);
+            ldrEntry.SizeOfImage,
+            TRUE);
     }
 
     //

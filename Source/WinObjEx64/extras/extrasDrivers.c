@@ -1029,11 +1029,13 @@ VOID DrvListDrivers(
 */
 BOOL CALLBACK DrvDlgHandleNotify(
     _In_ LPNMLISTVIEW NMListView,
-    _In_ EXTRASCONTEXT* Context
+    _In_ EXTRASCONTEXT* Context,
+    _In_ LPARAM lParam
 )
 {
     INT nImageIndex;
 
+    UNREFERENCED_PARAMETER(lParam);
 
     if (NMListView->hdr.idFrom != ID_EXTRASLIST)
         return FALSE;
@@ -1262,7 +1264,7 @@ VOID DrvDlgOnInit(
         // Set listview imagelist, style flags and theme.
         //
         supSetListViewSettings(pDlgContext->ListView,
-            LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
+            LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_INFOTIP | LVS_EX_LABELTIP,
             FALSE,
             TRUE,
             g_ListViewImages,
@@ -1360,7 +1362,8 @@ INT_PTR CALLBACK DrvDlgProc(
         if (pDlgContext) {
             DrvDlgHandleNotify(
                 (LPNMLISTVIEW)lParam,
-                pDlgContext);
+                pDlgContext,
+                lParam);
         }
         break;
 

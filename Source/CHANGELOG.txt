@@ -1,3 +1,7 @@
+v2.0.2
+recent win10/win11 compatibility improvements
+display more details about shimmed drivers
+
 v2.0.1
 recent win10/win11 compatibility improvements
 token properties dialog changes

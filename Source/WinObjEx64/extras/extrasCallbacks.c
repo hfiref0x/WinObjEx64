@@ -859,6 +859,7 @@ ULONG_PTR ComputeAddressInsideNtOs(
 */
 OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacksEx)
 {
+    BOOL        bFound = FALSE;
     PBYTE       ptrCode;
     ULONG_PTR   cbSize = 0, ulTag = 0, Index = 0, kvarAddress = 0;
     LONG        Rel = 0;
@@ -924,6 +925,8 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacksEx)
 
         if (g_CbtMapping[Index].Build == g_NtBuildNumber) {
 
+            bFound = TRUE;
+
             //
             // Validate for known table values.
             //
@@ -936,6 +939,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacksEx)
         }
 
     }
+
+    if (bFound == FALSE)
+        logAdd(EntryTypeWarning, TEXT("NtBuildNumber is not recognized"));
 
     return 0;
 }

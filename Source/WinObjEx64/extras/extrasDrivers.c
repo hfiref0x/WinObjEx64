@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2016 - 2022
+*  (C) COPYRIGHT AUTHORS, 2016 - 2023
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
 *  VERSION:     2.01
 *
-*  DATE:        01 Dec 2022
+*  DATE:        10 Apr 2023
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -56,6 +56,8 @@ static EXTRASCONTEXT DrvDlgContext[DrvModeMax];
 static HANDLE DrvDlgThreadHandles[DrvModeMax] = { NULL, NULL };
 static FAST_EVENT DrvDlgInitializedEvents[DrvModeMax] = { FAST_EVENT_INIT, FAST_EVENT_INIT };
 static ULONG g_cDrvShimmed = 0;
+
+WNDPROC g_OriginalListViewProc = NULL;
 
 LPCWSTR CryptAlgoIdRef[] = {
     BCRYPT_MD5_ALGORITHM,
@@ -1028,14 +1030,12 @@ VOID DrvListDrivers(
 *
 */
 BOOL CALLBACK DrvDlgHandleNotify(
-    _In_ LPNMLISTVIEW NMListView,
     _In_ EXTRASCONTEXT* Context,
     _In_ LPARAM lParam
 )
 {
     INT nImageIndex;
-
-    UNREFERENCED_PARAMETER(lParam);
+    LPNMLISTVIEW NMListView = (LPNMLISTVIEW)lParam;
 
     if (NMListView->hdr.idFrom != ID_EXTRASLIST)
         return FALSE;
@@ -1193,6 +1193,149 @@ VOID DrvDlgHandleWMCommand(
 }
 
 /*
+* DrvListViewHookProc
+*
+* Purpose:
+*
+* Drivers Dialog listview hook handler.
+*
+*/
+LRESULT CALLBACK DrvListViewHookProc(
+    HWND hwnd,
+    UINT uMsg,
+    WPARAM wParam,
+    LPARAM lParam
+)
+{
+    HWND hwndTT = (HWND)DrvDlgContext[DrvModeNormal].TooltipInfo;
+
+    ULONG_PTR drvBase;
+
+    LVHITTESTINFO ht;
+    TOOLINFO toolInfo;
+
+    BOOL bShimmed, bCheckPass = FALSE;
+    GUID shimGUID;
+    SUP_SHIM_INFO* shimInfo;
+
+    WCHAR szText[MAX_PATH * 4];
+    WCHAR szBuffer[MAX_PATH];
+
+    switch (uMsg) {
+
+    case WM_MOUSEMOVE:
+
+        RtlSecureZeroMemory(&ht, sizeof(ht));
+        ht.pt.x = GET_X_LPARAM(lParam);
+        ht.pt.y = GET_Y_LPARAM(lParam);
+
+        do {
+
+            if (ChildWindowFromPoint(hwnd, ht.pt) != hwnd)
+                break;
+
+            if (-1 == ListView_SubItemHitTest(hwnd, &ht))
+                break;
+
+            bCheckPass = (ht.iSubItem == COLUMN_DRVLIST_DRIVER_NAME);
+
+        } while (FALSE);
+
+        if (bCheckPass == FALSE) {
+            SendMessage(hwndTT, TTM_TRACKACTIVATE, FALSE, (LPARAM)&toolInfo);
+            ReleaseCapture();
+            break;
+        }
+
+        RtlSecureZeroMemory(&toolInfo, sizeof(toolInfo));
+        toolInfo.cbSize = sizeof(toolInfo);
+        toolInfo.hwnd = DrvDlgContext[DrvModeNormal].hwndDlg;
+        toolInfo.uFlags = TTF_TRACK;
+        toolInfo.uId = ID_EXTRASLIST;
+
+        if (ht.flags & LVHT_ONITEM) {          
+
+            //
+            // Get name
+            //
+            RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+            supGetItemText2(hwnd, ht.iItem,
+                COLUMN_DRVLIST_DRIVER_NAME, szBuffer, MAX_PATH);
+
+            RtlSecureZeroMemory(&szText, sizeof(szText));
+            _strcpy(szText, szBuffer);
+
+            //
+            // Get base.
+            //
+            szBuffer[0] = 0;
+            supGetItemText2(hwnd, ht.iItem,
+                COLUMN_DRVLIST_DRIVER_ADDRESS, szBuffer, 32);
+
+            _strcat(szText, TEXT("\n"));
+            _strcat(szText, szBuffer);
+            _strcat(szText, TEXT("\n"));
+
+            drvBase = hextou64(&szBuffer[2]);
+
+            //
+            // Module name.
+            //
+            szBuffer[0] = 0;
+            supGetItemText2(hwnd, ht.iItem,                               
+                COLUMN_DRVLIST_MODULE_NAME, szBuffer, MAX_PATH);
+            _strcat(szText, szBuffer);
+
+            //
+            // Shim desc.
+            //
+            szBuffer[0] = 0;
+            supGetItemText2(hwnd, ht.iItem,
+                COLUMN_DRVLIST_SHIMMED, szBuffer, MAX_PATH);
+            if (szBuffer[0]) {
+
+                bShimmed = supIsDriverShimmed(&g_kdctx.Data->KseEngineDump, (PVOID)drvBase, &shimGUID);
+
+                if (bShimmed) {
+
+                    shimInfo = supGetDriverShimInformation(shimGUID);
+                    if (shimInfo) {
+                        szBuffer[0] = 0;
+                        RtlStringCchPrintfSecure(szBuffer,
+                            RTL_NUMBER_OF(szBuffer),
+                            L"\n\n%ws\n%ws",
+                            shimInfo->KseShimName,
+                            shimInfo->Description);
+
+                        _strcat(szText, szBuffer);
+                    }
+
+                }
+            }
+
+            toolInfo.lpszText = szText;
+            SendMessage(hwndTT, TTM_SETTOOLINFO, 0, (LPARAM)&toolInfo);
+
+            GetCursorPos(&ht.pt);
+            ht.pt.x += 20;
+            ht.pt.y += 20;
+            SendMessage(hwndTT, TTM_TRACKPOSITION, 0, MAKELPARAM(ht.pt.x, ht.pt.y));
+            SendMessage(hwndTT, TTM_TRACKACTIVATE, (WPARAM)TRUE, (LPARAM)&toolInfo);
+            SetCapture(hwnd);
+
+        }
+        else
+        {
+            SendMessage(hwndTT, TTM_TRACKACTIVATE, (WPARAM)FALSE, (LPARAM)&toolInfo);
+            ReleaseCapture();
+        }
+        break;
+    }
+
+    return g_OriginalListViewProc(hwnd, uMsg, wParam, lParam);
+}
+
+/*
 * DrvDlgOnInit
 *
 * Purpose:
@@ -1269,6 +1412,19 @@ VOID DrvDlgOnInit(
             TRUE,
             g_ListViewImages,
             LVSIL_SMALL);
+
+        if (pDlgContext->DialogMode == DrvModeNormal) {
+
+            pDlgContext->TooltipInfo = (PVOID)supCreateTrackingToolTip(ID_EXTRASLIST, hwndDlg);
+            if (pDlgContext->TooltipInfo) {
+
+                g_OriginalListViewProc = (WNDPROC)SetWindowLongPtr(pDlgContext->ListView,
+                    GWLP_WNDPROC,
+                    (LONG_PTR)&DrvListViewHookProc);
+
+            }
+
+        }
 
         //
         // And columns and remember their count.
@@ -1361,13 +1517,12 @@ INT_PTR CALLBACK DrvDlgProc(
         pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
         if (pDlgContext) {
             DrvDlgHandleNotify(
-                (LPNMLISTVIEW)lParam,
                 pDlgContext,
                 lParam);
         }
         break;
 
-    case WM_SIZE:
+     case WM_SIZE:
         extrasSimpleListResize(hwndDlg);
         break;
 
@@ -1378,6 +1533,9 @@ INT_PTR CALLBACK DrvDlgProc(
     case WM_CLOSE:
         pDlgContext = (EXTRASCONTEXT*)RemoveProp(hwndDlg, T_DLGCONTEXT);
         if (pDlgContext) {
+            if (pDlgContext->TooltipInfo)
+                DestroyWindow((HWND)pDlgContext->TooltipInfo);
+
             extrasRemoveDlgIcon(pDlgContext);
 
             if (pDlgContext->DialogMode == DrvModeNormal) {
@@ -1409,9 +1567,12 @@ INT_PTR CALLBACK DrvDlgProc(
                 pDlgContext);
         }
         break;
+
+    default:
+        return FALSE;
     }
 
-    return FALSE;
+    return TRUE;
 }
 
 /*

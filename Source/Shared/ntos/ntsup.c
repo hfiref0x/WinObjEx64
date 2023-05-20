@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTSUP.C
 *
-*  VERSION:     2.17
+*  VERSION:     2.18
 *
-*  DATE:        06 Feb 2023
+*  DATE:        18 Feb 2023
 *
 *  Native API support functions.
 *
@@ -116,9 +116,9 @@ BOOL ntsupVirtualLock(
     _In_ SIZE_T dwSize
 )
 {
-    return (NT_SUCCESS(NtLockVirtualMemory(NtCurrentProcess(), 
-        &lpAddress, 
-        &dwSize, 
+    return (NT_SUCCESS(NtLockVirtualMemory(NtCurrentProcess(),
+        &lpAddress,
+        &dwSize,
         MAP_PROCESS)));
 }
 
@@ -135,9 +135,9 @@ BOOL ntsupVirtualUnlock(
     _In_ SIZE_T dwSize
 )
 {
-    return (NT_SUCCESS(NtUnlockVirtualMemory(NtCurrentProcess(), 
-        &lpAddress, 
-        &dwSize, 
+    return (NT_SUCCESS(NtUnlockVirtualMemory(NtCurrentProcess(),
+        &lpAddress,
+        &dwSize,
         MAP_PROCESS)));
 }
 
@@ -2011,6 +2011,26 @@ VOID ntsupPurgeSystemCache(
         smlc = MemoryPurgeStandbyList;
         NtSetSystemInformation(SystemMemoryListInformation, (PVOID)&smlc, sizeof(smlc));
     }
+}
+
+/*
+* ntsupGetSystemRoot
+*
+* Purpose:
+*
+* Return system root directory silo session aware.
+*
+*/
+PWSTR ntsupGetSystemRoot(
+    VOID
+)
+{
+    PEB* peb = NtCurrentPeb();
+
+    if (peb->SharedData && peb->SharedData->ServiceSessionId)
+        return peb->SharedData->NtSystemRoot;
+    else
+        return USER_SHARED_DATA->NtSystemRoot;
 }
 
 /*

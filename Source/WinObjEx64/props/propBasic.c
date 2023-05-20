@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2023
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.01
 *
-*  DATE:        19 Jun 2022
+*  DATE:        15 Apr 2023
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -108,7 +108,7 @@ VOID propSetProcessMitigationsInfo(
 
     RtlSecureZeroMemory(&Policies, sizeof(Policies));
 
-    SendMessage(hwndCB, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
+    ComboBox_ResetContent(hwndCB);
 
     //
     // DEP state.
@@ -145,7 +145,7 @@ VOID propSetProcessMitigationsInfo(
             if (Policies.DEPPolicy.DisableAtlThunkEmulation)
                 _strcat(szBuffer, TEXT(" (ATL thunk emulation is disabled)"));
 
-            SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            ComboBox_AddString(hwndCB, szBuffer);
         }
     }
 
@@ -154,7 +154,7 @@ VOID propSetProcessMitigationsInfo(
     //
     if (supGetProcessMitigationPolicy(hProcess,
         (PROCESS_MITIGATION_POLICY)ProcessASLRPolicy,
-        sizeof(PROCESS_MITIGATION_ASLR_POLICY),
+        sizeof(Policies.ASLRPolicy),
         &Policies.ASLRPolicy))
     {
         if (Policies.ASLRPolicy.Flags) {
@@ -163,7 +163,7 @@ VOID propSetProcessMitigationsInfo(
             if (Policies.ASLRPolicy.EnableForceRelocateImages) _strcat(szBuffer, TEXT(" (Force Relocate)"));
             if (Policies.ASLRPolicy.EnableBottomUpRandomization) _strcat(szBuffer, TEXT(" (Bottom-Up)"));
             if (Policies.ASLRPolicy.DisallowStrippedImages) _strcat(szBuffer, TEXT(" (Disallow Stripped)"));
-            SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+            ComboBox_AddString(hwndCB, szBuffer);
         }
     }
 
@@ -172,25 +172,25 @@ VOID propSetProcessMitigationsInfo(
     //
     if (supGetProcessMitigationPolicy(hProcess,
         (PROCESS_MITIGATION_POLICY)ProcessDynamicCodePolicy,
-        sizeof(PROCESS_MITIGATION_DYNAMIC_CODE_POLICY_W10),
+        sizeof(Policies.DynamicCodePolicy),
         &Policies.DynamicCodePolicy))
     {
         if (Policies.DynamicCodePolicy.Flags) {
             if (Policies.DynamicCodePolicy.ProhibitDynamicCode) {
-                _strcpy(szBuffer, TEXT("Dynamic code -> Prohibited"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Dynamic code prohibited"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.DynamicCodePolicy.AuditProhibitDynamicCode) {
-                _strcpy(szBuffer, TEXT("Dynamic code -> Audit prohibit"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Dynamic code audit prohibit"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.DynamicCodePolicy.AllowThreadOptOut) {
-                _strcpy(szBuffer, TEXT("Dynamic code -> Allow thread opt out"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Dynamic code prohibited (per-thread)"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.DynamicCodePolicy.AllowRemoteDowngrade) {
-                _strcpy(szBuffer, TEXT("Dynamic code -> Allow remote downgrade"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Dynamic code downgradable"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
         }
     }
@@ -200,17 +200,17 @@ VOID propSetProcessMitigationsInfo(
     //
     if (supGetProcessMitigationPolicy(hProcess,
         (PROCESS_MITIGATION_POLICY)ProcessStrictHandleCheckPolicy,
-        sizeof(PROCESS_MITIGATION_STRICT_HANDLE_CHECK_POLICY),
+        sizeof(Policies.StrictHandleCheckPolicy),
         &Policies.StrictHandleCheckPolicy))
     {
         if (Policies.StrictHandleCheckPolicy.Flags) {
             if (Policies.StrictHandleCheckPolicy.RaiseExceptionOnInvalidHandleReference) {
-                _strcpy(szBuffer, TEXT("Strict handle checks -> Raise exception on invalid handle reference"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Strict handle checks"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.StrictHandleCheckPolicy.HandleExceptionsPermanentlyEnabled) {
-                _strcpy(szBuffer, TEXT("Strict handle checks -> Handle exceptions permanently enabled"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Handle exceptions permanently"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
         }
     }
@@ -220,17 +220,17 @@ VOID propSetProcessMitigationsInfo(
     //
     if (supGetProcessMitigationPolicy(hProcess,
         (PROCESS_MITIGATION_POLICY)ProcessSystemCallDisablePolicy,
-        sizeof(PPROCESS_MITIGATION_SYSTEM_CALL_DISABLE_POLICY),
+        sizeof(Policies.SystemCallDisablePolicy),
         &Policies.SystemCallDisablePolicy))
     {
         if (Policies.SystemCallDisablePolicy.Flags) {
             if (Policies.SystemCallDisablePolicy.DisallowWin32kSystemCalls) {
-                _strcpy(szBuffer, TEXT("SystemCallDisable -> Disallow Win32k calls"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Disallow Win32k system calls"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.SystemCallDisablePolicy.AuditDisallowWin32kSystemCalls) {
-                _strcpy(szBuffer, TEXT("SystemCallDisable -> Audit disallow Win32k calls"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Disallow Win32k system calls (Audit)"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
         }
     }
@@ -240,13 +240,13 @@ VOID propSetProcessMitigationsInfo(
     //
     if (supGetProcessMitigationPolicy(hProcess,
         (PROCESS_MITIGATION_POLICY)ProcessExtensionPointDisablePolicy,
-        sizeof(PROCESS_MITIGATION_EXTENSION_POINT_DISABLE_POLICY),
+        sizeof(Policies.ExtensionPointDisablePolicy),
         &Policies.ExtensionPointDisablePolicy))
     {
         if (Policies.ExtensionPointDisablePolicy.Flags) {
             if (Policies.ExtensionPointDisablePolicy.DisableExtensionPoints) {
                 _strcpy(szBuffer, TEXT("Extension points disabled"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                ComboBox_AddString(hwndCB, szBuffer);
             }
         }
     }
@@ -256,7 +256,7 @@ VOID propSetProcessMitigationsInfo(
     //
     if (supGetProcessMitigationPolicy(hProcess,
         (PROCESS_MITIGATION_POLICY)ProcessControlFlowGuardPolicy,
-        sizeof(PROCESS_MITIGATION_CONTROL_FLOW_GUARD_POLICY_W10),
+        sizeof(Policies.ControlFlowGuardPolicy),
         &Policies.ControlFlowGuardPolicy))
     {
         if (Policies.ControlFlowGuardPolicy.Flags) {
@@ -275,7 +275,8 @@ VOID propSetProcessMitigationsInfo(
                 if (Policies.ControlFlowGuardPolicy.EnableXfgAuditMode) {
                     _strcat(szBuffer, TEXT(" (Extended CF Guard audit)"));
                 }
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+
+                ComboBox_AddString(hwndCB, szBuffer);
             }
         }
     }
@@ -285,29 +286,29 @@ VOID propSetProcessMitigationsInfo(
     //
     if (supGetProcessMitigationPolicy(hProcess,
         (PROCESS_MITIGATION_POLICY)ProcessSignaturePolicy,
-        sizeof(PROCESS_MITIGATION_BINARY_SIGNATURE_POLICY_W10),
+        sizeof(Policies.SignaturePolicy),
         &Policies.SignaturePolicy))
     {
         if (Policies.SignaturePolicy.Flags) {
             if (Policies.SignaturePolicy.MicrosoftSignedOnly) {
-                _strcpy(szBuffer, TEXT("Signature -> Microsoft signed only"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Signatures restricted (Microsoft only)"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.SignaturePolicy.StoreSignedOnly) {
-                _strcpy(szBuffer, TEXT("Signature -> Store signed only"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Signatures restricted (Store only)"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.SignaturePolicy.AuditMicrosoftSignedOnly) {
-                _strcpy(szBuffer, TEXT("Signature -> Audit Microsoft signed only"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Signatures restricted (Microsoft only, audit)"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.SignaturePolicy.AuditStoreSignedOnly) {
-                _strcpy(szBuffer, TEXT("Signature -> Audit Store signed only"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Signatures restricted (Store only, audit)"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.SignaturePolicy.MitigationOptIn) {
-                _strcpy(szBuffer, TEXT("Signature -> Opt in"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Signatures opt-in restriction"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
         }
     }
@@ -317,17 +318,17 @@ VOID propSetProcessMitigationsInfo(
     //
     if (supGetProcessMitigationPolicy(hProcess,
         (PROCESS_MITIGATION_POLICY)ProcessFontDisablePolicy,
-        sizeof(PROCESS_MITIGATION_FONT_DISABLE_POLICY_W10),
+        sizeof(Policies.FontDisablePolicy),
         &Policies.FontDisablePolicy))
     {
         if (Policies.FontDisablePolicy.Flags) {
             if (Policies.FontDisablePolicy.DisableNonSystemFonts) {
-                _strcpy(szBuffer, TEXT("Fonts -> Disable non system fonts"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Non-system fonts disabled"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.FontDisablePolicy.AuditNonSystemFontLoading) {
-                _strcpy(szBuffer, TEXT("Fonts -> Audit non system font loading"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Non system font loading audit"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
         }
     }
@@ -337,29 +338,30 @@ VOID propSetProcessMitigationsInfo(
     //
     if (supGetProcessMitigationPolicy(hProcess,
         (PROCESS_MITIGATION_POLICY)ProcessImageLoadPolicy,
-        sizeof(PROCESS_MITIGATION_IMAGE_LOAD_POLICY_W10),
+        sizeof(Policies.ImageLoadPolicy),
         &Policies.ImageLoadPolicy))
     {
         if (Policies.ImageLoadPolicy.Flags) {
+
             if (Policies.ImageLoadPolicy.PreferSystem32Images) {
-                _strcpy(szBuffer, TEXT("ImageLoad -> Prefer system32 images"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Prefer system32 images"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.ImageLoadPolicy.NoRemoteImages) {
-                _strcpy(szBuffer, TEXT("ImageLoad -> No remote images"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Resticted remote images"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.ImageLoadPolicy.NoLowMandatoryLabelImages) {
-                _strcpy(szBuffer, TEXT("ImageLoad -> No low mandatory label images"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Restricted low mandatory label images"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.ImageLoadPolicy.AuditNoRemoteImages) {
-                _strcpy(szBuffer, TEXT("ImageLoad -> Audit remote images"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Restricted remote images (Audit)"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.ImageLoadPolicy.AuditNoLowMandatoryLabelImages) {
-                _strcpy(szBuffer, TEXT("ImageLoad -> Audit no low mandatory label images"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Restricted low mandatory label images (Audit)"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
         }
     }
@@ -369,69 +371,69 @@ VOID propSetProcessMitigationsInfo(
     //
     if (supGetProcessMitigationPolicy(hProcess,
         (PROCESS_MITIGATION_POLICY)ProcessPayloadRestrictionPolicy,
-        sizeof(PROCESS_MITIGATION_PAYLOAD_RESTRICTION_POLICY_W10),
+        sizeof(Policies.PayloadRestrictionPolicy),
         &Policies.PayloadRestrictionPolicy))
     {
         if (Policies.PayloadRestrictionPolicy.Flags) {
 
             if (Policies.PayloadRestrictionPolicy.EnableExportAddressFilter) {
-                _strcpy(szBuffer, TEXT("PayloadRestriction -> Enable export address filter"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Enable export address filter"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
 
             if (Policies.PayloadRestrictionPolicy.AuditExportAddressFilter) {
-                _strcpy(szBuffer, TEXT("PayloadRestriction -> Audit export address filter"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Audit export address filter"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
 
             if (Policies.PayloadRestrictionPolicy.EnableExportAddressFilterPlus) {
-                _strcpy(szBuffer, TEXT("PayloadRestriction -> Enable export address filter plus"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Enable export address filter plus"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
 
             if (Policies.PayloadRestrictionPolicy.AuditExportAddressFilterPlus) {
-                _strcpy(szBuffer, TEXT("PayloadRestriction -> Audit export address filter plus"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Audit export address filter plus"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
 
             if (Policies.PayloadRestrictionPolicy.EnableImportAddressFilter) {
-                _strcpy(szBuffer, TEXT("PayloadRestriction -> Enable import address filter"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Enable import address filter"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
 
             if (Policies.PayloadRestrictionPolicy.AuditImportAddressFilter) {
-                _strcpy(szBuffer, TEXT("PayloadRestriction -> Audit import address filter"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Audit import address filter"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
 
             if (Policies.PayloadRestrictionPolicy.EnableRopStackPivot) {
-                _strcpy(szBuffer, TEXT("PayloadRestriction -> Enable rop stack pivot"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Enable ROP stack pivot"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
 
             if (Policies.PayloadRestrictionPolicy.AuditRopStackPivot) {
-                _strcpy(szBuffer, TEXT("PayloadRestriction -> Audit rop stack pivot"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Audit ROP stack pivot"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
 
             if (Policies.PayloadRestrictionPolicy.EnableRopCallerCheck) {
-                _strcpy(szBuffer, TEXT("PayloadRestriction -> Enable rop caller check"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Enable ROP caller check"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
 
             if (Policies.PayloadRestrictionPolicy.AuditRopCallerCheck) {
-                _strcpy(szBuffer, TEXT("PayloadRestriction -> Audit rop caller check"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Audit ROP caller check"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
 
             if (Policies.PayloadRestrictionPolicy.EnableRopSimExec) {
-                _strcpy(szBuffer, TEXT("PayloadRestriction -> Enable rop sim exec"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Enable ROP sim exec"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
 
             if (Policies.PayloadRestrictionPolicy.AuditRopSimExec) {
-                _strcpy(szBuffer, TEXT("PayloadRestriction -> Audit rop sim exec"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Audit ROP sim exec"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
 
         }
@@ -442,21 +444,21 @@ VOID propSetProcessMitigationsInfo(
     //
     if (supGetProcessMitigationPolicy(hProcess,
         (PROCESS_MITIGATION_POLICY)ProcessChildProcessPolicy,
-        sizeof(PROCESS_MITIGATION_CHILD_PROCESS_POLICY_W10),
+        sizeof(Policies.ChildProcessPolicy),
         &Policies.ChildProcessPolicy))
     {
         if (Policies.ChildProcessPolicy.Flags) {
             if (Policies.ChildProcessPolicy.NoChildProcessCreation) {
-                _strcpy(szBuffer, TEXT("ChildProcess -> No child process creation"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("No child process creation"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.ChildProcessPolicy.AllowSecureProcessCreation) {
-                _strcpy(szBuffer, TEXT("ChildProcess -> Allow secure process creation"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Allow secure process creation"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.ChildProcessPolicy.AuditNoChildProcessCreation) {
-                _strcpy(szBuffer, TEXT("ChildProcess -> Audit no child process creation"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Audit no child process creation"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
         }
     }
@@ -466,25 +468,25 @@ VOID propSetProcessMitigationsInfo(
     //
     if (supGetProcessMitigationPolicy(hProcess,
         (PROCESS_MITIGATION_POLICY)ProcessSideChannelIsolationPolicy,
-        sizeof(PROCESS_MITIGATION_SIDE_CHANNEL_ISOLATION_POLICY_W10),
+        sizeof(Policies.SideChannelIsolationPolicy),
         &Policies.SideChannelIsolationPolicy))
     {
         if (Policies.SideChannelIsolationPolicy.Flags) {
             if (Policies.SideChannelIsolationPolicy.DisablePageCombine) {
-                _strcpy(szBuffer, TEXT("SideChannel -> Disable page combine"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Restricted page combining"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.SideChannelIsolationPolicy.IsolateSecurityDomain) {
-                _strcpy(szBuffer, TEXT("SideChannel -> Isolate security domain"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Distinct security domain"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.SideChannelIsolationPolicy.SmtBranchTargetIsolation) {
-                _strcpy(szBuffer, TEXT("SideChannel -> Smt branch target isolation"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("SMT-thread branch target isolation"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.SideChannelIsolationPolicy.SpeculativeStoreBypassDisable) {
-                _strcpy(szBuffer, TEXT("SideChannel -> Speculative store bypass disable"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Memory disambiguation (SSBD)"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
 
         }
@@ -495,46 +497,46 @@ VOID propSetProcessMitigationsInfo(
     //
     if (supGetProcessMitigationPolicy(hProcess,
         (PROCESS_MITIGATION_POLICY)ProcessUserShadowStackPolicy,
-        sizeof(PROCESS_MITIGATION_USER_SHADOW_STACK_POLICY_W10),
+        sizeof(Policies.UserShadowStackPolicy),
         &Policies.UserShadowStackPolicy))
     {
         if (Policies.UserShadowStackPolicy.Flags) {
 
             if (Policies.UserShadowStackPolicy.EnableUserShadowStack) {
-                _strcpy(szBuffer, TEXT("UserShadowStack -> Enabled"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Shadow Stack enabled"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.UserShadowStackPolicy.AuditUserShadowStack) {
-                _strcpy(szBuffer, TEXT("AuditUserShadowStack -> Enabled"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Shadow Stack enabled (audit)"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.UserShadowStackPolicy.SetContextIpValidation) {
-                _strcpy(szBuffer, TEXT("SetContextIpValidation -> Enabled"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("SetContextIpValidation enabled"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.UserShadowStackPolicy.AuditSetContextIpValidation) {
-                _strcpy(szBuffer, TEXT("AuditSetContextIpValidation -> Enabled"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("SetContextIpValidation (Audit)"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.UserShadowStackPolicy.EnableUserShadowStackStrictMode) {
-                _strcpy(szBuffer, TEXT("EnableUserShadowStackStrictMode -> Enabled"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Shadow Stack Strict Mode"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.UserShadowStackPolicy.BlockNonCetBinaries) {
-                _strcpy(szBuffer, TEXT("BlockNonCetBinaries -> Enabled"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Block Non Cet Binaries"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.UserShadowStackPolicy.BlockNonCetBinariesNonEhcont) {
-                _strcpy(szBuffer, TEXT("BlockNonCetBinariesNonEhcont -> Enabled"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Block Non Cet Binaries Non Ehcont"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.UserShadowStackPolicy.AuditBlockNonCetBinaries) {
-                _strcpy(szBuffer, TEXT("AuditBlockNonCetBinaries -> Enabled"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Block Non CetBinaries (Audit)"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
             if (Policies.UserShadowStackPolicy.CetDynamicApisOutOfProcOnly) {
-                _strcpy(szBuffer, TEXT("CetDynamicApisOutOfProcOnly -> Enabled"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Cet Dynamic Apis Out Of Proc Only"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
 
         }
@@ -545,29 +547,63 @@ VOID propSetProcessMitigationsInfo(
     //
     if (supGetProcessMitigationPolicy(hProcess,
         (PROCESS_MITIGATION_POLICY)ProcessRedirectionTrustPolicy,
-        sizeof(PROCESS_MITIGATION_REDIRECTION_TRUST_POLICY_W10),
+        sizeof(Policies.RedirectionTrustPolicy),
         &Policies.RedirectionTrustPolicy))
     {
         if (Policies.RedirectionTrustPolicy.Flags) {
 
             if (Policies.RedirectionTrustPolicy.EnforceRedirectionTrust) {
-                _strcpy(szBuffer, TEXT("RedirectionTrust -> Enforced"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Redirection Trust Enforced"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
 
             if (Policies.RedirectionTrustPolicy.AuditRedirectionTrust) {
-                _strcpy(szBuffer, TEXT("AuditRedirectionTrust -> Enabled"));
-                SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)&szBuffer);
+                _strcpy(szBuffer, TEXT("Redirection Trust (Audit)"));
+                ComboBox_AddString(hwndCB, szBuffer);
             }
         }
     }
 
-    lResult = SendMessage(hwndCB, CB_GETCOUNT, 0, 0);
-    if (lResult != CB_ERR) {
-        if (lResult > 0) {
-            EnableWindow(hwndCB, TRUE);
-            SendMessage(hwndCB, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
+    //
+    // User Pointer Auth Policy.
+    //
+    if (supGetProcessMitigationPolicy(hProcess,
+        (PROCESS_MITIGATION_POLICY)ProcessUserPointerAuthPolicy,
+        sizeof(Policies.UserPointerAuthPolicy),
+        &Policies.UserPointerAuthPolicy))
+    {
+        if (Policies.UserPointerAuthPolicy.Flags) {
+
+            if (Policies.UserPointerAuthPolicy.EnablePointerAuthUserIp) {
+                _strcpy(szBuffer, TEXT("User Pointer Auth Policy enabled"));
+                ComboBox_AddString(hwndCB, szBuffer);
+            }
+
         }
+    }
+
+    //
+    // SEHOPPolicy Policy.
+    //
+    if (supGetProcessMitigationPolicy(hProcess,
+        (PROCESS_MITIGATION_POLICY)ProcessSEHOPPolicy,
+        sizeof(Policies.SEHOPPolicy),
+        &Policies.SEHOPPolicy))
+    {
+        if (Policies.SEHOPPolicy.Flags) {
+
+            if (Policies.SEHOPPolicy.EnableSehop) {
+                _strcpy(szBuffer, TEXT("Sehop enabled"));
+                ComboBox_AddString(hwndCB, szBuffer);
+            }
+
+        }
+    }
+    
+    lResult = ComboBox_GetCount(hwndCB);
+    if (lResult != CB_ERR && lResult > 0) {
+        EnableWindow(hwndCB, TRUE);
+        ComboBox_SetCurSel(hwndCB, 0);
     }
 }
 

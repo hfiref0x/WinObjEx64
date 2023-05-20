@@ -45,14 +45,14 @@ OBEX_DEFINE_GUID(ShimCetCompat, 0x31971B07, 0x71A4, 0x480A, 0x87, 0xA9, 0xD9, 0x
 
 SUP_SHIM_INFO KsepShimInformation[] = {
     { L"DriverScope", (GUID*)&ShimDriverScope, L"ETW event logger", L"ntos" },
-    { L"VersionLie",  (GUID*)&ShimVersionLie1, L"Reports previous version of OS", L"ntos" },
-    { L"VersionLie",  (GUID*)&ShimVersionLie2, L"Reports previous version of OS", L"ntos" },
-    { L"VersionLie",  (GUID*)&ShimVersionLie3, L"Reports previous version of OS", L"ntos" },
-    { L"SkipDriverUnload", (GUID*)&ShimSkipDriverUnload, L"Replace driver unload with ETW hook", L"ntos" },
+    { L"VersionLie 7",  (GUID*)&ShimVersionLie1, L"Reports previous version of OS", L"ntos" },
+    { L"VersionLie 8",  (GUID*)&ShimVersionLie2, L"Reports previous version of OS", L"ntos" },
+    { L"VersionLie 8.1",  (GUID*)&ShimVersionLie3, L"Reports previous version of OS", L"ntos" },
+    { L"SkipDriverUnload", (GUID*)&ShimSkipDriverUnload, L"Replaces driver unload with ETW hook", L"ntos" },
     { L"ZeroPool", (GUID*)&ShimZeroPool, L"ExAllocatePool hook that forces zeroes allocation", L"ntos" },
-    { L"ClearPCIDBits", (GUID*)&ShimClearPCIDBits, L"Clear PCID bits for some ISV", L"ntos" },
+    { L"ClearPCIDBits", (GUID*)&ShimClearPCIDBits, L"Clears PCID bits for some ISV", L"ntos" },
     { L"Kaspersky", (GUID*)&ShimKaspersky, L"Kaspersky driver forced bugfix", L"ntos" },
-    { L"memcpy", (GUID*)&ShimMemcpy, L"memcpy hook to \"safer\" variant", L"ntos" },
+    { L"memcpy", (GUID*)&ShimMemcpy, L"The memcpy hook to \"safer\" variant", L"ntos" },
     { L"KernelPadSectionsOverride", (GUID*)&ShimKernelPadSectionsOverride, L"Blocks drivers discardable section disposal", L"ntos" },
     { L"NdisVersionLie", (GUID*)&ShimNdisVersionLie, L"Reports NDIS version 6.40", L"ndis" },
     { L"SrbShim", (GUID*)&ShimSrb, L"SCSI request IOCTL_STORAGE_QUERY_PROPERTY compatibility hook", L"storport" },
@@ -61,7 +61,7 @@ SUP_SHIM_INFO KsepShimInformation[] = {
     { L"BluetoothFilterPowerShim", (GUID*)&ShimBluetoothFilterPower, L"Bluetooth filter driver compatibility shim", L"bthport" },
     { L"UsbConexantShim", (GUID*)&ShimUsbConexant, L"USB modem compatibility shim", L"usbd" },
     { L"NokiaShim", (GUID*)&ShimNokiaPCSuite, L"Nokia PC Suite compatibility shim", L"usbd" },
-    { L"UserCetBasicModeAllowRetTargetNotCetCompat", (GUID*)&ShimCetCompat, L"CET compatibility shim", L"ntos"}
+    { L"UserCetBasicModeAllowRetTargetNotCetCompat", (GUID*)&ShimCetCompat, L"Intel CET compatibility shim", L"ntos"}
 };
 
 LIST_ENTRY supShutdownListHead;
@@ -9733,8 +9733,53 @@ BOOL supReadObexConfiguration(
     return FALSE;
 }
 
+/*
+* supGetParametersBlock
+*
+* Purpose:
+*
+* Return pointer to program parameters block.
+*
+*/
 POBEX_CONFIG supGetParametersBlock(
     VOID)
 {
     return &g_LoadedParametersBlock;
+}
+
+/*
+* supCreateTrackingToolTip
+*
+* Purpose:
+*
+* Create tracking tooltip.
+*
+*/
+HWND supCreateTrackingToolTip(
+    _In_ INT toolID,
+    _In_ HWND hwndOwner)
+{
+    HWND hwndTip;
+    TOOLINFO toolInfo;
+
+    hwndTip = CreateWindowEx(0, TOOLTIPS_CLASS, NULL,
+        WS_POPUP,
+        CW_USEDEFAULT, CW_USEDEFAULT,
+        CW_USEDEFAULT, CW_USEDEFAULT,
+        hwndOwner, NULL,
+        g_WinObj.hInstance, NULL);
+
+    if (hwndTip)
+    {
+        RtlSecureZeroMemory(&toolInfo, sizeof(toolInfo));
+        toolInfo.cbSize = sizeof(toolInfo);
+        toolInfo.hwnd = hwndOwner;
+        toolInfo.uFlags = TTF_TRACK;
+        toolInfo.uId = (UINT_PTR)toolID;
+
+        SendMessage(hwndTip, TTM_ADDTOOL, 0, (LPARAM)&toolInfo);
+        SendMessage(hwndTip, TTM_SETMAXTIPWIDTH, 0, MAX_PATH);
+    }
+
+    return hwndTip;
 }

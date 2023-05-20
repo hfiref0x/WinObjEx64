@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2023
 *
 *  TITLE:       EXTRAS.H
 *
-*  VERSION:     2.00
+*  VERSION:     2.01
 *
-*  DATE:        19 Jun 2022
+*  DATE:        20 Mar 2023
 *
 *  Common header file for Extras dialogs.
 *
@@ -23,6 +23,7 @@ typedef struct _EXTRASCONTEXT {
     HWND ListView;
     HWND TreeList;
     HWND StatusBar;
+    PVOID TooltipInfo;
     HIMAGELIST ImageList;
     INT lvColumnToSort;
     INT lvColumnCount;

@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTSUP.H
 *
-*  VERSION:     2.17
+*  VERSION:     2.18
 *
-*  DATE:        06 Feb 2023
+*  DATE:        16 Feb 2023
 *
 *  Common header file for the NT API support functions and definitions.
 *
@@ -317,6 +317,9 @@ NTSTATUS ntsupIsProcessElevated(
     _Out_ PBOOL Elevated);
 
 VOID ntsupPurgeSystemCache(
+    VOID);
+
+PWSTR ntsupGetSystemRoot(
     VOID);
 
 NTSTATUS ntsupGetProcessDebugObject(

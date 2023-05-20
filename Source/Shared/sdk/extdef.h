@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2022
+*  (C) COPYRIGHT AUTHORS, 2019 - 2023
 *
 *  TITLE:       EXTAPI.H
 *
-*  VERSION:     2.00
+*  VERSION:     2.02
 *
-*  DATE:        19 Jun 2022
+*  DATE:        15 May 2023
 *
 *  Windows SDK compatibility header.
 *
@@ -95,6 +95,10 @@
 
 #ifndef PF_AVX512F_INSTRUCTIONS_AVAILABLE
 #define PF_AVX512F_INSTRUCTIONS_AVAILABLE           41
+#endif
+
+#ifndef PF_ERMS_AVAILABLE
+#define PF_ERMS_AVAILABLE                           42
 #endif
 
 #ifndef VER_SUITE_MULTIUSERTS

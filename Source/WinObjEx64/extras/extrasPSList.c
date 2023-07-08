@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPSLIST.C
 *
-*  VERSION:     2.01
+*  VERSION:     2.02
 *
-*  DATE:        06 Feb 2023
+*  DATE:        10 Jul 2023
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -211,7 +211,7 @@ PROP_UNNAMED_OBJECT_INFO* PsxAllocateUnnamedObjectEntry(
     _In_ WOBJ_OBJECT_TYPE ObjectType
 )
 {
-    PSYSTEM_PROCESSES_INFORMATION processEntry;
+    PSYSTEM_PROCESS_INFORMATION processEntry;
     PSYSTEM_THREAD_INFORMATION threadEntry;
     PROP_UNNAMED_OBJECT_INFO* objectEntry;
 
@@ -226,7 +226,7 @@ PROP_UNNAMED_OBJECT_INFO* PsxAllocateUnnamedObjectEntry(
 
     if (ObjectType == ObjectTypeProcess) {
 
-        processEntry = (PSYSTEM_PROCESSES_INFORMATION)Data;
+        processEntry = (PSYSTEM_PROCESS_INFORMATION)Data;
         objectEntry->ClientId.UniqueProcess = processEntry->UniqueProcessId;
         objectEntry->ClientId.UniqueThread = NULL;
 
@@ -930,7 +930,7 @@ DWORD WINAPI CreateThreadListProc(
     ULONG i, ThreadCount, ErrorCount = 0;
     HANDLE UniqueProcessId;
     PVOID ProcessList = NULL;
-    PSYSTEM_PROCESSES_INFORMATION Process;
+    PSYSTEM_PROCESS_INFORMATION Process;
     PSYSTEM_THREAD_INFORMATION Thread;
     PRTL_PROCESS_MODULES pModules = NULL;
     PSUP_HANDLE_DUMP SortedHandleList = NULL;
@@ -1194,7 +1194,7 @@ DWORD WINAPI CreateProcessListProc(
     WCHAR szBuffer[100];
 
     union {
-        PSYSTEM_PROCESSES_INFORMATION ProcessEntry;
+        PSYSTEM_PROCESS_INFORMATION ProcessEntry;
         PBYTE ListRef;
     } List;
 

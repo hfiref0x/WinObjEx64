@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     2.01
+*  VERSION:     2.02
 *
-*  DATE:        01 Mar 2023
+*  DATE:        10 Jul 2023
 *
 *  Common header file for the program support routines.
 *
@@ -107,7 +107,7 @@ typedef struct _OBEX_PROCESS_LOOKUP_ENTRY {
     HANDLE hProcess;
     union {
         PUCHAR EntryPtr;
-        PSYSTEM_PROCESSES_INFORMATION ProcessInformation;
+        PSYSTEM_PROCESS_INFORMATION ProcessInformation;
     };
 } OBEX_PROCESS_LOOKUP_ENTRY, *POBEX_PROCESS_LOOKUP_ENTRY;
 

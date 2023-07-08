@@ -3831,7 +3831,7 @@ NTSTATUS supxGetSystemToken(
     UNICODE_STRING usWinlogon = RTL_CONSTANT_STRING(L"winlogon.exe");
 
     union {
-        PSYSTEM_PROCESSES_INFORMATION Processes;
+        PSYSTEM_PROCESS_INFORMATION Process;
         PBYTE ListRef;
     } List;
 
@@ -3847,12 +3847,12 @@ NTSTATUS supxGetSystemToken(
 
         List.ListRef += NextEntryDelta;
 
-        if (RtlEqualUnicodeString(&usWinlogon, &List.Processes->ImageName, TRUE)) {
+        if (RtlEqualUnicodeString(&usWinlogon, &List.Process->ImageName, TRUE)) {
 
-            if (List.Processes->SessionId == WinlogonSessionId) {
+            if (List.Process->SessionId == WinlogonSessionId) {
 
                 Status = supOpenProcess(
-                    List.Processes->UniqueProcessId,
+                    List.Process->UniqueProcessId,
                     PROCESS_QUERY_LIMITED_INFORMATION,
                     &hObject);
 
@@ -3890,7 +3890,7 @@ NTSTATUS supxGetSystemToken(
             }
         }
 
-        NextEntryDelta = List.Processes->NextEntryDelta;
+        NextEntryDelta = List.Process->NextEntryDelta;
 
     } while (NextEntryDelta);
 
@@ -6397,7 +6397,7 @@ BOOL supPHLCreate(
     ULONG numberOfThreads = 0, numberOfProcesses = 0;
     PHL_ENTRY* PsListItem;
     union {
-        PSYSTEM_PROCESSES_INFORMATION ProcessEntry;
+        PSYSTEM_PROCESS_INFORMATION ProcessEntry;
         PBYTE ListRef;
     } List;
 

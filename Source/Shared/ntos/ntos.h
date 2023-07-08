@@ -5,9 +5,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.210
+*  VERSION:     1.214
 *
-*  DATE:        11 Apr 2023
+*  DATE:        01 Jul 2023
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -739,12 +739,13 @@ typedef struct _SYSTEM_EXTENDED_THREAD_INFORMATION {
     ULONG_PTR Reserved4;
 } SYSTEM_EXTENDED_THREAD_INFORMATION, *PSYSTEM_EXTENDED_THREAD_INFORMATION;
 
-typedef struct _SYSTEM_PROCESSES_INFORMATION {
+typedef struct _SYSTEM_PROCESS_INFORMATION {
     ULONG NextEntryDelta;
     ULONG ThreadCount;
-    LARGE_INTEGER SpareLi1;
-    LARGE_INTEGER SpareLi2;
-    LARGE_INTEGER SpareLi3;
+    LARGE_INTEGER WorkingSetPrivateSize;
+    ULONG HardFaultCount;
+    ULONG NumberOfThreadsHighWatermark;
+    ULONGLONG CycleTime;
     LARGE_INTEGER CreateTime;
     LARGE_INTEGER UserTime;
     LARGE_INTEGER KernelTime;
@@ -754,11 +755,11 @@ typedef struct _SYSTEM_PROCESSES_INFORMATION {
     HANDLE InheritedFromUniqueProcessId;
     ULONG HandleCount;
     ULONG SessionId;
-    ULONG_PTR PageDirectoryBase;
+    ULONG_PTR UniqueProcessKey;
     VM_COUNTERS VmCounters;
     IO_COUNTERS IoCounters;
-    SYSTEM_THREAD_INFORMATION Threads[1];
-} SYSTEM_PROCESSES_INFORMATION, *PSYSTEM_PROCESSES_INFORMATION;
+    SYSTEM_THREAD_INFORMATION Threads[1]; //not a part of this structure
+} SYSTEM_PROCESS_INFORMATION, *PSYSTEM_PROCESS_INFORMATION;
 
 typedef enum _SYSTEM_PROCESS_CLASSIFICATION {
     SystemProcessClassificationNormal,
@@ -837,10 +838,10 @@ typedef struct _SYSTEM_PROCESS_INFORMATION_EXTENSION {
     ULONGLONG ProcessSequenceNumber;
 } SYSTEM_PROCESS_INFORMATION_EXTENSION, *PSYSTEM_PROCESS_INFORMATION_EXTENSION;
 
-typedef struct _SYSTEM_PROCESSES_FULL_INFORMATION {
-    SYSTEM_PROCESSES_INFORMATION ProcessAndThreads;
+typedef struct _SYSTEM_PROCESS_FULL_INFORMATION {
+    SYSTEM_PROCESS_INFORMATION ProcessAndThreads;
     SYSTEM_PROCESS_INFORMATION_EXTENSION ExtendedInfo;
-} SYSTEM_PROCESSES_FULL_INFORMATION, *PSYSTEM_PROCESSES_FULL_INFORMATION;
+} SYSTEM_PROCESS_FULL_INFORMATION, *PSYSTEM_PROCESS_FULL_INFORMATION;
 
 typedef struct _SYSTEM_PROCESS_ID_INFORMATION {
     HANDLE ProcessId;
@@ -1171,6 +1172,18 @@ typedef struct _THREAD_BASIC_INFORMATION {
     KPRIORITY Priority;
     LONG BasePriority;
 } THREAD_BASIC_INFORMATION, *PTHREAD_BASIC_INFORMATION;
+
+// taken from ph2(whatever)
+typedef struct _THREAD_LAST_SYSCALL_INFORMATION {
+    PVOID FirstArgument;
+    USHORT SystemCallNumber;
+#ifdef WIN64
+    USHORT Pad[0x3]; // since REDSTONE2
+#else
+    USHORT Pad[0x1]; // since REDSTONE2
+#endif
+    ULONG64 WaitTime;
+} THREAD_LAST_SYSCALL_INFORMATION, * PTHREAD_LAST_SYSCALL_INFORMATION;
 
 typedef struct _THREAD_NAME_INFORMATION {
     UNICODE_STRING ThreadName;
@@ -5629,6 +5642,93 @@ typedef struct _MEMORY_ENCLAVE_IMAGE_INFORMATION {
     UCHAR AuthorID[32];
 } MEMORY_ENCLAVE_IMAGE_INFORMATION, * PMEMORY_ENCLAVE_IMAGE_INFORMATION;
 
+typedef struct _MEMORY_WORKING_SET_BLOCK {
+    ULONG_PTR Protection : 5;
+    ULONG_PTR ShareCount : 3;
+    ULONG_PTR Shared : 1;
+    ULONG_PTR Node : 3;
+#ifdef _WIN64
+    ULONG_PTR VirtualPage : 52;
+#else
+    ULONG VirtualPage : 20;
+#endif
+} MEMORY_WORKING_SET_BLOCK, * PMEMORY_WORKING_SET_BLOCK;
+
+typedef struct _MEMORY_WORKING_SET_INFORMATION {
+    ULONG_PTR NumberOfEntries;
+    _Field_size_(NumberOfEntries) MEMORY_WORKING_SET_BLOCK WorkingSetInfo[1];
+} MEMORY_WORKING_SET_INFORMATION, * PMEMORY_WORKING_SET_INFORMATION;
+
+typedef struct _MEMORY_WORKING_SET_EX_BLOCK {
+    union {
+        struct {
+            ULONG_PTR Valid : 1;
+            ULONG_PTR ShareCount : 3;
+            ULONG_PTR Win32Protection : 11;
+            ULONG_PTR Shared : 1;
+            ULONG_PTR Node : 6;
+            ULONG_PTR Locked : 1;
+            ULONG_PTR LargePage : 1;
+            ULONG_PTR Priority : 3;
+            ULONG_PTR Reserved : 3;
+            ULONG_PTR SharedOriginal : 1;
+            ULONG_PTR Bad : 1;
+            ULONG_PTR Win32GraphicsProtection : 4;
+#ifdef _WIN64
+            ULONG_PTR ReservedUlong : 28;
+#endif
+        };
+        struct {
+            ULONG_PTR Valid : 1;
+            ULONG_PTR Reserved0 : 14;
+            ULONG_PTR Shared : 1;
+            ULONG_PTR Reserved1 : 5;
+            ULONG_PTR PageTable : 1;
+            ULONG_PTR Location : 2;
+            ULONG_PTR Priority : 3;
+            ULONG_PTR ModifiedList : 1;
+            ULONG_PTR Reserved2 : 2;
+            ULONG_PTR SharedOriginal : 1;
+            ULONG_PTR Bad : 1;
+#ifdef _WIN64
+            ULONG_PTR ReservedUlong : 32;
+#endif
+        } Invalid;
+    };
+} MEMORY_WORKING_SET_EX_BLOCK, * PMEMORY_WORKING_SET_EX_BLOCK;
+
+typedef struct _MEMORY_WORKING_SET_EX_INFORMATION {
+    PVOID VirtualAddress;
+    union {
+        MEMORY_WORKING_SET_EX_BLOCK VirtualAttributes;
+        ULONG_PTR Long;
+    } u1;
+} MEMORY_WORKING_SET_EX_INFORMATION, * PMEMORY_WORKING_SET_EX_INFORMATION;
+
+#define MM_ZERO_ACCESS         0  // this value is not used.
+#define MM_READONLY            1
+#define MM_EXECUTE             2
+#define MM_EXECUTE_READ        3
+#define MM_READWRITE           4  // bit 2 is set if this is writable.
+#define MM_WRITECOPY           5
+#define MM_EXECUTE_READWRITE   6
+#define MM_EXECUTE_WRITECOPY   7
+
+#define MM_NOCACHE            0x8
+#define MM_GUARD_PAGE         0x10
+#define MM_DECOMMIT           0x10   // NO_ACCESS, Guard page
+#define MM_NOACCESS           0x18   // NO_ACCESS, Guard_page, nocache.
+#define MM_UNKNOWN_PROTECTION 0x100  // bigger than 5 bits!
+
+#define MM_INVALID_PROTECTION ((ULONG)-1)  // bigger than 5 bits!
+
+#define MM_PROTECTION_WRITE_MASK     4
+#define MM_PROTECTION_COPY_MASK      1
+#define MM_PROTECTION_OPERATION_MASK 7 // mask off guard page and nocache.
+#define MM_PROTECTION_EXECUTE_MASK   2
+
+#define MM_SECURE_DELETE_CHECK 0x55
+
 /*
 ** Virtual Memory END
 */
@@ -5673,8 +5773,6 @@ typedef ULONG GDI_HANDLE_BUFFER[GDI_HANDLE_BUFFER_SIZE];
 
 #define RTL_MAX_DRIVE_LETTERS 32
 #define RTL_DRIVE_LETTER_VALID (USHORT)0x0001
-
-#define GDI_MAX_HANDLE_COUNT 0x4000 //0xFFFF
 
 // 32-bit definitions
 typedef struct _STRING32 {
@@ -6003,32 +6101,6 @@ typedef struct _PEB_LDR_DATA {
     HANDLE ShutdownThreadId;
 } PEB_LDR_DATA, *PPEB_LDR_DATA;
 
-typedef struct _GDI_HANDLE_ENTRY {
-    union
-    {
-        PVOID Object;
-        PVOID NextFree;
-    };
-    union
-    {
-        struct
-        {
-            USHORT ProcessId;
-            USHORT Lock : 1;
-            USHORT Count : 15;
-        };
-        ULONG Value;
-    } Owner;
-    USHORT Unique;
-    UCHAR Type;
-    UCHAR Flags;
-    PVOID UserPointer;
-} GDI_HANDLE_ENTRY, *PGDI_HANDLE_ENTRY;
-
-typedef struct _GDI_SHARED_MEMORY {
-    GDI_HANDLE_ENTRY Handles[GDI_MAX_HANDLE_COUNT];
-} GDI_SHARED_MEMORY, *PGDI_SHARED_MEMORY;
-
 #ifndef FLS_MAXIMUM_AVAILABLE
 #define FLS_MAXIMUM_AVAILABLE 128
 #endif
@@ -6312,7 +6384,7 @@ typedef struct _GDI_TEB_BATCH {
 } GDI_TEB_BATCH, *PGDI_TEB_BATCH;
 
 typedef struct _ACTIVATION_CONTEXT_DATA {
-    ULONG Magic;
+    ULONG Magic; //'xtcA'
     ULONG HeaderSize;
     ULONG FormatVersion;
     ULONG TotalSize;
@@ -6716,7 +6788,9 @@ typedef struct tagPROCESS_MITIGATION_SYSTEM_CALL_DISABLE_POLICY_W10 {
         struct {
             DWORD DisallowWin32kSystemCalls : 1;
             DWORD AuditDisallowWin32kSystemCalls : 1;
-            DWORD ReservedFlags : 30;
+            DWORD DisallowFsctlSystemCalls : 1;
+            DWORD AuditDisallowFsctlSystemCalls : 1;
+            DWORD ReservedFlags : 28;
         } DUMMYSTRUCTNAME;
     } DUMMYUNIONNAME;
 } PROCESS_MITIGATION_SYSTEM_CALL_DISABLE_POLICY_W10, *PPROCESS_MITIGATION_SYSTEM_CALL_DISABLE_POLICY_W10;
@@ -7970,11 +8044,11 @@ typedef struct _LDR_DATA_TABLE_ENTRY_FULL
     USHORT TlsIndex;
     LIST_ENTRY HashLinks;
     ULONG TimeDateStamp;
-    struct _ACTIVATION_CONTEXT* EntryPointActivationContext;
+    PACTIVATION_CONTEXT EntryPointActivationContext;
     PVOID Lock;
     PLDR_DDAG_NODE DdagNode;
     LIST_ENTRY NodeModuleLink;
-    struct _LDRP_LOAD_CONTEXT* LoadContext;
+    PVOID LoadContext;
     PVOID ParentDllBase;
     PVOID SwitchBackContext;
     RTL_BALANCED_NODE BaseAddressIndexNode;
@@ -7987,12 +8061,9 @@ typedef struct _LDR_DATA_TABLE_ENTRY_FULL
     ULONG ReferenceCount;
     ULONG DependentLoadFlags;
     UCHAR SigningLevel;
-    CHAR Padding1[3];
-    ULONG CheckSum;
-    LONG Padding2;
+    ULONG CheckSum; 
     PVOID ActivePatchImageBase;
     LDR_HOT_PATCH_STATE HotPatchState;
-    LONG __PADDING__[1];
 } LDR_DATA_TABLE_ENTRY_FULL, * PLDR_DATA_TABLE_ENTRY_FULL;
 
 typedef struct _LDR_DLL_LOADED_NOTIFICATION_DATA {
@@ -8365,46 +8436,6 @@ LdrControlFlowGuardEnforced(
 /*
 **  LDR END
 */
-
-/*
-* WIN32K OBJECTS START
-*/
-
-typedef struct _HANDLEENTRY {
-    PHEAD   phead;  // Pointer to the Object.
-    PVOID   pOwner; // PTI or PPI
-    BYTE    bType;  // Object handle type
-    BYTE    bFlags; // Flags
-    WORD    wUniq;  // Access count.
-} HANDLEENTRY, *PHANDLEENTRY;
-
-typedef struct _SERVERINFO {
-    WORD            wRIPFlags;
-    WORD            wSRVIFlags;
-    WORD            wRIPPID;
-    WORD            wRIPError;
-    ULONG           cHandleEntries;
-    // incomplete
-} SERVERINFO, *PSERVERINFO;
-
-typedef struct _SHAREDINFO {
-    PSERVERINFO		psi;
-    PHANDLEENTRY	aheList;
-    ULONG			HeEntrySize;
-    // incomplete
-} SHAREDINFO, *PSHAREDINFO;
-
-typedef struct _USERCONNECT {
-    ULONG ulVersion;
-    ULONG ulCurrentVersion;
-    DWORD dwDispatchCount;
-    SHAREDINFO siClient;
-} USERCONNECT, *PUSERCONNECT;
-
-/*
-* WIN32K OBJECTS END
-*/
-
 
 /*
 ** Runtime Library API START
@@ -9835,6 +9866,32 @@ RtlAdjustPrivilege(
     _In_ BOOLEAN Enable,
     _In_ BOOLEAN Client,
     _Out_ PBOOLEAN WasEnabled);
+
+#define RTL_ACQUIRE_PRIVILEGE_REVERT 0x00000001
+#define RTL_ACQUIRE_PRIVILEGE_PROCESS 0x00000002
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+RtlAcquirePrivilege(
+    _In_ PULONG Privilege,
+    _In_ ULONG NumPriv,
+    _In_ ULONG Flags,
+    _Out_ PVOID* ReturnedState);
+
+NTSYSAPI
+VOID
+NTAPI
+RtlReleasePrivilege(
+    _In_ PVOID StatePointer);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+RtlRemovePrivileges(
+    _In_ HANDLE TokenHandle,
+    _In_ PULONG PrivilegesToKeep,
+    _In_ ULONG PrivilegeCount);
 
 NTSYSAPI
 BOOLEAN
@@ -14244,6 +14301,22 @@ NtRemoveProcessDebug(
     _In_ HANDLE ProcessHandle,
     _In_ HANDLE DebugObjectHandle);
 
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtQueryDebugFilterState(
+    _In_ ULONG ComponentId,
+    _In_ ULONG Level);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtSetDebugFilterState(
+    _In_ ULONG ComponentId,
+    _In_ ULONG Level,
+    _In_ BOOLEAN State);
+
+
 /************************************************************************************
 *
 * Profile API.
@@ -14698,6 +14771,53 @@ NtRaiseHardError(
     _In_reads_(NumberOfParameters) PULONG_PTR Parameters,
     _In_ ULONG ValidResponseOptions,
     _Out_ PULONG Response);
+
+/************************************************************************************
+*
+* Thread Pooling API and definitions.
+*
+************************************************************************************/
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+TpAllocPool(
+    _Out_ PTP_POOL* PoolReturn,
+    _Reserved_ PVOID Reserved);
+
+NTSYSAPI
+VOID
+NTAPI
+TpReleasePool(
+    _Inout_ PTP_POOL Pool);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+TpAllocWork(
+    _Out_ PTP_WORK* WorkReturn,
+    _In_ PTP_WORK_CALLBACK Callback,
+    _Inout_opt_ PVOID Context,
+    _In_opt_ PTP_CALLBACK_ENVIRON CallbackEnviron);
+
+NTSYSAPI
+VOID
+NTAPI
+TpReleaseWork(
+    _Inout_ PTP_WORK Work);
+
+NTSYSAPI
+VOID
+NTAPI
+TpPostWork(
+    _Inout_ PTP_WORK Work);
+
+NTSYSAPI
+VOID
+NTAPI
+TpWaitForWork(
+    _Inout_ PTP_WORK Work,
+    _In_ LOGICAL CancelPendingCallbacks);
 
 /************************************************************************************
 *

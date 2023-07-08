@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     2.01
+*  VERSION:     2.02
 *
-*  DATE:        15 Apr 2023
+*  DATE:        10 Jul 2023
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -177,20 +177,16 @@ VOID propSetProcessMitigationsInfo(
     {
         if (Policies.DynamicCodePolicy.Flags) {
             if (Policies.DynamicCodePolicy.ProhibitDynamicCode) {
-                _strcpy(szBuffer, TEXT("Dynamic code prohibited"));
-                ComboBox_AddString(hwndCB, szBuffer);
+                ComboBox_AddString(hwndCB, TEXT("Dynamic code prohibited"));
             }
             if (Policies.DynamicCodePolicy.AuditProhibitDynamicCode) {
-                _strcpy(szBuffer, TEXT("Dynamic code audit prohibit"));
-                ComboBox_AddString(hwndCB, szBuffer);
+                ComboBox_AddString(hwndCB, TEXT("Dynamic code audit prohibit"));
             }
             if (Policies.DynamicCodePolicy.AllowThreadOptOut) {
-                _strcpy(szBuffer, TEXT("Dynamic code prohibited (per-thread)"));
-                ComboBox_AddString(hwndCB, szBuffer);
+                ComboBox_AddString(hwndCB, TEXT("Dynamic code prohibited (per-thread)"));
             }
             if (Policies.DynamicCodePolicy.AllowRemoteDowngrade) {
-                _strcpy(szBuffer, TEXT("Dynamic code downgradable"));
-                ComboBox_AddString(hwndCB, szBuffer);
+                ComboBox_AddString(hwndCB, TEXT("Dynamic code downgradable"));
             }
         }
     }
@@ -231,6 +227,12 @@ VOID propSetProcessMitigationsInfo(
             if (Policies.SystemCallDisablePolicy.AuditDisallowWin32kSystemCalls) {
                 _strcpy(szBuffer, TEXT("Disallow Win32k system calls (Audit)"));
                 ComboBox_AddString(hwndCB, szBuffer);
+            }
+            if (Policies.SystemCallDisablePolicy.DisallowFsctlSystemCalls) {
+                ComboBox_AddString(hwndCB, TEXT("Disallow Fsctl system calls"));
+            }
+            if (Policies.SystemCallDisablePolicy.AuditDisallowFsctlSystemCalls) {
+                ComboBox_AddString(hwndCB, TEXT("Disallow Fsctl system calls (Audit)"));
             }
         }
     }

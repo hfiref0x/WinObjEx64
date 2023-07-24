@@ -1,13 +1,13 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2021
+*  (C) COPYRIGHT AUTHORS, 2019 - 2023
 *
 *  TITLE:       QUERY.H
 *
-*  VERSION:     1.03
+*  VERSION:     1.04
 *
-*  DATE:        04 Sep 2021
-* 
+*  DATE:        16 Jul 2023
+*
 *  Sonar plugin query information definitions.
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
@@ -22,37 +22,41 @@
 typedef struct _PROTOCOL_BLOCK_VERSIONS {
     union {
         union {
-            NDIS_PROTOCOL_BLOCK_7601 *v1;
-            NDIS_PROTOCOL_BLOCK_9200 *v2;
-            NDIS_PROTOCOL_BLOCK_9600_17134 *v3;
-            NDIS_PROTOCOL_BLOCK_17763 *v4;
-            NDIS_PROTOCOL_BLOCK_18362_22000 *v5;
+            NDIS_PROTOCOL_BLOCK_7601* v1;
+            NDIS_PROTOCOL_BLOCK_9200* v2;
+            NDIS_PROTOCOL_BLOCK_9600_17134* v3;
+            NDIS_PROTOCOL_BLOCK_17763* v4;
+            NDIS_PROTOCOL_BLOCK_18362_25905* v5;
         } Versions;
         PVOID Ref;
     } u1;
-} PROTOCOL_BLOCK_VERSIONS, *PPROTOCOL_BLOCK_VERSIONS;
+} PROTOCOL_BLOCK_VERSIONS, * PPROTOCOL_BLOCK_VERSIONS;
 
 typedef struct _OPEN_BLOCK_VERSIONS {
     union {
         union {
-            NDIS_OPEN_BLOCK_7601 *v1;
-            NDIS_OPEN_BLOCK_9200 *v2;
+            NDIS_OPEN_BLOCK_7601* v1;
+            NDIS_OPEN_BLOCK_9200* v2;
             union {
-                NDIS_COMMON_OPEN_BLOCK_9600_10586 *v3c;
-                NDIS_OPEN_BLOCK_9600_10586 *v3;
+                NDIS_COMMON_OPEN_BLOCK_9600_10586* v3c;
+                NDIS_OPEN_BLOCK_9600_10586* v3;
             } u_v3;
             union {
-                NDIS_COMMON_OPEN_BLOCK_14393_17134 *v4c;
-                NDIS_OPEN_BLOCK_14393_17134 *v4;
+                NDIS_COMMON_OPEN_BLOCK_14393_17134* v4c;
+                NDIS_OPEN_BLOCK_14393_17134* v4;
             } u_v4;
             union {
-                NDIS_COMMON_OPEN_BLOCK_17763_22000 *v5c;
-                NDIS_OPEN_BLOCK_17763_22000 *v5;
+                NDIS_COMMON_OPEN_BLOCK_17763_22000* v5c;
+                NDIS_OPEN_BLOCK_17763_22000* v5;
             } u_v5;
+            union {
+                NDIS_COMMON_OPEN_BLOCK_22621_25905* v6c;
+                NDIS_OPEN_BLOCK_22621_25905* v6;
+            } u_v6;
         } Versions;
         PVOID Ref;
     } u1;
-} OPEN_BLOCK_VERSIONS, *POPEN_BLOCK_VERSIONS;
+} OPEN_BLOCK_VERSIONS, * POPEN_BLOCK_VERSIONS;
 
 typedef enum _NDIS_OBJECT_TYPE {
     NdisObjectTypeProtocolBlock = 1,
@@ -134,9 +138,9 @@ typedef struct _NDIS_OPEN_BLOCK_HANDLERS {
     PVOID MiniportCoOidRequestHandler;
     PVOID CoOidRequestCompleteHandler;
     PVOID CoOidRequestHandler;
-} NDIS_OPEN_BLOCK_HANDLERS, *PNDIS_OPEN_BLOCK_HANDLERS;
+} NDIS_OPEN_BLOCK_HANDLERS, * PNDIS_OPEN_BLOCK_HANDLERS;
 
-typedef struct _NDIS_OPEN_BLOCK_COMPATIBLE{
+typedef struct _NDIS_OPEN_BLOCK_COMPATIBLE {
     PVOID ProtocolNextOpen;
 
     UNICODE_STRING* BindDeviceName;
@@ -144,7 +148,7 @@ typedef struct _NDIS_OPEN_BLOCK_COMPATIBLE{
 
     NDIS_OPEN_BLOCK_HANDLERS Handlers;
 
-} NDIS_OPEN_BLOCK_COMPATIBLE, *PNDIS_OPEN_BLOCK_COMPATIBLE;
+} NDIS_OPEN_BLOCK_COMPATIBLE, * PNDIS_OPEN_BLOCK_COMPATIBLE;
 
 typedef struct _NDIS_PROTOCOL_BLOCK_HANDLERS {
     PVOID BindAdapterHandlerEx;
@@ -202,7 +206,7 @@ typedef struct _NDIS_PROTOCOL_BLOCK_HANDLERS {
     PVOID DirectOidRequestCompleteHandler;
     PVOID AllocateSharedMemoryHandler;
     PVOID FreeSharedMemoryHandler;
-} NDIS_PROTOCOL_BLOCK_HANDLERS, *PNDIS_PROTOCOL_BLOCK_HANDLERS;
+} NDIS_PROTOCOL_BLOCK_HANDLERS, * PNDIS_PROTOCOL_BLOCK_HANDLERS;
 
 typedef struct _NDIS_PROTOCOL_BLOCK_COMPATIBLE {
     UNICODE_STRING Name;
@@ -221,7 +225,7 @@ typedef struct _NDIS_PROTOCOL_BLOCK_COMPATIBLE {
 
     NDIS_PROTOCOL_BLOCK_HANDLERS Handlers;
 
-} NDIS_PROTOCOL_BLOCK_COMPATIBLE, *PNDIS_PROTOCOL_BLOCK_COMPATIBLE;
+} NDIS_PROTOCOL_BLOCK_COMPATIBLE, * PNDIS_PROTOCOL_BLOCK_COMPATIBLE;
 
 static LPCWSTR g_lpszOpenBlockHandlers[] = {
     TEXT("NextSendHandler"),
@@ -355,12 +359,12 @@ ULONG GetNextProtocolOffset(
 _Success_(return == TRUE)
 BOOL ReadAndConvertProtocolBlock(
     _In_ ULONG_PTR ObjectAddress,
-    _Inout_ NDIS_PROTOCOL_BLOCK_COMPATIBLE *ProtoBlock,
+    _Inout_ NDIS_PROTOCOL_BLOCK_COMPATIBLE * ProtoBlock,
     _Out_opt_ PULONG ObjectVersion);
 
 _Success_(return == TRUE)
 BOOL ReadAndConvertOpenBlock(
     _In_ ULONG_PTR ObjectAddress,
-    _Inout_ NDIS_OPEN_BLOCK_COMPATIBLE *OpenBlock,
+    _Inout_ NDIS_OPEN_BLOCK_COMPATIBLE * OpenBlock,
     _Out_opt_ PULONG ObjectVersion);
 

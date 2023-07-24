@@ -1,13 +1,13 @@
 /************************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2021
+*  (C) COPYRIGHT AUTHORS, 2019 - 2023
 *  Translated from Microsoft sources/symbols with help of pdbex
 *
 *  TITLE:       NDIS.H
 *
-*  VERSION:     1.03
+*  VERSION:     1.06
 *
-*  DATE:        04 Se 2021
+*  DATE:        14 Jul 2023
 *
 *  Common header file for the NDIS related definitions/structures.
 *
@@ -54,14 +54,14 @@ typedef struct _NDIS_OBJECT_HEADER
 
 typedef struct _NDIS_SPIN_LOCK
 {
-    KSPIN_LOCK  SpinLock;
-    KIRQL       OldIrql;
+    KSPIN_LOCK SpinLock;
+    KIRQL OldIrql;
 } NDIS_SPIN_LOCK, *PNDIS_SPIN_LOCK;
 
 typedef struct _REFERENCE
 {
     unsigned __int64 SpinLock;
-    unsigned short ReferenceCount;
+    USHORT ReferenceCount;
     UCHAR Closing;
     char __PADDING__[5];
 } REFERENCE, *PREFERENCE;
@@ -69,7 +69,7 @@ typedef struct _REFERENCE
 typedef struct _REFERENCE_EX
 {
     unsigned __int64 SpinLock;
-    unsigned short ReferenceCount;
+    USHORT ReferenceCount;
     UCHAR Closing;
     UCHAR ZeroBased;
     long Padding_188;
@@ -265,8 +265,35 @@ typedef enum _PKTMON_PACKET_TYPE
     PktMonPayload_Unknown = 0,
     PktMonPayload_Ethernet = 1,
     PktMonPayload_WiFi = 2,
-    PktMonPayload_MBB = 3,
+    PktMonPayload_IP = 3,
+    PktMonPayload_HTTP = 4,
+    PktMonPayload_TCP = 5,
+    PktMonPayload_UDP = 6,
+    PktMonPayload_ARP = 7,
+    PktMonPayload_ICMP = 8,
+    PktMonPayload_ESP = 9,
+    PktMonPayload_AH = 10,
+    PktMonPayload_L4Payload = 11
 } PKTMON_PACKET_TYPE, *PPKTMON_PACKET_TYPE;
+
+typedef enum _PKTMON_COMPONENT_TYPE
+{
+    PktMonComp_Ndis = 1,
+    PktMonComp_Miniport = 2,
+    PktMonComp_Filter = 3,
+    PktMonComp_Protocol = 4,
+    PktMonComp_VmsVmNic = 5,
+    PktMonComp_VmsMiniport = 6,
+    PktMonComp_VmsExtMiniport = 7,
+    PktMonComp_VmsProtocolNic = 8,
+    PktMonComp_NetVsc = 9,
+    PktMonComp_HTTP = 10,
+    PktMonComp_IpInterface = 11,
+    PktMonComp_Slbmux = 12,
+    PktMonComp_Ipsec = 13,
+    PktMonComp_NetCx = 14,
+    PktMonComp_HTTPMessage = 15
+} PKTMON_COMPONENT_TYPE, * PPKTMON_COMPONENT_TYPE;
 
 typedef struct _PKTMON_COMPONENT_CONTEXT
 {
@@ -279,13 +306,37 @@ typedef struct _PKTMON_COMPONENT_CONTEXT
     }; /* bitfield */
 } PKTMON_COMPONENT_CONTEXT, *PPKTMON_COMPONENT_CONTEXT; /* size: 0x0010 */
 
+typedef struct _PKTMON_COMPONENT_CONTEXT_V2
+{
+    /* 0x0000 */ struct _LIST_ENTRY ListLink;
+    /* 0x0010 */ struct _LIST_ENTRY EdgeList;
+    /* 0x0020 */ long EdgeCount;
+    /* 0x0024 */ long Padding_113;
+    /* 0x0028 */ PVOID CompHandle;
+    /* 0x0030 */ PKTMON_COMPONENT_TYPE CompType;
+    /* 0x0034 */ PKTMON_PACKET_TYPE PacketType;
+    struct /* bitfield */
+    {
+        /* 0x0038 */ int FlowEnabled : 1; /* bit position: 0 */
+        /* 0x0038 */ int DropEnabled : 1; /* bit position: 1 */
+    }; /* bitfield */
+    /* 0x003c */ long __PADDING__[1];
+} PKTMON_COMPONENT_CONTEXT_V2, * PPKTMON_COMPONENT_CONTEXT_V2; /* size: 0x0040 */
+
 typedef struct _PKTMON_EDGE_CONTEXT
 {
     /* 0x0000 */ PVOID EdgeHandle;
     /* 0x0008 */ PKTMON_COMPONENT_CONTEXT* CompContext;
     /* 0x0010 */ PKTMON_PACKET_TYPE PacketType;
-    /* 0x0014 */ long __PADDING__[1];
 } PKTMON_EDGE_CONTEXT, *PPKTMON_EDGE_CONTEXT; /* size: 0x0018 */
+
+typedef struct _PKTMON_EDGE_CONTEXT_V2
+{
+    /* 0x0000 */ LIST_ENTRY ListLink;
+    /* 0x0010 */ PVOID EdgeHandle;
+    /* 0x0018 */ PKTMON_COMPONENT_CONTEXT* CompContext;
+    /* 0x0020 */ enum _PKTMON_PACKET_TYPE PacketType;
+} PKTMON_EDGE_CONTEXT_V2, * PPKTMON_EDGE_CONTEXT_V2; /* size: 0x0028 */
 
 typedef struct _NDIS_OPEN_BLOCK_7601 {
     union
@@ -414,7 +465,7 @@ typedef struct _NDIS_OPEN_BLOCK_7601 {
             /* 0x0620 */ PVOID TcpOffloadReceiveIndicateHandler;
             /* 0x0628 */ unsigned long ProtocolMajorVersion;
             /* 0x062c */ long Padding_283;
-            /* 0x0630 */ void** IfBlock;
+            /* 0x0630 */ PVOID* IfBlock;
             /* 0x0638 */ NDIS_SPIN_LOCK PnPStateLock;
             /* 0x0648 */ NDIS_NDIS5_DRIVER_STATE PnPState;
             /* 0x064c */ NDIS_OPEN_TRANSLATION_STATE TranslationState;
@@ -650,7 +701,7 @@ typedef struct _NDIS_OPEN_BLOCK_9600_10586
 
 typedef struct _NDIS_OPEN_BLOCK_14393_17134
 {
-    /* 0x0000 */ long Padding_7[254];
+    /* 0x0000 */ long Padding_7[254]; //NDIS_COMMON_OPEN_BLOCK
     /* 0x03f8 */ struct _NDIS_CO_AF_BLOCK* NextAf;
     /* 0x0400 */ PVOID MiniportCoCreateVcHandler;
     /* 0x0408 */ PVOID MiniportCoRequestHandler;
@@ -672,7 +723,7 @@ typedef struct _NDIS_OPEN_BLOCK_14393_17134
 
 typedef struct _NDIS_OPEN_BLOCK_17763_22000
 {
-    /* 0x0000 */ long Padding_297[240];
+    /* 0x0000 */ long Padding_297[240]; //NDIS_COMMON_OPEN_BLOCK
     /* 0x03c0 */ struct _NDIS_CO_AF_BLOCK* NextAf;
     /* 0x03c8 */ PVOID MiniportCoCreateVcHandler;
     /* 0x03d0 */ PVOID MiniportCoRequestHandler;
@@ -691,6 +742,28 @@ typedef struct _NDIS_OPEN_BLOCK_17763_22000
     /* 0x0440 */ PVOID CoOidRequestCompleteHandler;
     /* 0x0448 */ PVOID CoOidRequestHandler;
 } NDIS_OPEN_BLOCK_17763_22000, *PNDIS_OPEN_BLOCK_17763_22000; /* size: 0x0450 */
+
+typedef struct _NDIS_OPEN_BLOCK_22621_25905
+{
+    /* 0x0000 */ long Padding_293[256]; //NDIS_COMMON_OPEN_BLOCK
+    /* 0x0400 */ struct _NDIS_CO_AF_BLOCK* NextAf;
+    /* 0x0408 */ void* MiniportCoCreateVcHandler /* function */;
+    /* 0x0410 */ void* MiniportCoRequestHandler /* function */;
+    /* 0x0418 */ void* CoCreateVcHandler /* function */;
+    /* 0x0420 */ void* CoDeleteVcHandler /* function */;
+    /* 0x0428 */ void* CmActivateVcCompleteHandler /* function */;
+    /* 0x0430 */ void* CmDeactivateVcCompleteHandler /* function */;
+    /* 0x0438 */ void* CoRequestCompleteHandler /* function */;
+    /* 0x0440 */ void* CoRequestHandler /* function */;
+    /* 0x0448 */ struct _LIST_ENTRY ActiveVcHead;
+    /* 0x0458 */ struct _LIST_ENTRY InactiveVcHead;
+    /* 0x0468 */ long PendingAfNotifications;
+    /* 0x046c */ long Padding_294;
+    /* 0x0470 */ struct _KEVENT* AfNotifyCompleteEvent;
+    /* 0x0478 */ void* MiniportCoOidRequestHandler /* function */;
+    /* 0x0480 */ void* CoOidRequestCompleteHandler /* function */;
+    /* 0x0488 */ void* CoOidRequestHandler /* function */;
+} NDIS_OPEN_BLOCK_22621_25905, * PNDIS_OPEN_BLOCK_22621_25905; /* size: 0x0490 */
 
 typedef struct _NDIS_COMMON_OPEN_BLOCK_9600_10586
 {
@@ -834,7 +907,7 @@ typedef struct _NDIS_COMMON_OPEN_BLOCK_9600_10586
     /* 0x03b8 */ struct NDIS_BIND_PROTOCOL_LINK* Bind;
     /* 0x03c0 */ WORK_QUEUE_ITEM UnsolicitedUnbindComplete;
     /* 0x03e0 */ KEVENT* UnsolicitedUnbindEvent;
-    /* 0x03e8 */ BOOL PendingLegacyUnbind;
+    /* 0x03e8 */ char PendingLegacyUnbind;
     /* 0x03e9 */ char __PADDING__[7];
 } NDIS_COMMON_OPEN_BLOCK_9600_10586, *PNDIS_COMMON_OPEN_BLOCK_9600_10586; /* size: 0x03f0 */
 
@@ -980,7 +1053,7 @@ typedef struct _NDIS_COMMON_OPEN_BLOCK_14393_17134
     /* 0x03b8 */ struct NDIS_BIND_PROTOCOL_LINK* Bind;
     /* 0x03c0 */ WORK_QUEUE_ITEM UnsolicitedUnbindComplete;
     /* 0x03e0 */ KEVENT* UnsolicitedUnbindEvent;
-    /* 0x03e8 */ BOOL PendingLegacyUnbind;
+    /* 0x03e8 */ char PendingLegacyUnbind;
     /* 0x03e9 */ char Padding_385[7];
     /* 0x03f0 */ KEVENT* WaitNetPnpEvent;
 } NDIS_COMMON_OPEN_BLOCK_14393_17134, *PNDIS_COMMON_OPEN_BLOCK_14393_17134; /* size: 0x03f8 */
@@ -1115,12 +1188,149 @@ typedef struct _NDIS_COMMON_OPEN_BLOCK_17763_22000
     /* 0x0358 */ struct NDIS_BIND_PROTOCOL_LINK* Bind;
     /* 0x0360 */ WORK_QUEUE_ITEM UnsolicitedUnbindComplete;
     /* 0x0380 */ KEVENT* UnsolicitedUnbindEvent;
-    /* 0x0388 */ BOOL PendingLegacyUnbind;
+    /* 0x0388 */ char PendingLegacyUnbind;
     /* 0x0389 */ char Padding_378[7];
     /* 0x0390 */ KEVENT* WaitNetPnpEvent;
     /* 0x0398 */ PKTMON_COMPONENT_CONTEXT PktMonComp;
     /* 0x03a8 */ PKTMON_EDGE_CONTEXT PktMonEdge;
 } NDIS_COMMON_OPEN_BLOCK_17763_22000, *PNDIS_COMMON_OPEN_BLOCK_17763_22000; /* size: 0x03c0 */
+
+typedef struct _NDIS_COMMON_OPEN_BLOCK_22621_25905
+{
+    union
+    {
+        /* 0x0000 */ PVOID MacHandle;
+        /* 0x0000 */ struct _NDIS_OBJECT_HEADER Header;
+    }; /* size: 0x0008 */
+    /* 0x0008 */ PVOID BindingHandle;
+    /* 0x0010 */ struct _NDIS_MINIPORT_BLOCK* MiniportHandle;
+    /* 0x0018 */ struct _NDIS_PROTOCOL_BLOCK* ProtocolHandle;
+    /* 0x0020 */ PVOID ProtocolBindingContext;
+    /* 0x0028 */ PVOID NextSendHandler /* function */;
+    /* 0x0030 */ PVOID NextSendContext;
+    /* 0x0038 */ PVOID MiniportAdapterContext;
+    /* 0x0040 */ unsigned char Reserved1;
+    /* 0x0041 */ unsigned char CallingFromNdis6Protocol;
+    /* 0x0042 */ unsigned char Reserved3;
+    /* 0x0043 */ unsigned char Reserved4;
+    /* 0x0044 */ long Padding_328;
+    /* 0x0048 */ PVOID NextReturnNetBufferListsHandler /* function */;
+    /* 0x0050 */ unsigned __int64 Reserved5;
+    /* 0x0058 */ PVOID NextReturnNetBufferListsContext;
+    union
+    {
+        /* 0x0060 */ PVOID SendHandler /* function */;
+        /* 0x0060 */ PVOID WanSendHandler /* function */;
+    }; /* size: 0x0008 */
+    /* 0x0068 */ PVOID TransferDataHandler /* function */;
+    /* 0x0070 */ PVOID SendCompleteHandler /* function */;
+    /* 0x0078 */ PVOID TransferDataCompleteHandler /* function */;
+    /* 0x0080 */ PVOID ReceiveHandler /* function */;
+    /* 0x0088 */ PVOID ReceiveCompleteHandler /* function */;
+    /* 0x0090 */ PVOID WanReceiveHandler /* function */;
+    /* 0x0098 */ PVOID RequestCompleteHandler /* function */;
+    /* 0x00a0 */ PVOID ReceivePacketHandler /* function */;
+    /* 0x00a8 */ PVOID SendPacketsHandler /* function */;
+    /* 0x00b0 */ PVOID ResetHandler /* function */;
+    /* 0x00b8 */ PVOID RequestHandler /* function */;
+    /* 0x00c0 */ PVOID OidRequestHandler /* function */;
+    /* 0x00c8 */ PVOID ResetCompleteHandler /* function */;
+    union
+    {
+        /* 0x00d0 */ PVOID StatusHandler /* function */;
+        /* 0x00d0 */ PVOID StatusHandlerEx /* function */;
+    }; /* size: 0x0008 */
+    /* 0x00d8 */ PVOID StatusCompleteHandler /* function */;
+    /* 0x00e0 */ volatile unsigned long OpenFlags;
+    /* 0x00e4 */ long References;
+    /* 0x00e8 */ unsigned __int64 SpinLock;
+    /* 0x00f0 */ PVOID FilterHandle;
+    /* 0x00f8 */ unsigned int FrameTypeArraySize;
+    /* 0x00fc */ unsigned short FrameTypeArray[4];
+    /* 0x0104 */ unsigned long ProtocolOptions;
+    /* 0x0108 */ unsigned long CurrentLookahead;
+    /* 0x010c */ long Padding_329;
+    /* 0x0110 */ PVOID WSendHandler /* function */;
+    /* 0x0118 */ PVOID WTransferDataHandler /* function */;
+    /* 0x0120 */ PVOID WSendPacketsHandler /* function */;
+    /* 0x0128 */ PVOID CancelSendPacketsHandler /* function */;
+    /* 0x0130 */ unsigned long WakeUpEnable;
+    /* 0x0134 */ struct _NDIS_PM_PARAMETERS PMCurrentParameters;
+    /* 0x0148 */ struct _KEVENT* CloseCompleteEvent;
+    /* 0x0150 */ QUEUED_CLOSE QC;
+    /* 0x0178 */ long AfReferences;
+    /* 0x017c */ long Padding_330;
+    /* 0x0180 */ struct _NDIS_OPEN_BLOCK* NextGlobalOpen;
+    /* 0x0188 */ struct _NDIS_OPEN_BLOCK* MiniportNextOpen;
+    /* 0x0190 */ struct _NDIS_OPEN_BLOCK* ProtocolNextOpen;
+    /* 0x0198 */ struct _UNICODE_STRING* BindDeviceName;
+    /* 0x01a0 */ struct _UNICODE_STRING* RootDeviceName;
+    /* 0x01a8 */ struct _NDIS_OPEN_BLOCK* FilterNextOpen;
+    /* 0x01b0 */ unsigned int PacketFilters;
+    /* 0x01b4 */ unsigned int OldPacketFilters;
+    /* 0x01b8 */ unsigned int MaxMulticastAddresses;
+    /* 0x01bc */ long Padding_331;
+    /* 0x01c0 */ struct _ETH_MULTICAST_WRAPPER* MCastAddressBuf;
+    /* 0x01c8 */ unsigned int NumAddresses;
+    /* 0x01cc */ long Padding_332;
+    /* 0x01d0 */ struct _ETH_MULTICAST_WRAPPER* OldMCastAddressBuf;
+    /* 0x01d8 */ unsigned int OldNumAddresses;
+    /* 0x01dc */ long Padding_333;
+    /* 0x01e0 */ unsigned char* RssParametersBuffer;
+    /* 0x01e8 */ struct _NDIS_RECEIVE_SCALE_PARAMETERS* NdisRSSParameters;
+    /* 0x01f0 */ struct _SINGLE_LIST_ENTRY PatternList;
+    /* 0x01f8 */ struct _SINGLE_LIST_ENTRY WOLPatternList;
+    /* 0x0200 */ struct _SINGLE_LIST_ENTRY PMProtocolOffloadList;
+    /* 0x0208 */ PVOID ProtSendNetBufferListsComplete /* function */;
+    /* 0x0210 */ PVOID SendCompleteNdisPacketContext;
+    /* 0x0218 */ PVOID SendCompleteNetBufferListsContext;
+    /* 0x0220 */ PVOID ReceiveNetBufferLists /* function */;
+    /* 0x0228 */ PVOID ReceiveNetBufferListsContext;
+    /* 0x0230 */ PVOID SavedSendPacketsHandler /* function */;
+    /* 0x0238 */ PVOID SavedCancelSendPacketsHandler /* function */;
+    /* 0x0240 */ PVOID SavedSendHandler /* function */;
+    /* 0x0248 */ struct NDIS_NBL_TRACKER_HANDLE__* NblTracker;
+    /* 0x0250 */ struct NDIS_REFCOUNT_HANDLE__* RefCountTracker;
+    /* 0x0258 */ unsigned __int64 RefCountLock;
+    /* 0x0260 */ unsigned long ProtocolMajorVersion;
+    /* 0x0264 */ long Padding_334;
+    /* 0x0268 */ PVOID* IfBlock;
+    /* 0x0270 */ struct _NDIS_SPIN_LOCK PnPStateLock;
+    /* 0x0280 */ enum NDIS_NDIS5_DRIVER_STATE PnPState;
+    /* 0x0284 */ int OutstandingSends;
+    /* 0x0288 */ struct _NDIS_EVENT PauseEvent;
+    /* 0x02a0 */ PVOID Ndis5WanSendHandler /* function */;
+    /* 0x02a8 */ PVOID ProtSendCompleteHandler /* function */;
+    /* 0x02b0 */ PVOID OidRequestCompleteHandler /* function */;
+    /* 0x02b8 */ struct _NDIS_OPEN_OFFLOAD* Offload;
+    /* 0x02c0 */ struct _NDIS_STATUS_UNBIND_WORKITEM* StatusUnbindWorkItem;
+    /* 0x02c8 */ unsigned __int64 DpcStartCycle;
+    /* 0x02d0 */ struct PNDIS_PER_PROCESSOR_SLOT__* ReceivedAPacketSlot;
+    /* 0x02d8 */ PVOID DirectOidRequestHandler /* function */;
+    /* 0x02e0 */ struct _LIST_ENTRY ReceiveQueueList;
+    /* 0x02f0 */ unsigned long NumReceiveQueues;
+    /* 0x02f4 */ long Padding_335;
+    /* 0x02f8 */ struct _LIST_ENTRY SharedMemoryBlockList;
+    /* 0x0308 */ PVOID AllocateSharedMemoryHandler /* function */;
+    /* 0x0310 */ PVOID FreeSharedMemoryHandler /* function */;
+    /* 0x0318 */ PVOID AllocateSharedMemoryContext;
+    /* 0x0320 */ unsigned long NumAllocatedVFs;
+    /* 0x0324 */ long Padding_336;
+    /* 0x0328 */ struct _LIST_ENTRY VFList;
+    /* 0x0338 */ unsigned long NumActiveVPorts;
+    /* 0x033c */ long Padding_337;
+    /* 0x0340 */ struct _LIST_ENTRY VPortList;
+    /* 0x0350 */ unsigned long AoAcReferences;
+    /* 0x0354 */ long Padding_338;
+    /* 0x0358 */ struct NDIS_BIND_PROTOCOL_LINK* Bind;
+    /* 0x0360 */ struct _WORK_QUEUE_ITEM UnsolicitedUnbindComplete;
+    /* 0x0380 */ struct _KEVENT* UnsolicitedUnbindEvent;
+    /* 0x0388 */ char PendingLegacyUnbind;
+    /* 0x0389 */ char Padding_339[7];
+    /* 0x0390 */ struct _KEVENT* WaitNetPnpEvent;
+    /* 0x0398 */ PKTMON_COMPONENT_CONTEXT_V2 PktMonComp;
+    /* 0x03d8 */ PKTMON_EDGE_CONTEXT_V2 PktMonEdge;
+} NDIS_COMMON_OPEN_BLOCK_22621_25905, * PNDIS_COMMON_OPEN_BLOCK_22621_25905; /* size: 0x0400 */
 
 typedef struct _NDIS_PROTOCOL_BLOCK_7601 {
     NDIS_OBJECT_HEADER Header;
@@ -1532,7 +1742,7 @@ typedef struct _NDIS_PROTOCOL_BLOCK_17763
     /* 0x0340 */ PVOID NotifyBindCompleteWorkItem; //class pointer
 } NDIS_PROTOCOL_BLOCK_17763, *PNDIS_PROTOCOL_BLOCK_17763; /* size: 0x0378 */
 
-typedef struct _NDIS_PROTOCOL_BLOCK_18362_22000
+typedef struct _NDIS_PROTOCOL_BLOCK_18362_25905
 {
     /* 0x0000 */ NDIS_OBJECT_HEADER Header;
     /* 0x0004 */ long Padding_126;
@@ -1624,7 +1834,7 @@ typedef struct _NDIS_PROTOCOL_BLOCK_18362_22000
     /* 0x0328 */ UNICODE_STRING ImageName;
     /* 0x0338 */ PVOID Bind; //class pointer
     /* 0x0340 */ PVOID NotifyBindCompleteWorkItem; //class pointer
-} NDIS_PROTOCOL_BLOCK_18362_22000, *PNDIS_PROTOCOL_BLOCK_18362_22000; /* size: 0x0378 */
+} NDIS_PROTOCOL_BLOCK_18362_25905, *PNDIS_PROTOCOL_BLOCK_18362_25905; /* size: 0x0378 */
 
 
 //

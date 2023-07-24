@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2021
+*  (C) COPYRIGHT AUTHORS, 2019 - 2023
 *
 *  TITLE:       QUERY.C
 *
-*  VERSION:     1.03
+*  VERSION:     1.04
 *
-*  DATE:        15 May 2021
+*  DATE:        16 Jul 2023
 *
 *  Query NDIS specific data.
 *
@@ -50,6 +50,8 @@ NdisDeregisterProtocol
 48 8B 3D BA 92 FA FF                                            mov     rdi, cs:ndisProtocolList
 21376
 48 8B 3D XX XX XX XX                                            mov     rdi, cs:ndisProtocolList
+25905
+48 8B 3D 7C FB F9 FF                                            mov     rdi, cs:ndisProtocolList
 */
 
 #define HDE_F_ERROR 0x00001000
@@ -281,9 +283,11 @@ PVOID DumpProtocolBlockVersionAware(
     case NT_WIN10_20H2:
     case NT_WIN10_21H1:
     case NT_WIN10_21H2:
+    case NT_WIN11_21H2:
+    case NT_WIN11_22H2:
     case NTX_WIN11_ADB:
     default:
-        ObjectSize = sizeof(NDIS_PROTOCOL_BLOCK_18362_22000);
+        ObjectSize = sizeof(NDIS_PROTOCOL_BLOCK_18362_25905);
         ObjectVersion = 5;
         break;
 
@@ -348,10 +352,14 @@ PVOID DumpOpenBlockVersionAware(
     case NT_WIN10_20H2:
     case NT_WIN10_21H1:
     case NT_WIN10_21H2:
-    case NTX_WIN11_ADB:
-    default:
+    case NT_WIN11_21H2:
         ObjectSize = sizeof(NDIS_OPEN_BLOCK_17763_22000);
         ObjectVersion = 5;
+        break;
+    case NT_WIN11_22H2:
+    default:
+        ObjectSize = sizeof(NDIS_OPEN_BLOCK_22621_25905);
+        ObjectVersion = 6;
         break;
     }
 
@@ -470,9 +478,10 @@ ULONG GetNextProtocolOffset(
     case NT_WIN10_20H2:
     case NT_WIN10_21H1:
     case NT_WIN10_21H2:
-    case NTX_WIN11_ADB:
+    case NT_WIN11_21H2:
+    case NT_WIN11_22H2:
     default:
-        Offset = FIELD_OFFSET(NDIS_PROTOCOL_BLOCK_18362_22000, NextProtocol);
+        Offset = FIELD_OFFSET(NDIS_PROTOCOL_BLOCK_18362_25905, NextProtocol);
         break;
 
     }
@@ -1048,7 +1057,7 @@ BOOL CreateCompatibleOpenBlock(
         OpenBlock->Handlers.WTransferDataHandler = BlockRef->u1.Versions.u_v4.v4c->WTransferDataHandler;
         break;
 
-    case 5: //17763..19569
+    case 5: //17763..22000
         OpenBlock->ProtocolNextOpen = BlockRef->u1.Versions.u_v5.v5c->ProtocolNextOpen;
         OpenBlock->BindDeviceName = BlockRef->u1.Versions.u_v5.v5c->BindDeviceName;
         OpenBlock->RootDeviceName = BlockRef->u1.Versions.u_v5.v5c->RootDeviceName;
@@ -1099,6 +1108,56 @@ BOOL CreateCompatibleOpenBlock(
         OpenBlock->Handlers.WTransferDataHandler = BlockRef->u1.Versions.u_v5.v5c->WTransferDataHandler;
         break;
 
+    case 6: //22621..25905
+        OpenBlock->ProtocolNextOpen = BlockRef->u1.Versions.u_v6.v6c->ProtocolNextOpen;
+        OpenBlock->BindDeviceName = BlockRef->u1.Versions.u_v6.v6c->BindDeviceName;
+        OpenBlock->RootDeviceName = BlockRef->u1.Versions.u_v6.v6c->RootDeviceName;
+
+        OpenBlock->Handlers.AllocateSharedMemoryHandler = BlockRef->u1.Versions.u_v6.v6c->AllocateSharedMemoryHandler;
+        OpenBlock->Handlers.CancelSendPacketsHandler = BlockRef->u1.Versions.u_v6.v6c->CancelSendPacketsHandler;
+        OpenBlock->Handlers.CmActivateVcCompleteHandler = BlockRef->u1.Versions.u_v6.v6->CmActivateVcCompleteHandler;
+        OpenBlock->Handlers.CmDeactivateVcCompleteHandler = BlockRef->u1.Versions.u_v6.v6->CmDeactivateVcCompleteHandler;
+        OpenBlock->Handlers.CoCreateVcHandler = BlockRef->u1.Versions.u_v6.v6->CoCreateVcHandler;
+        OpenBlock->Handlers.CoDeleteVcHandler = BlockRef->u1.Versions.u_v6.v6->CoDeleteVcHandler;
+        OpenBlock->Handlers.CoOidRequestCompleteHandler = BlockRef->u1.Versions.u_v6.v6->CoOidRequestCompleteHandler;
+        OpenBlock->Handlers.CoOidRequestHandler = BlockRef->u1.Versions.u_v6.v6->CoOidRequestHandler;
+        OpenBlock->Handlers.CoRequestCompleteHandler = BlockRef->u1.Versions.u_v6.v6->CoRequestCompleteHandler;
+        OpenBlock->Handlers.CoRequestHandler = BlockRef->u1.Versions.u_v6.v6->CoRequestHandler;
+        OpenBlock->Handlers.DirectOidRequestHandler = BlockRef->u1.Versions.u_v6.v6c->DirectOidRequestHandler;
+        OpenBlock->Handlers.FreeSharedMemoryHandler = BlockRef->u1.Versions.u_v6.v6c->FreeSharedMemoryHandler;
+        OpenBlock->Handlers.MiniportCoCreateVcHandler = BlockRef->u1.Versions.u_v6.v6->MiniportCoCreateVcHandler;
+        OpenBlock->Handlers.MiniportCoOidRequestHandler = BlockRef->u1.Versions.u_v6.v6->MiniportCoOidRequestHandler;
+        OpenBlock->Handlers.MiniportCoRequestHandler = BlockRef->u1.Versions.u_v6.v6->MiniportCoRequestHandler;
+        OpenBlock->Handlers.Ndis5WanSendHandler = BlockRef->u1.Versions.u_v6.v6c->Ndis5WanSendHandler;
+        OpenBlock->Handlers.NextReturnNetBufferListsHandler = BlockRef->u1.Versions.u_v6.v6c->NextReturnNetBufferListsHandler;
+        OpenBlock->Handlers.NextSendHandler = BlockRef->u1.Versions.u_v6.v6c->NextSendHandler;
+        OpenBlock->Handlers.OidRequestCompleteHandler = BlockRef->u1.Versions.u_v6.v6c->OidRequestCompleteHandler;
+        OpenBlock->Handlers.OidRequestHandler = BlockRef->u1.Versions.u_v6.v6c->OidRequestHandler;
+        OpenBlock->Handlers.ProtSendCompleteHandler = BlockRef->u1.Versions.u_v6.v6c->ProtSendCompleteHandler;
+        OpenBlock->Handlers.ProtSendNetBufferListsComplete = BlockRef->u1.Versions.u_v6.v6c->ProtSendNetBufferListsComplete;
+        OpenBlock->Handlers.ReceiveCompleteHandler = BlockRef->u1.Versions.u_v6.v6c->ReceiveCompleteHandler;
+        OpenBlock->Handlers.ReceiveHandler = BlockRef->u1.Versions.u_v6.v6c->ReceiveHandler;
+        OpenBlock->Handlers.ReceiveNetBufferLists = BlockRef->u1.Versions.u_v6.v6c->ReceiveNetBufferLists;
+        OpenBlock->Handlers.ReceivePacketHandler = BlockRef->u1.Versions.u_v6.v6c->ReceivePacketHandler;
+        OpenBlock->Handlers.RequestCompleteHandler = BlockRef->u1.Versions.u_v6.v6c->RequestCompleteHandler;
+        OpenBlock->Handlers.RequestHandler = BlockRef->u1.Versions.u_v6.v6c->RequestHandler;
+        OpenBlock->Handlers.ResetCompleteHandler = BlockRef->u1.Versions.u_v6.v6c->ResetCompleteHandler;
+        OpenBlock->Handlers.ResetHandler = BlockRef->u1.Versions.u_v6.v6c->ResetHandler;
+        OpenBlock->Handlers.SavedCancelSendPacketsHandler = BlockRef->u1.Versions.u_v6.v6c->SavedCancelSendPacketsHandler;
+        OpenBlock->Handlers.SavedSendHandler = BlockRef->u1.Versions.u_v6.v6c->SavedSendHandler;
+        OpenBlock->Handlers.SavedSendPacketsHandler = BlockRef->u1.Versions.u_v6.v6c->SavedSendPacketsHandler;
+        OpenBlock->Handlers.SendCompleteHandler = BlockRef->u1.Versions.u_v6.v6c->SendCompleteHandler;
+        OpenBlock->Handlers.SendHandler = BlockRef->u1.Versions.u_v6.v6c->SendHandler;
+        OpenBlock->Handlers.SendPacketsHandler = BlockRef->u1.Versions.u_v6.v6c->SendPacketsHandler;
+        OpenBlock->Handlers.StatusCompleteHandler = BlockRef->u1.Versions.u_v6.v6c->StatusCompleteHandler;
+        OpenBlock->Handlers.StatusHandler = BlockRef->u1.Versions.u_v6.v6c->StatusHandler;
+        OpenBlock->Handlers.TransferDataCompleteHandler = BlockRef->u1.Versions.u_v6.v6c->TransferDataCompleteHandler;
+        OpenBlock->Handlers.TransferDataHandler = BlockRef->u1.Versions.u_v6.v6c->TransferDataHandler;
+        OpenBlock->Handlers.WanReceiveHandler = BlockRef->u1.Versions.u_v6.v6c->WanReceiveHandler;
+        OpenBlock->Handlers.WSendHandler = BlockRef->u1.Versions.u_v6.v6c->WSendHandler;
+        OpenBlock->Handlers.WSendPacketsHandler = BlockRef->u1.Versions.u_v6.v6c->WSendPacketsHandler;
+        OpenBlock->Handlers.WTransferDataHandler = BlockRef->u1.Versions.u_v6.v6c->WTransferDataHandler;
+        break;
     default:
         return FALSE;
     }

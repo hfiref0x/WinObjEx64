@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2023
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     2.00
+*  VERSION:     2.02
 *
-*  DATE:        19 Jun 2022
+*  DATE:        19 Jul 2023
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -58,7 +58,11 @@
 #pragma comment(lib, "shlwapi.lib")
 #pragma comment(lib, "Version.lib")
 
-#if defined (_MSC_VER)
+#if defined (_MSC_VER) //for vs2015
+#if (_MSC_VER <= 1900)
+#pragma warning(disable: 4214)
+#pragma warning(disable: 4204)
+#endif
 #if (_MSC_VER >= 1900)
 #ifdef _DEBUG
 #pragma comment(lib, "vcruntimed.lib")
@@ -162,8 +166,8 @@ typedef struct _WINOBJ_STATS {
 
 extern WINOBJ_STATS g_WinObjStats;
 
-#define OBEX_STATS_INC(Name) (_InterlockedIncrement((LONG*)&g_WinObjStats.Name))
-#define OBEX_STATS_INC64(Name, Value) (_InlineInterlockedAdd64((LONG64*)&g_WinObjStats.Name, Value))
+#define OBEX_STATS_INC(Name) (InterlockedIncrement((LONG*)&g_WinObjStats.Name))
+#define OBEX_STATS_INC64(Name, Value) (InterlockedAdd64((LONG64*)&g_WinObjStats.Name, Value))
 
 typedef struct _WINOBJ_GLOBALS {
     BOOLEAN IsWine;

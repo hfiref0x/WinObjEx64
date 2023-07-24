@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.02
 *
-*  DATE:        15 May 2023
+*  DATE:        19 Jul 2023
 *
 *  Windows SDK compatibility header.
 *
@@ -17,6 +17,26 @@
 *
 *******************************************************************************/
 #pragma once
+
+#ifndef PRODUCT_ENTERPRISE_S
+#define PRODUCT_ENTERPRISE_S 0x0000007D
+#endif
+
+#ifndef PRODUCT_ENTERPRISE_S_N
+#define PRODUCT_ENTERPRISE_S_N 0x0000007E
+#endif
+
+#ifndef PRODUCT_ENTERPRISE_S_EVALUATION
+#define PRODUCT_ENTERPRISE_S_EVALUATION 0x00000081
+#endif
+
+#ifndef PRODUCT_ENTERPRISE_S_N_EVALUATION
+#define PRODUCT_ENTERPRISE_S_N_EVALUATION 0x00000082
+#endif
+
+#ifndef PRODUCT_IOTENTERPRISES
+#define PRODUCT_IOTENTERPRISES 0x000000BF
+#endif
 
 #define sidTypeUser 1
 #define sidTypeGroup 2

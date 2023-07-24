@@ -5,9 +5,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.214
+*  VERSION:     1.218
 *
-*  DATE:        01 Jul 2023
+*  DATE:        13 Jul 2023
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -181,6 +181,12 @@ typedef PVOID PMEM_EXTENDED_PARAMETER;
 #define NtCurrentProcessToken() ((HANDLE)(LONG_PTR)-4) 
 #define NtCurrentThreadToken() ((HANDLE)(LONG_PTR)-5)
 #define NtCurrentThreadEffectiveToken() ((HANDLE)(LONG_PTR)-6) //GetCurrentThreadEffectiveToken
+
+enum _KPROCESSOR_MODE {
+    KernelMode = 0,
+    UserMode,
+    MaximumMode
+};
 
 //
 // ntdef.h begin
@@ -963,6 +969,10 @@ typedef struct _SYSTEM_BIGPOOL_INFORMATION {
     SYSTEM_BIGPOOL_ENTRY AllocatedInfo[1];
 } SYSTEM_BIGPOOL_INFORMATION, * PSYSTEM_BIGPOOL_INFORMATION;
 
+typedef struct _SYSTEM_FIRMWARE_PARTITION_INFORMATION {
+    UNICODE_STRING FirmwarePartition; // \Device\HarddiskX
+} SYSTEM_FIRMWARE_PARTITION_INFORMATION, * PSYSTEM_FIRMWARE_PARTITION_INFORMATION;
+
 typedef struct _RTL_PROCESS_BACKTRACE_INFORMATION {
     PCHAR SymbolicBackTrace;
     ULONG TraceCount;
@@ -1029,7 +1039,7 @@ typedef enum _PROCESSINFOCLASS {
     ProcessMemoryAllocationMode = 46,
     ProcessGroupInformation = 47,
     ProcessTokenVirtualizationEnabled = 48,
-    ProcessOwnerInformation = 49,
+    ProcessConsoleHostProcess = 49, //ProcessOwnerInformation
     ProcessWindowInformation = 50,
     ProcessHandleInformation = 51,
     ProcessMitigationPolicy = 52,
@@ -1227,8 +1237,8 @@ typedef struct _PROCESS_HANDLE_TABLE_ENTRY_INFO {
 } PROCESS_HANDLE_TABLE_ENTRY_INFO, *PPROCESS_HANDLE_TABLE_ENTRY_INFO;
 
 typedef struct _PROCESS_HANDLE_SNAPSHOT_INFORMATION {
-    ULONG NumberOfHandles;
-    ULONG Reserved;
+    ULONG_PTR NumberOfHandles;
+    ULONG_PTR Reserved;
     PROCESS_HANDLE_TABLE_ENTRY_INFO Handles[1];
 } PROCESS_HANDLE_SNAPSHOT_INFORMATION, *PPROCESS_HANDLE_SNAPSHOT_INFORMATION;
 
@@ -1605,6 +1615,12 @@ typedef struct _PROCESS_WS_WATCH_INFORMATION_EX {
     ULONG_PTR FaultingThreadId;
     ULONG_PTR Flags;
 } PROCESS_WS_WATCH_INFORMATION_EX, * PPROCESS_WS_WATCH_INFORMATION_EX;
+
+typedef struct _PROCESS_INSTRUMENTATION_CALLBACK_INFORMATION {
+    ULONG Version;
+    ULONG Reserved;
+    PVOID Callback;
+} PROCESS_INSTRUMENTATION_CALLBACK_INFORMATION, * PPROCESS_INSTRUMENTATION_CALLBACK_INFORMATION;
 
 /*
 ** Processes END
@@ -9290,7 +9306,7 @@ NtRaiseException(
     _In_ BOOLEAN FirstChance);
 
 __analysis_noreturn
-NTSYSCALLAPI
+NTSYSAPI
 VOID
 NTAPI
 RtlAssert(
@@ -9307,6 +9323,22 @@ RtlAssert(
     ((!(_exp)) ? (DbgPrint("%s(%d): Soft assertion failed\n   Expression: %s\n", __FILE__, __LINE__, #_exp), FALSE) : TRUE)
 #define RTL_SOFT_ASSERTMSG(_msg, _exp) \
     ((!(_exp)) ? (DbgPrint("%s(%d): Soft assertion failed\n   Expression: %s\n   Message: %s\n", __FILE__, __LINE__, #_exp, (_msg)), FALSE) : TRUE)
+
+typedef ULONG(NTAPI* PRTLP_UNHANDLED_EXCEPTION_FILTER)(
+    _In_ PEXCEPTION_POINTERS ExceptionInfo
+    );
+
+NTSYSAPI
+VOID
+NTAPI
+RtlSetUnhandledExceptionFilter(
+    _In_ PRTLP_UNHANDLED_EXCEPTION_FILTER UnhandledExceptionFilter);
+
+NTSYSAPI
+LONG
+NTAPI
+RtlUnhandledExceptionFilter(
+    _In_ PEXCEPTION_POINTERS ExceptionPointers);
 
 /************************************************************************************
 *
@@ -14390,6 +14422,114 @@ NTAPI
 NtSetIntervalProfile(
     _In_ ULONG Interval,
     _In_ KPROFILE_SOURCE Source);
+
+/************************************************************************************
+*
+* Signing Levels API.
+*
+************************************************************************************/
+typedef UCHAR SE_SIGNING_LEVEL, * PSE_SIGNING_LEVEL;
+
+#ifndef SE_SIGNING_LEVEL_UNCHECKED
+#define SE_SIGNING_LEVEL_UNCHECKED         0x00000000
+#endif
+
+#ifndef SE_SIGNING_LEVEL_UNSIGNED
+#define SE_SIGNING_LEVEL_UNSIGNED          0x00000001
+#endif
+
+#ifndef SE_SIGNING_LEVEL_ENTERPRISE
+#define SE_SIGNING_LEVEL_ENTERPRISE        0x00000002
+#endif
+
+#ifndef SE_SIGNING_LEVEL_CUSTOM_1
+#define SE_SIGNING_LEVEL_CUSTOM_1          0x00000003
+#endif
+
+#ifndef SE_SIGNING_LEVEL_DEVELOPER
+#define SE_SIGNING_LEVEL_DEVELOPER         SE_SIGNING_LEVEL_CUSTOM_1
+#endif
+
+#ifndef SE_SIGNING_LEVEL_AUTHENTICODE
+#define SE_SIGNING_LEVEL_AUTHENTICODE      0x00000004
+#endif
+
+#ifndef SE_SIGNING_LEVEL_CUSTOM_2
+#define SE_SIGNING_LEVEL_CUSTOM_2          0x00000005
+#endif
+
+#ifndef SE_SIGNING_LEVEL_STORE
+#define SE_SIGNING_LEVEL_STORE             0x00000006
+#endif
+
+#ifndef SE_SIGNING_LEVEL_CUSTOM_3
+#define SE_SIGNING_LEVEL_CUSTOM_3          0x00000007
+#endif
+
+#ifndef SE_SIGNING_LEVEL_ANTIMALWARE
+#define SE_SIGNING_LEVEL_ANTIMALWARE       SE_SIGNING_LEVEL_CUSTOM_3
+#endif
+
+#ifndef SE_SIGNING_LEVEL_MICROSOFT
+#define SE_SIGNING_LEVEL_MICROSOFT         0x00000008
+#endif
+
+#ifndef SE_SIGNING_LEVEL_CUSTOM_4
+#define SE_SIGNING_LEVEL_CUSTOM_4          0x00000009
+#endif
+
+#ifndef SE_SIGNING_LEVEL_CUSTOM_5
+#define SE_SIGNING_LEVEL_CUSTOM_5          0x0000000A
+#endif
+
+#ifndef SE_SIGNING_LEVEL_DYNAMIC_CODEGEN
+#define SE_SIGNING_LEVEL_DYNAMIC_CODEGEN   0x0000000B
+#endif
+
+#ifndef SE_SIGNING_LEVEL_WINDOWS
+#define SE_SIGNING_LEVEL_WINDOWS           0x0000000C
+#endif
+
+#ifndef SE_SIGNING_LEVEL_CUSTOM_7
+#define SE_SIGNING_LEVEL_CUSTOM_7          0x0000000D
+#endif
+
+#ifndef SE_SIGNING_LEVEL_WINDOWS_TCB
+#define SE_SIGNING_LEVEL_WINDOWS_TCB       0x0000000E
+#endif
+
+#ifndef SE_SIGNING_LEVEL_CUSTOM_6
+#define SE_SIGNING_LEVEL_CUSTOM_6          0x0000000F
+#endif
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtSetCachedSigningLevel(
+    _In_ ULONG Flags,
+    _In_ SE_SIGNING_LEVEL InputSigningLevel,
+    _In_reads_(SourceFileCount) PHANDLE SourceFiles,
+    _In_ ULONG SourceFileCount,
+    _In_opt_ HANDLE TargetFile);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtGetCachedSigningLevel(
+    _In_ HANDLE File,
+    _Out_ PULONG Flags,
+    _Out_ PSE_SIGNING_LEVEL SigningLevel,
+    _Out_writes_bytes_to_opt_(*ThumbprintSize, *ThumbprintSize) PUCHAR Thumbprint,
+    _Inout_opt_ PULONG ThumbprintSize,
+    _Out_opt_ PULONG ThumbprintAlgorithm);
+
+//REDSTONE 2 and above
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtCompareSigningLevels(
+    _In_ SE_SIGNING_LEVEL FirstSigningLevel,
+    _In_ SE_SIGNING_LEVEL SecondSigningLevel);
 
 /************************************************************************************
 *

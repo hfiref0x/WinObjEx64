@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTSUP.C
 *
-*  VERSION:     2.19
+*  VERSION:     2.20
 *
-*  DATE:        10 Jul 2023
+*  DATE:        14 Jul 2023
 *
 *  Native API support functions.
 *
@@ -842,7 +842,7 @@ PVOID ntsupGetSystemInfoEx(
         &returnedLength)) == STATUS_INFO_LENGTH_MISMATCH)
     {
         FreeMem(buffer);
-        bufferSize *= 2;
+        bufferSize <<= 1;
 
         if (bufferSize > NTQSI_MAX_BUFFER_LENGTH)
             return NULL;

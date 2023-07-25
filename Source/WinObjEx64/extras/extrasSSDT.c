@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2023
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     2.01
+*  VERSION:     2.03
 *
-*  DATE:        01 Dec 2022
+*  DATE:        21 Jul 2023
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -97,8 +97,11 @@ HMODULE SdtLoadWin32kImage(
 {
     HMODULE hModule;
     WCHAR szBuffer[MAX_PATH * 2];
-
+#ifdef _DEBUG
+    _strcpy(szBuffer, L"C:\\windows\\system32");
+#else
     _strcpy(szBuffer, g_WinObj.szSystemDirectory);
+#endif
     _strcat(szBuffer, TEXT("\\win32k.sys"));
     hModule = LoadLibraryEx(szBuffer, NULL, DONT_RESOLVE_DLL_REFERENCES);
     
@@ -141,6 +144,7 @@ BOOL CALLBACK SearchPatternCallback(
 * Purpose:
 *
 * Locate prologue of win32k!InitializeWin32kCall.
+*                    win32k!CreateWin32kApiSetTable
 *
 */
 PBYTE SdtFindInitializeWin32kCall(
@@ -152,29 +156,37 @@ PBYTE SdtFindInitializeWin32kCall(
     PATTERN_SEARCH_PARAMS params;
     SDT_SEARCH_CONTEXT scontext;
 
-    BYTE pbOldPattern[] = { 0x55, 0x41, 0x54, 0x41, 0x55, 0x41, 0x56, 0x41, 0x57 };
-    BYTE pbPattern[] = { 0x48, 0x89, 0x5C, 0x24, 0x10, 0x48, 0x89, 0x6C, 0x24, 0x18, 0x48, 0x89, 0x7C, 0x24, 0x20 };
-    BYTE pbMask[] = { 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x00, 0x11, 0x11, 0x11, 0x11, 0x00, 0x11, 0x11 };
+    BYTE pbPattern[] = { 
+        0x48, 0x89, 0x5C, 0x24, 0x10, 0x48, 0x89, 0x6C, 0x24, 0x18, 0x48, 0x89, 0x7C, 0x24, 0x20 };
+    BYTE pbMask[] = { 
+        0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x00, 0x11, 0x11, 0x11, 0x11, 0x00, 0x11, 0x11 };
 
     //
-    // Pre 19045.
+    // As of >23H2, there is not enough data to do a proper mask.
+    // Win32ApiSetTable are now can be configured per session by win32ksgd.sys, it saves pointers to them in gSessionGlobalSlots structure.
     //
-    result = (PBYTE)supFindPattern((PBYTE)SectionBase,
-        SectionSize,
-        pbOldPattern,
-        sizeof(pbOldPattern));
-
-    if (result)
-        return result;
+    BYTE pbPatternW11_NEXT[] = {
+        0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x6C, 0x24, 0x10, 0x48, 0x89, 0x74, 0x24, 0x18, 0x57, 0x41, 0x55, 0x41, 0x56 };
+    BYTE pbMask_NEXT[] = {
+        0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x00, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11 };
 
     scontext.Result = NULL;
     params.Buffer = (PBYTE)SectionBase;
     params.BufferSize = SectionSize;
     params.Callback = SearchPatternCallback;
     params.CallbackContext = &scontext;
-    params.Pattern = pbPattern;
-    params.PatternSize = sizeof(pbPattern);
-    params.Mask = pbMask;
+
+    if (g_NtBuildNumber > NT_WIN11_22H2) {
+        params.Pattern = pbPatternW11_NEXT;
+        params.PatternSize = sizeof(pbPatternW11_NEXT);
+        params.Mask = pbMask_NEXT;
+    }
+    else {
+        params.Pattern = pbPattern;
+        params.PatternSize = sizeof(pbPattern);
+        params.Mask = pbMask;
+    }
+
     if (supFindPatternEx(&params))
         result = scontext.Result;
 
@@ -249,17 +261,15 @@ ULONG_PTR SdtQueryWin32kApiSetTable(
                 break;
 
             // lea reg, Win32kApiSetTable
-            if (hs.len == 7) {
-
-                if ((ptrCode[Index] == 0x4C || ptrCode[Index] == 0x48) &&
-                    (ptrCode[Index + 1] == 0x8D) &&
-                    (ptrCode[Index + 2] == 0x05 || ptrCode[Index+2] == 0x2D))
-                {
-                    relativeValue = *(PLONG)(ptrCode + Index + (hs.len - 4));
-                    instructionLength = hs.len;
-                    break;
-                }
-
+            if ((hs.len == 7) &&
+                (hs.flags & F_PREFIX_REX) &&
+                (hs.flags & F_DISP32) &&
+                (hs.flags & F_MODRM) &&
+                (hs.opcode == 0x8D))
+            {
+                relativeValue = (LONG)hs.disp.disp32;
+                instructionLength = hs.len;
+                break;
             }
 
             Index += hs.len;

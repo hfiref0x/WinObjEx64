@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2022
+*  (C) COPYRIGHT AUTHORS, 2022 - 2023
 *
 *  TITLE:       SYSINFODLG.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.03
 *
-*  DATE:        19 Jun 2022
+*  DATE:        21 Jul 2023
 * 
 *  System Information Dialog.
 *
@@ -351,6 +351,7 @@ VOID SysInfoCollectInformation(
     AddParameterValueBool(hwndOutput, TEXT("Internal.IsFullAdmin"), g_kdctx.IsFullAdmin); //admin privileges available
     AddParameterValueBool(hwndOutput, TEXT("Internal.IsSecureBoot"), g_kdctx.IsSecureBoot); //secure boot enabled
     AddParameterValueBool(hwndOutput, TEXT("Internal.IsWine"), g_WinObj.IsWine);
+    AddParameterValueBool(hwndOutput, TEXT("Internal.IsDebugPrivAssigned"), g_kdctx.IsDebugPrivAssigned);
     AddParameterValue32Hex(hwndOutput, TEXT("Internal.NameNormalizationSymbol"), (ULONG)g_ObNameNormalizationSymbol);
 
     if (obConfig->SymbolsDbgHelpDllValid) {

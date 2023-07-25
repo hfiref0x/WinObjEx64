@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2023
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.03
 *
-*  DATE:        19 Jun 2022
+*  DATE:        21 Jul 2023
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED

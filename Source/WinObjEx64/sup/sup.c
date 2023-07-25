@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     2.01
+*  VERSION:     2.03
 *
-*  DATE:        10 Mar 2023
+*  DATE:        21 Jul 2023
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -3954,11 +3954,6 @@ BOOL supRunAsLocalSystem(
 
         return FALSE;
     }
-
-    //
-    // Optionally, enable debug privileges.
-    // 
-    supEnablePrivilege(SE_DEBUG_PRIVILEGE, TRUE);
 
     //
     // Get LocalSystem token from winlogon.
@@ -9782,4 +9777,119 @@ HWND supCreateTrackingToolTip(
     }
 
     return hwndTip;
+}
+
+/*
+* supIsPrivilegeEnabledForClient
+*
+* Purpose:
+*
+* Tests if given privilege is enabled for client.
+*
+*/
+BOOL supIsPrivilegeEnabledForClient(
+    _In_ ULONG Privilege
+)
+{
+    BOOL bResult = FALSE;
+    NTSTATUS ntStatus;
+    HANDLE tokenHandle;
+
+    //
+    // Cannot use new fancy consts as this code must work pre Win10/11.
+    // 
+
+    ntStatus = NtOpenProcessToken(
+        NtCurrentProcess(),
+        TOKEN_QUERY,
+        &tokenHandle);
+
+    if (NT_SUCCESS(ntStatus)) {
+        ntStatus = supPrivilegeEnabled(tokenHandle, Privilege, &bResult);
+        NtClose(tokenHandle);
+    }
+
+    RtlSetLastWin32Error(RtlNtStatusToDosError(ntStatus));
+    return bResult;
+}
+
+/*
+* supEnablePrivilegeWithCheck
+*
+* Purpose:
+*
+* Enable/Disable privilege with check if it was previously enabled.
+*
+*/
+BOOLEAN supEnablePrivilegeWithCheck(
+    _In_ ULONG Privilege,
+    _In_ BOOLEAN Enable
+)
+{
+    BOOLEAN bResult = FALSE, bWasEnabled = FALSE;
+    NTSTATUS status;
+    PRIVILEGE_SET privSet;
+    ULONG returnLength;
+    NTSTATUS ntStatus;
+    HANDLE tokenHandle;
+    PTOKEN_PRIVILEGES newState;
+    UCHAR rawBuffer[sizeof(TOKEN_PRIVILEGES) + sizeof(LUID_AND_ATTRIBUTES)];
+
+    do {
+        ntStatus = NtOpenProcessToken(
+            NtCurrentProcess(),
+            TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
+            &tokenHandle);
+
+        if (!NT_SUCCESS(ntStatus))
+            break;
+
+        privSet.Control = PRIVILEGE_SET_ALL_NECESSARY;
+        privSet.PrivilegeCount = 1;
+        privSet.Privilege[0].Luid.LowPart = Privilege;
+        privSet.Privilege[0].Luid.HighPart = 0;
+        privSet.Privilege[0].Attributes = SE_PRIVILEGE_ENABLED_BY_DEFAULT | SE_PRIVILEGE_ENABLED;
+
+        status = NtPrivilegeCheck(tokenHandle, &privSet, &bWasEnabled);
+
+        //
+        // Already enabled, leave.
+        //
+        if (Enable && bWasEnabled) {
+            bResult = TRUE;
+            break;
+        }
+        //
+        // Already disabled, leave.
+        //
+        if (!Enable && !bWasEnabled) {
+            bResult = TRUE;
+            break;
+        }
+
+        newState = (PTOKEN_PRIVILEGES)rawBuffer;
+
+        newState->PrivilegeCount = 1;
+        newState->Privileges[0].Luid = RtlConvertUlongToLuid(Privilege);
+        newState->Privileges[0].Attributes = Enable ? SE_PRIVILEGE_ENABLED : 0;
+
+        ntStatus = NtAdjustPrivilegesToken(
+            tokenHandle,
+            FALSE,
+            newState,
+            sizeof(rawBuffer),
+            NULL,
+            &returnLength);
+
+        if (ntStatus == STATUS_NOT_ALL_ASSIGNED) {
+            ntStatus = STATUS_PRIVILEGE_NOT_HELD;
+        }
+
+    } while (FALSE);
+
+    if (tokenHandle)
+        NtClose(tokenHandle);
+
+    RtlSetLastWin32Error(RtlNtStatusToDosError(ntStatus));
+    return bResult;
 }

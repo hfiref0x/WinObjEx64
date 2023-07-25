@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2023
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     2.00
+*  VERSION:     2.03
 *
-*  DATE:        19 Jun 2022
+*  DATE:        21 Jul 2023
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -229,11 +229,14 @@ typedef struct _KLDBGCONTEXT {
     //Is user full admin
     BOOLEAN IsFullAdmin;
 
-    //secureboot enabled?
+    //SecureBoot enabled?
     BOOLEAN IsSecureBoot;
 
     //VHD boot?
     BOOLEAN IsOsDiskVhd;
+
+    //Debug privilege?
+    BOOLEAN IsDebugPrivAssigned;
 
     union {
         struct {

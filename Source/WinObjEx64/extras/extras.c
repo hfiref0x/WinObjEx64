@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2023
 *
 *  TITLE:       EXTRAS.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.03
 *
-*  DATE:        19 Jun 2022
+*  DATE:        21 Jul 2023
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -209,7 +209,16 @@ VOID extrasShowDialogById(
         break;
 
     case ID_EXTRAS_DRIVERS:
-        extrasCreateDriversDialog(DrvModeNormal);
+
+        if ((g_NtBuildNumber > NT_WIN11_22H2) &&
+            (g_kdctx.IsFullAdmin == FALSE) &&
+            (g_WinObj.IsWine == FALSE))
+        {
+            supRunAsAdmin();
+        }
+        else {
+            extrasCreateDriversDialog(DrvModeNormal);
+        }
         break;
 
     case ID_EXTRAS_PROCESSLIST:

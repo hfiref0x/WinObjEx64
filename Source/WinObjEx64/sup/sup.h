@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     2.02
+*  VERSION:     2.03
 *
-*  DATE:        10 Jul 2023
+*  DATE:        21 Jul 2023
 *
 *  Common header file for the program support routines.
 *
@@ -1233,3 +1233,10 @@ POBEX_CONFIG supGetParametersBlock(
 HWND supCreateTrackingToolTip(
     _In_ INT toolID,
     _In_ HWND hwndOwner);
+
+BOOLEAN supEnablePrivilegeWithCheck(
+    _In_ ULONG Privilege,
+    _In_ BOOLEAN Enable);
+
+BOOL supIsPrivilegeEnabledForClient(
+    _In_ ULONG Privilege);

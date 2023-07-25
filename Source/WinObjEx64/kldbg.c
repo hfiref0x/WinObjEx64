@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2023
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     2.00
+*  VERSION:     2.03
 *
-*  DATE:        25 Oct 2022
+*  DATE:        21 Jul 2023
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -2611,7 +2611,6 @@ PVOID kdQueryIopInvalidDeviceRequest(
 
             RtlInitUnicodeString(&usName, drvProvider->DriverName);
             RtlInitUnicodeString(&usDirectory, L"\\Driver");
-
             selfDriverObject = ObQueryObjectInDirectory(&usName, &usDirectory);
             if (selfDriverObject) {
 
@@ -2628,8 +2627,9 @@ PVOID kdQueryIopInvalidDeviceRequest(
                     //
                     // IopInvalidDeviceRequest is a routine inside ntoskrnl.
                     //
-                    if (!kdAddressInNtOsImage(pHandler))
+                    if (!kdAddressInNtOsImage(pHandler)) {
                         pHandler = NULL;
+                    }
                 }
                 supHeapFree(selfDriverObject);
             }
@@ -3988,6 +3988,13 @@ VOID kdInit(
     symInit(lpSymbolPath, lpDbgHelpDll);
 
     //
+    // Enable debug privileges for newest Windows 11.
+    // 
+    if (IsFullAdmin) {
+        g_kdctx.IsDebugPrivAssigned = supEnablePrivilegeWithCheck(SE_DEBUG_PRIVILEGE, TRUE);
+    }
+
+    //
     // Query global variables.
     //
     kdQuerySystemInformation(&g_kdctx);
@@ -4033,7 +4040,7 @@ VOID kdInit(
             TEXT("Could not open/load helper driver.\r\nSome features maybe unavailable, error code 0x%lX"),
             ntStatus);
 
-        MessageBox(GetDesktopWindow(), szBuffer, TEXT("WinObjEx64"), MB_ICONINFORMATION);
+        MessageBox(GetDesktopWindow(), szBuffer, PROGRAM_NAME, MB_ICONINFORMATION);
         logAdd(EntryTypeError, szBuffer);
     }
 

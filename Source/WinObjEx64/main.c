@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2023
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.03
 *
-*  DATE:        07 Aug 2022
+*  DATE:        21 Jul 2023
 *
 *  Program entry point and main window handler.
 *
@@ -101,6 +101,9 @@ VOID guiExtrasDisableAdminFeatures(
             supSetMenuIcon(hExtrasSubMenu, ID_EXTRAS_PRIVATENAMESPACES, hIcon);
             supSetMenuIcon(hExtrasSubMenu, ID_EXTRAS_CALLBACKS, hIcon);
             supSetMenuIcon(hExtrasSubMenu, ID_EXTRAS_UNLOADEDDRIVERS, hIcon);
+            if (g_NtBuildNumber > NT_WIN11_22H2) {
+                supSetMenuIcon(hExtrasSubMenu, ID_EXTRAS_DRIVERS, hIcon);
+            }
         }
 
     }

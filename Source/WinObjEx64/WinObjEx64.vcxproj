@@ -396,6 +396,7 @@
     <ClCompile Include="kldbg.c" />
     <ClCompile Include="sup\sup.c" />
     <ClCompile Include="sup\sync.c" />
+    <ClCompile Include="sup\w32k.c" />
     <ClCompile Include="sup\wine.c" />
     <ClCompile Include="symparser.c" />
     <ClCompile Include="list.c" />
@@ -454,6 +455,7 @@
     <ClInclude Include="props\propCommon.h" />
     <ClInclude Include="props\props.h" />
     <ClInclude Include="sup\sup.h" />
+    <ClInclude Include="sup\w32k.h" />
     <ClInclude Include="sup\wine.h" />
     <ClInclude Include="symparser.h" />
     <ClInclude Include="list.h" />

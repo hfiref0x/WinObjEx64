@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.03
 *
-*  DATE:        21 Jul 2023
+*  DATE:        22 Jul 2023
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -209,7 +209,7 @@ VOID extrasShowDialogById(
         break;
 
     case ID_EXTRAS_DRIVERS:
-
+     
         if ((g_NtBuildNumber > NT_WIN11_22H2) &&
             (g_kdctx.IsFullAdmin == FALSE) &&
             (g_WinObj.IsWine == FALSE))

@@ -1,3 +1,7 @@
+v2.0.3
+recent win11 compatibility improvements
+win11 24h2 preliminary support
+
 v2.0.2
 recent win10/win11 compatibility improvements
 display more details about shimmed drivers

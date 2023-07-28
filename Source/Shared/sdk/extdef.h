@@ -208,6 +208,14 @@ typedef enum DPI_AWARENESS {
 #define NTDDI_WIN10_CU 0x0A00000D       /* ABRACADABRA_WIN10_CU */
 #endif
 
+#ifndef NTDDI_WIN10_ZN
+#define NTDDI_WIN10_ZN 0x0A00000E       /* ABRACADABRA_WIN10_ZN */
+#endif
+
+#ifndef NTDDI_WIN10_GA
+#define NTDDI_WIN10_GA 0x0A00000F       /* ABRACADABRA_WIN10_GA */
+#endif
+
 FORCEINLINE LONG_PTR _InterlockedExchangeAddPointer(
     _Inout_ _Interlocked_operand_ LONG_PTR volatile* Addend,
     _In_ LONG_PTR Value

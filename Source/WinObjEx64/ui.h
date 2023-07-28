@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.03
 *
-*  DATE:        21 Jul 2023
+*  DATE:        22 Jul 2023
 *
 *  Common header file for the user interface.
 *
@@ -192,19 +192,11 @@ typedef struct _LVCOLUMNS_DATA {
 #define ErrShadowW32pServiceLimitNotFound   6
 #define ErrShadowWin32uMismatch             7
 #define ErrShadowW32pServiceTableNotFound   8
-#define ErrShadowApiSetSchemaMapNotFound    9
+#define ErrShadowWin32ksgdLoadFail          9
 #define ErrShadowApiSetSchemaVerUnknown     10
-
-#define T_ERRSHADOW_WIN32K_NOT_FOUND TEXT("Could not find win32k module")
-#define T_ERRSHADOW_MEMORY_NOT_ALLOCATED TEXT("Could not create heap for table")
-#define T_ERRSHADOW_WIN32U_LOAD_FAILED TEXT("Could not load win32u.dll")
-#define T_ERRSHADOW_WIN32K_LOAD_FAILED TEXT("Could not load win32k.sys")
-#define T_ERRSHADOW_APISETTABLE_NOT_FOUND TEXT("Win32kApiSetTable was not found, win32k adapters targets will not be determinated")
-#define T_ERRSHADOW_WIN32KLIMIT_NOT_FOUND TEXT("W32pServiceLimit was not found in win32k module")
-#define T_ERRSHADOW_WIN32U_MISMATCH TEXT("Not all services found in win32u")
-#define T_ERRSHADOW_TABLE_NOT_FOUND TEXT("W32pServiceTable was not found in win32k module")
-#define T_ERRSHADOW_APISETMAP_NOT_FOUND TEXT("ApiSetSchema map was not found")
-#define T_ERRSHADOW_APISET_VER_UNKNOWN TEXT("ApiSetSchema version is unknown")
+#define ErrShadowWin32ksgdNotFound          11
+#define ErrShadowWin32ksgdGlobalsNotFound   12
+#define ErrShadowWin32ksgdOffsetNotFound    13
 
 //
 // Common Dialog handlers.

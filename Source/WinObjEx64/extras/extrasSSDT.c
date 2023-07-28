@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.03
 *
-*  DATE:        21 Jul 2023
+*  DATE:        22 Jul 2023
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -19,19 +19,26 @@
 #include "extras.h"
 #include "ntos/ntldr.h"
 #include "ksymbols.h"
+#include "sup/w32k.h"
 
-typedef struct _SERVICETABLEENTRY {
+static EXTRASCONTEXT SSTDlgContext[SST_Max];
+static HANDLE SdtDlgThreadHandles[SST_Max] = { NULL, NULL };
+static FAST_EVENT SdtDlgInitializedEvents[SST_Max] = { FAST_EVENT_INIT, FAST_EVENT_INIT };
+
+typedef struct _SDT_TABLE_ENTRY {
     ULONG ServiceId;
     ULONG_PTR Address;
     WCHAR Name[MAX_PATH + 1];
-} SERVICETABLEENTRY, * PSERVICETABLEENTRY;
+} SDT_TABLE_ENTRY, * PSDT_TABLE_ENTRY;
 
 typedef struct _SDT_TABLE {
     BOOL Allocated;
     ULONG Limit;
     ULONG_PTR Base;
-    PSERVICETABLEENTRY Table;
+    PSDT_TABLE_ENTRY Table;
 } SDT_TABLE, * PSDT_TABLE;
+
+static SDT_CONTEXT g_SDTCtx = { 0 };
 
 //
 // UI part
@@ -54,238 +61,8 @@ typedef struct _SDT_TABLE {
 
 SDT_TABLE KiServiceTable;
 SDT_TABLE W32pServiceTable;
-SYMCONTEXT* W32SymContext;
-
-//
-// Win32kApiSetTable signatures
-//
-
-//
-// Win32kApiSetTable adapter patterns
-//
-BYTE Win32kApiSetAdapterPattern1[] = {
-   0x4C, 0x8B, 0x15
-};
-BYTE Win32kApiSetAdapterPattern2[] = {
-   0x48, 0x8B, 0x05
-};
-BYTE Win32kApiSetAdapterPattern3[] = {
-   0x4C, 0x8B, 0x1D // mov r11, value
-};
-
-W32K_API_SET_LOOKUP_PATTERN W32kApiSetAdapters[] = {
-    { sizeof(Win32kApiSetAdapterPattern1), Win32kApiSetAdapterPattern1 },
-    { sizeof(Win32kApiSetAdapterPattern2), Win32kApiSetAdapterPattern2 },
-    { sizeof(Win32kApiSetAdapterPattern3), Win32kApiSetAdapterPattern3 }
-};
-
-static EXTRASCONTEXT SSTDlgContext[SST_Max];
-static HANDLE SdtDlgThreadHandles[SST_Max] = { NULL, NULL };
-static FAST_EVENT SdtDlgInitializedEvents[SST_Max] = { FAST_EVENT_INIT, FAST_EVENT_INIT };
-
-/*
-* SdtLoadWin32kImage
-*
-* Purpose:
-*
-* Load win32k image and symbols for it if available.
-*
-*/
-HMODULE SdtLoadWin32kImage(
-    _In_opt_ SYMCONTEXT *SymContext
-)
-{
-    HMODULE hModule;
-    WCHAR szBuffer[MAX_PATH * 2];
-#ifdef _DEBUG
-    _strcpy(szBuffer, L"C:\\windows\\system32");
-#else
-    _strcpy(szBuffer, g_WinObj.szSystemDirectory);
-#endif
-    _strcat(szBuffer, TEXT("\\win32k.sys"));
-    hModule = LoadLibraryEx(szBuffer, NULL, DONT_RESOLVE_DLL_REFERENCES);
-    
-    if (hModule) {
-
-        if (SymContext) {
-            kdLoadSymbolsForNtImage(SymContext,
-                szBuffer,
-                hModule, 
-                0);
-
-        }
-
-    }
-
-    return hModule;
-}
-
-typedef struct _SDT_SEARCH_CONTEXT {
-    PBYTE Result;
-} SDT_SEARCH_CONTEXT, * PSDT_SEARCH_CONTEXT;
-
-BOOL CALLBACK SearchPatternCallback(
-    _In_ PBYTE Buffer,
-    _In_ ULONG PatternSize,
-    _In_ PVOID CallbackContext
-)
-{
-    UNREFERENCED_PARAMETER(PatternSize);
-
-    PSDT_SEARCH_CONTEXT context = (PSDT_SEARCH_CONTEXT)CallbackContext;
-    context->Result = Buffer;
-
-    return TRUE;
-}
-
-/*
-* SdtFindInitializeWin32kCall
-*
-* Purpose:
-*
-* Locate prologue of win32k!InitializeWin32kCall.
-*                    win32k!CreateWin32kApiSetTable
-*
-*/
-PBYTE SdtFindInitializeWin32kCall(
-    _In_ PVOID SectionBase,
-    _In_ ULONG SectionSize
-)
-{
-    PBYTE result = NULL;
-    PATTERN_SEARCH_PARAMS params;
-    SDT_SEARCH_CONTEXT scontext;
-
-    BYTE pbPattern[] = { 
-        0x48, 0x89, 0x5C, 0x24, 0x10, 0x48, 0x89, 0x6C, 0x24, 0x18, 0x48, 0x89, 0x7C, 0x24, 0x20 };
-    BYTE pbMask[] = { 
-        0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x00, 0x11, 0x11, 0x11, 0x11, 0x00, 0x11, 0x11 };
-
-    //
-    // As of >23H2, there is not enough data to do a proper mask.
-    // Win32ApiSetTable are now can be configured per session by win32ksgd.sys, it saves pointers to them in gSessionGlobalSlots structure.
-    //
-    BYTE pbPatternW11_NEXT[] = {
-        0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x6C, 0x24, 0x10, 0x48, 0x89, 0x74, 0x24, 0x18, 0x57, 0x41, 0x55, 0x41, 0x56 };
-    BYTE pbMask_NEXT[] = {
-        0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x00, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11 };
-
-    scontext.Result = NULL;
-    params.Buffer = (PBYTE)SectionBase;
-    params.BufferSize = SectionSize;
-    params.Callback = SearchPatternCallback;
-    params.CallbackContext = &scontext;
-
-    if (g_NtBuildNumber > NT_WIN11_22H2) {
-        params.Pattern = pbPatternW11_NEXT;
-        params.PatternSize = sizeof(pbPatternW11_NEXT);
-        params.Mask = pbMask_NEXT;
-    }
-    else {
-        params.Pattern = pbPattern;
-        params.PatternSize = sizeof(pbPattern);
-        params.Mask = pbMask;
-    }
-
-    if (supFindPatternEx(&params))
-        result = scontext.Result;
-
-    return result;
-}
-
-/*
-* SdtQueryWin32kApiSetTable
-*
-* Purpose:
-*
-* Locate address of win32k!Win32kApiSetTable structure.
-*
-*/
-ULONG_PTR SdtQueryWin32kApiSetTable(
-    _In_ HMODULE hModule,
-    _In_ PVOID ImageBase,
-    _In_ ULONG_PTR ImageSize
-)
-{
-    PBYTE       ptrCode = (PBYTE)hModule;
-
-    PVOID       SectionBase;
-    ULONG       SectionSize = 0, Index;
-
-    ULONG_PTR   tableAddress = 0, instructionLength = 0;
-    LONG        relativeValue = 0;
-    hde64s      hs;
-
-    if (kdIsSymAvailable(W32SymContext)) {
-
-        if (kdGetAddressFromSymbolEx(W32SymContext,
-            KVAR_Win32kApiSetTable,
-            ImageBase,
-            ImageSize,
-            &tableAddress))
-        {
-            tableAddress = tableAddress - (ULONG_PTR)ImageBase + (ULONG_PTR)hModule;
-        }
-    }
-
-    if (tableAddress == 0) {
-
-        //
-        // Locate .text image section as required variable is always in .text.
-        //
-        SectionBase = supLookupImageSectionByName(TEXT_SECTION,
-            TEXT_SECTION_LEGNTH,
-            (PVOID)hModule,
-            &SectionSize);
-
-        if (SectionBase == 0 || SectionSize == 0)
-            return 0;
-
-        //
-        // Locate InitializeWin32Call body.
-        //
-        ptrCode = SdtFindInitializeWin32kCall(SectionBase,
-            SectionSize);
-
-        if (ptrCode == NULL) {
-            return 0;
-        }
-
-        Index = 0;
-        instructionLength = 0;
-
-        do {
-
-            hde64_disasm((void*)(ptrCode + Index), &hs);
-            if (hs.flags & F_ERROR)
-                break;
-
-            // lea reg, Win32kApiSetTable
-            if ((hs.len == 7) &&
-                (hs.flags & F_PREFIX_REX) &&
-                (hs.flags & F_DISP32) &&
-                (hs.flags & F_MODRM) &&
-                (hs.opcode == 0x8D))
-            {
-                relativeValue = (LONG)hs.disp.disp32;
-                instructionLength = hs.len;
-                break;
-            }
-
-            Index += hs.len;
-
-        } while (Index < 256);
 
 
-        if (relativeValue == 0 || instructionLength == 0)
-            return 0;
-
-        tableAddress = (ULONG_PTR)ptrCode + Index + instructionLength + relativeValue;
-
-    }
-
-    return tableAddress;
-}
 
 /*
 * SdtListOutputTable
@@ -414,7 +191,7 @@ BOOL SdtListCreateTable(
     PDWORD                  ExportNames, ExportFunctions;
     PWORD                   NameOrdinals;
 
-    PSERVICETABLEENTRY      ServiceEntry;
+    PSDT_TABLE_ENTRY        ServiceEntry;
 
     CHAR* ServiceName;
     CHAR* FunctionAddress;
@@ -458,9 +235,9 @@ BOOL SdtListCreateTable(
             ExportFunctions = (PDWORD)((PBYTE)Module + ExportDirectory->AddressOfFunctions);
             NameOrdinals = (PWORD)((PBYTE)Module + ExportDirectory->AddressOfNameOrdinals);
 
-            memIO = sizeof(SERVICETABLEENTRY) * ExportDirectory->NumberOfNames;
+            memIO = sizeof(SDT_TABLE_ENTRY) * ExportDirectory->NumberOfNames;
 
-            KiServiceTable.Table = (PSERVICETABLEENTRY)supHeapAlloc(memIO);
+            KiServiceTable.Table = (PSDT_TABLE_ENTRY)supHeapAlloc(memIO);
             if (KiServiceTable.Table == NULL)
                 __leave;
 
@@ -563,364 +340,6 @@ BOOL SdtListCreateTable(
     return bResult;
 }
 
-/*
-* ApiSetExtractReferenceFromAdapter
-*
-* Purpose:
-*
-* Extract apiset reference from adapter code.
-*
-*/
-ULONG_PTR ApiSetExtractReferenceFromAdapter(
-    _In_ PBYTE ptrFunction
-)
-{
-    BOOL       bFound;
-    PBYTE      ptrCode = ptrFunction;
-    ULONG      Index = 0, i;
-    LONG       Rel = 0;
-    hde64s     hs;
-
-    ULONG      PatternSize;
-    PVOID      PatternData;
-
-    do {
-        hde64_disasm((void*)(ptrCode + Index), &hs);
-        if (hs.flags & F_ERROR)
-            break;
-
-        if (hs.len == 7) {
-
-            bFound = FALSE;
-
-            for (i = 0; i < RTL_NUMBER_OF(W32kApiSetAdapters); i++) {
-
-                PatternSize = W32kApiSetAdapters[i].Size;
-                PatternData = W32kApiSetAdapters[i].Data;
-
-                if (PatternSize == RtlCompareMemory(&ptrCode[Index],
-                    PatternData,
-                    PatternSize))
-                {
-                    Rel = *(PLONG)(ptrCode + Index + (hs.len - 4));
-                    bFound = TRUE;
-                    break;
-                }
-
-            }
-
-            if (bFound)
-                break;
-        }
-
-        Index += hs.len;
-
-    } while (Index < 32);
-
-    if (Rel == 0)
-        return 0;
-
-
-    return (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-}
-
-/*
-* ApiSetLoadResolvedModule
-*
-* Purpose:
-*
-* Final apiset resolving and loading actual file.
-*
-* Function return NTSTATUS value and sets ResolvedEntry parameter.
-*
-*/
-_Success_(return == STATUS_SUCCESS)
-NTSTATUS ApiSetLoadResolvedModule(
-    _In_ PVOID ApiSetMap,
-    _In_ PUNICODE_STRING ApiSetToResolve,
-    _Inout_ PANSI_STRING ConvertedModuleName,
-    _Out_ HMODULE * DllModule
-)
-{
-    BOOL            ResolvedResult;
-    NTSTATUS        Status;
-    UNICODE_STRING  usResolvedModule;
-
-    if (DllModule == NULL)
-        return STATUS_INVALID_PARAMETER_2;
-    if (ConvertedModuleName == NULL)
-        return STATUS_INVALID_PARAMETER_3;
-
-    *DllModule = NULL;
-
-    ResolvedResult = FALSE;
-    RtlInitEmptyUnicodeString(&usResolvedModule, NULL, 0);
-
-    //
-    // Resolve ApiSet.
-    //
-    Status = NtLdrApiSetResolveLibrary(ApiSetMap,
-        ApiSetToResolve,
-        NULL,
-        &ResolvedResult,
-        &usResolvedModule);
-
-    if (NT_SUCCESS(Status)) {
-
-        if (ResolvedResult) {
-            //
-            // ApiSet resolved, load result library.
-            //
-            *DllModule = LoadLibraryEx(usResolvedModule.Buffer, NULL, DONT_RESOLVE_DLL_REFERENCES);
-
-            //
-            // Convert resolved name back to ANSI for module query.
-            //
-            RtlUnicodeStringToAnsiString(ConvertedModuleName,
-                &usResolvedModule,
-                TRUE);
-
-            RtlFreeUnicodeString(&usResolvedModule);
-            Status = STATUS_SUCCESS;
-        }
-    }
-    else {
-        //
-        // Change status code for dbg output.
-        //
-        if (Status == STATUS_UNSUCCESSFUL)
-            Status = STATUS_APISET_NOT_PRESENT;
-    }
-
-    return Status;
-}
-
-/*
-* ApiSetResolveWin32kTableEntry
-*
-* Purpose:
-*
-* Find entry in Win32kApiSetTable.
-*
-* Function return STATUS_SUCCESS on success and sets ResolvedEntry parameter.
-*
-*/
-NTSTATUS ApiSetResolveWin32kTableEntry(
-    _In_ ULONG_PTR ApiSetTable,
-    _In_ ULONG_PTR LookupEntry,
-    _In_ ULONG EntrySize,
-    _Out_ PVOID* ResolvedEntry
-)
-{
-    NTSTATUS resolveStatus = STATUS_APISET_NOT_PRESENT;
-    PW32K_API_SET_TABLE_ENTRY pvTableEntry = (PW32K_API_SET_TABLE_ENTRY)ApiSetTable;
-    ULONG cEntries;
-    ULONG_PTR entryValue;
-    PULONG_PTR pvHostEntries;
-
-    *ResolvedEntry = NULL;
-
-    //
-    // Lookup entry in table.
-    //
-    __try {
-
-        while (pvTableEntry->Host) {
-
-            cEntries = pvTableEntry->Host->HostEntriesCount;
-            pvHostEntries = (PULONG_PTR)pvTableEntry->HostEntriesArray;
-
-            //
-            // Search inside table host entry array.
-            //
-            do {
-
-                entryValue = (ULONG_PTR)pvHostEntries;
-                pvHostEntries++;
-
-                if (entryValue == LookupEntry) {
-                    *ResolvedEntry = (PVOID)pvTableEntry;
-                    resolveStatus = STATUS_SUCCESS;
-                    break;
-                }
-
-            } while (--cEntries);
-
-            pvTableEntry = (PW32K_API_SET_TABLE_ENTRY)RtlOffsetToPointer(pvTableEntry, EntrySize);
-        }
-    }
-    __except (WOBJ_EXCEPTION_FILTER_LOG) {
-        //
-        // Should never be here. Only in case if table structure changed or ApiSetTable address points to invalid data.
-        //
-        return STATUS_ACCESS_VIOLATION;
-    }
-
-    return resolveStatus;
-}
-
-/*
-* SdtResolveServiceEntryModule
-*
-* Purpose:
-*
-* Find a module for shadow table entry by parsing apisets(if present) and/or forwarders (if present).
-*
-* Function return NTSTATUS value and sets ResolvedModule, ResolvedModuleName, FunctionName parameters.
-*
-*/
-_Success_(return == STATUS_SUCCESS)
-NTSTATUS SdtResolveServiceEntryModule(
-    _In_ PBYTE FunctionPtr,
-    _In_ HMODULE MappedWin32k,
-    _In_opt_ PVOID ApiSetMap,
-    _In_ ULONG_PTR Win32kApiSetTable,
-    _In_ PWIN32_SHADOWTABLE ShadowTableEntry,
-    _Out_ HMODULE * ResolvedModule,
-    _Inout_ PANSI_STRING ResolvedModuleName,
-    _Out_ LPCSTR * FunctionName
-)
-{
-    BOOLEAN         NeedApiSetResolve = (g_NtBuildNumber > 18885);
-    BOOLEAN         Win32kApiSetTableExpected = (g_NtBuildNumber > 18935);
-
-    ULONG           ApiSetTableEntrySize;
-
-    NTSTATUS        resultStatus = STATUS_UNSUCCESSFUL, resolveStatus;
-
-    HMODULE         DllModule = NULL;
-
-    LONG32          JmpAddress;
-    ULONG_PTR       ApiSetReference;
-
-    LPCSTR	        ModuleName;
-    PWCHAR          HostName;
-
-    W32K_API_SET_TABLE_ENTRY *pvApiSetEntry = NULL;
-
-    UNICODE_STRING  usApiSetEntry, usModuleName;
-    hde64s hs;
-
-
-    *ResolvedModule = NULL;
-
-    hde64_disasm((void*)FunctionPtr, &hs);
-    if (hs.flags & F_ERROR) {
-        return STATUS_INTERNAL_ERROR;
-    }
-
-    do {
-
-        //
-        // See if this is new Win32kApiSetTable adapter.
-        //
-        if (Win32kApiSetTableExpected && ApiSetMap) {
-
-            ApiSetReference = ApiSetExtractReferenceFromAdapter(FunctionPtr);
-            if (ApiSetReference) {
-
-                if (g_NtBuildNumber >= NT_WINSRV_21H1)
-                    ApiSetTableEntrySize = sizeof(W32K_API_SET_TABLE_ENTRY_V2);
-                else
-                    ApiSetTableEntrySize = sizeof(W32K_API_SET_TABLE_ENTRY);
-
-                resolveStatus = ApiSetResolveWin32kTableEntry(
-                    Win32kApiSetTable,
-                    ApiSetReference,
-                    ApiSetTableEntrySize,
-                    (PVOID*)&pvApiSetEntry);
-
-                if (!NT_SUCCESS(resolveStatus))
-                    return resolveStatus;
-
-                //
-                // Host is on the same offset for both V1/V2 versions.
-                //
-                HostName = pvApiSetEntry->Host->HostName;
-
-                RtlInitUnicodeString(&usApiSetEntry, HostName);
-
-                resolveStatus = ApiSetLoadResolvedModule(
-                    ApiSetMap,
-                    &usApiSetEntry,
-                    ResolvedModuleName,
-                    &DllModule);
-
-                if (NT_SUCCESS(resolveStatus)) {
-                    if (DllModule) {
-                        *ResolvedModule = DllModule;
-                        *FunctionName = ShadowTableEntry->Name;
-                        return STATUS_SUCCESS;
-                    }
-                    else {
-                        return STATUS_DLL_NOT_FOUND;
-                    }
-                }
-                else {
-                    return resolveStatus;
-                }
-
-            }
-            else {
-                resultStatus = STATUS_APISET_NOT_HOSTED;
-            }
-        }
-
-        JmpAddress = *(PLONG32)(FunctionPtr + (hs.len - 4)); // retrieve the offset
-        FunctionPtr = FunctionPtr + hs.len + JmpAddress; // hs.len -> length of jmp instruction
-
-        *FunctionName = NtRawIATEntryToImport(MappedWin32k, FunctionPtr, &ModuleName);
-        if (*FunctionName == NULL) {
-            resultStatus = STATUS_PROCEDURE_NOT_FOUND;
-            break;
-        }
-
-        //
-        // Convert module name to UNICODE.
-        //
-        if (RtlCreateUnicodeStringFromAsciiz(&usModuleName, (PSTR)ModuleName)) {
-
-            //
-            // Check whatever ApiSet resolving required.
-            //
-            if (NeedApiSetResolve) {
-
-                if (ApiSetMap) {
-                    resolveStatus = ApiSetLoadResolvedModule(
-                        ApiSetMap,
-                        &usModuleName,
-                        ResolvedModuleName,
-                        &DllModule);
-                }
-                else {
-                    resolveStatus = STATUS_INVALID_PARAMETER_3;
-                }
-
-                if (!NT_SUCCESS(resolveStatus)) {
-                    RtlFreeUnicodeString(&usModuleName);
-                    return resolveStatus;
-                }
-
-            }
-            else {
-                //
-                // No ApiSet resolve required, load as usual.
-                //
-                DllModule = LoadLibraryEx(usModuleName.Buffer, NULL, DONT_RESOLVE_DLL_REFERENCES);
-                RtlUnicodeStringToAnsiString(ResolvedModuleName, &usModuleName, TRUE);
-            }
-
-            RtlFreeUnicodeString(&usModuleName);
-
-            *ResolvedModule = DllModule;
-            resultStatus = (DllModule != NULL) ? STATUS_SUCCESS : STATUS_DLL_NOT_FOUND;
-        }
-
-
-    } while (FALSE);
-
-    return resultStatus;
-}
 
 /*
 * SdtListReportEvent
@@ -979,8 +398,8 @@ VOID SdtListReportFunctionResolveError(
 */
 VOID SdtListReportResolveModuleError(
     _In_ NTSTATUS Status,
-    _In_ PWIN32_SHADOWTABLE Table,
-    _In_ PSTRING ResolvedModuleName,
+    _In_ PRAW_SYSCALL_ENTRY Table,
+    _In_ PUNICODE_STRING ResolvedModuleName,
     _In_ LPCWSTR ErrorSource
 )
 {
@@ -995,7 +414,7 @@ VOID SdtListReportResolveModuleError(
     switch (Status) {
 
     case STATUS_INTERNAL_ERROR:
-        _strcpy(szErrorBuffer, TEXT("HDE Error"));
+        _strcpy(szErrorBuffer, TEXT("Internal error"));
         break;
 
     case STATUS_APISET_NOT_HOSTED:
@@ -1026,15 +445,16 @@ VOID SdtListReportResolveModuleError(
 
     case STATUS_DLL_NOT_FOUND:
 
-        _strcpy(szErrorBuffer, TEXT("could not load import dll "));
+        RtlStringCchPrintfSecure(szErrorBuffer, 
+            RTL_NUMBER_OF(szErrorBuffer),
+            L"could not load import dll %wZ",
+            ResolvedModuleName);
 
-        MultiByteToWideChar(CP_ACP,
-            0,
-            ResolvedModuleName->Buffer,
-            ResolvedModuleName->Length,
-            _strend(szErrorBuffer),
-            MAX_PATH);
+        break;
 
+    case STATUS_ILLEGAL_FUNCTION:
+
+        _strcpy(szErrorBuffer, TEXT("does not look like a import thunk"));
         break;
 
     default:
@@ -1050,11 +470,36 @@ VOID SdtListReportResolveModuleError(
 }
 
 /*
+* SdtpSetDllDirectory
+*
+* Purpose:
+*
+* Insert/Remove SystemRoot\System32\Drivers to the loader directories search list.
+*
+*/
+VOID SdtpSetDllDirectory(
+    _In_ BOOLEAN bSet
+)
+{
+    WCHAR szBuffer[MAX_PATH * 2];
+    PWCHAR lpDirectory = NULL;
+
+    if (bSet) {
+        _strcpy(szBuffer, g_WinObj.szSystemDirectory);
+        _strcat(szBuffer, TEXT("\\drivers"));
+        lpDirectory = (PWCHAR)&szBuffer;
+    } 
+
+    SetDllDirectory(lpDirectory);
+}
+
+/*
 * SdtListCreateTableShadow
 *
 * Purpose:
 *
-* W32pServiceTable create table routine.
+* W32pServiceTable table parsing routine.
+* Does optional function resolving to actual handlers.
 *
 * Note: This code only for Windows 10 RS1+
 *
@@ -1064,41 +509,25 @@ BOOL SdtListCreateTableShadow(
     _Out_ PULONG Status
 )
 {
-    BOOLEAN     NeedApiSetResolve = (g_NtBuildNumber > 18885);
-    BOOLEAN     Win32kApiSetTableExpected = (g_NtBuildNumber > 18935);
-    NTSTATUS    ntStatus;
-    BOOL        bResult = FALSE;
-    ULONG       w32u_limit, w32k_limit, c;
-    HMODULE     w32u = NULL, w32k = NULL, DllModule, forwdll;
-    PBYTE       fptr;
-    PULONG      pServiceLimit, pServiceTable;
-    LPCSTR	    ModuleName, FunctionName, ForwarderDot, ForwarderFunctionName;
-    HANDLE      EnumerationHeap = NULL;
-    ULONG_PTR   Win32kBase = 0, kernelWin32kBase = 0;
+    BOOL bResult = FALSE;
+    ULONG i, ulInitStatus;
+    NTSTATUS ntStatus;
+    HMODULE forwardDll;
+    LPCSTR lpFunctionName = NULL, lpForwarderDot, lpForwarderFunctionName;
+    PBYTE functionPtr;
+    PSDT_TABLE_ENTRY ServiceEntry;
+    PRAW_SYSCALL_ENTRY tableEntry;
+    RESOLVE_INFO resolveInfo;
 
-    PSERVICETABLEENTRY  ServiceEntry;
-    PWIN32_SHADOWTABLE  table, itable;
-    RESOLVE_INFO        rfn;
-
-    ULONG_PTR                       Win32kApiSetTable = 0;
-
-    PVOID                           pvApiSetMap = NULL;
-    ULONG                           schemaVersion = 0;
-
-    PRTL_PROCESS_MODULE_INFORMATION w32Module, subModule, ForwardModule;
-
-    LOAD_MODULE_ENTRY               LoadedModulesHead;
-    PLOAD_MODULE_ENTRY              ModuleEntry = NULL, PreviousEntry = NULL;
-
-    ANSI_STRING                     ResolvedModuleName;
-
-    WCHAR szBuffer[MAX_PATH * 2];
+    PRTL_PROCESS_MODULE_INFORMATION subModule, forwardModule;
+    SDT_MODULE_ENTRY loadedModulesHead, sdtModule;
+    UNICODE_STRING forwardModuleName;
+    SDT_FUNCTION_NAME sdtFn;
     CHAR szForwarderModuleName[MAX_PATH];
 
-    LoadedModulesHead.Next = NULL;
-    LoadedModulesHead.hModule = NULL;
-
     *Status = STATUS_SUCCESS;
+    RtlSecureZeroMemory(&sdtModule, sizeof(SDT_MODULE_ENTRY));
+    RtlSecureZeroMemory(&loadedModulesHead, sizeof(SDT_MODULE_ENTRY));
 
     __try {
 
@@ -1107,266 +536,158 @@ BOOL SdtListCreateTableShadow(
         //
         if (W32pServiceTable.Allocated == FALSE) {
 
-            //
-            // Find win32k loaded image base.
-            //
-            w32Module = (PRTL_PROCESS_MODULE_INFORMATION)ntsupFindModuleEntryByName(
-                pModules,
-                "win32k.sys");
+            ulInitStatus = SdtWin32kInitializeOnce(pModules, &g_SDTCtx);
+            if (ulInitStatus != 0) {
+                *Status = ulInitStatus;
 
-            if (w32Module == NULL) {
-                *Status = ErrShadowWin32kNotFound;
-                __leave;
-            }
-
-            Win32kBase = (ULONG_PTR)w32Module->ImageBase;
-
-            //
-            // Prepare dedicated heap for exports enumeration.
-            //
-            EnumerationHeap = supCreateHeap(HEAP_GROWABLE, TRUE);
-            if (EnumerationHeap == NULL) {
-                *Status = ErrShadowMemAllocFail;
-                __leave;
-            }
-
-            //
-            // Load win32u and dump exports, in KnownDlls.
-            //
-            w32u = LoadLibraryEx(TEXT("win32u.dll"), NULL, 0);
-            if (w32u == NULL) {
-                *Status = ErrShadowWin32uLoadFail;
-                __leave;
-            }
-
-            w32u_limit = NtRawEnumW32kExports(EnumerationHeap, w32u, &table);
-
-            //
-            // Load win32k.
-            //
-
-            W32SymContext = SymParserCreate();
-            w32k = SdtLoadWin32kImage(W32SymContext);
-            if (w32k == NULL) {
-                *Status = ErrShadowWin32kLoadFail;
-                __leave;
-            }
-
-            if (Win32kApiSetTableExpected) {
-                //
-                // Locate Win32kApiSetTable variable. Failure will result in unresolved apiset adapters.
-                //
-                Win32kApiSetTable = SdtQueryWin32kApiSetTable(w32k,
-                    w32Module->ImageBase,
-                    w32Module->ImageSize);
-
-                if (Win32kApiSetTable == 0) {
-                    *Status = ErrShadowApiSetNotFound;
-                }
-            }
-
-            //
-            // Query win32k!W32pServiceLimit.
-            //
-            pServiceLimit = (PULONG)GetProcAddress(w32k, "W32pServiceLimit");
-            if (pServiceLimit == NULL) {
-                *Status = ErrShadowW32pServiceLimitNotFound;
-                __leave;
-            }
-
-            //
-            // Check whatever win32u is compatible with win32k data.
-            //
-            w32k_limit = *pServiceLimit;
-            if (w32k_limit != w32u_limit) {
-                *Status = ErrShadowWin32uMismatch;
-                __leave;
-            }
-
-            //
-            // Query win32k!W32pServiceTable.
-            //
-            RtlSecureZeroMemory(&rfn, sizeof(RESOLVE_INFO));
-            if (!NT_SUCCESS(NtRawGetProcAddress(w32k, "W32pServiceTable", &rfn))) {
-                *Status = ErrShadowW32pServiceTableNotFound;
-                __leave;
-            }
-
-            //
-            // Query ApiSetMap
-            //
-            if (NeedApiSetResolve) {
-
-                if (!NtLdrApiSetLoadFromPeb(&schemaVersion, (PVOID*)&pvApiSetMap)) {
-                    *Status = ErrShadowApiSetSchemaMapNotFound;
+                if (ulInitStatus != ErrShadowApiSetNotFound)
                     __leave;
-                }
-
-                //
-                // Windows 10+ uses modern ApiSetSchema version, everything else not supported.
-                //
-                if (schemaVersion != API_SET_SCHEMA_VERSION_V6) {
-                    *Status = ErrShadowApiSetSchemaVerUnknown;
-                    __leave;
-                }
             }
 
-            //
-            // Set global variables.
-            //
-            kernelWin32kBase = Win32kBase + (ULONG_PTR)rfn.Function - (ULONG_PTR)w32k;
-
-            //
-            // Insert SystemRoot\System32\Drivers to the loader directories search list.
-            //
-            _strcpy(szBuffer, g_WinObj.szSystemDirectory);
-            _strcat(szBuffer, TEXT("\\drivers"));
-            SetDllDirectory(szBuffer);
+            SdtpSetDllDirectory(TRUE);
 
             //
             // Build table.
             //
-            pServiceTable = (PULONG)rfn.Function;
+            for (i = 0; i < g_SDTCtx.KernelLimit; ++i) {
 
-            for (c = 0; c < w32k_limit; ++c) {
+                tableEntry = g_SDTCtx.UserTable;
+                while (tableEntry != 0) {
 
-                itable = table;
-                while (itable != 0) {
+                    if (tableEntry->Index == i + WIN32K_START_INDEX) {
 
-                    if (itable->Index == c + WIN32K_START_INDEX) {
+                        lpFunctionName = tableEntry->Name;
 
-                        itable->KernelStubAddress = pServiceTable[c];
-                        fptr = (PBYTE)w32k + itable->KernelStubAddress;
-                        itable->KernelStubAddress += Win32kBase;
+                        tableEntry->KernelStubAddress = g_SDTCtx.W32pServiceTableUserBase[i];
+                        functionPtr = (PBYTE)g_SDTCtx.KernelModule + tableEntry->KernelStubAddress;
+                        tableEntry->KernelStubAddress += g_SDTCtx.KernelBaseAddress;
+
+                        sdtFn.ServiceName = tableEntry->Name;
+                        sdtFn.ExportName = NULL;
+                        sdtFn.ExportOrdinal = 0;
 
                         //
                         // Resolve module name for table entry and load this module to the memory.
                         //
+                        if (g_SDTCtx.ApiSetSessionAware) {
 
-                        DllModule = NULL;
-                        RtlSecureZeroMemory(&ResolvedModuleName, sizeof(ResolvedModuleName));
-                        ntStatus = SdtResolveServiceEntryModule(fptr,
-                            w32k,
-                            pvApiSetMap,
-                            Win32kApiSetTable,
-                            itable,
-                            &DllModule,
-                            &ResolvedModuleName,
-                            &FunctionName);
+                            ntStatus = SdtResolveServiceEntryModuleSessionAware(
+                                &g_SDTCtx,
+                                functionPtr,
+                                pModules,
+                                &sdtFn,
+                                &loadedModulesHead,
+                                &sdtModule);
+
+                        }
+                        else {
+
+                            ntStatus = SdtResolveServiceEntryModule(
+                                &g_SDTCtx,
+                                functionPtr,
+                                &loadedModulesHead,
+                                &sdtModule);
+
+                        }
 
                         if (!NT_SUCCESS(ntStatus)) {
 
                             SdtListReportResolveModuleError(ntStatus,
-                                itable,
-                                &ResolvedModuleName,
+                                tableEntry,
+                                &sdtModule.Name,
                                 __FUNCTIONW__);
 
                             break;
                         }
 
-                        ModuleName = ResolvedModuleName.Buffer;
-
-                        //
-                        // Remember loaded module to the internal list.
-                        //
-                        ModuleEntry = (PLOAD_MODULE_ENTRY)supHeapAllocEx(EnumerationHeap,
-                            sizeof(LOAD_MODULE_ENTRY));
-
-                        if (ModuleEntry) {
-                            ModuleEntry->Next = LoadedModulesHead.Next;
-                            ModuleEntry->hModule = DllModule;
-                            LoadedModulesHead.Next = ModuleEntry;
-                        }
-
                         //
                         // Check function forwarding.
                         //
-                        if (!NT_SUCCESS(NtRawGetProcAddress(DllModule, FunctionName, &rfn))) {
+                        RtlSecureZeroMemory(&resolveInfo, sizeof(resolveInfo));
+
+                        if (sdtFn.ExportName)
+                            lpFunctionName = sdtFn.ExportName;
+                        else if (sdtFn.ExportOrdinal)
+                            lpFunctionName = MAKEINTRESOURCEA(sdtFn.ExportOrdinal);
+
+                        if (!NT_SUCCESS(NtRawGetProcAddress(sdtModule.ImageBase, lpFunctionName, &resolveInfo))) {
                             //
                             // Log error.
                             //
-                            SdtListReportFunctionResolveError(FunctionName);
+                            SdtListReportFunctionResolveError(lpFunctionName);
                             break;
                         }
 
                         //
                         // Function is forward, resolve again.
                         //
-                        if (rfn.ResultType == ForwarderString) {
+                        if (resolveInfo.ResultType == ForwarderString) {
 
-                            ForwarderDot = _strchr_a(rfn.ForwarderName, '.');
-                            ForwarderFunctionName = ForwarderDot + 1;
+                            lpForwarderDot = _strchr_a(resolveInfo.ForwarderName, '.');
+                            lpForwarderFunctionName = lpForwarderDot + 1;
+                            if (lpForwarderFunctionName) {
+                                
+                                //
+                                // Build forwarder module name.
+                                //
+                                RtlSecureZeroMemory(szForwarderModuleName, sizeof(szForwarderModuleName));
+                                _strncpy_a(szForwarderModuleName, sizeof(szForwarderModuleName),
+                                    resolveInfo.ForwarderName, lpForwarderDot - &resolveInfo.ForwarderName[0]);
 
-                            //
-                            // Build forwarder module name.
-                            //
-                            RtlSecureZeroMemory(szForwarderModuleName, sizeof(szForwarderModuleName));
-                            _strncpy_a(szForwarderModuleName, sizeof(szForwarderModuleName),
-                                rfn.ForwarderName, ForwarderDot - &rfn.ForwarderName[0]);
+                                _strcat_a(szForwarderModuleName, ".SYS");
 
-                            _strcat_a(szForwarderModuleName, ".SYS");
+                                forwardModule = (PRTL_PROCESS_MODULE_INFORMATION)ntsupFindModuleEntryByName(pModules,
+                                    szForwarderModuleName);
 
-                            ForwardModule = (PRTL_PROCESS_MODULE_INFORMATION)ntsupFindModuleEntryByName(pModules,
-                                szForwarderModuleName);
+                                if (forwardModule) {
 
-                            if (ForwardModule) {
+                                    if (RtlCreateUnicodeStringFromAsciiz(&forwardModuleName, szForwarderModuleName)) {
 
-                                if (ForwarderFunctionName) {
+                                        if (NT_SUCCESS(SdtLoadAndRememberModule(&loadedModulesHead, &forwardModuleName, &sdtModule, TRUE))) {
 
-                                    forwdll = LoadLibraryExA(szForwarderModuleName, NULL, DONT_RESOLVE_DLL_REFERENCES);
-                                    if (forwdll) {
+                                            forwardDll = sdtModule.ImageBase;
 
-                                        //
-                                        // Remember loaded module to the internal list.
-                                        //
-                                        ModuleEntry = (PLOAD_MODULE_ENTRY)supHeapAllocEx(EnumerationHeap,
-                                            sizeof(LOAD_MODULE_ENTRY));
+                                            if (NT_SUCCESS(NtRawGetProcAddress(forwardDll, lpForwarderFunctionName, &resolveInfo))) {
 
-                                        if (ModuleEntry) {
-                                            ModuleEntry->Next = LoadedModulesHead.Next;
-                                            ModuleEntry->hModule = forwdll;
-                                            LoadedModulesHead.Next = ModuleEntry;
+                                                //
+                                                // Calculate routine kernel mode address.
+                                                //
+                                                tableEntry->KernelStubTargetAddress =
+                                                    (ULONG_PTR)forwardModule->ImageBase + ((ULONG_PTR)resolveInfo.Function - (ULONG_PTR)forwardDll);
+                                            }
+
                                         }
-
-                                        if (NT_SUCCESS(NtRawGetProcAddress(forwdll, ForwarderFunctionName, &rfn))) {
+                                        else {
+                                            RtlFreeUnicodeString(&forwardModuleName);
 
                                             //
-                                            // Calculate routine kernel mode address.
+                                            // Log error.
                                             //
-                                            itable->KernelStubTargetAddress =
-                                                (ULONG_PTR)ForwardModule->ImageBase + ((ULONG_PTR)rfn.Function - (ULONG_PTR)forwdll);
+                                            SdtListReportEvent(EntryTypeError, __FUNCTIONW__, TEXT("could not load forwarded module"));
                                         }
-
-                                    }
-                                    else {
-                                        //
-                                        // Log error.
-                                        //
-                                        SdtListReportEvent(EntryTypeError, __FUNCTIONW__, TEXT("could not load forwarded module"));
+                                        
                                     }
 
-                                } // if (ForwarderFunctionName)
+                                }
 
-                            }//if (ForwardModule)
+                            }
 
                         }
                         else {
                             //
                             // Calculate routine kernel mode address.
-                            //
-                            subModule = (PRTL_PROCESS_MODULE_INFORMATION)ntsupFindModuleEntryByName(pModules, ModuleName);
+                            //                           
+                            subModule = (PRTL_PROCESS_MODULE_INFORMATION)ntsupFindModuleEntryByName_U(pModules, sdtModule.Name.Buffer);
                             if (subModule) {
-                                itable->KernelStubTargetAddress =
-                                    (ULONG_PTR)subModule->ImageBase + ((ULONG_PTR)rfn.Function - (ULONG_PTR)DllModule);
+                                tableEntry->KernelStubTargetAddress =
+                                    (ULONG_PTR)subModule->ImageBase + ((ULONG_PTR)resolveInfo.Function - (ULONG_PTR)sdtModule.ImageBase);
                             }
-
-                            RtlFreeAnsiString(&ResolvedModuleName);
 
                         }
 
                     } // if (itable->Index == c + WIN32K_START_INDEX)
 
-                    itable = itable->NextService;
+                    tableEntry = tableEntry->NextEntry;
 
                 } //while (itable != 0);
             }
@@ -1374,41 +695,41 @@ BOOL SdtListCreateTableShadow(
             //
             // Output table.
             //
-            W32pServiceTable.Table = (PSERVICETABLEENTRY)supHeapAlloc(sizeof(SERVICETABLEENTRY) * w32k_limit);
+            W32pServiceTable.Table = (PSDT_TABLE_ENTRY)supHeapAlloc(sizeof(SDT_TABLE_ENTRY) * g_SDTCtx.KernelLimit);
             if (W32pServiceTable.Table) {
 
                 W32pServiceTable.Allocated = TRUE;
-                W32pServiceTable.Base = kernelWin32kBase;
+                W32pServiceTable.Base = g_SDTCtx.W32pServiceTableKernelBase;
 
                 //
                 // Convert table to output format.
                 //
                 W32pServiceTable.Limit = 0;
-                itable = table;
-                while (itable != 0) {
+                tableEntry = g_SDTCtx.UserTable;
+                while (tableEntry != 0) {
 
                     //
                     // Service Id.
                     //
                     ServiceEntry = &W32pServiceTable.Table[W32pServiceTable.Limit];
 
-                    ServiceEntry->ServiceId = itable->Index;
+                    ServiceEntry->ServiceId = tableEntry->Index;
 
                     //
                     // Routine real address.
                     //
-                    if (itable->KernelStubTargetAddress) {
+                    if (tableEntry->KernelStubTargetAddress) {
                         //
                         // Output stub target address.
                         //
-                        ServiceEntry->Address = itable->KernelStubTargetAddress;
+                        ServiceEntry->Address = tableEntry->KernelStubTargetAddress;
 
                     }
                     else {
                         //
                         // Query failed, output stub address.
                         //
-                        ServiceEntry->Address = itable->KernelStubAddress;
+                        ServiceEntry->Address = tableEntry->KernelStubAddress;
 
                     }
 
@@ -1418,14 +739,14 @@ BOOL SdtListCreateTableShadow(
                     MultiByteToWideChar(
                         CP_ACP,
                         0,
-                        itable->Name,
-                        (INT)_strlen_a(itable->Name),
+                        tableEntry->Name,
+                        (INT)_strlen_a(tableEntry->Name),
                         ServiceEntry->Name,
                         MAX_PATH);
 
                     W32pServiceTable.Limit += 1;
 
-                    itable = itable->NextService;
+                    tableEntry = tableEntry->NextEntry;
                 }
 
             }
@@ -1441,29 +762,10 @@ BOOL SdtListCreateTableShadow(
             supReportAbnormalTermination(__FUNCTIONW__);
 
         //
-        // Restore default search order.
-        //
-        SetDllDirectory(NULL);
-
-        //
         // Unload all loaded modules.
         //
-        for (PreviousEntry = &LoadedModulesHead, ModuleEntry = LoadedModulesHead.Next;
-            ModuleEntry != NULL;
-            PreviousEntry = ModuleEntry, ModuleEntry = ModuleEntry->Next)
-        {
-            FreeLibrary(ModuleEntry->hModule);
-        }
-        if (EnumerationHeap) supDestroyHeap(EnumerationHeap);
-        if (w32u) FreeLibrary(w32u);
-        if (w32k) FreeLibrary(w32k);
-
-        if (W32SymContext) {
-            W32SymContext->Parser.UnloadModule(W32SymContext);
-            SymParserDestroy(W32SymContext);
-            W32SymContext = NULL;
-        }
-
+        SdtUnloadRememberedModules(&loadedModulesHead);
+        SdtpSetDllDirectory(FALSE);
     }
 
     return bResult;
@@ -1532,14 +834,15 @@ INT CALLBACK SdtDlgCompareFunc(
 VOID SdtListCreate(
     _In_ HWND hwndDlg,
     _In_ BOOL fRescan,
-    _In_ EXTRASCONTEXT * pDlgContext
+    _In_ EXTRASCONTEXT* pDlgContext
 )
 {
     BOOL bSuccess = FALSE;
     ULONG returnStatus;
     EXTRASCALLBACK CallbackParam;
     PRTL_PROCESS_MODULES pModules = NULL;
-    LPWSTR lpStatusMsg;
+    LPWSTR lpModule;
+    WCHAR szText[MAX_PATH];
 
     __try {
 
@@ -1588,7 +891,7 @@ VOID SdtListCreate(
 
                 if (returnStatus == ErrShadowApiSetNotFound) {
                     supStatusBarSetText(pDlgContext->StatusBar, 1,
-                        T_ERRSHADOW_APISETTABLE_NOT_FOUND);
+                        TEXT("Win32kApiSet not found"));
                 }
 
                 SdtListOutputTable(hwndDlg, pModules, &W32pServiceTable);
@@ -1598,47 +901,73 @@ VOID SdtListCreate(
                 switch (returnStatus) {
 
                 case ErrShadowWin32kNotFound:
-                    lpStatusMsg = T_ERRSHADOW_WIN32K_NOT_FOUND;
+                case ErrShadowWin32ksgdNotFound:
+
+                    RtlStringCchPrintfSecure(szText,
+                        RTL_NUMBER_OF(szText),
+                        TEXT("Could not find %ws module"),
+                        (returnStatus == ErrShadowWin32kNotFound) ? WIN32K_FILENAME : WIN32KSGD_FILENAME);
+
                     break;
 
                 case ErrShadowMemAllocFail:
-                    lpStatusMsg = T_ERRSHADOW_MEMORY_NOT_ALLOCATED;
+
+                    _strcpy(szText, TEXT("Could not create heap for table"));
                     break;
 
                 case ErrShadowWin32uLoadFail:
-                    lpStatusMsg = T_ERRSHADOW_WIN32U_LOAD_FAILED;
-                    break;
-
                 case ErrShadowWin32kLoadFail:
-                    lpStatusMsg = T_ERRSHADOW_WIN32K_LOAD_FAILED;
+                case ErrShadowWin32ksgdLoadFail:
+
+                    switch (returnStatus) {
+                    case ErrShadowWin32kLoadFail:
+                        lpModule = WIN32K_FILENAME;
+                        break;
+                    case ErrShadowWin32ksgdLoadFail:
+                        lpModule = WIN32KSGD_FILENAME;
+                        break;
+                    default:
+                    case ErrShadowWin32uLoadFail:
+                        lpModule = WIN32U_FILENAME;
+                        break;
+                    }
+
+                    RtlStringCchPrintfSecure(szText,
+                        RTL_NUMBER_OF(szText),
+                        TEXT("Could not load %ws module"),
+                        lpModule);
                     break;
 
                 case ErrShadowW32pServiceLimitNotFound:
-                    lpStatusMsg = T_ERRSHADOW_WIN32KLIMIT_NOT_FOUND;
+                    _strcpy(szText, TEXT("W32pServiceLimit was not found in win32k module"));
                     break;
 
                 case ErrShadowWin32uMismatch:
-                    lpStatusMsg = T_ERRSHADOW_WIN32U_MISMATCH;
+                    _strcpy(szText, TEXT("Not all services found in win32u"));
                     break;
 
                 case ErrShadowW32pServiceTableNotFound:
-                    lpStatusMsg = T_ERRSHADOW_TABLE_NOT_FOUND;
-                    break;
-
-                case ErrShadowApiSetSchemaMapNotFound:
-                    lpStatusMsg = T_ERRSHADOW_APISETMAP_NOT_FOUND;
+                    _strcpy(szText, TEXT("W32pServiceTable was not found in win32k module"));
                     break;
 
                 case ErrShadowApiSetSchemaVerUnknown:
-                    lpStatusMsg = T_ERRSHADOW_APISET_VER_UNKNOWN;
+                    _strcpy(szText, TEXT("ApiSetSchema version is unknown"));
+                    break;
+
+                case ErrShadowWin32ksgdGlobalsNotFound:
+                    _strcpy(szText, TEXT("Could not find win32ksgd.sys globals variable"));
+                    break;
+
+                case ErrShadowWin32ksgdOffsetNotFound:
+                    _strcpy(szText, TEXT("Could not find win32ksgd.sys Win32kApiSetTable offset"));
                     break;
 
                 default:
-                    lpStatusMsg = TEXT("Unknown error");
+                    _strcpy(szText, TEXT("Unknown error"));
                     break;
                 }
 
-                supStatusBarSetText(pDlgContext->StatusBar, 1, lpStatusMsg);
+                supStatusBarSetText(pDlgContext->StatusBar, 1, szText);
             }
         }
 
@@ -1654,7 +983,7 @@ VOID SdtListCreate(
     }
 
     if (bSuccess) {
-        supStatusBarSetText(pDlgContext->StatusBar, 1, TEXT("Table read - OK"));
+        supStatusBarSetText(pDlgContext->StatusBar, 1, TEXT("Table read OK"));
         CallbackParam.lParam = 0;
         CallbackParam.Value = pDlgContext->DialogMode;
         ListView_SortItemsEx(pDlgContext->ListView, &SdtDlgCompareFunc, (LPARAM)&CallbackParam);
@@ -2086,6 +1415,9 @@ DWORD extrasSSDTDialogWorkerThread(
         NtClose(workerThread);
         SdtDlgThreadHandles[pDlgContext->DialogMode] = NULL;
     }
+
+    if (pDlgContext->DialogMode == SST_Win32k)
+        SdtWin32kUninitialize(&g_SDTCtx);
 
     return 0;
 }

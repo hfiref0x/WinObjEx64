@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020 - 2022
+*  (C) COPYRIGHT AUTHORS, 2020 - 2023
 *
 *  TITLE:       KSYMBOLS.H
 *
-*  VERSION:     2.00
+*  VERSION:     2.03
 *
-*  DATE:        19 Jun 2022
+*  DATE:        21 Jul 2023
 *
 *  Header file for kernel symbol names.
 *
@@ -27,6 +27,8 @@
 
 #define KVAR_SeCiCallbacks                          L"SeCiCallbacks"
 #define KVAR_g_CiCallbacks                          L"g_CiCallbacks"
+
+#define KVAR_gSessionGlobalSlots					L"gSessionGlobalSlots"
 
 #define KVAR_IopFsNotifyChangeQueueHead             L"IopFsNotifyChangeQueueHead"
 #define KVAR_RtlpDebugPrintCallbackList             L"RtlpDebugPrintCallbackList"

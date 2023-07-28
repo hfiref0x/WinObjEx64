@@ -285,7 +285,8 @@ PVOID DumpProtocolBlockVersionAware(
     case NT_WIN10_21H2:
     case NT_WIN11_21H2:
     case NT_WIN11_22H2:
-    case NTX_WIN11_ADB:
+    case NT_WIN11_23H2:
+    case NT_WIN11_24H2:
     default:
         ObjectSize = sizeof(NDIS_PROTOCOL_BLOCK_18362_25905);
         ObjectVersion = 5;

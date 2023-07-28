@@ -1,12 +1,12 @@
 /************************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2014 - 2021
+*  (C) COPYRIGHT AUTHORS, 2014 - 2023
 *
 *  TITLE:       NTLDR.H
 *
-*  VERSION:     1.19
+*  VERSION:     1.22
 *
-*  DATE:        14 Jan 2021
+*  DATE:        21 Jul 2023
 *
 *  Common header file for the NTLDR definitions.
 *
@@ -64,19 +64,13 @@ typedef struct _RESOLVE_INFO {
     };
 } RESOLVE_INFO, *PRESOLVE_INFO;
 
-typedef struct _LOAD_MODULE_ENTRY {
-    HMODULE hModule;
-    struct _LOAD_MODULE_ENTRY *Next;
-} LOAD_MODULE_ENTRY, *PLOAD_MODULE_ENTRY;
-
-typedef struct _WIN32_SHADOWTABLE {
+typedef struct _RAW_SYSCALL_ENTRY {
     ULONG Index;
     CHAR Name[256];
     ULONG_PTR KernelStubAddress;
     ULONG_PTR KernelStubTargetAddress;
-    struct _WIN32_SHADOWTABLE *NextService;
-} WIN32_SHADOWTABLE, *PWIN32_SHADOWTABLE;
-
+    struct _RAW_SYSCALL_ENTRY* NextEntry;
+} RAW_SYSCALL_ENTRY, *PRAW_SYSCALL_ENTRY;
 
 _Success_(return != NULL)
 LPCSTR NtRawIATEntryToImport(
@@ -85,27 +79,21 @@ LPCSTR NtRawIATEntryToImport(
     _Out_opt_ LPCSTR *ImportModuleName);
 
 _Success_(return != 0)
-ULONG NtRawEnumW32kExports(
+ULONG NtRawEnumSyscallExports(
     _In_ HANDLE HeapHandle,
     _In_ LPVOID Module,
-    _Out_ PWIN32_SHADOWTABLE* Table);
+    _Out_ PRAW_SYSCALL_ENTRY* SyscallTable);
 
 NTSTATUS NtRawGetProcAddress(
     _In_ LPVOID Module,
     _In_ LPCSTR ProcName,
     _In_ PRESOLVE_INFO Pointer);
 
-BOOLEAN NtLdrApiSetLoadFromPeb(
-    _Out_ PULONG SchemaVersion,
-    _Out_ PVOID* DataPointer);
-
-_Success_(return == STATUS_SUCCESS)
 NTSTATUS NtLdrApiSetResolveLibrary(
     _In_ PVOID Namespace,
-    _In_ PUNICODE_STRING ApiSetToResolve,
-    _In_opt_ PUNICODE_STRING ApiSetParentName,
-    _Out_ PBOOL Resolved,
-    _Out_ PUNICODE_STRING ResolvedHostLibraryName);
+    _In_ PCUNICODE_STRING ApiSetToResolve,
+    _In_opt_ PCUNICODE_STRING ApiSetParentName,
+    _Inout_ PUNICODE_STRING ResolvedHostLibraryName);
 
 
 #pragma warning(pop)

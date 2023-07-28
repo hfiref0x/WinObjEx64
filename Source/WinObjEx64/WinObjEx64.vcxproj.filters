@@ -258,6 +258,9 @@
     <ClCompile Include="sup\wine.c">
       <Filter>Source Files\sup</Filter>
     </ClCompile>
+    <ClCompile Include="sup\w32k.c">
+      <Filter>Source Files\sup</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc">
@@ -402,6 +405,9 @@
     </ClInclude>
     <ClInclude Include="extras\extrasHandlers.h">
       <Filter>Source Files\extras</Filter>
+    </ClInclude>
+    <ClInclude Include="sup\w32k.h">
+      <Filter>Source Files\sup</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

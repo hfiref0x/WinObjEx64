@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2018 - 2022
+*  (C) COPYRIGHT AUTHORS, 2018 - 2023
 *
 *  TITLE:       EXTRASCALLBACKS.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.03
 *
-*  DATE:        25 Oct 2022
+*  DATE:        21 Jul 2023
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -38,6 +38,7 @@ static FAST_EVENT SysCbInitializedEvent = FAST_EVENT_INIT;
 #define CBT_SIZE_CO_V1        0x100
 #define CBT_SIZE_NI_V1        0xF8
 #define CBT_SIZE_CU_V1        0x100
+#define CBT_SIZE_GA_V1        0x100
 
 typedef struct _CBT_MAPPING {
     ULONG Build;
@@ -67,7 +68,8 @@ CBT_MAPPING g_CbtMapping[] = {
 
     { NT_WIN11_21H2, NTDDI_WIN10_CO, CBT_SIZE_CO_V1 },
     { NT_WIN11_22H2, NTDDI_WIN10_NI, CBT_SIZE_NI_V1 },
-    { NTX_WIN11_ADB, NTDDI_WIN10_CU, CBT_SIZE_CU_V1 }
+    { NT_WIN11_23H2, NTDDI_WIN10_CU, CBT_SIZE_CU_V1 }, //update on release
+    { NT_WIN11_24H2, NTDDI_WIN10_GA, CBT_SIZE_GA_V1 }  //update on release
 };
 
 //
@@ -800,7 +802,8 @@ LPWSTR GetCiRoutineNameFromIndex(
         break;
 
     case NT_WIN11_22H2:
-    case NTX_WIN11_ADB:
+    case NT_WIN11_23H2:
+    case NT_WIN11_24H2:
     default:
         Indexes = CiCallbackIndexes_Win11_22H2;
         ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win11_22H2);
@@ -2625,16 +2628,21 @@ OBEX_FINDCALLBACK_ROUTINE(FindExpCallbackListHead)
         if (hs.flags & F_ERROR)
             break;
 
-        if (hs.len == 7) { //check if lea
-
-            if (((ptrCode[Index] == 0x48) || (ptrCode[Index] == 0x4C)) &&
-                (ptrCode[Index + 1] == 0x8D) &&
-                (ptrCode[Index + hs.len + 3] == 0x28)) // add/lea with +0x28 = offset of object's ExpCallbackList
-            {
-                Rel = *(PLONG)(ptrCode + Index + 3);
-                break;
-            }
-        }
+		if (hs.len == 7) { 
+			if (hs.flags & F_PREFIX_REX &&
+				hs.flags & F_DISP32 &&
+				hs.flags & F_MODRM)
+			{
+				if (((ptrCode[Index] == 0x48) || (ptrCode[Index] == 0x4C)) &&
+					(ptrCode[Index + 1] == 0x8D) &&
+					((ptrCode[Index + 2] == 0x15) ||
+						(ptrCode[Index + hs.len + 3] == 0x28))) // add/lea with +0x28 = offset of object's ExpCallbackList
+				{
+					Rel = (LONG)hs.disp.disp32;
+					break;
+				}
+			}
+		}
 
         Index += hs.len;
 

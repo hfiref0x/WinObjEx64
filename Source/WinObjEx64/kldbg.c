@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.03
 *
-*  DATE:        21 Jul 2023
+*  DATE:        22 Jul 2023
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -2819,7 +2819,7 @@ BOOL kdLoadSymbolsForNtImage(
         (DWORD64)ImageBase,
         SizeOfImage);
 
-    Sleep(1000);
+    Sleep(100);
     supCloseLoadBanner();
 
     return bResult;

@@ -22,7 +22,7 @@
 //
 // Maximum tested build Sonar is known to work.
 //
-#define SONAR_MAX_TESTED_BUILD NTX_WIN11_ADB
+#define SONAR_MAX_TESTED_BUILD NT_WIN11_24H2
 
 //
 // Dll instance.

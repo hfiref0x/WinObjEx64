@@ -1,12 +1,12 @@
 /************************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2014 - 2021
+*  (C) COPYRIGHT AUTHORS, 2014 - 2023
 *
 *  TITLE:       NTLDR.C
 *
-*  VERSION:     1.20
+*  VERSION:     1.22
 *
-*  DATE:        13 Nov 2021
+*  DATE:        21 Jul 2023
 *
 *  NT loader related code.
 *
@@ -75,6 +75,9 @@ NTSTATUS NtRawGetProcAddress(
     ULONG_PTR                   fnptr, exprva, expsize;
     int                         r;
 
+    if (Module == NULL)
+        return STATUS_INVALID_PARAMETER_1;
+
     NtHeaders = RtlImageNtHeader(Module);
     if (NtHeaders->OptionalHeader.NumberOfRvaAndSizes <= IMAGE_DIRECTORY_ENTRY_EXPORT)
         return STATUS_OBJECT_NAME_NOT_FOUND;
@@ -142,67 +145,64 @@ NTSTATUS NtRawGetProcAddress(
 }
 
 /*
-* NtRawEnumW32kExports
+* NtRawEnumSyscallExports
 *
 * Purpose:
 *
-* Enumerate win32k module exports to the table.
+* Enumerate syscall module exports to the table.
 *
 */
 _Success_(return != 0)
-ULONG NtRawEnumW32kExports(
+ULONG NtRawEnumSyscallExports(
     _In_ HANDLE HeapHandle,
     _In_ LPVOID Module,
-    _Out_ PWIN32_SHADOWTABLE * Table
+    _Out_ PRAW_SYSCALL_ENTRY * SyscallTable
 )
 {
-    PIMAGE_NT_HEADERS           NtHeaders;
-    PIMAGE_EXPORT_DIRECTORY		exp;
+    PIMAGE_EXPORT_DIRECTORY		pExportDirectory;
     PDWORD						FnPtrTable, NameTable;
     PWORD						NameOrdTable;
-    ULONG_PTR					fnptr, exprva, expsize;
-    ULONG						c, n, result;
-    PWIN32_SHADOWTABLE			NewEntry;
+    ULONG_PTR					fnptr;
+    ULONG						i, j, result, exportSize;
+    PRAW_SYSCALL_ENTRY			newEntry;
 
-    NtHeaders = RtlImageNtHeader(Module);
-    if (NtHeaders->OptionalHeader.NumberOfRvaAndSizes <= IMAGE_DIRECTORY_ENTRY_EXPORT)
+    pExportDirectory = (PIMAGE_EXPORT_DIRECTORY)RtlImageDirectoryEntryToData(
+        Module,
+        TRUE,
+        IMAGE_DIRECTORY_ENTRY_EXPORT,
+        &exportSize);
+
+    if (pExportDirectory == NULL)
         return 0;
 
-    exprva = NtHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
-    if (exprva == 0)
-        return 0;
-
-    expsize = NtHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size;
-
-    exp = (PIMAGE_EXPORT_DIRECTORY)((ULONG_PTR)Module + exprva);
-    FnPtrTable = (PDWORD)((ULONG_PTR)Module + exp->AddressOfFunctions);
-    NameTable = (PDWORD)((ULONG_PTR)Module + exp->AddressOfNames);
-    NameOrdTable = (PWORD)((ULONG_PTR)Module + exp->AddressOfNameOrdinals);
+    FnPtrTable = (PDWORD)((ULONG_PTR)Module + pExportDirectory->AddressOfFunctions);
+    NameTable = (PDWORD)((ULONG_PTR)Module + pExportDirectory->AddressOfNames);
+    NameOrdTable = (PWORD)((ULONG_PTR)Module + pExportDirectory->AddressOfNameOrdinals);
 
     result = 0;
 
-    for (c = 0; c < exp->NumberOfFunctions; ++c)
-    {
-        fnptr = (ULONG_PTR)Module + FnPtrTable[c];
+    for (i = 0; i < pExportDirectory->NumberOfFunctions; ++i) {
+
+        fnptr = (ULONG_PTR)Module + FnPtrTable[i];
         if (*(PDWORD)fnptr != 0xb8d18b4c) //mov r10, rcx; mov eax
             continue;
 
-        NewEntry = (PWIN32_SHADOWTABLE)RtlAllocateHeap(HeapHandle,
-            HEAP_ZERO_MEMORY, sizeof(WIN32_SHADOWTABLE));
+        newEntry = (PRAW_SYSCALL_ENTRY)RtlAllocateHeap(HeapHandle,
+            HEAP_ZERO_MEMORY, sizeof(RAW_SYSCALL_ENTRY));
 
-        if (NewEntry == NULL)
+        if (newEntry == NULL)
             break;
 
-        NewEntry->Index = *(PDWORD)(fnptr + 4);
+        newEntry->Index = *(PDWORD)(fnptr + 4);
 
-        for (n = 0; n < exp->NumberOfNames; ++n)
+        for (j = 0; j < pExportDirectory->NumberOfNames; ++j)
         {
-            if (NameOrdTable[n] == c)
+            if (NameOrdTable[j] == i)
             {
-                _strncpy_a(&NewEntry->Name[0],
-                    sizeof(NewEntry->Name),
-                    (LPCSTR)((ULONG_PTR)Module + NameTable[n]),
-                    sizeof(NewEntry->Name));
+                _strncpy_a(&newEntry->Name[0],
+                    sizeof(newEntry->Name),
+                    (LPCSTR)((ULONG_PTR)Module + NameTable[j]),
+                    sizeof(newEntry->Name));
 
                 break;
             }
@@ -210,8 +210,8 @@ ULONG NtRawEnumW32kExports(
 
         ++result;
 
-        *Table = NewEntry;
-        Table = &NewEntry->NextService;
+        *SyscallTable = newEntry;
+        SyscallTable = &newEntry->NextEntry;
     }
 
     return result;
@@ -232,30 +232,29 @@ LPCSTR NtRawIATEntryToImport(
     _Out_opt_ LPCSTR * ImportModuleName
 )
 {
-    PIMAGE_NT_HEADERS           NtHeaders;
-    PIMAGE_IMPORT_DESCRIPTOR    impd;
-    ULONG_PTR* rname, imprva;
+    PIMAGE_IMPORT_DESCRIPTOR pImageImportDescriptor;
+    ULONG_PTR* rname;
+    ULONG size;
     LPVOID* raddr;
 
     if (ImportModuleName)
         *ImportModuleName = NULL;
 
-    NtHeaders = RtlImageNtHeader(Module);
-    if (NtHeaders->OptionalHeader.NumberOfRvaAndSizes <= IMAGE_DIRECTORY_ENTRY_IMPORT)
-        return NULL;
+    pImageImportDescriptor = (PIMAGE_IMPORT_DESCRIPTOR)RtlImageDirectoryEntryToData(
+        Module,
+        TRUE,
+        IMAGE_DIRECTORY_ENTRY_IMPORT,
+        &size);
 
-    imprva = NtHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
-    if (imprva == 0)
-        return NULL;
+    if (pImageImportDescriptor == NULL)
+        return 0;
 
-    impd = (PIMAGE_IMPORT_DESCRIPTOR)((ULONG_PTR)Module + imprva);
-
-    while (impd->Name != 0) {
-        raddr = (LPVOID*)((ULONG_PTR)Module + impd->FirstThunk);
-        if (impd->OriginalFirstThunk == 0)
+    while (pImageImportDescriptor->Name != 0) {
+        raddr = (LPVOID*)((ULONG_PTR)Module + pImageImportDescriptor->FirstThunk);
+        if (pImageImportDescriptor->OriginalFirstThunk == 0)
             rname = (ULONG_PTR*)raddr;
         else
-            rname = (ULONG_PTR*)((ULONG_PTR)Module + impd->OriginalFirstThunk);
+            rname = (ULONG_PTR*)((ULONG_PTR)Module + pImageImportDescriptor->OriginalFirstThunk);
 
         while (*rname != 0) {
             if (IATEntry == raddr)
@@ -263,7 +262,7 @@ LPCSTR NtRawIATEntryToImport(
                 if (((*rname) & IMAGE_ORDINAL_FLAG) == 0)
                 {
                     if (ImportModuleName) {
-                        *ImportModuleName = (LPCSTR)((ULONG_PTR)Module + impd->Name);
+                        *ImportModuleName = (LPCSTR)((ULONG_PTR)Module + pImageImportDescriptor->Name);
                     }
                     return (LPCSTR) & ((PIMAGE_IMPORT_BY_NAME)((ULONG_PTR)Module + *rname))->Name;
                 }
@@ -272,7 +271,7 @@ LPCSTR NtRawIATEntryToImport(
             ++rname;
             ++raddr;
         }
-        ++impd;
+        ++pImageImportDescriptor;
     }
 
     return NULL;
@@ -436,17 +435,14 @@ PAPI_SET_NAMESPACE_ENTRY_V6 ApiSetpSearchForApiSet(
 * Resolve apiset library name.
 *
 */
-_Success_(return == STATUS_SUCCESS)
 NTSTATUS NtLdrApiSetResolveLibrary(
     _In_ PVOID Namespace,
-    _In_ PUNICODE_STRING ApiSetToResolve,
-    _In_opt_ PUNICODE_STRING ApiSetParentName,
-    _Out_ PBOOL Resolved,
-    _Out_ PUNICODE_STRING ResolvedHostLibraryName
+    _In_ PCUNICODE_STRING ApiSetToResolve,
+    _In_opt_ PCUNICODE_STRING ApiSetParentName,
+    _Inout_ PUNICODE_STRING ResolvedHostLibraryName
 )
 {
-    BOOL IsResolved = FALSE;
-    NTSTATUS Status = STATUS_UNSUCCESSFUL;
+    NTSTATUS Status = STATUS_APISET_NOT_PRESENT;
     PWCHAR BufferPtr;
     USHORT Length;
     ULONG64 SchemaPrefix;
@@ -455,8 +451,6 @@ NTSTATUS NtLdrApiSetResolveLibrary(
     PAPI_SET_NAMESPACE_ARRAY_V6 ApiSetNamespace = (PAPI_SET_NAMESPACE_ARRAY_V6)Namespace;
 
     __try {
-
-        *Resolved = FALSE;
 
         //
         // Only Win10+ version supported.
@@ -533,8 +527,6 @@ NTSTATUS NtLdrApiSetResolveLibrary(
         if (HostLibraryEntry) {
             if (!API_SET_EMPTY_NAMESPACE_VALUE(HostLibraryEntry)) {
 
-                IsResolved = TRUE;
-
                 //
                 // Host library name is not null terminated, handle that.
                 //
@@ -560,36 +552,7 @@ NTSTATUS NtLdrApiSetResolveLibrary(
         return GetExceptionCode();
     }
 
-    *Resolved = IsResolved;
     return Status;
-}
-
-/*
-* NtLdrApiSetLoadFromPeb
-*
-* Purpose:
-*
-* Load ApiSetSchema map from PEB.
-*
-*/
-BOOLEAN NtLdrApiSetLoadFromPeb(
-    _Out_ PULONG SchemaVersion,
-    _Out_ PVOID * DataPointer)
-{
-    PBYTE DataPtr = NULL;
-
-    __try {
-        *SchemaVersion = 0;
-        *DataPointer = 0;
-
-        DataPtr = (PBYTE)NtCurrentPeb()->ApiSetMap;
-        *SchemaVersion = *(ULONG*)DataPtr;
-        *DataPointer = DataPtr;
-    }
-    __except (NTLDR_EXCEPTION_FILTER) {
-        return FALSE;
-    }
-    return TRUE;
 }
 
 #pragma warning(pop)

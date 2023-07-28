@@ -156,6 +156,10 @@ winobjex64\sup\sup.c
 winobjex64\sup\sup.h
 winobjex64\sup\sync.c
 
+* Win32k service table parsing support *
+winobjex64\sup\w32k.c
+winobjex64\sup\w32k.h
+
 * Wine support header file *
 winobjex64\sup\wine.c
 winobjex64\sup\wine.h

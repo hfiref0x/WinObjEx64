@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2023
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     2.01
+*  VERSION:     2.03
 *
-*  DATE:        03 Dec 2022
+*  DATE:        21 Jul 2023
 *
 *  Test code used while debug.
 *
@@ -775,17 +775,14 @@ VOID TestThread()
 
 VOID TestApiSetResolve()
 {
-    ULONG i, Version;
-    PVOID Data;
-    BOOL Resolved;
+    ULONG i;
+    PVOID Data = NtCurrentPeb()->ApiSetMap;
 
     NTSTATUS Status;
 
     UNICODE_STRING ApiSetLibrary;
     UNICODE_STRING ParentLibrary;
     UNICODE_STRING ResolvedHostLibrary;
-
-    NtLdrApiSetLoadFromPeb(&Version, &Data);
 
     LPWSTR ToResolve[] = {
         L"hui-ms-win-core-app-l1-2-3.dll",
@@ -803,24 +800,24 @@ VOID TestApiSetResolve()
         L"api-ms-win-core-com-l2-1-1"
     };
 
+    if (Data == NULL) {
+        kdDebugPrint("APISET>>ApiSetMap is NULL\r\n");
+        return;
+    }
 
     for (i = 0; i < RTL_NUMBER_OF(ToResolve); i++) {
+
         RtlInitUnicodeString(&ApiSetLibrary, ToResolve[i]);
+        RtlInitEmptyUnicodeString(&ResolvedHostLibrary, NULL, 0);
 
         Status = NtLdrApiSetResolveLibrary(Data,
             &ApiSetLibrary,
             NULL,
-            &Resolved,
             &ResolvedHostLibrary);
 
         if (NT_SUCCESS(Status)) {
-            if (Resolved) {
-                kdDebugPrint("APISET>> %wZ\r\n", &ResolvedHostLibrary);
-                RtlFreeUnicodeString(&ResolvedHostLibrary);
-            }
-            else {
-                kdDebugPrint("APISET>> Could not resolve apiset %wZ\r\n", &ApiSetLibrary);
-            }
+            kdDebugPrint("APISET>> %wZ\r\n", &ResolvedHostLibrary);
+            RtlFreeUnicodeString(&ResolvedHostLibrary);
         }
         else {
             kdDebugPrint("APISET>> NtLdrApiSetResolveLibrary failed 0x%lx for %wZ\r\n", Status, &ApiSetLibrary);
@@ -833,17 +830,11 @@ VOID TestApiSetResolve()
     Status = NtLdrApiSetResolveLibrary(Data,
         &ApiSetLibrary,
         &ParentLibrary,
-        &Resolved,
         &ResolvedHostLibrary);
 
     if (NT_SUCCESS(Status)) {
-        if (Resolved) {
-            kdDebugPrint("APISET>> Resolved apiset %wZ\r\n", &ResolvedHostLibrary);
-            RtlFreeUnicodeString(&ResolvedHostLibrary);
-        }
-        else {
-            kdDebugPrint("APISET>> Could not resolve apiset %wZ\r\n", &ApiSetLibrary);
-        }
+        kdDebugPrint("APISET>> Resolved apiset %wZ\r\n", &ResolvedHostLibrary);
+        RtlFreeUnicodeString(&ResolvedHostLibrary);
     }
     else {
         kdDebugPrint("NtLdrApiSetResolveLibrary failed 0x%lx\r\n", Status);

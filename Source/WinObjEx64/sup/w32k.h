@@ -85,8 +85,8 @@ typedef struct _SDT_FUNCTION_NAME {
 
 typedef struct _SDT_MODULE_ENTRY {
     struct _SDT_MODULE_ENTRY* Next;
-    HMODULE ImageBase;
     DWORD Hash;
+    HMODULE ImageBase;
     UNICODE_STRING Name;
 } SDT_MODULE_ENTRY, * PSDT_MODULE_ENTRY;
 

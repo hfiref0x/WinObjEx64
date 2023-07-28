@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.03
 *
-*  DATE:        22 Jul 2023
+*  DATE:        27 Jul 2023
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -156,6 +156,18 @@ VOID extrasProcessElevationRequiredDialogs(
     }
 
     switch (DialogId) {
+    case ID_EXTRAS_DRIVERS:
+        //
+        // Since 24H2 as it restricts NTQSI output.
+        //
+        extrasCreateDriversDialog(DrvModeNormal);
+        break;
+    case ID_EXTRAS_W32PSERVICETABLE:
+        //
+        // Since 24H2 as it requires driver usage to access kmod apiset table.
+        //
+        extrasCreateSSDTDialog(SST_Win32k);
+        break;
     case ID_EXTRAS_PRIVATENAMESPACES:
         extrasCreatePNDialog();
         break;
@@ -183,6 +195,10 @@ VOID extrasShowDialogById(
     _In_ WORD DialogId
 )
 {
+    BOOL fullAdminAccessRequired = ((g_NtBuildNumber > NT_WIN11_22H2) &&
+        (g_kdctx.IsFullAdmin == FALSE) &&
+        (g_WinObj.IsWine == FALSE));
+
     switch (DialogId) {
 
     case ID_EXTRAS_PIPES:
@@ -205,16 +221,17 @@ VOID extrasShowDialogById(
         break;
 
     case ID_EXTRAS_W32PSERVICETABLE:
-        extrasCreateSSDTDialog(SST_Win32k);
+        if (fullAdminAccessRequired) {
+            extrasProcessElevationRequiredDialogs(DialogId);
+        }
+        else {
+            extrasCreateSSDTDialog(SST_Win32k);
+        }
         break;
 
-    case ID_EXTRAS_DRIVERS:
-     
-        if ((g_NtBuildNumber > NT_WIN11_22H2) &&
-            (g_kdctx.IsFullAdmin == FALSE) &&
-            (g_WinObj.IsWine == FALSE))
-        {
-            supRunAsAdmin();
+    case ID_EXTRAS_DRIVERS:    
+        if (fullAdminAccessRequired) {
+            extrasProcessElevationRequiredDialogs(DialogId);
         }
         else {
             extrasCreateDriversDialog(DrvModeNormal);

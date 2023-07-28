@@ -810,7 +810,7 @@ VOID TestApiSetResolve()
         RtlInitUnicodeString(&ApiSetLibrary, ToResolve[i]);
         RtlInitEmptyUnicodeString(&ResolvedHostLibrary, NULL, 0);
 
-        Status = NtLdrApiSetResolveLibrary(Data,
+        Status = NtRawApiSetResolveLibrary(Data,
             &ApiSetLibrary,
             NULL,
             &ResolvedHostLibrary);
@@ -820,14 +820,14 @@ VOID TestApiSetResolve()
             RtlFreeUnicodeString(&ResolvedHostLibrary);
         }
         else {
-            kdDebugPrint("APISET>> NtLdrApiSetResolveLibrary failed 0x%lx for %wZ\r\n", Status, &ApiSetLibrary);
+            kdDebugPrint("APISET>> NtRawApiSetResolveLibrary failed 0x%lx for %wZ\r\n", Status, &ApiSetLibrary);
         }
     }
 
     RtlInitUnicodeString(&ParentLibrary, L"kernel32.dll");
     RtlInitUnicodeString(&ApiSetLibrary, L"api-ms-win-core-processsecurity-l1-1-0.dll");
 
-    Status = NtLdrApiSetResolveLibrary(Data,
+    Status = NtRawApiSetResolveLibrary(Data,
         &ApiSetLibrary,
         &ParentLibrary,
         &ResolvedHostLibrary);
@@ -837,7 +837,7 @@ VOID TestApiSetResolve()
         RtlFreeUnicodeString(&ResolvedHostLibrary);
     }
     else {
-        kdDebugPrint("NtLdrApiSetResolveLibrary failed 0x%lx\r\n", Status);
+        kdDebugPrint("NtRawApiSetResolveLibrary failed 0x%lx\r\n", Status);
     }
 }
 

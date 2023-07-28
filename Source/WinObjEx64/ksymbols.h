@@ -28,7 +28,7 @@
 #define KVAR_SeCiCallbacks                          L"SeCiCallbacks"
 #define KVAR_g_CiCallbacks                          L"g_CiCallbacks"
 
-#define KVAR_gSessionGlobalSlots					L"gSessionGlobalSlots"
+#define KVAR_gSessionGlobalSlots                    L"gSessionGlobalSlots"
 
 #define KVAR_IopFsNotifyChangeQueueHead             L"IopFsNotifyChangeQueueHead"
 #define KVAR_RtlpDebugPrintCallbackList             L"RtlpDebugPrintCallbackList"

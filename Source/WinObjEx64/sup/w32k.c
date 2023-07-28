@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.03
 *
-*  DATE:        26 Jul 2023
+*  DATE:        27 Jul 2023
 *
 *  Win32k syscall table actual handlers resolving routines.
 *
@@ -406,7 +406,7 @@ NTSTATUS ApiSetResolveAndLoadModule(
     //
     // Resolve ApiSet.
     //
-    ntStatus = NtLdrApiSetResolveLibrary(ApiSetMap,
+    ntStatus = NtRawApiSetResolveLibrary(ApiSetMap,
         ApiSetToResolve,
         NULL,
         &usResolvedModule);
@@ -558,7 +558,7 @@ NTSTATUS SdtResolveFunctionNameFromModuleExport(
     PIMAGE_EXPORT_DIRECTORY pExportDirectory;
     ULONG_PTR fnPtr;
     LPCSTR lpName = NULL;
-    ULONG exportSize, exportRva, nameRva;
+    ULONG exportSize, exportRva;
 
     *FunctionName = NULL;
     *Ordinal = 0;
@@ -582,8 +582,7 @@ NTSTATUS SdtResolveFunctionNameFromModuleExport(
 
                     for (j = 0; j < pExportDirectory->NumberOfNames; j++) {
                         if (nameOrdinalTableBase[j] == i) {
-                            nameRva = nameTableBase[j];
-                            lpName = (LPCSTR)RtlOffsetToPointer(ModuleBase, nameRva);
+                            lpName = (LPCSTR)RtlOffsetToPointer(ModuleBase, nameTableBase[j]);
                             *FunctionName = lpName;
                             break;
                         }
@@ -611,7 +610,7 @@ NTSTATUS SdtResolveFunctionNameFromModuleExport(
 *
 * Find a module for shadow table entry in win32k imports.
 *
-* Function return NTSTATUS value and sets ModuleEntry, ResolvedModuleName parameters.
+* Function return NTSTATUS value and sets ModuleEntry parameter.
 *
 */
 NTSTATUS SdtResolveModuleFromImportThunk(
@@ -682,7 +681,7 @@ NTSTATUS SdtResolveModuleFromImportThunk(
 *
 * Find a module for shadow table entry by parsing apisets(if present) and/or forwarders (if present).
 *
-* Function return NTSTATUS value and sets ModuleEntry, ResolvedModuleName parameters.
+* Function return NTSTATUS value and sets ModuleEntry parameter.
 *
 */
 NTSTATUS SdtResolveServiceEntryModule(
@@ -756,7 +755,7 @@ NTSTATUS SdtResolveServiceEntryModule(
 *
 * Find a module for shadow table entry.
 *
-* Function return NTSTATUS value and sets ModuleEntry, ResolvedModuleName parameters.
+* Function return NTSTATUS value and sets ModuleEntry parameter.
 *
 */
 NTSTATUS SdtResolveServiceEntryModuleSessionAware(
@@ -771,13 +770,12 @@ NTSTATUS SdtResolveServiceEntryModuleSessionAware(
     BOOL bFound = FALSE;
     NTSTATUS resultStatus = STATUS_UNSUCCESSFUL;
     PBYTE ptrCode = FunctionPtr;
-    ULONG i, hostOffset = 0, hostEntryOffset = 0;
-    ULONG_PTR slotAddress, hostAddress, hostEntry, tableAddress, routineAddress;
+    ULONG hostOffset = 0, hostEntryOffset = 0;
+    ULONG_PTR i, slotAddress, hostAddress, hostEntry, tableAddress, routineAddress;
     PCHAR pStr;
     HMODULE hModule = NULL;
     PRTL_PROCESS_MODULE_INFORMATION pModule;
     UNICODE_STRING usModuleName;
-    ANSI_STRING asModuleName;
     hde64s hs;
 
     ULONG offsets[2];
@@ -921,43 +919,26 @@ NTSTATUS SdtResolveServiceEntryModuleSessionAware(
 
                 pStr = (PCHAR)&pModule->FullPathName[pModule->OffsetToFileName];
 
-                asModuleName.Length = (USHORT)_strlen_a(pStr);
-                asModuleName.MaximumLength = asModuleName.Length + sizeof(CHAR);
-                asModuleName.Buffer = (PCHAR)RtlAllocateHeap(NtCurrentPeb()->ProcessHeap, 0, asModuleName.MaximumLength);
-
-                if (asModuleName.Buffer) {
-
-                    _strcpy_a(asModuleName.Buffer, pStr);
-
-                    resultStatus = RtlAnsiStringToUnicodeString(&usModuleName, &asModuleName, TRUE);
+                if (RtlCreateUnicodeStringFromAsciiz(&usModuleName, pStr)) {
+                    resultStatus = SdtLoadAndRememberModule(ModulesHead, &usModuleName, ModuleEntry, TRUE);
                     if (NT_SUCCESS(resultStatus)) {
 
-                        resultStatus = SdtLoadAndRememberModule(ModulesHead, &usModuleName, ModuleEntry, TRUE);
-                        if (NT_SUCCESS(resultStatus)) {
+                        hModule = ModuleEntry->ImageBase;
 
-                            hModule = ModuleEntry->ImageBase;
-
-                            resultStatus = SdtResolveFunctionNameFromModuleExport(hModule,
-                                (ULONG_PTR)pModule->ImageBase,
-                                routineAddress,
-                                &ServiceName->ExportName,
-                                &ServiceName->ExportOrdinal);
-
-                        }
-                        else {
-                            RtlFreeUnicodeString(&usModuleName);
-                        }
+                        resultStatus = SdtResolveFunctionNameFromModuleExport(hModule,
+                            (ULONG_PTR)pModule->ImageBase,
+                            routineAddress,
+                            &ServiceName->ExportName,
+                            &ServiceName->ExportOrdinal);
 
                     }
-
+                    else {
+                        RtlFreeUnicodeString(&usModuleName);
+                    }
                 }
-
-#ifdef _DEBUG   
                 else {
-                    DbgPrint("Cannot resolve %s\n", pStr);
+                    resultStatus = STATUS_INTERNAL_ERROR;
                 }
-#endif
-
             }
             else {
                 resultStatus = STATUS_INTERNAL_ERROR;
@@ -1124,9 +1105,8 @@ ULONG SdtWin32kInitializeOnce(
             if (symContext)
                 kdLoadSymbolsForNtImage(symContext, szModuleFileName, hModule, 0);
 
-
             //
-            // This is win11 next approarch.
+            // This is win11 next layout.
             //
             if (Context->ApiSetSessionAware) {
 

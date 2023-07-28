@@ -6,9 +6,9 @@
 *
 *  VERSION:     1.22
 *
-*  DATE:        21 Jul 2023
+*  DATE:        25 Jul 2023
 *
-*  NT loader related code.
+*  NT loader raw parsing related code.
 *
 *  Depends on:    ntos.h
 *                 apisetx.h
@@ -22,9 +22,6 @@
 ************************************************************************************/
 
 #include "ntldr.h"
-
-#pragma warning(push)
-#pragma warning(disable: 26812) // Prefer 'enum class' over 'enum'
 
 PFNNTLDR_EXCEPT_FILTER NtpLdrExceptionFilter = NULL;
 
@@ -67,13 +64,13 @@ NTSTATUS NtRawGetProcAddress(
     _In_ PRESOLVE_INFO Pointer
 )
 {
-    PIMAGE_NT_HEADERS           NtHeaders;
-    PIMAGE_EXPORT_DIRECTORY     exp;
-    PDWORD                      fntable, nametable;
-    PWORD                       ordtable;
-    ULONG                       mid, high, low;
-    ULONG_PTR                   fnptr, exprva, expsize;
-    int                         r;
+    PIMAGE_NT_HEADERS NtHeaders;
+    PIMAGE_EXPORT_DIRECTORY exp;
+    PDWORD fntable, nametable;
+    PWORD ordtable;
+    ULONG mid, high, low;
+    ULONG_PTR fnptr, exprva, expsize;
+    int r;
 
     if (Module == NULL)
         return STATUS_INVALID_PARAMETER_1;
@@ -159,12 +156,12 @@ ULONG NtRawEnumSyscallExports(
     _Out_ PRAW_SYSCALL_ENTRY * SyscallTable
 )
 {
-    PIMAGE_EXPORT_DIRECTORY		pExportDirectory;
-    PDWORD						FnPtrTable, NameTable;
-    PWORD						NameOrdTable;
-    ULONG_PTR					fnptr;
-    ULONG						i, j, result, exportSize;
-    PRAW_SYSCALL_ENTRY			newEntry;
+    PIMAGE_EXPORT_DIRECTORY pExportDirectory;
+    PDWORD FnPtrTable, NameTable;
+    PWORD NameOrdTable;
+    ULONG_PTR fnptr;
+    ULONG i, j, result, exportSize;
+    PRAW_SYSCALL_ENTRY newEntry;
 
     pExportDirectory = (PIMAGE_EXPORT_DIRECTORY)RtlImageDirectoryEntryToData(
         Module,
@@ -415,11 +412,11 @@ PAPI_SET_NAMESPACE_ENTRY_V6 ApiSetpSearchForApiSet(
     //
     NamespaceEntryName = API_SET_TO_NAMESPACE_ENTRY_NAME(ApiSetNamespace, NamespaceEntry);
 
-    if (RtlCompareUnicodeStrings(ResolveName,
+    if (0 == RtlCompareUnicodeStrings(ResolveName,
         ResolveNameEffectiveLength,
         NamespaceEntryName,
         (NamespaceEntry->HashNameLength >> 1),
-        TRUE) == 0)
+        TRUE))
     {
         return NamespaceEntry;
     }
@@ -428,14 +425,14 @@ PAPI_SET_NAMESPACE_ENTRY_V6 ApiSetpSearchForApiSet(
 }
 
 /*
-* NtLdrApiSetResolveLibrary
+* NtRawApiSetResolveLibrary
 *
 * Purpose:
 *
 * Resolve apiset library name.
 *
 */
-NTSTATUS NtLdrApiSetResolveLibrary(
+NTSTATUS NtRawApiSetResolveLibrary(
     _In_ PVOID Namespace,
     _In_ PCUNICODE_STRING ApiSetToResolve,
     _In_opt_ PCUNICODE_STRING ApiSetParentName,
@@ -554,5 +551,3 @@ NTSTATUS NtLdrApiSetResolveLibrary(
 
     return Status;
 }
-
-#pragma warning(pop)

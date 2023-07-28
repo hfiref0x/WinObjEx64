@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.22
 *
-*  DATE:        21 Jul 2023
+*  DATE:        25 Jul 2023
 *
 *  Common header file for the NTLDR definitions.
 *
@@ -89,7 +89,7 @@ NTSTATUS NtRawGetProcAddress(
     _In_ LPCSTR ProcName,
     _In_ PRESOLVE_INFO Pointer);
 
-NTSTATUS NtLdrApiSetResolveLibrary(
+NTSTATUS NtRawApiSetResolveLibrary(
     _In_ PVOID Namespace,
     _In_ PCUNICODE_STRING ApiSetToResolve,
     _In_opt_ PCUNICODE_STRING ApiSetParentName,

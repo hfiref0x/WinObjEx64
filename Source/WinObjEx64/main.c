@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.03
 *
-*  DATE:        21 Jul 2023
+*  DATE:        27 Jul 2023
 *
 *  Program entry point and main window handler.
 *
@@ -102,6 +102,7 @@ VOID guiExtrasDisableAdminFeatures(
             supSetMenuIcon(hExtrasSubMenu, ID_EXTRAS_CALLBACKS, hIcon);
             supSetMenuIcon(hExtrasSubMenu, ID_EXTRAS_UNLOADEDDRIVERS, hIcon);
             if (g_NtBuildNumber > NT_WIN11_22H2) {
+                supSetMenuIcon(hExtrasSubMenu, ID_EXTRAS_W32PSERVICETABLE, hIcon);
                 supSetMenuIcon(hExtrasSubMenu, ID_EXTRAS_DRIVERS, hIcon);
             }
         }

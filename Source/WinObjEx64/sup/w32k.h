@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.03
 *
-*  DATE:        21 Jul 2023
+*  DATE:        26 Jul 2023
 *
 *  Common header file for the win32k support routines.
 *
@@ -45,6 +45,55 @@ typedef struct _SGD_GLOBALS {
     PVOID gLowSessionGlobalSlots;  //pointer to list
     ULONG gAvailableSlots;
 } SGD_GLOBALS, * PSGD_GLOBALS;
+
+//
+//  ApiSet layout 24H2
+//
+//  WIN32KSGD!gSessionGlobalSlots:
+//
+//  +------+
+//  | Slot |
+//  +------+------+------------+
+//  |  0   |  ... |  MaxSlot   |
+//  +------+------+------------+
+//
+//  where
+//
+//      MaxSlot - is the maximum allocated slot
+//
+//  slot selection scheme 
+//
+//      Current process SessionId - 1, i.e. 0 for SessionId 1
+// 
+// Each slot is a pointer to tagWIN32KSESSIONSTATE opaque structure which
+// holds multiple global variables for given session, 
+// including Win32kApiSetTable pointer (at +0x88 for 25905 24H2).
+// 
+// If current session id is zero then apiset will be resolved from 
+// WIN32KSGD!gLowSessionGlobalSlots instead.
+// 
+// Win32kApiSetTable layout is the same as pre Win11.
+// 
+// Array of host entries each contains another array of apiset table entries.
+//
+//   See W32K_API_SET_TABLE_ENTRY_V2. 
+// 
+// The difference between current implementation and what was in win10 pre 24H2
+// is that ApiSet data moved to the kernel memory and apisets are now session aware
+// which now allows them:
+//   1. Further services (session 0) isolation to reduce possible attack surfaces.
+//   2. Stop leaking kernel addresses through manual resolve in user mode.
+//
+// To walk 24H2 table you have to find the following offsets in the kernel table 
+// for given entry inside win32k:
+// 
+//      1. Offset to ApiSet host structure pointer
+//      2. Offset in the ApiSet host enties array
+//
+// Globally you must also find offset to apiset table pointer in tagWIN32KSESSIONSTATE 
+// as it can be subject of change.
+// 
+//
 
 typedef struct _SDT_CONTEXT {
     BOOL Initialized;

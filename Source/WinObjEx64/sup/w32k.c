@@ -624,7 +624,7 @@ NTSTATUS SdtResolveModuleFromImportThunk(
     ULONG importSize;
     PIMAGE_IMPORT_DESCRIPTOR pImportDescriptor, pIID;
     PIMAGE_IMPORT_BY_NAME pImageImportByName;
-    PIMAGE_THUNK_DATA pOgFirstThunk, pFirstThunk, pFuncThunk;
+    PIMAGE_THUNK_DATA pOrigFirstThunk, pFirstThunk, pFuncThunk;
 
     hde64s hs;
     LONG32 rel;
@@ -648,12 +648,12 @@ NTSTATUS SdtResolveModuleFromImportThunk(
 
         for (pIID = pImportDescriptor; pIID->Name != 0; pIID++) {
 
-            pOgFirstThunk = (PIMAGE_THUNK_DATA)RtlOffsetToPointer(Context->KernelModule, pIID->OriginalFirstThunk);
+            pOrigFirstThunk = (PIMAGE_THUNK_DATA)RtlOffsetToPointer(Context->KernelModule, pIID->OriginalFirstThunk);
             pFirstThunk = (PIMAGE_THUNK_DATA)RtlOffsetToPointer(Context->KernelModule, pIID->FirstThunk);
 
-            for (; pOgFirstThunk->u1.AddressOfData; ++pOgFirstThunk, ++pFirstThunk) {
+            for (; pOrigFirstThunk->u1.AddressOfData; ++pOrigFirstThunk, ++pFirstThunk) {
                 pImageImportByName = (PIMAGE_IMPORT_BY_NAME)RtlOffsetToPointer(Context->KernelModule,
-                    pOgFirstThunk->u1.AddressOfData);
+                    pOrigFirstThunk->u1.AddressOfData);
 
                 if (pFirstThunk == pFuncThunk) {
                     pszDllName = (LPCSTR)RtlOffsetToPointer(Context->KernelModule, pIID->Name);
@@ -695,10 +695,9 @@ NTSTATUS SdtResolveServiceEntryModule(
     ULONG entrySize;
     NTSTATUS ntStatus = STATUS_DLL_NOT_FOUND;
     ULONG_PTR entryReference;
-    PWCHAR lpHostName;
     PVOID pvApiSetMap = NtCurrentPeb()->ApiSetMap;
     W32K_API_SET_TABLE_ENTRY* pvApiSetEntry = NULL;
-    UNICODE_STRING  usApiSetEntry;
+    UNICODE_STRING usApiSetEntry;
 
     //
     // See if this is new Win32kApiSetTable adapter.
@@ -725,9 +724,7 @@ NTSTATUS SdtResolveServiceEntryModule(
             //
             // Host is on the same offset for both V1/V2 versions.
             //
-            lpHostName = pvApiSetEntry->Host->HostName;
-
-            RtlInitUnicodeString(&usApiSetEntry, lpHostName);
+            RtlInitUnicodeString(&usApiSetEntry, pvApiSetEntry->Host->HostName);
 
             return ApiSetResolveAndLoadModule(
                 pvApiSetMap,
@@ -769,11 +766,10 @@ NTSTATUS SdtResolveServiceEntryModuleSessionAware(
 {
     BOOL bFound = FALSE;
     NTSTATUS resultStatus = STATUS_UNSUCCESSFUL;
+    PCHAR pStr;
     PBYTE ptrCode = FunctionPtr;
     ULONG hostOffset = 0, hostEntryOffset = 0;
     ULONG_PTR i, slotAddress, hostAddress, hostEntry, tableAddress, routineAddress;
-    PCHAR pStr;
-    HMODULE hModule = NULL;
     PRTL_PROCESS_MODULE_INFORMATION pModule;
     UNICODE_STRING usModuleName;
     hde64s hs;
@@ -923,9 +919,7 @@ NTSTATUS SdtResolveServiceEntryModuleSessionAware(
                     resultStatus = SdtLoadAndRememberModule(ModulesHead, &usModuleName, ModuleEntry, TRUE);
                     if (NT_SUCCESS(resultStatus)) {
 
-                        hModule = ModuleEntry->ImageBase;
-
-                        resultStatus = SdtResolveFunctionNameFromModuleExport(hModule,
+                        resultStatus = SdtResolveFunctionNameFromModuleExport(ModuleEntry->ImageBase,
                             (ULONG_PTR)pModule->ImageBase,
                             routineAddress,
                             &ServiceName->ExportName,

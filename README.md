@@ -229,7 +229,7 @@ In order to build from source you need Microsoft Visual Studio 2015 and later ve
   * If v140 then select 8.1;
   * If v141 and above then select 10.
 * Minimum required Windows SDK version 8.1
-* Recommended Windows SDK version 10.0.19041
+* Recommended Windows SDK version 10.0.19041 and above
  
  
 # What is new
@@ -241,6 +241,6 @@ In order to build from source you need Microsoft Visual Studio 2015 and later ve
 # Authors
 
 
-(c) 2015 - 2023 WinObjEx64 Project
+(c) 2015 - 2023 WinObjEx64 Project, hfiref0x
 
 Original WinObjEx (c) 2003 - 2005 Four-F

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2023
 *
 *  TITLE:       LOG.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.03
 *
-*  DATE:        19 Jun 2022
+*  DATE:        27 Jul 2023
 *
 *  Simplified log.
 *
@@ -144,27 +144,42 @@ BOOL logEnumEntries(
 *
 */
 VOID LogViewerPrintEntry(
-    _In_ HWND OutputWindow,
-    _In_ LPWSTR lpTime,
-    _In_ LPWSTR lpType,
-    _In_ LPWSTR lpValue)
+    _In_ HWND hwndRichEdit,
+    _In_ LPWSTR lpMessage,
+    _In_ BOOL bHighlight)
 {
     LONG StartPos = 0;
-    CHARRANGE SelectedRange;
 
-    SendMessage(OutputWindow, EM_EXGETSEL, (WPARAM)0, (LPARAM)&SelectedRange);
-    StartPos = SelectedRange.cpMin;
+    CHARFORMAT cf;
+    CHARRANGE cr, sr;
 
-    if (StartPos) {
-        SendMessage(OutputWindow, EM_REPLACESEL, (WPARAM)0, (LPARAM)L"\r\n");
-        StartPos += 1;
+    cr.cpMax = INT_MAX;
+    cr.cpMin = INT_MAX;
+
+    SendMessage(hwndRichEdit, EM_EXSETSEL, (WPARAM)0, (LPARAM)&cr);
+    SendMessage(hwndRichEdit, EM_EXGETSEL, (WPARAM)0, (LPARAM)&sr);
+    StartPos = sr.cpMin;
+
+    if (bHighlight) {
+        cf.cbSize = sizeof(CHARFORMAT);
+        cf.dwMask = CFM_BOLD;
+        SendMessage(hwndRichEdit, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
     }
 
-    SendMessage(OutputWindow, EM_REPLACESEL, (WPARAM)0, (LPARAM)lpTime);
-    SendMessage(OutputWindow, EM_REPLACESEL, (WPARAM)0, (LPARAM)L" (");
-    SendMessage(OutputWindow, EM_REPLACESEL, (WPARAM)0, (LPARAM)lpType);
-    SendMessage(OutputWindow, EM_REPLACESEL, (WPARAM)0, (LPARAM)L"): ");
-    SendMessage(OutputWindow, EM_REPLACESEL, (WPARAM)0, (LPARAM)lpValue);
+    if (StartPos) {
+        SendMessage(hwndRichEdit, EM_REPLACESEL, (WPARAM)0, (LPARAM)L"\r\n");
+        StartPos += 2;
+    }
+
+    SendMessage(hwndRichEdit, EM_REPLACESEL, (WPARAM)0, (LPARAM)lpMessage);
+
+    if (bHighlight) {
+        cf.dwEffects = CFE_BOLD;
+        cr.cpMin = StartPos;
+        cr.cpMax = (LONG)_strlen(lpMessage) + StartPos + 1;
+        SendMessage(hwndRichEdit, EM_EXSETSEL, (WPARAM)0, (LPARAM)&cr);
+        SendMessage(hwndRichEdit, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
+    }
 }
 
 /*
@@ -180,18 +195,22 @@ BOOL CALLBACK LogViewerAddEntryCallback(
     _In_ PVOID CallbackContext
 )
 {
+    BOOL bHighlight = FALSE;
     HWND hwndList = (HWND)CallbackContext;
+    TIME_FIELDS tFields = { 0, 0, 0, 0, 0, 0, 0, 0 };
     LPWSTR lpType;
-    WCHAR szTime[64];
+    WCHAR szMessage[WOBJ_MAX_MESSAGE + 128];
 
     switch (Entry->Type) {
     case EntryTypeError:
+        bHighlight = TRUE;
         lpType = TEXT("Error");
         break;
     case EntryTypeSuccess:
         lpType = TEXT("Success");
         break;
     case EntryTypeWarning:
+        bHighlight = TRUE;
         lpType = TEXT("Warning");
         break;
     case EntryTypeInformation:
@@ -202,9 +221,20 @@ BOOL CALLBACK LogViewerAddEntryCallback(
         break;
     }
 
-    szTime[0] = 0;
-    supPrintTimeToBuffer(&Entry->LoggedTime, szTime, RTL_NUMBER_OF(szTime));
-    LogViewerPrintEntry(hwndList, szTime, lpType, Entry->MessageData);
+    szMessage[0] = 0;
+
+    RtlTimeToTimeFields(&Entry->LoggedTime, &tFields);
+    RtlStringCchPrintfSecure(szMessage,
+        RTL_NUMBER_OF(szMessage),
+        L"%02hd:%02hd:%02hd.%03hd (%ws): %ws",
+        tFields.Hour,
+        tFields.Minute,
+        tFields.Second,
+        tFields.Milliseconds,
+        lpType,
+        Entry->MessageData);
+
+    LogViewerPrintEntry(hwndList, szMessage, bHighlight);
 
     return TRUE; //continue with next entry
 }
@@ -221,14 +251,22 @@ VOID LogViewerListLog(
     _In_ HWND hwndParent
 )
 {
-    CHARRANGE CharRange;
+    CHARRANGE charRange;
     HWND hwndList = GetDlgItem(hwndParent, IDC_LOGLIST);
+    PARAFORMAT ParaFormat;
 
     //
     // Prepare RichEdit.
     //
     SendMessage(hwndList, EM_SETEVENTMASK, (WPARAM)0, (LPARAM)0);
     SendMessage(hwndList, WM_SETREDRAW, (WPARAM)0, (LPARAM)0);
+
+    RtlSecureZeroMemory(&ParaFormat, sizeof(ParaFormat));
+    ParaFormat.cbSize = sizeof(ParaFormat);
+    ParaFormat.cTabCount = 1;
+    ParaFormat.dwMask = PFM_TABSTOPS;
+    ParaFormat.rgxTabs[0] = 3500;
+    SendMessage(hwndList, EM_SETPARAFORMAT, (WPARAM)0, (LPARAM)&ParaFormat);
 
     logEnumEntries(LogViewerAddEntryCallback, (PVOID)hwndList);
 
@@ -240,12 +278,11 @@ VOID LogViewerListLog(
     InvalidateRect(hwndList, NULL, TRUE);
 
     SendMessage(hwndList, EM_SETEVENTMASK, (WPARAM)0, (LPARAM)ENM_SELCHANGE);
+    
+    charRange.cpMax = 0;
+    charRange.cpMin = 0;
+    SendMessage(hwndList, EM_EXSETSEL, (WPARAM)0, (LPARAM)&charRange);
 
-    CharRange.cpMax = 0;
-    CharRange.cpMin = 0;
-    SendMessage(hwndList, EM_EXSETSEL, (WPARAM)0, (LPARAM)&CharRange);
-
-    SetFocus(hwndList);
 }
 
 /*

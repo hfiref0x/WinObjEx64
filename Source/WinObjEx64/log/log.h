@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2023
 *
 *  TITLE:       LOG.H
 *
-*  VERSION:     2.00
+*  VERSION:     2.03
 *
-*  DATE:        19 Jun 2022
+*  DATE:        27 Jul 2022
 *
 *  Header file for simplified log support.
 *
@@ -39,8 +39,8 @@ typedef enum _WOBJ_ENTRY_TYPE {
 typedef struct _WOBJ_LOG_ENTRY {
     WOBJ_ENTRY_TYPE Type;
     LARGE_INTEGER LoggedTime;
-    WCHAR MessageData[WOBJ_MAX_MESSAGE + 1];
-    BYTE Reserved[72];
+    WCHAR MessageData[WOBJ_MAX_MESSAGE];
+    BYTE Reserved[74];
 } WOBJ_LOG_ENTRY, * PWOBJ_LOG_ENTRY;
 
 typedef struct _WOBJ_LOG {

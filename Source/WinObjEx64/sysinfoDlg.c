@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.03
 *
-*  DATE:        21 Jul 2023
+*  DATE:        27 Jul 2023
 * 
 *  System Information Dialog.
 *
@@ -55,8 +55,8 @@ VOID AddParameterValue(
     CHARFORMAT CharFormat;
     CHARRANGE CharRange, SelectedRange;
 
-    CharRange.cpMax = 0x7FFFFFFF;
-    CharRange.cpMin = 0x7FFFFFFF;
+    CharRange.cpMax = INT_MAX;
+    CharRange.cpMin = INT_MAX;
 
     SendMessage(OutputWindow, EM_EXSETSEL, (WPARAM)0, (LPARAM)&CharRange);
     SendMessage(OutputWindow, EM_EXGETSEL, (WPARAM)0, (LPARAM)&SelectedRange);

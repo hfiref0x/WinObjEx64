@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.03
 *
-*  DATE:        22 Jul 2023
+*  DATE:        28 Jul 2023
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -182,16 +182,16 @@ BOOL SdtListCreateTable(
     VOID
 )
 {
-    BOOL                    bResult = FALSE;
-    ULONG                   EntrySize = 0;
-    SIZE_T                  memIO;
-    PUTable                 TableDump = NULL;
-    PBYTE                   Module = NULL;
+    BOOL bResult = FALSE;
+    ULONG EntrySize = 0;
+    SIZE_T memIO;
+    PUTable TableDump = NULL;
+    PBYTE Module = NULL;
     PIMAGE_EXPORT_DIRECTORY ExportDirectory = NULL;
-    PDWORD                  ExportNames, ExportFunctions;
-    PWORD                   NameOrdinals;
+    PDWORD ExportNames, ExportFunctions;
+    PWORD NameOrdinals;
 
-    PSDT_TABLE_ENTRY        ServiceEntry;
+    PSDT_TABLE_ENTRY ServiceEntry;
 
     CHAR* ServiceName;
     CHAR* FunctionAddress;
@@ -367,25 +367,41 @@ VOID SdtListReportEvent(
 }
 
 /*
-* SdtListReportFunctionResolveError
+* SdtListErrorProcedureNotFound
 *
 * Purpose:
 *
 * Report function name resolve error.
 *
 */
-VOID SdtListReportFunctionResolveError(
-    _In_ LPCSTR FunctionName
+VOID SdtListErrorProcedureNotFound(
+    _In_ LPCSTR FunctionName,
+    _In_ PCUNICODE_STRING ModuleName
 )
 {
-    WCHAR szErrorBuffer[512];
+    PWCHAR pszErrorMsg;
+    WCHAR szFunctionName[MAX_PATH];
+    SIZE_T sz;
 
-    RtlSecureZeroMemory(szErrorBuffer, sizeof(szErrorBuffer));
+    sz = MAX_PATH +
+        (_strlen_a(FunctionName) * sizeof(WCHAR)) +
+        ModuleName->MaximumLength;
 
-    _strcpy(szErrorBuffer, TEXT("could not resolve function "));
-    MultiByteToWideChar(CP_ACP, 0, FunctionName, -1, _strend(szErrorBuffer), MAX_PATH);
-    _strcat(szErrorBuffer, TEXT(" address"));
-    SdtListReportEvent(EntryTypeError, __FUNCTIONW__, szErrorBuffer);
+    pszErrorMsg = (PWCHAR)supHeapAlloc(sz);
+    if (pszErrorMsg) {
+
+        szFunctionName[0] = 0;
+        MultiByteToWideChar(CP_ACP, 0, FunctionName, -1, szFunctionName, MAX_PATH);
+
+        RtlStringCchPrintfSecure(pszErrorMsg, sz / sizeof(WCHAR),
+            L"the entry point for %ws was not found in module %wZ",
+            szFunctionName,
+            ModuleName);
+
+        SdtListReportEvent(EntryTypeError, __FUNCTIONW__, pszErrorMsg);
+
+        supHeapFree(pszErrorMsg);
+    }
 }
 
 /*
@@ -405,7 +421,7 @@ VOID SdtListReportResolveModuleError(
 {
     WCHAR szErrorBuffer[512];
 
-    RtlSecureZeroMemory(szErrorBuffer, sizeof(szErrorBuffer));
+    szErrorBuffer[0] = 0;
 
     //
     // Most of this errors are not critical and ok.
@@ -421,7 +437,7 @@ VOID SdtListReportResolveModuleError(
         //
         // Corresponding apiset not found.
         //
-        _strcpy(szErrorBuffer, TEXT("not an apiset adapter for "));
+        _strcpy(szErrorBuffer, TEXT("not an ApiSet adapter for "));
         MultiByteToWideChar(CP_ACP, 0, Table->Name, -1, _strend(szErrorBuffer), MAX_PATH);
         break;
 
@@ -429,7 +445,7 @@ VOID SdtListReportResolveModuleError(
         //
         // ApiSet extension present but empty.
         // 
-        _strcpy(szErrorBuffer, TEXT("extension contains a host for a non-existent apiset "));
+        _strcpy(szErrorBuffer, TEXT("ApiSet host is empty for "));
         MultiByteToWideChar(CP_ACP, 0, Table->Name, -1, _strend(szErrorBuffer), MAX_PATH);
         break;
 
@@ -437,10 +453,10 @@ VOID SdtListReportResolveModuleError(
         //
         // Not a critical issue. This mean we cannot pass this service next to forwarder lookup code.
         //
-        _strcpy(szErrorBuffer, TEXT("could not resolve function name in module for service id "));
-        ultostr(Table->Index, _strend(szErrorBuffer));
-        _strcat(szErrorBuffer, TEXT(", service name "));
+        _strcpy(szErrorBuffer, TEXT("could not resolve function name in module for "));
         MultiByteToWideChar(CP_ACP, 0, Table->Name, -1, _strend(szErrorBuffer), MAX_PATH);
+        _strcat(szErrorBuffer, TEXT(", service id "));
+        ultostr(Table->Index, _strend(szErrorBuffer));
         break;
 
     case STATUS_DLL_NOT_FOUND:
@@ -454,7 +470,8 @@ VOID SdtListReportResolveModuleError(
 
     case STATUS_ILLEGAL_FUNCTION:
 
-        _strcpy(szErrorBuffer, TEXT("does not look like a import thunk"));
+        MultiByteToWideChar(CP_ACP, 0, Table->Name, -1, szErrorBuffer, MAX_PATH);
+        _strcpy(szErrorBuffer, TEXT(" code does not look like a import thunk"));
         break;
 
     default:
@@ -610,11 +627,8 @@ BOOL SdtListCreateTableShadow(
                         else if (sdtFn.ExportOrdinal)
                             lpFunctionName = MAKEINTRESOURCEA(sdtFn.ExportOrdinal);
 
-                        if (!NT_SUCCESS(NtRawGetProcAddress(sdtModule.ImageBase, lpFunctionName, &resolveInfo))) {
-                            //
-                            // Log error.
-                            //
-                            SdtListReportFunctionResolveError(lpFunctionName);
+                        if (!NT_SUCCESS(NtRawGetProcAddress(sdtModule.ImageBase, lpFunctionName, &resolveInfo))) {                         
+                            SdtListErrorProcedureNotFound(lpFunctionName, &sdtModule.Name);
                             break;
                         }
 
@@ -626,7 +640,7 @@ BOOL SdtListCreateTableShadow(
                             lpForwarderDot = _strchr_a(resolveInfo.ForwarderName, '.');
                             lpForwarderFunctionName = lpForwarderDot + 1;
                             if (lpForwarderFunctionName) {
-                                
+
                                 //
                                 // Build forwarder module name.
                                 //
@@ -665,7 +679,7 @@ BOOL SdtListCreateTableShadow(
                                             //
                                             SdtListReportEvent(EntryTypeError, __FUNCTIONW__, TEXT("could not load forwarded module"));
                                         }
-                                        
+
                                     }
 
                                 }
@@ -751,7 +765,13 @@ BOOL SdtListCreateTableShadow(
 
             }
 
-        } // if (W32pServiceTable.Allocated == FALSE)
+        }
+        else {
+            //
+            // Table already allocated.
+            //
+            *Status = 0;
+        }
 
         bResult = W32pServiceTable.Allocated;
 

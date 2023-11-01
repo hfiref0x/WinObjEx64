@@ -4,9 +4,9 @@
 *
 *  TITLE:       W32K.C
 *
-*  VERSION:     2.03
+*  VERSION:     2.04
 *
-*  DATE:        27 Jul 2023
+*  DATE:        21 Oct 2023
 *
 *  Win32k syscall table actual handlers resolving routines.
 *
@@ -975,7 +975,7 @@ ULONG SdtWin32kInitializeOnce(
         if (Context->Initialized)
             return 0;
 
-        Context->ApiSetSessionAware = (g_NtBuildNumber > NT_WIN11_22H2);
+        Context->ApiSetSessionAware = (g_NtBuildNumber > NT_WIN11_23H2);
 
         //
         // Find win32k loaded image base and size.

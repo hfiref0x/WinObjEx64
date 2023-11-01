@@ -1,3 +1,6 @@
+v2.0.4
+win11 23h2 compatibility
+
 v2.0.3
 recent win11 compatibility improvements
 win11 24h2 preliminary support

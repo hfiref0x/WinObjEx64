@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017 - 2022
+*  (C) COPYRIGHT AUTHORS, 2017 - 2023
 *
 *  TITLE:       OBJECTS.C
 *
-*  VERSION:     2.01
+*  VERSION:     2.04
 *
-*  DATE:        18 Dec 2022
+*  DATE:        01 Dec 2023
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -29,6 +29,8 @@ WOBJ_TYPE_DESC g_TypeController = { L"Controller", 0x38a0df3c, ObjectTypeControl
 WOBJ_TYPE_DESC g_TypeCoreMessaging = { L"CoreMessaging", 0x86bcebe5, ObjectTypeCoreMessaging, IDI_ICON_COREMESSAGING, IDS_DESC_COREMESSAGING };
 WOBJ_TYPE_DESC g_TypeCoverageSampler = { L"CoverageSampler", 0xb6a0f960, ObjectTypeCoverageSampler, IDI_ICON_COVERAGESAMPLER, IDS_DESC_COVERAGESAMPLER };
 WOBJ_TYPE_DESC g_TypeCpuPartition = { L"CpuPartition", 0xafdf1c82, ObjectTypeCpuPartition, IDI_ICON_CPUPARTITION, IDS_DESC_CPUPARTITION };
+WOBJ_TYPE_DESC g_TypeCrossVmEvent = { L"CrossVmEvent", 0x6eb9ebe3, ObjectTypeCrossVmEvent, IDI_ICON_CROSSVMEVENT, IDS_DESC_CROSSVMEVENT };
+WOBJ_TYPE_DESC g_TypeCrossVmMutant = { L"CrossVmMutant", 0x4c942872, ObjectTypeCrossVmMutant, IDI_ICON_CROSSVMMUTANT, IDS_DESC_CROSSVMMUTANT };
 WOBJ_TYPE_DESC g_TypeDebugObject = { L"DebugObject", 0x8282e52, ObjectTypeDebugObject, IDI_ICON_DEBUGOBJECT, IDS_DESC_DEBUGOBJECT };
 WOBJ_TYPE_DESC g_TypeDesktop = { OBTYPE_NAME_DESKTOP, 0xd1ffc79c, ObjectTypeDesktop, IDI_ICON_DESKTOP, IDS_DESC_DESKTOP };
 WOBJ_TYPE_DESC g_TypeDevice = { L"Device", OBTYPE_HASH_DEVICE, ObjectTypeDevice, IDI_ICON_DEVICE, IDS_DESC_DEVICE };
@@ -113,6 +115,8 @@ static WOBJ_TYPE_DESC* gpObjectTypes[] = {
     &g_TypeCoreMessaging,
     &g_TypeCoverageSampler,
     &g_TypeCpuPartition,
+    &g_TypeCrossVmEvent,
+    &g_TypeCrossVmMutant,
     &g_TypeDebugObject,
     &g_TypeDesktop,
     &g_TypeDevice,

@@ -1,3 +1,5 @@
+CrossVmEvent - new Win11 object
+CrossVmMutant - new Win11 object
 CpuPartition - new Win11 object, unnamed objects
 EtwSessionDemuxEntry - new Win10 object
 NetworkNamespace - managed by NDIS.sys (renamed to NdisCmState in RS1)

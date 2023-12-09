@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2023
 *
 *  TITLE:       OBJECTS.H
 *
-*  VERSION:     2.01
+*  VERSION:     2.04
 *
-*  DATE:        18 Dec 2022
+*  DATE:        01 Dec 2023
 *
 *  Header file for internal Windows object types handling.
 *
@@ -105,6 +105,8 @@ typedef enum _WOBJ_OBJECT_TYPE {
     ObjectTypeThreadStateChange = ObjectTypeUnknown,
     ObjectTypeCpuPartition = ObjectTypeUnknown,
     ObjectTypeSchedulerSharedData = ObjectTypeUnknown,
+    ObjectTypeCrossVmEvent = ObjectTypeUnknown,
+    ObjectTypeCrossVmMutant = ObjectTypeUnknown,
     ObjectTypeMax
 } WOBJ_OBJECT_TYPE;
 
@@ -203,6 +205,12 @@ typedef struct _WOBJ_TYPE_DESC {
 
 #define IDI_ICON_SCHEDULERSHAREDDATA UNUSED_IDI_ICON
 #define IDS_DESC_SCHEDULERSHAREDDATA UNUSED_IDS_DESC
+
+#define IDI_ICON_CROSSVMEVENT UNUSED_IDI_ICON
+#define IDS_DESC_CROSSVMEVENT UNUSED_IDS_DESC
+
+#define IDI_ICON_CROSSVMMUTANT UNUSED_IDI_ICON
+#define IDS_DESC_CROSSVMMUTANT UNUSED_IDS_DESC
 
 extern WOBJ_TYPE_DESC g_TypeUnknown;
 extern WOBJ_TYPE_DESC g_TypeSymbolicLink;

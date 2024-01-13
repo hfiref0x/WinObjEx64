@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2016 - 2023
+*  (C) COPYRIGHT AUTHORS, 2016 - 2024
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
-*  VERSION:     2.01
+*  VERSION:     2.04
 *
-*  DATE:        10 Apr 2023
+*  DATE:        13 Jan 2024
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1193,6 +1193,92 @@ VOID DrvDlgHandleWMCommand(
 }
 
 /*
+* DrvListSetTooltip
+*
+* Purpose:
+*
+* Collect all information for tooltip and set it.
+*
+*/
+VOID DrvListSetTooltip(
+    _In_ HWND ListViewHandle,
+    _In_ HWND ToolTipHandle,
+    _In_ TOOLINFO* ToolInfo,
+    _In_ INT iItem)
+{
+    ULONG_PTR drvBase;
+
+    BOOL bShimmed;
+    GUID shimGUID;
+
+    SUP_SHIM_INFO* shimInfo;
+
+    WCHAR szText[MAX_PATH * 4];
+    WCHAR szBuffer[MAX_PATH];
+
+    //
+    // Get name
+    //
+    RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
+    supGetItemText2(ListViewHandle, iItem,
+        COLUMN_DRVLIST_DRIVER_NAME, szBuffer, MAX_PATH);
+
+    RtlSecureZeroMemory(&szText, sizeof(szText));
+    _strcpy(szText, szBuffer);
+
+    //
+    // Get base.
+    //
+    szBuffer[0] = 0;
+    supGetItemText2(ListViewHandle, iItem,
+        COLUMN_DRVLIST_DRIVER_ADDRESS, szBuffer, 32);
+
+    _strcat(szText, TEXT("\n"));
+    _strcat(szText, szBuffer);
+    _strcat(szText, TEXT("\n"));
+
+    drvBase = hextou64(&szBuffer[2]);
+
+    //
+    // Module name.
+    //
+    szBuffer[0] = 0;
+    supGetItemText2(ListViewHandle, iItem,
+        COLUMN_DRVLIST_MODULE_NAME, szBuffer, MAX_PATH);
+    _strcat(szText, szBuffer);
+
+    //
+    // Shim desc.
+    //
+    szBuffer[0] = 0;
+    supGetItemText2(ListViewHandle, iItem,
+        COLUMN_DRVLIST_SHIMMED, szBuffer, MAX_PATH);
+    if (szBuffer[0]) {
+
+        bShimmed = supIsDriverShimmed(&g_kdctx.Data->KseEngineDump, (PVOID)drvBase, &shimGUID);
+
+        if (bShimmed) {
+
+            shimInfo = supGetDriverShimInformation(shimGUID);
+            if (shimInfo) {
+                szBuffer[0] = 0;
+                RtlStringCchPrintfSecure(szBuffer,
+                    RTL_NUMBER_OF(szBuffer),
+                    L"\n\n%ws\n%ws",
+                    shimInfo->KseShimName,
+                    shimInfo->Description);
+
+                _strcat(szText, szBuffer);
+            }
+
+        }
+    }
+
+    ToolInfo->lpszText = szText;
+    SendMessage(ToolTipHandle, TTM_SETTOOLINFO, 0, (LPARAM)ToolInfo);
+}
+
+/*
 * DrvListViewHookProc
 *
 * Purpose:
@@ -1209,17 +1295,12 @@ LRESULT CALLBACK DrvListViewHookProc(
 {
     HWND hwndTT = (HWND)DrvDlgContext[DrvModeNormal].TooltipInfo;
 
-    ULONG_PTR drvBase;
-
     LVHITTESTINFO ht;
     TOOLINFO toolInfo;
 
-    BOOL bShimmed, bCheckPass = FALSE;
-    GUID shimGUID;
-    SUP_SHIM_INFO* shimInfo;
+    BOOL bCheckPass = FALSE;
 
-    WCHAR szText[MAX_PATH * 4];
-    WCHAR szBuffer[MAX_PATH];
+    static int oldX, oldY;
 
     switch (uMsg) {
 
@@ -1243,92 +1324,30 @@ LRESULT CALLBACK DrvListViewHookProc(
 
         if (bCheckPass == FALSE) {
             SendMessage(hwndTT, TTM_TRACKACTIVATE, FALSE, (LPARAM)&toolInfo);
-            ReleaseCapture();
             break;
         }
 
-        RtlSecureZeroMemory(&toolInfo, sizeof(toolInfo));
-        toolInfo.cbSize = sizeof(toolInfo);
-        toolInfo.hwnd = DrvDlgContext[DrvModeNormal].hwndDlg;
-        toolInfo.uFlags = TTF_TRACK;
-        toolInfo.uId = ID_EXTRASLIST;
+        if ((ht.flags & LVHT_ONITEM) &&
+            ((ht.pt.x != oldX) || (ht.pt.y != oldY)))
+        {
+            oldX = ht.pt.x;
+            oldY = ht.pt.y;
 
-        if (ht.flags & LVHT_ONITEM) {          
+            RtlSecureZeroMemory(&toolInfo, sizeof(toolInfo));
+            toolInfo.cbSize = sizeof(toolInfo);
+            toolInfo.hwnd = DrvDlgContext[DrvModeNormal].hwndDlg;
+            toolInfo.uFlags = TTF_TRACK;
+            toolInfo.uId = ID_EXTRASLIST;
 
-            //
-            // Get name
-            //
-            RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-            supGetItemText2(hwnd, ht.iItem,
-                COLUMN_DRVLIST_DRIVER_NAME, szBuffer, MAX_PATH);
-
-            RtlSecureZeroMemory(&szText, sizeof(szText));
-            _strcpy(szText, szBuffer);
-
-            //
-            // Get base.
-            //
-            szBuffer[0] = 0;
-            supGetItemText2(hwnd, ht.iItem,
-                COLUMN_DRVLIST_DRIVER_ADDRESS, szBuffer, 32);
-
-            _strcat(szText, TEXT("\n"));
-            _strcat(szText, szBuffer);
-            _strcat(szText, TEXT("\n"));
-
-            drvBase = hextou64(&szBuffer[2]);
-
-            //
-            // Module name.
-            //
-            szBuffer[0] = 0;
-            supGetItemText2(hwnd, ht.iItem,                               
-                COLUMN_DRVLIST_MODULE_NAME, szBuffer, MAX_PATH);
-            _strcat(szText, szBuffer);
-
-            //
-            // Shim desc.
-            //
-            szBuffer[0] = 0;
-            supGetItemText2(hwnd, ht.iItem,
-                COLUMN_DRVLIST_SHIMMED, szBuffer, MAX_PATH);
-            if (szBuffer[0]) {
-
-                bShimmed = supIsDriverShimmed(&g_kdctx.Data->KseEngineDump, (PVOID)drvBase, &shimGUID);
-
-                if (bShimmed) {
-
-                    shimInfo = supGetDriverShimInformation(shimGUID);
-                    if (shimInfo) {
-                        szBuffer[0] = 0;
-                        RtlStringCchPrintfSecure(szBuffer,
-                            RTL_NUMBER_OF(szBuffer),
-                            L"\n\n%ws\n%ws",
-                            shimInfo->KseShimName,
-                            shimInfo->Description);
-
-                        _strcat(szText, szBuffer);
-                    }
-
-                }
-            }
-
-            toolInfo.lpszText = szText;
-            SendMessage(hwndTT, TTM_SETTOOLINFO, 0, (LPARAM)&toolInfo);
+            DrvListSetTooltip(hwnd, hwndTT, &toolInfo, ht.iItem);
 
             GetCursorPos(&ht.pt);
+            SendMessage(hwndTT, TTM_TRACKACTIVATE, (WPARAM)TRUE, (LPARAM)&toolInfo);
             ht.pt.x += 20;
             ht.pt.y += 20;
-            SendMessage(hwndTT, TTM_TRACKPOSITION, 0, MAKELPARAM(ht.pt.x, ht.pt.y));
-            SendMessage(hwndTT, TTM_TRACKACTIVATE, (WPARAM)TRUE, (LPARAM)&toolInfo);
-            SetCapture(hwnd);
+            SendMessage(hwndTT, TTM_TRACKPOSITION, 0, (LPARAM)MAKELONG(ht.pt.x, ht.pt.y));
+        }
 
-        }
-        else
-        {
-            SendMessage(hwndTT, TTM_TRACKACTIVATE, (WPARAM)FALSE, (LPARAM)&toolInfo);
-            ReleaseCapture();
-        }
         break;
     }
 

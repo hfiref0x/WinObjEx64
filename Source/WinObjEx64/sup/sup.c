@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2023
+*  (C) COPYRIGHT AUTHORS, 2015 - 2024
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     2.03
+*  VERSION:     2.04
 *
-*  DATE:        22 Jul 2023
+*  DATE:        12 Jan 2024
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -9769,11 +9769,11 @@ HWND supCreateTrackingToolTip(
         RtlSecureZeroMemory(&toolInfo, sizeof(toolInfo));
         toolInfo.cbSize = sizeof(toolInfo);
         toolInfo.hwnd = hwndOwner;
-        toolInfo.uFlags = TTF_TRACK;
+        toolInfo.uFlags = TTF_TRACK | TTF_ABSOLUTE;
         toolInfo.uId = (UINT_PTR)toolID;
 
         SendMessage(hwndTip, TTM_ADDTOOL, 0, (LPARAM)&toolInfo);
-        SendMessage(hwndTip, TTM_SETMAXTIPWIDTH, 0, MAX_PATH);
+        SendMessage(hwndTip, TTM_SETMAXTIPWIDTH, 0, MAX_PATH * 2);
     }
 
     return hwndTip;

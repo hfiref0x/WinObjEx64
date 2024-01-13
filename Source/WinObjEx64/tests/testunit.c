@@ -4,9 +4,9 @@
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     2.03
+*  VERSION:     2.04
 *
-*  DATE:        21 Jul 2023
+*  DATE:        01 Dec 2023
 *
 *  Test code used while debug.
 *

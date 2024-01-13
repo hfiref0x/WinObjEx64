@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2018 - 2023
+*  (C) COPYRIGHT AUTHORS, 2018 - 2024
 *
 *  TITLE:       EXTRASCALLBACKS.C
 *
 *  VERSION:     2.04
 *
-*  DATE:        21 Oct 2023
+*  DATE:        11 Jan 2024
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -37,8 +37,7 @@ static FAST_EVENT SysCbInitializedEvent = FAST_EVENT_INIT;
 #define CBT_SIZE_FE_V1        0xF8
 #define CBT_SIZE_CO_V1        0x100
 #define CBT_SIZE_NI_V1        0xF8
-#define CBT_SIZE_CU_V1        0x100
-#define CBT_SIZE_GA_V1        0x100
+#define CBT_SIZE_GE_V1        0x100 //same as CU/GA
 
 typedef struct _CBT_MAPPING {
     ULONG Build;
@@ -69,7 +68,7 @@ CBT_MAPPING g_CbtMapping[] = {
     { NT_WIN11_21H2, NTDDI_WIN10_CO, CBT_SIZE_CO_V1 },
     { NT_WIN11_22H2, NTDDI_WIN10_NI, CBT_SIZE_NI_V1 },
     { NT_WIN11_23H2, NTDDI_WIN10_NI, CBT_SIZE_NI_V1 }, 
-    { NT_WIN11_24H2, NTDDI_WIN10_GA, CBT_SIZE_GA_V1 }  //update on release
+    { NT_WIN11_24H2, NTDDI_WIN10_GE, CBT_SIZE_GE_V1 }   //update on release
 };
 
 //
@@ -874,14 +873,21 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacksEx)
     // NtCompareSigningLevels added in REDSTONE2 (15063)
     // It is a call to SeCiCallbacks[CiCompareSigningLevelsId]
     // Before REDSTONE5 it is called via wrapper SeCompareSigningLevels
-    // From REDSTONE6 and above it is inlined
+    // From REDSTONE6 and above it is sometimes inlined.
     //
 
     ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
-        "NtCompareSigningLevels");
+        "SeCompareSigningLevels");
 
-    if (ptrCode == NULL)
+    if (ptrCode == NULL) {
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
+            "NtCompareSigningLevels");
+    }
+
+    if (ptrCode == NULL) {
+        logAdd(EntryTypeWarning, TEXT("CompareSigningLevels ptr is not found"));
         return 0;
+    }
 
     do {
         hde64_disasm((void*)(ptrCode + Index), &hs);
@@ -903,8 +909,10 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacksEx)
 
     } while (Index < 64);
 
-    if (Rel == 0)
+    if (Rel == 0) {
+        logAdd(EntryTypeWarning, TEXT("CiCallbacks relative offset is not found"));
         return 0;
+    }
 
     kvarAddress = kdAdjustAddressToNtOsBase((ULONG_PTR)ptrCode, Index, hs.len, Rel);
     kvarAddress -= CiCompareSigningLevels_Offset;
@@ -912,17 +920,23 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacksEx)
     //
     // Read head - structure size.
     //
-    if (!kdReadSystemMemory(kvarAddress, &cbSize, sizeof(cbSize)))
+    if (!kdReadSystemMemory(kvarAddress, &cbSize, sizeof(cbSize))) {
+        logAdd(EntryTypeWarning, TEXT("Failed to read CiCallbacks head"));
         return 0;
+    }
 
-    if (cbSize == 0 || cbSize > 0x1000)
+    if (cbSize == 0 || cbSize > 0x1000) {
+        logAdd(EntryTypeWarning, TEXT("CiCallbacks size is ambiguous"));
         return 0;
+    }
 
     //
     // Read tail - marker tag.
     //
-    if (!kdReadSystemMemory(kvarAddress + (cbSize - sizeof(ULONG_PTR)), &ulTag, sizeof(ulTag)))
+    if (!kdReadSystemMemory(kvarAddress + (cbSize - sizeof(ULONG_PTR)), &ulTag, sizeof(ulTag))) {
+        logAdd(EntryTypeWarning, TEXT("Failed to read CiCallbacks tail"));
         return 0;
+    }
 
     for (Index = 0; Index < RTL_NUMBER_OF(g_CbtMapping); Index++) {
 
@@ -1021,8 +1035,8 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
                     break;
 
                 InstructionMatchPattern = SeCiCallbacksMatchingPattern; //default matching pattern
-                InstructionMatchLength = 7; //lea
-                InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern);
+                InstructionMatchLength = CI_CALLBACKS_LEA_INSTRUCTION_SIZE;
+                InstructionExactMatchLength = CI_CALLBACKS_3BYTE_INSTRUCTION_SIZE;
 
                 switch (g_NtBuildNumber) {
 
@@ -1030,7 +1044,6 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
                     Signature = g_CiCallbacksPattern_7601;
                     SignatureSize = sizeof(g_CiCallbacksPattern_7601);
                     InstructionMatchPattern = g_CiCallbacksMatchingPattern;
-                    InstructionExactMatchLength = RTL_NUMBER_OF(g_CiCallbacksMatchingPattern);
                     break;
 
                 case NT_WIN8_RTM:
@@ -3086,8 +3099,17 @@ OBEX_FINDCALLBACK_ROUTINE(FindEmpCallbackListHead)
             SignatureSize = sizeof(g_EmpSearchCallbackDatabase);
         }
         else {
-            Signature = g_EmpSearchCallbackDatabase2;
-            SignatureSize = sizeof(g_EmpSearchCallbackDatabase2);
+            if (g_NtBuildNumber >= NT_WIN8_BLUE && g_NtBuildNumber <= NT_WIN11_23H2) {
+                Signature = g_EmpSearchCallbackDatabase2;
+                SignatureSize = sizeof(g_EmpSearchCallbackDatabase2);
+            }
+            else if (g_NtBuildNumber >= NT_WIN11_24H2) {
+                Signature = g_EmpSearchCallbackDatabase3;
+                SignatureSize = sizeof(g_EmpSearchCallbackDatabase3);
+            }
+            else {
+                return 0; // this is general fuckup.
+            }
         }
 
         ptrCode = (PBYTE)supFindPattern(

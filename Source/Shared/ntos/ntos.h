@@ -1,13 +1,13 @@
 /************************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2023 
+*  (C) COPYRIGHT AUTHORS, 2015 - 2024 
 *  Translated from Microsoft sources/debugger or mentioned elsewhere.
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.219
+*  VERSION:     1.221
 *
-*  DATE:        21 Jul 2023
+*  DATE:        11 Jan 2024
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -9726,7 +9726,18 @@ NTSYSAPI
 NTSTATUS
 NTAPI
 RtlDefaultNpAcl(
-    _Out_ PACL *Acl);
+    _Out_ PACL* Acl);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+RtlAddProcessTrustLabelAce(
+    _Inout_ PACL Acl,
+    _In_ ULONG AceRevision,
+    _In_ ULONG AceFlags,
+    _In_ PSID ProcessTrustLabelSid,
+    _In_ UCHAR AceType,
+    _In_ ACCESS_MASK AccessMask);
 
 NTSYSAPI
 BOOLEAN
@@ -12150,6 +12161,21 @@ NtNotifyChangeDirectoryFile(
 NTSYSAPI
 NTSTATUS
 NTAPI
+NtCopyFileChunk(
+    _In_ HANDLE SourceHandle,
+    _In_ HANDLE DestinationHandle,
+    _In_opt_ HANDLE EventHandle,
+    _Out_ PIO_STATUS_BLOCK IoStatusBlock,
+    _In_ ULONG Length,
+    _In_ PLARGE_INTEGER SourceOffset,
+    _In_ PLARGE_INTEGER DestOffset,
+    _In_opt_ PULONG SourceKey,
+    _In_opt_ PULONG DestKey,
+    _In_ ULONG Flags);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
 NtLoadDriver(
     _In_ PUNICODE_STRING DriverServiceName);
 
@@ -13462,6 +13488,15 @@ NTAPI
 NtQueryPerformanceCounter(
     _Out_ PLARGE_INTEGER PerformanceCounter,
     _Out_opt_ PLARGE_INTEGER PerformanceFrequency);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtConvertBetweenAuxiliaryCounterAndPerformanceCounter(
+    _In_ BOOLEAN ConvertAuxiliaryToPerformanceCounter,
+    _In_ PLARGE_INTEGER PerformanceOrAuxiliaryCounterValue,
+    _Out_ PLARGE_INTEGER ConvertedValue,
+    _Out_opt_ PLARGE_INTEGER ConversionError);
 
 /************************************************************************************
 *
@@ -14954,6 +14989,22 @@ NtRaiseHardError(
     _In_reads_(NumberOfParameters) PULONG_PTR Parameters,
     _In_ ULONG ValidResponseOptions,
     _Out_ PULONG Response);
+
+/************************************************************************************
+*
+* IoRing API.
+*
+************************************************************************************/
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtCreateIoRing(
+    _Out_ PHANDLE IoRingHandle,
+    _In_ ULONG CreateParametersLength,
+    _In_ PVOID CreateParameters,
+    _In_ ULONG OutputParametersLength,
+    _Out_ PVOID OutputParameters);
 
 /************************************************************************************
 *

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2023
+*  (C) COPYRIGHT AUTHORS, 2015 - 2024
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     2.03
+*  VERSION:     2.04
 *
-*  DATE:        28 Jul 2023
+*  DATE:        11 Jan 2024
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -765,12 +765,6 @@ BOOL SdtListCreateTableShadow(
 
             }
 
-        }
-        else {
-            //
-            // Table already allocated.
-            //
-            *Status = 0;
         }
 
         bResult = W32pServiceTable.Allocated;

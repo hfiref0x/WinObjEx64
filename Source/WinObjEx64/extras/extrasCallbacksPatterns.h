@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2022
+*  (C) COPYRIGHT AUTHORS, 2019 - 2024
 *
 *  TITLE:       EXTRASCALLBACKSPATTERNS.H
 *
-*  VERSION:     2.00
+*  VERSION:     2.04
 *
-*  DATE:        19 Jun 2022
+*  DATE:        11 Jan 2024
 *
 *  Header with search patterns used by Callbacks dialog routines.
 *
@@ -74,6 +74,9 @@ BYTE g_CiCallbacksMatchingPattern[] = {
     0x48, 0x89, 0x05
 };
 
+#define CI_CALLBACKS_LEA_INSTRUCTION_SIZE   7
+#define CI_CALLBACKS_3BYTE_INSTRUCTION_SIZE 3
+
 /*+++
 
  EmpSearchCallbackDatabase search pattern
@@ -81,3 +84,4 @@ BYTE g_CiCallbacksMatchingPattern[] = {
 +++*/
 BYTE g_EmpSearchCallbackDatabase[] = { 0x48, 0x8B, 0x4E, 0xF8, 0x48, 0x85, 0xC9 };
 BYTE g_EmpSearchCallbackDatabase2[] = { 0x49, 0x8B, 0x4A, 0xF8, 0x48, 0x85, 0xC9 };
+BYTE g_EmpSearchCallbackDatabase3[] = { 0x4B, 0x8B, 0x0C, 0xF7, 0x48, 0x85, 0xC9 };

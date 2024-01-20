@@ -359,6 +359,7 @@
     <ClCompile Include="..\Shared\minirtl\u64tostr.c" />
     <ClCompile Include="..\Shared\minirtl\ultohex.c" />
     <ClCompile Include="..\Shared\minirtl\ultostr.c" />
+    <ClCompile Include="..\Shared\minirtl\_filename.c" />
     <ClCompile Include="..\Shared\minirtl\_strcat.c" />
     <ClCompile Include="..\Shared\minirtl\_strchr.c" />
     <ClCompile Include="..\Shared\minirtl\_strcmp.c" />
@@ -427,6 +428,7 @@
   <ItemGroup>
     <ClInclude Include="..\Shared\minirtl\minirtl.h" />
     <ClInclude Include="..\Shared\minirtl\rtltypes.h" />
+    <ClInclude Include="..\Shared\minirtl\_filename.h" />
     <ClInclude Include="..\Shared\ntos\apisetx.h" />
     <ClInclude Include="..\Shared\ntos\halamd64.h" />
     <ClInclude Include="..\Shared\ntos\ntalpc.h" />

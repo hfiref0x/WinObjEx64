@@ -55,7 +55,9 @@ BOOLEAN DrvDlgShimsEnabled = FALSE;
 static EXTRASCONTEXT DrvDlgContext[DrvModeMax];
 static HANDLE DrvDlgThreadHandles[DrvModeMax] = { NULL, NULL };
 static FAST_EVENT DrvDlgInitializedEvents[DrvModeMax] = { FAST_EVENT_INIT, FAST_EVENT_INIT };
+static LIST_ENTRY g_DrvFilterListHead;
 static ULONG g_cDrvShimmed = 0;
+static ULONG g_cDrvFilters = 0;
 
 WNDPROC g_OriginalListViewProc = NULL;
 
@@ -403,7 +405,7 @@ VOID DumpTerminateWorker(
 {
     if (DumpWorkerThread) {
         _InterlockedExchange((LONG*)&TerminateDumpOperation, TRUE);
-        if (WaitForSingleObject(DumpWorkerThread, 20*1000) == WAIT_TIMEOUT) {
+        if (WaitForSingleObject(DumpWorkerThread, 20 * 1000) == WAIT_TIMEOUT) {
             TerminateThread(DumpWorkerThread, ERROR_CANCELLED);
             NtClose(DumpWorkerThread);
             DumpWorkerThread = NULL;
@@ -880,7 +882,7 @@ VOID DrvListDrivers(
     WCHAR szBuffer[MAX_PATH * 2];
 
     GUID shimGUID;
-    SUP_SHIM_INFO *shimInfo;
+    SUP_SHIM_INFO* shimInfo;
 
     RTL_PROCESS_MODULES* pModulesList = NULL;
     PRTL_PROCESS_MODULE_INFORMATION pModule;
@@ -895,6 +897,14 @@ VOID DrvListDrivers(
     pModulesList = (PRTL_PROCESS_MODULES)supGetLoadedModulesList(NULL);
     if (pModulesList == NULL)
         return;
+
+    if (g_cDrvFilters) {
+        supFilterDestroyList(&g_DrvFilterListHead);
+    }
+    else {
+        InitializeListHead(&g_DrvFilterListHead);
+    }
+    g_cDrvFilters = supFilterCreateList(&g_DrvFilterListHead);
 
     supListViewEnableRedraw(hwndList, FALSE);
 
@@ -1213,8 +1223,9 @@ VOID DrvListSetTooltip(
 
     SUP_SHIM_INFO* shimInfo;
 
-    WCHAR szText[MAX_PATH * 4];
+    WCHAR szText[4096];
     WCHAR szBuffer[MAX_PATH];
+    WCHAR szNameWithoutExt[MAX_PATH];
 
     //
     // Get name
@@ -1222,6 +1233,9 @@ VOID DrvListSetTooltip(
     RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
     supGetItemText2(ListViewHandle, iItem,
         COLUMN_DRVLIST_DRIVER_NAME, szBuffer, MAX_PATH);
+
+    szNameWithoutExt[0] = 0;
+    _filename_noext(szNameWithoutExt, szBuffer);
 
     RtlSecureZeroMemory(&szText, sizeof(szText));
     _strcpy(szText, szBuffer);
@@ -1246,6 +1260,12 @@ VOID DrvListSetTooltip(
     supGetItemText2(ListViewHandle, iItem,
         COLUMN_DRVLIST_MODULE_NAME, szBuffer, MAX_PATH);
     _strcat(szText, szBuffer);
+
+    //
+    // Is it filter driver?
+    //
+    if (supFilterFindByName(&g_DrvFilterListHead, szNameWithoutExt))
+        _strcat(szText, TEXT("\nRegistered as filter"));
 
     //
     // Shim desc.
@@ -1541,7 +1561,7 @@ INT_PTR CALLBACK DrvDlgProc(
         }
         break;
 
-     case WM_SIZE:
+    case WM_SIZE:
         extrasSimpleListResize(hwndDlg);
         break;
 
@@ -1559,6 +1579,8 @@ INT_PTR CALLBACK DrvDlgProc(
 
             if (pDlgContext->DialogMode == DrvModeNormal) {
                 kdDestroyShimmedDriversList(&g_kdctx.Data->KseEngineDump);
+                supFilterDestroyList(&g_DrvFilterListHead);
+                g_cDrvFilters = 0;
             }
 
         }

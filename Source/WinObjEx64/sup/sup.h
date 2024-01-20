@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2023
+*  (C) COPYRIGHT AUTHORS, 2015 - 2024
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     2.03
+*  VERSION:     2.04
 *
-*  DATE:        21 Jul 2023
+*  DATE:        11 Jan 2024
 *
 *  Common header file for the program support routines.
 *
@@ -102,6 +102,25 @@ typedef struct _SUP_HANDLE_DUMP {
     ULONG_PTR NumberOfHandles;
     SUP_HANDLE_DUMP_ENTRY Handles[ANYSIZE_ARRAY];
 } SUP_HANDLE_DUMP, * PSUP_HANDLE_DUMP;
+
+typedef struct _SUP_FLT_ENTRY {
+    LIST_ENTRY ListEntry;
+    ULONG FrameID;
+    ULONG NumberOfInstances;
+    USHORT FilterNameLength; //in bytes
+    PWCHAR FilterNameBuffer;
+} SUP_FLT_ENTRY, * PSUP_FLT_ENTRY;
+
+#define FLTMGR_LINK_HANDLE_FUNCID 3
+#define FLTMGR_FIND_FIRST_FUNCID  9
+#define FLTMGR_FIND_NEXT_FUNCID   0xA
+
+#define IOCTL_FLTMGR_LINK_HANDLE    \
+    CTL_CODE(FILE_DEVICE_DISK_FILE_SYSTEM, FLTMGR_LINK_HANDLE_FUNCID, METHOD_BUFFERED, FILE_READ_ACCESS)
+#define IOCTL_FLTMGR_FIND_FIRST     \
+    CTL_CODE(FILE_DEVICE_DISK_FILE_SYSTEM, FLTMGR_FIND_FIRST_FUNCID, METHOD_BUFFERED, FILE_READ_ACCESS)
+#define IOCTL_FLTMGR_FIND_NEXT      \
+    CTL_CODE(FILE_DEVICE_DISK_FILE_SYSTEM, FLTMGR_FIND_NEXT_FUNCID, METHOD_BUFFERED, FILE_READ_ACCESS)
 
 typedef struct _OBEX_PROCESS_LOOKUP_ENTRY {
     HANDLE hProcess;
@@ -1240,3 +1259,13 @@ BOOLEAN supEnablePrivilegeWithCheck(
 
 BOOL supIsPrivilegeEnabledForClient(
     _In_ ULONG Privilege);
+
+ULONG supFilterCreateList(
+    _In_ PLIST_ENTRY FltListHead);
+
+VOID supFilterDestroyList(
+    _In_ PLIST_ENTRY FltListHead);
+
+BOOL supFilterFindByName(
+    _In_ PLIST_ENTRY FltListHead,
+    _In_ LPCWSTR Name);

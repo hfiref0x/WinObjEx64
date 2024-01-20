@@ -261,6 +261,9 @@
     <ClCompile Include="sup\w32k.c">
       <Filter>Source Files\sup</Filter>
     </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\_filename.c">
+      <Filter>Minirtl</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc">
@@ -408,6 +411,9 @@
     </ClInclude>
     <ClInclude Include="sup\w32k.h">
       <Filter>Source Files\sup</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\minirtl\_filename.h">
+      <Filter>Minirtl</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

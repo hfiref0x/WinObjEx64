@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.04
 *
-*  DATE:        12 Jan 2024
+*  DATE:        17 Jan 2024
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -9892,4 +9892,290 @@ BOOLEAN supEnablePrivilegeWithCheck(
 
     RtlSetLastWin32Error(RtlNtStatusToDosError(ntStatus));
     return bResult;
+}
+
+/*
+* supFilterDeviceIoControl
+*
+* Purpose:
+*
+* Call filter driver.
+*
+* Simplified fltlib!FilterpDeviceIoControl
+*
+*/
+NTSTATUS supFilterDeviceIoControl(
+    _In_ HANDLE Handle,
+    _In_ ULONG IoControlCode,
+    _In_reads_bytes_(InBufferSize) PVOID InBuffer,
+    _In_ ULONG InBufferSize,
+    _Out_writes_bytes_to_opt_(OutBufferSize, *BytesReturned) PVOID OutBuffer,
+    _In_ ULONG OutBufferSize,
+    _Out_opt_ PULONG BytesReturned
+)
+{
+    NTSTATUS ntStatus;
+
+    if (BytesReturned)
+        *BytesReturned = 0;
+
+    IO_STATUS_BLOCK ioStatusBlock;
+
+    if (DEVICE_TYPE_FROM_CTL_CODE(IoControlCode) == FILE_DEVICE_FILE_SYSTEM) {
+        ntStatus = NtFsControlFile(Handle,
+            NULL,
+            NULL,
+            NULL,
+            &ioStatusBlock,
+            IoControlCode,
+            InBuffer,
+            InBufferSize,
+            OutBuffer,
+            OutBufferSize);
+    }
+    else {
+
+        ntStatus = NtDeviceIoControlFile(Handle,
+            NULL,
+            NULL,
+            NULL,
+            &ioStatusBlock,
+            IoControlCode,
+            InBuffer,
+            InBufferSize,
+            OutBuffer,
+            OutBufferSize);
+    }
+
+    if (ntStatus == STATUS_PENDING) {
+        ntStatus = NtWaitForSingleObject(Handle, FALSE, NULL);
+        if (NT_SUCCESS(ntStatus))
+            ntStatus = ioStatusBlock.Status;
+    }
+
+    if (BytesReturned)
+        *BytesReturned = (ULONG)ioStatusBlock.Information;
+
+    return ntStatus;
+}
+
+/*
+* supxFilterFindFirst
+*
+* Purpose:
+*
+* Simplified fltlib!FilterFindFirst.
+*
+*/
+NTSTATUS supxFilterFindFirst(
+    _In_ HANDLE FltMgrHandle,
+    _In_ FILTER_INFORMATION_CLASS InformationClass,
+    _In_ PVOID Buffer,
+    _In_ ULONG BufferSize
+)
+{
+    FILTER_INFORMATION_CLASS infoClass = InformationClass;
+    NTSTATUS ntStatus;
+    DWORD linkInfo[2];
+
+    linkInfo[0] = 3; //type of callback, 3 is for filters.
+    linkInfo[1] = 0;
+
+    ntStatus = supFilterDeviceIoControl(FltMgrHandle,
+        IOCTL_FLTMGR_LINK_HANDLE,
+        &linkInfo,
+        sizeof(linkInfo),
+        NULL,
+        0,
+        NULL);
+
+    if (NT_SUCCESS(ntStatus)) {
+
+        ntStatus = supFilterDeviceIoControl(FltMgrHandle,
+            IOCTL_FLTMGR_FIND_FIRST,
+            &infoClass,
+            sizeof(infoClass),
+            Buffer,
+            BufferSize,
+            NULL);
+
+    }
+
+    return ntStatus;
+}
+
+/*
+* supxFilterFindNext
+*
+* Purpose:
+*
+* Simplified fltlib!supxFilterFindNext.
+*
+*/
+NTSTATUS supxFilterFindNext(
+    _In_ HANDLE FltMgrHandle,
+    _In_ FILTER_INFORMATION_CLASS InformationClass,
+    _In_ PVOID Buffer,
+    _In_ ULONG BufferSize
+)
+{
+    FILTER_INFORMATION_CLASS infoClass = InformationClass;
+
+    return supFilterDeviceIoControl(FltMgrHandle,
+        IOCTL_FLTMGR_FIND_NEXT,
+        &infoClass,
+        sizeof(infoClass),
+        Buffer,
+        BufferSize,
+        NULL);
+}
+
+/*
+* supFilterFindByName
+*
+* Purpose:
+*
+* Find filter by name.
+* 
+* N.B. Case insensitive since filter and driver names seems case insensitive as declared without matching.
+*
+*/
+BOOL supFilterFindByName(
+    _In_ PLIST_ENTRY FltListHead,
+    _In_ LPCWSTR Name
+)
+{
+    PLIST_ENTRY ListHead = FltListHead, Entry, NextEntry;
+    PSUP_FLT_ENTRY Item;
+
+    ASSERT_LIST_ENTRY_VALID_BOOLEAN(ListHead);
+
+    if (IsListEmpty(ListHead))
+        return FALSE;
+
+    for (Entry = ListHead->Flink, NextEntry = Entry->Flink;
+        Entry != ListHead;
+        Entry = NextEntry, NextEntry = Entry->Flink)
+    {
+        Item = CONTAINING_RECORD(Entry, SUP_FLT_ENTRY, ListEntry);
+
+        if (_strcmpi(Item->FilterNameBuffer, Name) == 0)
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
+/*
+* supFilterDestroyList
+*
+* Purpose:
+*
+* Remove all items from filter drivers list and free memory.
+*
+*/
+VOID supFilterDestroyList(
+    _In_ PLIST_ENTRY FltListHead
+)
+{
+    PLIST_ENTRY ListHead = FltListHead, Entry, NextEntry;
+    PSUP_FLT_ENTRY Item;
+
+    ASSERT_LIST_ENTRY_VALID(ListHead);
+
+    if (IsListEmpty(ListHead))
+        return;
+
+    for (Entry = ListHead->Flink, NextEntry = Entry->Flink;
+        Entry != ListHead;
+        Entry = NextEntry, NextEntry = Entry->Flink)
+    {
+        Item = CONTAINING_RECORD(Entry, SUP_FLT_ENTRY, ListEntry);
+
+        if (Item->FilterNameBuffer) 
+            supHeapFree(Item->FilterNameBuffer);
+
+        RemoveEntryList(Entry);
+        supHeapFree(Item);
+    }
+}
+
+/*
+* supFilterCreateList
+*
+* Purpose:
+*
+* Enumerate registered filter drivers into linked list of SUP_FLT_ENTRY structures.
+*
+*/
+ULONG supFilterCreateList(
+    _In_ PLIST_ENTRY FltListHead
+)
+{
+    DWORD bufferSize;
+    ULONG cFlt = 0;
+    PFILTER_FULL_INFORMATION buffer = NULL;
+    HANDLE fltMgrHandle = NULL;
+    NTSTATUS ntStatus;
+    UNICODE_STRING usDeviceName;
+    IO_STATUS_BLOCK iost;
+    OBJECT_ATTRIBUTES obja;
+    PSUP_FLT_ENTRY pFltEntry;
+
+    bufferSize = sizeof(FILTER_FULL_INFORMATION) + MAX_PATH * 2;
+    buffer = (PFILTER_FULL_INFORMATION)supHeapAlloc((SIZE_T)bufferSize);
+    if (buffer) {
+
+        RtlInitUnicodeString(&usDeviceName, L"\\??\\FltMgr");
+        InitializeObjectAttributes(&obja, &usDeviceName, OBJ_CASE_INSENSITIVE, NULL, NULL);
+
+        ntStatus = NtCreateFile(&fltMgrHandle,
+            GENERIC_READ,
+            &obja,
+            &iost,
+            NULL,
+            FILE_ATTRIBUTE_NORMAL,
+            FILE_SHARE_READ,
+            FILE_OPEN,
+            0,
+            NULL,
+            0);
+
+        if (NT_SUCCESS(ntStatus)) {
+
+            if (NT_SUCCESS(supxFilterFindFirst(fltMgrHandle, FilterFullInformation, buffer, bufferSize))) {
+
+                do {
+                    pFltEntry = (PSUP_FLT_ENTRY)supHeapAlloc(sizeof(SUP_FLT_ENTRY));
+                    if (pFltEntry) {
+
+                        pFltEntry->FrameID = buffer->FrameID;
+                        pFltEntry->NumberOfInstances = buffer->NumberOfInstances;
+                        pFltEntry->FilterNameLength = buffer->FilterNameLength;
+
+                        pFltEntry->FilterNameBuffer = (PWCHAR)supHeapAlloc(pFltEntry->FilterNameLength);
+                        if (pFltEntry->FilterNameBuffer) {
+
+                            RtlCopyMemory(pFltEntry->FilterNameBuffer,
+                                buffer->FilterNameBuffer,
+                                pFltEntry->FilterNameLength);
+                           
+                        }
+
+
+                        InsertHeadList(FltListHead, &pFltEntry->ListEntry);
+                        cFlt += 1;
+                    }
+
+                } while (supxFilterFindNext(fltMgrHandle,
+                    FilterFullInformation,
+                    buffer, bufferSize) != STATUS_NO_MORE_ENTRIES);
+
+            }
+        }
+        NtClose(fltMgrHandle);
+        supHeapFree(buffer);
+    }
+
+    return cFlt;
 }

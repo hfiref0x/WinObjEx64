@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2023
+*  (C) COPYRIGHT AUTHORS, 2015 - 2024
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     2.02
+*  VERSION:     2.04
 *
-*  DATE:        19 Jul 2023
+*  DATE:        16 Jan 2024
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -94,6 +94,7 @@
 #include <Richedit.h>
 #include <Aclui.h>
 #include <Aclapi.h>
+#include <FltUser.h>
 #include <assert.h>
 
 #include "resource.h"
@@ -101,6 +102,7 @@
 
 #include "minirtl/minirtl.h"
 #include "minirtl/rtltypes.h"
+#include "minirtl/_filename.h"
 
 #include "ntos/ntos.h"
 #include "ntos/ntalpc.h"

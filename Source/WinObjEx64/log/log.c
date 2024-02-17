@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2023
+*  (C) COPYRIGHT AUTHORS, 2015 - 2024
 *
 *  TITLE:       LOG.C
 *
-*  VERSION:     2.03
+*  VERSION:     2.04
 *
-*  DATE:        27 Jul 2023
+*  DATE:        31 Jan 2024
 *
 *  Simplified log.
 *
@@ -150,36 +150,36 @@ VOID LogViewerPrintEntry(
 {
     LONG StartPos = 0;
 
-    CHARFORMAT cf;
-    CHARRANGE cr, sr;
+    CHARFORMAT format;
+    CHARRANGE range;
 
-    cr.cpMax = INT_MAX;
-    cr.cpMin = INT_MAX;
+    range.cpMax = INT_MAX;
+    range.cpMin = INT_MAX;
 
-    SendMessage(hwndRichEdit, EM_EXSETSEL, (WPARAM)0, (LPARAM)&cr);
-    SendMessage(hwndRichEdit, EM_EXGETSEL, (WPARAM)0, (LPARAM)&sr);
-    StartPos = sr.cpMin;
-
-    if (bHighlight) {
-        cf.cbSize = sizeof(CHARFORMAT);
-        cf.dwMask = CFM_BOLD;
-        SendMessage(hwndRichEdit, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
-    }
+    SendMessage(hwndRichEdit, EM_EXSETSEL, (WPARAM)0, (LPARAM)&range);
+    SendMessage(hwndRichEdit, EM_EXGETSEL, (WPARAM)0, (LPARAM)&range);
+    StartPos = range.cpMin;
 
     if (StartPos) {
         SendMessage(hwndRichEdit, EM_REPLACESEL, (WPARAM)0, (LPARAM)L"\r\n");
-        StartPos += 2;
+        StartPos++;
     }
 
     SendMessage(hwndRichEdit, EM_REPLACESEL, (WPARAM)0, (LPARAM)lpMessage);
 
+    range.cpMin = StartPos;
+    range.cpMax = (LONG)_strlen(lpMessage) + StartPos;
+    SendMessage(hwndRichEdit, EM_EXSETSEL, (WPARAM)0, (LPARAM)&range);
+
+    format.cbSize = sizeof(CHARFORMAT);
+    format.dwMask = CFM_BOLD;
     if (bHighlight) {
-        cf.dwEffects = CFE_BOLD;
-        cr.cpMin = StartPos;
-        cr.cpMax = (LONG)_strlen(lpMessage) + StartPos + 1;
-        SendMessage(hwndRichEdit, EM_EXSETSEL, (WPARAM)0, (LPARAM)&cr);
-        SendMessage(hwndRichEdit, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
+        format.dwEffects = CFE_BOLD;
     }
+    else {
+        format.dwEffects = 0;
+    }
+    SendMessage(hwndRichEdit, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&format);
 }
 
 /*

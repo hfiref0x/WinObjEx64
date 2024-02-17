@@ -2,6 +2,7 @@ v2.0.4
 win11 23h2 compatibility
 win11+ 24h2 compatibility improvements
 fix tooltip flickering for drivers list
+fix log ui highlight glitch
 driver list tooltip now include information if the given driver is registered as filter (admin priv. required)
 
 v2.0.3

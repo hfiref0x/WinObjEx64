@@ -757,6 +757,7 @@ PVOID ObDumpSymbolicLinkObjectVersionAware(
     case NT_WINSRV_21H1:
     case NT_WIN11_21H2:
     case NT_WIN11_22H2:
+    case NT_WIN11_23H2:
     default:
         objectSize = sizeof(OBJECT_SYMBOLIC_LINK_V5);
         objectVersion = OBVERSION_OBJECT_SYMBOLIC_LINK_V5;

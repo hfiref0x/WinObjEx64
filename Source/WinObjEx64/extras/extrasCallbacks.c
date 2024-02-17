@@ -3019,6 +3019,10 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspSiloMonitorList)
         Index = 0;
         Rel = 0;
 
+        //
+        // Search for PspSiloMonitorList.
+        //
+
         do {
 
             hde64_disasm(ptrCode + Index, &hs);
@@ -3099,7 +3103,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindEmpCallbackListHead)
             SignatureSize = sizeof(g_EmpSearchCallbackDatabase);
         }
         else {
-            if (g_NtBuildNumber >= NT_WIN8_BLUE && g_NtBuildNumber <= NT_WIN11_23H2) {
+            if (g_NtBuildNumber <= NT_WIN11_23H2) {
                 Signature = g_EmpSearchCallbackDatabase2;
                 SignatureSize = sizeof(g_EmpSearchCallbackDatabase2);
             }

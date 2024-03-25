@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASCALLBACKSPATTERNS.H
 *
-*  VERSION:     2.04
+*  VERSION:     2.05
 *
-*  DATE:        11 Jan 2024
+*  DATE:        11 Mar 2024
 *
 *  Header with search patterns used by Callbacks dialog routines.
 *
@@ -85,3 +85,21 @@ BYTE g_CiCallbacksMatchingPattern[] = {
 BYTE g_EmpSearchCallbackDatabase[] = { 0x48, 0x8B, 0x4E, 0xF8, 0x48, 0x85, 0xC9 };
 BYTE g_EmpSearchCallbackDatabase2[] = { 0x49, 0x8B, 0x4A, 0xF8, 0x48, 0x85, 0xC9 };
 BYTE g_EmpSearchCallbackDatabase3[] = { 0x4B, 0x8B, 0x0C, 0xF7, 0x48, 0x85, 0xC9 };
+
+
+/*
+* PnpDeviceClassNotifyList search pattern
+*/
+
+//
+// mul ecx
+//
+BYTE PnpDeviceClassNotifyList_SubPattern_7601[] = { 0xF7, 0xE1 };
+
+BYTE PnpDeviceClassNotifyList_SubPattern_9200[] = { 0xC1, 0xEA, 0x02, 0x6B, 0xD2, 0x0D };
+
+//
+//  shr edx, 2
+//  imul eax, edx, 0Dh
+//
+BYTE PnpDeviceClassNofityList_SubPattern_9600_26080[] = { 0xC1, 0xEA, 0x02, 0x6B, 0xC2, 0x0D };

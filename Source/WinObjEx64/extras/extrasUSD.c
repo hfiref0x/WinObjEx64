@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2023
+*  (C) COPYRIGHT AUTHORS, 2015 - 2024
 *
 *  TITLE:       EXTRASUSD.C
 *
-*  VERSION:     2.02
+*  VERSION:     2.05
 *
-*  DATE:        15 May 2023
+*  DATE:        11 Mar 2024
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -68,7 +68,8 @@ LPWSTR T_PROCESSOR_FEATURES[] = {
     L"PF_AVX512F_INSTRUCTIONS_AVAILABLE",
     L"PF_ERMS_AVAILABLE",
     L"PF_ARM_V82_DP_INSTRUCTIONS_AVAILABLE",
-    L"PF_ARM_V83_JSCVT_INSTRUCTIONS_AVAILABLE"
+    L"PF_ARM_V83_JSCVT_INSTRUCTIONS_AVAILABLE",
+    L"PF_ARM_V83_LRCPC_INSTRUCTIONS_AVAILABLE"
 };
 
 LPCWSTR T_SharedDataFlagsW7[] = {
@@ -95,7 +96,7 @@ LPCWSTR T_SharedDataFlags[] = {
     L"DbgStateSeparationEnabled"
 };
 
-VALUE_DESC SuiteMasks[] = {
+VALUE_DESC USD_SuiteMasks[] = {
     { L"ServerNT", VER_SERVER_NT },
     { L"WorkstationNT", VER_WORKSTATION_NT },
     { L"SmallBusiness", VER_SUITE_SMALLBUSINESS },
@@ -117,6 +118,92 @@ VALUE_DESC SuiteMasks[] = {
     { L"MultiUserTS", VER_SUITE_MULTIUSERTS }
 };
 
+VALUE_DESC USD_NXSupportPolicyFlags[] = {
+    { L"AlwaysOff", NX_SUPPORT_POLICY_ALWAYSOFF },
+    { L"AlwaysOn", NX_SUPPORT_POLICY_ALWAYSON },
+    { L"OptIn", NX_SUPPORT_POLICY_OPTIN },
+    { L"OptOut", NX_SUPPORT_POLICY_OPTOUT }
+};
+
+VALUE_DESC USD_SEHValidationPolicyFlags[] = {
+    { L"AlwaysOff", SEH_VALIDATION_POLICY_ON },
+    { L"AlwaysOn", SEH_VALIDATION_POLICY_OFF },
+    { L"Telemetry", SEH_VALIDATION_POLICY_TELEMETRY },
+    { L"Defer", SEH_VALIDATION_POLICY_DEFER }
+};
+
+/*
+* UsdDumpMitigationPolicies
+*
+* Purpose:
+*
+* Display dump of SEH and NX policies.
+*
+*/
+VOID UsdDumpMitigationPolicies(
+    _In_ HTREEITEM tviRoot,
+    _In_ PKUSER_SHARED_DATA pUserSharedData
+)
+{
+    HTREEITEM h_tviSubItem;
+    TL_SUBITEMS_FIXED subitems;
+    WCHAR szValue[MAX_PATH + 1];
+
+    RtlSecureZeroMemory(&subitems, sizeof(subitems));
+
+    //
+    // Expanded to more values starting from Windows 8+
+    //
+
+    RtlSecureZeroMemory(szValue, sizeof(szValue));
+
+    RtlStringCchPrintfSecure(szValue,
+        MAX_PATH,
+        TEXT("0x%02X"),
+        pUserSharedData->MitigationPolicies);
+
+    subitems.Text[0] = szValue;
+    subitems.Count = 1;
+
+    h_tviSubItem = supTreeListAddItem(
+        g_UsdDlgContext.TreeList,
+        tviRoot,
+        TVIF_TEXT | TVIF_STATE,
+        (UINT)0,
+        (UINT)0,
+        TEXT("MitigationPolicies"),
+        &subitems);
+
+    if (h_tviSubItem) {
+
+        propDumpEnumWithNames(
+            g_UsdDlgContext.TreeList,
+            h_tviSubItem,
+            TEXT("NXSupportPolicy"),
+            pUserSharedData->NXSupportPolicy,
+            USD_NXSupportPolicyFlags,
+            RTL_NUMBER_OF(USD_NXSupportPolicyFlags));
+
+        propDumpEnumWithNames(
+            g_UsdDlgContext.TreeList,
+            h_tviSubItem,
+            TEXT("SEHValidationPolicy"),
+            pUserSharedData->SEHValidationPolicy,
+            USD_SEHValidationPolicyFlags,
+            RTL_NUMBER_OF(USD_SEHValidationPolicyFlags));
+
+        propObDumpByte(
+            g_UsdDlgContext.TreeList,
+            h_tviSubItem,
+            TEXT("CurDirDevicesSkippedForDlls"),
+            (LPWSTR)NULL,
+            pUserSharedData->CurDirDevicesSkippedForDlls,
+            (COLORREF)0,
+            (COLORREF)0,
+            FALSE);
+    }
+
+}
 
 /*
 * UsdDumpSharedRegion
@@ -132,7 +219,7 @@ VOID UsdDumpSharedRegion(
 {
     BOOL                bAny = FALSE;
     UINT                i;
-    DWORD               mask, cFlags;
+    DWORD               cFlags;
 
     LPCWSTR* pvSharedFlagsDesc;
 
@@ -370,66 +457,13 @@ VOID UsdDumpSharedRegion(
         //
         // SuiteMask
         //
-        RtlSecureZeroMemory(&subitems, sizeof(subitems));
-        RtlSecureZeroMemory(&szValue, sizeof(szValue));
-        szValue[0] = TEXT('0');
-        szValue[1] = TEXT('x');
-        ultohex(pUserSharedData->SuiteMask, &szValue[2]);
-        subitems.Text[0] = szValue;
-        subitems.Count = 1;
-
-        h_tviSubItem = supTreeListAddItem(
-            g_UsdDlgContext.TreeList,
+        propDumpEnumWithNames(g_UsdDlgContext.TreeList,
             h_tviRootItem,
-            TVIF_TEXT | TVIF_STATE,
-            (UINT)0,
-            (UINT)0,
             TEXT("SuiteMask"),
-            &subitems);
+            pUserSharedData->SuiteMask,
+            USD_SuiteMasks,
+            RTL_NUMBER_OF(USD_SuiteMasks));
 
-        if (h_tviSubItem) {
-            h_tviLast = NULL;
-            mask = pUserSharedData->SuiteMask;
-            for (i = 0; i < RTL_NUMBER_OF(SuiteMasks); i++) {
-                if (mask & SuiteMasks[i].dwValue) {
-
-                    RtlSecureZeroMemory(&subitems, sizeof(subitems));
-                    RtlSecureZeroMemory(&szValue, sizeof(szValue));
-                    szValue[0] = TEXT('0');
-                    szValue[1] = TEXT('x');
-                    ultohex(SuiteMasks[i].dwValue, &szValue[2]);
-                    subitems.Text[0] = szValue;
-                    subitems.Text[1] = SuiteMasks[i].lpDescription;
-                    subitems.Count = 2;
-
-                    h_tviLast = supTreeListAddItem(
-                        g_UsdDlgContext.TreeList,
-                        h_tviSubItem,
-                        TVIF_TEXT | TVIF_STATE,
-                        (UINT)0,
-                        (UINT)0,
-                        (LPWSTR)T_EmptyString,
-                        &subitems);
-
-                    mask &= ~SuiteMasks[i].dwValue;
-                }
-            }
-
-            //
-            // Output dotted corner for suite mask.
-            //
-            if (h_tviLast) {
-                RtlSecureZeroMemory(&itemex, sizeof(itemex));
-
-                itemex.hItem = h_tviLast;
-                itemex.mask = TVIF_TEXT | TVIF_HANDLE;
-                itemex.pszText = T_EMPTY;
-
-                TreeList_SetTreeItem(g_UsdDlgContext.TreeList, &itemex, NULL);
-            }
-        }
-
-        //
         // KdDebuggerEnabled
         //
         propObDumpByte(
@@ -464,60 +498,8 @@ VOID UsdDumpSharedRegion(
             //
             // Expanded to more values starting from Windows 8+
             //
+            UsdDumpMitigationPolicies(h_tviRootItem, pUserSharedData);
 
-            RtlSecureZeroMemory(&subitems, sizeof(subitems));
-            RtlSecureZeroMemory(szValue, sizeof(szValue));
-
-            RtlStringCchPrintfSecure(szValue,
-                MAX_PATH,
-                TEXT("0x%02X"),
-                pUserSharedData->MitigationPolicies);
-
-            subitems.Text[0] = szValue;
-            subitems.Count = 1;
-
-            h_tviSubItem = supTreeListAddItem(
-                g_UsdDlgContext.TreeList,
-                h_tviRootItem,
-                TVIF_TEXT | TVIF_STATE,
-                (UINT)0,
-                (UINT)0,
-                TEXT("MitigationPolicies"),
-                &subitems);
-
-            if (h_tviSubItem) {
-
-                propObDumpByte(
-                    g_UsdDlgContext.TreeList,
-                    h_tviSubItem,
-                    TEXT("NXSupportPolicy"),
-                    (LPWSTR)NULL,
-                    pUserSharedData->NXSupportPolicy,
-                    (COLORREF)0,
-                    (COLORREF)0,
-                    FALSE);
-
-                propObDumpByte(
-                    g_UsdDlgContext.TreeList,
-                    h_tviSubItem,
-                    TEXT("SEHValidationPolicy"),
-                    (LPWSTR)NULL,
-                    pUserSharedData->SEHValidationPolicy,
-                    (COLORREF)0,
-                    (COLORREF)0,
-                    FALSE);
-
-
-                propObDumpByte(
-                    g_UsdDlgContext.TreeList,
-                    h_tviSubItem,
-                    TEXT("CurDirDevicesSkippedForDlls"),
-                    (LPWSTR)NULL,
-                    pUserSharedData->CurDirDevicesSkippedForDlls,
-                    (COLORREF)0,
-                    (COLORREF)0,
-                    FALSE);
-            }
         }
 
         //

@@ -5,9 +5,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.221
+*  VERSION:     1.223
 *
-*  DATE:        11 Jan 2024
+*  DATE:        12 Mar 2024
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -101,6 +101,7 @@ typedef ULONGLONG REGHANDLE, *PREGHANDLE;
 typedef PVOID *PDEVICE_MAP;
 typedef PVOID PHEAD;
 typedef PVOID PEJOB;
+typedef PVOID PKTHREAD;
 typedef struct _IO_TIMER* PIO_TIMER;
 typedef LARGE_INTEGER PHYSICAL_ADDRESS;
 typedef struct _EJOB* PESILO;
@@ -5516,6 +5517,61 @@ typedef struct _EMP_CALLBACK_LIST_ENTRY {
     SINGLE_LIST_ENTRY CallbackListEntry;
 } EMP_CALLBACK_LIST_ENTRY, * PEMP_CALLBACK_LIST_ENTRY;
 
+typedef enum _IO_NOTIFICATION_EVENT_CATEGORY {
+    EventCategoryReserved,
+    EventCategoryHardwareProfileChange,
+    EventCategoryDeviceInterfaceChange,
+    EventCategoryTargetDeviceChange
+} IO_NOTIFICATION_EVENT_CATEGORY;
+
+typedef
+NTSTATUS
+(*PDRIVER_NOTIFICATION_CALLBACK_ROUTINE) (
+    IN PVOID NotificationStructure,
+    IN PVOID Context
+    );
+
+typedef struct _KGUARDED_MUTEX {
+    LONG Count;
+    PKTHREAD Owner;
+    ULONG Contention;
+    KEVENT Event;
+    union {
+        struct {
+            SHORT KernelApcDisable;
+            SHORT SpecialApcDisable;
+        };
+
+        ULONG CombinedApcDisable;
+    };
+
+} KGUARDED_MUTEX, * PKGUARDED_MUTEX;
+
+typedef struct _DEVICE_CLASS_NOTIFY_ENTRY {
+
+    // 
+    // Header entries 
+    // 
+
+    LIST_ENTRY ListEntry;
+    IO_NOTIFICATION_EVENT_CATEGORY EventCategory;
+    ULONG SessionId;
+    HANDLE SessionHandle;
+    PDRIVER_NOTIFICATION_CALLBACK_ROUTINE CallbackRoutine;
+    PVOID Context;
+    PDRIVER_OBJECT DriverObject;
+    USHORT RefCount;
+    BOOLEAN Unregistered;
+    PKGUARDED_MUTEX Lock;
+    PERESOURCE EntryLock;
+    // 
+    // ClassGuid - the guid of the device class we are interested in 
+    // 
+
+    GUID ClassGuid;
+
+} DEVICE_CLASS_NOTIFY_ENTRY, * PDEVICE_CLASS_NOTIFY_ENTRY;
+
 /*
 ** Callbacks END
 */
@@ -6920,10 +6976,15 @@ typedef struct _PROCESS_MITIGATION_POLICY_INFORMATION {
 /*
 ** KUSER_SHARED_DATA START
 */
-#define NX_SUPPORT_POLICY_ALWAYSOFF 0
-#define NX_SUPPORT_POLICY_ALWAYSON  1
-#define NX_SUPPORT_POLICY_OPTIN     2
-#define NX_SUPPORT_POLICY_OPTOUT    3
+#define NX_SUPPORT_POLICY_ALWAYSOFF     0
+#define NX_SUPPORT_POLICY_ALWAYSON      1
+#define NX_SUPPORT_POLICY_OPTIN         2
+#define NX_SUPPORT_POLICY_OPTOUT        3
+
+#define SEH_VALIDATION_POLICY_ON        0
+#define SEH_VALIDATION_POLICY_OFF       1
+#define SEH_VALIDATION_POLICY_TELEMETRY 2
+#define SEH_VALIDATION_POLICY_DEFER     3
 
 #include <pshpack4.h>
 typedef struct _KSYSTEM_TIME {
@@ -7004,7 +7065,7 @@ typedef struct _KUSER_SHARED_DATA {
     ULONG Reserved3;
     volatile ULONG TimeSlip;
     ALTERNATIVE_ARCHITECTURE_TYPE AlternativeArchitecture;
-    ULONG AltArchitecturePad;
+    ULONG BootId; //previously AltArchitecturePad
     LARGE_INTEGER SystemExpirationDate;
     ULONG SuiteMask;
     BOOLEAN KdDebuggerEnabled;
@@ -7113,6 +7174,8 @@ typedef struct _KUSER_SHARED_DATA {
 
     KSYSTEM_TIME FeatureConfigurationChangeStamp;
     ULONG Spare;
+
+    ULONG64 UserPointerAuthMask;
 
 } KUSER_SHARED_DATA, *PKUSER_SHARED_DATA;
 #include <poppack.h>

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2023
+*  (C) COPYRIGHT AUTHORS, 2015 - 2024
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     2.03
+*  VERSION:     2.05
 *
-*  DATE:        21 Jul 2023
+*  DATE:        12 Mar 2024
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -361,6 +361,7 @@ typedef struct _NOTIFICATION_CALLBACKS {
     ULONG_PTR KiNmiCallbackListHead;
     ULONG_PTR PspSiloMonitorList;
     ULONG_PTR EmpCallbackListHead;
+    ULONG_PTR PnpDeviceClassNotifyList;
 } NOTIFICATION_CALLBACKS, *PNOTIFICATION_CALLBACKS;
 
 //

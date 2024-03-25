@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2023
+*  (C) COPYRIGHT AUTHORS, 2015 - 2024
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     2.01
+*  VERSION:     2.05
 *
-*  DATE:        06 Feb 2023
+*  DATE:        11 Mar 2024
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -33,6 +33,92 @@ typedef VOID(NTAPI* pfnObDumpRoutine)(
     _In_ PROP_OBJECT_INFO* Context,           \
     _In_ HWND hwndDlg,                        \
     _In_ HWND hwndTreeList)
+
+/*
+* propDumpEnumWithNames
+*
+* Purpose:
+*
+* Dump given enumeration to the treelist (simple output).
+*
+*/
+VOID propDumpEnumWithNames(
+    _In_ HWND TreeList,
+    _In_ HTREEITEM ParentItem,
+    _In_ LPWSTR EnumName,
+    _In_ ULONG EnumValue,
+    _In_ PVALUE_DESC EnumNames,
+    _In_ ULONG EnumNamesCount
+)
+{
+    ULONG i, mask;
+    HTREEITEM h_tviSubItem, h_tviLast = NULL;
+
+    TVITEMEX itemex;
+
+    TL_SUBITEMS_FIXED subitems;
+    WCHAR szValue[MAX_PATH + 1];
+
+    RtlSecureZeroMemory(&subitems, sizeof(subitems));
+    szValue[0] = TEXT('0');
+    szValue[1] = TEXT('x');
+    ultohex(EnumValue, &szValue[2]);
+    subitems.Text[0] = szValue;
+    subitems.Count = 1;
+
+    h_tviSubItem = supTreeListAddItem(
+        TreeList,
+        ParentItem,
+        TVIF_TEXT | TVIF_STATE,
+        (UINT)0,
+        (UINT)0,
+        (LPWSTR)EnumName,
+        &subitems);
+
+    if (h_tviSubItem) {
+        h_tviLast = NULL;
+        mask = EnumValue;
+        for (i = 0; i < EnumNamesCount; i++) {
+            if (mask & EnumNames->dwValue) {
+                RtlSecureZeroMemory(&subitems, sizeof(subitems));
+                RtlSecureZeroMemory(&szValue, sizeof(szValue));
+                szValue[0] = TEXT('0');
+                szValue[1] = TEXT('x');
+                ultohex(EnumNames->dwValue, &szValue[2]);
+                subitems.Text[0] = szValue;
+                subitems.Text[1] = EnumNames->lpDescription;
+                subitems.Count = 2;
+
+                h_tviLast = supTreeListAddItem(
+                    TreeList,
+                    h_tviSubItem,
+                    TVIF_TEXT | TVIF_STATE,
+                    (UINT)0,
+                    (UINT)0,
+                    (LPWSTR)T_EmptyString,
+                    &subitems);
+
+                mask &= ~EnumNames->dwValue;
+            }
+
+            EnumNames++;
+        }
+    }
+
+
+    //
+    // Output dotted corner.
+    //
+    if (h_tviLast) {
+        RtlSecureZeroMemory(&itemex, sizeof(itemex));
+
+        itemex.hItem = h_tviLast;
+        itemex.mask = TVIF_TEXT | TVIF_HANDLE;
+        itemex.pszText = T_EMPTY;
+
+        TreeList_SetTreeItem(TreeList, &itemex, NULL);
+    }
+}
 
 /*
 * propObDumpGUID

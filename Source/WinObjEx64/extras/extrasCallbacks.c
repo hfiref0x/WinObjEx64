@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASCALLBACKS.C
 *
-*  VERSION:     2.04
+*  VERSION:     2.05
 *
-*  DATE:        11 Jan 2024
+*  DATE:        12 Mar 2024
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -149,6 +149,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPspPicoProviderRoutines);
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpKiNmiCallbackListHead);
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpPspSiloMonitorList);
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpEmpCallbackListHead);
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpPnpDeviceClassNotifyList);
 
 OBEX_FINDCALLBACK_ROUTINE(FindPspCreateProcessNotifyRoutine);
 OBEX_FINDCALLBACK_ROUTINE(FindPspCreateThreadNotifyRoutine);
@@ -173,6 +174,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspPicoProviderRoutines);
 OBEX_FINDCALLBACK_ROUTINE(FindKiNmiCallbackListHead);
 OBEX_FINDCALLBACK_ROUTINE(FindPspSiloMonitorList);
 OBEX_FINDCALLBACK_ROUTINE(FindEmpCallbackListHead);
+OBEX_FINDCALLBACK_ROUTINE(FindPnpDeviceClassNotifyList);
 
 OBEX_CALLBACK_DISPATCH_ENTRY g_CallbacksDispatchTable[] = {
     {
@@ -308,6 +310,11 @@ OBEX_CALLBACK_DISPATCH_ENTRY g_CallbacksDispatchTable[] = {
         0, L"EmpCallbacks",
         QueryCallbackGeneric, DumpEmpCallbackListHead, FindEmpCallbackListHead,
         &g_SystemCallbacks.EmpCallbackListHead
+    },
+    {
+        0, L"PnpCallbacks",
+        QueryCallbackGeneric, DumpPnpDeviceClassNotifyList, FindPnpDeviceClassNotifyList,
+        &g_SystemCallbacks.PnpDeviceClassNotifyList
     }
 };
 
@@ -3183,6 +3190,111 @@ OBEX_FINDCALLBACK_ROUTINE(FindEmpCallbackListHead)
 }
 
 /*
+* FindPnpDeviceClassNotifyList 
+*
+* Purpose:
+*
+* Returns the address of PnpDeviceClassNotifyList  for callbacks registered with:
+*
+*   IoRegisterPlugPlayNotification
+*
+*/
+OBEX_FINDCALLBACK_ROUTINE(FindPnpDeviceClassNotifyList)
+{
+    ULONG Index;
+    LONG Rel;
+    PBYTE ptrCode;
+    hde64s hs;
+    ULONG_PTR kvarAddress = 0;
+
+    ULONG SignatureSize = 0;
+    PBYTE Signature = NULL;
+
+    UNREFERENCED_PARAMETER(QueryFlags);
+
+    if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
+
+        kdGetAddressFromSymbol(&g_kdctx,
+            KVAR_PnpDeviceClassNotifyList,
+            &kvarAddress);
+
+    }
+
+    if (kvarAddress == 0) {
+
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
+            "IoRegisterPlugPlayNotification");
+
+        if (ptrCode == NULL)
+            return 0;
+
+        //
+        // Find subpattern first.
+        //
+
+        switch (g_NtBuildNumber) {
+
+        case NT_WIN7_RTM:
+        case NT_WIN7_SP1:
+
+            Signature = PnpDeviceClassNotifyList_SubPattern_7601;
+            SignatureSize = sizeof(PnpDeviceClassNotifyList_SubPattern_7601);
+            break;
+
+        case NT_WIN8_RTM:
+            Signature = PnpDeviceClassNotifyList_SubPattern_9200;
+            SignatureSize = sizeof(PnpDeviceClassNotifyList_SubPattern_9200);
+            break;
+
+        default:
+            Signature = PnpDeviceClassNofityList_SubPattern_9600_26080;
+            SignatureSize = sizeof(PnpDeviceClassNofityList_SubPattern_9600_26080);
+            break;
+        }
+
+        ptrCode = (PBYTE)supFindPattern(
+            ptrCode,
+            1024,
+            Signature,
+            SignatureSize);
+
+        if (ptrCode == NULL)
+            return 0;
+
+        Index = SignatureSize;
+        Rel = 0;
+
+        //
+        // Find lea rcx, PnpDeviceClassNotifyList
+        //
+
+        do {
+
+            hde64_disasm(ptrCode + Index, &hs);
+            if (hs.flags & F_ERROR)
+                break;
+
+            if ((hs.len == 7) &&
+                (hs.flags & F_PREFIX_REX) &&
+                (hs.flags & F_DISP32) &&
+                (hs.flags & F_MODRM) &&
+                (hs.opcode == 0x8D))
+            {
+                Rel = *(PLONG)(ptrCode + Index + 3);
+                break;
+            }
+
+            Index += hs.len;
+
+        } while (Index < 64);
+
+        kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
+    }
+
+    return kvarAddress;
+}
+
+/*
 * AddRootEntryToList
 *
 * Purpose:
@@ -5224,6 +5336,85 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpEmpCallbackListHead)
 
         Next = (ULONG_PTR)CallbackRecord.List.Next;
     }
+}
+
+/*
+* DumpPnpDeviceClassNotifyList 
+*
+* Purpose:
+*
+* Dump Pnp manager notify list from kernel and send them to output window.
+*
+*/
+OBEX_DISPLAYCALLBACK_ROUTINE(DumpPnpDeviceClassNotifyList)
+{
+    LIST_ENTRY ListEntry;
+    ULONG_PTR ListHead = KernelVariableAddress;
+    HTREEITEM RootItem;
+
+    LPWSTR GuidString;
+
+    DEVICE_CLASS_NOTIFY_ENTRY NotifyEntry;
+    UNICODE_STRING ConvertedGuid;
+
+    //
+    // Add callback root entry to the treelist.
+    //
+    RootItem = AddRootEntryToList(TreeList, CallbackType);
+    if (RootItem == 0)
+        return;
+
+    ListEntry.Flink = ListEntry.Blink = NULL;
+
+    //
+    // Read head.
+    //
+    if (!kdReadSystemMemory(
+        ListHead,
+        &ListEntry,
+        sizeof(LIST_ENTRY)))
+    {
+        return;
+    }
+
+    //
+    // Walk list entries.
+    //
+    while ((ULONG_PTR)ListEntry.Flink != ListHead) {
+
+        RtlSecureZeroMemory(&NotifyEntry, sizeof(NotifyEntry));
+
+        if (!kdReadSystemMemory(
+            (ULONG_PTR)ListEntry.Flink,
+            &NotifyEntry,
+            sizeof(NotifyEntry)))
+        {
+            break;
+        }
+
+        if (NotifyEntry.CallbackRoutine != NULL) {
+
+            if (NT_SUCCESS(RtlStringFromGUID(&NotifyEntry.ClassGuid, &ConvertedGuid)))
+                GuidString = ConvertedGuid.Buffer;
+            else
+                GuidString = NULL;
+
+            AddEntryToList(TreeList,
+                RootItem,
+                (ULONG_PTR)NotifyEntry.CallbackRoutine,
+                GuidString,
+                Modules);
+
+            if (GuidString)
+                RtlFreeUnicodeString(&ConvertedGuid);
+        }
+
+        if (NotifyEntry.ListEntry.Flink == NULL)
+            break;
+
+        ListEntry.Flink = NotifyEntry.ListEntry.Flink;
+    }
+
 }
 
 /*

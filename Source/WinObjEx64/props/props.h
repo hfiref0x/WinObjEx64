@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2024
 *
 *  TITLE:       PROPS.H
 *
-*  VERSION:     2.00
+*  VERSION:     2.05
 *
-*  DATE:        19 Jun 2022
+*  DATE:        11 Mar 2024
 *
 *  Common header file for properties dialog definitions.
 *
@@ -177,3 +177,11 @@ VOID propObDumpUnicodeString(
     _In_ LPWSTR StringName,
     _In_ PUNICODE_STRING InputString,
     _In_ BOOLEAN IsKernelPointer);
+
+VOID propDumpEnumWithNames(
+    _In_ HWND TreeList,
+    _In_ HTREEITEM ParentItem,
+    _In_ LPWSTR EnumName,
+    _In_ ULONG EnumValue,
+    _In_ PVALUE_DESC EnumNames,
+    _In_ ULONG EnumNamesCount);

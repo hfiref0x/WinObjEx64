@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020 - 2023
+*  (C) COPYRIGHT AUTHORS, 2020 - 2024
 *
 *  TITLE:       KSYMBOLS.H
 *
-*  VERSION:     2.03
+*  VERSION:     2.05
 *
-*  DATE:        21 Jul 2023
+*  DATE:        12 Mar 2024
 *
 *  Header file for kernel symbol names.
 *
@@ -70,6 +70,8 @@
 #define KVAR_PspSiloMonitorList                     L"PspSiloMonitorList"
 
 #define KVAR_EmpCallbackListHead                    L"EmpCallbackListHead"
+
+#define KVAR_PnpDeviceClassNotifyList               L"PnpDeviceClassNotifyList"
 
 #define KVAR_Win32kApiSetTable                      L"Win32kApiSetTable"
 

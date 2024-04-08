@@ -5238,21 +5238,37 @@ typedef VOID(NTAPI* PEX_HOST_NOTIFICATION) (
     _In_ ULONG NotificationType,
     _In_opt_ PVOID Context);
 
-typedef struct _EX_EXTENSION_INFORMATION {
+typedef struct _EX_EXTENSION_INFORMATION_V1 {
     USHORT Id;
     USHORT Version;
     USHORT FunctionCount;
-} EX_EXTENSION_INFORMATION, * PEX_EXTENSION_INFORMATION;
+} EX_EXTENSION_INFORMATION_V1, * PEX_EXTENSION_INFORMATION_V1;
+
+typedef struct _EX_EXTENSION_VERSION {
+    USHORT MajorVersion;
+    USHORT MinorVersion;
+} EX_EXTENSION_VERSION, * PEX_EXTENSION_VERSION;
+
+typedef struct _EX_EXTENSION_INFORMATION_V2 {
+    USHORT Id;
+    EX_EXTENSION_VERSION Version;
+    USHORT FunctionCount;
+} EX_EXTENSION_INFORMATION_V2, * PEX_EXTENSION_INFORMATION_V2;
+
+typedef struct _EX_HOST_TABLE {
+    EX_EXTENSION_INFORMATION_V2 HostInformation;
+    PVOID FunctionTable; //calbacks
+} EX_HOST_TABLE, * PEX_HOST_TABLE;
 
 typedef struct _EX_HOST_PARAMS {
-    EX_EXTENSION_INFORMATION HostInformation;
+    EX_EXTENSION_INFORMATION_V1 HostInformation;
     POOL_TYPE PoolType;
     PVOID HostTable;
     PVOID NotificationRoutine;
     PVOID NotificationContext;
 } EX_HOST_PARAMS, * PEX_HOST_PARAMS;
 
-typedef struct _EX_HOST_ENTRY {
+typedef struct _EX_HOST_ENTRY_V1 {
     LIST_ENTRY ListEntry;
     LONG RefCounter;
     EX_HOST_PARAMS HostParameters;
@@ -5260,10 +5276,29 @@ typedef struct _EX_HOST_ENTRY {
     EX_PUSH_LOCK PushLock;
     PVOID FunctionTable; //callbacks
     ULONG Flags;
-} EX_HOST_ENTRY, * PEX_HOST_ENTRY;
+} EX_HOST_ENTRY_V1, * PEX_HOST_ENTRY_V1;
+
+typedef struct _EX_HOST_ENTRY_V2 {
+    LIST_ENTRY ListEntry;
+    EX_EXTENSION_INFORMATION_V2 HostInformation;
+    ULONG64 RefCounter;
+    EX_PUSH_LOCK PushLock;
+    PEX_HOST_TABLE HostTablesPtr;
+    USHORT HostTablesCount;
+    PEX_HOST_TABLE CurrentHostTableEntry; //only set when an extension registers
+    PVOID NotificationRoutine;
+    PVOID NotificationContext;
+    EX_EXTENSION_VERSION ExtensionVersion;
+    EX_RUNDOWN_REF RundownProtection;
+    PVOID FunctionTable;
+    USHORT ExtensionTableFunctionCount;
+    ULONG Pad;
+    ULONG Flags;
+    EX_HOST_TABLE HostTables[1];
+} EX_HOST_ENTRY_V2, * PEX_HOST_ENTRY_V2;
 
 typedef struct _EX_EXTENSION_REGISTRATION {
-    EX_EXTENSION_INFORMATION Information;
+    EX_EXTENSION_INFORMATION_V1 Information;
     PVOID FunctionTable;
     PVOID* HostTable;
     PDRIVER_OBJECT DriverObject;

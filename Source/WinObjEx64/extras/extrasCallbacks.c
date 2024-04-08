@@ -2527,10 +2527,20 @@ OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
     ULONG_PTR kvarAddress = 0;
     PBYTE   ptrCode;
     LONG    Rel = 0;
-    ULONG   Index, c;
+    ULONG   Index, c, callIndex;
     hde64s  hs;
 
     UNREFERENCED_PARAMETER(QueryFlags);
+
+    // another call was added in 24H2 to ExfAcquirePushLockSharedEx
+    if (g_NtBuildNumber > NT_WIN11_23H2)
+    {
+        callIndex = 2;
+    }
+    else
+    {
+        callIndex = 1;
+    }
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
 
@@ -2552,7 +2562,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
         Index = 0;
 
         //
-        // Find ExpFindHost
+        // Find ExpFindHost / ExpFindCompatibleHost
         //
 
         do {
@@ -2572,14 +2582,48 @@ OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
             if (ptrCode[Index] == 0xE8)
                 c++;
 
-            if (c > 1) {
+            if (c > callIndex) {
                 Rel = *(PLONG)(ptrCode + Index + 1);
                 break;
             }
 
             Index += hs.len;
 
-        } while (Index < 256);
+        } while (Index < 512);
+
+        //
+        // If this is 25H2, the call is to ExpFindCompatibleHost
+        // Need to do another search to find the call to ExpFindHost
+        //
+        if (g_NtBuildNumber >= NT_WIN11_25H2)
+        {
+            ptrCode = ptrCode + Index + 5 + Rel;
+            Rel = 0;
+            Index = 0;
+            do {
+
+                hde64_disasm(ptrCode + Index, &hs);
+                if (hs.flags & F_ERROR)
+                    break;
+
+                //
+                // Find call instruction.
+                //
+                if (hs.len != 5) {
+                    Index += hs.len;
+                    continue;
+                }
+
+                if (ptrCode[Index] == 0xE8)
+                {
+                    Rel = *(PLONG)(ptrCode + Index + 1);
+                    break;
+                }
+
+                Index += hs.len;
+
+            } while (Index < 128);
+        }
 
         if (Rel == 0)
             return 0;
@@ -4717,13 +4761,30 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExHostCallbacks)
 {
     LIST_ENTRY ListEntry;
 
-    EX_HOST_ENTRY HostEntry;
+    EX_HOST_ENTRY_V1 HostEntryV1;
+    EX_HOST_ENTRY_V2 HostEntryV2;
+    PVOID HostEntry;
+    ULONG HostEntrySize;
 
     ULONG_PTR ListHead = KernelVariableAddress;
     ULONG_PTR* HostTableDump;
     ULONG NumberOfCallbacks, i;
+    PVOID NotificationRoutine;
+    PVOID FunctionTable;
 
     HTREEITEM RootItem;
+
+    // Starting build 26080 (25H2) the structures were updated
+    if (g_NtBuildNumber < NT_WIN11_25H2)
+    {
+        HostEntrySize = sizeof(HostEntryV1);
+        HostEntry = &HostEntryV1;
+    }
+    else
+    {
+        HostEntrySize = sizeof(HostEntryV2);
+        HostEntry = &HostEntryV2;
+    }
 
     //
     // Add callback root entry to the treelist.
@@ -4749,27 +4810,38 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExHostCallbacks)
     // Walk list entries.
     //
     while ((ULONG_PTR)ListEntry.Flink != ListHead) {
-
-        RtlSecureZeroMemory(&HostEntry, sizeof(HostEntry));
+        RtlSecureZeroMemory(HostEntry, HostEntrySize);
 
         if (!kdReadSystemMemory((ULONG_PTR)ListEntry.Flink,
-            &HostEntry,
-            sizeof(HostEntry)))
+            HostEntry,
+            HostEntrySize))
         {
             break;
+        }
+
+        // read extension function table
+        if (g_NtBuildNumber < NT_WIN11_25H2)
+        {
+            NumberOfCallbacks = HostEntryV1.HostParameters.HostInformation.FunctionCount;
+            NotificationRoutine = HostEntryV1.HostParameters.NotificationRoutine;
+            FunctionTable = HostEntryV1.FunctionTable;
+        }
+        else
+        {
+            NumberOfCallbacks = HostEntryV2.ExtensionTableFunctionCount;
+            NotificationRoutine = HostEntryV2.NotificationRoutine;
+            FunctionTable = HostEntryV2.FunctionTable;
         }
 
         //
         // Find not an empty host table.
         //
-        NumberOfCallbacks = HostEntry.HostParameters.HostInformation.FunctionCount;
-
         if (NumberOfCallbacks) {
 
-            if (HostEntry.HostParameters.NotificationRoutine) {
+            if (NotificationRoutine) {
                 AddEntryToList(TreeList,
                     RootItem,
-                    (ULONG_PTR)HostEntry.HostParameters.NotificationRoutine,
+                    (ULONG_PTR)NotificationRoutine,
                     L"NotificationRoutine",
                     Modules);
 
@@ -4778,12 +4850,12 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExHostCallbacks)
             //
             // Read function table.
             //
-            if (HostEntry.FunctionTable) {
+            if (FunctionTable) {
                 HostTableDump = (ULONG_PTR*)supHeapAlloc(NumberOfCallbacks * sizeof(PVOID));
                 if (HostTableDump) {
 
                     if (kdReadSystemMemory(
-                        (ULONG_PTR)HostEntry.FunctionTable,
+                        (ULONG_PTR)FunctionTable,
                         HostTableDump,
                         NumberOfCallbacks * sizeof(PVOID)))
                     {
@@ -4805,7 +4877,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExHostCallbacks)
             }
         }
 
-        ListEntry.Flink = HostEntry.ListEntry.Flink;
+        ListEntry.Flink = ((LIST_ENTRY*)(HostEntry))->Flink;
     }
 }
 

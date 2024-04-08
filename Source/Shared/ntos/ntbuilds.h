@@ -91,3 +91,4 @@
 // Windows 11 Active Development Branch
 #define NT_WIN11_DEV            23615 //dev
 #define NT_WIN11_24H2           26020 //canary (24H2)
+#define NT_WIN11_25H2			26080 //canary (25H2)

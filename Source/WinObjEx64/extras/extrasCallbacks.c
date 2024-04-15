@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.05
 *
-*  DATE:        12 Mar 2024
+*  DATE:        12 Apr 2024
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -67,7 +67,7 @@ CBT_MAPPING g_CbtMapping[] = {
 
     { NT_WIN11_21H2, NTDDI_WIN10_CO, CBT_SIZE_CO_V1 },
     { NT_WIN11_22H2, NTDDI_WIN10_NI, CBT_SIZE_NI_V1 },
-    { NT_WIN11_23H2, NTDDI_WIN10_NI, CBT_SIZE_NI_V1 }, 
+    { NT_WIN11_23H2, NTDDI_WIN10_NI, CBT_SIZE_NI_V1 },
     { NT_WIN11_24H2, NTDDI_WIN10_GE, CBT_SIZE_GE_V1 }   //update on release
 };
 
@@ -80,16 +80,16 @@ ULONG g_CallbacksCount;
 
 typedef struct _OBEX_CALLBACK_DISPATCH_ENTRY OBEX_CALLBACK_DISPATCH_ENTRY;
 
-typedef ULONG_PTR(CALLBACK *POBEX_FINDCALLBACK_ROUTINE)(
+typedef ULONG_PTR(CALLBACK* POBEX_FINDCALLBACK_ROUTINE)(
     _In_ ULONG_PTR QueryFlags);
 
-typedef VOID(CALLBACK *POBEX_DISPLAYCALLBACK_ROUTINE)(
+typedef VOID(CALLBACK* POBEX_DISPLAYCALLBACK_ROUTINE)(
     _In_ HWND TreeList,
     _In_ LPWSTR CallbackType,
     _In_ ULONG_PTR KernelVariableAddress,
     _In_ PRTL_PROCESS_MODULES Modules);
 
-typedef NTSTATUS(CALLBACK *POBEX_QUERYCALLBACK_ROUTINE)(
+typedef NTSTATUS(CALLBACK* POBEX_QUERYCALLBACK_ROUTINE)(
     _In_ ULONG_PTR QueryFlags,
     _In_ POBEX_DISPLAYCALLBACK_ROUTINE DisplayRoutine,
     _In_opt_ POBEX_FINDCALLBACK_ROUTINE FindRoutine,
@@ -123,7 +123,7 @@ typedef struct _OBEX_CALLBACK_DISPATCH_ENTRY {
     POBEX_DISPLAYCALLBACK_ROUTINE DisplayRoutine;
     POBEX_FINDCALLBACK_ROUTINE FindRoutine;
     PULONG_PTR SystemCallbacksRef;
-} OBEX_CALLBACK_DISPATCH_ENTRY, *POBEX_CALLBACK_DISPATCH_ENTRY;
+} OBEX_CALLBACK_DISPATCH_ENTRY, * POBEX_CALLBACK_DISPATCH_ENTRY;
 
 OBEX_QUERYCALLBACK_ROUTINE(QueryIopFsListsCallbacks);
 OBEX_QUERYCALLBACK_ROUTINE(QueryCallbackGeneric);
@@ -227,7 +227,7 @@ OBEX_CALLBACK_DISPATCH_ENTRY g_CallbacksDispatchTable[] = {
         &g_SystemCallbacks.ObThreadCallbackHead
     },
     {
-        ObjectTypeDesktop, L"ObDesktop", 
+        ObjectTypeDesktop, L"ObDesktop",
         QueryCallbackGeneric, DumpObCallbacks, FindObjectTypeCallbackListHeadByType,
         &g_SystemCallbacks.ObDesktopCallbackHead
     },
@@ -321,7 +321,7 @@ OBEX_CALLBACK_DISPATCH_ENTRY g_CallbacksDispatchTable[] = {
 //
 // All available names for CiCallbacks. Unknown is expected to be XBOX callback.
 //
-static const WCHAR *CiCallbackNames[] = {
+static const WCHAR* CiCallbackNames[] = {
     L"CiSetFileCache", //0
     L"CiGetFileCache", //1
     L"CiQueryInformation", //2
@@ -728,7 +728,7 @@ LPWSTR GetCiRoutineNameFromIndex(
     _In_ ULONG_PTR CiCallbacksSize)
 {
     ULONG ArrayCount = 0, index;
-    CONST BYTE *Indexes;
+    CONST BYTE* Indexes;
 
     switch (g_NtBuildNumber) {
 
@@ -782,7 +782,7 @@ LPWSTR GetCiRoutineNameFromIndex(
     case NT_WIN10_21H1:
     case NT_WIN10_21H2:
     case NT_WIN10_22H2:
-        
+
         switch (CiCallbacksSize) {
         case CBT_SIZE_VB_V2:
             Indexes = CiCallbackIndexes_Win1021H2_V2;
@@ -1205,10 +1205,10 @@ BOOL IopFileSystemIsValidPattern(
 *
 */
 BOOL FindIopFileSystemQueueHeads(
-    _Out_ ULONG_PTR *IopCdRomFileSystemQueueHead,
-    _Out_ ULONG_PTR *IopDiskFileSystemQueueHead,
-    _Out_ ULONG_PTR *IopTapeFileSystemQueueHead,
-    _Out_ ULONG_PTR *IopNetworkFileSystemQueueHead
+    _Out_ ULONG_PTR* IopCdRomFileSystemQueueHead,
+    _Out_ ULONG_PTR* IopDiskFileSystemQueueHead,
+    _Out_ ULONG_PTR* IopTapeFileSystemQueueHead,
+    _Out_ ULONG_PTR* IopNetworkFileSystemQueueHead
 )
 {
     BOOL bSymQuerySuccess = FALSE;
@@ -1275,7 +1275,7 @@ BOOL FindIopFileSystemQueueHeads(
     if (bSymQuerySuccess)
         return TRUE;
 
-    ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, 
+    ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
         "IoRegisterFileSystem");
 
     if (ptrCode == NULL)
@@ -1421,7 +1421,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindIopFsNotifyChangeQueueHead)
 
     if (kvarAddress == 0) {
 
-        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, 
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
             "IoUnregisterFsRegistrationChange");
 
         if (ptrCode == NULL)
@@ -1488,7 +1488,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindRtlpDebugPrintCallbackList)
             KVAR_RtlpDebugPrintCallbackList,
             &kvarAddress);
 
-    } 
+    }
 
     if (kvarAddress == 0) {
 
@@ -1599,7 +1599,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindPopRegisteredPowerSettingCallbacks)
 
     if (kvarAddress == 0) {
 
-        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, 
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
             "PoRegisterPowerSettingCallback");
 
         if (ptrCode == NULL)
@@ -1750,10 +1750,10 @@ OBEX_FINDCALLBACK_ROUTINE(FindObjectTypeCallbackListHeadByType)
 
     union {
         union {
-            OBJECT_TYPE_7 *ObjectType_7;
-            OBJECT_TYPE_8 *ObjectType_8;
-            OBJECT_TYPE_RS1 *ObjectType_RS1;
-            OBJECT_TYPE_RS2 *ObjectType_RS2;
+            OBJECT_TYPE_7* ObjectType_7;
+            OBJECT_TYPE_8* ObjectType_8;
+            OBJECT_TYPE_RS1* ObjectType_RS1;
+            OBJECT_TYPE_RS2* ObjectType_RS2;
         } Versions;
         PVOID Ref;
     } ObjectType;
@@ -1782,7 +1782,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindObjectTypeCallbackListHeadByType)
     RtlInitUnicodeString(&usName, TypeName);
     CurrentObject = ObQueryObjectInDirectory(&usName,
         ObGetPredefinedUnicodeString(OBP_OBTYPES));
-    
+
     if (CurrentObject == NULL)
         return 0;
 
@@ -2033,7 +2033,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindKeBugCheckReasonCallbackHead)
 
     if (kvarAddress == 0) {
 
-        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, 
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
             "KeRegisterBugCheckReasonCallback");
 
         if (ptrCode == NULL)
@@ -2377,7 +2377,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspCreateProcessNotifyRoutine)
 
     if (kvarAddress == 0) {
 
-        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, 
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
             "PsSetCreateProcessNotifyRoutine");
 
         if (ptrCode == NULL)
@@ -2650,7 +2650,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
             }
 
         }
-    
+
     }
 
     return kvarAddress;
@@ -2692,21 +2692,21 @@ OBEX_FINDCALLBACK_ROUTINE(FindExpCallbackListHead)
         if (hs.flags & F_ERROR)
             break;
 
-		if (hs.len == 7) { 
-			if (hs.flags & F_PREFIX_REX &&
-				hs.flags & F_DISP32 &&
-				hs.flags & F_MODRM)
-			{
-				if (((ptrCode[Index] == 0x48) || (ptrCode[Index] == 0x4C)) &&
-					(ptrCode[Index + 1] == 0x8D) &&
-					((ptrCode[Index + 2] == 0x15) ||
-						(ptrCode[Index + hs.len + 3] == 0x28))) // add/lea with +0x28 = offset of object's ExpCallbackList
-				{
-					Rel = (LONG)hs.disp.disp32;
-					break;
-				}
-			}
-		}
+        if (hs.len == 7) {
+            if (hs.flags & F_PREFIX_REX &&
+                hs.flags & F_DISP32 &&
+                hs.flags & F_MODRM)
+            {
+                if (((ptrCode[Index] == 0x48) || (ptrCode[Index] == 0x4C)) &&
+                    (ptrCode[Index + 1] == 0x8D) &&
+                    ((ptrCode[Index + 2] == 0x15) ||
+                        (ptrCode[Index + hs.len + 3] == 0x28))) // add/lea with +0x28 = offset of object's ExpCallbackList
+                {
+                    Rel = (LONG)hs.disp.disp32;
+                    break;
+                }
+            }
+        }
 
         Index += hs.len;
 
@@ -3234,7 +3234,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindEmpCallbackListHead)
 }
 
 /*
-* FindPnpDeviceClassNotifyList 
+* FindPnpDeviceClassNotifyList
 *
 * Purpose:
 *
@@ -3432,8 +3432,8 @@ VOID AddEntryToList(
     RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
 
     if (ntsupFindModuleEntryByAddress(
-        Modules, 
-        (PVOID)Function, 
+        Modules,
+        (PVOID)Function,
         &moduleIndex))
     {
         MultiByteToWideChar(
@@ -4161,7 +4161,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpSeFileSystemCallbacks)
     ULONG_PTR Next;
 
     SEP_LOGON_SESSION_TERMINATED_NOTIFICATION SeEntry; // This structure is different for Ex variant but 
-                                                       // key callback function field is on the same offset.
+    // key callback function field is on the same offset.
 
     HTREEITEM RootItem;
 
@@ -4225,8 +4225,8 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCallbacks)
 
     union {
         union {
-            POP_POWER_SETTING_REGISTRATION_V1 *v1;
-            POP_POWER_SETTING_REGISTRATION_V2 *v2;
+            POP_POWER_SETTING_REGISTRATION_V1* v1;
+            POP_POWER_SETTING_REGISTRATION_V2* v2;
         } Versions;
         PBYTE Ref;
     } CallbackData;
@@ -4336,7 +4336,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCallbacks)
             ListEntry.Flink = CallbackData.Versions.v1->Link.Flink;
         }
 
-    } while (FALSE); 
+    } while (FALSE);
 
     if (Buffer) supHeapFree(Buffer);
 }
@@ -4761,124 +4761,142 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExHostCallbacks)
 {
     LIST_ENTRY ListEntry;
 
-    EX_HOST_ENTRY_V1 HostEntryV1;
-    EX_HOST_ENTRY_V2 HostEntryV2;
-    PVOID HostEntry;
     ULONG HostEntrySize;
 
     ULONG_PTR ListHead = KernelVariableAddress;
     ULONG_PTR* HostTableDump;
     ULONG NumberOfCallbacks, i;
     PVOID NotificationRoutine;
-    PVOID FunctionTable;
-
+    PVOID FunctionTable, HostEntryBuffer = NULL;
     HTREEITEM RootItem;
 
-    // Starting build 26080 (25H2) the structures were updated
-    if (g_NtBuildNumber < NT_WIN11_25H2)
-    {
-        HostEntrySize = sizeof(HostEntryV1);
-        HostEntry = &HostEntryV1;
-    }
-    else
-    {
-        HostEntrySize = sizeof(HostEntryV2);
-        HostEntry = &HostEntryV2;
-    }
+    union {
+        union {
+            EX_HOST_ENTRY_V1* v1;
+            EX_HOST_ENTRY_V2* v2;
+        } Versions;
+        PBYTE Ref;
+    } hostEntry;
 
-    //
-    // Add callback root entry to the treelist.
-    //
-    RootItem = AddRootEntryToList(TreeList, CallbackType);
-    if (RootItem == 0)
-        return;
 
-    ListEntry.Flink = ListEntry.Blink = NULL;
+    do {
 
-    //
-    // Read head.
-    //
-    if (!kdReadSystemMemory(
-        ListHead,
-        &ListEntry,
-        sizeof(LIST_ENTRY)))
-    {
-        return;
-    }
+        // Starting build 26080 (25H2) the structures were updated
+        if (g_NtBuildNumber < NT_WIN11_25H2)
+            HostEntrySize = sizeof(EX_HOST_ENTRY_V1);
+        else
+            HostEntrySize = sizeof(EX_HOST_ENTRY_V2);
 
-    //
-    // Walk list entries.
-    //
-    while ((ULONG_PTR)ListEntry.Flink != ListHead) {
-        RtlSecureZeroMemory(HostEntry, HostEntrySize);
+        HostEntryBuffer = supHeapAlloc(HostEntrySize);
+        if (HostEntryBuffer == NULL)
+            break;
 
-        if (!kdReadSystemMemory((ULONG_PTR)ListEntry.Flink,
-            HostEntry,
-            HostEntrySize))
+        hostEntry.Ref = (PBYTE)HostEntryBuffer;
+
+        //
+        // Add callback root entry to the treelist.
+        //
+        RootItem = AddRootEntryToList(TreeList, CallbackType);
+        if (RootItem == 0)
+            break;
+
+        ListEntry.Flink = ListEntry.Blink = NULL;
+
+        //
+        // Read head.
+        //
+        if (!kdReadSystemMemory(
+            ListHead,
+            &ListEntry,
+            sizeof(LIST_ENTRY)))
         {
             break;
         }
 
-        // read extension function table
-        if (g_NtBuildNumber < NT_WIN11_25H2)
-        {
-            NumberOfCallbacks = HostEntryV1.HostParameters.HostInformation.FunctionCount;
-            NotificationRoutine = HostEntryV1.HostParameters.NotificationRoutine;
-            FunctionTable = HostEntryV1.FunctionTable;
-        }
-        else
-        {
-            NumberOfCallbacks = HostEntryV2.ExtensionTableFunctionCount;
-            NotificationRoutine = HostEntryV2.NotificationRoutine;
-            FunctionTable = HostEntryV2.FunctionTable;
-        }
-
         //
-        // Find not an empty host table.
+        // Walk list entries.
         //
-        if (NumberOfCallbacks) {
+        while ((ULONG_PTR)ListEntry.Flink != ListHead) {
 
-            if (NotificationRoutine) {
-                AddEntryToList(TreeList,
-                    RootItem,
-                    (ULONG_PTR)NotificationRoutine,
-                    L"NotificationRoutine",
-                    Modules);
+            //
+            // Since this buffer now allocated, on a first call it will be empty. Zero it when iteration is over.
+            //
+            if (!kdReadSystemMemory((ULONG_PTR)ListEntry.Flink,
+                HostEntryBuffer,
+                HostEntrySize))
+            {
+                break;
+            }
 
+            // read extension function table
+            if (g_NtBuildNumber < NT_WIN11_25H2)
+            {               
+                NumberOfCallbacks = hostEntry.Versions.v1->HostParameters.HostInformation.FunctionCount;
+                NotificationRoutine = hostEntry.Versions.v1->HostParameters.NotificationRoutine;
+                FunctionTable = hostEntry.Versions.v1->FunctionTable;
+            }
+            else
+            {
+                NumberOfCallbacks = hostEntry.Versions.v2->ExtensionTableFunctionCount;
+                NotificationRoutine = hostEntry.Versions.v2->NotificationRoutine;
+                FunctionTable = hostEntry.Versions.v2->FunctionTable;
             }
 
             //
-            // Read function table.
+            // Find not an empty host table.
             //
-            if (FunctionTable) {
-                HostTableDump = (ULONG_PTR*)supHeapAlloc(NumberOfCallbacks * sizeof(PVOID));
-                if (HostTableDump) {
+            if (NumberOfCallbacks) {
 
-                    if (kdReadSystemMemory(
-                        (ULONG_PTR)FunctionTable,
-                        HostTableDump,
-                        NumberOfCallbacks * sizeof(PVOID)))
-                    {
+                if (NotificationRoutine) {
+                    AddEntryToList(TreeList,
+                        RootItem,
+                        (ULONG_PTR)NotificationRoutine,
+                        L"NotificationRoutine",
+                        Modules);
 
-                        for (i = 0; i < NumberOfCallbacks; i++) {
-                            if (HostTableDump[i]) {
-                                AddEntryToList(TreeList,
-                                    RootItem,
-                                    (ULONG_PTR)HostTableDump[i],
-                                    L"Callback",
-                                    Modules);
+                }
+
+                //
+                // Read function table.
+                //
+                if (FunctionTable) {
+                    HostTableDump = (ULONG_PTR*)supHeapAlloc(NumberOfCallbacks * sizeof(PVOID));
+                    if (HostTableDump) {
+
+                        if (kdReadSystemMemory(
+                            (ULONG_PTR)FunctionTable,
+                            HostTableDump,
+                            NumberOfCallbacks * sizeof(PVOID)))
+                        {
+
+                            for (i = 0; i < NumberOfCallbacks; i++) {
+                                if (HostTableDump[i]) {
+                                    AddEntryToList(TreeList,
+                                        RootItem,
+                                        (ULONG_PTR)HostTableDump[i],
+                                        L"Callback",
+                                        Modules);
+                                }
                             }
+
                         }
 
+                        supHeapFree(HostTableDump);
                     }
-
-                    supHeapFree(HostTableDump);
                 }
             }
+
+            //
+            // ListEntry is on the same offset.
+            //
+            ListEntry.Flink = hostEntry.Versions.v1->ListEntry.Flink;
+            RtlSecureZeroMemory(HostEntryBuffer, HostEntrySize);
         }
 
-        ListEntry.Flink = ((LIST_ENTRY*)(HostEntry))->Flink;
-    }
+    } while (FALSE);
+
+    if (HostEntryBuffer)
+        supHeapFree(HostEntryBuffer);
 }
 
 /*
@@ -5045,7 +5063,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCoalescingCallbacks)
             CallbacksCount = PopCoalescingCallbackRoutineCount_V2;
 
         if (kdReadSystemMemory(KernelVariableAddress,
-            &Callbacks, 
+            &Callbacks,
             CallbacksCount * sizeof(EX_FAST_REF)))
         {
 
@@ -5120,7 +5138,7 @@ LPWSTR PspPicoProviderNameFromIndex(
 )
 {
     LPWSTR LxpNames[] = {
-        L"PicoSystemCallDispatch", 
+        L"PicoSystemCallDispatch",
         L"PicoThreadExit",
         L"PicoProcessExit",
         L"PicoDispatchException",
@@ -5411,7 +5429,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpEmpCallbackListHead)
 }
 
 /*
-* DumpPnpDeviceClassNotifyList 
+* DumpPnpDeviceClassNotifyList
 *
 * Purpose:
 *
@@ -5706,7 +5724,7 @@ VOID DisplayCallbacksList(
 */
 VOID SysCbDialogHandlePopupMenu(
     _In_ HWND hwndDlg,
-    _In_ EXTRASCONTEXT* pDlgContext, 
+    _In_ EXTRASCONTEXT* pDlgContext,
     _In_ LPARAM lParam
 )
 {
@@ -5719,13 +5737,13 @@ VOID SysCbDialogHandlePopupMenu(
 
     hMenu = CreatePopupMenu();
     if (hMenu) {
-        
-        if (supTreeListAddCopyValueItem(hMenu, 
-            pDlgContext->TreeList, 
-            ID_OBJECT_COPY, 
-            uPos++, 
-            lParam, 
-            &pDlgContext->tlSubItemHit)) 
+
+        if (supTreeListAddCopyValueItem(hMenu,
+            pDlgContext->TreeList,
+            ID_OBJECT_COPY,
+            uPos++,
+            lParam,
+            &pDlgContext->tlSubItemHit))
         {
             InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
         }
@@ -5779,7 +5797,7 @@ INT_PTR SysCbDialogResize(
 */
 VOID SysCbDialogContentRefresh(
     _In_ HWND hwndDlg,
-    _In_ EXTRASCONTEXT *pDlgContext,
+    _In_ EXTRASCONTEXT* pDlgContext,
     _In_ BOOL fResetContent
 )
 {
@@ -5861,7 +5879,7 @@ INT_PTR CALLBACK SysCbDialogProc(
     _In_ LPARAM lParam
 )
 {
-    EXTRASCONTEXT *pDlgContext;
+    EXTRASCONTEXT* pDlgContext;
 
     switch (uMsg) {
 
@@ -5904,7 +5922,7 @@ INT_PTR CALLBACK SysCbDialogProc(
     case WM_COMMAND:
 
         switch (GET_WM_COMMAND_ID(wParam, lParam)) {
-       
+
         case IDCANCEL:
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
             break;
@@ -5914,7 +5932,7 @@ INT_PTR CALLBACK SysCbDialogProc(
             pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
             if (pDlgContext) {
 
-                supTreeListCopyItemValueToClipboard(pDlgContext->TreeList, 
+                supTreeListCopyItemValueToClipboard(pDlgContext->TreeList,
                     pDlgContext->tlSubItemHit);
 
             }

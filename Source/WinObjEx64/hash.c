@@ -4,9 +4,9 @@
 *
 *  TITLE:       HASH.C
 *
-*  VERSION:     2.04
+*  VERSION:     2.05
 *
-*  DATE:        22 Feb 2024
+*  DATE:        12 Apr 2024
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -165,10 +165,11 @@ NTSTATUS HashpAddPad(
 
         i = (cbPad >> 3);
         do {
-
+#pragma warning(push)
+#pragma warning(disable: 28193)
             ntStatus = BCryptHashData(HashContext->HashHandle,
                 (PUCHAR)pbInput, DEFAULT_ALIGN_BYTES, 0);
-
+#pragma warning(pop)
             cbPad -= DEFAULT_ALIGN_BYTES;
             --i;
 

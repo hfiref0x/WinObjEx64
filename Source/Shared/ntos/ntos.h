@@ -5,9 +5,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.223
+*  VERSION:     1.224
 *
-*  DATE:        12 Apr 2024
+*  DATE:        01 May 2024
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -8258,6 +8258,14 @@ typedef VOID(CALLBACK *PLDR_DLL_NOTIFICATION_FUNCTION)(
 #define IMAGE_FILE_MACHINE_CHPE_X86 0x3A64
 #endif
 
+#ifndef IMAGE_FILE_MACHINE_ARM64EC
+#define IMAGE_FILE_MACHINE_ARM64EC           0xA641
+#endif
+
+#ifndef IMAGE_FILE_MACHINE_ARM64X
+#define IMAGE_FILE_MACHINE_ARM64X            0xA64E
+#endif
+
 NTSYSAPI
 NTSTATUS
 NTAPI
@@ -14604,7 +14612,18 @@ NtSetIntervalProfile(
 * Signing Levels API.
 *
 ************************************************************************************/
-typedef UCHAR SE_SIGNING_LEVEL, * PSE_SIGNING_LEVEL;
+typedef UCHAR SE_SIGNING_LEVEL, *PSE_SIGNING_LEVEL;
+
+typedef struct _SE_FILE_CACHE_CLAIM_INFORMATION {
+    ULONG Size;
+    PVOID Claim;
+} SE_FILE_CACHE_CLAIM_INFORMATION, *PSE_FILE_CACHE_CLAIM_INFORMATION;
+
+typedef struct _SE_SET_FILE_CACHE_INFORMATION {
+    ULONG Size;
+    UNICODE_STRING CatalogDirectoryPath;
+    SE_FILE_CACHE_CLAIM_INFORMATION OriginClaimInfo;
+} SE_SET_FILE_CACHE_INFORMATION, *PSE_SET_FILE_CACHE_INFORMATION;
 
 #ifndef SE_SIGNING_LEVEL_UNCHECKED
 #define SE_SIGNING_LEVEL_UNCHECKED         0x00000000
@@ -14687,6 +14706,17 @@ NtSetCachedSigningLevel(
     _In_reads_(SourceFileCount) PHANDLE SourceFiles,
     _In_ ULONG SourceFileCount,
     _In_opt_ HANDLE TargetFile);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtSetCachedSigningLevel2(
+    _In_ ULONG Flags,
+    _In_ SE_SIGNING_LEVEL InputSigningLevel,
+    _In_reads_(SourceFileCount) PHANDLE SourceFiles,
+    _In_ ULONG SourceFileCount,
+    _In_opt_ HANDLE TargetFile,
+    _In_opt_ SE_SET_FILE_CACHE_INFORMATION* CacheInformation);
 
 NTSYSAPI
 NTSTATUS

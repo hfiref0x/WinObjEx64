@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
-*  VERSION:     2.04
+*  VERSION:     2.05
 *
-*  DATE:        13 Jan 2024
+*  DATE:        21 Apr 2024
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1371,7 +1371,7 @@ LRESULT CALLBACK DrvListViewHookProc(
         break;
     }
 
-    return g_OriginalListViewProc(hwnd, uMsg, wParam, lParam);
+    return CallWindowProc(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
 }
 
 /*

@@ -1,5 +1,6 @@
 v2.0.5
 added Pnp manager callbacks
+recent win11 compatibility improvements
 
 v2.0.4
 win11 23h2 compatibility

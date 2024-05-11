@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.05
 *
-*  DATE:        01 May 2024
+*  DATE:        11 May 2024
 *
 *  Common header file for the user interface.
 *
@@ -192,11 +192,10 @@ typedef struct _LVCOLUMNS_DATA {
 #define ErrShadowW32pServiceLimitNotFound   6
 #define ErrShadowWin32uMismatch             7
 #define ErrShadowW32pServiceTableNotFound   8
-#define ErrShadowWin32ksgdLoadFail          9
-#define ErrShadowApiSetSchemaVerUnknown     10
-#define ErrShadowWin32ksgdNotFound          11
-#define ErrShadowWin32ksgdGlobalsNotFound   12
-#define ErrShadowWin32ksgdOffsetNotFound    13
+#define ErrShadowApiSetSchemaVerUnknown     9
+#define ErrShadowWin32kGlobalsNotFound      10
+#define ErrShadowWin32kOffsetNotFound       11
+#define ErrShadowWin32kGetStateNotFound     12
 
 //
 // Common Dialog handlers.

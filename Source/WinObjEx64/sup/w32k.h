@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2023
+*  (C) COPYRIGHT AUTHORS, 2023 - 2024
 *
 *  TITLE:       W32K.H
 *
-*  VERSION:     2.03
+*  VERSION:     2.05
 *
-*  DATE:        26 Jul 2023
+*  DATE:        11 May 2024
 *
 *  Common header file for the win32k support routines.
 *
@@ -20,7 +20,6 @@
 
 #define WIN32K_FILENAME     L"win32k.sys"       // base kernel module
 #define WIN32U_FILENAME     L"win32u.dll"       // base user module
-#define WIN32KSGD_FILENAME  L"win32ksgd.sys"    // session global kernel module
 
 //
 // It is overcomplicated since we have to support multiple variants of what
@@ -31,6 +30,11 @@
 // 3. Win32k ApiSetTable
 // 4. Win32k ApiSetTable improvement
 // 5. Win32k session aware ApiSets
+// 6. Win32kSgd merge into win32k.sys
+//
+
+//
+// The following structure only valid for deprecated win32ksgd.
 //
 typedef struct _SGD_GLOBALS {
     PVOID gSessionGlobalSlots;     //pointer to list
@@ -44,12 +48,29 @@ typedef struct _SGD_GLOBALS {
     PVOID gSessionApiSetHostRefCountLock;
     PVOID gLowSessionGlobalSlots;  //pointer to list
     ULONG gAvailableSlots;
-} SGD_GLOBALS, * PSGD_GLOBALS;
+} SGD_GLOBALS, *PSGD_GLOBALS;
+
+typedef struct _W32K_GLOBALS {
+    PVOID gLowSessionGlobalSlots;  //pointer to list
+    ULONG gAvailableSlots;
+    ULONG Reserved0;
+    PVOID gSessionGlobalSlots;     //pointer to list
+    PVOID gpSESSIONSLOTS;          //pointer to list
+    LIST_ENTRY gSessionSlotsList;  //gpSESSIONSLOTS is the head
+    struct {
+        ULONG LowCount;
+        ULONG HighCount;
+        ULONGLONG TotalCount;
+    } gSessionApiSetHostRefCount;
+    PVOID gSessionApiSetHostRefCountLock;
+    PVOID gSessionProcessLifetimeLock; //W32_PUSH_LOCK
+    PVOID gLock; //W32_PUSH_LOCK
+} W32K_GLOBALS, *PW32K_GLOBALS;
 
 //
 //  ApiSet layout 24H2
 //
-//  WIN32KSGD!gSessionGlobalSlots:
+//  WIN32K!gSessionGlobalSlots:
 //
 //  +------+
 //  | Slot |
@@ -67,10 +88,10 @@ typedef struct _SGD_GLOBALS {
 // 
 // Each slot is a pointer to tagWIN32KSESSIONSTATE opaque structure which
 // holds multiple global variables for given session, 
-// including Win32kApiSetTable pointer (at +0x88 for 25905 24H2).
+// including Win32kApiSetTable pointer (at +0x88 for 26212 24H2).
 // 
 // If current session id is zero then apiset will be resolved from 
-// WIN32KSGD!gLowSessionGlobalSlots instead.
+// WIN32K!gLowSessionGlobalSlots instead.
 // 
 // Win32kApiSetTable layout is the same as pre Win11.
 // 
@@ -102,14 +123,10 @@ typedef struct _SDT_CONTEXT {
     ULONG_PTR KernelBaseAddress;            //win32k.sys kernel image base address
     ULONG_PTR KernelImageSize;              //win32k.sys kernel image size
 
-    ULONG_PTR SgdBaseAddress;               //win32ksgd.sys kernel image base address
-    ULONG_PTR SgdImageSize;                 //win32ksgd.sys kernel image size
-
     HANDLE ExportsEnumHeap;                 //heap handle for enum
 
     HMODULE UserModule;                     //win32u.dll hmodule
     HMODULE KernelModule;                   //win32k.sys hmodule
-    HMODULE SgdModule;                      //win32ksgd.sys hmodule
 
     PRAW_SYSCALL_ENTRY UserTable;           //win32u syscalls exports dump
     ULONG UserLimit;                        //win32u syscalls count
@@ -119,11 +136,11 @@ typedef struct _SDT_CONTEXT {
     ULONG Win32kApiSetTableOffset;          //SGD offset to Win32kApiSetTable
 
     ULONG_PTR Win32kApiSetTable;            //Win32kApiSetTable user address for pre-24H2
+    ULONG_PTR W32GetSessionStatePtr;        //Function pointer
 
     ULONG_PTR W32pServiceTableKernelBase;   //W32pServiceTable calculated kernel address
     PULONG W32pServiceTableUserBase;        //W32pServiceTable user address
-    SGD_GLOBALS SgdGlobals;                 //win32ksgd.sys global variables
-
+    W32K_GLOBALS W32Globals;                //win32k.sys global variables
 } SDT_CONTEXT, * PSDT_CONTEXT;
 
 typedef struct _SDT_FUNCTION_NAME {

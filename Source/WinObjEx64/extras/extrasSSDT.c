@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     2.04
+*  VERSION:     2.05
 *
-*  DATE:        11 Jan 2024
+*  DATE:        11 May 2024
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -461,7 +461,7 @@ VOID SdtListReportResolveModuleError(
 
     case STATUS_DLL_NOT_FOUND:
 
-        RtlStringCchPrintfSecure(szErrorBuffer, 
+        RtlStringCchPrintfSecure(szErrorBuffer,
             RTL_NUMBER_OF(szErrorBuffer),
             L"could not load import dll %wZ",
             ResolvedModuleName);
@@ -505,7 +505,7 @@ VOID SdtpSetDllDirectory(
         _strcpy(szBuffer, g_WinObj.szSystemDirectory);
         _strcat(szBuffer, TEXT("\\drivers"));
         lpDirectory = (PWCHAR)&szBuffer;
-    } 
+    }
 
     SetDllDirectory(lpDirectory);
 }
@@ -627,7 +627,7 @@ BOOL SdtListCreateTableShadow(
                         else if (sdtFn.ExportOrdinal)
                             lpFunctionName = MAKEINTRESOURCEA(sdtFn.ExportOrdinal);
 
-                        if (!NT_SUCCESS(NtRawGetProcAddress(sdtModule.ImageBase, lpFunctionName, &resolveInfo))) {                         
+                        if (!NT_SUCCESS(NtRawGetProcAddress(sdtModule.ImageBase, lpFunctionName, &resolveInfo))) {
                             SdtListErrorProcedureNotFound(lpFunctionName, &sdtModule.Name);
                             break;
                         }
@@ -915,12 +915,11 @@ VOID SdtListCreate(
                 switch (returnStatus) {
 
                 case ErrShadowWin32kNotFound:
-                case ErrShadowWin32ksgdNotFound:
 
                     RtlStringCchPrintfSecure(szText,
                         RTL_NUMBER_OF(szText),
                         TEXT("Could not find %ws module"),
-                        (returnStatus == ErrShadowWin32kNotFound) ? WIN32K_FILENAME : WIN32KSGD_FILENAME);
+                        WIN32K_FILENAME);
 
                     break;
 
@@ -931,14 +930,10 @@ VOID SdtListCreate(
 
                 case ErrShadowWin32uLoadFail:
                 case ErrShadowWin32kLoadFail:
-                case ErrShadowWin32ksgdLoadFail:
 
                     switch (returnStatus) {
                     case ErrShadowWin32kLoadFail:
                         lpModule = WIN32K_FILENAME;
-                        break;
-                    case ErrShadowWin32ksgdLoadFail:
-                        lpModule = WIN32KSGD_FILENAME;
                         break;
                     default:
                     case ErrShadowWin32uLoadFail:
@@ -968,12 +963,16 @@ VOID SdtListCreate(
                     _strcpy(szText, TEXT("ApiSetSchema version is unknown"));
                     break;
 
-                case ErrShadowWin32ksgdGlobalsNotFound:
-                    _strcpy(szText, TEXT("Could not find win32ksgd.sys globals variable"));
+                case ErrShadowWin32kGlobalsNotFound:
+                    _strcpy(szText, TEXT("Could not find win32k.sys globals variable"));
                     break;
 
-                case ErrShadowWin32ksgdOffsetNotFound:
-                    _strcpy(szText, TEXT("Could not find win32ksgd.sys Win32kApiSetTable offset"));
+                case ErrShadowWin32kOffsetNotFound:
+                    _strcpy(szText, TEXT("Could not find win32k.sys Win32kApiSetTable offset"));
+                    break;
+
+                case ErrShadowWin32kGetStateNotFound:
+                    _strcpy(szText, TEXT("Could not find win32k.sys W32GetSessionState pointer"));
                     break;
 
                 default:

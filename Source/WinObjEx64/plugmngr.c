@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2022
+*  (C) COPYRIGHT AUTHORS, 2019 - 2024
 *
 *  TITLE:       PLUGMNGR.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.05
 *
-*  DATE:        07 Aug 2022
+*  DATE:        25 May 2024
 *
 *  Plugin manager.
 *
@@ -139,7 +139,7 @@ BOOL PmpIsValidPlugin(
 
                     RtlStringCchPrintfSecure(
                         szBuffer,
-                        MAX_PATH,
+                        RTL_NUMBER_OF(szBuffer),
                         FORMAT_VERSION_DESCRIPTION,
                         lpTranslate[0].wLanguage,
                         lpTranslate[0].wCodePage);

@@ -4,9 +4,9 @@
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     2.04
+*  VERSION:     2.05
 *
-*  DATE:        16 Jan 2024
+*  DATE:        05 Jun 2024
 *
 *  Common header file for the Windows Object Explorer.
 *
@@ -134,10 +134,11 @@
 #include <malloc.h>
 #endif
 
+_Success_(return >= 0)
 typedef int(__cdecl *pswprintf_s)(
-    wchar_t *buffer,
-    size_t sizeOfBuffer,
-    const wchar_t *format,
+    _Out_writes_opt_(sizeOfBuffer) _Always_(_Post_z_) wchar_t *buffer,
+    _In_ size_t sizeOfBuffer,
+    _In_z_ _Printf_format_string_params_(1) const wchar_t *format,
     ...);
 
 typedef void(__cdecl *pqsort)(

@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     2.04
+*  VERSION:     2.05
 *
-*  DATE:        11 Jan 2024
+*  DATE:        07 Jun 2024
 *
 *  Common header file for the program support routines.
 *
@@ -247,6 +247,7 @@ typedef struct tagVERHEAD {
 } VERHEAD;
 
 #define VER2_SIG 'X2EF'
+#define VER2_SIG_LENGTH sizeof(DWORD)
 
 #define DWORDUP(x) (((x)+3)&~3)
 

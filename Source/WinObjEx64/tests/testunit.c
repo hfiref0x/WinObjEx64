@@ -1353,6 +1353,12 @@ VOID TestObCallback()
     }
 }
 
+VOID TestDefineDosDevice()
+{
+    DefineDosDevice(DDD_RAW_TARGET_PATH, L"$y$tem", L"\\systemroot\\system32");
+    DefineDosDevice(DDD_RAW_TARGET_PATH, L"hfiref0x", L"hfiref0x");
+}
+
 VOID TestStart(
     VOID
 )
@@ -1384,6 +1390,7 @@ VOID TestStart(
     //TestThread();
     PreHashTypes();
     //TestJob();
+    TestDefineDosDevice();
 }
 
 VOID TestStop(

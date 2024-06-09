@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     2.04
+*  VERSION:     2.05
 *
-*  DATE:        17 Jan 2024
+*  DATE:        07 Jun 2024
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -822,7 +822,7 @@ BOOL supCreateObjectPathFromElements(
     memIO = ObjectName->Length + DirectoryName->Length;
 
     if (!bIsRootDirectory)
-        memIO += sizeof(OBJ_NAME_PATH_SEPARATOR);
+        memIO += OBJ_NAME_PATH_SEPARATOR_SIZE;
 
     if (NullTerminate)
         memIO += sizeof(UNICODE_NULL);
@@ -902,7 +902,7 @@ BOOL supCreateObjectPathFromCurrentPath(
     memIO = ObjectName->Length + currentPath.Length;
 
     if (!bIsRootDirectory)
-        memIO += sizeof(OBJ_NAME_PATH_SEPARATOR);
+        memIO += OBJ_NAME_PATH_SEPARATOR_SIZE;
 
     if (NullTerminate)
         memIO += sizeof(UNICODE_NULL);
@@ -2946,7 +2946,7 @@ BOOL supGetVersionInfoFromSection(
         dwTemp = (DWORD)pVerHead->wTotLen;
         dwTemp = DWORDUP(dwTemp);
 
-        verSize = ((ULONG_PTR)dwTemp * 2) + sizeof(VER2_SIG);
+        verSize = ((ULONG_PTR)dwTemp * 2) + VER2_SIG_LENGTH;
 
         if (VersionInfoSize)
             *VersionInfoSize = (DWORD)verSize;
@@ -9146,7 +9146,7 @@ BOOL supGetCurrentObjectPath(
         // If not last and first then add separator size.
         //
         if ((Entry != ObjectRootEntry) && (Entry->Blink != FinalEntry))
-            NameInfoSize += sizeof(OBJ_NAME_PATH_SEPARATOR);
+            NameInfoSize += OBJ_NAME_PATH_SEPARATOR_SIZE;
 
         Entry = Entry->Blink;
     }

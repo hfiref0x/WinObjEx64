@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2023
+*  (C) COPYRIGHT AUTHORS, 2015 - 2024
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     2.03
+*  VERSION:     2.05
 *
-*  DATE:        21 Jul 2023
+*  DATE:        25 May 2024
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -90,9 +90,12 @@ VOID AboutDialogInit(
     // Set build date and time.
     //
     RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-    MultiByteToWideChar(CP_ACP, 0, __DATE__, (INT)_strlen_a(__DATE__), szBuffer, 40);
-    _strcat(szBuffer, TEXT(" "));
-    MultiByteToWideChar(CP_ACP, 0, __TIME__, (INT)_strlen_a(__TIME__), _strend(szBuffer), 40);
+    RtlStringCchPrintfSecure(szBuffer,
+        ARRAYSIZE(szBuffer),
+        TEXT("%ws %ws"),
+        TEXT(__DATE__),
+        TEXT(__TIME__));
+
     SetDlgItemText(hwndDlg, ID_ABOUT_BUILDDATE, szBuffer);
 
     //

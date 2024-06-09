@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.05
 *
-*  DATE:        12 Mar 2024
+*  DATE:        07 Jun 2024
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -105,6 +105,7 @@
 
 #define KM_OBJECTS_ROOT_DIRECTORY  L"\\"
 #define OBJ_NAME_PATH_SEPARATOR L'\\'
+#define OBJ_NAME_PATH_SEPARATOR_SIZE sizeof(WCHAR)
 
 #define OBJ_NAME_NORMALIZATION_SYMBOL L'?'
 

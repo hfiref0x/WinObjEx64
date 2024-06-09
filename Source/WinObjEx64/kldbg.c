@@ -2392,13 +2392,13 @@ SIZE_T ObpDumpObjectName(
         sizeof(nameInfo)))
     {
         ObpDumpNameElementSpecial(ListHead, OBP_ERROR_NAME_LITERAL, OBP_ERROR_NAME_LITERAL_SIZE);
-        return OBP_ERROR_NAME_LITERAL_SIZE + sizeof(OBJ_NAME_PATH_SEPARATOR);
+        return OBP_ERROR_NAME_LITERAL_SIZE + OBJ_NAME_PATH_SEPARATOR_SIZE;
     }
 
     *NextObject = (ULONG_PTR)nameInfo.Directory;
 
     if (ObpDumpNameElement(ListHead, &nameInfo, &pathLength))
-        return pathLength + sizeof(OBJ_NAME_PATH_SEPARATOR);
+        return pathLength + OBJ_NAME_PATH_SEPARATOR_SIZE;
 
     return 0;
 }
@@ -2468,7 +2468,7 @@ BOOL ObQueryFullNamespacePath(
                 pathElement = CONTAINING_RECORD(Next, OB_NAME_ELEMENT, ListEntry);
                 
                 *string++ = OBJ_NAME_PATH_SEPARATOR; 
-                length += sizeof(OBJ_NAME_PATH_SEPARATOR);
+                length += OBJ_NAME_PATH_SEPARATOR_SIZE;
                 
                 RtlCopyMemory(string, pathElement->Name.Buffer, pathElement->Name.Length);
                 string = (PWSTR)RtlOffsetToPointer(string, pathElement->Name.Length);

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2024
 *
 *  TITLE:       LIST.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.05
 *
-*  DATE:        07 Aug 2022
+*  DATE:        07 Jun 2024
 * 
 *  Program main object listing and search logic.
 *
@@ -655,7 +655,7 @@ PFO_LIST_ITEM AllocateFoundItem(
         InfoBuffer->Name.Length +
         InfoBuffer->TypeName.Length +
         DirectoryName->Length +
-        sizeof(OBJ_NAME_PATH_SEPARATOR) +
+        OBJ_NAME_PATH_SEPARATOR_SIZE +
         2 * sizeof(UNICODE_NULL);
 
     Item = (PFO_LIST_ITEM)supHeapAlloc(BufferLength);
@@ -669,7 +669,7 @@ PFO_LIST_ITEM AllocateFoundItem(
 
     TypeNameOffset = (SIZE_T)DirectoryName->Length +
         (SIZE_T)InfoBuffer->Name.Length +
-        sizeof(OBJ_NAME_PATH_SEPARATOR) +
+        OBJ_NAME_PATH_SEPARATOR_SIZE +
         sizeof(UNICODE_NULL);
 
     //
@@ -829,7 +829,7 @@ VOID FindObject(
         {
             NameSize = (SIZE_T)InfoBuffer->Name.Length +
                 (SIZE_T)DirectoryName->Length +
-                sizeof(OBJ_NAME_PATH_SEPARATOR) +
+                OBJ_NAME_PATH_SEPARATOR_SIZE +
                 sizeof(UNICODE_NULL);
 
             ObjectName = (PWCH)supHeapAlloc(NameSize);

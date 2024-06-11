@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2022
+*  (C) COPYRIGHT AUTHORS, 2019 - 2024
 *
 *  TITLE:       MAIN.H
 *
 *  VERSION:     1.15
 *
-*  DATE:        11 May 2022
+*  DATE:        04 Jun 2024
 *
 *  WinObjEx64 Sonar plugin.
 *
@@ -542,7 +542,10 @@ VOID DumpHandlers(
     for (i = 0; i < Count; i++) {
         if ((ULONG_PTR)Handlers[i] > g_ctx.ParamBlock.SystemRangeStart) {
 
-            StringCchPrintf(szBuffer, 64, TEXT("0x%p"), Handlers[i]);
+            StringCchPrintf(szBuffer, 
+                RTL_NUMBER_OF(szBuffer), 
+                TEXT("0x%p"), 
+                Handlers[i]);
 
             if (ntsupFindModuleEntryByAddress(
                 pModulesList,

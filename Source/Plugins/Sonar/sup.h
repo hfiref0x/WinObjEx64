@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2021
+*  (C) COPYRIGHT AUTHORS, 2021 - 2024
 *
 *  TITLE:       SUP.H
 *
 *  VERSION:     1.14
 *
-*  DATE:        30 Sep 2021
+*  DATE:        04 Jun 2024
 * 
 *  Sonar plugin support definitions and declarations.
 *
@@ -38,7 +38,7 @@ BOOL supTreeListAddCopyValueItem(
     _In_ HMENU hMenu,
     _In_ HWND hwndTreeList,
     _In_ UINT uId,
-    _In_opt_ UINT uPos,
+    _In_ UINT uPos,
     _In_ LPARAM lParam,
     _In_ INT* pSubItemHit);
 
@@ -59,7 +59,7 @@ BOOL supListViewAddCopyValueItem(
     _In_ HMENU hMenu,
     _In_ HWND hwndLv,
     _In_ UINT uId,
-    _In_opt_ UINT uPos,
+    _In_ UINT uPos,
     _In_ POINT* lpPoint,
     _Out_ INT* pItemHit,
     _Out_ INT* pColumnHit);

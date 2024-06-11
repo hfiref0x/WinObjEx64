@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2021
+*  (C) COPYRIGHT AUTHORS, 2019 - 2024
 *
 *  TITLE:       MAIN.C
 *
 *  VERSION:     1.01
 *
-*  DATE:        01 Oct 2021
+*  DATE:        04 Jun 2024
 *
 *  WinObjEx64 example and test plugin.
 *
@@ -16,6 +16,10 @@
 * PARTICULAR PURPOSE.
 *
 *******************************************************************************/
+
+#pragma warning(disable: 6258) //Using TerminateThread does not allow proper thread clean up.
+#pragma warning(disable: 6320) //Exception-filter expression is the constant EXCEPTION_EXECUTE_HANDLER. This might mask exceptions that were not intended to be handled.
+
 
 #include <Windows.h>
 #include <strsafe.h>

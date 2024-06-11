@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020 - 2021
+*  (C) COPYRIGHT AUTHORS, 2020 - 2024
 *
 *  TITLE:       SUP.C
 *
 *  VERSION:     1.14
 *
-*  DATE:        28 Sep 2021
+*  DATE:        04 Jun 2024
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -71,7 +71,7 @@ BOOL supConvertFileName(
     // Query array of logical disk drive strings.
     //
     szTemp[0] = 0;
-    if (GetLogicalDriveStrings(CONVERT_NTNAME_BUFFER_SIZE - 1, szTemp) == 0)
+    if (GetLogicalDriveStrings(RTL_NUMBER_OF(szTemp), szTemp) == 0)
         return FALSE;
 
     pszTemp = szTemp;
@@ -96,14 +96,16 @@ BOOL supConvertFileName(
                 //
                 // Match device name.
                 //
-                bFound = (_strncmpi(NtFileName, szName, nLen) == 0);
+                bFound = ((_strncmpi(NtFileName, szName, nLen) == 0)
+                    && *(NtFileName + nLen) == L'\\');
 
                 if (bFound) {
 
                     //
                     // Build output name.
                     //
-                    StringCchPrintf(DosFileName,
+                    StringCchPrintf(
+                        DosFileName,
                         ccDosFileName,
                         TEXT("%ws%ws"),
                         szDrive,
@@ -124,6 +126,7 @@ BOOL supConvertFileName(
 
     return bFound;
 }
+
 /*
 * supGetWin32FileName
 *
@@ -241,7 +244,7 @@ BOOL supTreeListAddCopyValueItem(
     _In_ HMENU hMenu,
     _In_ HWND hwndTreeList,
     _In_ UINT uId,
-    _In_opt_ UINT uPos,
+    _In_ UINT uPos,
     _In_ LPARAM lParam,
     _In_ INT* pSubItemHit
 )
@@ -376,7 +379,7 @@ BOOL supListViewAddCopyValueItem(
     _In_ HMENU hMenu,
     _In_ HWND hwndLv,
     _In_ UINT uId,
-    _In_opt_ UINT uPos,
+    _In_ UINT uPos,
     _In_ POINT* lpPoint,
     _Out_ INT* pItemHit,
     _Out_ INT* pColumnHit

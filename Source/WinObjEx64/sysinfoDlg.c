@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2022 - 2023
+*  (C) COPYRIGHT AUTHORS, 2022 - 2024
 *
 *  TITLE:       SYSINFODLG.C
 *
-*  VERSION:     2.03
+*  VERSION:     2.05
 *
-*  DATE:        27 Jul 2023
+*  DATE:        04 Jun 2024
 * 
 *  System Information Dialog.
 *
@@ -183,6 +183,7 @@ VOID SysInfoCollectInformation(
     BOOLEAN bCustomSignersAllowed;
     BOOLEAN bKdEnabled = FALSE, bKdAllowed = FALSE, bKdNotPresent = FALSE;
     LPWSTR lpType;
+    NTSTATUS ntStatus;
     ULONG Index, Value, SaveValue;
 
     PCHAR lpWineVersion;
@@ -192,10 +193,13 @@ VOID SysInfoCollectInformation(
 
     SYSTEM_CODEINTEGRITY_INFORMATION CodeIntegrity;
     SYSTEM_KERNEL_VA_SHADOW_INFORMATION KernelVaShadow;
-    SYSTEM_SPECULATION_CONTROL_INFORMATION SpeculationControl;
     SYSTEM_VSM_PROTECTION_INFORMATION VsmProtectionInfo;
     SYSTEM_INFO SystemInfo;
-    ULONG Dummy;
+    union {
+        SYSTEM_SPECULATION_CONTROL_INFORMATION v1;
+        SYSTEM_SPECULATION_CONTROL_INFORMATION_V2 v2;
+    } SpecControlInfo;
+    ULONG bytesIO;
 
     FIRMWARE_TYPE fmType;
     LPWSTR lpFmType;
@@ -494,7 +498,7 @@ VOID SysInfoCollectInformation(
         SystemCodeIntegrityInformation,
         &CodeIntegrity,
         sizeof(CodeIntegrity),
-        &Dummy)))
+        &bytesIO)))
     {
         AddParameterValue32Hex(hwndOutput, TEXT("System.CodeIntegrityOptions"), CodeIntegrity.CodeIntegrityOptions);
 
@@ -530,19 +534,25 @@ VOID SysInfoCollectInformation(
         SystemKernelVaShadowInformation,
         &KernelVaShadow,
         sizeof(KernelVaShadow),
-        &Dummy)))
+        &bytesIO)))
     {
         AddParameterValue32Hex(hwndOutput, TEXT("System.KvaShadowFlags"), KernelVaShadow.Flags);
     }
 
-    SpeculationControl.Flags = 0;
-    if (NT_SUCCESS(NtQuerySystemInformation(
-        SystemSpeculationControlInformation,
-        &SpeculationControl,
-        sizeof(SpeculationControl),
-        &Dummy)))
-    {
-        AddParameterValue32Hex(hwndOutput, TEXT("System.SpeculationControlFlags"), SpeculationControl.Flags);
+    SpecControlInfo.v2.Flags2 = 0;
+    SpecControlInfo.v2.Flags = 0;
+    bytesIO = sizeof(SpecControlInfo);
+    ntStatus = NtQuerySystemInformation(SystemSpeculationControlInformation, &SpecControlInfo, bytesIO, &bytesIO);
+    if (NT_SUCCESS(ntStatus)) {
+
+        if (bytesIO == sizeof(SYSTEM_SPECULATION_CONTROL_INFORMATION)) {
+            AddParameterValue32Hex(hwndOutput, TEXT("System.SpeculationControlFlags"), SpecControlInfo.v1.Flags);
+        }
+        else if (bytesIO == sizeof(SYSTEM_SPECULATION_CONTROL_INFORMATION_V2)) {
+            AddParameterValue32Hex(hwndOutput, TEXT("System.SpeculationControlFlags"), SpecControlInfo.v1.Flags);
+            AddParameterValue32Hex(hwndOutput, TEXT("System.SpeculationControlFlags2"), SpecControlInfo.v2.Flags2);
+        }
+
     }
 
     AddParameterValue(hwndOutput, TEXT("System.TempDirectory"), g_WinObj.szTempDirectory);
@@ -555,7 +565,7 @@ VOID SysInfoCollectInformation(
         SystemVsmProtectionInformation,
         &VsmProtectionInfo,
         sizeof(VsmProtectionInfo),
-        &Dummy)))
+        &bytesIO)))
     {
         AddParameterValueBool(hwndOutput, TEXT("Vsm.DmaProtectionsAvailable"), VsmProtectionInfo.DmaProtectionsAvailable);
         AddParameterValueBool(hwndOutput, TEXT("Vsm.DmaProtectionsInUse"), VsmProtectionInfo.DmaProtectionsInUse);

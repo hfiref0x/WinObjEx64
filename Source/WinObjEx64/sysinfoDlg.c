@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2022 - 2023
+*  (C) COPYRIGHT AUTHORS, 2022 - 2024
 *
 *  TITLE:       SYSINFODLG.C
 *
-*  VERSION:     2.03
+*  VERSION:     2.05
 *
-*  DATE:        27 Jul 2023
+*  DATE:        04 Jun 2024
 * 
 *  System Information Dialog.
 *
@@ -183,6 +183,7 @@ VOID SysInfoCollectInformation(
     BOOLEAN bCustomSignersAllowed;
     BOOLEAN bKdEnabled = FALSE, bKdAllowed = FALSE, bKdNotPresent = FALSE;
     LPWSTR lpType;
+    NTSTATUS ntStatus;
     ULONG Index, Value, SaveValue;
 
     PCHAR lpWineVersion;
@@ -190,12 +191,16 @@ VOID SysInfoCollectInformation(
     WCHAR szBuffer[MAX_PATH * 4], szWineVer[40];
     WCHAR szTemp[MAX_PATH];
 
+    SYSTEM_ISOLATED_USER_MODE_INFORMATION IsolatedUM;
     SYSTEM_CODEINTEGRITY_INFORMATION CodeIntegrity;
     SYSTEM_KERNEL_VA_SHADOW_INFORMATION KernelVaShadow;
-    SYSTEM_SPECULATION_CONTROL_INFORMATION SpeculationControl;
     SYSTEM_VSM_PROTECTION_INFORMATION VsmProtectionInfo;
     SYSTEM_INFO SystemInfo;
-    ULONG Dummy;
+    union {
+        SYSTEM_SPECULATION_CONTROL_INFORMATION v1;
+        SYSTEM_SPECULATION_CONTROL_INFORMATION_V2 v2;
+    } SpecControlInfo;
+    ULONG bytesIO;
 
     FIRMWARE_TYPE fmType;
     LPWSTR lpFmType;
@@ -488,13 +493,16 @@ VOID SysInfoCollectInformation(
 
     AddParameterValueUlong(hwndOutput, TEXT("System.DpiValue"), (ULONG)supGetDPIValue(NULL));
 
+    //
+    // CI flags.
+    //
     CodeIntegrity.Length = sizeof(CodeIntegrity);
     CodeIntegrity.CodeIntegrityOptions = 0;
     if (NT_SUCCESS(NtQuerySystemInformation(
         SystemCodeIntegrityInformation,
         &CodeIntegrity,
         sizeof(CodeIntegrity),
-        &Dummy)))
+        &bytesIO)))
     {
         AddParameterValue32Hex(hwndOutput, TEXT("System.CodeIntegrityOptions"), CodeIntegrity.CodeIntegrityOptions);
 
@@ -525,43 +533,79 @@ VOID SysInfoCollectInformation(
         }
     }
 
+    //
+    // Kernel VA Shadowing flags.
+    //
     KernelVaShadow.Flags = 0;
     if (NT_SUCCESS(NtQuerySystemInformation(
         SystemKernelVaShadowInformation,
         &KernelVaShadow,
         sizeof(KernelVaShadow),
-        &Dummy)))
+        &bytesIO)))
     {
         AddParameterValue32Hex(hwndOutput, TEXT("System.KvaShadowFlags"), KernelVaShadow.Flags);
     }
 
-    SpeculationControl.Flags = 0;
-    if (NT_SUCCESS(NtQuerySystemInformation(
-        SystemSpeculationControlInformation,
-        &SpeculationControl,
-        sizeof(SpeculationControl),
-        &Dummy)))
-    {
-        AddParameterValue32Hex(hwndOutput, TEXT("System.SpeculationControlFlags"), SpeculationControl.Flags);
+    //
+    // Speculation Control flags.
+    //
+    SpecControlInfo.v2.Flags2 = 0;
+    SpecControlInfo.v2.Flags = 0;
+    bytesIO = sizeof(SpecControlInfo);
+    ntStatus = NtQuerySystemInformation(SystemSpeculationControlInformation, &SpecControlInfo, bytesIO, &bytesIO);
+    if (NT_SUCCESS(ntStatus)) {
+
+        if (bytesIO == sizeof(SYSTEM_SPECULATION_CONTROL_INFORMATION)) {
+            AddParameterValue32Hex(hwndOutput, TEXT("System.SpeculationControlFlags"), SpecControlInfo.v1.Flags);
+        }
+        else if (bytesIO == sizeof(SYSTEM_SPECULATION_CONTROL_INFORMATION_V2)) {
+            AddParameterValue32Hex(hwndOutput, TEXT("System.SpeculationControlFlags"), SpecControlInfo.v1.Flags);
+            AddParameterValue32Hex(hwndOutput, TEXT("System.SpeculationControlFlags2"), SpecControlInfo.v2.Flags2);
+        }
+
     }
 
-    AddParameterValue(hwndOutput, TEXT("System.TempDirectory"), g_WinObj.szTempDirectory);
-    AddParameterValue(hwndOutput, TEXT("System.WindowsDirectory"), g_WinObj.szWindowsDirectory);
-    AddParameterValue(hwndOutput, TEXT("System.SystemDirectory"), g_WinObj.szSystemDirectory);
-    AddParameterValue(hwndOutput, TEXT("System.ProgramDirectory"), g_WinObj.szProgramDirectory);
+    //
+    // Isolated UM flags.
+    //
+    RtlSecureZeroMemory(&IsolatedUM, sizeof(SYSTEM_ISOLATED_USER_MODE_INFORMATION));
+    ntStatus = NtQuerySystemInformation(SystemIsolatedUserModeInformation, &IsolatedUM, sizeof(IsolatedUM), &bytesIO);
+    if (NT_SUCCESS(ntStatus)) {
+        AddParameterValueBool(hwndOutput, TEXT("IUM.SecureKernelRunning"), IsolatedUM.SecureKernelRunning);
+        AddParameterValueBool(hwndOutput, TEXT("IUM.HvciEnabled"), IsolatedUM.HvciEnabled);
+        AddParameterValueBool(hwndOutput, TEXT("IUM.HvciStrictMode"), IsolatedUM.HvciStrictMode);
+        AddParameterValueBool(hwndOutput, TEXT("IUM.DebugEnabled"), IsolatedUM.DebugEnabled);
+        AddParameterValueBool(hwndOutput, TEXT("IUM.FirmwarePageProtection"), IsolatedUM.FirmwarePageProtection);
+        AddParameterValueBool(hwndOutput, TEXT("IUM.TrustletRunning"), IsolatedUM.TrustletRunning);
+        AddParameterValueBool(hwndOutput, TEXT("IUM.HvciDisableAllowed"), IsolatedUM.HvciDisableAllowed);
+        AddParameterValueBool(hwndOutput, TEXT("IUM.HardwareEnforcedVbs"), IsolatedUM.HardwareEnforcedVbs);
+        AddParameterValueBool(hwndOutput, TEXT("IUM.HardwareEnforcedHvpt"), IsolatedUM.HardwareEnforcedHvpt);
+        AddParameterValueBool(hwndOutput, TEXT("IUM.HardwareHvptAvailable"), IsolatedUM.HardwareHvptAvailable);
+    }
 
+    //
+    // VSM protection flags.
+    //
     RtlSecureZeroMemory(&VsmProtectionInfo, sizeof(VsmProtectionInfo));
     if (NT_SUCCESS(NtQuerySystemInformation(
         SystemVsmProtectionInformation,
         &VsmProtectionInfo,
         sizeof(VsmProtectionInfo),
-        &Dummy)))
+        &bytesIO)))
     {
         AddParameterValueBool(hwndOutput, TEXT("Vsm.DmaProtectionsAvailable"), VsmProtectionInfo.DmaProtectionsAvailable);
         AddParameterValueBool(hwndOutput, TEXT("Vsm.DmaProtectionsInUse"), VsmProtectionInfo.DmaProtectionsInUse);
         AddParameterValueBool(hwndOutput, TEXT("Vsm.HardwareMbecAvailable"), VsmProtectionInfo.HardwareMbecAvailable);
         AddParameterValueBool(hwndOutput, TEXT("Vsm.ApicVirtualizationAvailable"), VsmProtectionInfo.ApicVirtualizationAvailable);
     }
+
+    //
+    // Global directories.
+    //
+    AddParameterValue(hwndOutput, TEXT("System.TempDirectory"), g_WinObj.szTempDirectory);
+    AddParameterValue(hwndOutput, TEXT("System.WindowsDirectory"), g_WinObj.szWindowsDirectory);
+    AddParameterValue(hwndOutput, TEXT("System.SystemDirectory"), g_WinObj.szSystemDirectory);
+    AddParameterValue(hwndOutput, TEXT("System.ProgramDirectory"), g_WinObj.szProgramDirectory);
 
     //
     // End work with RichEdit.

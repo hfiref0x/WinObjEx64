@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020 - 2022
+*  (C) COPYRIGHT AUTHORS, 2020 - 2024
 *
 *  TITLE:       MAIN.C
 *
 *  VERSION:     1.10
 *
-*  DATE:        11 Jun 2022
+*  DATE:        04 Jun 2024
 *
 *  WinObjEx64 ImageScope plugin.
 *
@@ -86,6 +86,9 @@ DWORD WINAPI PluginThread(
     ULONG uResult = 0;
     GUI_CONTEXT* Context = (GUI_CONTEXT*)Parameter;
 
+    if (Context == NULL)
+        return (DWORD)-1;
+
     InterlockedIncrement(&m_RefCount);
 
     do {
@@ -110,10 +113,8 @@ DWORD WINAPI PluginThread(
 
     InterlockedDecrement(&m_RefCount);
 
-    if (Context) {
-        PluginFreeGlobalResources(Context);
-        supHeapFree(Context);
-    }
+    PluginFreeGlobalResources(Context);
+    supHeapFree(Context);
 
     ExitThread(uResult);
 }

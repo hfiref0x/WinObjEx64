@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     2.03
+*  VERSION:     2.05
 *
-*  DATE:        22 Jul 2023
+*  DATE:        12 Jul 2024
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -3042,11 +3042,19 @@ BOOLEAN kdpQueryMmUnloadedDrivers(
             else {
 
                 //
-                // Use 19041+ specific pattern as an array allocation code has been changed.
+                // Use 19041+ specific patterns as an array allocation code has been changed.
                 //
-
-                sigPattern = MiRememberUnloadedDriverPattern2;
-                sigSize = sizeof(MiRememberUnloadedDriverPattern2);
+                switch (g_NtBuildNumber)
+                {
+                case NT_WIN11_24H2:
+                    sigPattern = MiRememberUnloadedDriverPattern24H2;
+                    sigSize = sizeof(MiRememberUnloadedDriverPattern24H2);
+                    break;
+                default:
+                    sigPattern = MiRememberUnloadedDriverPattern2;
+                    sigSize = sizeof(MiRememberUnloadedDriverPattern2);
+                    break;
+                }
 
             }
 
@@ -3756,8 +3764,8 @@ BOOL CALLBACK symCallbackProc(
     case CBA_DEFERRED_SYMBOL_LOAD_COMPLETE:
     case CBA_DEFERRED_SYMBOL_LOAD_FAILURE:
 
-        symCallbackReportEvent(ActionCode, 
-            (PIMAGEHLP_DEFERRED_SYMBOL_LOAD)CallbackData, 
+        symCallbackReportEvent(ActionCode,
+            (PIMAGEHLP_DEFERRED_SYMBOL_LOAD)CallbackData,
             (PFNSUPSYMCALLBACK)UserContext);
 
         break;
@@ -3790,7 +3798,7 @@ BOOL symInit(
     if (g_kdctx.NtOsSymContext != NULL)
         return TRUE;
 
-   if (lpDbgHelpDll == NULL) {
+    if (lpDbgHelpDll == NULL) {
 
         szFileName[0] = 0;
         cch = GetCurrentDirectory(MAX_PATH, szFileName);
@@ -3945,7 +3953,7 @@ VOID kdInit(
 
     if (supReadObexConfiguration(obexConfig)) {
 
-        if (obexConfig->SymbolsDbgHelpDllValid) 
+        if (obexConfig->SymbolsDbgHelpDllValid)
             lpDbgHelpDll = obexConfig->szSymbolsDbgHelpDll;
 
         if (obexConfig->SymbolsPathValid)

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2022
+*  (C) COPYRIGHT AUTHORS, 2019 - 2024
 *
 *  TITLE:       KLDBG_PATTERNS.H
 *
-*  VERSION:     2.00
+*  VERSION:     2.05
 *
-*  DATE:        19 Jun 2022
+*  DATE:        11 Jul 2024
 *
 *  Header with search patterns used by KLDBG.
 *
@@ -135,3 +135,8 @@ BYTE MiRememberUnloadedDriverPattern2[] = {
 };
 
 #define FIX_WIN10_THRESHOULD_REG 0xBF
+
+BYTE MiRememberUnloadedDriverPattern24H2[] = {
+    0xBA, 0xD0, 0x07, 0x00, 0x00,  // mov    edx, 7D0h
+    0x41, 0x8D, 0x4E, 0x40         // lea    ecx, [r14+40h]
+};

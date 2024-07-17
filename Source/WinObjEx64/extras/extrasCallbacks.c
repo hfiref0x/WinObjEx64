@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.05
 *
-*  DATE:        12 Apr 2024
+*  DATE:        12 Jul 2024
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1150,7 +1150,15 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
     return kvarAddress;
 }
 
-BOOL IopFileSystemIsValidPattern(
+/*
+* IopFileSystemIsKnownPattern
+*
+* Purpose:
+*
+* Tests IoRegisterFileSystem function pattern to be known.
+*
+*/
+BOOL IopFileSystemIsKnownPattern(
     _In_ PBYTE Buffer,
     _In_ ULONG Offset,
     _In_ ULONG InstructionSize
@@ -1158,40 +1166,227 @@ BOOL IopFileSystemIsValidPattern(
 {
     BOOL bResult = FALSE;
 
+    BYTE inst3byte;
+    BYTE nextInstructionByte1, nextInstructionByte2;
+
     if (g_NtBuildNumber <= NT_WIN11_21H2) {
-
-        //
-        // lea  rdx, xxx                
-        //
-        if ((Buffer[Offset] == 0x48) &&
-            (Buffer[Offset + 1] == 0x8D) &&
-            (Buffer[Offset + 2] == 0x0D) &&
-            ((Buffer[Offset + InstructionSize] == 0x48) || (Buffer[Offset + InstructionSize] == 0xE9)))
-        {
-            bResult = TRUE;
-        }
-
+        inst3byte = 0x0D;
+        nextInstructionByte1 = 0x48;
+        nextInstructionByte2 = 0xE9;
     }
     else { //win11 22h1+
 
-        //
-        // mov  rcx, xxx                
-        //
-        if ((Buffer[Offset] == 0x48) &&
-            (Buffer[Offset + 1] == 0x8B) &&
-            (Buffer[Offset + 2] == 0x0D) &&
-            (
-                (Buffer[Offset + InstructionSize] == 0x48) ||
-                (Buffer[Offset + InstructionSize] == 0xE9) ||
-                (Buffer[Offset + InstructionSize] == 0x8B))
-            )
+        switch (g_NtBuildNumber)
         {
-            bResult = TRUE;
-        }
+        case NT_WIN11_21H2:
+            inst3byte = 0x0D;
+            nextInstructionByte1 = 0x48;
+            nextInstructionByte2 = 0xE9;
+            break;
 
+        case NT_WIN11_22H2:
+        case NT_WIN11_23H2:
+            inst3byte = 0x15;
+            nextInstructionByte1 = 0x0F;
+            nextInstructionByte2 = 0xE9;
+            break;
+
+        case NT_WIN11_24H2:
+        default:
+            inst3byte = 0x15;
+            nextInstructionByte1 = 0x0F;
+            nextInstructionByte2 = 0xEB;
+            break;
+        }
+    }
+
+    if ((Buffer[Offset] == 0x48) &&
+        (Buffer[Offset + 1] == 0x8D) &&
+        (Buffer[Offset + 2] == inst3byte) &&
+        ((Buffer[Offset + InstructionSize] == nextInstructionByte1) || (Buffer[Offset + InstructionSize] == nextInstructionByte2)))
+    {
+        bResult = TRUE;
     }
 
     return bResult;
+}
+
+/*
+* LookupIopFileSystemQueueHeads_w7
+*
+* Purpose:
+*
+* Windows 7 version of IoRegisterFileSystem listheads lookup.
+*
+*/
+ULONG LookupIopFileSystemQueueHeads_w7(
+    _In_ PBYTE Buffer,
+    _Inout_ ULONG_PTR* IopCdRomFileSystemQueueHead,
+    _Inout_ ULONG_PTR* IopDiskFileSystemQueueHead,
+    _Inout_ ULONG_PTR* IopTapeFileSystemQueueHead,
+    _Inout_ ULONG_PTR* IopNetworkFileSystemQueueHead
+)
+{
+    ULONG Index, Count;
+    LONG Rel;
+    ULONG_PTR kvarAddress;
+    hde64s hs;
+
+    PBYTE ptrCode = Buffer;
+    Index = 0;
+    Rel = 0;
+    Count = 0;
+
+    do {
+        hde64_disasm(ptrCode + Index, &hs);
+        if (hs.flags & F_ERROR)
+            break;
+
+        if (hs.len == 7) {
+            //
+            // lea  rdx, xxx                
+            //
+            if ((ptrCode[Index] == 0x48) &&
+                (ptrCode[Index + 1] == 0x8D) &&
+                (ptrCode[Index + 2] == 0x15))
+            {
+                Rel = *(PLONG)(ptrCode + Index + 3);
+                if (Rel) {
+
+                    kvarAddress = kdAdjustAddressToNtOsBase((ULONG_PTR)ptrCode, Index, hs.len, Rel);
+
+                    if (kdAddressInNtOsImage((PVOID)kvarAddress)) {
+
+                        switch (Count) {
+                        case 0:
+                            *IopNetworkFileSystemQueueHead = kvarAddress;
+                            break;
+
+                        case 1:
+                            *IopCdRomFileSystemQueueHead = kvarAddress;
+                            break;
+
+                        case 2:
+                            *IopDiskFileSystemQueueHead = kvarAddress;
+                            break;
+
+                        case 3:
+                            *IopTapeFileSystemQueueHead = kvarAddress;
+                            break;
+                        }
+                        Count += 1;
+                        if (Count == 4)
+                            break;
+                    }
+                }
+            }
+
+        }
+
+        Index += hs.len;
+
+    } while (Index < 512);
+
+    return Count;
+}
+
+/*
+* LookupIopFileSystemQueueHeads_w8_11
+*
+* Purpose:
+*
+* Windows 8-11 version of IoRegisterFileSystem listheads lookup.
+*
+*/
+ULONG LookupIopFileSystemQueueHeads_w8_11(
+    _In_ PBYTE Buffer,
+    _In_ BOOL Reorder,
+    _Inout_ ULONG_PTR* IopCdRomFileSystemQueueHead,
+    _Inout_ ULONG_PTR* IopDiskFileSystemQueueHead,
+    _Inout_ ULONG_PTR* IopTapeFileSystemQueueHead,
+    _Inout_ ULONG_PTR* IopNetworkFileSystemQueueHead
+)
+{
+    ULONG Index, Count;
+    LONG Rel;
+    ULONG_PTR kvarAddress;
+    hde64s hs;
+
+    PBYTE ptrCode = Buffer;
+    Index = 0;
+    Rel = 0;
+    Count = 0;
+
+    do {
+        hde64_disasm(ptrCode + Index, &hs);
+        if (hs.flags & F_ERROR)
+            break;
+
+        if (hs.len == 7) {
+
+            if (IopFileSystemIsKnownPattern(ptrCode, Index, hs.len)) {
+                Rel = *(PLONG)(ptrCode + Index + 3);
+                if (Rel) {
+
+                    kvarAddress = kdAdjustAddressToNtOsBase((ULONG_PTR)ptrCode, Index, hs.len, Rel);
+
+                    if (kdAddressInNtOsImage((PVOID)kvarAddress)) {
+
+                        if (Reorder)
+                        {
+                            switch (Count) {
+
+                            case 0:
+                                *IopNetworkFileSystemQueueHead = kvarAddress;
+                                break;
+
+                            case 1:
+                                *IopCdRomFileSystemQueueHead = kvarAddress;
+                                break;
+
+                            case 2:
+                                *IopDiskFileSystemQueueHead = kvarAddress;
+                                break;
+
+                            case 3:
+                                *IopTapeFileSystemQueueHead = kvarAddress;
+                                break;
+                            }
+                        }
+                        else {
+
+                            switch (Count) {
+                            case 0:
+                                *IopDiskFileSystemQueueHead = kvarAddress;
+                                break;
+
+                            case 1:
+                                *IopCdRomFileSystemQueueHead = kvarAddress;
+                                break;
+
+                            case 2:
+                                *IopNetworkFileSystemQueueHead = kvarAddress;
+                                break;
+
+                            case 3:
+                                *IopTapeFileSystemQueueHead = kvarAddress;
+                                break;
+                            }
+                        }
+                        Count += 1;
+                        if (Count == 4)
+                            break;
+                    }
+                }
+            }
+
+        }
+
+        Index += hs.len;
+
+    } while (Index < 512);
+
+    return Count;
 }
 
 /*
@@ -1211,12 +1406,10 @@ BOOL FindIopFileSystemQueueHeads(
     _Out_ ULONG_PTR* IopNetworkFileSystemQueueHead
 )
 {
-    BOOL bSymQuerySuccess = FALSE;
-    ULONG Index, Count;
-    LONG Rel = 0;
+    BOOL bSymQuerySuccess = FALSE, bReoder;
+    ULONG Count = 0;
     ULONG_PTR kvarAddress = 0;
     PBYTE ptrCode;
-    hde64s hs;
 
     //
     // Assume failure.
@@ -1281,114 +1474,74 @@ BOOL FindIopFileSystemQueueHeads(
     if (ptrCode == NULL)
         return 0;
 
-    Index = 0;
-    Rel = 0;
-    Count = 0;
-
     if (g_NtBuildNumber < NT_WIN8_RTM) {
 
-        do {
-            hde64_disasm(ptrCode + Index, &hs);
-            if (hs.flags & F_ERROR)
-                break;
-
-            if (hs.len == 7) {
-                //
-                // lea  rdx, xxx                
-                //
-                if ((ptrCode[Index] == 0x48) &&
-                    (ptrCode[Index + 1] == 0x8D) &&
-                    (ptrCode[Index + 2] == 0x15))
-                {
-                    Rel = *(PLONG)(ptrCode + Index + 3);
-                    if (Rel) {
-
-                        kvarAddress = kdAdjustAddressToNtOsBase((ULONG_PTR)ptrCode, Index, hs.len, Rel);
-
-                        if (kdAddressInNtOsImage((PVOID)kvarAddress)) {
-
-                            switch (Count) {
-                            case 0:
-                                *IopNetworkFileSystemQueueHead = kvarAddress;
-                                break;
-
-                            case 1:
-                                *IopCdRomFileSystemQueueHead = kvarAddress;
-                                break;
-
-                            case 2:
-                                *IopDiskFileSystemQueueHead = kvarAddress;
-                                break;
-
-                            case 3:
-                                *IopTapeFileSystemQueueHead = kvarAddress;
-                                break;
-                            }
-                            Count += 1;
-                            if (Count == 4)
-                                break;
-                        }
-                    }
-                }
-
-            }
-
-            Index += hs.len;
-
-        } while (Index < 512);
-
+        Count = LookupIopFileSystemQueueHeads_w7(ptrCode,
+            IopCdRomFileSystemQueueHead,
+            IopDiskFileSystemQueueHead,
+            IopTapeFileSystemQueueHead,
+            IopNetworkFileSystemQueueHead);
     }
     else {
 
-        do {
-            hde64_disasm(ptrCode + Index, &hs);
-            if (hs.flags & F_ERROR)
-                break;
+        //
+        // Since WIN11 24H2 pointer usage in this function is reordered.
+        //
+        bReoder = (g_NtBuildNumber >= NT_WIN11_24H2);
 
-            if (hs.len == 7) {
-
-                if (IopFileSystemIsValidPattern(ptrCode, Index, hs.len)) {
-                    Rel = *(PLONG)(ptrCode + Index + 3);
-                    if (Rel) {
-
-                        kvarAddress = kdAdjustAddressToNtOsBase((ULONG_PTR)ptrCode, Index, hs.len, Rel);
-
-                        if (kdAddressInNtOsImage((PVOID)kvarAddress)) {
-
-                            switch (Count) {
-
-                            case 0:
-                                *IopDiskFileSystemQueueHead = kvarAddress;
-                                break;
-
-                            case 1:
-                                *IopCdRomFileSystemQueueHead = kvarAddress;
-                                break;
-
-                            case 2:
-                                *IopNetworkFileSystemQueueHead = kvarAddress;
-                                break;
-
-                            case 3:
-                                *IopTapeFileSystemQueueHead = kvarAddress;
-                                break;
-                            }
-                            Count += 1;
-                            if (Count == 4)
-                                break;
-                        }
-                    }
-                }
-
-            }
-
-            Index += hs.len;
-
-        } while (Index < 512);
+        Count = LookupIopFileSystemQueueHeads_w8_11(ptrCode,
+            bReoder,
+            IopCdRomFileSystemQueueHead,
+            IopDiskFileSystemQueueHead,
+            IopTapeFileSystemQueueHead,
+            IopNetworkFileSystemQueueHead);
 
     }
 
     return (Count == 4);
+}
+
+/*
+* IopFsNotifyChangeIsKnownPattern
+*
+* Purpose:
+*
+* Tests IoUnregisterFsRegistrationChange function pattern to be known.
+*
+*/
+BOOL IopFsNotifyChangeIsKnownPattern(
+    _In_ PBYTE Buffer,
+    _In_ ULONG Offset,
+    _In_ ULONG InstructionSize
+)
+{
+    BOOL bResult = FALSE;
+
+    BYTE nextInstructionByte1;
+
+    switch (g_NtBuildNumber)
+    {
+    case NT_WIN11_24H2:
+        nextInstructionByte1 = 0x48;
+        break;
+    default:
+        nextInstructionByte1 = 0xEB;
+        break;
+    }
+
+    //
+    // lea  rax, IopFsNotifyChangeQueueHead
+    // jmp  short / cmp rcx, rax
+    //
+    if ((Buffer[Offset] == 0x48) &&
+        (Buffer[Offset + 1] == 0x8D) &&
+        (Buffer[Offset + 2] == 0x05) &&
+        (Buffer[Offset + InstructionSize] == nextInstructionByte1))
+    {
+        bResult = TRUE;
+    }
+
+    return bResult;
 }
 
 /*
@@ -1436,14 +1589,11 @@ OBEX_FINDCALLBACK_ROUTINE(FindIopFsNotifyChangeQueueHead)
                 break;
 
             if (hs.len == 7) {
-                //
-                // lea  rax, IopFsNotifyChangeQueueHead
-                // jmp  short
-                //
-                if ((ptrCode[Index] == 0x48) &&
-                    (ptrCode[Index + 1] == 0x8D) &&
-                    (ptrCode[Index + 2] == 0x05) &&
-                    (ptrCode[Index + 7] == 0xEB))
+
+                if (IopFsNotifyChangeIsKnownPattern(
+                    ptrCode,
+                    Index,
+                    hs.len))
                 {
                     Rel = *(PLONG)(ptrCode + Index + 3);
                     break;
@@ -4829,8 +4979,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExHostCallbacks)
             }
 
             // read extension function table
-            if (g_NtBuildNumber < NT_WIN11_25H2)
-            {               
+            if (g_NtBuildNumber < NT_WIN11_25H2) {
                 NumberOfCallbacks = hostEntry.Versions.v1->HostParameters.HostInformation.FunctionCount;
                 NotificationRoutine = hostEntry.Versions.v1->HostParameters.NotificationRoutine;
                 FunctionTable = hostEntry.Versions.v1->FunctionTable;

@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.05
 *
-*  DATE:        21 Apr 2024
+*  DATE:        12 Jul 2024
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -846,7 +846,7 @@ VOID DrvListUnloadedDrivers(
         (PVOID)Context))
     {
         _strcpy(szBuffer, TEXT("Could not resolve MmUnloadedDrivers"));
-        supStatusBarSetText(Context->StatusBar, 1, (LPWSTR)&szBuffer);
+        supStatusBarSetText(Context->StatusBar, 0, (LPWSTR)&szBuffer);
         return;
     }
 

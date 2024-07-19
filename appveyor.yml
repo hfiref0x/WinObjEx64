@@ -12,5 +12,5 @@ build:
   project: Source/WinObjEx64.sln
   verbosity: normal
 artifacts:
-- path: WinObjEx64\output\x64\Release\bin\WinObjEx64.exe
+- path: Source\WinObjEx64\output\x64\Release\bin\WinObjEx64.exe
   name: WinObjEx64

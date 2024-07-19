@@ -148,6 +148,7 @@ WinObjEx64 works only on the following x64 Windows: Windows 7, Windows 8, Window
 		- SeRegisterLogonSessionTerminatedRoutineEx
 		- IoRegisterFsRegistrationChange
 		- IopFsListsCallbacks
+		- IoRegisterPlugPlayNotification
 		- ObRegisterCallbacks
 		- DbgSetDebugPrintCallback
 		- DbgkLkmdRegisterCallback

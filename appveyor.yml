@@ -1,8 +1,16 @@
 version: 1.0.{build}
+branches:
+  only:
+  - master
+skip_tags: true
 image: Visual Studio 2022
 configuration: Release
 platform: x64
+shallow_clone: true
 clone_folder: c:\projects\winobjex64
 build:
   project: Source/WinObjEx64.sln
   verbosity: normal
+artifacts:
+- path: WinObjEx64\output\x64\Release\bin\WinObjEx64.exe
+  name: WinObjEx64

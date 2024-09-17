@@ -1,12 +1,12 @@
 /************************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017 - 2021, translated from Microsoft sources/debugger
+*  (C) COPYRIGHT AUTHORS, 2017 - 2024, translated from Microsoft sources/debugger
 *
 *  TITLE:       APISETX.H
 *
-*  VERSION:     1.07
+*  VERSION:     1.08
 *
-*  DATE:        13 Nov 2021
+*  DATE:        16 Sep 2024
 *
 *  Common header file for the ApiSetSchema definitions.
 *
@@ -91,7 +91,7 @@
     ((PWCHAR)RtlOffsetToPointer(Namespace, Entry->NameOffset))
 
 #define API_SET_TO_HASH_ENTRY(Namespace, HashIndex) \
-   ((API_SET_HASH_ENTRY_V6*)RtlOffsetToPointer(Namespace, Namespace->NamespaceHashesOffset + sizeof(ULONG_PTR) * (HashIndex)))
+   ((API_SET_HASH_ENTRY_V6*)RtlOffsetToPointer(Namespace, Namespace->NamespaceHashesOffset + sizeof(ULONG64) * (HashIndex)))
 
 #define API_SET_TO_NAMESPACE_ENTRY(Namespace, LookupHashEntry) \
    ((PAPI_SET_NAMESPACE_ENTRY_V6)RtlOffsetToPointer(Namespace, LookupHashEntry->NamespaceIndex * sizeof(API_SET_NAMESPACE_ENTRY_V6) + Namespace->NamespaceEntryOffset))

@@ -5,9 +5,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.225
+*  VERSION:     1.226
 *
-*  DATE:        05 Jun 2024
+*  DATE:        07 Jun 2024
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -8319,7 +8319,7 @@ NTSYSAPI
 NTSTATUS
 NTAPI
 LdrEnumerateLoadedModules(
-    _In_opt_ ULONG Flags,
+    _In_ ULONG Flags,
     _In_ PLDR_LOADED_MODULE_ENUMERATION_CALLBACK_FUNCTION CallbackFunction,
     _In_opt_ PVOID Context);
 
@@ -13100,7 +13100,7 @@ NTAPI
 NtSetValueKey(
     _In_ HANDLE KeyHandle,
     _In_ PUNICODE_STRING ValueName,
-    _In_opt_ ULONG TitleIndex,
+    _In_ ULONG TitleIndex,
     _In_ ULONG Type,
     _In_reads_bytes_opt_(DataSize) PVOID Data,
     _In_ ULONG DataSize);

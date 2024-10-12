@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASCALLBACKS.C
 *
-*  VERSION:     2.05
+*  VERSION:     2.06
 *
-*  DATE:        12 Jul 2024
+*  DATE:        11 Oct 2024
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -68,7 +68,8 @@ CBT_MAPPING g_CbtMapping[] = {
     { NT_WIN11_21H2, NTDDI_WIN10_CO, CBT_SIZE_CO_V1 },
     { NT_WIN11_22H2, NTDDI_WIN10_NI, CBT_SIZE_NI_V1 },
     { NT_WIN11_23H2, NTDDI_WIN10_NI, CBT_SIZE_NI_V1 },
-    { NT_WIN11_24H2, NTDDI_WIN10_GE, CBT_SIZE_GE_V1 }   //update on release
+    { NT_WIN11_24H2, NTDDI_WIN10_GE, CBT_SIZE_GE_V1 },
+    { NT_WIN11_25H2, NTDDI_WIN10_SE, CBT_SIZE_GE_V1 } //update on release
 };
 
 //
@@ -1522,6 +1523,7 @@ BOOL IopFsNotifyChangeIsKnownPattern(
     switch (g_NtBuildNumber)
     {
     case NT_WIN11_24H2:
+    case NT_WIN11_25H2:
         nextInstructionByte1 = 0x48;
         break;
     default:
@@ -1731,7 +1733,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindRtlpDebugPrintCallbackList)
 */
 OBEX_FINDCALLBACK_ROUTINE(FindPopRegisteredPowerSettingCallbacks)
 {
-    ULONG Index;
+    ULONG Index, ScanBytes;
     LONG Rel = 0;
     ULONG_PTR kvarAddress = 0;
     PBYTE ptrCode;
@@ -1758,6 +1760,8 @@ OBEX_FINDCALLBACK_ROUTINE(FindPopRegisteredPowerSettingCallbacks)
         Index = 0;
         Rel = 0;
 
+        ScanBytes = (g_NtBuildNumber < NT_WIN11_25H2) ? 512 : 640;
+
         do {
             hde64_disasm(ptrCode + Index, &hs);
             if (hs.flags & F_ERROR)
@@ -1782,7 +1786,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindPopRegisteredPowerSettingCallbacks)
 
             Index += hs.len;
 
-        } while (Index < 512);
+        } while (Index < ScanBytes);
 
         kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
 
@@ -2079,6 +2083,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindIopNotifyShutdownQueueHeadHead)
 */
 OBEX_FINDCALLBACK_ROUTINE(FindCmCallbackHead)
 {
+    BOOL bFound = FALSE;
     ULONG Index, resultOffset;
     LONG Rel = 0, FirstInstructionLength;
     ULONG_PTR kvarAddress = 0;
@@ -2110,34 +2115,61 @@ OBEX_FINDCALLBACK_ROUTINE(FindCmCallbackHead)
             if (hs.flags & F_ERROR)
                 break;
 
-            if (hs.len == 5) {
-                /*
-                ** lea     rdx, [rsp+20h] <-
-                ** lea     rcx, CallbackListHead
-                */
-                if ((ptrCode[Index] == 0x48) &&
-                    (ptrCode[Index + 1] == 0x8D) &&
-                    (ptrCode[Index + 2] == 0x54))
+            if (g_NtBuildNumber < NT_WIN11_25H2)
+            {
+                if (hs.len == 5) {
+                    /*
+                    ** lea     rdx, [rsp+20h] <-
+                    ** lea     rcx, CallbackListHead
+                    */
+                    if ((ptrCode[Index] == 0x48) &&
+                        (ptrCode[Index + 1] == 0x8D) &&
+                        (ptrCode[Index + 2] == 0x54))
+                    {
+                        bFound = TRUE;
+                    }
+                }
+            }
+            else {
+                if (hs.len == 8 &&
+                    (hs.flags & F_PREFIX_REX) &&
+                    (hs.flags & F_DISP32) &&
+                    (hs.flags & F_MODRM))
                 {
-                    hde64_disasm(ptrCode + Index + hs.len, &hs_next);
-                    if (hs_next.flags & F_ERROR)
+                    /*
+                    ** lea     rdx, [rsp+0B8h+arg_8] <-
+                    ** lea     rcx, CallbackListHead
+                    */
+                    if ((ptrCode[Index] == 0x48) &&
+                        (ptrCode[Index + 1] == 0x8D) &&
+                        (ptrCode[Index + 2] == 0x94))
+                    {
+                        bFound = TRUE;
+                    }
+                }
+
+            }
+
+            if (bFound)
+            {
+                hde64_disasm(ptrCode + Index + hs.len, &hs_next);
+                if (hs_next.flags & F_ERROR)
+                    break;
+                if (hs_next.len == 7) {
+
+                    /*
+                    ** lea     rdx, [rsp+20h]
+                    ** lea     rcx, CallbackListHead <-
+                    */
+                    FirstInstructionLength = hs.len;
+
+                    if ((ptrCode[Index + FirstInstructionLength] == 0x48) &&
+                        (ptrCode[Index + FirstInstructionLength + 1] == 0x8D) &&
+                        (ptrCode[Index + FirstInstructionLength + 2] == 0x0D))
+                    {
+                        resultOffset = Index + FirstInstructionLength + hs_next.len;
+                        Rel = *(PLONG)(ptrCode + Index + FirstInstructionLength + 3);
                         break;
-                    if (hs_next.len == 7) {
-
-                        /*
-                        ** lea     rdx, [rsp+20h]
-                        ** lea     rcx, CallbackListHead <-
-                        */
-                        FirstInstructionLength = hs.len;
-
-                        if ((ptrCode[Index + FirstInstructionLength] == 0x48) &&
-                            (ptrCode[Index + FirstInstructionLength + 1] == 0x8D) &&
-                            (ptrCode[Index + FirstInstructionLength + 2] == 0x0D))
-                        {
-                            resultOffset = Index + FirstInstructionLength + hs_next.len;
-                            Rel = *(PLONG)(ptrCode + Index + FirstInstructionLength + 3);
-                            break;
-                        }
                     }
                 }
             }
@@ -2742,10 +2774,12 @@ OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
         } while (Index < 512);
 
         //
-        // If this is 25H2, the call is to ExpFindCompatibleHost
+        // If this is 24H2, the call is to ExpFindCompatibleHost
         // Need to do another search to find the call to ExpFindHost
         //
-        if (g_NtBuildNumber >= NT_WIN11_25H2)
+        // For some unknown reason this was removed from release builds and not present in 25H2.
+        //
+    /*   if (g_NtBuildNumber == NT_WIN11_24H2)
         {
             ptrCode = ptrCode + Index + 5 + Rel;
             Rel = 0;
@@ -2773,7 +2807,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
                 Index += hs.len;
 
             } while (Index < 128);
-        }
+        }*/
 
         if (Rel == 0)
             return 0;

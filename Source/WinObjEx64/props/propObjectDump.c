@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     2.05
+*  VERSION:     2.06
 *
-*  DATE:        11 Mar 2024
+*  DATE:        11 Oct 2024
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1050,6 +1050,8 @@ VOID propObDumpUnicodeString(
     UNICODE_STRING dumpedString;
     PVOID pvRefAddr;
     BOOL bDumpOk;
+
+    RtlInitEmptyUnicodeString(&dumpedString, NULL, 0);
 
     bDumpOk = kdDumpUnicodeString(InputString,
         &dumpedString,
@@ -3537,6 +3539,7 @@ VOID propObxComposeFltFilterCompatibleForm(
             FLT_FILTER_V2* V2;
             FLT_FILTER_V3* V3;
             FLT_FILTER_V4* V4;
+            FLT_FILTER_V5* V5;
         } u1;
         PBYTE Ref;
     } FltFilter;
@@ -3545,17 +3548,22 @@ VOID propObxComposeFltFilterCompatibleForm(
 
     FltFilter.Ref = (PBYTE)ObjectBuffer;
 
+    if (ObjectVersion == OBVERSION_FLT_FILTER_V5)
+    {
+        RtlCopyMemory(&ComposedObject->Base, &FltFilter.u1.V5->Base, sizeof(FLT_OBJECT_V3));
+    }
+    else {
+        //
+        // Same offset.
+        //
+        RtlCopyMemory(&ComposedObject->Base, &FltFilter.u1.V1->Base, sizeof(FLT_OBJECT));
 
-    //
-    // Same offset.
-    //
-    RtlCopyMemory(&ComposedObject->Base, &FltFilter.u1.V1->Base, sizeof(FLT_OBJECT));
-
-    //
-    // UniqueIdentifier
-    //
-    if (ObjectVersion >= OBVERSION_FLT_FILTER_V3)
-        ComposedObject->Base.UniqueIdentifier = FltFilter.u1.V3->Base.UniqueIdentifier;
+        //
+        // UniqueIdentifier
+        //
+        if (ObjectVersion >= OBVERSION_FLT_FILTER_V3)
+            ComposedObject->Base.UniqueIdentifier = FltFilter.u1.V3->Base.UniqueIdentifier;
+    }
 
     switch (ObjectVersion) {
 
@@ -3590,7 +3598,6 @@ VOID propObxComposeFltFilterCompatibleForm(
 
     case OBVERSION_FLT_FILTER_V3:
     case OBVERSION_FLT_FILTER_V4:
-    default:
         ComposedObject->Frame = FltFilter.u1.V3->Frame;
         ComposedObject->Name = FltFilter.u1.V3->Name;
         ComposedObject->DefaultAltitude = FltFilter.u1.V3->DefaultAltitude;
@@ -3610,6 +3617,28 @@ VOID propObxComposeFltFilterCompatibleForm(
         ComposedObject->KtmNotification = FltFilter.u1.V3->KtmNotification;
         ComposedObject->SectionNotification = FltFilter.u1.V3->SectionNotification;
         ComposedObject->OldDriverUnload = FltFilter.u1.V3->OldDriverUnload;
+        break;
+    case OBVERSION_FLT_FILTER_V5:
+    default:
+        ComposedObject->Frame = FltFilter.u1.V5->Frame;
+        ComposedObject->Name = FltFilter.u1.V5->Name;
+        ComposedObject->DefaultAltitude = FltFilter.u1.V5->DefaultAltitude;
+        ComposedObject->DriverObject = FltFilter.u1.V5->DriverObject;
+        ComposedObject->VerifiedFiltersLink = FltFilter.u1.V5->VerifiedFiltersLink;
+        ComposedObject->FilterUnload = FltFilter.u1.V5->FilterUnload;
+        ComposedObject->InstanceSetup = FltFilter.u1.V5->InstanceSetup;
+        ComposedObject->InstanceQueryTeardown = FltFilter.u1.V5->InstanceQueryTeardown;
+        ComposedObject->InstanceTeardownStart = FltFilter.u1.V5->InstanceTeardownStart;
+        ComposedObject->InstanceTeardownComplete = FltFilter.u1.V5->InstanceTeardownComplete;
+        ComposedObject->PreVolumeMount = FltFilter.u1.V5->PreVolumeMount;
+        ComposedObject->PostVolumeMount = FltFilter.u1.V5->PostVolumeMount;
+        ComposedObject->GenerateFileName = FltFilter.u1.V5->GenerateFileName;
+        ComposedObject->NormalizeNameComponent = FltFilter.u1.V5->NormalizeNameComponent;
+        ComposedObject->NormalizeNameComponentEx = FltFilter.u1.V5->NormalizeNameComponentEx;
+        ComposedObject->NormalizeContextCleanup = FltFilter.u1.V5->NormalizeContextCleanup;
+        ComposedObject->KtmNotification = FltFilter.u1.V5->KtmNotification;
+        ComposedObject->SectionNotification = FltFilter.u1.V5->SectionNotification;
+        ComposedObject->OldDriverUnload = FltFilter.u1.V5->OldDriverUnload;
         break;
     }
 }

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2023
+*  (C) COPYRIGHT AUTHORS, 2019 - 2024
 *
 *  TITLE:       EXTAPI.H
 *
-*  VERSION:     2.04
+*  VERSION:     2.06
 *
-*  DATE:        18 Dec 2023
+*  DATE:        11 Oct 2024
 *
 *  Windows SDK compatibility header.
 *
@@ -218,6 +218,10 @@ typedef enum DPI_AWARENESS {
 
 #ifndef NTDDI_WIN10_GE
 #define NTDDI_WIN10_GE 0x0A000010       /* ABRACADABRA_WIN10_GE */
+#endif
+
+#ifndef NTDDI_WIN10_SE
+#define NTDDI_WIN10_SE 0x0A000011       /* ABRACADABRA_WIN10_SE */
 #endif
 
 FORCEINLINE LONG_PTR _InterlockedExchangeAddPointer(

@@ -4,9 +4,9 @@
 *
 *  TITLE:       W32K.H
 *
-*  VERSION:     2.05
+*  VERSION:     2.06
 *
-*  DATE:        11 May 2024
+*  DATE:        11 Oct 2024
 *
 *  Common header file for the win32k support routines.
 *
@@ -66,6 +66,23 @@ typedef struct _W32K_GLOBALS {
     PVOID gSessionProcessLifetimeLock; //W32_PUSH_LOCK
     PVOID gLock; //W32_PUSH_LOCK
 } W32K_GLOBALS, *PW32K_GLOBALS;
+
+typedef struct _W32K_GLOBALS_V2 {
+    PVOID gSessionGlobalSlots;     //pointer to list
+    PVOID gpSESSIONSLOTS;          //pointer to list
+    LIST_ENTRY gSessionSlotsList;  //gpSESSIONSLOTS is the head
+    struct {
+        ULONG LowCount;
+        ULONG HighCount;
+        ULONGLONG TotalCount;
+    } gSessionApiSetHostRefCount;
+    PVOID gSessionApiSetHostRefCountLock;
+    PVOID gSessionProcessLifetimeLock; //W32_PUSH_LOCK
+    PVOID gLowSessionGlobalSlots;  //pointer to list
+    ULONG gAvailableSlots;
+    ULONG Reserved0;
+    PVOID gLock; //W32_PUSH_LOCK
+} W32K_GLOBALS_V2, * PWIN32K_GLOBALS_V2;
 
 //
 //  ApiSet layout 24H2
@@ -140,7 +157,10 @@ typedef struct _SDT_CONTEXT {
 
     ULONG_PTR W32pServiceTableKernelBase;   //W32pServiceTable calculated kernel address
     PULONG W32pServiceTableUserBase;        //W32pServiceTable user address
-    W32K_GLOBALS W32Globals;                //win32k.sys global variables
+    union {
+        W32K_GLOBALS v1;                
+        W32K_GLOBALS_V2 v2;
+    } W32Globals;                           //win32k.sys global variables
 } SDT_CONTEXT, * PSDT_CONTEXT;
 
 typedef struct _SDT_FUNCTION_NAME {

@@ -4,9 +4,9 @@
 *
 *  TITLE:       W32K.C
 *
-*  VERSION:     2.05
+*  VERSION:     2.06
 *
-*  DATE:        11 May 2024
+*  DATE:        11 Oct 2024
 *
 *  Win32k syscall table actual handlers resolving routines.
 *
@@ -207,7 +207,7 @@ ULONG SdtpQueryW32GetWin32kApiSetTableOffset(
     _In_ HMODULE hModule
 )
 {
-    ULONG Index;
+    ULONG Index, c, ScanBytes, InstCount;
     PBYTE ptrCode;
     hde64s hs;
 
@@ -217,6 +217,9 @@ ULONG SdtpQueryW32GetWin32kApiSetTableOffset(
     }
 
     Index = 0;
+    c = 0;
+    ScanBytes = (g_NtBuildNumber >= NT_WIN11_25H2) ? 64 : 32;
+    InstCount = (g_NtBuildNumber >= NT_WIN11_25H2) ? 2 : 1;
 
     do {
 
@@ -231,12 +234,14 @@ ULONG SdtpQueryW32GetWin32kApiSetTableOffset(
             (hs.flags & F_MODRM) &&
             (hs.opcode == 0x8B))
         {
-            return hs.disp.disp32;
+            c += 1;
+            if (c >= InstCount)
+                return hs.disp.disp32;
         }
 
         Index += hs.len;
 
-    } while (Index < 32);
+    } while (Index < ScanBytes);
 
     return 0;
 }
@@ -285,73 +290,102 @@ ULONG_PTR SdtpQueryWin32kSessionGlobals(
             return 0;
         }
 
-        //
-        // Find W32GetSessionStateForSession.
-        //
+        if (g_NtBuildNumber >= NT_WIN11_25H2)
+        {
+            Index = 0;
+            k = 0;
 
-        Index = 0;
-        k = 0;
+            do {
 
-        do {
+                hde64_disasm((void*)(ptrCode + Index), &hs);
+                if (hs.flags & F_ERROR)
+                    break;
 
-            hde64_disasm((void*)(ptrCode + Index), &hs);
-            if (hs.flags & F_ERROR)
-                break;
+                if ((hs.len == 7) &&
+                    (hs.flags & F_MODRM) &&
+                    (hs.opcode == 0x8B))
+                {
+                    relativeValue = (LONG)hs.disp.disp32;
+                    instructionLength = hs.len;
+                    break;
+                }
 
-            //
-            // Find W32GetSessionStateForSession call.
-            //
-            if ((hs.len == 5) &&
-                (hs.flags & F_RELATIVE) &&
-                (hs.opcode == 0xE8))
-            {
-                k++;
-            }
+                Index += hs.len;
 
-            if (k > 1) {
-                relativeValue = *(PLONG)(ptrCode + Index + 1);
-                bFound = TRUE;
-                break;
-            }
-
-            Index += hs.len;
-
-        } while (Index < 64);
-
-        if (bFound == FALSE || relativeValue == 0) {
-            return 0;
+            } while (Index < 64);
         }
 
-        ptrCode = ptrCode + Index + (hs.len) + relativeValue;
+        else {
 
-        //
-        // Find gLowSessionGlobalSlots ref.
-        //
+            //
+            // Find W32GetSessionStateForSession.
+            //
 
-        Index = 0;
-        instructionLength = 0;
-        relativeValue = 0;
+            Index = 0;
+            k = 0;
 
-        do {
+            do {
 
-            hde64_disasm((void*)(ptrCode + Index), &hs);
-            if (hs.flags & F_ERROR)
-                break;
+                hde64_disasm((void*)(ptrCode + Index), &hs);
+                if (hs.flags & F_ERROR)
+                    break;
 
-            if ((hs.len == 7) &&
-                (hs.flags & F_PREFIX_REX) &&
-                (hs.flags & F_DISP32) &&
-                (hs.flags & F_MODRM) &&
-                (hs.opcode == 0x8D))
-            {
-                relativeValue = (LONG)hs.disp.disp32;
-                instructionLength = hs.len;
-                break;
+                //
+                // Find W32GetSessionStateForSession call.
+                //
+                if ((hs.len == 5) &&
+                    (hs.flags & F_RELATIVE) &&
+                    (hs.opcode == 0xE8))
+                {
+                    k++;
+                }
+
+                if (k > 1) {
+                    relativeValue = *(PLONG)(ptrCode + Index + 1);
+                    bFound = TRUE;
+                    break;
+                }
+
+                Index += hs.len;
+
+            } while (Index < 64);
+
+            if (bFound == FALSE || relativeValue == 0) {
+                return 0;
             }
 
-            Index += hs.len;
+            ptrCode = ptrCode + Index + (hs.len) + relativeValue;
 
-        } while (Index < 64);
+            //
+            // Find gLowSessionGlobalSlots ref.
+            //
+
+            Index = 0;
+            instructionLength = 0;
+            relativeValue = 0;
+
+            do {
+
+                hde64_disasm((void*)(ptrCode + Index), &hs);
+                if (hs.flags & F_ERROR)
+                    break;
+
+                if ((hs.len == 7) &&
+                    (hs.flags & F_PREFIX_REX) &&
+                    (hs.flags & F_DISP32) &&
+                    (hs.flags & F_MODRM) &&
+                    (hs.opcode == 0x8D))
+                {
+                    relativeValue = (LONG)hs.disp.disp32;
+                    instructionLength = hs.len;
+                    break;
+                }
+
+                Index += hs.len;
+
+            } while (Index < 64);
+
+        }
 
         if (relativeValue == 0 || instructionLength == 0)
             return 0;
@@ -817,7 +851,7 @@ NTSTATUS SdtResolveServiceEntryModuleSessionAware(
     PCHAR pStr;
     PBYTE ptrCode = FunctionPtr, testPtr;
     ULONG hostOffset = 0, hostEntryOffset = 0;
-    ULONG_PTR i, slotAddress, hostAddress, hostEntry, tableAddress, routineAddress;
+    ULONG_PTR i, slotAddress, hostAddress = 0, hostEntry = 0, tableAddress = 0, routineAddress;
     PRTL_PROCESS_MODULE_INFORMATION pModule;
     UNICODE_STRING usModuleName;
     hde64s hs;
@@ -827,11 +861,12 @@ NTSTATUS SdtResolveServiceEntryModuleSessionAware(
 
     LONG rel;
 
+    //
+    // First, find offsets block.
+    //
     do {
 
-        //
-        // Extract offsets.
-        // 
+
         i = 0;
         k = 0;
 
@@ -872,10 +907,43 @@ NTSTATUS SdtResolveServiceEntryModuleSessionAware(
 
         } while (i < 64);
 
+        //
+        // Offset block not found, function seems inlined, scan again.
+        //
+        if (!bFound) {
+
+            i = 0;
+            do {
+
+                hde64_disasm(RtlOffsetToPointer(ptrCode, i), &hs);
+                if (hs.flags & F_ERROR) {
+                    resultStatus = STATUS_INTERNAL_ERROR;
+                    break;
+                }
+
+                if ((hs.len == 4) &&
+                    (hs.flags & F_PREFIX_REX) &&
+                    (hs.flags & F_MODRM) &&
+                    (hs.opcode == 0x8B))
+                {
+                    ptrCode = (PBYTE)RtlOffsetToPointer(ptrCode, i + hs.len);
+                    bFound = TRUE;
+                    break;
+                }
+
+                i += hs.len;
+
+            } while (i < 128);
+
+        }
+
         offsets[W32CALL_APISETTABLE_OFFSET] = 0;
         offsets[W32CALL_HOST_OFFSET] = 0;
         offsets[W32CALL_HOST_ENTRY_OFFSET] = 0;
 
+        //
+        // If offsets block has been found, extract offsets.
+        //
         if (bFound) {
 
             c = 0;
@@ -932,14 +1000,24 @@ NTSTATUS SdtResolveServiceEntryModuleSessionAware(
 
         }
         else {
+            //
+            // Offsets found and extracted, proceed with resolving.
+            //
 
             resultStatus = STATUS_PROCEDURE_NOT_FOUND;
 
             //
             // Read slot.
             //
-            slotAddress = (ULONG_PTR)RtlOffsetToPointer(Context->W32Globals.gSessionGlobalSlots,
-                (Context->SessionId - 1) * sizeof(ULONG_PTR));
+            if (g_NtBuildNumber <= NT_WIN11_24H2)
+            {
+                slotAddress = (ULONG_PTR)RtlOffsetToPointer(Context->W32Globals.v1.gSessionGlobalSlots,
+                    (Context->SessionId - 1) * sizeof(ULONG_PTR));
+            }
+            else {
+                slotAddress = (ULONG_PTR)RtlOffsetToPointer(Context->W32Globals.v2.gSessionGlobalSlots,
+                    (Context->SessionId - 1) * sizeof(ULONG_PTR));
+            }
 
             if (!kdReadSystemMemory(slotAddress, &tableAddress, sizeof(ULONG_PTR)))
                 break;
@@ -1191,10 +1269,19 @@ ULONG SdtWin32kInitializeOnce(
                     break;
                 }
 
-                if (!kdReadSystemMemory(varAddress, &Context->W32Globals, sizeof(W32K_GLOBALS))) {
-                    ulResult = ErrShadowWin32kGlobalsNotFound;
-                    break;
+                if (g_NtBuildNumber <= NT_WIN11_24H2) {
+                    if (!kdReadSystemMemory(varAddress, &Context->W32Globals.v1, sizeof(W32K_GLOBALS))) {
+                        ulResult = ErrShadowWin32kGlobalsNotFound;
+                        break;
+                    }
                 }
+                else {
+                    if (!kdReadSystemMemory(varAddress, &Context->W32Globals.v2, sizeof(W32K_GLOBALS_V2))) {
+                        ulResult = ErrShadowWin32kGlobalsNotFound;
+                        break;
+                    }
+                }
+
 
                 //
                 // Remember table offset.

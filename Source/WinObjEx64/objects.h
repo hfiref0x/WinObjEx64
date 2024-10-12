@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2023
+*  (C) COPYRIGHT AUTHORS, 2015 - 2024
 *
 *  TITLE:       OBJECTS.H
 *
-*  VERSION:     2.04
+*  VERSION:     2.06
 *
-*  DATE:        01 Dec 2023
+*  DATE:        11 Oct 2024
 *
 *  Header file for internal Windows object types handling.
 *
@@ -74,27 +74,28 @@ typedef enum _WOBJ_OBJECT_TYPE {
     ObjectTypeDxgkCurrentDxgProcessObject = 46,
     ObjectTypeDxgkCurrentDxgThreadObject = 47,
     ObjectTypeDxgkDisplayManager = 48,
-    ObjectTypeDxgkSharedBundle = 49,
-    ObjectTypeDxgkSharedProtectedSession = 50,
-    ObjectTypeDxgkComposition = 51,
-    ObjectTypeDxgkSharedKeyedMutex = 52,
-    ObjectTypeMemoryPartition = 53,
-    ObjectTypeRegistryTransaction = 54,
-    ObjectTypeDmaAdapter = 55,
-    ObjectTypeDmaDomain = 56,
-    ObjectTypeCoverageSampler = 57, //NI
-    ObjectTypeActivationObject = 58, //NI
-    ObjectTypeActivityReference = 59, //NI
-    ObjectTypeCoreMessaging = 60, //NI
-    ObjectTypeRawInputManager = 61, //NI
-    ObjectTypeWaitCompletionPacket = 62, //NI
-    ObjectTypeIoCompletionReserve = 63, 
-    ObjectTypeUserApcReserve = 64, //NI
-    ObjectTypeIoRing = 65, //NI
-    ObjectTypeTerminal = 66, //NI
-    ObjectTypeTerminalEventQueue = 67, //NI
-    ObjectTypeEnergyTracker = 68, //NI
-    ObjectTypeUnknown = 69,
+    ObjectTypeDxgkDisplayMuxSwitch = 49,
+    ObjectTypeDxgkSharedBundle = 50,
+    ObjectTypeDxgkSharedProtectedSession = 51,
+    ObjectTypeDxgkComposition = 52,
+    ObjectTypeDxgkSharedKeyedMutex = 53,
+    ObjectTypeMemoryPartition = 54,
+    ObjectTypeRegistryTransaction = 55,
+    ObjectTypeDmaAdapter = 56,
+    ObjectTypeDmaDomain = 57,
+    ObjectTypeCoverageSampler = 58, //NI
+    ObjectTypeActivationObject = 59, //NI
+    ObjectTypeActivityReference = 60, //NI
+    ObjectTypeCoreMessaging = 61, //NI
+    ObjectTypeRawInputManager = 62, //NI
+    ObjectTypeWaitCompletionPacket = 63, //NI
+    ObjectTypeIoCompletionReserve = 64, 
+    ObjectTypeUserApcReserve = 65, //NI
+    ObjectTypeIoRing = 66, //NI
+    ObjectTypeTerminal = 67, //NI
+    ObjectTypeTerminalEventQueue = 68, //NI
+    ObjectTypeEnergyTracker = 69, //NI
+    ObjectTypeUnknown = 70,
     ObjectTypeEtwSessionDemuxEntry = ObjectTypeUnknown,
     ObjectTypeNdisCmState = ObjectTypeUnknown,
     ObjectTypePsSiloContextNonPaged = ObjectTypeUnknown,

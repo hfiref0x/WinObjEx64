@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     2.05
+*  VERSION:     2.06
 *
-*  DATE:        12 Jul 2024
+*  DATE:        11 Oct 2024
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -758,6 +758,7 @@ PVOID ObDumpSymbolicLinkObjectVersionAware(
     case NT_WIN11_21H2:
     case NT_WIN11_22H2:
     case NT_WIN11_23H2:
+    case NT_WIN11_24H2:
     default:
         objectSize = sizeof(OBJECT_SYMBOLIC_LINK_V5);
         objectVersion = OBVERSION_OBJECT_SYMBOLIC_LINK_V5;
@@ -901,9 +902,15 @@ PVOID ObDumpFltFilterObjectVersionAware(
         objectSize = sizeof(FLT_FILTER_V3);
         objectVersion = OBVERSION_FLT_FILTER_V3;
     }
-    else {
+    else if (g_NtBuildNumber >= NT_WIN11_21H2 &&
+        g_NtBuildNumber < NT_WIN11_25H2)
+    {
         objectSize = sizeof(FLT_FILTER_V4);
         objectVersion = OBVERSION_FLT_FILTER_V4;
+    }
+    else {
+        objectSize = sizeof(FLT_FILTER_V5);
+        objectVersion = OBVERSION_FLT_FILTER_V5;
     }
 
     return ObpDumpObjectWithSpecifiedSize(ObjectAddress,
@@ -2147,7 +2154,7 @@ BOOL ObpEnumeratePrivateNamespaceTable(
                                 sizeof(OBJECT_HEADER)))
                             {
 
-                                //
+                               //
                                // Allocate object entry
                                //
                                 ObjectEntry = (POBJREF)supHeapAllocEx(ListHeap,
@@ -3047,6 +3054,7 @@ BOOLEAN kdpQueryMmUnloadedDrivers(
                 switch (g_NtBuildNumber)
                 {
                 case NT_WIN11_24H2:
+                case NT_WIN11_25H2:
                     sigPattern = MiRememberUnloadedDriverPattern24H2;
                     sigSize = sizeof(MiRememberUnloadedDriverPattern24H2);
                     break;

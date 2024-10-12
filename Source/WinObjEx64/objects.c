@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017 - 2023
+*  (C) COPYRIGHT AUTHORS, 2017 - 2024
 *
 *  TITLE:       OBJECTS.C
 *
-*  VERSION:     2.04
+*  VERSION:     2.06
 *
-*  DATE:        01 Dec 2023
+*  DATE:        11 Oct 2024
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -42,6 +42,7 @@ WOBJ_TYPE_DESC g_TypeDxgkCompositionObject = { L"DxgkCompositionObject", 0xf2bf1
 WOBJ_TYPE_DESC g_TypeDxgkCurrentDxgProcessObject = { L"DxgkCurrentDxgProcessObject", 0xc27e9d7c, ObjectTypeDxgkCurrentDxgProcessObject, IDI_ICON_DXOBJECT, IDS_DESC_DXGK_CURRENT_DXG_PROCESS_OBJECT };
 WOBJ_TYPE_DESC g_TypeDxgkCurrentDxgThreadObject = { L"DxgkCurrentDxgThreadObject", 0xc8d07f5b, ObjectTypeDxgkCurrentDxgThreadObject, IDI_ICON_DXOBJECT, IDS_DESC_DXGK_CURRENT_DXG_THREAD_OBJECT };
 WOBJ_TYPE_DESC g_TypeDxgkDisplayManagerObject = { L"DxgkDisplayManagerObject", 0x5afc4062, ObjectTypeDxgkDisplayManager, IDI_ICON_DXOBJECT, IDS_DESC_DXGK_DISPLAY_MANAGER_OBJECT };
+WOBJ_TYPE_DESC g_TypeDxgkDisplayMuxSwitch = { L"DxgkDisplayMuxSwitch", 0x180e2a1a, ObjectTypeDxgkDisplayMuxSwitch, IDI_ICON_DXOBJECT, IDS_DESC_DXGK_DISPLAYMUXSWITCH };
 WOBJ_TYPE_DESC g_TypeDxgkSharedBundleObject = { L"DxgkSharedBundleObject", 0xf7e4ab9e, ObjectTypeDxgkSharedBundle, IDI_ICON_DXOBJECT, IDS_DESC_DXGK_SHARED_BUNDLE_OBJECT };
 WOBJ_TYPE_DESC g_TypeDxgkSharedKeyedMutexObject = { L"DxgkSharedKeyedMutexObject", 0xd6c628fd, ObjectTypeDxgkSharedKeyedMutex, IDI_ICON_DXOBJECT, IDS_DESC_DXGK_SHARED_KEYED_MUTEX_OBJECT };
 WOBJ_TYPE_DESC g_TypeDxgkSharedProtectedSessionObject = { L"DxgkSharedProtectedSessionObject", 0xa9676f44, ObjectTypeDxgkSharedProtectedSession, IDI_ICON_DXOBJECT, IDS_DESC_DXGK_SHARED_PROTECTED_SESSION_OBJECT };
@@ -128,6 +129,7 @@ static WOBJ_TYPE_DESC* gpObjectTypes[] = {
     &g_TypeDxgkCurrentDxgProcessObject,
     &g_TypeDxgkCurrentDxgThreadObject,
     &g_TypeDxgkDisplayManagerObject,
+    &g_TypeDxgkDisplayMuxSwitch,
     &g_TypeDxgkSharedBundleObject,
     &g_TypeDxgkSharedKeyedMutexObject,
     &g_TypeDxgkSharedProtectedSessionObject,

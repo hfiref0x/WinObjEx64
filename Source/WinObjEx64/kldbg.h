@@ -94,6 +94,8 @@
 #define OBVERSION_FLT_FILTER_V3 (3)
 // Structure version since W11
 #define OBVERSION_FLT_FILTER_V4 (4)
+// Structure version since W11 25H2
+#define OBVERSION_FLT_FILTER_V5 (5)
 
 #define NT_REG_PREP             L"\\Registry\\Machine"
 #define DRIVER_REGKEY           L"%wS\\System\\CurrentControlSet\\Services\\%wS"

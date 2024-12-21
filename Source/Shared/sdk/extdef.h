@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.06
 *
-*  DATE:        11 Oct 2024
+*  DATE:        21 Dec 2024
 *
 *  Windows SDK compatibility header.
 *
@@ -208,20 +208,20 @@ typedef enum DPI_AWARENESS {
 #define NTDDI_WIN10_CU 0x0A00000D       /* ABRACADABRA_WIN10_CU */
 #endif
 
-#ifndef NTDDI_WIN10_ZN
-#define NTDDI_WIN10_ZN 0x0A00000E       /* ABRACADABRA_WIN10_ZN */
+#ifndef NTDDI_WIN11_ZN
+#define NTDDI_WIN11_ZN 0x0A00000E       /* ABRACADABRA_WIN11_ZN */
 #endif
 
-#ifndef NTDDI_WIN10_GA
-#define NTDDI_WIN10_GA 0x0A00000F       /* ABRACADABRA_WIN10_GA */
+#ifndef NTDDI_WIN11_GA
+#define NTDDI_WIN11_GA 0x0A00000F       /* ABRACADABRA_WIN11_GA */
 #endif
 
-#ifndef NTDDI_WIN10_GE
-#define NTDDI_WIN10_GE 0x0A000010       /* ABRACADABRA_WIN10_GE */
+#ifndef NTDDI_WIN11_GE
+#define NTDDI_WIN11_GE 0x0A000010       /* ABRACADABRA_WIN11_GE */
 #endif
 
-#ifndef NTDDI_WIN10_SE
-#define NTDDI_WIN10_SE 0x0A000011       /* ABRACADABRA_WIN10_SE */
+#ifndef NTDDI_WIN11_SE
+#define NTDDI_WIN11_SE 0x0A000011       /* ABRACADABRA_WIN11_SE */
 #endif
 
 FORCEINLINE LONG_PTR _InterlockedExchangeAddPointer(

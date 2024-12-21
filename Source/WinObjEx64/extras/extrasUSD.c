@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASUSD.C
 *
-*  VERSION:     2.05
+*  VERSION:     2.06
 *
-*  DATE:        11 Mar 2024
+*  DATE:        21 Dec 2024
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -93,7 +93,9 @@ LPCWSTR T_SharedDataFlags[] = {
     L"DbgSecureBootEnabled",
     L"DbgMultiSessionSku",
     L"DbgMultiUsersInSessionSku",
-    L"DbgStateSeparationEnabled"
+    L"DbgStateSeparationEnabled",
+    L"DbgSplitTokenEnabled",
+    L"DbgShadowAdminEnabled"
 };
 
 VALUE_DESC USD_SuiteMasks[] = {

@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
-*  VERSION:     2.05
+*  VERSION:     2.06
 *
-*  DATE:        12 Jul 2024
+*  DATE:        12 Dec 2024
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -524,8 +524,10 @@ DWORD DumpDialogWorkerThread(
 
     } while (bResult != 0);
 
-    if (NT_SUCCESS(dumpInfo->DumpStatus) || (dumpInfo->DumpStatus == STATUS_PARTIAL_COPY)) {
-
+    if ((NT_SUCCESS(dumpInfo->DumpStatus) 
+        || dumpInfo->DumpStatus == STATUS_PARTIAL_COPY)
+        && (dumpInfo->Buffer != NULL)) 
+    {
         if (dumpInfo->FixSections)
             supImageFixSections(dumpInfo->Buffer);
 

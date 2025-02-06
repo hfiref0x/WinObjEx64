@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2024
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     2.06
+*  VERSION:     2.07
 *
-*  DATE:        21 Dec 2024
+*  DATE:        04 Feb 2025
 *
 *  Common header file for the user interface.
 *
@@ -49,8 +49,8 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 
 #define PROGRAM_MAJOR_VERSION       2
 #define PROGRAM_MINOR_VERSION       0
-#define PROGRAM_REVISION_NUMBER     6
-#define PROGRAM_BUILD_NUMBER        2412
+#define PROGRAM_REVISION_NUMBER     7
+#define PROGRAM_BUILD_NUMBER        2502
 
 #ifdef _USE_OWN_DRIVER
 #define PROGRAM_NAME            L"Windows Object Explorer 64-bit (Non-public version)"

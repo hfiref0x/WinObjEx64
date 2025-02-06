@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2023
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     2.06
+*  VERSION:     2.07
 *
-*  DATE:        11 Oct 2024
+*  DATE:        04 Feb 2025
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -903,7 +903,7 @@ PVOID ObDumpFltFilterObjectVersionAware(
         objectVersion = OBVERSION_FLT_FILTER_V3;
     }
     else if (g_NtBuildNumber >= NT_WIN11_21H2 &&
-        g_NtBuildNumber < NT_WIN11_25H2)
+        g_NtBuildNumber < NT_WIN11_24H2)
     {
         objectSize = sizeof(FLT_FILTER_V4);
         objectVersion = OBVERSION_FLT_FILTER_V4;

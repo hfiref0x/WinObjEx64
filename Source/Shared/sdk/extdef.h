@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2024
+*  (C) COPYRIGHT AUTHORS, 2019 - 2025
 *
 *  TITLE:       EXTAPI.H
 *
-*  VERSION:     2.06
+*  VERSION:     2.07
 *
-*  DATE:        21 Dec 2024
+*  DATE:        04 Feb 2025
 *
 *  Windows SDK compatibility header.
 *
@@ -119,6 +119,10 @@
 
 #ifndef PF_ERMS_AVAILABLE
 #define PF_ERMS_AVAILABLE                           42
+#endif
+
+#ifndef PF_BMI2_INSTRUCTIONS_AVAILABLE
+#define PF_BMI2_INSTRUCTIONS_AVAILABLE              60
 #endif
 
 #ifndef VER_SUITE_MULTIUSERTS

@@ -242,6 +242,6 @@ In order to build from source you need Microsoft Visual Studio 2015 and later ve
 # Authors
 
 
-(c) 2015 - 2024 WinObjEx64 Project, hfiref0x
+(c) 2015 - 2025 WinObjEx64 Project, hfiref0x
 
 Original WinObjEx (c) 2003 - 2005 Four-F

@@ -1,13 +1,13 @@
 /************************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2024 
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *  Translated from Microsoft sources/debugger or mentioned elsewhere.
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.229
+*  VERSION:     1.234
 *
-*  DATE:        12 Dec 2024
+*  DATE:        28 Mar 2025
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -683,6 +683,7 @@ typedef enum _KWAIT_REASON {
     WrPhysicalFault,
     WrIoRing,
     WrMdlCache,
+    WrRcu,
     MaximumWaitReason
 } KWAIT_REASON;
 
@@ -1112,6 +1113,8 @@ typedef enum _PROCESSINFOCLASS {
     ProcessSlistRollbackInformation = 113,
     ProcessNetworkIoCounters = 114,
     ProcessFindFirstThreadByTebValue = 115,
+    ProcessEnclaveAddressSpaceRestriction = 116,
+    ProcessAvailableCpus = 117,
     MaxProcessInfoClass
 } PROCESSINFOCLASS;
 
@@ -1899,6 +1902,9 @@ typedef enum _SYSTEM_INFORMATION_CLASS {
     SystemResourceDeadlockTimeout = 245,
     SystemBreakOnContextUnwindFailureInformation = 246,
     SystemOslRamdiskInformation = 247,
+    SystemCodeIntegrityPolicyManagementInformation = 248,
+    SystemMemoryNumaCacheInformation = 249,
+    SystemProcessorFeaturesBitMapInformation = 250,
     MaxSystemInfoClass
 } SYSTEM_INFORMATION_CLASS, * PSYSTEM_INFORMATION_CLASS;
 
@@ -6362,6 +6368,39 @@ typedef struct _RTL_USER_PROCESS_PARAMETERS {
     ULONG HeapMemoryTypeMask; // WIN11
 } RTL_USER_PROCESS_PARAMETERS, * PRTL_USER_PROCESS_PARAMETERS;
 
+#define FLG_STOP_ON_EXCEPTION 0x00000001
+#define FLG_SHOW_LDR_SNAPS 0x00000002 
+#define FLG_DEBUG_INITIAL_COMMAND 0x00000004 
+#define FLG_STOP_ON_HUNG_GUI 0x00000008 
+#define FLG_HEAP_ENABLE_TAIL_CHECK 0x00000010
+#define FLG_HEAP_ENABLE_FREE_CHECK 0x00000020
+#define FLG_HEAP_VALIDATE_PARAMETERS 0x00000040
+#define FLG_HEAP_VALIDATE_ALL 0x00000080
+#define FLG_APPLICATION_VERIFIER 0x00000100
+#define FLG_MONITOR_SILENT_PROCESS_EXIT 0x00000200
+#define FLG_POOL_ENABLE_TAGGING 0x00000400
+#define FLG_HEAP_ENABLE_TAGGING 0x00000800
+#define FLG_USER_STACK_TRACE_DB 0x00001000 
+#define FLG_KERNEL_STACK_TRACE_DB 0x00002000
+#define FLG_MAINTAIN_OBJECT_TYPELIST 0x00004000
+#define FLG_HEAP_ENABLE_TAG_BY_DLL 0x00008000
+#define FLG_DISABLE_STACK_EXTENSION 0x00010000 
+#define FLG_ENABLE_CSRDEBUG 0x00020000
+#define FLG_ENABLE_KDEBUG_SYMBOL_LOAD 0x00040000 
+#define FLG_DISABLE_PAGE_KERNEL_STACKS 0x00080000
+#define FLG_ENABLE_SYSTEM_CRIT_BREAKS 0x00100000
+#define FLG_HEAP_DISABLE_COALESCING 0x00200000 
+#define FLG_ENABLE_CLOSE_EXCEPTIONS 0x00400000 
+#define FLG_ENABLE_EXCEPTION_LOGGING 0x00800000
+#define FLG_ENABLE_HANDLE_TYPE_TAGGING 0x01000000 
+#define FLG_HEAP_PAGE_ALLOCS 0x02000000
+#define FLG_DEBUG_INITIAL_COMMAND_EX 0x04000000 
+#define FLG_DISABLE_DBGPRINT 0x08000000
+#define FLG_CRITSEC_EVENT_CREATION 0x10000000 
+#define FLG_LDR_TOP_DOWN 0x20000000 
+#define FLG_ENABLE_HANDLE_EXCEPTIONS 0x40000000
+#define FLG_DISABLE_PROTDLLS 0x80000000
+
 typedef struct _PEB {
     BOOLEAN InheritedAddressSpace;
     BOOLEAN ReadImageFileExecOptions;
@@ -6430,7 +6469,45 @@ typedef struct _PEB {
     PVOID UnicodeCaseTableData;
 
     ULONG NumberOfProcessors;
-    ULONG NtGlobalFlag;
+    union
+    {
+        ULONG NtGlobalFlag;
+        struct
+        {
+            ULONG StopOnException : 1;          // FLG_STOP_ON_EXCEPTION
+            ULONG ShowLoaderSnaps : 1;          // FLG_SHOW_LDR_SNAPS
+            ULONG DebugInitialCommand : 1;      // FLG_DEBUG_INITIAL_COMMAND
+            ULONG StopOnHungGUI : 1;            // FLG_STOP_ON_HUNG_GUI
+            ULONG HeapEnableTailCheck : 1;      // FLG_HEAP_ENABLE_TAIL_CHECK
+            ULONG HeapEnableFreeCheck : 1;      // FLG_HEAP_ENABLE_FREE_CHECK
+            ULONG HeapValidateParameters : 1;   // FLG_HEAP_VALIDATE_PARAMETERS
+            ULONG HeapValidateAll : 1;          // FLG_HEAP_VALIDATE_ALL
+            ULONG ApplicationVerifier : 1;      // FLG_APPLICATION_VERIFIER
+            ULONG MonitorSilentProcessExit : 1; // FLG_MONITOR_SILENT_PROCESS_EXIT
+            ULONG PoolEnableTagging : 1;        // FLG_POOL_ENABLE_TAGGING
+            ULONG HeapEnableTagging : 1;        // FLG_HEAP_ENABLE_TAGGING
+            ULONG UserStackTraceDb : 1;         // FLG_USER_STACK_TRACE_DB
+            ULONG KernelStackTraceDb : 1;       // FLG_KERNEL_STACK_TRACE_DB
+            ULONG MaintainObjectTypeList : 1;   // FLG_MAINTAIN_OBJECT_TYPELIST
+            ULONG HeapEnableTagByDll : 1;       // FLG_HEAP_ENABLE_TAG_BY_DLL
+            ULONG DisableStackExtension : 1;    // FLG_DISABLE_STACK_EXTENSION
+            ULONG EnableCsrDebug : 1;           // FLG_ENABLE_CSRDEBUG
+            ULONG EnableKDebugSymbolLoad : 1;   // FLG_ENABLE_KDEBUG_SYMBOL_LOAD
+            ULONG DisablePageKernelStacks : 1;  // FLG_DISABLE_PAGE_KERNEL_STACKS
+            ULONG EnableSystemCritBreaks : 1;   // FLG_ENABLE_SYSTEM_CRIT_BREAKS
+            ULONG HeapDisableCoalescing : 1;    // FLG_HEAP_DISABLE_COALESCING
+            ULONG EnableCloseExceptions : 1;    // FLG_ENABLE_CLOSE_EXCEPTIONS
+            ULONG EnableExceptionLogging : 1;   // FLG_ENABLE_EXCEPTION_LOGGING
+            ULONG EnableHandleTypeTagging : 1;  // FLG_ENABLE_HANDLE_TYPE_TAGGING
+            ULONG HeapPageAllocs : 1;           // FLG_HEAP_PAGE_ALLOCS
+            ULONG DebugInitialCommandEx : 1;    // FLG_DEBUG_INITIAL_COMMAND_EX
+            ULONG DisableDbgPrint : 1;          // FLG_DISABLE_DBGPRINT
+            ULONG CritSecEventCreation : 1;     // FLG_CRITSEC_EVENT_CREATION
+            ULONG LdrTopDown : 1;               // FLG_LDR_TOP_DOWN
+            ULONG EnableHandleExceptions : 1;   // FLG_ENABLE_HANDLE_EXCEPTIONS
+            ULONG DisableProtDlls : 1;          // FLG_DISABLE_PROTDLLS
+        } NtGlobalFlags;
+    };
 
     ULARGE_INTEGER CriticalSectionTimeout;
     SIZE_T HeapSegmentReserve;
@@ -12422,10 +12499,10 @@ NTSYSAPI
 NTSTATUS
 NTAPI
 NtManageHotPatch(
-    _In_ ULONG HotPatchInformation,
-    _In_ PVOID HotPatchData,
-    _In_ ULONG Length,
-    _Out_ PULONG ReturnLength);
+    _In_ ULONG HotPatchInformationClass,
+    _Out_writes_bytes_opt_(HotPatchInformationLength) PVOID HotPatchInformation,
+    _In_ ULONG HotPatchInformationLength,
+    _Out_opt_ PULONG ReturnLength);
 
 /************************************************************************************
 *
@@ -14616,10 +14693,89 @@ typedef struct _DEBUG_OBJECT {
 } DEBUG_OBJECT, *PDEBUG_OBJECT;
 
 typedef enum _DEBUGOBJECTINFOCLASS {
-    DebugObjectUnusedInformation,
+    fv,
     DebugObjectKillProcessOnExitInformation,
     MaxDebugObjectInfoClass
 } DEBUGOBJECTINFOCLASS, * PDEBUGOBJECTINFOCLASS;
+
+typedef struct _DBGKM_EXCEPTION {
+    EXCEPTION_RECORD ExceptionRecord;
+    ULONG FirstChance;
+} DBGKM_EXCEPTION, * PDBGKM_EXCEPTION;
+
+typedef struct _DBGKM_CREATE_THREAD {
+    ULONG SubSystemKey;
+    PVOID StartAddress;
+} DBGKM_CREATE_THREAD, * PDBGKM_CREATE_THREAD;
+
+typedef struct _DBGKM_CREATE_PROCESS {
+    ULONG SubSystemKey;
+    HANDLE FileHandle;
+    PVOID BaseOfImage;
+    ULONG DebugInfoFileOffset;
+    ULONG DebugInfoSize;
+    DBGKM_CREATE_THREAD InitialThread;
+} DBGKM_CREATE_PROCESS, * PDBGKM_CREATE_PROCESS;
+
+typedef struct _DBGKM_EXIT_THREAD {
+    NTSTATUS ExitStatus;
+} DBGKM_EXIT_THREAD, * PDBGKM_EXIT_THREAD;
+
+typedef struct _DBGKM_EXIT_PROCESS {
+    NTSTATUS ExitStatus;
+} DBGKM_EXIT_PROCESS, * PDBGKM_EXIT_PROCESS;
+
+typedef struct _DBGKM_LOAD_DLL {
+    HANDLE FileHandle;
+    PVOID BaseOfDll;
+    ULONG DebugInfoFileOffset;
+    ULONG DebugInfoSize;
+    PVOID NamePointer;
+} DBGKM_LOAD_DLL, * PDBGKM_LOAD_DLL;
+
+typedef struct _DBGKM_UNLOAD_DLL {
+    PVOID BaseAddress;
+} DBGKM_UNLOAD_DLL, * PDBGKM_UNLOAD_DLL;
+
+typedef enum _DBG_STATE {
+    DbgIdle,
+    DbgReplyPending,
+    DbgCreateThreadStateChange,
+    DbgCreateProcessStateChange,
+    DbgExitThreadStateChange,
+    DbgExitProcessStateChange,
+    DbgExceptionStateChange,
+    DbgBreakpointStateChange,
+    DbgSingleStepStateChange,
+    DbgLoadDllStateChange,
+    DbgUnloadDllStateChange
+} DBG_STATE, * PDBG_STATE;
+
+typedef struct _DBGUI_CREATE_THREAD {
+    HANDLE HandleToThread;
+    DBGKM_CREATE_THREAD NewThread;
+} DBGUI_CREATE_THREAD, * PDBGUI_CREATE_THREAD;
+
+typedef struct _DBGUI_CREATE_PROCESS {
+    HANDLE HandleToProcess;
+    HANDLE HandleToThread;
+    DBGKM_CREATE_PROCESS NewProcess;
+} DBGUI_CREATE_PROCESS, * PDBGUI_CREATE_PROCESS;
+
+typedef struct _DBGUI_WAIT_STATE_CHANGE {
+    DBG_STATE NewState;
+    CLIENT_ID AppClientId;
+    union
+    {
+        DBGKM_EXCEPTION Exception;
+        DBGUI_CREATE_THREAD CreateThread;
+        DBGUI_CREATE_PROCESS CreateProcessInfo;
+        DBGKM_EXIT_THREAD ExitThread;
+        DBGKM_EXIT_PROCESS ExitProcess;
+        DBGKM_LOAD_DLL LoadDll;
+        DBGKM_UNLOAD_DLL UnloadDll;
+    } StateInfo;
+} DBGUI_WAIT_STATE_CHANGE, * PDBGUI_WAIT_STATE_CHANGE;
 
 NTSYSAPI
 NTSTATUS
@@ -14646,6 +14802,24 @@ NTAPI
 NtDebugActiveProcess(
     _In_ HANDLE ProcessHandle,
     _In_ HANDLE DebugObjectHandle);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtDebugContinue(
+    _In_ HANDLE DebugObjectHandle,
+    _In_ PCLIENT_ID ClientId,
+    _In_ NTSTATUS ContinueStatus);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtWaitForDebugEvent(
+    _In_ HANDLE DebugObjectHandle,
+    _In_ BOOLEAN Alertable,
+    _In_opt_ PLARGE_INTEGER Timeout,
+    _Out_ PDBGUI_WAIT_STATE_CHANGE WaitStateChange
+);
 
 NTSYSAPI
 NTSTATUS
@@ -15475,6 +15649,16 @@ NtSetInformationCpuPartition(
     _Reserved_ PVOID Reserved0,
     _Reserved_ ULONG Reserved1,
     _Reserved_ ULONG Reserved2);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtQueryInformationCpuPartition(
+    _In_ HANDLE CpuPartitionHandle,
+    _In_ ULONG CpuPartitionInformationClass,
+    _Out_writes_bytes_opt_(CpuPartitionInformationLength) PVOID CpuPartitionInformation,
+    _In_ ULONG CpuPartitionInformationLength,
+    _Out_opt_ PULONG ReturnLength);
 
 //
 // NTOS_RTL HEADER END

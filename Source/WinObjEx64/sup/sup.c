@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2024
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     2.05
+*  VERSION:     2.07
 *
-*  DATE:        07 Jun 2024
+*  DATE:        31 Mar 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -8156,15 +8156,6 @@ VOID supDestroyFileViewInfo(
     ViewInformation->NtHeaders = NULL;
     ViewInformation->FileSize.QuadPart = 0;
 }
-
-#define PE_SIGNATURE_SIZE           4
-#define RTL_MEG                     (1024UL * 1024UL)
-#define RTLP_IMAGE_MAX_DOS_HEADER   (256UL * RTL_MEG)
-#define MM_SIZE_OF_LARGEST_IMAGE    ((ULONG)0x77000000)
-#define MM_MAXIMUM_IMAGE_HEADER     (2 * PAGE_SIZE)
-#define MM_MAXIMUM_IMAGE_SECTIONS                       \
-     ((MM_MAXIMUM_IMAGE_HEADER - (PAGE_SIZE + sizeof(IMAGE_NT_HEADERS))) /  \
-            sizeof(IMAGE_SECTION_HEADER))
 
 /*
 * supxInitializeFileViewInfo

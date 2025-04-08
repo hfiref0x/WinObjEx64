@@ -5,9 +5,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.234
+*  VERSION:     1.235
 *
-*  DATE:        28 Mar 2025
+*  DATE:        31 Mar 2025
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -116,6 +116,25 @@ typedef PVOID PMEM_EXTENDED_PARAMETER;
 #ifndef IN_REGION
 #define IN_REGION(x, Base, Size) (((ULONG_PTR)(x) >= (ULONG_PTR)(Base)) && \
             ((ULONG_PTR)(x) <= (ULONG_PTR)(Base) + (ULONG_PTR)(Size)))
+#endif
+
+#define PE_SIGNATURE_SIZE           4
+#ifndef RTL_MEG
+#define RTL_MEG                     (1024UL * 1024UL)
+#endif
+#ifndef RTLP_IMAGE_MAX_DOS_HEADER
+#define RTLP_IMAGE_MAX_DOS_HEADER   (256UL * RTL_MEG)
+#endif
+#ifndef MM_SIZE_OF_LARGEST_IMAGE
+#define MM_SIZE_OF_LARGEST_IMAGE    ((ULONG)0x77000000)
+#endif
+#ifndef MM_MAXIMUM_IMAGE_HEADER
+#define MM_MAXIMUM_IMAGE_HEADER     (2 * PAGE_SIZE)
+#endif
+#ifndef MM_MAXIMUM_IMAGE_SECTIONS
+#define MM_MAXIMUM_IMAGE_SECTIONS                       \
+     ((MM_MAXIMUM_IMAGE_HEADER - (PAGE_SIZE + sizeof(IMAGE_NT_HEADERS))) /  \
+            sizeof(IMAGE_SECTION_HEADER))
 #endif
 
 //
@@ -9007,6 +9026,13 @@ RtlUpperString(
     _In_ PSTRING DestinationString,
     _In_ PSTRING SourceString);
 
+NTSYSAPI
+LONG
+NTAPI
+RtlCompareAltitudes(
+    _In_ PCUNICODE_STRING Altitude1,
+    _In_ PCUNICODE_STRING Altitude2);
+
 //
 // preallocated heap-growable buffers
 //
@@ -14693,7 +14719,7 @@ typedef struct _DEBUG_OBJECT {
 } DEBUG_OBJECT, *PDEBUG_OBJECT;
 
 typedef enum _DEBUGOBJECTINFOCLASS {
-    fv,
+    DebugObjectUnusedInformation,
     DebugObjectKillProcessOnExitInformation,
     MaxDebugObjectInfoClass
 } DEBUGOBJECTINFOCLASS, * PDEBUGOBJECTINFOCLASS;

@@ -3288,6 +3288,46 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspSiloMonitorList)
 }
 
 /*
+* VaildEmpCallbackListHead
+*
+* Purpose:
+*
+* Check if the address is EmpCallbackListHead
+*
+*/
+BOOL VaildEmpCallbackListHead(ULONG_PTR EmpCallbackListHead)
+{
+    SINGLE_LIST_ENTRY Head;
+    ULONG_PTR ListHead = EmpCallbackListHead, Next, RecordAddress;
+    EMP_CALLBACK_DB_RECORD CallbackRecord;
+    Head.Next = NULL;
+    if (!kdReadSystemMemory(
+        ListHead,
+        &Head,
+        sizeof(SINGLE_LIST_ENTRY)))
+    {
+        return FALSE;
+    }
+    Next = (ULONG_PTR)Head.Next;
+    while (Next) {
+        RtlSecureZeroMemory(&CallbackRecord, sizeof(CallbackRecord));
+        RecordAddress = (ULONG_PTR)Next - FIELD_OFFSET(EMP_CALLBACK_DB_RECORD, List);
+        if (!kdReadSystemMemory(RecordAddress, &CallbackRecord, sizeof(CallbackRecord)))
+            break;
+
+        if (CallbackRecord.CallbackFunc) 
+        {
+            if (CallbackRecord.CallbackFunc != NULL && CallbackRecord.CallbackFunc > (PVOID)0xFFFF080000000000 && CallbackRecord.CallbackFunc < (PVOID)0xFFFFFF0000000000)
+            {
+                return TRUE;
+            }
+        }
+        Next = (ULONG_PTR)CallbackRecord.List.Next;
+    }
+    return FALSE;
+}
+
+/*
 * FindEmpCallbackListHead
 *
 * Purpose:
@@ -3414,6 +3454,23 @@ OBEX_FINDCALLBACK_ROUTINE(FindEmpCallbackListHead)
 
     }
 
+    if (!VaildEmpCallbackListHead(kvarAddress)) //Check if the address is EmpCallbackListHead
+    {
+        //The address is EmpEntryListHead.
+        if (g_NtBuildNumber >= NT_WIN11_24H2 && g_NtBuildNumber < NT_WIN11_25H2)
+        {
+            //24H2
+            //Calculate the address of EmpCallbackListHead
+            kvarAddress -= 0x58;
+        }
+        else if (g_NtBuildNumber > NT_WIN11_25H2)
+        {
+            //25H2
+            //Calculate the address of EmpCallbackListHead
+            kvarAddress += 0x18;
+        }
+    }
+    
     return kvarAddress;
 }
 

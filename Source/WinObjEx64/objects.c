@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017 - 2024
+*  (C) COPYRIGHT AUTHORS, 2017 - 2025
 *
 *  TITLE:       OBJECTS.C
 *
-*  VERSION:     2.06
+*  VERSION:     2.07
 *
-*  DATE:        11 Oct 2024
+*  DATE:        11 May 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -22,7 +22,7 @@ WOBJ_TYPE_DESC g_TypeUnknown = { OBTYPE_NAME_UNKNOWN, 0, ObjectTypeUnknown, IDI_
 WOBJ_TYPE_DESC g_TypeActivationObject = { L"ActivationObject", 0xde960015, ObjectTypeActivationObject, IDI_ICON_ACTIVATIONOBJECT, IDS_DESC_ACTIVATIONOBJECT };
 WOBJ_TYPE_DESC g_TypeActivityReference = { L"ActivityReference", 0x44db295c, ObjectTypeActivityReference, IDI_ICON_ACTIVITYREFERENCE, IDS_DESC_ACTIVITYREFERENCE };
 WOBJ_TYPE_DESC g_TypeAdapter = { L"Adapter", 0x5b4bfe0f, ObjectTypeAdapter, IDI_ICON_ADAPTER, IDS_DESC_ADAPTER };
-WOBJ_TYPE_DESC g_TypePort = { L"ALPC Port", 0xfc99f003, ObjectTypePort, IDI_ICON_PORT, IDS_DESC_PORT };
+WOBJ_TYPE_DESC g_TypeALPCPort = { L"ALPC Port", 0xfc99f003, ObjectTypePort, IDI_ICON_PORT, IDS_DESC_PORT };
 WOBJ_TYPE_DESC g_TypeCallback = { L"Callback", 0xd619e0a5, ObjectTypeCallback, IDI_ICON_CALLBACK, IDS_DESC_CALLBACK };
 WOBJ_TYPE_DESC g_TypeComposition = { L"Composition", 0xf009caea, ObjectTypeComposition, IDI_ICON_DXOBJECT, IDS_DESC_COMPOSITION };
 WOBJ_TYPE_DESC g_TypeController = { L"Controller", 0x38a0df3c, ObjectTypeController, IDI_ICON_CONTROLLER, IDS_DESC_CONTROLLER };
@@ -102,92 +102,97 @@ WOBJ_TYPE_DESC g_TypeWaitCompletionPacket = { L"WaitCompletionPacket", 0xdaa80e1
 WOBJ_TYPE_DESC g_TypeWinstation = { L"WindowStation", OBTYPE_HASH_WINSTATION, ObjectTypeWinstation, IDI_ICON_WINSTATION, IDS_DESC_WINSTATION };
 WOBJ_TYPE_DESC g_TypeWmiGuid = { L"WmiGuid", 0x36d9823c, ObjectTypeWMIGuid, IDI_ICON_WMIGUID, IDS_DESC_WMIGUID };
 
+#define OBJECT_TYPE_ENTRIES \
+    X(g_TypeActivationObject) \
+    X(g_TypeActivityReference) \
+    X(g_TypeAdapter) \
+    X(g_TypeALPCPort) \
+    X(g_TypeCallback) \
+    X(g_TypeComposition) \
+    X(g_TypeController) \
+    X(g_TypeCoreMessaging) \
+    X(g_TypeCoverageSampler) \
+    X(g_TypeCpuPartition) \
+    X(g_TypeCrossVmEvent) \
+    X(g_TypeCrossVmMutant) \
+    X(g_TypeDebugObject) \
+    X(g_TypeDesktop) \
+    X(g_TypeDevice) \
+    X(g_TypeDirectory) \
+    X(g_TypeDmaAdapter) \
+    X(g_TypeDmaDomain) \
+    X(g_TypeDriver) \
+    X(g_TypeDxgkCompositionObject) \
+    X(g_TypeDxgkCurrentDxgProcessObject) \
+    X(g_TypeDxgkCurrentDxgThreadObject) \
+    X(g_TypeDxgkDisplayManagerObject) \
+    X(g_TypeDxgkDisplayMuxSwitch) \
+    X(g_TypeDxgkSharedBundleObject) \
+    X(g_TypeDxgkSharedKeyedMutexObject) \
+    X(g_TypeDxgkSharedProtectedSessionObject) \
+    X(g_TypeDxgkSharedResource) \
+    X(g_TypeDxgkSharedSwapChainObject) \
+    X(g_TypeDxgkSharedSyncObject) \
+    X(g_TypeEnergyTracker) \
+    X(g_TypeEtwConsumer) \
+    X(g_TypeEtwRegistration) \
+    X(g_TypeEtwSessionDemuxEntry) \
+    X(g_TypeEvent) \
+    X(g_TypeEventPair) \
+    X(g_TypeFile) \
+    X(g_TypeFilterCommunicationPort) \
+    X(g_TypeFilterConnectionPort) \
+    X(g_TypeIoCompletion) \
+    X(g_TypeIoCompletionReserve) \
+    X(g_TypeIoRing) \
+    X(g_TypeIRTimer) \
+    X(g_TypeJob) \
+    X(g_TypeKey) \
+    X(g_TypeKeyedEvent) \
+    X(g_TypeMutant) \
+    X(g_TypeNdisCmState) \
+    X(g_TypePartition) \
+    X(g_TypePcwObject) \
+    X(g_TypePowerRequest) \
+    X(g_TypeProcess) \
+    X(g_TypeProcessStateChange) \
+    X(g_TypeProfile) \
+    X(g_TypePsSiloContextNonPaged) \
+    X(g_TypePsSiloContextPaged) \
+    X(g_TypeRawInputManager) \
+    X(g_TypeRegistryTransaction) \
+    X(g_TypeSchedulerSharedData) \
+    X(g_TypeSection) \
+    X(g_TypeSemaphore) \
+    X(g_TypeSession) \
+    X(g_TypeSymbolicLink) \
+    X(g_TypeTerminal) \
+    X(g_TypeTerminalEventQueue) \
+    X(g_TypeThread) \
+    X(g_TypeThreadStateChange) \
+    X(g_TypeTimer) \
+    X(g_TypeTmEn) \
+    X(g_TypeTmRm) \
+    X(g_TypeTmTm) \
+    X(g_TypeTmTx) \
+    X(g_TypeToken) \
+    X(g_TypeTpWorkerFactory) \
+    X(g_TypeType) \
+    X(g_TypeUserApcReserve) \
+    X(g_TypeVirtualKey) \
+    X(g_TypeVRegConfigurationContext) \
+    X(g_TypeWaitablePort) \
+    X(g_TypeWaitCompletionPacket) \
+    X(g_TypeWinstation) \
+    X(g_TypeWmiGuid)
+
 //
 // Array items must be always sorted by object type name.
 //
 static WOBJ_TYPE_DESC* gpObjectTypes[] = {
-    &g_TypeActivationObject,
-    &g_TypeActivityReference,
-    &g_TypeAdapter,
-    &g_TypePort,
-    &g_TypeCallback,
-    &g_TypeComposition,
-    &g_TypeController,
-    &g_TypeCoreMessaging,
-    &g_TypeCoverageSampler,
-    &g_TypeCpuPartition,
-    &g_TypeCrossVmEvent,
-    &g_TypeCrossVmMutant,
-    &g_TypeDebugObject,
-    &g_TypeDesktop,
-    &g_TypeDevice,
-    &g_TypeDirectory,
-    &g_TypeDmaAdapter,
-    &g_TypeDmaDomain,
-    &g_TypeDriver,
-    &g_TypeDxgkCompositionObject,
-    &g_TypeDxgkCurrentDxgProcessObject,
-    &g_TypeDxgkCurrentDxgThreadObject,
-    &g_TypeDxgkDisplayManagerObject,
-    &g_TypeDxgkDisplayMuxSwitch,
-    &g_TypeDxgkSharedBundleObject,
-    &g_TypeDxgkSharedKeyedMutexObject,
-    &g_TypeDxgkSharedProtectedSessionObject,
-    &g_TypeDxgkSharedResource,
-    &g_TypeDxgkSharedSwapChainObject,
-    &g_TypeDxgkSharedSyncObject,
-    &g_TypeEnergyTracker,
-    &g_TypeEtwConsumer,
-    &g_TypeEtwRegistration,
-    &g_TypeEtwSessionDemuxEntry,
-    &g_TypeEvent,
-    &g_TypeEventPair,
-    &g_TypeFile,
-    &g_TypeFilterCommunicationPort,
-    &g_TypeFilterConnectionPort,
-    &g_TypeIoCompletion,
-    &g_TypeIoCompletionReserve,
-    &g_TypeIoRing,
-    &g_TypeIRTimer,
-    &g_TypeJob,
-    &g_TypeKey,
-    &g_TypeKeyedEvent,
-    &g_TypeMutant,
-    &g_TypeNdisCmState,
-    &g_TypePartition,
-    &g_TypePcwObject,
-    &g_TypePowerRequest,
-    &g_TypeProcess,
-    &g_TypeProcessStateChange,
-    &g_TypeProfile,
-    &g_TypePsSiloContextNonPaged,
-    &g_TypePsSiloContextPaged,
-    &g_TypeRawInputManager,
-    &g_TypeRegistryTransaction,
-    &g_TypeSchedulerSharedData,
-    &g_TypeSection,
-    &g_TypeSemaphore,
-    &g_TypeSession,
-    &g_TypeSymbolicLink,
-    &g_TypeTerminal,
-    &g_TypeTerminalEventQueue,
-    &g_TypeThread,
-    &g_TypeThreadStateChange,
-    &g_TypeTimer,
-    &g_TypeTmEn,
-    &g_TypeTmRm,
-    &g_TypeTmTm,
-    &g_TypeTmTx,
-    &g_TypeToken,
-    &g_TypeTpWorkerFactory,
-    &g_TypeType,
-    &g_TypeUserApcReserve,
-    &g_TypeVirtualKey,
-    &g_TypeVRegConfigurationContext,
-    &g_TypeWaitablePort,
-    &g_TypeWaitCompletionPacket,
-    &g_TypeWinstation,
-    &g_TypeWmiGuid
+#define X(type) &type,
+    OBJECT_TYPE_ENTRIES
+#undef X
 };
 
 //
@@ -237,29 +242,6 @@ LPWSTR ObManagerGetNameByIndex(
     }
 
     return OBTYPE_NAME_UNKNOWN;
-}
-
-/*
-* ObManagerGetImageIndexByTypeIndex
-*
-* Purpose:
-*
-* Returns object image index by index of known type.
-*
-*
-*/
-UINT ObManagerGetImageIndexByTypeIndex(
-    _In_ WOBJ_OBJECT_TYPE TypeIndex
-)
-{
-    ULONG i;
-
-    for (i = 0; i < g_ObjectTypesCount; i++) {
-        if (gpObjectTypes[i]->Index == TypeIndex)
-            return gpObjectTypes[i]->ImageIndex;
-    }
-
-    return ObjectTypeUnknown;
 }
 
 /*

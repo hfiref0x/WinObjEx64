@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2024
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       OBJECTS.H
 *
-*  VERSION:     2.06
+*  VERSION:     2.07
 *
-*  DATE:        11 Oct 2024
+*  DATE:        11 May 2025
 *
 *  Header file for internal Windows object types handling.
 *
@@ -83,18 +83,18 @@ typedef enum _WOBJ_OBJECT_TYPE {
     ObjectTypeRegistryTransaction = 55,
     ObjectTypeDmaAdapter = 56,
     ObjectTypeDmaDomain = 57,
-    ObjectTypeCoverageSampler = 58, //NI
-    ObjectTypeActivationObject = 59, //NI
-    ObjectTypeActivityReference = 60, //NI
-    ObjectTypeCoreMessaging = 61, //NI
-    ObjectTypeRawInputManager = 62, //NI
-    ObjectTypeWaitCompletionPacket = 63, //NI
-    ObjectTypeIoCompletionReserve = 64, 
-    ObjectTypeUserApcReserve = 65, //NI
-    ObjectTypeIoRing = 66, //NI
-    ObjectTypeTerminal = 67, //NI
-    ObjectTypeTerminalEventQueue = 68, //NI
-    ObjectTypeEnergyTracker = 69, //NI
+    ObjectTypeCoverageSampler = 58,
+    ObjectTypeActivationObject = 59,
+    ObjectTypeActivityReference = 60,
+    ObjectTypeCoreMessaging = 61,
+    ObjectTypeRawInputManager = 62,
+    ObjectTypeWaitCompletionPacket = 63,
+    ObjectTypeIoCompletionReserve = 64,
+    ObjectTypeUserApcReserve = 65,
+    ObjectTypeIoRing = 66,
+    ObjectTypeTerminal = 67,
+    ObjectTypeTerminalEventQueue = 68,
+    ObjectTypeEnergyTracker = 69,
     ObjectTypeUnknown = 70,
     ObjectTypeEtwSessionDemuxEntry = ObjectTypeUnknown,
     ObjectTypeNdisCmState = ObjectTypeUnknown,
@@ -215,15 +215,14 @@ typedef struct _WOBJ_TYPE_DESC {
 
 extern WOBJ_TYPE_DESC g_TypeUnknown;
 extern WOBJ_TYPE_DESC g_TypeSymbolicLink;
+extern WOBJ_TYPE_DESC g_TypeDevice;
 extern WOBJ_TYPE_DESC g_TypeDriver;
 extern WOBJ_TYPE_DESC g_TypeKey;
+extern WOBJ_TYPE_DESC g_TypeToken;
 extern ULONG g_ObjectTypesCount;
 
 HIMAGELIST ObManagerLoadImageList(
     VOID);
-
-UINT ObManagerGetImageIndexByTypeIndex(
-    _In_ WOBJ_OBJECT_TYPE TypeIndex);
 
 UINT ObManagerGetImageIndexByTypeName(
     _In_opt_ LPCWSTR lpTypeName);

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2018 - 2024
+*  (C) COPYRIGHT AUTHORS, 2018 - 2025
 *
 *  TITLE:       EXTRASCALLBACKS.C
 *
-*  VERSION:     2.06
+*  VERSION:     2.07
 *
-*  DATE:        21 Dec 2024
+*  DATE:        11 May 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -681,9 +681,9 @@ static const BYTE CiCallbackIndexes_Win11_21H1[] = {
 };
 
 //
-// Windows 11 22H2
+// Windows 11 22H2 - 25H2
 //
-static const BYTE CiCallbackIndexes_Win11_22H2[] = {
+static const BYTE CiCallbackIndexes_Win11_22H2_25H2[] = {
     Id_CiSetFileCache,
     Id_CiGetFileCache,
     Id_CiQueryInformation,
@@ -811,9 +811,10 @@ LPWSTR GetCiRoutineNameFromIndex(
     case NT_WIN11_22H2:
     case NT_WIN11_23H2:
     case NT_WIN11_24H2:
+    case NT_WIN11_25H2:
     default:
-        Indexes = CiCallbackIndexes_Win11_22H2;
-        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win11_22H2);
+        Indexes = CiCallbackIndexes_Win11_22H2_25H2;
+        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win11_22H2_25H2);
         break;
     }
 
@@ -5783,7 +5784,6 @@ OBEX_QUERYCALLBACK_ROUTINE(QueryCallbackGeneric)
             QueryAddress = FindRoutine(QueryFlags);
 
         *SystemCallbacksRef = QueryAddress;
-
 
     }
     __except (WOBJ_EXCEPTION_FILTER_LOG) {

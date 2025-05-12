@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2022
+*  (C) COPYRIGHT AUTHORS, 2019 - 2025
 *
 *  TITLE:       EXTRASSL.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.07
 *
-*  DATE:        19 Jun 2022
+*  DATE:        11 May 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -595,7 +595,7 @@ VOID SLCacheDialogOnInit(
             //
             // Remember image index.
             //
-            g_SLCacheImageIndex = ObManagerGetImageIndexByTypeIndex(ObjectTypeToken);
+            g_SLCacheImageIndex = g_TypeToken.ImageIndex;
             pDlgContext->Reserved = (ULONG_PTR)SLCacheData;
             SLCacheListItems(pDlgContext, NULL, FALSE);
 

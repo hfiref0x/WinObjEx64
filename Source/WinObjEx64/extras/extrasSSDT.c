@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2024
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     2.05
+*  VERSION:     2.07
 *
-*  DATE:        11 May 2024
+*  DATE:        11 May 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -107,9 +107,8 @@ VOID SdtListOutputTable(
         SdtTableEntry->Limit,
         SdtTableEntry->Limit);
 
-    supStatusBarSetText(Context->StatusBar, 0, (LPWSTR)&szBuffer);
-
-    iImage = ObManagerGetImageIndexByTypeIndex(ObjectTypeDevice);
+    supStatusBarSetText(Context->StatusBar, 0, (LPWSTR)&szBuffer); 
+    iImage = g_TypeDevice.ImageIndex;
 
     ListView_DeleteAllItems(Context->ListView);
 

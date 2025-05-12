@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2011 - 2023 UGN/HE
+*  (C) COPYRIGHT AUTHORS, 2011 - 2025 UGN/HE
 *
 *  TITLE:       NTSUP.C
 *
-*  VERSION:     2.21
+*  VERSION:     2.22
 *
-*  DATE:        22 Jul 2023
+*  DATE:        11 May 2025
 *
 *  Native API support functions.
 *
@@ -293,11 +293,8 @@ PVOID ntsupFindModuleEntryByName(
         moduleEntry = &ModulesList->Modules[i];
         fnameOffset = moduleEntry->OffsetToFileName;
         entryName = (LPSTR)&moduleEntry->FullPathName[fnameOffset];
-
-        if (entryName) {
-            if (_strcmpi_a(entryName, ModuleName) == 0)
-                return moduleEntry;
-        }
+        if (_strcmpi_a(entryName, ModuleName) == 0)
+            return moduleEntry;
     }
 
     return NULL;
@@ -333,12 +330,9 @@ PVOID ntsupFindModuleEntryByName_U(
             moduleEntry = &ModulesList->Modules[i];
             fnameOffset = moduleEntry->OffsetToFileName;
             entryName = (LPSTR)&moduleEntry->FullPathName[fnameOffset];
-
-            if (entryName) {
-                if (_strcmpi_a(entryName, moduleName.Buffer) == 0) {
-                    result = moduleEntry;
-                    break;
-                }
+            if (_strcmpi_a(entryName, moduleName.Buffer) == 0) {
+                result = moduleEntry;
+                break;
             }
         }
 

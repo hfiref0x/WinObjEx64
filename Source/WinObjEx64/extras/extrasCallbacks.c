@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.07
 *
-*  DATE:        11 May 2025
+*  DATE:        14 May 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -2710,20 +2710,13 @@ OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
     ULONG_PTR kvarAddress = 0;
     PBYTE   ptrCode;
     LONG    Rel = 0;
-    ULONG   Index, c, callIndex;
+    ULONG   Index, c;
     hde64s  hs;
 
-    UNREFERENCED_PARAMETER(QueryFlags);
+    ULONG SignatureSize = 0;
+    PBYTE Signature = NULL;
 
-    // another call was added in 24H2 to ExfAcquirePushLockSharedEx
-    if (g_NtBuildNumber > NT_WIN11_23H2)
-    {
-        callIndex = 2;
-    }
-    else
-    {
-        callIndex = 1;
-    }
+    UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
 
@@ -2747,44 +2740,65 @@ OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
         //
         // Find ExpFindHost / ExpFindCompatibleHost
         //
-
-        do {
-
-            hde64_disasm(ptrCode + Index, &hs);
-            if (hs.flags & F_ERROR)
-                break;
+        if (g_NtBuildNumber >= NT_WIN11_21H2) {
 
             //
-            // Find call instruction.
+            // For Windows 11 and above lookup for ExpFindHost parameters 
+            // as the call of ExpFindHost maybe deep inside the ExRegisterExtension with
+            // multiple other calls before.
             //
-            if (hs.len != 5) {
-                Index += hs.len;
-                continue;
-            }
-
-            if (ptrCode[Index] == 0xE8)
-                c++;
-
-            if (c > callIndex) {
-                Rel = *(PLONG)(ptrCode + Index + 1);
+            switch (g_NtBuildNumber)
+            {
+            case NT_WIN11_21H2:
+            case NT_WIN11_22H2:
+                Signature = g_ExpFindHost22000_22621;
+                SignatureSize = sizeof(g_ExpFindHost22000_22621);
                 break;
+            case NT_WIN11_23H2:
+            case NT_WIN11_24H2:
+            case NT_WIN11_25H2:
+            default:
+                Signature = g_ExpFindHost22631_27842;
+                SignatureSize = sizeof(g_ExpFindHost22631_27842);
+                break;
+
             }
 
-            Index += hs.len;
+            ptrCode = (PBYTE)supFindPattern(
+                (PBYTE)ptrCode,
+                1024,
+                Signature,
+                SignatureSize);
 
-        } while (Index < 512);
+            if (ptrCode == NULL)
+                return 0;
 
-        //
-        // If this is 24H2, the call is to ExpFindCompatibleHost
-        // Need to do another search to find the call to ExpFindHost
-        //
-        // For some unknown reason this was removed from release builds and not present in 25H2.
-        //
-    /*   if (g_NtBuildNumber == NT_WIN11_24H2)
-        {
-            ptrCode = ptrCode + Index + 5 + Rel;
+            Index = SignatureSize;
             Rel = 0;
-            Index = 0;
+
+            do {
+                hde64_disasm(ptrCode + Index, &hs);
+                if (hs.flags & F_ERROR)
+                    break;
+
+                //
+               // Find call instruction.
+               //
+                if (hs.len != 5) {
+                    Index += hs.len;
+                    continue;
+                }
+
+                if (ptrCode[Index] == 0xE8) {
+                    Rel = *(PLONG)(ptrCode + Index + 1);
+                    break;
+                }
+
+            } while (Index < 64);
+
+        }
+        else {
+
             do {
 
                 hde64_disasm(ptrCode + Index, &hs);
@@ -2792,7 +2806,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
                     break;
 
                 //
-                // Find call instruction.
+                // Find second call instruction.
                 //
                 if (hs.len != 5) {
                     Index += hs.len;
@@ -2800,15 +2814,17 @@ OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
                 }
 
                 if (ptrCode[Index] == 0xE8)
-                {
+                    c++;
+
+                if (c > 1) {
                     Rel = *(PLONG)(ptrCode + Index + 1);
                     break;
                 }
 
                 Index += hs.len;
 
-            } while (Index < 128);
-        }*/
+            } while (Index < 512);
+        }
 
         if (Rel == 0)
             return 0;
@@ -3466,18 +3482,18 @@ OBEX_FINDCALLBACK_ROUTINE(FindPnpDeviceClassNotifyList)
         case NT_WIN7_RTM:
         case NT_WIN7_SP1:
 
-            Signature = PnpDeviceClassNotifyList_SubPattern_7601;
-            SignatureSize = sizeof(PnpDeviceClassNotifyList_SubPattern_7601);
+            Signature = g_PnpDeviceClassNotifyList_SubPattern_7601;
+            SignatureSize = sizeof(g_PnpDeviceClassNotifyList_SubPattern_7601);
             break;
 
         case NT_WIN8_RTM:
-            Signature = PnpDeviceClassNotifyList_SubPattern_9200;
-            SignatureSize = sizeof(PnpDeviceClassNotifyList_SubPattern_9200);
+            Signature = g_PnpDeviceClassNotifyList_SubPattern_9200;
+            SignatureSize = sizeof(g_PnpDeviceClassNotifyList_SubPattern_9200);
             break;
 
         default:
-            Signature = PnpDeviceClassNofityList_SubPattern_9600_26080;
-            SignatureSize = sizeof(PnpDeviceClassNofityList_SubPattern_9600_26080);
+            Signature = g_PnpDeviceClassNofityList_SubPattern_9600_26080;
+            SignatureSize = sizeof(g_PnpDeviceClassNofityList_SubPattern_9600_26080);
             break;
         }
 

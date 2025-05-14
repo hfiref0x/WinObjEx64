@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.07
 *
-*  DATE:        10 May 2025
+*  DATE:        14 May 2025
 *
 *  Header with search patterns used by Callbacks dialog routines.
 *
@@ -86,20 +86,30 @@ BYTE g_EmpSearchCallbackDatabase[] = { 0x48, 0x8B, 0x4E, 0xF8, 0x48, 0x85, 0xC9 
 BYTE g_EmpSearchCallbackDatabase2[] = { 0x49, 0x8B, 0x4A, 0xF8, 0x48, 0x85, 0xC9 };
 BYTE g_EmpSearchCallbackDatabase3[] = { 0x4B, 0x8B, 0x0C, 0xDC, 0x48, 0x85, 0xC9, 0x74, 0x48 };
 
+/*+++
 
-/*
-* PnpDeviceClassNotifyList search pattern
-*/
+ ExpFindHost search pattern
+
++++*/
+
+BYTE g_ExpFindHost22000_22621[] = { 0x41, 0x0F, 0xB7, 0x0E };
+BYTE g_ExpFindHost22631_27842[] = { 0x44, 0x89, 0x44, 0x24, 0x78 };
+
+/*+++
+
+ PnpDeviceClassNotifyList search pattern
+
++++*/
 
 //
 // mul ecx
 //
-BYTE PnpDeviceClassNotifyList_SubPattern_7601[] = { 0xF7, 0xE1 };
+BYTE g_PnpDeviceClassNotifyList_SubPattern_7601[] = { 0xF7, 0xE1 };
 
-BYTE PnpDeviceClassNotifyList_SubPattern_9200[] = { 0xC1, 0xEA, 0x02, 0x6B, 0xD2, 0x0D };
+BYTE g_PnpDeviceClassNotifyList_SubPattern_9200[] = { 0xC1, 0xEA, 0x02, 0x6B, 0xD2, 0x0D };
 
 //
 //  shr edx, 2
 //  imul eax, edx, 0Dh
 //
-BYTE PnpDeviceClassNofityList_SubPattern_9600_26080[] = { 0xC1, 0xEA, 0x02, 0x6B, 0xC2, 0x0D };
+BYTE g_PnpDeviceClassNofityList_SubPattern_9600_26080[] = { 0xC1, 0xEA, 0x02, 0x6B, 0xC2, 0x0D };

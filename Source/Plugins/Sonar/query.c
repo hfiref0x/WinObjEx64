@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2023
+*  (C) COPYRIGHT AUTHORS, 2019 - 2025
 *
 *  TITLE:       QUERY.C
 *
-*  VERSION:     1.04
+*  VERSION:     1.05
 *
-*  DATE:        16 Jul 2023
+*  DATE:        14 May 2025
 *
 *  Query NDIS specific data.
 *
@@ -52,6 +52,8 @@ NdisDeregisterProtocol
 48 8B 3D XX XX XX XX                                            mov     rdi, cs:ndisProtocolList
 25905
 48 8B 3D 7C FB F9 FF                                            mov     rdi, cs:ndisProtocolList
+27842
+48 8B 3D 44 A6 FA FF                                            mov     rdi, cs:ndisProtocolList
 */
 
 #define HDE_F_ERROR 0x00001000
@@ -327,24 +329,24 @@ PVOID DumpOpenBlockVersionAware(
     case NT_WIN7_RTM:
     case NT_WIN7_SP1:
         ObjectSize = sizeof(NDIS_OPEN_BLOCK_7601);
-        ObjectVersion = 1;
+        ObjectVersion = NDIS_OPEN_BLOCK_VERSION_WIN7;
         break;
     case NT_WIN8_RTM:
         ObjectSize = sizeof(NDIS_OPEN_BLOCK_9200);
-        ObjectVersion = 2;
+        ObjectVersion = NDIS_OPEN_BLOCK_VERSION_WIN8;
         break;
     case NT_WIN8_BLUE:
     case NT_WIN10_THRESHOLD1:
     case NT_WIN10_THRESHOLD2:
         ObjectSize = sizeof(NDIS_OPEN_BLOCK_9600_10586);
-        ObjectVersion = 3;
+        ObjectVersion = NDIS_OPEN_BLOCK_VERSION_WIN81_WIN10TH1;
         break;
     case NT_WIN10_REDSTONE1:
     case NT_WIN10_REDSTONE2:
     case NT_WIN10_REDSTONE3:
     case NT_WIN10_REDSTONE4:
         ObjectSize = sizeof(NDIS_OPEN_BLOCK_14393_17134);
-        ObjectVersion = 4;
+        ObjectVersion = NDIS_OPEN_BLOCK_VERSION_WIN10_RS1_4;
         break;
     case NT_WIN10_REDSTONE5:
     case NT_WIN10_19H1:
@@ -355,12 +357,14 @@ PVOID DumpOpenBlockVersionAware(
     case NT_WIN10_21H2:
     case NT_WIN11_21H2:
         ObjectSize = sizeof(NDIS_OPEN_BLOCK_17763_22000);
-        ObjectVersion = 5;
+        ObjectVersion = NDIS_OPEN_BLOCK_VERSION_WIN10_RS5_WIN11;
         break;
     case NT_WIN11_22H2:
+    case NT_WIN11_23H2:
+    case NT_WIN11_24H2:
     default:
         ObjectSize = sizeof(NDIS_OPEN_BLOCK_22621_25905);
-        ObjectVersion = 6;
+        ObjectVersion = NDIS_OPEN_BLOCK_VERSION_WIN11_22_25H2;
         break;
     }
 
@@ -481,6 +485,8 @@ ULONG GetNextProtocolOffset(
     case NT_WIN10_21H2:
     case NT_WIN11_21H2:
     case NT_WIN11_22H2:
+    case NT_WIN11_23H2:
+    case NT_WIN11_24H2:
     default:
         Offset = FIELD_OFFSET(NDIS_PROTOCOL_BLOCK_18362_25905, NextProtocol);
         break;
@@ -804,7 +810,7 @@ BOOL CreateCompatibleOpenBlock(
 {
     switch (ObjectVersion) {
 
-    case 1: //7600..7601
+    case NDIS_OPEN_BLOCK_VERSION_WIN7: //7600..7601
         OpenBlock->ProtocolNextOpen = BlockRef->u1.Versions.v1->ProtocolNextOpen;
         OpenBlock->BindDeviceName = BlockRef->u1.Versions.v1->BindDeviceName;
         OpenBlock->RootDeviceName = BlockRef->u1.Versions.v1->RootDeviceName;
@@ -869,7 +875,7 @@ BOOL CreateCompatibleOpenBlock(
         OpenBlock->Handlers.WTransferDataHandler = BlockRef->u1.Versions.v1->WTransferDataHandler;
         break;
 
-    case 2: //9200
+    case NDIS_OPEN_BLOCK_VERSION_WIN8: //9200
         OpenBlock->ProtocolNextOpen = BlockRef->u1.Versions.v2->ProtocolNextOpen;
         OpenBlock->BindDeviceName = BlockRef->u1.Versions.v2->BindDeviceName;
         OpenBlock->RootDeviceName = BlockRef->u1.Versions.v2->RootDeviceName;
@@ -932,7 +938,7 @@ BOOL CreateCompatibleOpenBlock(
         OpenBlock->Handlers.WTransferDataHandler = BlockRef->u1.Versions.v2->WTransferDataHandler;
         break;
 
-    case 3: //9600..10586      
+    case NDIS_OPEN_BLOCK_VERSION_WIN81_WIN10TH1: //9600..10586      
         OpenBlock->ProtocolNextOpen = BlockRef->u1.Versions.u_v3.v3c->ProtocolNextOpen;
         OpenBlock->BindDeviceName = BlockRef->u1.Versions.u_v3.v3c->BindDeviceName;
         OpenBlock->RootDeviceName = BlockRef->u1.Versions.u_v3.v3c->RootDeviceName;
@@ -995,7 +1001,7 @@ BOOL CreateCompatibleOpenBlock(
         OpenBlock->Handlers.WTransferDataHandler = BlockRef->u1.Versions.u_v3.v3c->WTransferDataHandler;
         break;
 
-    case 4: //14393..17134
+    case NDIS_OPEN_BLOCK_VERSION_WIN10_RS1_4: //14393..17134
         OpenBlock->ProtocolNextOpen = BlockRef->u1.Versions.u_v4.v4c->ProtocolNextOpen;
         OpenBlock->BindDeviceName = BlockRef->u1.Versions.u_v4.v4c->BindDeviceName;
         OpenBlock->RootDeviceName = BlockRef->u1.Versions.u_v4.v4c->RootDeviceName;
@@ -1058,7 +1064,7 @@ BOOL CreateCompatibleOpenBlock(
         OpenBlock->Handlers.WTransferDataHandler = BlockRef->u1.Versions.u_v4.v4c->WTransferDataHandler;
         break;
 
-    case 5: //17763..22000
+    case NDIS_OPEN_BLOCK_VERSION_WIN10_RS5_WIN11: //17763..22000
         OpenBlock->ProtocolNextOpen = BlockRef->u1.Versions.u_v5.v5c->ProtocolNextOpen;
         OpenBlock->BindDeviceName = BlockRef->u1.Versions.u_v5.v5c->BindDeviceName;
         OpenBlock->RootDeviceName = BlockRef->u1.Versions.u_v5.v5c->RootDeviceName;
@@ -1109,7 +1115,7 @@ BOOL CreateCompatibleOpenBlock(
         OpenBlock->Handlers.WTransferDataHandler = BlockRef->u1.Versions.u_v5.v5c->WTransferDataHandler;
         break;
 
-    case 6: //22621..25905
+    case NDIS_OPEN_BLOCK_VERSION_WIN11_22_25H2: //22621..25905
         OpenBlock->ProtocolNextOpen = BlockRef->u1.Versions.u_v6.v6c->ProtocolNextOpen;
         OpenBlock->BindDeviceName = BlockRef->u1.Versions.u_v6.v6c->BindDeviceName;
         OpenBlock->RootDeviceName = BlockRef->u1.Versions.u_v6.v6c->RootDeviceName;

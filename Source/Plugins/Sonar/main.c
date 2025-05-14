@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2024
+*  (C) COPYRIGHT AUTHORS, 2019 - 2025
 *
 *  TITLE:       MAIN.H
 *
 *  VERSION:     1.15
 *
-*  DATE:        04 Jun 2024
+*  DATE:        11 May 2025
 *
 *  WinObjEx64 Sonar plugin.
 *
@@ -22,7 +22,7 @@
 //
 // Maximum tested build Sonar is known to work.
 //
-#define SONAR_MAX_TESTED_BUILD NT_WIN11_24H2
+#define SONAR_MAX_TESTED_BUILD NT_WIN11_25H2
 
 //
 // Dll instance.

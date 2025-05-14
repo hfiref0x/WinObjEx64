@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2023
+*  (C) COPYRIGHT AUTHORS, 2019 - 2025
 *
 *  TITLE:       QUERY.H
 *
-*  VERSION:     1.04
+*  VERSION:     1.05
 *
-*  DATE:        16 Jul 2023
+*  DATE:        14 May 2025
 *
 *  Sonar plugin query information definitions.
 *
@@ -18,6 +18,13 @@
 *******************************************************************************/
 
 #pragma once
+
+#define NDIS_OPEN_BLOCK_VERSION_WIN7            1
+#define NDIS_OPEN_BLOCK_VERSION_WIN8            2
+#define NDIS_OPEN_BLOCK_VERSION_WIN81_WIN10TH1  3
+#define NDIS_OPEN_BLOCK_VERSION_WIN10_RS1_4     4
+#define NDIS_OPEN_BLOCK_VERSION_WIN10_RS5_WIN11 5
+#define NDIS_OPEN_BLOCK_VERSION_WIN11_22_25H2   6
 
 typedef struct _PROTOCOL_BLOCK_VERSIONS {
     union {

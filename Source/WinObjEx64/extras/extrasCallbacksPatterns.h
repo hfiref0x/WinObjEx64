@@ -74,7 +74,7 @@ BYTE g_CiCallbacksMatchingPattern[] = {
     0x48, 0x89, 0x05
 };
 
-#define CI_CALLBACKS_LEA_INSTRUCTION_SIZE   7
+#define LEA_INSTRUCTION_LENGTH_7B 7
 #define CI_CALLBACKS_3BYTE_INSTRUCTION_SIZE 3
 
 /*+++

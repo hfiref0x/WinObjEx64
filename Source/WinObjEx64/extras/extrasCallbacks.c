@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.07
 *
-*  DATE:        14 May 2025
+*  DATE:        15 May 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -903,7 +903,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacksEx)
         if (hs.flags & F_ERROR)
             break;
 
-        if (hs.len == 7) {
+        if (hs.len == 7) { //mov     r8, cs:CiCompareSigningLevels
 
             if ((ptrCode[Index] == 0x4C) &&
                 (ptrCode[Index + 1] == 0x8B) &&
@@ -1044,7 +1044,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
                     break;
 
                 InstructionMatchPattern = SeCiCallbacksMatchingPattern; //default matching pattern
-                InstructionMatchLength = CI_CALLBACKS_LEA_INSTRUCTION_SIZE;
+                InstructionMatchLength = LEA_INSTRUCTION_LENGTH_7B;
                 InstructionExactMatchLength = CI_CALLBACKS_3BYTE_INSTRUCTION_SIZE;
 
                 switch (g_NtBuildNumber) {
@@ -1244,7 +1244,7 @@ ULONG LookupIopFileSystemQueueHeads_w7(
         if (hs.flags & F_ERROR)
             break;
 
-        if (hs.len == 7) {
+        if (hs.len == LEA_INSTRUCTION_LENGTH_7B) {
             //
             // lea  rdx, xxx                
             //
@@ -1661,22 +1661,20 @@ OBEX_FINDCALLBACK_ROUTINE(FindRtlpDebugPrintCallbackList)
 
             //jmp/call DbgpInsertDebugPrintCallback
             if (hs.len == 5) {
-
-                if ((ptrCode[Index] == 0xE9) ||
-                    (ptrCode[Index] == 0xE8))
+                if (hs.opcode == 0xE8 || hs.opcode == 0xE9)
                 {
-                    Rel = *(PLONG)(ptrCode + Index + 1);
+                    Rel = (LONG)hs.imm.imm32;
                     break;
                 }
             }
             //jz
             if (hs.len == 6) {
-
-                if (ptrCode[Index] == 0x0F) {
-                    Rel = *(PLONG)(ptrCode + Index + 2);
+                if (hs.opcode == 0x0F) {
+                    Rel = (LONG)hs.imm.imm32;
                     break;
                 }
             }
+
             Index += hs.len;
 
         } while (Index < 64);
@@ -1700,13 +1698,13 @@ OBEX_FINDCALLBACK_ROUTINE(FindRtlpDebugPrintCallbackList)
             //
             // lea  reg, RtlpDebugPrintCallbackList
             //
-            if (hs.len == 7) {
+            if (hs.len == LEA_INSTRUCTION_LENGTH_7B) {
                 if ((ptrCode[Index] == 0x48) &&
                     (ptrCode[Index + 1] == 0x8D) &&
                     ((ptrCode[Index + 2] == 0x15) || (ptrCode[Index + 2] == 0x0D)) &&
                     (ptrCode[Index + hs.len] == 0x48))
                 {
-                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    Rel = (LONG)hs.disp.disp32;
                     break;
                 }
             }
@@ -2049,12 +2047,12 @@ OBEX_FINDCALLBACK_ROUTINE(FindIopNotifyShutdownQueueHeadHead)
             if (hs.flags & F_ERROR)
                 break;
 
-            if (hs.len == 7) { //check if lea
+            if (hs.len == LEA_INSTRUCTION_LENGTH_7B) { //check if lea
 
                 if (((ptrCode[Index] == 0x48) || (ptrCode[Index] == 0x4C)) &&
                     (ptrCode[Index + 1] == 0x8D))
                 {
-                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    Rel = (LONG)hs.disp.disp32;
                     break;
                 }
 
@@ -2156,7 +2154,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindCmCallbackHead)
                 hde64_disasm(ptrCode + Index + hs.len, &hs_next);
                 if (hs_next.flags & F_ERROR)
                     break;
-                if (hs_next.len == 7) {
+                if (hs_next.len == LEA_INSTRUCTION_LENGTH_7B) {
 
                     /*
                     ** lea     rdx, [rsp+20h]
@@ -2230,13 +2228,13 @@ OBEX_FINDCALLBACK_ROUTINE(FindKeBugCheckReasonCallbackHead)
             if (hs.flags & F_ERROR)
                 break;
 
-            if (hs.len == 7) { //check if lea
+            if (hs.len == LEA_INSTRUCTION_LENGTH_7B) { //check if lea
 
                 if (((ptrCode[Index] == 0x48) || (ptrCode[Index] == 0x4C)) &&
                     (ptrCode[Index + 1] == 0x8D) &&
                     ((ptrCode[Index + hs.len] == 0x48) || (ptrCode[Index + hs.len] == 0x83)))
                 {
-                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    Rel = (LONG)hs.disp.disp32;
                     break;
                 }
 
@@ -2297,13 +2295,13 @@ OBEX_FINDCALLBACK_ROUTINE(FindKeBugCheckCallbackHead)
             if (hs.flags & F_ERROR)
                 break;
 
-            if (hs.len == 7) { //check if lea + mov
+            if (hs.len == LEA_INSTRUCTION_LENGTH_7B) { //check if lea + mov
 
                 if (((ptrCode[Index] == 0x48) || (ptrCode[Index] == 0x4C)) &&
                     (ptrCode[Index + 1] == 0x8D) &&
                     (ptrCode[Index + hs.len] == 0x48))
                 {
-                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    Rel = (LONG)hs.disp.disp32;
                     break;
                 }
 
@@ -2357,7 +2355,6 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspLoadImageNotifyRoutine)
         if (ptrCode == NULL)
             return 0;
 
-
         Index = 0;
         Rel = 0;
 
@@ -2366,12 +2363,12 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspLoadImageNotifyRoutine)
             if (hs.flags & F_ERROR)
                 break;
 
-            if (hs.len == 7) { //check if lea
+            if (hs.len == LEA_INSTRUCTION_LENGTH_7B) { //check if lea
 
                 if (((ptrCode[Index] == 0x48) || (ptrCode[Index] == 0x4C)) &&
                     (ptrCode[Index + 1] == 0x8D))
                 {
-                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    Rel = (LONG)hs.disp.disp32;
                     break;
                 }
 
@@ -2433,12 +2430,12 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspCreateThreadNotifyRoutine)
             if (hs.flags & F_ERROR)
                 break;
 
-            if (hs.len == 7) { //check if lea
+            if (hs.len == LEA_INSTRUCTION_LENGTH_7B) { //check if lea
 
                 if (((ptrCode[Index] == 0x48) || (ptrCode[Index] == 0x4C)) &&
                     (ptrCode[Index + 1] == 0x8D))
                 {
-                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    Rel = (LONG)hs.disp.disp32;
                     break;
                 }
 
@@ -2502,16 +2499,15 @@ OBEX_FINDCALLBACK_ROUTINE(FindDbgkLmdCallbacks)
             if (hs.flags & F_ERROR)
                 break;
 
-            if (hs.len == 7) { //check if lea
+            if (hs.len == LEA_INSTRUCTION_LENGTH_7B) { //check if lea
 
                 //
                 // lea     rcx, DbgkLmdCallbacks
                 //
-
                 if (((ptrCode[Index] == 0x4C) || (ptrCode[Index] == 0x48)) &&
                     (ptrCode[Index + 1] == 0x8D))
                 {
-                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    Rel = (LONG)hs.disp.disp32;
                     break;
                 }
 
@@ -2576,12 +2572,18 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspCreateProcessNotifyRoutine)
             if (hs.flags & F_ERROR)
                 break;
 
-            //jmp/call PspSetCreateProcessNotifyRoutine
-            if ((ptrCode[Index] == 0xE9) ||
-                (ptrCode[Index] == 0xE8) ||
-                (ptrCode[Index] == 0xEB))
+            // Handle JMP/CALL rel32
+            if ((hs.opcode == 0xE8 || hs.opcode == 0xE9) &&
+                hs.len == 5)
             {
-                Rel = *(PLONG)(ptrCode + Index + 1);
+                Rel = (LONG)hs.imm.imm32;
+                break;
+            }
+            // Handle JMP rel8 (Windows 8 RTM)
+            else if (hs.opcode == 0xEB &&
+                hs.len == 2)
+            {
+                Rel = (LONG)(INT8)hs.imm.imm8;
                 break;
             }
 
@@ -2601,12 +2603,12 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspCreateProcessNotifyRoutine)
             if (hs.flags & F_ERROR)
                 break;
 
-            if (hs.len == 7) { //check if lea
+            if (hs.len == LEA_INSTRUCTION_LENGTH_7B) { //check if lea
 
                 if ((ptrCode[Index] == 0x4C) &&
                     (ptrCode[Index + 1] == 0x8D))
                 {
-                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    Rel = (LONG)hs.disp.disp32;
                     break;
                 }
 
@@ -2671,7 +2673,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindPsAltSystemCallHandlers)
             //
             // lea reg, PsAltSystemCallHandlers
             //
-            if (hs.len == 7) {
+            if (hs.len == LEA_INSTRUCTION_LENGTH_7B) {
 
                 //
                 // Match block found.
@@ -2680,7 +2682,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindPsAltSystemCallHandlers)
                     (VOID*)PsAltSystemCallHandlersPattern,
                     InstructionExactMatchLength) == InstructionExactMatchLength)
                 {
-                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    Rel = (LONG)hs.disp.disp32;
                     break;
                 }
             }
@@ -2784,15 +2786,12 @@ OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
                 //
                // Find call instruction.
                //
-                if (hs.len != 5) {
-                    Index += hs.len;
-                    continue;
-                }
-
-                if (ptrCode[Index] == 0xE8) {
-                    Rel = *(PLONG)(ptrCode + Index + 1);
+                if (hs.len == 5 && hs.opcode == 0xE8) {
+                    Rel = (LONG)hs.imm.imm32;
                     break;
                 }
+
+                Index += hs.len;
 
             } while (Index < 64);
 
@@ -2808,16 +2807,11 @@ OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
                 //
                 // Find second call instruction.
                 //
-                if (hs.len != 5) {
-                    Index += hs.len;
-                    continue;
-                }
-
-                if (ptrCode[Index] == 0xE8)
+                if (hs.len == 5 && hs.opcode == 0xE8)
                     c++;
 
                 if (c > 1) {
-                    Rel = *(PLONG)(ptrCode + Index + 1);
+                    Rel = (LONG)hs.imm.imm32;
                     break;
                 }
 
@@ -2893,19 +2887,15 @@ OBEX_FINDCALLBACK_ROUTINE(FindExpCallbackListHead)
         if (hs.flags & F_ERROR)
             break;
 
-        if (hs.len == 7) {
-            if (hs.flags & F_PREFIX_REX &&
-                hs.flags & F_DISP32 &&
-                hs.flags & F_MODRM)
+        if (hs.len == LEA_INSTRUCTION_LENGTH_7B
+            && (hs.flags & (F_PREFIX_REX | F_DISP32 | F_MODRM)) == (F_PREFIX_REX | F_DISP32 | F_MODRM))
+        {
+            if (((ptrCode[Index] == 0x48) || (ptrCode[Index] == 0x4C)) &&
+                (ptrCode[Index + 1] == 0x8D) &&
+                ((ptrCode[Index + 2] == 0x15) || (ptrCode[Index + hs.len + 3] == 0x28))) // add/lea with +0x28 = offset of object's ExpCallbackList
             {
-                if (((ptrCode[Index] == 0x48) || (ptrCode[Index] == 0x4C)) &&
-                    (ptrCode[Index + 1] == 0x8D) &&
-                    ((ptrCode[Index + 2] == 0x15) ||
-                        (ptrCode[Index + hs.len + 3] == 0x28))) // add/lea with +0x28 = offset of object's ExpCallbackList
-                {
-                    Rel = (LONG)hs.disp.disp32;
-                    break;
-                }
+                Rel = (LONG)hs.disp.disp32;
+                break;
             }
         }
 
@@ -2980,13 +2970,13 @@ OBEX_FINDCALLBACK_ROUTINE(FindPoCoalescingCallbacks)
             if (hs.flags & F_ERROR)
                 break;
 
-            if (hs.len == 7) { //check if lea
+            if (hs.len == LEA_INSTRUCTION_LENGTH_7B) { //check if lea
 
                 if ((ptrCode[Index] == 0x48) &&
                     (ptrCode[Index + 1] == 0x8D) &&
                     (ptrCode[Index + 2] == checkByte)) //universal for both types of implementation
                 {
-                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    Rel = (LONG)hs.disp.disp32;
                     break;
                 }
             }
@@ -3162,15 +3152,12 @@ OBEX_FINDCALLBACK_ROUTINE(FindKiNmiCallbackListHead)
                 if (hs.flags & F_ERROR)
                     break;
 
-                if (hs.len == 5) {
-
-                    //
-                    // Find KiDeregisterNmiSxCallback.
-                    //
-                    if (ptrCode[Index] == 0xE8) {
-                        Rel = *(PLONG)(ptrCode + Index + 1);
-                        break;
-                    }
+                //
+                // Find KiDeregisterNmiSxCallback.
+                //
+                if (hs.len == 5 && hs.opcode == 0xE8) {
+                    Rel = (LONG)hs.imm.imm32;
+                    break;
                 }
 
                 Index += hs.len;
@@ -3386,15 +3373,12 @@ OBEX_FINDCALLBACK_ROUTINE(FindEmpCallbackListHead)
             if (hs.flags & F_ERROR)
                 break;
 
-            if (hs.len == 5) {
-
-                //
-                // Find EmpSearchCallbackDatabase.
-                //
-                if (ptrCode[Index] == 0xE8) {
-                    Rel = *(PLONG)(ptrCode + Index + 1);
-                    break;
-                }
+            //
+            // Find EmpSearchCallbackDatabase.
+            //
+            if (hs.len == 5 && hs.opcode == 0xE8) {
+                Rel = (LONG)hs.imm.imm32;
+                break;
             }
 
             Index += hs.len;
@@ -3519,13 +3503,13 @@ OBEX_FINDCALLBACK_ROUTINE(FindPnpDeviceClassNotifyList)
             if (hs.flags & F_ERROR)
                 break;
 
-            if ((hs.len == 7) &&
+            if ((hs.len == LEA_INSTRUCTION_LENGTH_7B) &&
                 (hs.flags & F_PREFIX_REX) &&
                 (hs.flags & F_DISP32) &&
                 (hs.flags & F_MODRM) &&
                 (hs.opcode == 0x8D))
             {
-                Rel = *(PLONG)(ptrCode + Index + 3);
+                Rel = (LONG)hs.disp.disp32;
                 break;
             }
 

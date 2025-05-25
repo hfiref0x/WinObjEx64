@@ -9,9 +9,9 @@ WinObjEx64 is an advanced utility that lets you explore the Windows Object Manag
 
 # System Requirements
 
-WinObjEx64 does not require administrative privileges. However administrative privilege is required to view much of the namespace and to edit object-related security information.
+WinObjEx64 does not require administrative privileges. However, administrative privileges are required to view much of the namespace and to edit object-related security information.
 
-WinObjEx64 works only on the following x64 Windows: Windows 7, Windows 8, Windows 8.1 and Windows 10/11, including Server variants.
+WinObjEx64 works only on the following x64 Windows: Windows 7, Windows 8, Windows 8.1, and Windows 10/11, including Server variants.
 
 
 # Features
@@ -19,218 +19,218 @@ WinObjEx64 works only on the following x64 Windows: Windows 7, Windows 8, Window
 <details>
   <summary>View list</summary>
 
-- Explore all of Windows Object Manager namespace
-	- Hierarchical objects tree
+- **Explore all of Windows Object Manager namespace**  
+	- Hierarchical objects tree  
+	- Symbolic links resolving  
+	- Version information for `Section`-type objects backed by an image file  
+	- Additional information for `WindowStation`-type objects  
+	- **View objects details**:  
+		- Descriptions  
+		- Flags  
+		- Invalid attributes  
+		- Memory pool type  
+		- Object type-specific information  
+		- Object-related structure memory dumps<sup>1</sup>:  
+			- `ALPC_PORT`  
+			- `CALLBACK_OBJECT`  
+			- `DEVICE_OBJECT`  
+			- `DRIVER_OBJECT`  
+			- `DIRECTORY_OBJECT`  
+			- `FLT_SERVER_PORT_OBJECT`  
+			- `KEVENT`  
+			- `KMUTANT`  
+			- `KSEMAPHORE`  
+			- `KTIMER`  
+			- `KQUEUE` (IoCompletion)  
+			- `OBJECT_SYMBOLIC_LINK`  
+			- `OBJECT_TYPE`  
+		- Opened handles  
+		- Statistics  
+		- Supported access rights  
+		- Process Trust label  
+		- And more...  
 
-	- Symbolic links resolving
+	- **Display in dump sub-structures**<sup>1</sup>:  
+		- `ALPC_PORT_ATTRIBUTES`  
+		- `DEVICE_MAP`  
+		- `LDR_DATA_TABLE_ENTRY`  
+		- `OBJECT_TYPE_INITIALIZER`  
+		- `UNICODE_STRING`  
+		- And many others  
 
-	- Version information for Section type objects that are backed by an image file
+	- Edit object-related security information<sup>2</sup>  
+	- Detect driver object IRP modifications (via structure dump)<sup>1</sup>  
+	- Detect kernel object hooking (via structure dump)<sup>1</sup>  
+	- Search for objects by name and/or type  
 
-	- Additional information for WindowStation type objects
+- **System information viewer**  
+	- Boot state and type  
+	- Code Integrity options  
+	- Mitigation flags  
+	- Windows version and build  
 
-	- View objects details
-		- Descriptions
-		- Flags
-		- Invalid attributes
-		- Memory pool type
-		- Object type specific information
-		- Object-related structure memory dumps<sup>1</sup>
-			- ALPC_PORT
-			- CALLBACK_OBJECT
-			-  DEVICE_OBJECT
-			- DRIVER_OBJECT
-			- DIRECTORY_OBJECT
-			- FLT_SERVER_PORT_OBJECT
-			- KEVENT
-			- KMUTANT
-			- KSEMAPHORE
-			- KTIMER
-			- KQUEUE (IoCompletion)
-			- OBJECT_SYMBOLIC_LINK
-			- OBJECT_TYPE
-		- Opened handles
-		- Statistics
-		- Supported access rights
-		- Process Trust label
-		- And more...
+- **Loaded drivers list viewer**  
+	- Dump selected driver<sup>1</sup>  
+	- Export driver list to CSV file  
+	- Jump to driver file location  
+	- Detect Kernel Shim Engine "shimmed" drivers<sup>1</sup>  
+	- View driver file properties  
 
-	- Display in dump sub-structures such as<sup>1</sup>: 
+- **Mailslots/Named pipes viewer**  
+	- List all registered mailslots/named pipes  
+	- Edit named pipes security information<sup>4</sup>  
+	- Object statistics  
 
-		- ALPC_PORT_ATTRIBUTES
-		- DEVICE_MAP
-		- LDR_DATA_TABLE_ENTRY
-		- OBJECT_TYPE_INITIALIZER
-		- UNICODE_STRING
-		- and many others
+- **Hierarchical process tree viewer**<sup>2</sup>  
+	- Show process ID, user name, `EPROCESS` addresses  
+	- Highlight processes by type (similar to Process Explorer)  
+	- Show thread list for selected process  
+	- Show `ETHREAD` addresses  
+	- **Common properties for Process/Thread objects**:  
+		- Basic properties (as other object types)  
+		- Start time  
+		- Process type  
+		- Image file name  
+		- Command line  
+		- Current directory  
+		- Applied mitigations  
+		- Protection  
+		- "Critical Process" flag state  
+		- Security edit  
+	- Jump to process file location  
+	- **Process/Thread token information**:  
+		- User name  
+		- User SID  
+		- AppContainer SID  
+		- Session  
+		- UIAccess  
+		- Elevation state  
+		- Integrity level  
+		- Privileges and groups  
+	- **Additional token properties**:  
+		- Basic properties (as other object types)  
+		- Security attributes list  
+		- Security edit  
 
-	- Edit object-related security information<sup>2</sup>
+- **Software Licensing Cache viewer**  
+	- List registered licenses  
+	- Display license data  
+	- Dump `SL_DATA_BINARY` license data to file  
 
-	- Detect driver object IRP modifications (as part of structure dump)<sup>1</sup>
+- **User Shared Data viewer**  
+	- Structured dump of key `KUSER_SHARED_DATA` sections  
 
-	- Detect kernel object hooking (as part of structure dump)<sup>1</sup>
+- **System callbacks viewer**<sup>1</sup>  
+	- Display callback addresses, modules, and details for:  
+		- `PsSetCreateProcessNotifyRoutine`  
+		- `PsSetCreateProcessNotifyRoutineEx`  
+		- `PsSetCreateProcessNotifyRoutineEx2`  
+		- `PsSetCreateThreadNotifyRoutine`  
+		- `PsSetCreateThreadNotifyRoutineEx`  
+		- `PsSetLoadImageNotifyRoutine`  
+		- `PsSetLoadImageNotifyRoutineEx`  
+		- `KeRegisterBugCheckCallback`  
+		- `KeRegisterBugCheckReasonCallback`  
+		- `CmRegisterCallback`  
+		- `CmRegisterCallbackEx`  
+		- `IoRegisterShutdownNotification`  
+		- `IoRegisterLastChanceShutdownNotification`  
+		- `PoRegisterPowerSettingCallback`  
+		- `SeRegisterLogonSessionTerminatedRoutine`  
+		- `SeRegisterLogonSessionTerminatedRoutineEx`  
+		- `IoRegisterFsRegistrationChange`  
+		- `IopFsListsCallbacks`  
+		- `IoRegisterPlugPlayNotification`  
+		- `ObRegisterCallbacks`  
+		- `DbgSetDebugPrintCallback`  
+		- `DbgkLkmdRegisterCallback`  
+		- `PsRegisterAltSystemCallHandler`  
+		- CodeIntegrity `SeCiCallbacks`  
+		- `ExRegisterExtension`  
+		- `PoRegisterCoalescingCallback`  
+		- `PsRegisterPicoProvider`  
+		- `KeRegisterNmiCallback`  
+		- `PsRegisterSiloMonitor`  
+		- `EmProviderRegister`  
 
-	- Search for objects by name and/or type
+- **Windows Object Manager private namespace viewer**<sup>1</sup>  
+	- Namespace entry information  
+	- Boundary descriptor details  
+	- Common object properties  
 
-- System information viewer
-	- Boot state and type
-	- Code Integrity options
-	- Mitigation flags
-	- Windows version and build
+- **KiServiceTable viewer**<sup>1</sup>  
+	- Dump `Ntoskrnl`-managed `KiServiceTable` (SSDT)  
+	- Jump to service entry module  
+	- Export to CSV file  
 
-- Loaded drivers list viewer
-	- Ability to dump selected driver<sup>1</sup>
-	- Export driver list to file in CSV format
-	- Jump to driver file location
-	- Recognize Kernel Shim Engine "shimmed" drivers<sup>1</sup>
-	- View driver file properties
+- **W32pServiceTable viewer**<sup>1</sup>  
+	- Dump `Win32k`-managed `W32pServiceTable` (Shadow SSDT)  
+	- Win32k import forwarding support  
+	- Win32k ApiSets resolving  
+	- Jump to service entry module  
+	- Export to CSV file  
 
-- Mailslots/Named pipes viewer
-	- Display list of all registered mailslots/named pipes
-	- Named pipes security information editor<sup>4</sup>
-	- Object statistics
+- **CmControlVector viewer**  
+	- Dump `Ntoskrnl` `CmControlVector` array  
+	- Export kernel memory data to file<sup>1</sup>  
+	- Export to CSV file  
 
-- Hierarchical process tree viewer<sup>2</sup>
-	- Show process id, user name, EPROCESS addresses
-	- Highlight processes by type similar to default Process Explorer highlighting
-	- Show thread list for selected process
-	- Show ETHREAD addresses
-	- Show common properties for Process/Thread objects
-		- Basic properties as for any other object type
-		- Start time
-		- Process type
-		- Image file name
-		- Command line
-		- Current directory
-		- Applied mitigation's
-		- Protection
-		- State of "Critical Process" flag
-		- Security edit
-	- Jump to process file location
-	- Process/Thread token information
-		- User name
-		- User SID
-		- AppContainer SID
-		- Session
-		- UIAccess
-		- Elevation state
-		- Integrity level
-		- Privileges and groups
-	- Show additional token properties for Process/Thread
-		- Basic properties as for any other object type
-		- List of security attributes
-		- Security edit
+- **Clipboard integration**: Copy object addresses/names to clipboard  
 
-- Software Licensing Cache viewer
-	- Display list of registered licenses
-	- Display license data
-	- Dump license data of type SL_DATA_BINARY to file
+- **Wine/Wine-Staging support**<sup>3</sup>  
 
-- User Shared Data viewer
-	- Display structured dump of most important parts of KUSER_SHARED_DATA
+- **Plugins subsystem**  
+	- **Included plugins**:  
+		- **ApiSetView**: Windows ApiSetSchema viewer (supports loading schema from file)  
+		- **Example plugin**: Developer template  
+		- **Sonar**: NDIS protocols viewer (dumps protocol details)  
+		- **ImageScope**: Enhanced `Section`-type object details (via context menu)  
 
-- System callbacks viewer<sup>1</sup>
-	- Display address, module and callback specific information for callbacks registered with: 
-		- PsSetCreateProcessNotifyRoutine
-		- PsSetCreateProcessNotifyRoutineEx
-		- PsSetCreateProcessNotifyRoutineEx2
-		- PsSetCreateThreadNotifyRoutine
-		- PsSetCreateThreadNotifyRoutineEx
-		- PsSetLoadImageNotifyRoutine
-		- PsSetLoadImageNotifyRoutineEx
-		- KeRegisterBugCheckCallback
-		- KeRegisterBugCheckReasonCallback
-		- CmRegisterCallback
-		- CmRegisterCallbackEx
-		- IoRegisterShutdownNotification
-		- IoRegisterLastChanceShutdownNotification
-		- PoRegisterPowerSettingCallback
-		- SeRegisterLogonSessionTerminatedRoutine
-		- SeRegisterLogonSessionTerminatedRoutineEx
-		- IoRegisterFsRegistrationChange
-		- IopFsListsCallbacks
-		- IoRegisterPlugPlayNotification
-		- ObRegisterCallbacks
-		- DbgSetDebugPrintCallback
-		- DbgkLkmdRegisterCallback
-		- PsRegisterAltSystemCallHandler
-		- CodeIntegrity SeCiCallbacks
-		- ExRegisterExtension
-		- PoRegisterCoalescingCallback
-		- PsRegisterPicoProvider
-		- KeRegisterNmiCallback
-		- PsRegisterSiloMonitor
-		- EmProviderRegister
+- **Documentation**  
+	- Windows Callbacks  
+	- Plugins subsystem  
 
-- Windows Object Manager private namespace viewer<sup>1</sup>
-	- View basic namespace entry information
-	- View boundary descriptor information
-	- Show common properties for objects
-
-- KiServiceTable viewer<sup>1</sup>
-	- Show dump of Ntoskrnl-managed KiServiceTable (sometimes referenced as SSDT)
-	- Jump to service entry module
-	- Export list to file in CSV format
-
-- W32pServiceTable viewer<sup>1</sup>
-	- Show dump of Win32k-managed W32pServiceTable (sometimes referenced as Shadow SSDT)
-	- Support Win32k import forwarding
-	- Support Win32k ApiSets resolving
-	- Jump to service entry module
-	- Export list to file in CSV format
-
-- CmControlVector viewer
-	- Show dump of Ntoskrnl CmControlVector array
-	- Dump value data from kernel memory to file<sup>1</sup>
-	- Export list to file in CSV format
-
-- Most of list/trees allows to copy object address and/or name to the clipboard
-
-- Running on Wine/Wine-Staging is supported<sup>3</sup>
-
-- Plugins subsystem for extending basic features
-	- Available plugins that shipped with WinObjEx64 release:
-		- ApiSetView - viewer for Windows ApiSetSchema internals, support loading ApiSet schema from file
-		- Example plugin - example plugin for developers
-		- Sonar - NDIS protocols viewer, display registered NDIS protocols and dumps some information about them
-		- ImageScope - context plugin allowing to view more details in WinObjEx64 for Section type objects that are backed by image file (available through popup menu on object of Section type in WinObjEx64 main list)
-
-- Documentation
-	- Windows Callbacks
-	- Plugins subsystem
-
-1. This feature require driver support enabled, see "Driver support" part below.
-2. This may require administrator privileges.
-3. Most of additional Windows internals-specific features however will be unavailable due to obvious reasons.
-4. Some named pipes may require administrator privileges to access.
+1. Requires driver support (see "Driver Support" section).  
+2. Administrator privileges may be required.  
+3. Windows internals features unavailable on Wine/Wine-Staging.  
+4. Administrator privileges required for some named pipes.  
 
 ### Driver support
 
-WinObjEx64 supports two types of driver helpers:
+WinObjEx64 supports two types of driver helpers:  
 
-1. Helper for read-only access to the kernel memory. Default version uses Kernel Local Debugging Driver (KLDBGDRV) from WinDbg. In order to use it (and thus enable all the above features) Windows must be booted in the debug mode (bcdedit -debug on) and WinObjEx64 must be run with administrator privileges. If you are using WinObjEx64 version with custom helper driver - Windows debug mode is not required. There are exist several drivers that can be used as helpers for WinObjEx64, by default it has only WinDbg type built-in.
-2. Helper to access object handles. WinObjEx64 (any variant) support Process Explorer driver of version 1.5.2 to open process/threads. To enable this just load Process Explorer with administrator privileges simultaneously with WinObjEx64.
+1. **Helper for read-only access to kernel memory**:  
+   - Default version uses the **Kernel Local Debugging Driver (KLDBGDRV)** from WinDbg.  
+   - Requires:  
+     - Windows booted in debug mode (`bcdedit -debug on`)  
+     - WinObjEx64 running with administrator privileges  
+   - **Custom helper driver versions** do **not** require Windows debug mode.  
+   - Multiple third-party drivers can be used as helpers, though only the **WinDbg-type** driver is included by default.  
 
-All driver helpers require WinObjEx64 to be run with administrative privileges.
+2. **Helper to access object handles**:  
+   - WinObjEx64 (any variant) **supports** Process Explorer driver v1.5.2 for opening processes/threads.  
+   - Enable by running **both** Process Explorer and WinObjEx64 with administrator privileges.  
+
+**Note**: All driver helpers require WinObjEx64 to run with administrative privileges.  
 
 </details>
 
 # Build 
 
-WinObjEx64 comes with full source code.
-In order to build from source you need Microsoft Visual Studio 2015 and later versions.
+WinObjEx64 comes with full source code. To build from source, you need Microsoft Visual Studio 2015 or later.
 
 ## Instructions
 
-* Select Platform ToolSet first for project in solution you want to build (Project->Properties->General): 
+* Select Platform ToolSet first for the project in the solution you want to build (Project->Properties->General): 
   * v140 for Visual Studio 2015; 
   * v141 for Visual Studio 2017;
   * v142 for Visual Studio 2019;
   * v143 for Visual Studio 2022.
-* For v140 and above set Target Platform Version (Project->Properties->General):
-  * If v140 then select 8.1;
-  * If v141 and above then select 10.
-* Minimum required Windows SDK version 8.1
-* Recommended Windows SDK version 10.0.19041 and above
+* For v140 and above, set Target Platform Version (Project->Properties->General):
+  * If v140, select 8.1;
+  * If v141 and above, select 10.
+* Minimum required Windows SDK version: 8.1
+* Recommended Windows SDK version: 10.0.19041 and above
  
  
 # What is new
@@ -242,6 +242,6 @@ In order to build from source you need Microsoft Visual Studio 2015 and later ve
 # Authors
 
 
-(c) 2015 - 2025 WinObjEx64 Project, hfiref0x
+(c) 2015 – 2025 WinObjEx64 Project, hfiref0x
 
-Original WinObjEx (c) 2003 - 2005 Four-F
+Original WinObjEx (c) 2003 – 2005 Four-F

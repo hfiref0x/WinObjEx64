@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.07
 *
-*  DATE:        04 Feb 2025
+*  DATE:        25 May 2025
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -70,6 +70,14 @@ static UNICODE_STRING g_usGlobalNamespace = {
     OB_GLOBALNAMESPACE
 };
 
+static PUNICODE_STRING g_predefinedUnicodeStrings[] = {
+    &g_usObjectsRootDirectory,      // OBP_ROOT (0)
+    &g_usDirectoryType,             // OBP_DIRECTORY (1)
+    &g_usObjectTypesDirectory,      // OBP_OBTYPES (2)
+    &g_usGlobalRoot,                // OBP_GLOBAL (3)
+    &g_usGlobalNamespace            // OBP_GLOBALNAMESPACE (4)
+};
+
 /*
 * ObGetPredefinedUnicodeString
 *
@@ -82,19 +90,11 @@ PUNICODE_STRING ObGetPredefinedUnicodeString(
     _In_ ULONG Index
 )
 {
-    switch (Index) {
-    case OBP_GLOBALNAMESPACE:
-        return &g_usGlobalNamespace;
-    case OBP_GLOBAL:
-        return &g_usGlobalRoot;
-    case OBP_OBTYPES:
-        return &g_usObjectTypesDirectory;
-    case OBP_DIRECTORY:
-        return &g_usDirectoryType;
-    case OBP_ROOT:
-    default:
-        return &g_usObjectsRootDirectory;
+    if (Index < ARRAYSIZE(g_predefinedUnicodeStrings)) {
+        return g_predefinedUnicodeStrings[Index];
     }
+    // Default to root directory for out-of-bounds indices
+    return &g_usObjectsRootDirectory;
 }
 
 /*
@@ -884,40 +884,47 @@ PVOID ObDumpFltFilterObjectVersionAware(
     ULONG objectSize = 0;
     ULONG objectVersion = 0;
 
-    if (g_NtBuildNumber >= NT_WIN7_RTM &&
-        g_NtBuildNumber <= NT_WIN7_SP1)
-    {
+    //
+    // Check the newest versions first.
+    //
+    if (g_NtBuildNumber >= NT_WIN11_21H2) {
+        if (g_NtBuildNumber < NT_WIN11_24H2) {
+            objectSize = sizeof(FLT_FILTER_V4);
+            objectVersion = OBVERSION_FLT_FILTER_V4;
+        }
+        else {
+            goto DefaultCase;
+        }
+    }
+    else if (g_NtBuildNumber >= NT_WIN10_THRESHOLD1) {
+        if (g_NtBuildNumber < NT_WINSRV_21H1) {
+            objectSize = sizeof(FLT_FILTER_V3);
+            objectVersion = OBVERSION_FLT_FILTER_V3;
+        }
+        else {
+            goto DefaultCase;
+        }
+    }
+    else if (g_NtBuildNumber >= NT_WIN8_RTM) {
+        if (g_NtBuildNumber <= NT_WIN8_BLUE) {
+            objectSize = sizeof(FLT_FILTER_V2);
+            objectVersion = OBVERSION_FLT_FILTER_V2;
+        }
+        else {
+            goto DefaultCase;
+        }
+    }
+    else if (g_NtBuildNumber == NT_WIN7_RTM || g_NtBuildNumber == NT_WIN7_SP1) {
         objectSize = sizeof(FLT_FILTER_V1);
         objectVersion = OBVERSION_FLT_FILTER_V1;
     }
-    else if (g_NtBuildNumber >= NT_WIN8_RTM &&
-        g_NtBuildNumber <= NT_WIN8_BLUE)
-    {
-        objectSize = sizeof(FLT_FILTER_V2);
-        objectVersion = OBVERSION_FLT_FILTER_V2;
-    }
-    else if (g_NtBuildNumber >= NT_WIN10_THRESHOLD1 &&
-        g_NtBuildNumber < NT_WINSRV_21H1)
-    {
-        objectSize = sizeof(FLT_FILTER_V3);
-        objectVersion = OBVERSION_FLT_FILTER_V3;
-    }
-    else if (g_NtBuildNumber >= NT_WIN11_21H2 &&
-        g_NtBuildNumber < NT_WIN11_24H2)
-    {
-        objectSize = sizeof(FLT_FILTER_V4);
-        objectVersion = OBVERSION_FLT_FILTER_V4;
-    }
     else {
+    DefaultCase:
         objectSize = sizeof(FLT_FILTER_V5);
         objectVersion = OBVERSION_FLT_FILTER_V5;
     }
 
-    return ObpDumpObjectWithSpecifiedSize(ObjectAddress,
-        objectSize,
-        objectVersion,
-        Size,
-        Version);
+    return ObpDumpObjectWithSpecifiedSize(ObjectAddress, objectSize, objectVersion, Size, Version);
 }
 
 /*

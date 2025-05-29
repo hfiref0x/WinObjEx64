@@ -239,6 +239,16 @@ WinObjEx64 comes with full source code. To build from source, you need Microsoft
 
 [Complete changelog](https://github.com/hfiref0x/WinObjEx64/blob/master/Source/CHANGELOG.txt)
 
+
+# Support Our Work ❤️
+If you enjoy using this software and would like to help the authors maintain and improve it, please consider supporting us with a donation. Your contribution fuels development, ensures updates, and keeps the project alive.
+
+### Cryptocurrency Donations:
+
+BTC (Bitcoin): bc1qzkvtpa0053cagf35dqmpvv9k8hyrwl7krwdz84q39mcpy68y6tmqsju0g4
+
+This is purely optional, thank you!~
+
 # Authors
 
 

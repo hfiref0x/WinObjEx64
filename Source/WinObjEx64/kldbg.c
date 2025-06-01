@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.07
 *
-*  DATE:        25 May 2025
+*  DATE:        01 Jun 2025
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -3455,10 +3455,15 @@ PVOID kdQueryCmControlVector(
     PVOID CmControlVector = NULL;
     PBYTE SectionBase;
     PBYTE RefPointer;
-    IMAGE_NT_HEADERS* NtHeaders = RtlImageNtHeader(Context->NtOsImageMap);
+    IMAGE_NT_HEADERS* NtHeaders;
     IMAGE_SECTION_HEADER* SectionTableEntry;
 
     WCHAR szSignature[] = L"ProtectionMode";
+
+    if (Context->NtOsImageMap == NULL)
+        return NULL;
+
+    NtHeaders = RtlImageNtHeader(Context->NtOsImageMap);
 
     SectionTableEntry = IMAGE_FIRST_SECTION(NtHeaders);
 
@@ -3996,13 +4001,11 @@ VOID kdInit(
 
     //
     // Minimum supported client is windows 7
-    // Query system range start value and if version below Win7 - leave
+    // However allow experiments on Vista too.
+    // Everything below Vista - leave
     //
-    if (
-        (g_WinObj.osver.dwMajorVersion < 6) || //any lower other vista
-        ((g_WinObj.osver.dwMajorVersion == 6) && (g_WinObj.osver.dwMinorVersion == 0))//vista
-        )
-    {
+    if (g_WinObj.osver.dwMajorVersion < 6) {
+        MessageBox(GetDesktopWindow(), TEXT("Operation system is not supported, see program requirements."), PROGRAM_NAME, MB_ICONERROR);
         return;
     }
 

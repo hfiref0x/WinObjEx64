@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2022
+*  (C) COPYRIGHT AUTHORS, 2022 - 2025
 *
 *  TITLE:       EXTRASCMOPT.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.07
 *
-*  DATE:        19 Jun 2022
+*  DATE:        01 Jun 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED

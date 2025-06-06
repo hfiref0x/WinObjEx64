@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2024
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       LIST.C
 *
-*  VERSION:     2.05
+*  VERSION:     2.08
 *
-*  DATE:        07 Jun 2024
+*  DATE:        06 Jun 2025
 * 
 *  Program main object listing and search logic.
 *
@@ -62,11 +62,18 @@ POBEX_ITEM AllocateObjectItem(
     POBEX_ITEM item;
 
     item = (OBEX_ITEM*)supHeapAllocEx(HeapHandle, sizeof(OBEX_ITEM));
-    if (item) {
-        item->Prev = Parent;
-        item->TypeIndex = TypeIndex;
-        supDuplicateUnicodeString(HeapHandle, &item->Name, Name);
-        supDuplicateUnicodeString(HeapHandle, &item->TypeName, TypeName);
+    if (item == NULL) {
+        return NULL;
+    }
+    
+    item->Prev = Parent;
+    item->TypeIndex = TypeIndex;
+
+    if (!supDuplicateUnicodeString(HeapHandle, &item->Name, Name) ||
+        !supDuplicateUnicodeString(HeapHandle, &item->TypeName, TypeName)) 
+    {
+        supHeapFreeEx(HeapHandle, item);
+        return NULL;
     }
 
     return item;
@@ -660,7 +667,6 @@ PFO_LIST_ITEM AllocateFoundItem(
 
     Item = (PFO_LIST_ITEM)supHeapAlloc(BufferLength);
     if (Item == NULL) {
-        supHeapFree(InfoBuffer);
         return NULL;
     }
 

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2024
+*  (C) COPYRIGHT AUTHORS, 2019 - 2025
 *
 *  TITLE:       PLUGMNGR.C
 *
-*  VERSION:     2.05
+*  VERSION:     2.08
 *
-*  DATE:        25 May 2024
+*  DATE:        06 Jun 2025
 *
 *  Plugin manager.
 *
@@ -372,7 +372,12 @@ DWORD WINAPI PmpWorkerThread(
                 break;
 
             szPluginPath[Length] = 0;
-            _strcat(szPluginPath, fdata.cFileName);
+            if ((Length + _strlen(fdata.cFileName) + 1) < RTL_NUMBER_OF(szPluginPath)) {
+                _strcat(szPluginPath, fdata.cFileName);
+            }
+            else {
+                continue;
+            }
 
             //
             // Validate plugin dll.

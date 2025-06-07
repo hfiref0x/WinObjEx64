@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     2.07
+*  VERSION:     2.08
 *
-*  DATE:        31 Mar 2025
+*  DATE:        07 Jun 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -2318,10 +2318,14 @@ VOID supFreeSCMSnapshot(
     }
     else {
         EnterCriticalSection(&g_scmDB.Lock);
-        supHeapFree(g_scmDB.Entries);
-        g_scmDB.Entries = NULL;
-        g_scmDB.NumberOfEntries = 0;
-        LeaveCriticalSection(&g_scmDB.Lock);
+        __try {
+            supHeapFree(g_scmDB.Entries);
+            g_scmDB.Entries = NULL;
+            g_scmDB.NumberOfEntries = 0;
+        }
+        __finally {
+            LeaveCriticalSection(&g_scmDB.Lock);
+        }
     }
 }
 
@@ -2489,11 +2493,16 @@ VOID sapiFreeSnapshot(
 )
 {
     EnterCriticalSection(&g_sapiDB.Lock);
-    supDestroyHeap(g_sapiDB.HeapHandle);
-    g_sapiDB.HeapHandle = NULL;
-    g_sapiDB.ListHead.Blink = NULL;
-    g_sapiDB.ListHead.Flink = NULL;
-    LeaveCriticalSection(&g_sapiDB.Lock);
+
+    __try {
+        supDestroyHeap(g_sapiDB.HeapHandle);
+        g_sapiDB.HeapHandle = NULL;
+        g_sapiDB.ListHead.Blink = NULL;
+        g_sapiDB.ListHead.Flink = NULL;
+    }
+    __finally {
+        LeaveCriticalSection(&g_sapiDB.Lock);
+    }
 }
 
 /*
@@ -2806,6 +2815,7 @@ BOOL supQueryDriverDescription(
             dwSize = sizeof(szImagePath) - sizeof(UNICODE_NULL);
             lRet = RegQueryValueEx(hKey, TEXT("ImagePath"), NULL, NULL, (LPBYTE)szImagePath, &dwSize);
             RegCloseKey(hKey);
+            hKey = NULL;
 
             if (ERROR_SUCCESS == lRet) {
 
@@ -2857,6 +2867,10 @@ BOOL supQueryDriverDescription(
         }
         if (lpRegKey) {
             supHeapFree(lpRegKey);
+        }
+
+        if (hKey != NULL) {
+            RegCloseKey(hKey);
         }
     }
     return bResult;
@@ -7406,7 +7420,7 @@ BOOL supxListViewExportCSV(
     LVITEM          lvi;
     PWCHAR          text, buffer0 = NULL, buffer = NULL;
     BOOL            result = FALSE;
-    SIZE_T          total_lenght;
+    SIZE_T          total_length;
     DWORD           iobytes;
     HANDLE          f;
 
@@ -7422,7 +7436,7 @@ BOOL supxListViewExportCSV(
 
     for (pass = 0; pass < 2; ++pass)
     {
-        total_lenght = 0;
+        total_length = 0;
 
         for (i = 0; i < icount; ++i)
         {
@@ -7442,7 +7456,7 @@ BOOL supxListViewExportCSV(
                     lvi.iSubItem = c;
                     ListView_GetItem(List, &lvi);
                 }
-                total_lenght += supxEscStrlen(text) + 1;
+                total_length += supxEscStrlen(text) + 1;
 
                 if (buffer)
                 {
@@ -7458,12 +7472,12 @@ BOOL supxListViewExportCSV(
                     }
                 }
             }
-            ++total_lenght;
+            ++total_length;
         }
 
         if (buffer0 == NULL)
         {
-            buffer0 = (PWCHAR)supVirtualAlloc((1 + total_lenght) * sizeof(WCHAR));
+            buffer0 = (PWCHAR)supVirtualAlloc((1 + total_length) * sizeof(WCHAR));
             if (!buffer0)
                 break;
         }
@@ -7480,7 +7494,7 @@ BOOL supxListViewExportCSV(
             if (f != INVALID_HANDLE_VALUE) {
 
                 WriteFile(f, buffer0,
-                    (DWORD)(total_lenght * sizeof(WCHAR)),
+                    (DWORD)(total_length * sizeof(WCHAR)),
                     &iobytes, NULL);
 
                 CloseHandle(f);
@@ -9016,6 +9030,7 @@ BOOLEAN supIsLongTermServicingWindows(
 * Purpose:
 *
 * CreateThread wrapper.
+* Returned handle must be closed by caller.
 *
 */
 HANDLE supCreateThread(

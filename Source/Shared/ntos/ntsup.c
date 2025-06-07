@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTSUP.C
 *
-*  VERSION:     2.22
+*  VERSION:     2.23
 *
-*  DATE:        11 May 2025
+*  DATE:        05 Jun 2025
 *
 *  Native API support functions.
 *
@@ -142,7 +142,7 @@ BOOL ntsupVirtualUnlock(
 }
 
 /*
-* NtSupVirtualFree
+* ntsupVirtualFree
 *
 * Purpose:
 *
@@ -161,6 +161,10 @@ BOOL ntsupVirtualFree(
             &Memory,
             &sizeDummy,
             MEM_RELEASE);
+    }
+    else {
+        RtlSetLastWin32Error(ERROR_INVALID_PARAMETER);
+        return FALSE;
     }
 
     RtlSetLastWin32Error(RtlNtStatusToDosError(ntStatus));
@@ -320,25 +324,25 @@ PVOID ntsupFindModuleEntryByName_U(
     UNICODE_STRING usString;
     ANSI_STRING moduleName;
 
-    RtlInitUnicodeStringEx(&usString, ModuleName);
-    moduleName.Buffer = NULL;
-    moduleName.Length = moduleName.MaximumLength = 0;
-    if (NT_SUCCESS(RtlUnicodeStringToAnsiString(&moduleName, &usString, TRUE))) {
+    if (NT_SUCCESS(RtlInitUnicodeStringEx(&usString, ModuleName))) {
+        moduleName.Buffer = NULL;
+        moduleName.Length = moduleName.MaximumLength = 0;
+        if (NT_SUCCESS(RtlUnicodeStringToAnsiString(&moduleName, &usString, TRUE))) {
 
-        for (i = 0; i < modulesCount; i++) {
+            for (i = 0; i < modulesCount; i++) {
 
-            moduleEntry = &ModulesList->Modules[i];
-            fnameOffset = moduleEntry->OffsetToFileName;
-            entryName = (LPSTR)&moduleEntry->FullPathName[fnameOffset];
-            if (_strcmpi_a(entryName, moduleName.Buffer) == 0) {
-                result = moduleEntry;
-                break;
+                moduleEntry = &ModulesList->Modules[i];
+                fnameOffset = moduleEntry->OffsetToFileName;
+                entryName = (LPSTR)&moduleEntry->FullPathName[fnameOffset];
+                if (_strcmpi_a(entryName, moduleName.Buffer) == 0) {
+                    result = moduleEntry;
+                    break;
+                }
             }
+
+            RtlFreeAnsiString(&moduleName);
         }
-
-        RtlFreeAnsiString(&moduleName);
     }
-
     return result;
 }
 
@@ -787,7 +791,11 @@ PVOID ntsupGetLoadedModulesListEx(
         &bufferSize);
 
     if (ntStatus == STATUS_INFO_LENGTH_MISMATCH) {
+
         FreeMem(buffer);
+        if (bufferSize > MAX_NTSUP_BUFFER_SIZE)
+            return NULL;
+
         buffer = AllocMem((SIZE_T)bufferSize);
 
         ntStatus = NtQuerySystemInformation(
@@ -909,7 +917,7 @@ PVOID ntsupGetSystemInfoEx(
         FreeMem(buffer);
         bufferSize <<= 1;
 
-        if (bufferSize > NTQSI_MAX_BUFFER_LENGTH)
+        if (bufferSize > MAX_NTSUP_BUFFER_SIZE)
             return NULL;
 
         buffer = AllocMem((SIZE_T)bufferSize);
@@ -1718,11 +1726,12 @@ LPWSTR ntsupQueryEnvironmentVariableOffset(
 {
     UNICODE_STRING   str1;
     PWCHAR           ptrEnvironment;
+    ULONG            scanCount = 0;
 
     ptrEnvironment = (PWCHAR)RtlGetCurrentPeb()->ProcessParameters->Environment;
 
     do {
-        if (*ptrEnvironment == 0)
+        if (*ptrEnvironment == 0 || scanCount++ > MAX_NTSUP_ENV_SCAN)
             return 0;
 
         RtlInitUnicodeString(&str1, ptrEnvironment);

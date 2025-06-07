@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2023 - 2024
+*  (C) COPYRIGHT AUTHORS, 2023 - 2025
 *
 *  TITLE:       W32K.C
 *
-*  VERSION:     2.06
+*  VERSION:     2.08
 *
-*  DATE:        11 Oct 2024
+*  DATE:        06 Jun 2025
 *
 *  Win32k syscall table actual handlers resolving routines.
 *
@@ -188,8 +188,15 @@ ULONG_PTR SdtpQueryWin32kApiSetTable(
         if (relativeValue == 0 || instructionLength == 0)
             return 0;
 
+        //
+        // Sanity check.
+        //
         tableAddress = (ULONG_PTR)ptrCode + Index + instructionLength + relativeValue;
-
+        if (tableAddress < (ULONG_PTR)hModule ||
+            tableAddress >= ((ULONG_PTR)hModule + ImageSize))
+        {
+            return 0;
+        }
     }
 
     return tableAddress;
@@ -1435,7 +1442,11 @@ NTSTATUS SdtLoadAndRememberModule(
                 //
                 // Module name is local, duplicate.
                 //
-                supDuplicateUnicodeString(NtCurrentPeb()->ProcessHeap, &mEntry->Name, ModuleName);
+                if (!supDuplicateUnicodeString(NtCurrentPeb()->ProcessHeap, &mEntry->Name, ModuleName)) {
+                    LdrUnloadDll((PVOID)dllModule);
+                    supHeapFree(mEntry);
+                    return STATUS_NO_MEMORY;
+                }
             }
 
             Head->Next = mEntry;

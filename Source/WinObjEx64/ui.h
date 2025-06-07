@@ -4,9 +4,9 @@
 *
 *  TITLE:       UI.H
 *
-*  VERSION:     2.07
+*  VERSION:     2.08
 *
-*  DATE:        01 Jun 2025
+*  DATE:        06 Jun 2025
 *
 *  Common header file for the user interface.
 *
@@ -49,7 +49,7 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 
 #define PROGRAM_MAJOR_VERSION       2
 #define PROGRAM_MINOR_VERSION       0
-#define PROGRAM_REVISION_NUMBER     7
+#define PROGRAM_REVISION_NUMBER     8
 #define PROGRAM_BUILD_NUMBER        2506
 
 #ifdef _USE_OWN_DRIVER

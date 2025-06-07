@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.08
 *
-*  DATE:        06 Jun 2025
+*  DATE:        07 Jun 2025
 * 
 *  Program main object listing and search logic.
 *
@@ -69,9 +69,13 @@ POBEX_ITEM AllocateObjectItem(
     item->Prev = Parent;
     item->TypeIndex = TypeIndex;
 
-    if (!supDuplicateUnicodeString(HeapHandle, &item->Name, Name) ||
-        !supDuplicateUnicodeString(HeapHandle, &item->TypeName, TypeName)) 
-    {
+    if (!supDuplicateUnicodeString(HeapHandle, &item->Name, Name)) {
+        supHeapFreeEx(HeapHandle, item);
+        return NULL;
+    }
+
+    if (!supDuplicateUnicodeString(HeapHandle, &item->TypeName, TypeName)) {
+        supFreeDuplicatedUnicodeString(HeapHandle, &item->Name, FALSE);
         supHeapFreeEx(HeapHandle, item);
         return NULL;
     }
@@ -256,10 +260,17 @@ HTREEITEM AddTreeViewItem(
     treeItem.item.lParam = (LPARAM)objectRef;
 
     result = TreeView_InsertItem(g_hwndObjectTree, &treeItem);
+    if (result == NULL) {
+        // Failed to insert item, clean up the allocated object
+        supFreeDuplicatedUnicodeString(HeapHandle, &objectRef->Name, FALSE);
+        supFreeDuplicatedUnicodeString(HeapHandle, &objectRef->TypeName, FALSE);
+        supHeapFreeEx(HeapHandle, objectRef);
+        if (Parent) *Parent = NULL;
+    }
 
     if (bNeedFree)
         supFreeUnicodeString(g_obexHeap, &objectName);
-
+    
     return result;
 }
 
@@ -277,7 +288,6 @@ VOID xxxListObjectDirectoryTree(
     _In_opt_ HANDLE RootHandle,
     _In_opt_ HTREEITEM ViewRootHandle,
     _In_opt_ OBEX_ITEM* Parent
-
 )
 {
     ULONG queryContext = 0, rLength;
@@ -288,72 +298,77 @@ VOID xxxListObjectDirectoryTree(
     POBJECT_DIRECTORY_INFORMATION directoryEntry;
 
     ViewRootHandle = AddTreeViewItem(HeapHandle, SubDirName, ViewRootHandle, &prevItem);
-
-    supOpenDirectoryEx(&directoryHandle, RootHandle, SubDirName, DIRECTORY_QUERY);
-    if (directoryHandle == NULL)
+    if (ViewRootHandle == NULL)
         return;
 
-    do {
-
-        //
-        // Wine implementation of NtQueryDirectoryObject interface is very basic and incomplete.
-        // It doesn't work if no input buffer specified and does not return required buffer size.
-        //
-        if (g_WinObj.IsWine) {
-            rLength = 1024 * 64;
-        }
-        else {
+    supOpenDirectoryEx(&directoryHandle, RootHandle, SubDirName, DIRECTORY_QUERY);
+    if (directoryHandle == NULL) {
+        return;
+    }
+    __try {
+        do {
 
             //
-            // Request required buffer length.
+            // Wine implementation of NtQueryDirectoryObject interface is very basic and incomplete.
+            // It doesn't work if no input buffer specified and does not return required buffer size.
             //
-            rLength = 0;
+            if (g_WinObj.IsWine) {
+                rLength = 1024 * 64;
+            }
+            else {
+
+                //
+                // Request required buffer length.
+                //
+                rLength = 0;
+                ntStatus = NtQueryDirectoryObject(directoryHandle,
+                    NULL,
+                    0,
+                    TRUE,
+                    FALSE,
+                    &queryContext,
+                    &rLength);
+
+                if (ntStatus != STATUS_BUFFER_TOO_SMALL)
+                    break;
+            }
+
+            directoryEntry = (POBJECT_DIRECTORY_INFORMATION)supHeapAlloc((SIZE_T)rLength);
+            if (directoryEntry == NULL)
+                break;
+
             ntStatus = NtQueryDirectoryObject(directoryHandle,
-                NULL,
-                0,
+                directoryEntry,
+                rLength,
                 TRUE,
                 FALSE,
                 &queryContext,
                 &rLength);
 
-            if (ntStatus != STATUS_BUFFER_TOO_SMALL)
+            if (!NT_SUCCESS(ntStatus)) {
+                supHeapFree(directoryEntry);
                 break;
-        }
+            }
 
-        directoryEntry = (POBJECT_DIRECTORY_INFORMATION)supHeapAlloc((SIZE_T)rLength);
-        if (directoryEntry == NULL)
-            break;
+            if (RtlEqualUnicodeString(
+                &directoryEntry->TypeName,
+                ObGetPredefinedUnicodeString(OBP_DIRECTORY),
+                TRUE))
+            {
+                xxxListObjectDirectoryTree(HeapHandle,
+                    &directoryEntry->Name,
+                    directoryHandle,
+                    ViewRootHandle,
+                    prevItem);
+            }
 
-        ntStatus = NtQueryDirectoryObject(directoryHandle,
-            directoryEntry,
-            rLength,
-            TRUE,
-            FALSE,
-            &queryContext,
-            &rLength);
-
-        if (!NT_SUCCESS(ntStatus)) {
             supHeapFree(directoryEntry);
-            break;
-        }
 
-        if (RtlEqualUnicodeString(
-            &directoryEntry->TypeName,
-            ObGetPredefinedUnicodeString(OBP_DIRECTORY),
-            TRUE))
-        {
-            xxxListObjectDirectoryTree(HeapHandle,
-                &directoryEntry->Name,
-                directoryHandle,
-                ViewRootHandle,
-                prevItem);
-        }
-
-        supHeapFree(directoryEntry);
-
-    } while (TRUE);
-
-    NtClose(directoryHandle);
+        } while (TRUE);
+    }
+    __finally {
+        NtClose(directoryHandle);
+    }
 }
 
 /*
@@ -754,7 +769,6 @@ VOID FindObject(
     supOpenDirectoryEx(&directoryHandle, NULL, DirectoryName, DIRECTORY_QUERY);
     if (directoryHandle == NULL)
         return;
-
 
     ctx = 0;
     do {

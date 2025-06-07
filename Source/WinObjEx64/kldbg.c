@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     2.07
+*  VERSION:     2.08
 *
-*  DATE:        01 Jun 2025
+*  DATE:        07 Jun 2025
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -102,8 +102,19 @@ PUNICODE_STRING ObGetPredefinedUnicodeString(
 *
 * Purpose:
 *
-* Scan portion of code for specified instruction and extract address from it.
+* Scan code buffer for specified instruction pattern and extract address from it.
 *
+* Parameters:
+*   ImageBase           - Base address of the image in target address space
+*   MappedImageBase     - Base address of the mapped image in current process
+*   ReqInstructionLength - Expected length of the instruction to match
+*   PtrCode             - Pointer to code buffer to scan
+*   NumberOfBytes       - Size of the code buffer in bytes
+*   ScanPattern         - Pattern to search for
+*   ScanPatternSize     - Size of the pattern in bytes
+*
+* Return Value:
+*   Found address or 0 if pattern was not found or parameters are invalid
 */
 ULONG_PTR ObFindAddress(
     _In_ ULONG_PTR ImageBase,
@@ -114,39 +125,45 @@ ULONG_PTR ObFindAddress(
     _In_ PBYTE ScanPattern,
     _In_ ULONG ScanPatternSize)
 {
-    ULONG_PTR   Address;
-    PBYTE       ptrCode = PtrCode;
-    ULONG       Index = 0;
-    LONG        Rel = 0;
-    hde64s      hs;
+    ULONG_PTR resultAddress = 0;
+    ULONG currentIndex = 0;
+    LONG relativeOffset = 0;
+    hde64s decodedInstruction;
 
-    do {
-        hde64_disasm((void*)(ptrCode + Index), &hs);
-        if (hs.flags & F_ERROR)
+    if (!PtrCode || !ScanPattern || !ScanPatternSize || NumberOfBytes < ScanPatternSize)
+        return 0;
+
+    while (currentIndex < NumberOfBytes) {
+
+        if (currentIndex + ScanPatternSize >= NumberOfBytes)
             break;
 
-        if (hs.len == ReqInstructionLength) {
+        hde64_disasm((void*)(PtrCode + currentIndex), &decodedInstruction);
 
-            if (ScanPatternSize == RtlCompareMemory(&ptrCode[Index],
+        if (decodedInstruction.flags & F_ERROR)
+            break;
+
+        if (decodedInstruction.len == ReqInstructionLength) {
+
+            if (ScanPatternSize == RtlCompareMemory(&PtrCode[currentIndex],
                 ScanPattern,
                 ScanPatternSize))
             {
-                Rel = *(PLONG)(ptrCode + Index + ScanPatternSize);
-                break;
+                if (currentIndex + ScanPatternSize + sizeof(LONG) <= NumberOfBytes) {
+                    relativeOffset = *(PLONG)(PtrCode + currentIndex + ScanPatternSize);
+
+                    resultAddress = (ULONG_PTR)PtrCode + currentIndex + decodedInstruction.len + relativeOffset;
+                    resultAddress = ImageBase + resultAddress - MappedImageBase;
+
+                    return resultAddress;
+                }
             }
-
         }
-        Index += hs.len;
 
-    } while (Index < NumberOfBytes);
+        currentIndex += decodedInstruction.len;
+    }
 
-    if (Rel == 0)
-        return 0;
-
-    Address = (ULONG_PTR)ptrCode + Index + hs.len + Rel;
-    Address = ImageBase + Address - MappedImageBase;
-
-    return Address;
+    return 0;
 }
 
 /*
@@ -204,8 +221,18 @@ BYTE ObGetObjectHeaderOffset(
 *
 * Purpose:
 *
-* Calculate address of name structure from object header flags and object address
+* Calculate address of specific header information structure based on
+* object header flags and object address.
 *
+* Parameters:
+*   ObjectInfoMask      - Information mask from object header
+*   ObjectHeaderAddress - Address of the object header
+*   HeaderInfoAddress   - Pointer to variable that receives calculated header info address
+*   InfoFlag            - Type of header information to locate
+*
+* Return Value:
+*   TRUE if address was successfully calculated and is valid
+*   FALSE otherwise
 */
 BOOL ObHeaderToNameInfoAddress(
     _In_ UCHAR ObjectInfoMask,
@@ -214,8 +241,8 @@ BOOL ObHeaderToNameInfoAddress(
     _In_ OBJ_HEADER_INFO_FLAG InfoFlag
 )
 {
-    BYTE      HeaderOffset;
-    ULONG_PTR Address;
+    BYTE      headerOffset;
+    ULONG_PTR calculatedAddress;
 
     if (HeaderInfoAddress == NULL)
         return FALSE;
@@ -223,15 +250,15 @@ BOOL ObHeaderToNameInfoAddress(
     if (ObjectHeaderAddress < g_kdctx.SystemRangeStart)
         return FALSE;
 
-    HeaderOffset = ObGetObjectHeaderOffset(ObjectInfoMask, InfoFlag);
-    if (HeaderOffset == 0)
+    headerOffset = ObGetObjectHeaderOffset(ObjectInfoMask, InfoFlag);
+    if (headerOffset == 0)
         return FALSE;
 
-    Address = ObjectHeaderAddress - HeaderOffset;
-    if (Address < g_kdctx.SystemRangeStart)
+    calculatedAddress = ObjectHeaderAddress - headerOffset;
+    if (calculatedAddress < g_kdctx.SystemRangeStart)
         return FALSE;
 
-    *HeaderInfoAddress = Address;
+    *HeaderInfoAddress = calculatedAddress;
     return TRUE;
 }
 
@@ -432,7 +459,7 @@ BOOLEAN ObpValidateSidBuffer(
 *
 * Purpose:
 *
-* Walk each boundary descriptor entry, validate it and run optional callback.
+* Walk each boundary descriptor entry, validate it and run callback.
 *
 */
 NTSTATUS ObEnumerateBoundaryDescriptorEntries(
@@ -445,6 +472,9 @@ NTSTATUS ObEnumerateBoundaryDescriptorEntries(
     ULONG BoundaryDescriptorItems = 0;
     ULONG_PTR DataEnd;
     OBJECT_BOUNDARY_ENTRY* CurrentEntry, * NextEntry;
+
+    if (BoundaryDescriptor == NULL || Callback == NULL)
+        return STATUS_INVALID_PARAMETER;
 
     __try {
 
@@ -1014,7 +1044,7 @@ UCHAR ObDecodeTypeIndex(
     POBJECT_HEADER ObjectHeader;
 
     //
-    // Cookie can be zero.
+    // Cookie can be zero or we have no valid cookie data, return as is.
     //
     if (g_kdctx.Data->ObHeaderCookie.Valid == FALSE) {
         return EncodedTypeIndex;
@@ -3442,69 +3472,85 @@ BOOLEAN kdQueryKernelShims(
 *
 * Purpose:
 *
-* Return address of CmControlVector data array in mapped kernel.
+* Find CM_CONTROL_VECTOR structure in mapped kernel image.
+* The function works by first locating the "ProtectionMode" string
+* and then finding the reference to it in the kernel image.
 *
+* Parameters:
+*   Context - Kernel debugging context containing NtOsImageMap
+*
+* Return Value:
+*   Pointer to CM_CONTROL_VECTOR if found, NULL otherwise
 */
 PVOID kdQueryCmControlVector(
     _In_ PKLDBGCONTEXT Context
 )
 {
-    ULONG i, Offset;
-    ULONG SectionSize;
-    ULONG_PTR PatternValue = 0, TestValue;
-    PVOID CmControlVector = NULL;
-    PBYTE SectionBase;
-    PBYTE RefPointer;
-    IMAGE_NT_HEADERS* NtHeaders;
-    IMAGE_SECTION_HEADER* SectionTableEntry;
+    ULONG i, offset;
+    ULONG sectionSize;
+    ULONG_PTR signatureAddress = 0, testValue;
+    PVOID controlVector = NULL;
+    PBYTE sectionBase;
+    PBYTE currentPtr;
+    IMAGE_NT_HEADERS* ntHeaders;
+    IMAGE_SECTION_HEADER* sectionTableEntry;
 
     WCHAR szSignature[] = L"ProtectionMode";
 
-    if (Context->NtOsImageMap == NULL)
+    if (Context == NULL || Context->NtOsImageMap == NULL)
         return NULL;
 
-    NtHeaders = RtlImageNtHeader(Context->NtOsImageMap);
+    ntHeaders = RtlImageNtHeader(Context->NtOsImageMap);
 
-    SectionTableEntry = IMAGE_FIRST_SECTION(NtHeaders);
+    sectionTableEntry = IMAGE_FIRST_SECTION(ntHeaders);
 
-    for (i = 0; i < NtHeaders->FileHeader.NumberOfSections; i++, SectionTableEntry++) {
+    for (i = 0; i < ntHeaders->FileHeader.NumberOfSections; i++, sectionTableEntry++) {
+        sectionBase = (PBYTE)Context->NtOsImageMap + sectionTableEntry->VirtualAddress;
+        sectionSize = sectionTableEntry->Misc.VirtualSize;
 
-        SectionBase = (PBYTE)Context->NtOsImageMap + SectionTableEntry->VirtualAddress;
-        SectionSize = SectionTableEntry->Misc.VirtualSize;
+        if (sectionSize == 0 || sectionBase == NULL)
+            continue;
 
-        PatternValue = (ULONG_PTR)supFindPattern(SectionBase,
-            SectionSize,
+        signatureAddress = (ULONG_PTR)supFindPattern(sectionBase,
+            sectionSize,
             (CONST PBYTE)szSignature,
             sizeof(szSignature));
 
-        if (PatternValue)
+        if (signatureAddress)
             break;
     }
 
-    if (PatternValue == 0)
+    if (signatureAddress == 0)
         return NULL;
 
-    SectionTableEntry = IMAGE_FIRST_SECTION(NtHeaders);
+    sectionTableEntry = IMAGE_FIRST_SECTION(ntHeaders);
+    for (i = 0; i < ntHeaders->FileHeader.NumberOfSections; i++, sectionTableEntry++) {
+        sectionBase = (PBYTE)Context->NtOsImageMap + sectionTableEntry->VirtualAddress;
+        sectionSize = sectionTableEntry->Misc.VirtualSize;
 
-    for (i = 0; i < NtHeaders->FileHeader.NumberOfSections; i++, SectionTableEntry++) {
+        if (sectionSize <= sizeof(ULONG_PTR) || sectionBase == NULL)
+            continue;
 
-        SectionBase = (PBYTE)Context->NtOsImageMap + SectionTableEntry->VirtualAddress;
-        SectionSize = SectionTableEntry->Misc.VirtualSize;
-        for (Offset = 0; Offset < SectionSize - sizeof(ULONG_PTR); Offset++) {
+        for (offset = 0; offset < sectionSize - sizeof(ULONG_PTR); offset++) {
 
-            RefPointer = SectionBase + Offset;
-            TestValue = *(PULONG_PTR)RefPointer;
-            if (TestValue == PatternValue) {
-                CmControlVector = RefPointer - sizeof(ULONG_PTR);
+            currentPtr = sectionBase + offset;
+            if (currentPtr + sizeof(ULONG_PTR) > sectionBase + sectionSize)
                 break;
+
+            testValue = *(PULONG_PTR)currentPtr;
+            if (testValue == signatureAddress) {
+                if (offset >= sizeof(ULONG_PTR)) {
+                    controlVector = currentPtr - sizeof(ULONG_PTR);
+                    break;
+                }
             }
         }
 
-        if (CmControlVector)
+        if (controlVector)
             break;
     }
 
-    return CmControlVector;
+    return controlVector;
 }
 
 /*

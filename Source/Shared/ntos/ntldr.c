@@ -1,12 +1,12 @@
 /************************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2014 - 2023
+*  (C) COPYRIGHT AUTHORS, 2014 - 2025
 *
 *  TITLE:       NTLDR.C
 *
-*  VERSION:     1.22
+*  VERSION:     1.23
 *
-*  DATE:        25 Jul 2023
+*  DATE:        07 Jun 2025
 *
 *  NT loader raw parsing related code.
 *
@@ -30,6 +30,8 @@ INT NtLdrExceptionFilter(
     _In_ EXCEPTION_POINTERS* ExceptionPointers);
 
 #define NTLDR_EXCEPTION_FILTER NtLdrExceptionFilter(GetExceptionCode(), GetExceptionInformation())
+#define SYSCALL_SIGNATURE 0xb8d18b4c // mov r10, rcx; mov eax
+
 
 /*
 * NtLdrExceptionFilter
@@ -64,26 +66,35 @@ NTSTATUS NtRawGetProcAddress(
     _In_ PRESOLVE_INFO Pointer
 )
 {
-    PIMAGE_NT_HEADERS NtHeaders;
+    PIMAGE_NT_HEADERS ntHeaders;
     PIMAGE_EXPORT_DIRECTORY exp;
     PDWORD fntable, nametable;
     PWORD ordtable;
-    ULONG mid, high, low;
+    ULONG mid, high, low, ordinal;
     ULONG_PTR fnptr, exprva, expsize;
     int r;
 
     if (Module == NULL)
         return STATUS_INVALID_PARAMETER_1;
 
-    NtHeaders = RtlImageNtHeader(Module);
-    if (NtHeaders->OptionalHeader.NumberOfRvaAndSizes <= IMAGE_DIRECTORY_ENTRY_EXPORT)
+    if (ProcName == NULL)
+        return STATUS_INVALID_PARAMETER_2;
+
+    if (Pointer == NULL)
+        return STATUS_INVALID_PARAMETER_3;
+
+    ntHeaders = RtlImageNtHeader(Module);
+    if (ntHeaders == NULL)
+        return STATUS_INVALID_IMAGE_FORMAT;
+
+    if (ntHeaders->OptionalHeader.NumberOfRvaAndSizes <= IMAGE_DIRECTORY_ENTRY_EXPORT)
         return STATUS_OBJECT_NAME_NOT_FOUND;
 
-    exprva = NtHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
+    exprva = ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
     if (exprva == 0)
         return STATUS_INVALID_IMAGE_FORMAT;
 
-    expsize = NtHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size;
+    expsize = ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size;
 
     exp = (PIMAGE_EXPORT_DIRECTORY)((ULONG_PTR)Module + exprva);
     fntable = (PDWORD)((ULONG_PTR)Module + exp->AddressOfFunctions);
@@ -95,7 +106,11 @@ NTSTATUS NtRawGetProcAddress(
             ((ULONG_PTR)ProcName >= (ULONG_PTR)exp->Base + exp->NumberOfFunctions))
             return STATUS_OBJECT_NAME_NOT_FOUND;
 
-        fnptr = fntable[(ULONG_PTR)ProcName - exp->Base];
+        ordinal = (ULONG)((ULONG_PTR)ProcName - exp->Base);
+        if (ordinal >= exp->NumberOfFunctions)
+            return STATUS_OBJECT_NAME_NOT_FOUND;
+
+        fnptr = fntable[ordinal];
 
     }
     else {
@@ -126,10 +141,15 @@ NTSTATUS NtRawGetProcAddress(
             }
         } while (low < high);
 
-        if (r == 0)
+        if (r == 0) {
+            if (ordtable[mid] >= exp->NumberOfFunctions)
+                return STATUS_INVALID_IMAGE_FORMAT;
+
             fnptr = fntable[ordtable[mid]];
-        else
+        }
+        else {
             return STATUS_OBJECT_NAME_NOT_FOUND;
+        }
     }
 
     if ((fnptr >= exprva) && (fnptr < exprva + expsize))
@@ -180,8 +200,11 @@ ULONG NtRawEnumSyscallExports(
 
     for (i = 0; i < pExportDirectory->NumberOfFunctions; ++i) {
 
+        if (FnPtrTable[i] == 0)
+            continue;
+
         fnptr = (ULONG_PTR)Module + FnPtrTable[i];
-        if (*(PDWORD)fnptr != 0xb8d18b4c) //mov r10, rcx; mov eax
+        if (*(PDWORD)fnptr != SYSCALL_SIGNATURE)
             continue;
 
         newEntry = (PRAW_SYSCALL_ENTRY)RtlAllocateHeap(HeapHandle,
@@ -194,6 +217,12 @@ ULONG NtRawEnumSyscallExports(
 
         for (j = 0; j < pExportDirectory->NumberOfNames; ++j)
         {
+            if (j >= pExportDirectory->NumberOfNames)
+                break;
+
+            if (NameOrdTable[j] >= pExportDirectory->NumberOfFunctions)
+                continue;
+
             if (NameOrdTable[j] == i)
             {
                 _strncpy_a(&newEntry->Name[0],
@@ -233,6 +262,7 @@ LPCSTR NtRawIATEntryToImport(
     ULONG_PTR* rname;
     ULONG size;
     LPVOID* raddr;
+    PIMAGE_IMPORT_BY_NAME importByName;
 
     if (ImportModuleName)
         *ImportModuleName = NULL;
@@ -258,10 +288,12 @@ LPCSTR NtRawIATEntryToImport(
             {
                 if (((*rname) & IMAGE_ORDINAL_FLAG) == 0)
                 {
+                    importByName = (PIMAGE_IMPORT_BY_NAME)((ULONG_PTR)Module + *rname);
+
                     if (ImportModuleName) {
                         *ImportModuleName = (LPCSTR)((ULONG_PTR)Module + pImageImportDescriptor->Name);
                     }
-                    return (LPCSTR) & ((PIMAGE_IMPORT_BY_NAME)((ULONG_PTR)Module + *rname))->Name;
+                    return (LPCSTR)&importByName->Name[0];
                 }
             }
 
@@ -307,7 +339,8 @@ PAPI_SET_VALUE_ENTRY_V6 ApiSetpSearchForApiSetHost(
             AliasValueEntry = API_SET_TO_VALUE_ENTRY(Namespace, Entry, AliasIndex);
             AliasName = API_SET_TO_VALUE_NAME(Namespace, AliasValueEntry);
 
-            CompareResult = RtlCompareUnicodeStrings(ApiSetToResolve,
+            CompareResult = RtlCompareUnicodeStrings(
+                ApiSetToResolve,
                 ApiSetToResolveLength,
                 AliasName,
                 AliasValueEntry->NameLength >> 1,
@@ -375,10 +408,9 @@ PAPI_SET_NAMESPACE_ENTRY_V6 ApiSetpSearchForApiSet(
     //
     c = 0;
     EntryCount = ApiSetNamespace->Count - 1;
+
     do {
-
         HashIndex = (EntryCount + c) >> 1;
-
         LookupHashEntry = API_SET_TO_HASH_ENTRY(ApiSetNamespace, HashIndex);
         EntryHash = LookupHashEntry->Hash;
 
@@ -390,9 +422,7 @@ PAPI_SET_NAMESPACE_ENTRY_V6 ApiSetpSearchForApiSet(
         }
 
         if (EntryHash == LookupHash) {
-            //
             // Hash found, query namespace entry and break.
-            //
             NamespaceEntry = API_SET_TO_NAMESPACE_ENTRY(ApiSetNamespace, LookupHashEntry);
             break;
         }
@@ -412,7 +442,8 @@ PAPI_SET_NAMESPACE_ENTRY_V6 ApiSetpSearchForApiSet(
     //
     NamespaceEntryName = API_SET_TO_NAMESPACE_ENTRY_NAME(ApiSetNamespace, NamespaceEntry);
 
-    if (0 == RtlCompareUnicodeStrings(ResolveName,
+    if (0 == RtlCompareUnicodeStrings(
+        ResolveName,
         ResolveNameEffectiveLength,
         NamespaceEntryName,
         (NamespaceEntry->HashNameLength >> 1),
@@ -472,7 +503,6 @@ NTSTATUS NtRawApiSetResolveLibrary(
         // Calculate length without everything after last hyphen including dll suffix.
         //
         BufferPtr = (PWCHAR)RtlOffsetToPointer(ApiSetToResolve->Buffer, ApiSetToResolve->Length);
-
         Length = ApiSetToResolve->Length;
 
         do {
@@ -527,7 +557,9 @@ NTSTATUS NtRawApiSetResolveLibrary(
                 //
                 // Host library name is not null terminated, handle that.
                 //
-                BufferPtr = (PWSTR)RtlAllocateHeap(NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY,
+                BufferPtr = (PWSTR)RtlAllocateHeap(
+                    NtCurrentPeb()->ProcessHeap,
+                    HEAP_ZERO_MEMORY,
                     HostLibraryEntry->ValueLength + sizeof(UNICODE_NULL));
 
                 if (BufferPtr) {
@@ -540,6 +572,9 @@ NTSTATUS NtRawApiSetResolveLibrary(
                     ResolvedHostLibraryName->MaximumLength = (USHORT)HostLibraryEntry->ValueLength;
                     ResolvedHostLibraryName->Buffer = BufferPtr;
                     Status = STATUS_SUCCESS;
+                }
+                else {
+                    Status = STATUS_NO_MEMORY;
                 }
             }
         }

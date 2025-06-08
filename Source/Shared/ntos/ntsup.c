@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.23
 *
-*  DATE:        05 Jun 2025
+*  DATE:        08 Jun 2025
 *
 *  Native API support functions.
 *
@@ -60,7 +60,7 @@ VOID ntsupHeapFree(
 *
 * Purpose:
 *
-* Wrapper for NtAllocateVirtualMemory.
+* Wrapper for ntsupVirtualAllocEx with standard parameters.
 *
 */
 PVOID ntsupVirtualAllocEx(
@@ -347,11 +347,13 @@ PVOID ntsupFindModuleEntryByName_U(
 }
 
 /*
-* ntsupFindModuleEntryByAddress
+* ntsupFindModuleNameByAddress
 *
 * Purpose:
 *
-* Find Module Entry for given Address.
+* Find Module Name for given Address and copy it to the supplied buffer.
+*
+* Returns module entry if found, NULL otherwise.
 *
 */
 BOOL ntsupFindModuleEntryByAddress(
@@ -809,13 +811,11 @@ PVOID ntsupGetLoadedModulesListEx(
         *ReturnLength = bufferSize;
 
     //
-    // Handle unexpected return.
-    //
-    // If driver image path exceeds structure field size then 
+    // Handle special case:
+    // If driver image path exceeds structure field size, 
     // RtlUnicodeStringToAnsiString will throw STATUS_BUFFER_OVERFLOW.
-    // 
-    // If this is the last driver in the enumeration service will return 
-    // valid data but STATUS_BUFFER_OVERFLOW in result.
+    // If this is the last driver in enumeration, service will return 
+    // valid data but with STATUS_BUFFER_OVERFLOW result.
     //
     if (ntStatus == STATUS_BUFFER_OVERFLOW) {
 
@@ -2147,6 +2147,10 @@ PBYTE ntsupQueryResourceData(
     IMAGE_RESOURCE_DATA_ENTRY* dataEntry;
     PBYTE                      dataPtr = NULL;
     ULONG                      dataSize = 0;
+
+    if (DataSize) {
+        *DataSize = 0;
+    }
 
     if (DllHandle != NULL) {
 

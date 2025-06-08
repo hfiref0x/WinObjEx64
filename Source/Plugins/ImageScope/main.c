@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020 - 2024
+*  (C) COPYRIGHT AUTHORS, 2020 - 2025
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.10
+*  VERSION:     1.20
 *
-*  DATE:        04 Jun 2024
+*  DATE:        08 Jun 2025
 *
 *  WinObjEx64 ImageScope plugin.
 *
@@ -38,7 +38,7 @@ BOOL PmpCopyObjectData(
 )
 {
     HANDLE HeapHandle = NtCurrentPeb()->ProcessHeap;
-    
+
     return supDuplicateUnicodeString(HeapHandle, &Dest->Directory, &Source->Directory) &&
         supDuplicateUnicodeString(HeapHandle, &Dest->Name, &Source->Name);
 }
@@ -60,10 +60,10 @@ VOID PluginFreeGlobalResources(
         Context->SectionAddress = NULL;
     }
 
-    supFreeDuplicatedUnicodeString(NtCurrentPeb()->ProcessHeap, 
+    supFreeDuplicatedUnicodeString(NtCurrentPeb()->ProcessHeap,
         &Context->ParamBlock.Object.Directory, TRUE);
 
-    supFreeDuplicatedUnicodeString(NtCurrentPeb()->ProcessHeap, 
+    supFreeDuplicatedUnicodeString(NtCurrentPeb()->ProcessHeap,
         &Context->ParamBlock.Object.Name, TRUE);
 
     if (g_Plugin->StateChangeCallback)
@@ -91,11 +91,10 @@ DWORD WINAPI PluginThread(
 
     InterlockedIncrement(&m_RefCount);
 
-    do {
-
+    __try {
         if (g_Plugin->GuiInitCallback == NULL) { // this is required callback
             kdDebugPrint("Gui init callback required\r\n");
-            break;
+            __leave;
         }
 
         if (!g_Plugin->GuiInitCallback(g_Plugin,
@@ -104,17 +103,16 @@ DWORD WINAPI PluginThread(
             NULL))
         {
             kdDebugPrint("Gui init callback failure\r\n");
-            break;
+            __leave;
         }
 
         uResult = (ULONG)RunUI(Context);
-
-    } while (FALSE);
-
-    InterlockedDecrement(&m_RefCount);
-
-    PluginFreeGlobalResources(Context);
-    supHeapFree(Context);
+    }
+    __finally {
+        InterlockedDecrement(&m_RefCount);
+        PluginFreeGlobalResources(Context);
+        supHeapFree(Context);
+    }
 
     ExitThread(uResult);
 }
@@ -131,8 +129,9 @@ NTSTATUS CALLBACK StartPlugin(
     _In_ PWINOBJEX_PARAM_BLOCK ParamBlock
 )
 {
+    BOOL deallocateContext = FALSE;
     DWORD ThreadId;
-    NTSTATUS Status;
+    NTSTATUS Status = STATUS_UNSUCCESSFUL;
     WINOBJEX_PLUGIN_STATE State = PluginInitialization;
     HANDLE WorkerThread, SectionHandle = NULL;
     GUI_CONTEXT* Context;
@@ -143,96 +142,115 @@ NTSTATUS CALLBACK StartPlugin(
     if (Context == NULL)
         return STATUS_MEMORY_NOT_ALLOCATED;
 
-    RtlCopyMemory(
-        &Context->ParamBlock,
-        ParamBlock,
-        sizeof(WINOBJEX_PARAM_BLOCK));
+    __try {
+        RtlCopyMemory(
+            &Context->ParamBlock,
+            ParamBlock,
+            sizeof(WINOBJEX_PARAM_BLOCK));
 
-    RtlZeroMemory(
-        &Context->ParamBlock.Object,
-        sizeof(WINOBJEX_PARAM_OBJECT));
+        RtlZeroMemory(
+            &Context->ParamBlock.Object,
+            sizeof(WINOBJEX_PARAM_OBJECT));
 
-    if (!PmpCopyObjectData(
-        &ParamBlock->Object,
-        &Context->ParamBlock.Object))
-    {
-        supHeapFree(Context);
-        return STATUS_MEMORY_NOT_ALLOCATED;
-    }
-
-    Status = Context->ParamBlock.OpenNamedObjectByType(
-        &SectionHandle,
-        ObjectTypeSection,
-        &Context->ParamBlock.Object.Directory,
-        &Context->ParamBlock.Object.Name,
-        SECTION_QUERY | SECTION_MAP_READ);
-
-    if (!NT_SUCCESS(Status)) {
-        
-        StringCbPrintf(szError, 100, TEXT("Could not open section, 0x%lX"), Status);
-        
-        MessageBox(
-            ParamBlock->ParentWindow, 
-            szError,
-            T_PLUGIN_NAME,
-            MB_ICONERROR);
-        
-        g_Plugin->StateChangeCallback(g_Plugin, PluginStopped, NULL);
-        supHeapFree(Context);
-        return STATUS_SUCCESS;
-    }
-
-    Status = supMapSection(
-        SectionHandle,
-        &Context->SectionAddress,
-        &Context->SectionViewSize);
-
-    if (!NT_SUCCESS(Status)) {
-
-        NtClose(SectionHandle);
-
-        if (Status == STATUS_NOT_SUPPORTED) {
-
-            MessageBox(ParamBlock->ParentWindow,
-                TEXT("This section does not represent mapped image, unable to continue."),
-                T_PLUGIN_NAME,
-                MB_ICONINFORMATION);
-
+        if (!PmpCopyObjectData(
+            &ParamBlock->Object,
+            &Context->ParamBlock.Object))
+        {
+            deallocateContext = TRUE;
+            Status = STATUS_MEMORY_NOT_ALLOCATED;
+            __leave;
         }
-        else {
 
-            StringCbPrintf(szError, 100, TEXT("Could not map section, 0x%lX"), Status);
-            MessageBox(ParamBlock->ParentWindow, szError,
+        Status = Context->ParamBlock.OpenNamedObjectByType(
+            &SectionHandle,
+            ObjectTypeSection,
+            &Context->ParamBlock.Object.Directory,
+            &Context->ParamBlock.Object.Name,
+            SECTION_QUERY | SECTION_MAP_READ);
+
+        if (!NT_SUCCESS(Status)) {
+
+            StringCbPrintf(szError, 100, TEXT("Could not open section, 0x%lX"), Status);
+
+            MessageBox(
+                ParamBlock->ParentWindow,
+                szError,
                 T_PLUGIN_NAME,
                 MB_ICONERROR);
 
+            if (g_Plugin && g_Plugin->StateChangeCallback)
+                g_Plugin->StateChangeCallback(g_Plugin, PluginStopped, NULL);
+
+            deallocateContext = TRUE;
+            Status = STATUS_SUCCESS;
+            __leave;
         }
 
-        //
-        // Stop plugin if we cannot open section, but do not fail with error as we already displayed it.
-        //
-        g_Plugin->StateChangeCallback(g_Plugin, PluginStopped, NULL);
-        supHeapFree(Context);
-        return STATUS_SUCCESS;
+        // Map section
+        Status = supMapSection(
+            SectionHandle,
+            &Context->SectionAddress,
+            &Context->SectionViewSize);
+
+        NtClose(SectionHandle);
+        SectionHandle = NULL;
+
+        if (!NT_SUCCESS(Status)) {
+
+            if (Status == STATUS_NOT_SUPPORTED) {
+                MessageBox(ParamBlock->ParentWindow,
+                    TEXT("This section does not represent mapped image, unable to continue."),
+                    T_PLUGIN_NAME,
+                    MB_ICONINFORMATION);
+            }
+            else {
+                StringCbPrintf(szError, 100, TEXT("Could not map section, 0x%lX"), Status);
+                MessageBox(ParamBlock->ParentWindow, szError,
+                    T_PLUGIN_NAME,
+                    MB_ICONERROR);
+            }
+
+            // Stop plugin if we cannot open section, but do not fail with error as we already displayed it.
+            if (g_Plugin && g_Plugin->StateChangeCallback)
+                g_Plugin->StateChangeCallback(g_Plugin, PluginStopped, NULL);
+
+            Status = STATUS_SUCCESS;
+            deallocateContext = TRUE;
+            __leave;
+        }
+
+        WorkerThread = CreateThread(
+            NULL,
+            0,
+            (LPTHREAD_START_ROUTINE)PluginThread,
+            (PVOID)Context,
+            0,
+            &ThreadId);
+
+        if (WorkerThread) {
+            Status = STATUS_SUCCESS;
+            CloseHandle(WorkerThread);
+            WorkerThread = NULL;
+            State = PluginRunning;
+        }
+        else {
+            Status = STATUS_UNSUCCESSFUL;
+            State = PluginError;
+            deallocateContext = TRUE;
+        }
     }
+    __finally {
+        if (SectionHandle) {
+            NtClose(SectionHandle);
+        }
 
-    NtClose(SectionHandle);
+        if (deallocateContext && Context) {
+            supHeapFree(Context);
+        }
 
-    WorkerThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)PluginThread, (PVOID)Context, 0, &ThreadId);
-    if (WorkerThread) {
-        Status = STATUS_SUCCESS;
-        CloseHandle(WorkerThread);
-        State = PluginRunning;
+        if (g_Plugin && g_Plugin->StateChangeCallback)
+            g_Plugin->StateChangeCallback(g_Plugin, State, NULL);
     }
-    else {
-        Status = STATUS_UNSUCCESSFUL;
-        supHeapFree(Context);
-        State = PluginError;
-    }
-
-    if (g_Plugin->StateChangeCallback)
-        g_Plugin->StateChangeCallback(g_Plugin, State, NULL);
-
     return Status;
 }
 
@@ -248,11 +266,14 @@ void CALLBACK StopPlugin(
     VOID
 )
 {
+    // Signal stop
     InterlockedExchange((PLONG)&g_PluginState, PLUGIN_STOP);
 
-    while (m_RefCount);
+    // Wait for all references to be released
+    while (InterlockedCompareExchange(&m_RefCount, 0, 0) > 0)
+        Sleep(50);
 
-    if (g_Plugin->GuiShutdownCallback)
+    if (g_Plugin && g_Plugin->GuiShutdownCallback)
         g_Plugin->GuiShutdownCallback(g_Plugin, g_ThisDLL, NULL);
 
 }
@@ -287,7 +308,7 @@ BOOLEAN CALLBACK PluginInit(
         //
         // Set plugin description.
         //
-        StringCbCopy(PluginData->Description, sizeof(PluginData->Description), 
+        StringCbCopy(PluginData->Description, sizeof(PluginData->Description),
             TEXT("Display additional information for sections created from PE files."));
 
         //
@@ -322,8 +343,8 @@ BOOLEAN CALLBACK PluginInit(
         // Set supported object type(s).
         //
         RtlFillMemory(
-            PluginData->SupportedObjectsIds, 
-            sizeof(PluginData->SupportedObjectsIds), 
+            PluginData->SupportedObjectsIds,
+            sizeof(PluginData->SupportedObjectsIds),
             ObjectTypeNone);
 
         PluginData->SupportedObjectsIds[0] = ObjectTypeSection;

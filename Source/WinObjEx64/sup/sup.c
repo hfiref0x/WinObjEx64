@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.08
 *
-*  DATE:        07 Jun 2025
+*  DATE:        10 Jun 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -7359,10 +7359,13 @@ SUP_SHIM_INFO* supGetDriverShimInformation(
     ULONG i;
 
     for (i = 0; i < RTL_NUMBER_OF(KsepShimInformation); i++) {
-        if (sizeof(GUID) == RtlCompareMemory(
+        if (RtlCompareMemory(
             (PVOID)KsepShimInformation[i].Guid,
             (PVOID)&ShimGuid,
-            sizeof(GUID))) return &KsepShimInformation[i];
+            sizeof(GUID)) == sizeof(GUID))
+        {
+            return &KsepShimInformation[i];
+        }
     }
 
     return NULL;

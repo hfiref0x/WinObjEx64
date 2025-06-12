@@ -151,7 +151,6 @@ ULONG_PTR ObFindAddress(
             {
                 if (currentIndex + ScanPatternSize + sizeof(LONG) <= NumberOfBytes) {
                     relativeOffset = *(PLONG)(PtrCode + currentIndex + ScanPatternSize);
-
                     resultAddress = (ULONG_PTR)PtrCode + currentIndex + decodedInstruction.len + relativeOffset;
                     resultAddress = ImageBase + resultAddress - MappedImageBase;
 
@@ -507,6 +506,10 @@ NTSTATUS ObEnumerateBoundaryDescriptorEntries(
                 return STATUS_INVALID_PARAMETER;
 
             TotalItems++;
+
+            if (((ULONG_PTR)CurrentEntry + EntrySize) < (ULONG_PTR)CurrentEntry) {
+                return STATUS_INVALID_PARAMETER;
+            }
 
             NextEntry = (OBJECT_BOUNDARY_ENTRY*)ALIGN_UP(((PBYTE)CurrentEntry + EntrySize), ULONG_PTR);
 
@@ -1296,7 +1299,7 @@ PVOID ObFindPrivateNamespaceLookupTable2(
             // Locate .text image section.
             //
             SectionBase = supLookupImageSectionByName(TEXT_SECTION,
-                TEXT_SECTION_LEGNTH,
+                TEXT_SECTION_LENGTH,
                 (PVOID)hNtOs,
                 &SectionSize);
 
@@ -1511,7 +1514,7 @@ BOOL kdpFindKiServiceTableByPattern(
     // Locate .text image section.
     //
     sectionBase = (ULONG_PTR)supLookupImageSectionByName(TEXT_SECTION,
-        TEXT_SECTION_LEGNTH,
+        TEXT_SECTION_LENGTH,
         (PVOID)MappedImageBase,
         &sectionSize);
 
@@ -1714,12 +1717,7 @@ POBEX_OBJECT_INFORMATION ObpCopyObjectBasicInfo(
     //
     // Convert object address to object header address.
     //
-    if (ObjectHeaderAddressValid) {
-        HeaderAddress = ObjectHeaderAddress;
-    }
-    else {
-        HeaderAddress = (ULONG_PTR)OBJECT_TO_OBJECT_HEADER(ObjectAddress);
-    }
+    HeaderAddress = ObjectHeaderAddressValid ? ObjectHeaderAddress : (ULONG_PTR)OBJECT_TO_OBJECT_HEADER(ObjectAddress);
 
     //
     // ObjectHeader already dumped, copy it.
@@ -1763,9 +1761,7 @@ POBEX_OBJECT_INFORMATION ObpCopyObjectBasicInfo(
     //
     // Copy object header.
     //
-    RtlCopyMemory(&lpData->ObjectHeader,
-        pObjectHeader,
-        sizeof(OBJECT_HEADER));
+    RtlCopyMemory(&lpData->ObjectHeader, pObjectHeader, sizeof(OBJECT_HEADER));
 
     //
     // Query and copy quota info if exist.
@@ -2521,6 +2517,7 @@ BOOL ObQueryFullNamespacePath(
                 supFreeUnicodeString(g_obexHeap, &pathElement->Name);
 
                 Next = Next->Flink;
+                supHeapFree(pathElement);
 
             }
 

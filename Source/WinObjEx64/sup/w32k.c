@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.08
 *
-*  DATE:        06 Jun 2025
+*  DATE:        10 Jun 2025
 *
 *  Win32k syscall table actual handlers resolving routines.
 *
@@ -142,7 +142,7 @@ ULONG_PTR SdtpQueryWin32kApiSetTable(
         // Locate .text image section as required variable is always in .text.
         //
         SectionBase = supLookupImageSectionByName(TEXT_SECTION,
-            TEXT_SECTION_LEGNTH,
+            TEXT_SECTION_LENGTH,
             (PVOID)hModule,
             &SectionSize);
 
@@ -1061,7 +1061,7 @@ NTSTATUS SdtResolveServiceEntryModuleSessionAware(
             }
 
             pModule = (PRTL_PROCESS_MODULE_INFORMATION)ntsupGetModuleEntryByAddress(Modules, (PVOID)routineAddress);
-            if (pModule) {
+            if (pModule && pModule->OffsetToFileName < sizeof(pModule->FullPathName)) {
 
                 pStr = (PCHAR)&pModule->FullPathName[pModule->OffsetToFileName];
 

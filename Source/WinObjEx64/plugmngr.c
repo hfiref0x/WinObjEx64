@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.08
 *
-*  DATE:        06 Jun 2025
+*  DATE:        13 Jun 2025
 *
 *  Plugin manager.
 *
@@ -112,55 +112,61 @@ BOOL PmpIsValidPlugin(
 {
     BOOL bResult = FALSE;
     DWORD dwHandle, dwSize;
-    PVOID versionInfo;
-    LPTRANSLATE	lpTranslate = NULL;
+    PVOID versionInfo = NULL;
+    LPTRANSLATE lpTranslate = NULL;
     LPWSTR lpFileDescription;
+    UINT uLength;
 
     WCHAR szBuffer[100];
 
+    // Get required size first
     dwSize = GetFileVersionInfoSizeEx(0, lpszPluginName, &dwHandle);
-    if (dwSize) {
-        versionInfo = supHeapAlloc((SIZE_T)dwSize);
-        if (versionInfo) {
+    if (dwSize == 0)
+        return FALSE;
 
+    // Allocate memory
+    versionInfo = supHeapAlloc((SIZE_T)dwSize);
+    if (versionInfo == NULL)
+        return FALSE;
+
+    do {
 #pragma warning(push)
 #pragma warning(disable: 6388) //disable warning regarding reserved parameter
-            if (GetFileVersionInfoEx(0, lpszPluginName, dwHandle, dwSize, versionInfo)) {
+        if (!GetFileVersionInfoEx(0, lpszPluginName, dwHandle, dwSize, versionInfo))
+            break;
 #pragma warning(pop)
 
-                dwSize = 0;
-
-                if (VerQueryValue(
-                    versionInfo,
-                    T_VERSION_TRANSLATION,
-                    (LPVOID*)&lpTranslate,
-                    (PUINT)&dwSize))
-                {
-
-                    RtlStringCchPrintfSecure(
-                        szBuffer,
-                        RTL_NUMBER_OF(szBuffer),
-                        FORMAT_VERSION_DESCRIPTION,
-                        lpTranslate[0].wLanguage,
-                        lpTranslate[0].wCodePage);
-
-                    lpFileDescription = NULL;
-                    dwSize = 0;
-
-                    if (VerQueryValue(
-                        versionInfo,
-                        szBuffer,
-                        (LPVOID*)&lpFileDescription,
-                        (PUINT)&dwSize))
-                    {
-                        bResult = (_strcmp(lpFileDescription, WINOBJEX_PLUGIN_DESCRIPTION) == 0);
-                    }
-                }
-            }
-
-            supHeapFree(versionInfo);
+        // Get translation info
+        if (!VerQueryValue(versionInfo,
+            T_VERSION_TRANSLATION,
+            (LPVOID*)&lpTranslate,
+            &uLength) || uLength == 0)
+        {
+            break;
         }
-    }
+
+        // Format version string
+        RtlStringCchPrintfSecure(
+            szBuffer,
+            RTL_NUMBER_OF(szBuffer),
+            FORMAT_VERSION_DESCRIPTION,
+            lpTranslate[0].wLanguage,
+            lpTranslate[0].wCodePage);
+
+        // Query description
+        lpFileDescription = NULL;
+        if (VerQueryValue(
+            versionInfo,
+            szBuffer,
+            (LPVOID*)&lpFileDescription,
+            &uLength) && uLength > 0)
+        {
+            bResult = (_strcmp(lpFileDescription, WINOBJEX_PLUGIN_DESCRIPTION) == 0);
+        }
+
+    } while (FALSE);
+
+    supHeapFree(versionInfo);
 
     return bResult;
 }
@@ -653,7 +659,7 @@ VOID PmProcessEntry(
 
     WINOBJEX_PARAM_BLOCK ParamBlock;
 
-    WCHAR szMessage[MAX_PATH];
+    WCHAR szMessage[MAX_PATH * 2];
 
     __try {
         PluginEntry = PmpGetEntryById(Id);
@@ -973,6 +979,7 @@ VOID PmpListSupportedObjectTypes(
     UCHAR i;
     LPWSTR lpObjectType;
 
+    supDisableRedraw(hwndCB);
     if (Plugin->SupportedObjectsIds[0] == ObjectTypeAnyType) {
         lpObjectType = TEXT("Any");
         SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)lpObjectType);
@@ -986,6 +993,7 @@ VOID PmpListSupportedObjectTypes(
             }
 
     }
+    supEnableRedraw(hwndCB);
 }
 
 /*
@@ -1018,6 +1026,8 @@ VOID PmpShowPluginInfo(
 
     hwndCB = GetDlgItem(hwndDlg, IDC_PLUGIN_OBJECTTYPE);
     SendMessage(hwndCB, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
+
+    supDisableRedraw(hwndDlg);
 
     if (PluginData->Plugin.NeedAdmin)
         lpType = TEXT("Yes");
@@ -1060,6 +1070,8 @@ VOID PmpShowPluginInfo(
     RtlSecureZeroMemory(szModuleName, sizeof(szModuleName));
     GetModuleFileName(PluginData->Module, (LPWSTR)&szModuleName, MAX_PATH);
     SetDlgItemText(hwndDlg, IDC_PLUGIN_FILENAME, szModuleName);
+
+    supEnableRedraw(hwndDlg);
 }
 
 /*

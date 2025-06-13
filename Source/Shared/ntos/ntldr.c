@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTLDR.C
 *
-*  VERSION:     1.23
+*  VERSION:     1.24
 *
-*  DATE:        07 Jun 2025
+*  DATE:        11 Jun 2025
 *
 *  NT loader raw parsing related code.
 *
@@ -217,9 +217,6 @@ ULONG NtRawEnumSyscallExports(
 
         for (j = 0; j < pExportDirectory->NumberOfNames; ++j)
         {
-            if (j >= pExportDirectory->NumberOfNames)
-                break;
-
             if (NameOrdTable[j] >= pExportDirectory->NumberOfFunctions)
                 continue;
 

@@ -270,9 +270,11 @@ HTREEITEM AddTreeViewItem(
     result = TreeView_InsertItem(g_hwndObjectTree, &treeItem);
     if (result == NULL) {
         // Failed to insert item, clean up the allocated object
-        supFreeDuplicatedUnicodeString(HeapHandle, &objectRef->Name, FALSE);
-        supFreeDuplicatedUnicodeString(HeapHandle, &objectRef->TypeName, FALSE);
-        supHeapFreeEx(HeapHandle, objectRef);
+        if (objectRef != NULL) {
+            supFreeDuplicatedUnicodeString(HeapHandle, &objectRef->Name, FALSE);
+            supFreeDuplicatedUnicodeString(HeapHandle, &objectRef->TypeName, FALSE);
+            supHeapFreeEx(HeapHandle, objectRef);
+        }
         if (Parent) *Parent = NULL;
     }
 

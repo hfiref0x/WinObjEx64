@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.08
 *
-*  DATE:        11 Jun 2025
+*  DATE:        13 Jun 2025
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -3555,7 +3555,7 @@ PVOID kdQueryCmControlVector(
         sectionBase = (PBYTE)Context->NtOsImageMap + sectionTableEntry->VirtualAddress;
         sectionSize = sectionTableEntry->Misc.VirtualSize;
 
-        if (sectionSize == 0 || sectionBase == NULL)
+        if (sectionSize == 0)
             continue;
 
         signatureAddress = (ULONG_PTR)supFindPattern(sectionBase,
@@ -3575,7 +3575,7 @@ PVOID kdQueryCmControlVector(
         sectionBase = (PBYTE)Context->NtOsImageMap + sectionTableEntry->VirtualAddress;
         sectionSize = sectionTableEntry->Misc.VirtualSize;
 
-        if (sectionSize <= sizeof(ULONG_PTR) || sectionBase == NULL)
+        if (sectionSize <= sizeof(ULONG_PTR))
             continue;
 
         for (offset = 0; offset < sectionSize - sizeof(ULONG_PTR); offset++) {

@@ -6,8 +6,8 @@
 *
 *  VERSION:     2.08
 *
-*  DATE:        07 Jun 2025
-* 
+*  DATE:        12 Jun 2025
+*
 *  Program main object listing and search logic.
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
@@ -51,6 +51,14 @@ VOID ListHeapDestroy(
     }
 }
 
+/*
+* AllocateObjectItem
+*
+* Purpose:
+*
+* Create an OBEX_ITEM.
+*
+*/
 POBEX_ITEM AllocateObjectItem(
     _In_ HANDLE HeapHandle,
     _In_ WOBJ_OBJECT_TYPE TypeIndex,
@@ -65,7 +73,7 @@ POBEX_ITEM AllocateObjectItem(
     if (item == NULL) {
         return NULL;
     }
-    
+
     item->Prev = Parent;
     item->TypeIndex = TypeIndex;
 
@@ -270,8 +278,60 @@ HTREEITEM AddTreeViewItem(
 
     if (bNeedFree)
         supFreeUnicodeString(g_obexHeap, &objectName);
-    
+
     return result;
+}
+
+/*
+* AppendDirectoryPath
+*
+* Purpose:
+*
+* Helper function to construct full object path.
+*
+*/
+BOOLEAN AppendDirectoryPath(
+    _In_ PUNICODE_STRING DirectoryName,
+    _In_ PUNICODE_STRING ObjectName,
+    _Out_ PUNICODE_STRING FullPath
+)
+{
+    SIZE_T pathLength, allocSize;
+    PWCH target, source;
+
+    // Calculate required buffer size
+    pathLength = DirectoryName->Length;
+    if (!supIsRootDirectory(DirectoryName))
+        pathLength += OBJ_NAME_PATH_SEPARATOR_SIZE;
+
+    pathLength += ObjectName->Length + sizeof(UNICODE_NULL);
+    allocSize = pathLength;
+
+    // Allocate buffer
+    FullPath->Buffer = (PWSTR)supHeapAlloc(allocSize);
+    if (!FullPath->Buffer)
+        return FALSE;
+
+    // Copy directory path
+    target = FullPath->Buffer;
+    source = DirectoryName->Buffer;
+    RtlCopyMemory(target, source, DirectoryName->Length);
+    target = (PWCH)RtlOffsetToPointer(target, DirectoryName->Length);
+
+    // Add separator if not root
+    if (!supIsRootDirectory(DirectoryName))
+        *target++ = OBJ_NAME_PATH_SEPARATOR;
+
+    // Copy object name
+    RtlCopyMemory(target, ObjectName->Buffer, ObjectName->Length);
+    target = (PWCH)RtlOffsetToPointer(target, ObjectName->Length);
+    *target = UNICODE_NULL;
+
+    // Set string properties
+    FullPath->Length = (USHORT)(pathLength - sizeof(UNICODE_NULL));
+    FullPath->MaximumLength = (USHORT)allocSize;
+
+    return TRUE;
 }
 
 /*
@@ -291,7 +351,6 @@ VOID xxxListObjectDirectoryTree(
 )
 {
     ULONG queryContext = 0, rLength;
-    NTSTATUS ntStatus;
     HANDLE directoryHandle = NULL;
     OBEX_ITEM* prevItem = Parent;
 
@@ -305,50 +364,15 @@ VOID xxxListObjectDirectoryTree(
     if (directoryHandle == NULL) {
         return;
     }
+
+    // Suspend tree redraw for batch operations
+    supDisableRedraw(g_hwndObjectTree);
+
     __try {
         do {
-
-            //
-            // Wine implementation of NtQueryDirectoryObject interface is very basic and incomplete.
-            // It doesn't work if no input buffer specified and does not return required buffer size.
-            //
-            if (g_WinObj.IsWine) {
-                rLength = 1024 * 64;
-            }
-            else {
-
-                //
-                // Request required buffer length.
-                //
-                rLength = 0;
-                ntStatus = NtQueryDirectoryObject(directoryHandle,
-                    NULL,
-                    0,
-                    TRUE,
-                    FALSE,
-                    &queryContext,
-                    &rLength);
-
-                if (ntStatus != STATUS_BUFFER_TOO_SMALL)
-                    break;
-            }
-
-            directoryEntry = (POBJECT_DIRECTORY_INFORMATION)supHeapAlloc((SIZE_T)rLength);
+            directoryEntry = ObQueryObjectDirectory(directoryHandle, &queryContext, g_WinObj.IsWine, &rLength);
             if (directoryEntry == NULL)
                 break;
-
-            ntStatus = NtQueryDirectoryObject(directoryHandle,
-                directoryEntry,
-                rLength,
-                TRUE,
-                FALSE,
-                &queryContext,
-                &rLength);
-
-            if (!NT_SUCCESS(ntStatus)) {
-                supHeapFree(directoryEntry);
-                break;
-            }
 
             if (RtlEqualUnicodeString(
                 &directoryEntry->TypeName,
@@ -361,13 +385,12 @@ VOID xxxListObjectDirectoryTree(
                     ViewRootHandle,
                     prevItem);
             }
-
             supHeapFree(directoryEntry);
-
         } while (TRUE);
     }
     __finally {
         NtClose(directoryHandle);
+        supEnableRedraw(g_hwndObjectTree);
     }
 }
 
@@ -454,10 +477,8 @@ VOID AddListViewItem(
 
     RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
 
-    //
     // Special case for symbolic links as their link targets must be normalized before output.
-    // Do not bFound to TRUE so we will fall through the end of routine.
-    //
+    // Do not set bFound to TRUE so we will fall through the end of routine.
     if (typeDesc->NameHash == OBTYPE_HASH_SYMBOLIC_LINK) {
 
         if (supResolveSymbolicLinkTargetNormalized(
@@ -476,61 +497,44 @@ VOID AddListViewItem(
 
     }
     else {
-
-        //
         // Look for object type in well known type names hashes.
         // If found - query information for additional description field.
-        //
-
         switch (typeDesc->NameHash) {
-
         case OBTYPE_HASH_SECTION:
-
             bFound = supQuerySectionFileInfo(RootDirectoryHandle,
                 &Entry->Name,
                 szBuffer,
                 MAX_PATH);
-
             break;
 
         case OBTYPE_HASH_DRIVER:
-
             bFound = supQueryDriverDescription(objectName.Buffer,
                 szBuffer,
                 MAX_PATH);
-
             break;
 
         case OBTYPE_HASH_DEVICE:
-
-            bFound = supQueryDeviceDescription(NULL, 
+            bFound = supQueryDeviceDescription(NULL,
                 &Entry->Name,
                 szBuffer,
                 MAX_PATH);
-
             break;
 
         case OBTYPE_HASH_WINSTATION:
-
             bFound = supQueryWinstationDescription(objectName.Buffer,
                 szBuffer,
                 MAX_PATH);
-
             break;
 
         case OBTYPE_HASH_TYPE:
-
             bFound = supQueryTypeInfo(&Entry->Name,
                 szBuffer,
                 MAX_PATH);
-
             break;
         }
     }
 
-    //
     // Finally add information column if something found.
-    //
     if (bFound != FALSE) {
         lvItem.mask = LVIF_TEXT;
         lvItem.iSubItem = 2;
@@ -556,7 +560,6 @@ VOID xxxListCurrentDirectoryObjects(
     _In_ OBEX_ITEM* Parent
 )
 {
-    NTSTATUS ntStatus;
     ULONG queryContext = 0, rLength;
     HANDLE directoryHandle = NULL;
     UNICODE_STRING usDirectoryName;
@@ -573,68 +576,23 @@ VOID xxxListCurrentDirectoryObjects(
     if (directoryHandle == NULL)
         return;
 
-    supListViewEnableRedraw(g_hwndObjectList, FALSE);
+    supDisableRedraw(g_hwndObjectList);
 
     do {
-
-        //
-        // Wine implementation of NtQueryDirectoryObject interface is very basic and incomplete.
-        // It doesn't work if no input buffer specified and does not return required buffer size.
-        //
-        if (g_WinObj.IsWine) {
-            rLength = 1024 * 64;
-        }
-        else {
-
-            rLength = 0;
-
-            ntStatus = NtQueryDirectoryObject(
-                directoryHandle,
-                NULL,
-                0,
-                TRUE,
-                FALSE,
-                &queryContext,
-                &rLength);
-
-            if (ntStatus != STATUS_BUFFER_TOO_SMALL)
-                break;
-        }
-
-        infoBuffer = (POBJECT_DIRECTORY_INFORMATION)supHeapAlloc((SIZE_T)rLength);
+        infoBuffer = ObQueryObjectDirectory(directoryHandle, &queryContext, g_WinObj.IsWine, &rLength);
         if (infoBuffer) {
-
-            ntStatus = NtQueryDirectoryObject(
-                directoryHandle,
-                infoBuffer,
-                rLength,
-                TRUE,
-                FALSE,
-                &queryContext,
-                &rLength);
-
-            if (NT_SUCCESS(ntStatus)) {
-                AddListViewItem(HeapHandle, directoryHandle, infoBuffer, Parent);
-            }
-            else {
-                supHeapFree(infoBuffer);
-                break;
-            }
-
+            AddListViewItem(HeapHandle, directoryHandle, infoBuffer, Parent);
             supHeapFree(infoBuffer);
-
         }
         else {
             break;
         }
-
     } while (TRUE);
 
-    supListViewEnableRedraw(g_hwndObjectList, TRUE);
+    supEnableRedraw(g_hwndObjectList);
 
     NtClose(directoryHandle);
 }
-
 
 /*
 * ListCurrentDirectoryObjects
@@ -663,6 +621,14 @@ VOID ListCurrentDirectoryObjects(
     }
 }
 
+/*
+* AllocateFoundItem
+*
+* Purpose:
+*
+* Allocate item for search dialog results.
+*
+*/
 PFO_LIST_ITEM AllocateFoundItem(
     _In_ PFO_LIST_ITEM Previous,
     _In_ PUNICODE_STRING DirectoryName,
@@ -670,72 +636,45 @@ PFO_LIST_ITEM AllocateFoundItem(
 )
 {
     PFO_LIST_ITEM Item;
-    SIZE_T BufferLength, TypeNameOffset;
-    PWCH String, StringBuffer;
+    SIZE_T BufferLength;
+    UNICODE_STRING fullPath;
 
-    BufferLength = sizeof(FO_LIST_ITEM) +
-        InfoBuffer->Name.Length +
-        InfoBuffer->TypeName.Length +
-        DirectoryName->Length +
-        OBJ_NAME_PATH_SEPARATOR_SIZE +
-        2 * sizeof(UNICODE_NULL);
-
-    Item = (PFO_LIST_ITEM)supHeapAlloc(BufferLength);
-    if (Item == NULL) {
+    // Calculate the full objectname path and store it in fullPath
+    RtlInitEmptyUnicodeString(&fullPath, NULL, 0);
+    if (!AppendDirectoryPath(DirectoryName, &InfoBuffer->Name, &fullPath)) {
         return NULL;
     }
 
+    // Allocate memory for the item structure and string data
+    BufferLength = sizeof(FO_LIST_ITEM) +
+        fullPath.MaximumLength +
+        InfoBuffer->TypeName.Length + sizeof(UNICODE_NULL);
+
+    Item = (PFO_LIST_ITEM)supHeapAlloc(BufferLength);
+    if (Item == NULL) {
+        supHeapFree(fullPath.Buffer);
+        return NULL;
+    }
+
+    // Setup the item
     Item->Prev = Previous;
+
+    // Set up the ObjectName
     Item->ObjectName.Buffer = (PWSTR)Item->NameBuffer;
+    Item->ObjectName.Length = fullPath.Length;
+    Item->ObjectName.MaximumLength = fullPath.MaximumLength;
+    RtlCopyMemory(Item->ObjectName.Buffer, fullPath.Buffer, fullPath.Length);
+    Item->ObjectName.Buffer[fullPath.Length / sizeof(WCHAR)] = UNICODE_NULL;
 
-    TypeNameOffset = (SIZE_T)DirectoryName->Length +
-        (SIZE_T)InfoBuffer->Name.Length +
-        OBJ_NAME_PATH_SEPARATOR_SIZE +
-        sizeof(UNICODE_NULL);
+    // Set up the ObjectType
+    Item->ObjectType.Buffer = (PWSTR)(Item->NameBuffer + (fullPath.MaximumLength / sizeof(WCHAR)));
+    Item->ObjectType.Length = InfoBuffer->TypeName.Length;
+    Item->ObjectType.MaximumLength = InfoBuffer->TypeName.Length + sizeof(UNICODE_NULL);
+    RtlCopyMemory(Item->ObjectType.Buffer, InfoBuffer->TypeName.Buffer, InfoBuffer->TypeName.Length);
+    Item->ObjectType.Buffer[InfoBuffer->TypeName.Length / sizeof(WCHAR)] = UNICODE_NULL;
 
-    //
-    // Copy ObjectName.
-    //
-    Item->ObjectType.Buffer = (PWSTR)RtlOffsetToPointer(Item->NameBuffer, TypeNameOffset);
-    StringBuffer = Item->ObjectName.Buffer;
-    String = StringBuffer;
-
-    RtlCopyMemory(String, DirectoryName->Buffer, DirectoryName->Length);
-    String = (PWCH)RtlOffsetToPointer(Item->ObjectName.Buffer, DirectoryName->Length);
-
-    //
-    // Add separator if not root.
-    //
-    if (!supIsRootDirectory(DirectoryName))
-        *String++ = OBJ_NAME_PATH_SEPARATOR;
-
-    RtlCopyMemory(String, InfoBuffer->Name.Buffer, InfoBuffer->Name.Length);
-    String = (PWCH)RtlOffsetToPointer(String, InfoBuffer->Name.Length);
-    *String++ = UNICODE_NULL;
-
-    //
-    // Set new Length/MaximumLength to ObjectName.
-    //
-    BufferLength = (USHORT)((ULONG_PTR)String - (ULONG_PTR)StringBuffer);
-    Item->ObjectName.Length = (USHORT)BufferLength - sizeof(WCHAR);
-    Item->ObjectName.MaximumLength = (USHORT)BufferLength;
-
-    //
-    // Copy ObjectType.
-    //
-    StringBuffer = Item->ObjectType.Buffer;
-    String = StringBuffer;
-
-    RtlCopyMemory(String, InfoBuffer->TypeName.Buffer, InfoBuffer->TypeName.Length);
-    String = (PWCH)RtlOffsetToPointer(String, InfoBuffer->TypeName.Length);
-    *String++ = UNICODE_NULL;
-
-    //
-    // Set new Length/MaximumLength to ObjectType.
-    //
-    BufferLength = (USHORT)((ULONG_PTR)String - (ULONG_PTR)StringBuffer);
-    Item->ObjectType.Length = (USHORT)BufferLength - sizeof(WCHAR);
-    Item->ObjectType.MaximumLength = (USHORT)BufferLength;
+    // Free temporary buffer
+    supHeapFree(fullPath.Buffer);
 
     return Item;
 }
@@ -755,16 +694,13 @@ VOID FindObject(
     _In_ PFO_LIST_ITEM* List
 )
 {
-    NTSTATUS status;
     ULONG ctx, rlen;
     HANDLE directoryHandle = NULL;
 
-    PFO_LIST_ITEM Item;
-    SIZE_T NameSize, BufferLength;
-    PWCH ObjectName, String;
-    UNICODE_STRING SubDirectory;
+    PFO_LIST_ITEM item;
+    UNICODE_STRING subDirectory;
 
-    POBJECT_DIRECTORY_INFORMATION InfoBuffer;
+    POBJECT_DIRECTORY_INFORMATION infoBuffer;
 
     supOpenDirectoryEx(&directoryHandle, NULL, DirectoryName, DIRECTORY_QUERY);
     if (directoryHandle == NULL)
@@ -772,113 +708,56 @@ VOID FindObject(
 
     ctx = 0;
     do {
-        //
-        // Wine implementation of NtQueryDirectoryObject interface is very basic and incomplete.
-        // It doesn't work if no input buffer specified and does not return required buffer size.
-        //
-        if (g_WinObj.IsWine != FALSE) {
-            rlen = 1024 * 64;
-        }
-        else {
-            rlen = 0;
-            status = NtQueryDirectoryObject(directoryHandle, NULL, 0, TRUE, FALSE, &ctx, &rlen);
-            if (status != STATUS_BUFFER_TOO_SMALL)
-                break;
-        }
-
-        InfoBuffer = (POBJECT_DIRECTORY_INFORMATION)supHeapAlloc((SIZE_T)rlen);
-        if (InfoBuffer == NULL)
+        infoBuffer = ObQueryObjectDirectory(directoryHandle, &ctx, g_WinObj.IsWine, &rlen);
+        if (!infoBuffer)
             break;
-
-        status = NtQueryDirectoryObject(directoryHandle, InfoBuffer, rlen, TRUE, FALSE, &ctx, &rlen);
-        if (!NT_SUCCESS(status)) {
-            supHeapFree(InfoBuffer);
-            break;
-        }
 
         if (TypeName) {
-
-            if (RtlEqualUnicodeString(&InfoBuffer->TypeName, TypeName, TRUE)) {
-
+            if (RtlEqualUnicodeString(&infoBuffer->TypeName, TypeName, TRUE)) {
                 if (NameSubstring) {
-
-                    if (ULLONG_MAX != supFindUnicodeStringSubString(&InfoBuffer->Name, NameSubstring)) {
-                        Item = AllocateFoundItem(*List, DirectoryName, InfoBuffer);
-                        if (Item == NULL)
-                            break;
-
-                        *List = Item;
+                    if (ULLONG_MAX != supFindUnicodeStringSubString(&infoBuffer->Name, NameSubstring)) {
+                        item = AllocateFoundItem(*List, DirectoryName, infoBuffer);
+                        if (item) *List = item;
                     }
                 }
                 else {
-                    Item = AllocateFoundItem(*List, DirectoryName, InfoBuffer);
-                    if (Item == NULL)
-                        break;
-
-                    *List = Item;
-                }
-
-            }
-
-        }
-        else { 
-            if (NameSubstring) {
-                if (ULLONG_MAX != supFindUnicodeStringSubString(&InfoBuffer->Name, NameSubstring)) {
-                    Item = AllocateFoundItem(*List, DirectoryName, InfoBuffer);
-                    if (Item == NULL)
-                        break;
-
-                    *List = Item;
+                    item = AllocateFoundItem(*List, DirectoryName, infoBuffer);
+                    if (item) *List = item;
                 }
             }
-            else {
-                Item = AllocateFoundItem(*List, DirectoryName, InfoBuffer);
-                if (Item == NULL)
-                    break;
-
-                *List = Item;
+        }
+        else if (NameSubstring) {
+            // Only name substring specified - check for substring
+            if (ULLONG_MAX != supFindUnicodeStringSubString(&infoBuffer->Name, NameSubstring)) {
+                item = AllocateFoundItem(*List, DirectoryName, infoBuffer);
+                if (item) *List = item;
             }
         }
+        else {
+            // No filter specified - add all objects
+            item = AllocateFoundItem(*List, DirectoryName, infoBuffer);
+            if (item) *List = item;
+        }
 
-        //
         // If this is directory, go inside.
-        //
-        if (RtlEqualUnicodeString(&InfoBuffer->TypeName,
+        RtlInitEmptyUnicodeString(&subDirectory, NULL, 0);
+        if (RtlEqualUnicodeString(&infoBuffer->TypeName,
             ObGetPredefinedUnicodeString(OBP_DIRECTORY),
             TRUE))
         {
-            NameSize = (SIZE_T)InfoBuffer->Name.Length +
-                (SIZE_T)DirectoryName->Length +
-                OBJ_NAME_PATH_SEPARATOR_SIZE +
-                sizeof(UNICODE_NULL);
+            if (subDirectory.Buffer) {
+                supHeapFree(subDirectory.Buffer);
+                subDirectory.Buffer = NULL;
+            }
 
-            ObjectName = (PWCH)supHeapAlloc(NameSize);
-            if (ObjectName != NULL) {
-
-                String = ObjectName;
-
-                RtlCopyMemory(String, DirectoryName->Buffer, DirectoryName->Length);
-                String = (PWCH)RtlOffsetToPointer(String, DirectoryName->Length);
-
-                if (!supIsRootDirectory(DirectoryName))
-                    *String++ = OBJ_NAME_PATH_SEPARATOR;
-
-                RtlCopyMemory(String, InfoBuffer->Name.Buffer, InfoBuffer->Name.Length);
-                String = (PWCH)RtlOffsetToPointer(String, InfoBuffer->Name.Length);
-                *String++ = UNICODE_NULL;
-
-                BufferLength = (USHORT)((ULONG_PTR)String - (ULONG_PTR)ObjectName);
-                SubDirectory.Length = (USHORT)BufferLength - sizeof(WCHAR);
-                SubDirectory.MaximumLength = (USHORT)BufferLength;
-                SubDirectory.Buffer = ObjectName;
-
-                FindObject(&SubDirectory, NameSubstring, TypeName, List);
-
-                supHeapFree(ObjectName);
+            if (AppendDirectoryPath(DirectoryName, &infoBuffer->Name, &subDirectory)) {
+                FindObject(&subDirectory, NameSubstring, TypeName, List);
+                supHeapFree(subDirectory.Buffer);
+                subDirectory.Buffer = NULL;
             }
         }
 
-        supHeapFree(InfoBuffer);
+        supHeapFree(infoBuffer);
 
     } while (TRUE);
 

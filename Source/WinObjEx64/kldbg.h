@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2024
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     2.05
+*  VERSION:     2.08
 *
-*  DATE:        07 Jun 2024
+*  DATE:        11 Jun 2025
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -523,6 +523,12 @@ _Success_(return)
 BOOL ObQueryFullNamespacePath(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PUNICODE_STRING Path);
+
+POBJECT_DIRECTORY_INFORMATION ObQueryObjectDirectory(
+    _In_ HANDLE DirectoryHandle,
+    _Inout_ PULONG Context,
+    _In_ BOOL IsWine,
+    _Out_ PULONG ReturnLength);
 
 PVOID kdCreateObjectTypesList(
     VOID);

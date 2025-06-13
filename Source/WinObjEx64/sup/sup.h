@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2024
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     2.05
+*  VERSION:     2.08
 *
-*  DATE:        07 Jun 2024
+*  DATE:        11 Jun 2025
 *
 *  Common header file for the program support routines.
 *
@@ -403,8 +403,11 @@ BOOL supHeapFree(
 #define supPrivilegeEnabled ntsupPrivilegeEnabled
 #define supIsObjectExists ntsupIsObjectExists
 #define supIsKdEnabled ntsupIsKdEnabled
-#define supListViewEnableRedraw(ListView, fEnable) SendMessage(ListView, WM_SETREDRAW, (WPARAM)fEnable, (LPARAM)0)
 #define supIsLxssAvailable() ntsupIsObjectExists(TEXT("\\Device"), TEXT("Lxss"))
+#define supDisableRedraw(hwnd) SendMessage((hwnd), WM_SETREDRAW, (WPARAM)FALSE, 0)
+#define supEnableRedraw(hwnd) SendMessage((hwnd), WM_SETREDRAW, (WPARAM)TRUE, 0); \
+    InvalidateRect((hwnd), NULL, TRUE); \
+    UpdateWindow(hwnd)
 
 //
 // NTSUP defines for common information query

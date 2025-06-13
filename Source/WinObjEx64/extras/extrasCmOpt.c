@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASCMOPT.C
 *
-*  VERSION:     2.07
+*  VERSION:     2.08
 *
-*  DATE:        01 Jun 2025
+*  DATE:        10 Jun 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -524,7 +524,7 @@ VOID CmOptDlgListOptions(
     else
         size = sizeof(CM_SYSTEM_CONTROL_VECTOR_V1);
 
-    supListViewEnableRedraw(hwndList, FALSE);
+    supDisableRedraw(hwndList);
 
     while (CmControlVector.Version.v1->KeyPath != NULL) {
         CmpOptDlgAddEntry(hwndList, CmControlVector.Ref, size, (Context->Reserved != 0));
@@ -535,7 +535,7 @@ VOID CmOptDlgListOptions(
         &CmOptDlgCompareFunc,
         (LPARAM)Context);
 
-    supListViewEnableRedraw(hwndList, TRUE);
+    supEnableRedraw(hwndList);
 
     _strcpy(szBuffer, TEXT("Total: "));
     ultostr(ListView_GetItemCount(Context->ListView), _strend(szBuffer));

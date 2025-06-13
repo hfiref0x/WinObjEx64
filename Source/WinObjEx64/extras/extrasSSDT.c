@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     2.07
+*  VERSION:     2.08
 *
-*  DATE:        11 May 2025
+*  DATE:        11 Jun 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1228,9 +1228,9 @@ VOID SdtDlgOnInit(
 
         SendMessage(hwndDlg, WM_SIZE, 0, 0);
 
-        supListViewEnableRedraw(pDlgContext->ListView, FALSE);
+        supDisableRedraw(pDlgContext->ListView);
         SdtListCreate(pDlgContext->hwndDlg, FALSE, pDlgContext);
-        supListViewEnableRedraw(pDlgContext->ListView, TRUE);
+        supEnableRedraw(pDlgContext->ListView);
     }
 }
 
@@ -1322,9 +1322,9 @@ INT_PTR CALLBACK SdtDialogProc(
         case ID_VIEW_REFRESH:
             pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
             if (pDlgContext) {
-                supListViewEnableRedraw(pDlgContext->ListView, FALSE);
+                supDisableRedraw(pDlgContext->ListView);
                 SdtListCreate(hwndDlg, TRUE, pDlgContext);
-                supListViewEnableRedraw(pDlgContext->ListView, TRUE);
+                supEnableRedraw(pDlgContext->ListView);
             }
             break;
 

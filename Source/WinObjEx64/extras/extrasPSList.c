@@ -945,6 +945,8 @@ DWORD WINAPI CreateThreadListProc(
 
     DWORD dwWaitResult;
 
+    supDisableRedraw(PsDlgContext.ListView);
+
     __try {
 
         dwWaitResult = WaitForSingleObject(g_PsListWait, INFINITE);
@@ -1003,8 +1005,6 @@ DWORD WINAPI CreateThreadListProc(
 
             SortedHandleList = supHandlesCreateFilteredAndSortedList(GetCurrentProcessId(), FALSE);
             stlptr = stl;
-
-            supListViewEnableRedraw(PsDlgContext.ListView, FALSE);
 
             for (i = 0; i < ThreadCount; i++, stlptr++) {
 
@@ -1138,8 +1138,6 @@ DWORD WINAPI CreateThreadListProc(
                 PsListCompareFunc,
                 PsDlgContext.lvColumnToSort);
 
-            supListViewEnableRedraw(PsDlgContext.ListView, TRUE);
-
         }
     }
     __finally {
@@ -1156,6 +1154,7 @@ DWORD WINAPI CreateThreadListProc(
         supSetWaitCursor(FALSE);
 
         ReleaseMutex(g_PsListWait);
+        supEnableRedraw(PsDlgContext.ListView);
     }
 
     return 0;

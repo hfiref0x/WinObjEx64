@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.08
 *
-*  DATE:        07 Jun 2025
+*  DATE:        11 Jun 2025
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -2529,6 +2529,56 @@ BOOL ObQueryFullNamespacePath(
     }
 
     return bResult;
+}
+
+/*
+* ObQueryObjectDirectory
+*
+* Purpose:
+*
+* Helper function to query directory objects with proper buffer allocation.
+* Returns allocated buffer with directory information or NULL on failure.
+*
+*/
+POBJECT_DIRECTORY_INFORMATION ObQueryObjectDirectory(
+    _In_ HANDLE DirectoryHandle,
+    _Inout_ PULONG Context,
+    _In_ BOOL IsWine,
+    _Out_ PULONG ReturnLength
+)
+{
+    NTSTATUS status;
+    ULONG bufferSize;
+    POBJECT_DIRECTORY_INFORMATION buffer = NULL;
+
+    // Wine has a different implementation, use fixed buffer size
+    if (IsWine) {
+        bufferSize = 1024 * 64;
+    }
+    else {
+        // Request required buffer length for non-Wine systems
+        bufferSize = 0;
+        status = NtQueryDirectoryObject(DirectoryHandle, NULL, 0, TRUE, FALSE, Context, &bufferSize);
+        if (status != STATUS_BUFFER_TOO_SMALL) {
+            if (ReturnLength)
+                *ReturnLength = bufferSize;
+            return NULL;
+        }
+    }
+
+    buffer = (POBJECT_DIRECTORY_INFORMATION)supHeapAlloc((SIZE_T)bufferSize);
+    if (buffer) {
+        status = NtQueryDirectoryObject(DirectoryHandle, buffer, bufferSize, TRUE, FALSE, Context, &bufferSize);
+        if (!NT_SUCCESS(status)) {
+            supHeapFree(buffer);
+            buffer = NULL;
+        }
+    }
+
+    if (ReturnLength)
+        *ReturnLength = bufferSize;
+
+    return buffer;
 }
 
 /*

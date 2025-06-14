@@ -4,9 +4,9 @@
 *
 *  TITLE:       OBJECTS.C
 *
-*  VERSION:     2.07
+*  VERSION:     2.08
 *
-*  DATE:        11 May 2025
+*  DATE:        13 Jun 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -101,6 +101,9 @@ WOBJ_TYPE_DESC g_TypeWaitablePort = { L"WaitablePort", 0x66debaf0, ObjectTypeWai
 WOBJ_TYPE_DESC g_TypeWaitCompletionPacket = { L"WaitCompletionPacket", 0xdaa80e19, ObjectTypeWaitCompletionPacket, IDI_ICON_WAITCOMPLETIONPACKET, IDS_DESC_WAITCOMPLETIONPACKET };
 WOBJ_TYPE_DESC g_TypeWinstation = { L"WindowStation", OBTYPE_HASH_WINSTATION, ObjectTypeWinstation, IDI_ICON_WINSTATION, IDS_DESC_WINSTATION };
 WOBJ_TYPE_DESC g_TypeWmiGuid = { L"WmiGuid", 0x36d9823c, ObjectTypeWMIGuid, IDI_ICON_WMIGUID, IDS_DESC_WMIGUID };
+
+// Maximum object type index value for lookup table sizing
+#define MAX_OBJECT_TYPE_INDEX    ObjectTypeUnknown
 
 #define OBJECT_TYPE_ENTRIES \
     X(g_TypeActivationObject) \
@@ -200,6 +203,22 @@ static WOBJ_TYPE_DESC* gpObjectTypes[] = {
 //
 ULONG g_ObjectTypesCount = RTL_NUMBER_OF(gpObjectTypes);
 
+// Lookup table for access by type index
+static WOBJ_TYPE_DESC* g_TypeIndexLookup[MAX_OBJECT_TYPE_INDEX + 1];
+
+// Hash table for common type names (most frequently accessed)
+typedef struct _OBTYPE_HASH_ENTRY {
+    ULONG NameHash;
+    WOBJ_TYPE_DESC* TypeDesc;
+} OBTYPE_HASH_ENTRY, * POBTYPE_HASH_ENTRY;
+
+// Hashtable for frequently looked up types
+#define HASH_TABLE_SIZE 64
+static OBTYPE_HASH_ENTRY g_TypeHashTable[HASH_TABLE_SIZE];
+
+// Flag indicating if lookup tables have been initialized
+static BOOLEAN g_LookupTablesInitialized = FALSE;
+
 /*
 * ObManagerComparerName
 *
@@ -223,6 +242,42 @@ INT ObManagerComparerName(
 }
 
 /*
+* ObManagerInitLookupTables
+*
+* Purpose:
+*
+* Initialize lookup tables for faster object type searching.
+*
+*/
+VOID ObManagerInitLookupTables(VOID)
+{
+    ULONG i, hashIndex;
+    WOBJ_OBJECT_TYPE typeIndex;
+
+    if (g_LookupTablesInitialized)
+        return;
+
+    RtlSecureZeroMemory(g_TypeIndexLookup, sizeof(g_TypeIndexLookup));
+    RtlSecureZeroMemory(g_TypeHashTable, sizeof(g_TypeHashTable));
+
+    // Fill lookup tables
+    for (i = 0; i < g_ObjectTypesCount; i++) {
+        typeIndex = gpObjectTypes[i]->Index;
+        if (typeIndex >= 0 && (ULONG)typeIndex <= MAX_OBJECT_TYPE_INDEX) {
+            g_TypeIndexLookup[typeIndex] = gpObjectTypes[i];
+        }
+
+        if (gpObjectTypes[i]->NameHash != 0) {
+            hashIndex = gpObjectTypes[i]->NameHash % HASH_TABLE_SIZE;
+            g_TypeHashTable[hashIndex].NameHash = gpObjectTypes[i]->NameHash;
+            g_TypeHashTable[hashIndex].TypeDesc = gpObjectTypes[i];
+        }
+    }
+
+    g_LookupTablesInitialized = TRUE;
+}
+
+/*
 * ObManagerGetNameByIndex
 *
 * Purpose:
@@ -234,11 +289,13 @@ LPWSTR ObManagerGetNameByIndex(
     _In_ WOBJ_OBJECT_TYPE TypeIndex
 )
 {
-    ULONG nIndex;
+    if (!g_LookupTablesInitialized)
+        ObManagerInitLookupTables();
 
-    for (nIndex = 0; nIndex < g_ObjectTypesCount; nIndex++) {
-        if (gpObjectTypes[nIndex]->Index == TypeIndex)
-            return gpObjectTypes[nIndex]->Name;
+    if (TypeIndex >= 0 && (ULONG)TypeIndex <= MAX_OBJECT_TYPE_INDEX &&
+        g_TypeIndexLookup[TypeIndex] != NULL)
+    {
+        return g_TypeIndexLookup[TypeIndex]->Name;
     }
 
     return OBTYPE_NAME_UNKNOWN;
@@ -256,14 +313,41 @@ WOBJ_TYPE_DESC* ObManagerGetEntryByTypeIndex(
     _In_ WOBJ_OBJECT_TYPE TypeIndex
 )
 {
-    ULONG i;
+    if (!g_LookupTablesInitialized)
+        ObManagerInitLookupTables();
 
-    for (i = 0; i < g_ObjectTypesCount; i++) {
-        if (gpObjectTypes[i]->Index == TypeIndex)
-            return gpObjectTypes[i];
+    if (TypeIndex >= 0 && (ULONG)TypeIndex <= MAX_OBJECT_TYPE_INDEX &&
+        g_TypeIndexLookup[TypeIndex] != NULL)
+    {
+        return g_TypeIndexLookup[TypeIndex];
     }
 
     return &g_TypeUnknown;
+}
+
+/*
+* ObManagerLookupByHash
+*
+* Purpose:
+*
+* Fast lookup by hash value.
+*
+*/
+WOBJ_TYPE_DESC* ObManagerLookupByHash(
+    _In_ ULONG NameHash
+)
+{
+    ULONG hashIndex;
+
+    if (NameHash == 0)
+        return NULL;
+
+    hashIndex = NameHash % HASH_TABLE_SIZE;
+
+    if (g_TypeHashTable[hashIndex].NameHash == NameHash)
+        return g_TypeHashTable[hashIndex].TypeDesc;
+
+    return NULL;
 }
 
 /*
@@ -281,11 +365,25 @@ WOBJ_TYPE_DESC* ObManagerGetEntryByTypeName(
     WOBJ_TYPE_DESC searchItem;
     WOBJ_TYPE_DESC* result;
     PVOID lookupItem;
+    ULONG nameHash;
 
     if (lpTypeName == NULL) {
         return &g_TypeUnknown;
     }
 
+    if (!g_LookupTablesInitialized)
+        ObManagerInitLookupTables();
+
+    // Try fast lookup by hash first
+    nameHash = supHashString(lpTypeName, (ULONG)_strlen(lpTypeName));
+    result = ObManagerLookupByHash(nameHash);
+    if (result != NULL) {
+        // Verify name matches (in case of hash collision)
+        if (_strcmpi(result->Name, lpTypeName) == 0)
+            return result;
+    }
+
+    // Fall back to binary search
     searchItem.Name = (LPWSTR)lpTypeName;
 
     lookupItem = supBSearch((PCVOID)&searchItem,
@@ -381,8 +479,12 @@ HIMAGELIST ObManagerLoadImageList(
     VOID
 )
 {
-    UINT       i;
+    UINT i;
     HIMAGELIST ImageList;
+    HICON hIcon;
+
+    if (!g_LookupTablesInitialized)
+        ObManagerInitLookupTables();
 
     ImageList = ImageList_Create(
         16,
@@ -391,19 +493,27 @@ HIMAGELIST ObManagerLoadImageList(
         g_ObjectTypesCount,
         8);
 
-    if (ImageList) {
+    if (!ImageList)
+        return NULL;
 
-        for (i = 0; i < g_ObjectTypesCount; i++) {
+    for (i = 0; i < g_ObjectTypesCount; i++) {
+        hIcon = (HICON)LoadImage(g_WinObj.hInstance,
+            MAKEINTRESOURCE(gpObjectTypes[i]->ResourceImageId),
+            IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR);
 
-            gpObjectTypes[i]->ImageIndex = ObManagerLoadImageForType(ImageList,
-                gpObjectTypes[i]->ResourceImageId);
-
+        if (hIcon) {
+            gpObjectTypes[i]->ImageIndex = ImageList_AddIcon(ImageList, hIcon);
+            DestroyIcon(hIcon);
         }
-
-        g_TypeUnknown.ImageIndex = ObManagerLoadImageForType(ImageList,
-            g_TypeUnknown.ResourceImageId);
-
+        else {
+            gpObjectTypes[i]->ImageIndex = I_IMAGENONE;
+        }
     }
+
+    // Load the unknown type icon
+    g_TypeUnknown.ImageIndex = ObManagerLoadImageForType(ImageList,
+        g_TypeUnknown.ResourceImageId);
+
     return ImageList;
 }
 

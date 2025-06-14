@@ -1,6 +1,6 @@
 /*++
 
-Copyright (c) 2015 (see AUTHORS.txt).
+Copyright (c) 2015-2025 (see AUTHORS.txt).
 
 Module Name:
 
@@ -10,7 +10,7 @@ Abstract:
 
     Set of functions used with tab component.
 
-    VERSION 2.0 (01.02.2015)
+    VERSION 2.1 (08.06.2025)
 
     WinObjEx64 version.
 
@@ -19,6 +19,14 @@ Abstract:
 #define OEMRESOURCE
 #include "tabsctrl.h"
 
+/*
+* TabDefaultWndProc
+*
+* Purpose:
+*
+* Default empty window procedure for tab pages.
+*
+*/
 INT_PTR CALLBACK TabDefaultWndProc(
     _In_ HWND hwnd,
     _In_ UINT uMsg,
@@ -33,7 +41,14 @@ INT_PTR CALLBACK TabDefaultWndProc(
     return 0;
 }
 
-//resize window handler
+/*
+* TabResizeTabWindow
+*
+* Purpose:
+*
+* Resize the tab control and its content window.
+*
+*/
 VOID TabResizeTabWindow(
     _In_ PTABHDR hdr
 )
@@ -63,6 +78,16 @@ VOID TabResizeTabWindow(
         hdr->OnResize(hdr);
 }
 
+/*
+* TabGetItem
+*
+* Purpose:
+*
+* Find tab entry by index.
+*
+* Returns NULL if not found.
+*
+*/
 PTABENTRY TabGetItem(
     _In_ PTABHDR hdr,
     _In_ INT nIndex
@@ -83,7 +108,14 @@ PTABENTRY TabGetItem(
     return NULL;
 }
 
-//on tab selection change proc
+/*
+* TabOnSelChanged
+*
+* Purpose:
+*
+* Handle tab selection change event.
+*
+*/
 VOID TabOnSelChanged(
     _In_ PTABHDR hdr
 )
@@ -121,27 +153,45 @@ VOID TabOnSelChanged(
 
 }
 
+/*
+* TabDestroyControl
+*
+* Purpose:
+*
+* Destroy tab control and free all resources.
+*
+*/
 VOID TabDestroyControl(
     _In_ PTABHDR hdr
 )
 {
     PTABENTRY tabEntry;
-    PLIST_ENTRY Entry;
+    PLIST_ENTRY entry;
     TABCALLBACK_FREEMEM pFree;
 
     if (hdr) {
         pFree = hdr->FreeMem;
-        Entry = hdr->tabsHead.Flink;
+        entry = hdr->tabsHead.Flink;
 
-        while ((Entry != NULL) && (Entry != &hdr->tabsHead)) {
-            tabEntry = CONTAINING_RECORD(Entry, TABENTRY, ListEntry);
-            Entry = Entry->Flink;
+        while ((entry != NULL) && (entry != &hdr->tabsHead)) {
+            tabEntry = CONTAINING_RECORD(entry, TABENTRY, ListEntry);
+            entry = entry->Flink;
             pFree(tabEntry);
         }
         pFree(hdr);
     }
 }
 
+/*
+* TabAddPage
+*
+* Purpose:
+*
+* Add a new page to the tab control.
+*
+* Returns TRUE on success, FALSE otherwise.
+*
+*/
 BOOL TabAddPage(
     _In_ PTABHDR hdr,
     _In_ INT ResId,
@@ -161,6 +211,7 @@ BOOL TabAddPage(
 
     RtlSecureZeroMemory(&tie, sizeof(TC_ITEM));
     tie.mask = TCIF_TEXT;
+    tie.pszText = szCaption;
 
     if (hdr->hImageList != NULL) {
         tie.mask |= TCIF_IMAGE;
@@ -172,8 +223,6 @@ BOOL TabAddPage(
         tie.lParam = lParam;
     }
 
-    tie.pszText = szCaption;
-
     tabIndex = TabCtrl_InsertItem(hdr->hwndTab, hdr->tabsCount, &tie);
     if (tabIndex < 0) {
         hdr->FreeMem(tabEntry);
@@ -183,18 +232,24 @@ BOOL TabAddPage(
     tabEntry->TabIndex = tabIndex;
     hdr->tabsCount++;
 
-    if (DlgProc == NULL) {
-        tabEntry->DlgProc = (DLGPROC)&TabDefaultWndProc;
-    }
-    else {
-        tabEntry->DlgProc = DlgProc;
-    }
+    tabEntry->DlgProc = (DlgProc == NULL) ? (DLGPROC)&TabDefaultWndProc : DlgProc;
     tabEntry->ResId = ResId;
     tabEntry->UserParam = (PVOID)lParam;
+
     InsertHeadList(&hdr->tabsHead, &tabEntry->ListEntry);
     return TRUE;
 }
 
+/*
+* TabDeletePage
+*
+* Purpose:
+*
+* Delete a page from the tab control.
+*
+* Returns TRUE on success, FALSE otherwise.
+*
+*/
 BOOL TabDeletePage(
     _In_ PTABHDR hdr,
     _In_ INT TabIndex
@@ -221,6 +276,16 @@ BOOL TabDeletePage(
     return bResult;
 }
 
+/*
+* TabCreateControl
+*
+* Purpose:
+*
+* Create and initialize a new tab control.
+*
+* Returns pointer to TABHDR structure on success, NULL otherwise.
+*
+*/
 PTABHDR TabCreateControl(
     _In_ HINSTANCE hInstance,
     _In_ HWND hParentWnd,
@@ -252,13 +317,15 @@ PTABHDR TabCreateControl(
     SendMessage(hwndTab, WM_SETFONT, (WPARAM)GetStockObject(DEFAULT_GUI_FONT), 0);
 
     result = (PTABHDR)MemAlloc(sizeof(TABHDR));
-    if (result == NULL)
+    if (result == NULL) {
+        DestroyWindow(hwndTab);
         return NULL;
+    }
 
     dwDlgBase = GetDialogBaseUnits();
-
     result->cxMargin = LOWORD(dwDlgBase) / 4;
     result->cyMargin = HIWORD(dwDlgBase) / 8;
+
     result->hwndTab = hwndTab;
     result->hInstance = hInstance;
     result->tabsCount = 0;
@@ -293,22 +360,27 @@ PTABHDR TabCreateControl(
     return result;
 }
 
-//OnTabControlChange event handler
+/*
+* TabOnChangeTab
+*
+* Purpose:
+*
+* Handle tab control notification events.
+*
+*/
 VOID TabOnChangeTab(
     _In_ PTABHDR hdr,
     _In_ LPNMHDR pnmhdr
 )
 {
+    UINT TAB_SELECTION_CHANGE_NOTIFICATION = TCN_SELCHANGE;
     if ((pnmhdr == NULL) || (hdr == NULL))
         return;
 
     if (pnmhdr->hwndFrom != hdr->hwndTab)
         return;
 
-#pragma warning(push)
-#pragma warning(disable: 26454)
-    if (pnmhdr->code == TCN_SELCHANGE) {
-#pragma warning(pop)
+    if (pnmhdr->code == TAB_SELECTION_CHANGE_NOTIFICATION) {
         EnableWindow(hdr->hwndTab, FALSE);//lock change
         TabOnSelChanged(hdr); //call actual handler
         EnableWindow(hdr->hwndTab, TRUE); //unlock

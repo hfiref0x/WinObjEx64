@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2016 - 2024
+*  (C) COPYRIGHT AUTHORS, 2016 - 2025
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
-*  VERSION:     2.06
+*  VERSION:     2.08
 *
-*  DATE:        12 Dec 2024
+*  DATE:        12 Jun 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -841,7 +841,7 @@ VOID DrvListUnloadedDrivers(
         ListView_DeleteAllItems(hwndList);
     }
 
-    supListViewEnableRedraw(hwndList, FALSE);
+    supDisableRedraw(hwndList);
 
     if (!kdEnumerateMmUnloadedDrivers(
         (PENUMERATE_UNLOADED_DRIVERS_CALLBACK)DrvListCbEnumerateUnloadedDrivers,
@@ -858,7 +858,7 @@ VOID DrvListUnloadedDrivers(
         &DrvDlgCompareFunc,
         (LPARAM)Context);
 
-    supListViewEnableRedraw(hwndList, TRUE);
+    supEnableRedraw(hwndList);
 }
 
 /*
@@ -908,7 +908,7 @@ VOID DrvListDrivers(
     }
     g_cDrvFilters = supFilterCreateList(&g_DrvFilterListHead);
 
-    supListViewEnableRedraw(hwndList, FALSE);
+    supDisableRedraw(hwndList);
 
     for (i = 0; i < pModulesList->NumberOfModules; i++) {
 
@@ -1029,7 +1029,7 @@ VOID DrvListDrivers(
         &DrvDlgCompareFunc,
         (LPARAM)Context);
 
-    supListViewEnableRedraw(hwndList, TRUE);
+    supEnableRedraw(hwndList);
 
 }
 

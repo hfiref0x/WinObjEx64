@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020 - 2022
+*  (C) COPYRIGHT AUTHORS, 2020 - 2025
 *
 *  TITLE:       UI.C
 *
-*  VERSION:     1.10
+*  VERSION:     1.20
 *
-*  DATE:        11 Jun 2021
+*  DATE:        08 Jun 2025
 *
 *  WinObjEx64 ImageScope UI.
 *
@@ -1364,7 +1364,7 @@ VOID OnResize(
                 0,
                 r.right,
                 r.bottom - szr.bottom,
-                0);
+                SWP_NOACTIVATE | SWP_NOZORDER);
 
             TabResizeTabWindow(Context->TabHeader);
 

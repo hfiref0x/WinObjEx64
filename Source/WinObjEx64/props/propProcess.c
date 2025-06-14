@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       PROPPROCESS.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.08
 *
-*  DATE:        19 Jun 2022
+*  DATE:        12 Jun 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -551,13 +551,13 @@ VOID ProcessListSetInfo(
             enumContext.ObjectAddress = ObjectAddress;
             enumContext.ObjectTypeIndex = ObjectTypeIndex;
 
-            supListViewEnableRedraw(pDlgContext->ListView, FALSE);
+            supDisableRedraw(pDlgContext->ListView);
 
             supEnumHandleDump(pHandles,
                 (PENUMERATE_HANDLE_DUMP_CALLBACK)ProcessEnumHandlesCallback,
                 &enumContext);
 
-            supListViewEnableRedraw(pDlgContext->ListView, TRUE);
+            supEnableRedraw(pDlgContext->ListView);
 
             supHeapFree(pHandles);
             pHandles = NULL;

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       FINDDLG.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.08
 *
-*  DATE:        19 Jun 2022
+*  DATE:        12 Jun 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -15,6 +15,18 @@
 *
 *******************************************************************************/
 #include "global.h"
+
+// Define custom message for search completion
+#define WM_FINDOBJECT_SEARCHCOMPLETE (WM_USER + 100)
+
+// Search parameters structure
+typedef struct _FIND_SEARCH_PARAMS {
+    HWND hwndDlg;
+    BOOLEAN UseName;
+    BOOLEAN UseType;
+    WCHAR NameString[MAX_PATH * 2];
+    WCHAR TypeString[MAX_PATH * 2];
+} FIND_SEARCH_PARAMS, * PFIND_SEARCH_PARAMS;
 
 #define FINDDLG_TRACKSIZE_MIN_X 548
 #define FINDDLG_TRACKSIZE_MIN_Y 230
@@ -60,6 +72,12 @@ typedef struct _FINDDLG_CONTEXT {
     LONG dx11;
     LONG dx12;
     LONG dx13;
+
+    //
+    // Search state
+    //
+    BOOLEAN SearchCancelled;
+    HANDLE SearchThread;
 } FINDDLG_CONTEXT, * PFINDDLGCONTEXT;
 
 static FINDDLG_CONTEXT g_FindDlgContext;
@@ -79,37 +97,39 @@ VOID FindDlgAddTypes(
     ULONG  i;
     SIZE_T cbLen;
     LPWSTR lpType;
+    HWND hComboBox = GetDlgItem(hwnd, ID_SEARCH_TYPE);
 
     POBTYPE_LIST objectTypesList = g_kdctx.Data->ObjectTypesList;
     POBTYPE_ENTRY objectEntry;
 
-    SendDlgItemMessage(hwnd, ID_SEARCH_TYPE, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
+    SendMessage(hComboBox, CB_RESETCONTENT, 0, 0);
 
     if (objectTypesList == NULL) {
-        SendDlgItemMessage(hwnd, ID_SEARCH_TYPE, CB_ADDSTRING, (WPARAM)0, (LPARAM)L"*");
-        SendDlgItemMessage(hwnd, ID_SEARCH_TYPE, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
+        SendMessage(hComboBox, CB_ADDSTRING, 0, (LPARAM)L"*");
+        SendMessage(hComboBox, CB_SETCURSEL, 0, 0);
         return;
     }
 
-    for (i = 0; i < objectTypesList->NumberOfTypes; i++) {
+    supDisableRedraw(hComboBox);
 
+    for (i = 0; i < objectTypesList->NumberOfTypes; i++) {
         objectEntry = &objectTypesList->Types[i];
         cbLen = objectEntry->TypeName->MaximumLength + sizeof(UNICODE_NULL);
         lpType = (LPWSTR)supHeapAlloc(cbLen);
         if (lpType) {
-
             _strncpy(lpType,
                 cbLen / sizeof(WCHAR),
                 objectEntry->TypeName->Buffer,
                 objectEntry->TypeName->Length / sizeof(WCHAR));
 
-            SendDlgItemMessage(hwnd, ID_SEARCH_TYPE, CB_ADDSTRING, (WPARAM)0, (LPARAM)lpType);
+            SendMessage(hComboBox, CB_ADDSTRING, 0, (LPARAM)lpType);
             supHeapFree(lpType);
         }
     }
 
-    SendDlgItemMessage(hwnd, ID_SEARCH_TYPE, CB_ADDSTRING, (WPARAM)0, (LPARAM)L"*");
-    SendDlgItemMessage(hwnd, ID_SEARCH_TYPE, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
+    SendMessage(hComboBox, CB_ADDSTRING, 0, (LPARAM)L"*");
+    SendMessage(hComboBox, CB_SETCURSEL, 0, 0);
+    supEnableRedraw(hComboBox);
 }
 
 /*
@@ -194,6 +214,7 @@ VOID FindDlgResize(
     RECT  r1, r2;
     HWND  hwnd;
     POINT p0;
+    HDWP hDeferPos;
 
     GetClientRect(hwndDlg, &r2);
 
@@ -244,67 +265,87 @@ VOID FindDlgResize(
         Context->dx13 = p0.y;
     }
 
+    // Start batch window positioning for better performance
+    hDeferPos = BeginDeferWindowPos(7);
+    if (!hDeferPos) return;
+
     //resize groupbox search options
     hwnd = GetDlgItem(hwndDlg, ID_SEARCH_GROUPBOXOPTIONS);
     if (hwnd) {
-        SetWindowPos(hwnd, 0, 0, 0,
+        hDeferPos = DeferWindowPos(hDeferPos, hwnd, 0,
+            0, 0,
             r2.right - Context->dx1, Context->dx2,
             SWP_NOMOVE | SWP_NOZORDER);
+        if (!hDeferPos) return;
     }
 
     //resize groupbox results
     hwnd = GetDlgItem(hwndDlg, ID_SEARCH_GROUPBOX);
     if (hwnd) {
-        SetWindowPos(hwnd, 0, 0, 0,
+        hDeferPos = DeferWindowPos(hDeferPos, hwnd, 0,
+            0, 0,
             r2.right - Context->dx1, r2.bottom - Context->dx3,
             SWP_NOMOVE | SWP_NOZORDER);
+        if (!hDeferPos) return;
     }
 
     //resize listview
     hwnd = GetDlgItem(hwndDlg, ID_SEARCH_LIST);
     if (hwnd) {
-        SetWindowPos(hwnd, 0, 0, 0,
+        hDeferPos = DeferWindowPos(hDeferPos, hwnd, 0,
+            0, 0,
             r2.right - Context->dx4, r2.bottom - Context->dx5,
             SWP_NOMOVE | SWP_NOZORDER);
+        if (!hDeferPos) return;
     }
 
     //resize edit
     hwnd = GetDlgItem(hwndDlg, ID_SEARCH_NAME);
     if (hwnd) {
-        SetWindowPos(hwnd, 0, 0, 0,
+        hDeferPos = DeferWindowPos(hDeferPos, hwnd, 0,
+            0, 0,
             r2.right - Context->dx6, Context->dx7,
             SWP_NOMOVE | SWP_NOZORDER);
+        if (!hDeferPos) return;
     }
 
-    //resize combobox
+    //reposition combobox
     hwnd = GetDlgItem(hwndDlg, ID_SEARCH_TYPE);
     if (hwnd) {
-        SetWindowPos(hwnd, 0,
+        hDeferPos = DeferWindowPos(hDeferPos, hwnd, 0,
             r2.right - Context->dx8, Context->dx9,
             0, 0,
             SWP_NOSIZE | SWP_NOZORDER);
+        if (!hDeferPos) return;
     }
 
+    //reposition find button
     hwnd = GetDlgItem(hwndDlg, ID_SEARCH_FIND);
     if (hwnd) {
-        SetWindowPos(hwnd, 0,
+        hDeferPos = DeferWindowPos(hDeferPos, hwnd, 0,
             r2.right - Context->dx10, Context->dx11,
             0, 0,
             SWP_NOSIZE | SWP_NOZORDER);
+        if (!hDeferPos) return;
     }
 
-    //resize Type label
+    //reposition Type label
     hwnd = GetDlgItem(hwndDlg, ID_SEARCH_TYPELABEL);
     if (hwnd) {
-        SetWindowPos(hwnd, 0,
+        hDeferPos = DeferWindowPos(hDeferPos, hwnd, 0,
             r2.right - Context->dx12, Context->dx13,
             0, 0,
             SWP_NOSIZE | SWP_NOZORDER);
+        if (!hDeferPos) return;
     }
 
+    // Apply all positioning changes at once
+    EndDeferWindowPos(hDeferPos);
+
+    // Update status bar separately (it needs special handling)
     SendMessage(Context->StatusBar, WM_SIZE, 0, 0);
 
-    RedrawWindow(hwndDlg, NULL, 0, RDW_ERASE | RDW_INVALIDATE | RDW_ERASENOW);
+    InvalidateRect(hwndDlg, NULL, FALSE);
 }
 
 /*
@@ -347,7 +388,7 @@ BOOL FindDlgHandleNotify(
         break;
 
     case LVN_COLUMNCLICK:
-        g_FindDlgContext.SortInverse = !g_FindDlgContext.SortInverse;
+        g_FindDlgContext.SortInverse = (~g_FindDlgContext.SortInverse) & 1;
         g_FindDlgContext.SortColumn = pListView->iSubItem;
         ListView_SortItemsEx(g_FindDlgContext.SearchList, &FindDlgCompareFunc, g_FindDlgContext.SortColumn);
 
@@ -438,6 +479,118 @@ VOID FindDlgHandlePopupMenu(
 }
 
 /*
+* FindDlgSearchWorkerThread
+*
+* Purpose:
+*
+* Background thread to perform object search.
+*
+*/
+DWORD WINAPI FindDlgSearchWorkerThread(
+    _In_ LPVOID lpParameter
+)
+{
+    PFIND_SEARCH_PARAMS searchParams = (PFIND_SEARCH_PARAMS)lpParameter;
+    HWND hwndDlg = searchParams->hwndDlg;
+    PFO_LIST_ITEM flist = NULL;
+    UNICODE_STRING usName, usType;
+    PUNICODE_STRING pusName = NULL, pusType = NULL;
+
+    // Set up search strings
+    if (searchParams->UseName) {
+        RtlInitUnicodeString(&usName, searchParams->NameString);
+        pusName = &usName;
+    }
+
+    if (searchParams->UseType) {
+        RtlInitUnicodeString(&usType, searchParams->TypeString);
+        pusType = &usType;
+    }
+
+    // Perform search
+    FindObject(ObGetPredefinedUnicodeString(OBP_ROOT), pusName, pusType, &flist);
+
+    // Update UI from main thread
+    SendMessage(hwndDlg, WM_FINDOBJECT_SEARCHCOMPLETE, (WPARAM)flist, 0);
+
+    // Free search parameters
+    supHeapFree(searchParams);
+    return 0;
+}
+
+/*
+* FindDlgHandleSearchComplete
+*
+* Purpose:
+*
+* Process search results from background thread.
+*
+*/
+VOID FindDlgHandleSearchComplete(
+    _In_ HWND hwndDlg,
+    _In_ PFO_LIST_ITEM ResultList
+)
+{
+    PFO_LIST_ITEM flist = ResultList;
+    PFO_LIST_ITEM plist;
+    ULONG cci = 0;
+    WCHAR searchString[MAX_PATH + 1];
+
+    // Return to search mode
+    SetDlgItemText(hwndDlg, ID_SEARCH_FIND, TEXT("Search"));
+    EnableWindow(GetDlgItem(hwndDlg, ID_SEARCH_FIND), TRUE);
+
+    // Check if search was cancelled
+    if (g_FindDlgContext.SearchCancelled) {
+        g_FindDlgContext.SearchCancelled = FALSE;
+        SetDlgItemText(hwndDlg, ID_SEARCH_STATUSBAR, TEXT("Search cancelled"));
+
+        // Free the result list
+        while (flist != NULL) {
+            plist = flist->Prev;
+            supHeapFree(flist);
+            flist = plist;
+        }
+
+        if (g_FindDlgContext.SearchThread) {
+            CloseHandle(g_FindDlgContext.SearchThread);
+            g_FindDlgContext.SearchThread = NULL;
+        }
+        return;
+    }
+
+    // Begin batch processing
+    supDisableRedraw(g_FindDlgContext.SearchList);
+
+    // Process results
+    while (flist != NULL) {
+        FindDlgAddListItem(g_FindDlgContext.SearchList, &flist->ObjectName, &flist->ObjectType);
+        plist = flist->Prev;
+        supHeapFree(flist);
+        flist = plist;
+        cci++;
+    }
+
+    // Sort results
+    ListView_SortItemsEx(g_FindDlgContext.SearchList,
+        &FindDlgCompareFunc, g_FindDlgContext.SortColumn);
+
+    // Update status
+    ultostr(cci, searchString);
+    _strcat(searchString, TEXT(" matching object(s)."));
+    SetDlgItemText(hwndDlg, ID_SEARCH_STATUSBAR, searchString);
+
+    // End batch processing
+    supEnableRedraw(g_FindDlgContext.SearchList);
+
+    // Clean up
+    if (g_FindDlgContext.SearchThread) {
+        CloseHandle(g_FindDlgContext.SearchThread);
+        g_FindDlgContext.SearchThread = NULL;
+    }
+}
+
+/*
 * FindDlgHandleSearch
 *
 * Purpose:
@@ -450,22 +603,23 @@ VOID FindDlgHandleSearch(
 )
 {
     WCHAR searchString[MAX_PATH + 1], typeName[MAX_PATH + 1];
-    PFO_LIST_ITEM flist, plist;
-    ULONG cci;
+    PFIND_SEARCH_PARAMS searchParams;
 
-    UNICODE_STRING usName, usType;
-    PUNICODE_STRING pusName = &usName, pusType = &usType;
+    // Cancel ongoing search if any
+    if (g_FindDlgContext.SearchThread) {
+        // Signal cancellation
+        if (WaitForSingleObject(g_FindDlgContext.SearchThread, 0) == WAIT_TIMEOUT) {
+            g_FindDlgContext.SearchCancelled = TRUE;
+            SetDlgItemText(hwndDlg, ID_SEARCH_STATUSBAR, TEXT("Cancelling search..."));
+            return;
+        }
 
-    supSetWaitCursor(TRUE);
-    EnableWindow(GetDlgItem(hwndDlg, ID_SEARCH_FIND), FALSE);
+        CloseHandle(g_FindDlgContext.SearchThread);
+        g_FindDlgContext.SearchThread = NULL;
+    }
 
-    //
-    // Update status bar.
-    //
-    _strcpy(searchString, TEXT("Searching..."));
-    SetDlgItemText(hwndDlg, ID_SEARCH_STATUSBAR, searchString);
-
-    ListView_DeleteAllItems(g_FindDlgContext.SearchList);
+    // Prepare for new search
+    g_FindDlgContext.SearchCancelled = FALSE;
 
     RtlSecureZeroMemory(&searchString, sizeof(searchString));
     RtlSecureZeroMemory(&typeName, sizeof(typeName));
@@ -473,56 +627,45 @@ VOID FindDlgHandleSearch(
     GetDlgItemText(hwndDlg, ID_SEARCH_NAME, (LPWSTR)&searchString, MAX_PATH);
     GetDlgItemText(hwndDlg, ID_SEARCH_TYPE, (LPWSTR)&typeName, MAX_PATH);
 
-    flist = NULL;
+    // Update status and UI
+    ListView_DeleteAllItems(g_FindDlgContext.SearchList);
+    SetDlgItemText(hwndDlg, ID_SEARCH_STATUSBAR, TEXT("Searching..."));
+    EnableWindow(GetDlgItem(hwndDlg, ID_SEARCH_FIND), FALSE);
 
+    // Allocate search params
+    searchParams = (PFIND_SEARCH_PARAMS)supHeapAlloc(sizeof(FIND_SEARCH_PARAMS));
+    if (searchParams == NULL) {
+        SetDlgItemText(hwndDlg, ID_SEARCH_STATUSBAR, TEXT("Memory allocation failed"));
+        EnableWindow(GetDlgItem(hwndDlg, ID_SEARCH_FIND), TRUE);
+        return;
+    }
+
+    searchParams->hwndDlg = hwndDlg;
+
+    // Set up search parameters
     if (searchString[0] == 0) {
-        pusName = NULL;
+        searchParams->UseName = FALSE;
     }
     else {
-        RtlInitUnicodeString(&usName, searchString);
+        searchParams->UseName = TRUE;
+        _strcpy(searchParams->NameString, searchString);
     }
+
     if (typeName[0] == L'*') {
-        pusType = NULL;
+        searchParams->UseType = FALSE;
     }
     else {
-        RtlInitUnicodeString(&usType, typeName);
+        searchParams->UseType = TRUE;
+        _strcpy(searchParams->TypeString, typeName);
     }
 
-    FindObject(ObGetPredefinedUnicodeString(OBP_ROOT), 
-        pusName, pusType, &flist);
-
-    //
-    // Disable listview redraw
-    //
-    supListViewEnableRedraw(g_FindDlgContext.SearchList, FALSE);
-
-    cci = 0;
-    while (flist != NULL) {
-        FindDlgAddListItem(g_FindDlgContext.SearchList, &flist->ObjectName, &flist->ObjectType);
-        plist = flist->Prev;
-        supHeapFree(flist);
-        flist = plist;
-        cci++;
+    // Start search thread
+    g_FindDlgContext.SearchThread = CreateThread(NULL, 0, FindDlgSearchWorkerThread, searchParams, 0, NULL);
+    if (!g_FindDlgContext.SearchThread) {
+        supHeapFree(searchParams);
+        SetDlgItemText(hwndDlg, ID_SEARCH_STATUSBAR, TEXT("Failed to create search thread"));
+        EnableWindow(GetDlgItem(hwndDlg, ID_SEARCH_FIND), TRUE);
     }
-
-    //
-    // Update status bar with results.
-    //
-    ultostr(cci, searchString);
-    _strcat(searchString, TEXT(" matching object(s)."));
-    SetDlgItemText(hwndDlg, ID_SEARCH_STATUSBAR, searchString);
-
-    ListView_SortItemsEx(g_FindDlgContext.SearchList,
-        &FindDlgCompareFunc, g_FindDlgContext.SortColumn);
-
-    //
-    // Enable listview redraw
-    //
-    supListViewEnableRedraw(g_FindDlgContext.SearchList, TRUE);
-
-    supSetWaitCursor(FALSE);
-    EnableWindow(GetDlgItem(hwndDlg, ID_SEARCH_FIND), TRUE);
-
 }
 
 /*
@@ -548,6 +691,8 @@ VOID FindDlgOnInit(
     g_FindDlgContext.StatusBar = GetDlgItem(hwndDlg, ID_SEARCH_STATUSBAR);
     g_FindDlgContext.iColumnHit = -1;
     g_FindDlgContext.iSelectedItem = -1;
+    g_FindDlgContext.SearchThread = NULL;
+    g_FindDlgContext.SearchCancelled = FALSE;
 
     //
     // Set dialog icon.
@@ -614,6 +759,10 @@ INT_PTR CALLBACK FindDlgProc(
 
     switch (uMsg) {
 
+    case WM_FINDOBJECT_SEARCHCOMPLETE:
+        FindDlgHandleSearchComplete(hwndDlg, (PFO_LIST_ITEM)wParam);
+        return TRUE;
+
     case WM_NOTIFY:
         return FindDlgHandleNotify((LPNMLISTVIEW)lParam);
 
@@ -635,6 +784,13 @@ INT_PTR CALLBACK FindDlgProc(
         break;
 
     case WM_DESTROY:
+        // Cancel any ongoing search
+        if (g_FindDlgContext.SearchThread) {
+            g_FindDlgContext.SearchCancelled = TRUE;
+            WaitForSingleObject(g_FindDlgContext.SearchThread, 1000);
+            CloseHandle(g_FindDlgContext.SearchThread);
+            g_FindDlgContext.SearchThread = NULL;
+        }
         PostQuitMessage(0);
         break;
 
@@ -750,5 +906,4 @@ VOID FindDlgCreate(
         supWaitForFastEvent(&FindDialogInitializedEvent, NULL);
 
     }
-
 }

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017 - 2022
+*  (C) COPYRIGHT AUTHORS, 2017 - 2025
 *
 *  TITLE:       EXTRASIPC.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.08
 *
-*  DATE:        19 Jun 2022
+*  DATE:        11 Jun 2025
 *
 *  IPC supported: Pipes, Mailslots
 *
@@ -856,11 +856,11 @@ VOID IpcDlgOnInit(
             LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT,
             TEXT("Name"), 500);
 
-        supListViewEnableRedraw(pDlgContext->ListView, FALSE);
+        supDisableRedraw(pDlgContext->ListView);
 
         IpcDlgQueryInfo((IPC_DLG_MODE)pDlgContext->DialogMode, FALSE, pDlgContext->ListView);
 
-        supListViewEnableRedraw(pDlgContext->ListView, TRUE);
+        supEnableRedraw(pDlgContext->ListView);
     }
 }
 
@@ -922,11 +922,11 @@ INT_PTR CALLBACK IpcDlgProc(
             pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_IPCDLGCONTEXT);
             if (pDlgContext) {
 
-                supListViewEnableRedraw(pDlgContext->ListView, FALSE);
+                supDisableRedraw(pDlgContext->ListView);
 
                 IpcDlgQueryInfo((IPC_DLG_MODE)pDlgContext->DialogMode, TRUE, pDlgContext->ListView);
 
-                supListViewEnableRedraw(pDlgContext->ListView, TRUE);
+                supEnableRedraw(pDlgContext->ListView);
 
             }
             break;

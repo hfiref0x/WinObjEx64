@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020
+*  (C) COPYRIGHT AUTHORS, 2020 - 2025
 *
 *  TITLE:       QUERY.C
 *
 *  VERSION:     1.00
 *
-*  DATE:        04 July 2020
+*  DATE:        08 Jun 2025
 *
 *  ImageScope main logic.
 *
@@ -143,6 +143,9 @@ VS_FIXEDFILEINFO* PEImageEnumVersionFields(
         if (NT_SUCCESS(status)) {
             // root structure
             hdr = (PIMGVSVERSIONINFO)rptr;
+            if (hdr == NULL || datasz < sizeof(IMGVSVERSIONINFO))
+                __leave;
+
             vlimit = (ULONG_PTR)hdr + hdr->vshdr.wLength;
 
             if (hdr->vshdr.wValueLength)

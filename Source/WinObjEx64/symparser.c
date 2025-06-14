@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT H.E., 2015 - 2022
+*  (C) COPYRIGHT H.E., 2015 - 2025
 *
 *  TITLE:       SYMPARSER.C
 *
-*  VERSION:     1.18
+*  VERSION:     1.25
 *
-*  DATE:        20 Jun 2021
+*  DATE:        13 Jun 2025
 *
 *  DbgHelp wrapper for symbols parser support.
 *
@@ -60,7 +60,7 @@ typedef struct _BasicTypeMapElement {
 } BasicTypeMapElement, * PBasicTypeMapElement;
 
 // from wbenny's pdbex
-BasicTypeMapElement BasicTypeMapMSVC[] = {
+static const BasicTypeMapElement BasicTypeMapMSVC[] = {
     { btNoType,     0,      NULL                        },
     { btVoid,       0,      TEXT("void")                },
     { btChar,       1,      TEXT("char")                },
@@ -95,31 +95,38 @@ BasicTypeMapElement BasicTypeMapMSVC[] = {
     { btMaxType,    0,      NULL                        }
 };
 
+/**
+* Find the basic type name string from the type map
+*
+* @param TypeMap - Type mapping table
+* @param BasicType - Basic type to look up
+* @param Length - Type size in bytes
+* @return Type name string or NULL if not found
+*/
 PCWSTR SympGetBasicTypeNameString(
-    _In_ BasicTypeMapElement* TypeMap,
+    _In_ const BasicTypeMapElement* TypeMap,
     _In_ SymBasicType BasicType,
     _In_ ULONG Length
 )
 {
     ULONG i;
-
     for (i = 0; TypeMap[i].BasicType != btMaxType; i++) {
-
         if (TypeMap[i].BasicType == BasicType) {
-
-            if (TypeMap[i].Length == Length ||
-                TypeMap[i].Length == 0)
-            {
+            if (TypeMap[i].Length == Length || TypeMap[i].Length == 0) {
                 return TypeMap[i].TypeName;
             }
-
         }
-
     }
-
     return NULL;
 }
 
+/**
+* Get type name string for a basic type
+*
+* @param BasicType - Basic type to look up
+* @param Length - Type size in bytes
+* @return Type name string or NULL if not found
+*/
 PCWSTR SympGetTypeNameString(
     _In_ SymBasicType BasicType,
     _In_ ULONG Length
@@ -131,33 +138,38 @@ PCWSTR SympGetTypeNameString(
         Length);
 }
 
-/// <summary>
-/// SymRegisterCallbackW64 wrapper
-/// </summary>
-/// <param name="Context"></param>
-/// <param name="CallbackFunction"></param>
-/// <param name="UserContext"></param>
-/// <returns></returns>
+/**
+* Register callback for symbol operations
+*
+* @param Context - Symbol context
+* @param CallbackFunction - Callback function pointer
+* @param UserContext - User context to pass to callback
+* @return TRUE on success, FALSE on failure
+*/
 BOOL SymParserRegisterCallback(
     _In_ PSYMCONTEXT Context,
     _In_ PSYMBOL_REGISTERED_CALLBACK64 CallbackFunction,
     _In_ ULONG64 UserContext
 )
 {
+    if (!Context || !CallbackFunction)
+        return FALSE;
+
     return Context->DbgHelp.SymRegisterCallbackW64(
         Context->ProcessHandle,
         CallbackFunction,
         UserContext);
 }
 
-/// <summary>
-/// SymLoadModuleExW wrapper
-/// </summary>
-/// <param name="Context"></param>
-/// <param name="lpModulePath"></param>
-/// <param name="BaseOfDll"></param>
-/// <param name="SizeOfDll"></param>
-/// <returns>Result of SymLoadModuleExW call</returns>
+/**
+* Load module for symbol parsing
+*
+* @param Context - Symbol context
+* @param lpModulePath - Module path
+* @param BaseOfDll - Base address of module
+* @param SizeOfDll - Size of module
+* @return TRUE on success, FALSE on failure
+*/
 BOOL SymParserLoadModule(
     _In_ PSYMCONTEXT Context,
     _In_ LPCWSTR lpModulePath,
@@ -166,6 +178,9 @@ BOOL SymParserLoadModule(
 )
 {
     DWORD64 moduleBase;
+
+    if (!Context || !lpModulePath)
+        return FALSE;
 
     moduleBase = Context->DbgHelp.SymLoadModuleEx(
         Context->ProcessHandle,
@@ -183,16 +198,22 @@ BOOL SymParserLoadModule(
     return (moduleBase != 0);
 }
 
-/// <summary>
-/// SymUnloadModule64 wrapper
-/// </summary>
-/// <param name="Context"></param>
-/// <returns>Result of SymUnloadModule64 call</returns>
+/**
+* Unload module from symbol context
+*
+* @param Context - Symbol context
+* @return TRUE on success, FALSE on failure
+*/
 BOOL SymParserUnloadModule(
     _In_ PSYMCONTEXT Context
 )
 {
-    BOOL bStatus = Context->DbgHelp.SymUnloadModule(
+    BOOL bStatus;
+
+    if (!Context || Context->ModuleBase == 0)
+        return FALSE;
+
+    bStatus = Context->DbgHelp.SymUnloadModule(
         Context->ProcessHandle,
         Context->ModuleBase);
 
@@ -204,73 +225,116 @@ BOOL SymParserUnloadModule(
     return bStatus;
 }
 
-/// <summary>
-/// SymGetTypeInfo(TI_GET_TYPE) wrapper
-/// </summary>
-/// <param name="Context">Symbol parser context</param>
-/// <param name="TypeIndex">Symbox type index</param>
-/// <param name="Status">Optional, receive operation status</param>
-/// <returns></returns>
+/**
+ * Template function for safely retrieving type information
+ *
+ * @param Context - Symbol context
+ * @param TypeIndex - Type index
+ * @param GetType - Type of information to retrieve
+ * @param OutputValue - Pointer to output value
+ * @param Status - Optional output for status
+ * @return TRUE if successful, FALSE otherwise
+ */
+BOOL SympGetTypeInfo(
+    _In_ PSYMCONTEXT Context,
+    _In_ ULONG TypeIndex,
+    _In_ IMAGEHLP_SYMBOL_TYPE_INFO GetType,
+    _When_(return, _Post_valid_) _Pre_defensive_ PVOID OutputValue,
+    _Out_opt_ PBOOL Status
+)
+{
+    BOOL bSuccess = FALSE;
+
+    // Parameter validation
+    if (!Context || !OutputValue) {
+        if (Status) *Status = FALSE;
+        return FALSE;
+    }
+
+    // Check if module is loaded
+    if (Context->ModuleBase == 0) {
+        Context->SymLastError = ERROR_NOT_READY;
+        if (Status) *Status = FALSE;
+        return FALSE;
+    }
+
+    // Check if we have valid function pointer
+    if (!Context->DbgHelp.SymGetTypeInfo) {
+        Context->SymLastError = ERROR_INVALID_FUNCTION;
+        if (Status) *Status = FALSE;
+        return FALSE;
+    }
+
+    bSuccess = Context->DbgHelp.SymGetTypeInfo(
+        Context->ProcessHandle,
+        Context->ModuleBase,
+        TypeIndex,
+        GetType,
+        OutputValue);
+
+    Context->SymLastError = GetLastError();
+
+    if (Status)
+        *Status = bSuccess;
+
+    return bSuccess;
+}
+
+
+/**
+* Get symbol type
+*
+* @param Context - Symbol context
+* @param TypeIndex - Type index
+* @param Status - Optional status output
+* @return Symbol type
+*/
 SymBasicType SymParserGetType(
     _In_ PSYMCONTEXT Context,
     _In_ ULONG TypeIndex,
     _Out_opt_ PBOOL Status
 )
 {
-    ULONG symType = 0;
+    SymBasicType symType = btNoType;
+    BOOL bSuccess = SympGetTypeInfo(Context, TypeIndex, TI_GET_TYPE, &symType, Status);
 
-    BOOL bStatus = Context->DbgHelp.SymGetTypeInfo(
-        Context->ProcessHandle,
-        Context->ModuleBase,
-        TypeIndex,
-        TI_GET_TYPE,
-        (PVOID)&symType);
+    if (!bSuccess)
+        return btNoType;
 
-    Context->SymLastError = GetLastError();
-
-    if (Status)
-        *Status = bStatus;
-
-    return (SymBasicType)symType;
+    return symType;
 }
 
-/// <summary>
-/// SymGetTypeInfo(TI_GET_BASETYPE) wrapper
-/// </summary>
-/// <param name="Context">Symbol parser context</param>
-/// <param name="TypeIndex">Symbox type index</param>
-/// <param name="Status">Optional, receive operation status</param>
-/// <returns></returns>
+/**
+* Get symbol base type
+*
+* @param Context - Symbol context
+* @param TypeIndex - Type index
+* @param Status - Optional status output
+* @return Symbol base type
+*/
 SymBasicType SymParserGetBaseType(
     _In_ PSYMCONTEXT Context,
     _In_ ULONG TypeIndex,
     _Out_opt_ PBOOL Status
 )
 {
-    ULONG symBaseType = 0;
+    SymBasicType symBaseType = btNoType;
+    BOOL bSuccess = SympGetTypeInfo(Context, TypeIndex, TI_GET_BASETYPE, &symBaseType, Status);
 
-    BOOL bStatus = Context->DbgHelp.SymGetTypeInfo(
-        Context->ProcessHandle,
-        Context->ModuleBase,
-        TypeIndex,
-        TI_GET_BASETYPE,
-        (PVOID)&symBaseType);
+    if (!bSuccess)
+        return btNoType;
 
-    Context->SymLastError = GetLastError();
-
-    if (Status)
-        *Status = bStatus;
-
-    return (SymBasicType)symBaseType;
+    return symBaseType;
 }
 
-/// <summary>
-/// SymGetTypeInfo(TI_GET_TYPEID) wrapper
-/// </summary>
-/// <param name="Context">Symbol parser context</param>
-/// <param name="TypeIndex">Symbox type index</param>
-/// <param name="Status">Optional, receive operation status</param>
-/// <returns></returns>
+/**
+* Get symbol type ID
+*
+* @param Context - Symbol context
+* @param TypeIndex - Type index
+* @param Status - Optional status output
+* @return Symbol type ID
+*/
 ULONG SymParserGetTypeId(
     _In_ PSYMCONTEXT Context,
     _In_ ULONG TypeIndex,
@@ -278,29 +342,22 @@ ULONG SymParserGetTypeId(
 )
 {
     ULONG typeId = 0;
+    BOOL bSuccess = SympGetTypeInfo(Context, TypeIndex, TI_GET_TYPEID, &typeId, Status);
 
-    BOOL bStatus = Context->DbgHelp.SymGetTypeInfo(
-        Context->ProcessHandle,
-        Context->ModuleBase,
-        TypeIndex,
-        TI_GET_TYPEID,
-        (PVOID)&typeId);
-
-    Context->SymLastError = GetLastError();
-
-    if (Status)
-        *Status = bStatus;
+    if (!bSuccess)
+        return 0;
 
     return typeId;
 }
 
-/// <summary>
-/// SymGetTypeInfo(TI_GET_ARRAYINDEXTYPEID) wrapper
-/// </summary>
-/// <param name="Context">Symbol parser context</param>
-/// <param name="TypeIndex">Symbox type index</param>
-/// <param name="Status">Optional, receive operation status</param>
-/// <returns></returns>
+/**
+* Get symbol array type ID
+*
+* @param Context - Symbol context
+* @param TypeIndex - Type index
+* @param Status - Optional status output
+* @return Symbol array type ID
+*/
 ULONG SymParserGetArrayTypeId(
     _In_ PSYMCONTEXT Context,
     _In_ ULONG TypeIndex,
@@ -308,29 +365,22 @@ ULONG SymParserGetArrayTypeId(
 )
 {
     ULONG typeId = 0;
+    BOOL bSuccess = SympGetTypeInfo(Context, TypeIndex, TI_GET_ARRAYINDEXTYPEID, &typeId, Status);
 
-    BOOL bStatus = Context->DbgHelp.SymGetTypeInfo(
-        Context->ProcessHandle,
-        Context->ModuleBase,
-        TypeIndex,
-        TI_GET_ARRAYINDEXTYPEID,
-        (PVOID)&typeId);
-
-    Context->SymLastError = GetLastError();
-
-    if (Status)
-        *Status = bStatus;
+    if (!bSuccess)
+        return 0;
 
     return typeId;
 }
 
-/// <summary>
-/// SymGetTypeInfo(TI_GET_LENGTH) wrapper
-/// </summary>
-/// <param name="Context">Symbol parser context</param>
-/// <param name="TypeIndex">Symbox type index</param>
-/// <param name="Status">Optional, receive operation status</param>
-/// <returns></returns>
+/**
+* Get symbol size
+*
+* @param Context - Symbol context
+* @param TypeIndex - Type index
+* @param Status - Optional status output
+* @return Symbol size
+*/
 ULONG64 SymParserGetSize(
     _In_ PSYMCONTEXT Context,
     _In_ ULONG TypeIndex,
@@ -338,29 +388,22 @@ ULONG64 SymParserGetSize(
 )
 {
     ULONG64 symSize = 0;
+    BOOL bSuccess = SympGetTypeInfo(Context, TypeIndex, TI_GET_LENGTH, &symSize, Status);
 
-    BOOL bStatus = Context->DbgHelp.SymGetTypeInfo(
-        Context->ProcessHandle,
-        Context->ModuleBase,
-        TypeIndex,
-        TI_GET_LENGTH,
-        (PVOID)&symSize);
-
-    Context->SymLastError = GetLastError();
-
-    if (Status)
-        *Status = bStatus;
+    if (!bSuccess)
+        return 0;
 
     return symSize;
 }
 
-/// <summary>
-/// SymGetTypeInfo(TI_GET_OFFSET) wrapper
-/// </summary>
-/// <param name="Context">Symbol parser context</param>
-/// <param name="TypeIndex">Symbox type index</param>
-/// <param name="Status">Optional, receive operation status</param>
-/// <returns></returns>
+/**
+* Get symbol offset
+*
+* @param Context - Symbol context
+* @param TypeIndex - Type index
+* @param Status - Optional status output
+* @return Symbol offset
+*/
 ULONG SymParserGetOffset(
     _In_ PSYMCONTEXT Context,
     _In_ ULONG TypeIndex,
@@ -368,29 +411,22 @@ ULONG SymParserGetOffset(
 )
 {
     ULONG symOffset = 0;
+    BOOL bSuccess = SympGetTypeInfo(Context, TypeIndex, TI_GET_OFFSET, &symOffset, Status);
 
-    BOOL bStatus = Context->DbgHelp.SymGetTypeInfo(
-        Context->ProcessHandle,
-        Context->ModuleBase,
-        TypeIndex,
-        TI_GET_OFFSET,
-        (PVOID)&symOffset);
-
-    Context->SymLastError = GetLastError();
-
-    if (Status)
-        *Status = bStatus;
+    if (!bSuccess)
+        return 0;
 
     return symOffset;
 }
 
-/// <summary>
-/// SymGetTypeInfo(TI_GET_ADDRESSOFFSET) wrapper
-/// </summary>
-/// <param name="Context">Symbol parser context</param>
-/// <param name="TypeIndex">Symbox type index</param>
-/// <param name="Status">Optional, receive operation status</param>
-/// <returns></returns>
+/**
+* Get symbol address offset
+*
+* @param Context - Symbol context
+* @param TypeIndex - Type index
+* @param Status - Optional status output
+* @return Symbol address offset
+*/
 ULONG SymParserGetAddressOffset(
     _In_ PSYMCONTEXT Context,
     _In_ ULONG TypeIndex,
@@ -398,29 +434,22 @@ ULONG SymParserGetAddressOffset(
 )
 {
     ULONG symOffset = 0;
+    BOOL bSuccess = SympGetTypeInfo(Context, TypeIndex, TI_GET_ADDRESSOFFSET, &symOffset, Status);
 
-    BOOL bStatus = Context->DbgHelp.SymGetTypeInfo(
-        Context->ProcessHandle,
-        Context->ModuleBase,
-        TypeIndex,
-        TI_GET_ADDRESSOFFSET,
-        (PVOID)&symOffset);
-
-    Context->SymLastError = GetLastError();
-
-    if (Status)
-        *Status = bStatus;
+    if (!bSuccess)
+        return 0;
 
     return symOffset;
 }
 
-/// <summary>
-/// SymGetTypeInfo(TI_GET_BITPOSITION) wrapper
-/// </summary>
-/// <param name="Context">Symbol parser context</param>
-/// <param name="TypeIndex">Symbox type index</param>
-/// <param name="Status">Optional, receive operation status</param>
-/// <returns></returns>
+/**
+* Get symbol bit position
+*
+* @param Context - Symbol context
+* @param TypeIndex - Type index
+* @param Status - Optional status output
+* @return Symbol bit position
+*/
 ULONG SymParserGetBitPosition(
     _In_ PSYMCONTEXT Context,
     _In_ ULONG TypeIndex,
@@ -428,29 +457,22 @@ ULONG SymParserGetBitPosition(
 )
 {
     ULONG bitPosition = 0;
+    BOOL bSuccess = SympGetTypeInfo(Context, TypeIndex, TI_GET_BITPOSITION, &bitPosition, Status);
 
-    BOOL bStatus = Context->DbgHelp.SymGetTypeInfo(
-        Context->ProcessHandle,
-        Context->ModuleBase,
-        TypeIndex,
-        TI_GET_BITPOSITION,
-        (PVOID)&bitPosition);
-
-    Context->SymLastError = GetLastError();
-
-    if (Status)
-        *Status = bStatus;
+    if (!bSuccess)
+        return 0;
 
     return bitPosition;
 }
 
-/// <summary>
-/// SymGetTypeInfo(TI_GET_CHILDRENCOUNT) wrapper
-/// </summary>
-/// <param name="Context">Symbol parser context</param>
-/// <param name="TypeIndex">Symbox type index</param>
-/// <param name="Status">Optional, receive operation status</param>
-/// <returns></returns>
+/**
+* Get symbol children count
+*
+* @param Context - Symbol context
+* @param TypeIndex - Type index
+* @param Status - Optional status output
+* @return Symbol children count
+*/
 ULONG SymParserGetChildrenCount(
     _In_ PSYMCONTEXT Context,
     _In_ ULONG TypeIndex,
@@ -458,29 +480,22 @@ ULONG SymParserGetChildrenCount(
 )
 {
     ULONG childCount = 0;
+    BOOL bSuccess = SympGetTypeInfo(Context, TypeIndex, TI_GET_CHILDRENCOUNT, &childCount, Status);
 
-    BOOL bStatus = Context->DbgHelp.SymGetTypeInfo(
-        Context->ProcessHandle,
-        Context->ModuleBase,
-        TypeIndex,
-        TI_GET_CHILDRENCOUNT,
-        (PVOID)&childCount);
-
-    Context->SymLastError = GetLastError();
-
-    if (Status)
-        *Status = bStatus;
+    if (!bSuccess)
+        return 0;
 
     return childCount;
 }
 
-/// <summary>
-/// SymGetTypeInfo(TI_GET_SYMTAG) wrapper
-/// </summary>
-/// <param name="Context">Symbol parser context</param>
-/// <param name="TypeIndex">Symbox type index</param>
-/// <param name="Status">Optional, receive operation status</param>
-/// <returns></returns>
+/**
+* Get symbol tag
+*
+* @param Context - Symbol context
+* @param TypeIndex - Type index
+* @param Status - Optional status output
+* @return Symbol tag
+*/
 ULONG SymParserGetTag(
     _In_ PSYMCONTEXT Context,
     _In_ ULONG TypeIndex,
@@ -488,29 +503,23 @@ ULONG SymParserGetTag(
 )
 {
     ULONG symTag = 0;
+    BOOL bSuccess = SympGetTypeInfo(Context, TypeIndex, TI_GET_SYMTAG, &symTag, Status);
 
-    BOOL bStatus = Context->DbgHelp.SymGetTypeInfo(
-        Context->ProcessHandle,
-        Context->ModuleBase,
-        TypeIndex,
-        TI_GET_SYMTAG,
-        (PVOID)&symTag);
-
-    Context->SymLastError = GetLastError();
-
-    if (Status)
-        *Status = bStatus;
+    if (!bSuccess)
+        return 0;
 
     return symTag;
 }
 
-/// <summary>
-/// SymGetTypeInfo(TI_GET_SYMNAME) wrapper
-/// </summary>
-/// <param name="Context">Symbol parser context</param>
-/// <param name="TypeIndex">Symbox type index</param>
-/// <param name="Status">Optional, receive operation status</param>
-/// <returns>Symbol name string, use LocalFree to release string allocated memory</returns>
+/**
+* Get symbol name
+*
+* @param Context - Symbol context
+* @param TypeIndex - Type index
+* @param Status - Optional status output
+* @return Symbol name (must be freed with LocalFree)
+*/
+_Ret_maybenull_ _Post_writable_byte_size_(MAX_SYM_NAME * sizeof(WCHAR))
 LPCWSTR SymParserGetName(
     _In_ PSYMCONTEXT Context,
     _In_ ULONG TypeIndex,
@@ -534,22 +543,28 @@ LPCWSTR SymParserGetName(
     return lpSymbolName;
 }
 
-/// <summary>
-/// SymGetTypeInfo(TI_GET_VALUE) wrapper
-/// </summary>
-/// <param name="Context"></param>
-/// <param name="TypeIndex"></param>
-/// <param name="Value"></param>
-/// <param name="Status"></param>
-/// <returns></returns>
+/**
+* Get symbol value
+*
+* @param Context - Symbol context
+* @param TypeIndex - Type index
+* @param Value - Output variant value
+* @param Status - Optional status output
+* @return Variant type
+*/
 VARTYPE SymParserGetValue(
     _In_ PSYMCONTEXT Context,
     _In_ ULONG TypeIndex,
-    _Inout_ VARIANT* Value,
+    _Inout_ VARIANT * Value,
     _Out_opt_ PBOOL Status
 )
 {
     VARTYPE varResult;
+
+    if (!Value) {
+        if (Status) *Status = FALSE;
+        return VT_EMPTY;
+    }
 
     VariantInit(Value);
 
@@ -569,13 +584,14 @@ VARTYPE SymParserGetValue(
     return varResult;
 }
 
-/// <summary>
-/// SymGetTypeInfo(TI_GET_UDTKIND) wrapper
-/// </summary>
-/// <param name="Context"></param>
-/// <param name="TypeIndex"></param>
-/// <param name="Status"></param>
-/// <returns></returns>
+/**
+* Get symbol UDT kind
+*
+* @param Context - Symbol context
+* @param TypeIndex - Type index
+* @param Status - Optional status output
+* @return UDT kind
+*/
 SymUdtKind SymParserGetUDTKind(
     _In_ PSYMCONTEXT Context,
     _In_ ULONG TypeIndex,
@@ -583,29 +599,22 @@ SymUdtKind SymParserGetUDTKind(
 )
 {
     SymUdtKind udtKind = UdtInvalid;
+    BOOL bSuccess = SympGetTypeInfo(Context, TypeIndex, TI_GET_UDTKIND, &udtKind, Status);
 
-    BOOL bStatus = Context->DbgHelp.SymGetTypeInfo(
-        Context->ProcessHandle,
-        Context->ModuleBase,
-        TypeIndex,
-        TI_GET_UDTKIND,
-        (PVOID)&udtKind);
-
-    Context->SymLastError = GetLastError();
-
-    if (Status)
-        *Status = bStatus;
+    if (!bSuccess)
+        return UdtInvalid;
 
     return udtKind;
 }
 
-/// <summary>
-/// SymGetTypeInfo(TI_GET_COUNT) wrapper
-/// </summary>
-/// <param name="Context"></param>
-/// <param name="TypeIndex"></param>
-/// <param name="Status"></param>
-/// <returns>Number of arguments (DIA Count)</returns>
+/**
+* Get symbol count
+*
+* @param Context - Symbol context
+* @param TypeIndex - Type index
+* @param Status - Optional status output
+* @return Count value
+*/
 ULONG SymParserGetCount(
     _In_ PSYMCONTEXT Context,
     _In_ ULONG TypeIndex,
@@ -613,29 +622,22 @@ ULONG SymParserGetCount(
 )
 {
     ULONG ulCount = 0;
+    BOOL bSuccess = SympGetTypeInfo(Context, TypeIndex, TI_GET_COUNT, &ulCount, Status);
 
-    BOOL bStatus = Context->DbgHelp.SymGetTypeInfo(
-        Context->ProcessHandle,
-        Context->ModuleBase,
-        TypeIndex,
-        TI_GET_COUNT,
-        (PVOID)&ulCount);
-
-    Context->SymLastError = GetLastError();
-
-    if (Status)
-        *Status = bStatus;
+    if (!bSuccess)
+        return 0;
 
     return ulCount;
 }
 
-/// <summary>
-/// SymGetTypeInfo(TI_GET_CALLING_CONVENTION) wrapper
-/// </summary>
-/// <param name="Context"></param>
-/// <param name="TypeIndex"></param>
-/// <param name="Status"></param>
-/// <returns>Calling convention id</returns>
+/**
+* Get symbol calling convention
+*
+* @param Context - Symbol context
+* @param TypeIndex - Type index
+* @param Status - Optional status output
+* @return Calling convention value
+*/
 ULONG SymParserGetCallingConvention(
     _In_ PSYMCONTEXT Context,
     _In_ ULONG TypeIndex,
@@ -643,30 +645,23 @@ ULONG SymParserGetCallingConvention(
 )
 {
     ULONG ulCallingConvention = 0;
+    BOOL bSuccess = SympGetTypeInfo(Context, TypeIndex, TI_GET_CALLING_CONVENTION, &ulCallingConvention, Status);
 
-    BOOL bStatus = Context->DbgHelp.SymGetTypeInfo(
-        Context->ProcessHandle,
-        Context->ModuleBase,
-        TypeIndex,
-        TI_GET_CALLING_CONVENTION,
-        (PVOID)&ulCallingConvention);
-
-    Context->SymLastError = GetLastError();
-
-    if (Status)
-        *Status = bStatus;
+    if (!bSuccess)
+        return 0;
 
     return ulCallingConvention;
 }
 
-/// <summary>
-/// Retrieve symbol type name
-/// </summary>
-/// <param name="Context"></param>
-/// <param name="TypeIndex"></param>
-/// <param name="BaseTypeSize"></param>
-/// <param name="Status"></param>
-/// <returns></returns>
+/**
+* Get type name for a symbol
+*
+* @param Context - Symbol context
+* @param TypeIndex - Type index
+* @param BaseTypeSize - Optional output for base type size
+* @param Status - Optional status output
+* @return Type name string (must be freed with LocalFree)
+*/
 LPCWSTR SymParserGetTypeName(
     _In_ PSYMCONTEXT Context,
     _In_ ULONG TypeIndex,
@@ -682,26 +677,29 @@ LPCWSTR SymParserGetTypeName(
     SIZE_T nLen;
     ULONG tagEnum, symType;
 
-    symSize = Context->Parser.GetSize(
-        Context,
-        TypeIndex,
-        Status);
+    if (BaseTypeSize)
+        *BaseTypeSize = 0;
+
+    symSize = Context->Parser.GetSize(Context, TypeIndex, &bResult);
+    if (!bResult) {
+        if (Status) *Status = FALSE;
+        return NULL;
+    }
 
     if (BaseTypeSize)
         *BaseTypeSize = symSize;
 
-    lpSymbolTypeName = Context->Parser.GetName(
-        Context,
-        TypeIndex,
-        Status);
-
-    if (lpSymbolTypeName)
+    lpSymbolTypeName = Context->Parser.GetName(Context, TypeIndex, &bResult);
+    if (lpSymbolTypeName) {
+        if (Status) *Status = TRUE;
         return lpSymbolTypeName;
+    }
 
-    tagEnum = Context->Parser.GetTag(
-        Context,
-        TypeIndex,
-        Status);
+    tagEnum = Context->Parser.GetTag(Context, TypeIndex, &bResult);
+    if (!bResult) {
+        if (Status) *Status = FALSE;
+        return NULL;
+    }
 
     switch (tagEnum) {
 
@@ -721,7 +719,6 @@ LPCWSTR SymParserGetTypeName(
             case UdtClass:
             case UdtInterface:
             case UdtUnion:
-
                 lpSymbolTypeName = Context->Parser.GetName(
                     Context,
                     TypeIndex,
@@ -730,22 +727,17 @@ LPCWSTR SymParserGetTypeName(
                 break;
 
             default:
-
                 lpStringCopy = (LPWSTR)LocalAlloc(LPTR, MAX_SYM_NAME);
                 if (lpStringCopy) {
                     _strcpy(lpStringCopy, TEXT("UnknownType"));
                     lpSymbolTypeName = lpStringCopy;
+                    bResult = TRUE;
                 }
 
                 break;
             }
 
         }
-
-        if (Status)
-            *Status = bResult;
-
-
         break;
 
         //
@@ -759,7 +751,6 @@ LPCWSTR SymParserGetTypeName(
             &bResult);
 
         if (bResult) {
-
             lpTemp = Context->Parser.GetTypeName(
                 Context,
                 symType,
@@ -767,7 +758,6 @@ LPCWSTR SymParserGetTypeName(
                 &bResult);
 
             if (bResult && lpTemp) {
-
                 nLen = _strlen(lpTemp);
                 lpStringCopy = (LPWSTR)LocalAlloc(LPTR, (nLen + 2) * sizeof(WCHAR));
                 if (lpStringCopy) {
@@ -777,12 +767,7 @@ LPCWSTR SymParserGetTypeName(
                 }
                 LocalFree((HLOCAL)lpTemp);
             }
-
         }
-
-        if (Status)
-            *Status = bResult;
-
         break;
 
     case SymTagBaseType:
@@ -813,16 +798,11 @@ LPCWSTR SymParserGetTypeName(
             }
 
         }
-
-        if (Status)
-            *Status = bResult;
-
         break;
 
     case SymTagArrayType:
     case SymTagTypedef:
     default:
-
         symType = Context->Parser.GetTypeId(
             Context,
             TypeIndex,
@@ -837,24 +817,23 @@ LPCWSTR SymParserGetTypeName(
                 &bResult);
 
         }
-
-        if (Status)
-            *Status = bResult;
-
         break;
     }
 
+    if (Status)
+        *Status = bResult;
 
     return lpSymbolTypeName;
 }
 
-/// <summary>
-/// Lookup symbol address by it name
-/// </summary>
-/// <param name="Context"></param>
-/// <param name="SymbolName"></param>
-/// <param name="Status"></param>
-/// <returns></returns>
+/**
+* Look up a symbol address by name
+*
+* @param Context - Symbol context
+* @param SymbolName - Symbol name to look up
+* @param Status - Optional status output
+* @return Symbol address or 0 on failure
+*/
 ULONG64 SymParserLookupAddressBySymbol(
     _In_ PSYMCONTEXT Context,
     _In_ LPCWSTR SymbolName,
@@ -862,15 +841,16 @@ ULONG64 SymParserLookupAddressBySymbol(
 )
 {
     BOOL bStatus = FALSE;
-    SIZE_T symSize;
     ULONG64 symAddress = 0;
     PSYMBOL_INFO symbolInfo = NULL;
 
-    symSize = sizeof(SYMBOL_INFO);
+    if (!Context || !SymbolName) {
+        if (Status) *Status = FALSE;
+        return 0;
+    }
 
-    symbolInfo = (PSYMBOL_INFO)supHeapAlloc(symSize);
+    symbolInfo = (PSYMBOL_INFO)supHeapAlloc(sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(WCHAR));
     if (symbolInfo) {
-
         symbolInfo->SizeOfStruct = sizeof(SYMBOL_INFO);
         symbolInfo->MaxNameLen = 0; //name is not used
 
@@ -893,40 +873,39 @@ ULONG64 SymParserLookupAddressBySymbol(
     return symAddress;
 }
 
-/// <summary>
-/// Lookup symbol name by it address
-/// </summary>
-/// <param name="Context"></param>
-/// <param name="SymbolAddress"></param>
-/// <param name="Displacement"></param>
-/// <param name="SymbolName">
-/// Pointer to variable to receive symbol name. 
-/// Use LocalFree to release allocated memory
-/// </param>
-/// <param name="Status"></param>
-/// <returns>Length of the symbol name</returns>
+/**
+* Look up a symbol name by address
+*
+* @param Context - Symbol context
+* @param SymbolAddress - Address to look up
+* @param Displacement - Output displacement
+* @param SymbolName - Output symbol name pointer (must be freed with LocalFree)
+* @param Status - Optional status output
+* @return Length of symbol name
+*/
 ULONG SymParserLookupSymbolByAddress(
     _In_ PSYMCONTEXT Context,
     _In_ DWORD64 SymbolAddress,
     _In_ PDWORD64 Displacement,
-    _Inout_ LPWSTR* SymbolName,
+    _Inout_ LPWSTR * SymbolName,
     _Out_opt_ PBOOL Status
 )
 {
     BOOL bStatus = FALSE;
     ULONG nameLength = 0;
-    SIZE_T symSize;
     LPWSTR symName = NULL;
     PSYMBOL_INFO symbolInfo = NULL;
 
-    symSize = sizeof(SYMBOL_INFO) +
-        MAX_SYM_NAME * sizeof(WCHAR);
+    if (!Context || !SymbolName || !Displacement) {
+        if (Status) *Status = FALSE;
+        return 0;
+    }
 
     *SymbolName = NULL;
 
-    symbolInfo = (PSYMBOL_INFO)supHeapAlloc(symSize);
+    symbolInfo = (PSYMBOL_INFO)supHeapAlloc(
+        sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(WCHAR));
     if (symbolInfo) {
-
         symbolInfo->SizeOfStruct = sizeof(SYMBOL_INFO);
         symbolInfo->MaxNameLen = MAX_SYM_NAME;
 
@@ -938,24 +917,14 @@ ULONG SymParserLookupSymbolByAddress(
 
         Context->SymLastError = GetLastError();
 
-        if (bStatus) {
-
-            if (symbolInfo->NameLen) {
-                symName = (LPWSTR)LocalAlloc(LPTR, MAX_SYM_NAME + 1);
-                if (symName) {
-
-                    _strncpy(symName, MAX_SYM_NAME,
-                        symbolInfo->Name,
-                        symbolInfo->NameLen);
-
-                    nameLength = (ULONG)_strlen(symName);
-
-                    *SymbolName = symName;
-                }
+        if (bStatus && symbolInfo->NameLen > 0) {
+            symName = (LPWSTR)LocalAlloc(LPTR, MAX_SYM_NAME + 1);
+            if (symName) {
+                _strncpy(symName, MAX_SYM_NAME, symbolInfo->Name, symbolInfo->NameLen);
+                nameLength = (ULONG)_strlen(symName);
+                *SymbolName = symName;
             }
-
         }
-
         supHeapFree(symbolInfo);
     }
 
@@ -965,14 +934,15 @@ ULONG SymParserLookupSymbolByAddress(
     return nameLength;
 }
 
-/// <summary>
-/// Return offset to the specified symbol field
-/// </summary>
-/// <param name="Context"></param>
-/// <param name="SymbolName"></param>
-/// <param name="FieldName"></param>
-/// <param name="Status"></param>
-/// <returns></returns>
+/**
+* Get field offset from a structure
+*
+* @param Context - Symbol context
+* @param SymbolName - Structure name
+* @param FieldName - Field name
+* @param Status - Optional status output
+* @return Field offset or 0 on failure
+*/
 ULONG SymParserGetFieldOffset(
     _In_ PSYMCONTEXT Context,
     _In_ LPCWSTR SymbolName,
@@ -981,116 +951,101 @@ ULONG SymParserGetFieldOffset(
 )
 {
     BOOL bStatus = FALSE;
-    ULONG symOffset = 0, rootIndex, childCount, childIndex;
-    ULONG i;
-    SIZE_T symSize;
+    ULONG symOffset = 0, i;
+    ULONG rootIndex = 0, childCount = 0, childIndex = 0;
     LPCWSTR lpSymbolName = NULL;
     PSYMBOL_INFO rootSymbolInfo = NULL;
-    TI_FINDCHILDREN_PARAMS* childrenBuffer;
-    TI_FINDCHILDREN_PARAMS* childEntry;
+    TI_FINDCHILDREN_PARAMS* childrenBuffer = NULL;
 
-    do {
-        symSize = sizeof(SYMBOL_INFO) +
-            (MAX_SYM_NAME * sizeof(WCHAR));
+    if (!Context || !SymbolName || !FieldName) {
+        if (Status) *Status = FALSE;
+        return 0;
+    }
 
-        rootSymbolInfo = (PSYMBOL_INFO)supHeapAlloc(symSize);
-        if (rootSymbolInfo == NULL)
-            break;
+    rootSymbolInfo = (PSYMBOL_INFO)supHeapAlloc(
+        sizeof(SYMBOL_INFO) + (MAX_SYM_NAME * sizeof(WCHAR)));
 
-        rootSymbolInfo->SizeOfStruct = (ULONG)symSize;
-        rootSymbolInfo->MaxNameLen = MAX_SYM_NAME;
+    if (!rootSymbolInfo) {
+        if (Status) *Status = FALSE;
+        return 0;
+    }
 
-        bStatus = Context->DbgHelp.SymGetTypeFromName(
-            Context->ProcessHandle,
-            Context->ModuleBase,
-            SymbolName,
-            rootSymbolInfo);
+    rootSymbolInfo->SizeOfStruct = sizeof(SYMBOL_INFO);
+    rootSymbolInfo->MaxNameLen = MAX_SYM_NAME;
 
-        Context->SymLastError = GetLastError();
+    bStatus = Context->DbgHelp.SymGetTypeFromName(
+        Context->ProcessHandle,
+        Context->ModuleBase,
+        SymbolName,
+        rootSymbolInfo);
 
-        if (!bStatus)
-            break;
+    Context->SymLastError = GetLastError();
 
-        rootIndex = rootSymbolInfo->Index;
+    if (!bStatus) {
+        supHeapFree(rootSymbolInfo);
+        if (Status) *Status = FALSE;
+        return 0;
+    }
 
-        childCount = Context->Parser.GetChildrenCount(
-            Context,
-            rootIndex,
-            &bStatus);
+    rootIndex = rootSymbolInfo->Index;
+    childCount = Context->Parser.GetChildrenCount(
+        Context,
+        rootIndex,
+        &bStatus);
 
-        if (!bStatus)
-            break;
+    if (!bStatus || childCount == 0) {
+        supHeapFree(rootSymbolInfo);
+        if (Status) *Status = FALSE;
+        return 0;
+    }
 
-        if (childCount == 0) {
-            bStatus = FALSE;
-            break;
-        }
+    childrenBuffer = (TI_FINDCHILDREN_PARAMS*)supHeapAlloc(
+        sizeof(TI_FINDCHILDREN_PARAMS) + childCount * sizeof(ULONG));
 
-        childrenBuffer = (TI_FINDCHILDREN_PARAMS*)supHeapAlloc(
-            sizeof(TI_FINDCHILDREN_PARAMS) + childCount * sizeof(ULONG));
+    if (!childrenBuffer) {
+        supHeapFree(rootSymbolInfo);
+        if (Status) *Status = FALSE;
+        return 0;
+    }
 
-        if (childrenBuffer == NULL)
-            break;
+    childrenBuffer->Count = childCount;
+    childrenBuffer->Start = 0;
 
-        childEntry = &childrenBuffer[0];
-        childEntry->Count = childCount;
+    bStatus = Context->DbgHelp.SymGetTypeInfo(
+        Context->ProcessHandle,
+        Context->ModuleBase,
+        rootIndex,
+        TI_FINDCHILDREN,
+        childrenBuffer);
 
-        bStatus = Context->DbgHelp.SymGetTypeInfo(
-            Context->ProcessHandle,
-            Context->ModuleBase,
-            rootIndex,
-            TI_FINDCHILDREN,
-            childEntry);
+    if (!bStatus) {
+        supHeapFree(rootSymbolInfo);
+        supHeapFree(childrenBuffer);
+        if (Status) *Status = FALSE;
+        return 0;
+    }
 
-        if (bStatus) {
+    bStatus = FALSE;
 
-            if (childEntry->Start > childCount) {
-                bStatus = FALSE;
+    for (i = 0; i < childCount; i++) {
+        childIndex = childrenBuffer->ChildId[i];
+        lpSymbolName = Context->Parser.GetName(Context, childIndex, NULL);
+
+        if (lpSymbolName) {
+            bStatus = (_strcmpi(FieldName, lpSymbolName) == 0);
+
+            if (bStatus) {
+                symOffset = Context->Parser.GetOffset(Context, childIndex, NULL);
+                LocalFree((HLOCAL)lpSymbolName);
                 break;
             }
 
-            if (childEntry->Start)
-                i = childEntry->Start;
-            else
-                i = 0;
-
-            bStatus = FALSE;
-
-            do {
-
-                childIndex = childEntry->ChildId[i];
-                lpSymbolName = Context->Parser.GetName(
-                    Context,
-                    childIndex,
-                    NULL);
-                if (lpSymbolName) {
-
-                    bStatus = (_strcmpi(FieldName, lpSymbolName) == 0);
-
-                    if (bStatus) {
-
-                        symOffset = Context->Parser.GetOffset(
-                            Context,
-                            childIndex,
-                            NULL);
-
-                    }
-
-                    LocalFree((HLOCAL)lpSymbolName);
-                }
-
-                i++;
-
-            } while (!bStatus && i < childCount);
-
+            LocalFree((HLOCAL)lpSymbolName);
         }
+    }
 
-        supHeapFree(childrenBuffer);
-
-    } while (FALSE);
-
-    if (rootSymbolInfo)
-        supHeapFree(rootSymbolInfo);
+    supHeapFree(rootSymbolInfo);
+    supHeapFree(childrenBuffer);
 
     if (Status)
         *Status = bStatus;
@@ -1098,13 +1053,14 @@ ULONG SymParserGetFieldOffset(
     return symOffset;
 }
 
-/// <summary>
-/// Read symbol type information including childrens
-/// </summary>
-/// <param name="Context"></param>
-/// <param name="SymbolName"></param>
-/// <param name="Status"></param>
-/// <returns></returns>
+/**
+* Dump complete symbol information including all children
+*
+* @param Context - Symbol context
+* @param SymbolName - Symbol name
+* @param Status - Optional status output
+* @return Symbol entry structure or NULL on failure (must be freed with supHeapFree)
+*/
 PSYM_ENTRY SymParserDumpSymbolInformation(
     _In_ PSYMCONTEXT Context,
     _In_ LPCWSTR SymbolName,
@@ -1114,7 +1070,6 @@ PSYM_ENTRY SymParserDumpSymbolInformation(
     BOOL bStatus = FALSE;
     ULONG rootIndex, childCount, childIndex, typeId, i;
     ULONG cNameUnknown = 0, cTypeUnknown = 0;
-    SIZE_T symSize, nLen;
     ULONG64 baseTypeSize;
     LPCWSTR lpSymbolName = NULL;
     PSYM_ENTRY dumpEntry = NULL;
@@ -1125,16 +1080,18 @@ PSYM_ENTRY SymParserDumpSymbolInformation(
     VARIANT value;
     VARTYPE valueType;
 
+    if (!Context || !SymbolName) {
+        if (Status) *Status = FALSE;
+        return NULL;
+    }
+
     do {
-
-        symSize = sizeof(SYMBOL_INFO) +
-            (MAX_SYM_NAME * sizeof(WCHAR));
-
-        rootSymbolInfo = (PSYMBOL_INFO)supHeapAlloc(symSize);
+        rootSymbolInfo = (PSYMBOL_INFO)supHeapAlloc(
+            sizeof(SYMBOL_INFO) + (MAX_SYM_NAME * sizeof(WCHAR)));
         if (rootSymbolInfo == NULL)
             break;
 
-        rootSymbolInfo->SizeOfStruct = (ULONG)symSize;
+        rootSymbolInfo->SizeOfStruct = sizeof(SYMBOL_INFO);
         rootSymbolInfo->MaxNameLen = MAX_SYM_NAME;
 
         bStatus = Context->DbgHelp.SymGetTypeFromName(
@@ -1223,7 +1180,6 @@ PSYM_ENTRY SymParserDumpSymbolInformation(
                         &dumpChild->IsBitField);
 
                     VariantInit(&value);
-
                     valueType = Context->Parser.GetValue(
                         Context,
                         childIndex,
@@ -1270,50 +1226,27 @@ PSYM_ENTRY SymParserDumpSymbolInformation(
                     //
                     // Child name.
                     //
-                    lpSymbolName = Context->Parser.GetName(
-                        Context,
-                        childIndex,
-                        NULL);
-
+                    lpSymbolName = Context->Parser.GetName(Context, childIndex, NULL);
                     if (lpSymbolName) {
-
-                        nLen = _strlen(lpSymbolName);
-
-                        _strncpy(dumpChild->Name,
-                            MAX_SYM_NAME,
-                            lpSymbolName,
-                            nLen);
-
+                        _strncpy(dumpChild->Name, MAX_SYM_NAME, lpSymbolName, _strlen(lpSymbolName));
                         LocalFree((HLOCAL)lpSymbolName);
                     }
                     else {
                         RtlStringCchPrintfSecure(dumpChild->Name,
                             MAX_SYM_NAME,
                             TEXT("Unknown%lu"),
-                            cNameUnknown);
-
-                        cNameUnknown += 1;
+                            cNameUnknown++);
                     }
 
                     //
                     // Child type name.
                     //
                     baseTypeSize = 0;
-                    lpSymbolName = Context->Parser.GetTypeName(
-                        Context,
-                        typeId,
-                        &baseTypeSize,
-                        Status);
-
+                    lpSymbolName = Context->Parser.GetTypeName(Context, typeId, &baseTypeSize, NULL);
                     if (lpSymbolName) {
+                        _strncpy(dumpChild->TypeName, MAX_SYM_NAME, lpSymbolName, _strlen(lpSymbolName));
 
-                        nLen = _strlen(lpSymbolName);
-
-                        _strncpy(dumpChild->TypeName,
-                            MAX_SYM_NAME,
-                            lpSymbolName,
-                            nLen);
-
+                        // Calculate number of elements based on size
                         if (baseTypeSize == 0) {
                             dumpChild->ElementsCount = 1;
                         }
@@ -1321,16 +1254,14 @@ PSYM_ENTRY SymParserDumpSymbolInformation(
                             dumpChild->ElementsCount = dumpChild->Size / baseTypeSize;
                         }
 
-
                         LocalFree((HLOCAL)lpSymbolName);
                     }
                     else {
                         RtlStringCchPrintfSecure(dumpChild->TypeName,
                             RTL_NUMBER_OF(dumpChild->TypeName),
                             TEXT("UNKNOWN%lu"),
-                            cTypeUnknown);
-
-                        cTypeUnknown += 1;
+                            cTypeUnknown++);
+                        dumpChild->ElementsCount = 1;
                     }
 
                 }
@@ -1357,12 +1288,19 @@ PSYM_ENTRY SymParserDumpSymbolInformation(
     return dumpEntry;
 }
 
+/**
+* Initialize function pointers from DbgHelp DLL
+*
+* @param hDbgHelp - Handle to DbgHelp DLL
+* @param Ptrs - Output structure for function pointers
+* @return TRUE on success, FALSE on failure
+*/
 BOOL SympInitPointers(
     _In_ HMODULE hDbgHelp,
-    _Inout_ DBGHELP_PTRS* Ptrs
+    _Inout_ DBGHELP_PTRS * Ptrs
 )
 {
-    BOOL bResult = TRUE;
+    UINT i;
     LPCSTR szFuncs[] = {
         "SymSetOptions",
         "SymInitializeW",
@@ -1378,39 +1316,37 @@ BOOL SympInitPointers(
 
     DWORD64 dwPtrs[sizeof(DBGHELP_PTRS) / sizeof(DWORD64)];
 
-    UINT i;
+    if (!hDbgHelp || !Ptrs)
+        return FALSE;
 
     RtlSecureZeroMemory(dwPtrs, sizeof(dwPtrs));
 
     for (i = 0; i < RTL_NUMBER_OF(szFuncs); i++) {
         dwPtrs[i] = (DWORD64)GetProcAddress(hDbgHelp, szFuncs[i]);
         if (dwPtrs[i] == 0) {
-            bResult = FALSE;
-            break;
+            return FALSE;
         }
     }
 
-    if (bResult) {
-
-        RtlCopyMemory(Ptrs, dwPtrs, sizeof(DBGHELP_PTRS));
-
-    }
-
-    return bResult;
+    RtlCopyMemory(Ptrs, dwPtrs, sizeof(DBGHELP_PTRS));
+    return TRUE;
 }
 
-/// <summary>
-/// Create symbol parser context
-/// </summary>
-/// <returns>Pointer to allocated symbols context, use SymParserDestroy to deallocate it</returns>
+/**
+* Create a symbol parser context
+*
+* @return Symbol context or NULL on failure (must be freed with SymParserDestroy)
+*/
 PSYMCONTEXT SymParserCreate(
     VOID
 )
 {
     PSYMCONTEXT Context;
-    
-    if (g_SymGlobals.Initialized == FALSE)
+
+    if (g_SymGlobals.Initialized == FALSE) {
+        SetLastError(ERROR_NOT_READY);
         return NULL;
+    }
 
     Context = (PSYMCONTEXT)supHeapAlloc(sizeof(SYMCONTEXT));
     if (Context) {
@@ -1445,34 +1381,41 @@ PSYMCONTEXT SymParserCreate(
     }
     else {
         SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        return NULL;
     }
 
     return Context;
 }
 
-/// <summary>
-/// Deallocates all resources and destroy symbol context.
-/// </summary>
-/// <param name="Context">Pointer to symbols context</param>
+/**
+* Destroy a symbol parser context and free resources
+*
+* @param Context - Symbol context to destroy
+*/
 VOID SymParserDestroy(
     _In_ PSYMCONTEXT Context
 )
 {
     if (Context) {
+        if (Context->ModuleBase != 0)
+            SymParserUnloadModule(Context);
         supHeapFree(Context);
     }
 }
 
-/// <summary>
-/// Initialize global variables, called once.
-/// </summary>
-/// <param name="SymOptions"></param>
-/// <param name="ProcessHandle"></param>
-/// <param name="lpDbgHelpPath"></param>
-/// <param name="lpSymbolPath"></param>
-/// <param name="lpSystemPath">System32 directory, maximum length is MAX_PATH</param>
-/// <param name="lpTempPath">Temp directory, maximum length is MAX_PATH</param>
-/// <returns>TRUE on success</returns>
+/**
+* Initialize global symbol parser environment
+*
+* @param SymOptions - Symbol options or 0 for default
+* @param ProcessHandle - Process handle or NULL for current process
+* @param lpDbgHelpPath - Path to DbgHelp.dll or NULL for default
+* @param lpSymbolPath - Symbol path or NULL for default
+* @param lpSystemPath - System32 directory
+* @param lpTempPath - Temp directory for symbol cache
+* @param CallbackFunction - Optional callback function
+* @param UserContext - User context for callback
+* @return TRUE on success, FALSE on failure
+*/
 BOOL SymGlobalsInit(
     _In_ DWORD SymOptions,
     _In_opt_ HANDLE ProcessHandle,
@@ -1487,61 +1430,45 @@ BOOL SymGlobalsInit(
     BOOL bResult = FALSE;
     DWORD symOptions;
     HMODULE hDbg = NULL;
-    LPWSTR locaDbgHelplPath = NULL;
-    SIZE_T nLen;
-    WCHAR szWinPath[MAX_PATH * 2];
+    LPWSTR finalDbgHelpPath = NULL;
+    WCHAR szDbgHelpPath[MAX_PATH * 2];
 
-    RtlSecureZeroMemory(&g_SymGlobals, sizeof(g_SymGlobals));
+    if (!lpSystemPath || !lpTempPath) {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
 
     //
     // Validate symbols path input length.
     //
-    nLen = _strlen(lpSymbolPath);
-    if (nLen >= RTL_NUMBER_OF(g_SymGlobals.szSymbolsPath)) {
+    if (_strlen(lpSystemPath) > MAX_PATH || _strlen(lpTempPath) > MAX_PATH) {
         SetLastError(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
 
-    nLen = _strlen(lpTempPath);
-    if (nLen > MAX_PATH) {
+    if (lpSymbolPath && _strlen(lpSymbolPath) >= RTL_NUMBER_OF(g_SymGlobals.szSymbolsPath)) {
         SetLastError(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
+
+    RtlSecureZeroMemory(&g_SymGlobals, sizeof(g_SymGlobals));
 
     //
     // Prepare path and load dbghelp library.
     //
     if (lpDbgHelpPath) {
-
-        locaDbgHelplPath = (LPWSTR)lpDbgHelpPath;
-
+        finalDbgHelpPath = (LPWSTR)lpDbgHelpPath;
     }
     else {
-
-        nLen = _strlen(lpSystemPath);
-        if (nLen > MAX_PATH) {
-            SetLastError(ERROR_INVALID_PARAMETER);
-            return FALSE;
-        }
-
-        RtlSecureZeroMemory(&szWinPath, sizeof(szWinPath));
-
-        _strncpy(szWinPath,
-            MAX_PATH,
-            lpSystemPath,
-            nLen);
-
-        supPathAddBackSlash(szWinPath);
-        _strcat(szWinPath, DEFAULT_DLL);
-
-        locaDbgHelplPath = szWinPath;
+        // Construct path from system dir
+        RtlSecureZeroMemory(szDbgHelpPath, sizeof(szDbgHelpPath));
+        _strncpy(szDbgHelpPath, MAX_PATH, lpSystemPath, _strlen(lpSystemPath));
+        supPathAddBackSlash(szDbgHelpPath);
+        _strcat(szDbgHelpPath, DEFAULT_DLL);
+        finalDbgHelpPath = szDbgHelpPath;
     }
 
-    hDbg = LoadLibraryEx(
-        locaDbgHelplPath,
-        NULL,
-        0);
-
+    hDbg = LoadLibraryEx(finalDbgHelpPath, NULL, 0);
     if (hDbg == NULL)
         return FALSE;
 
@@ -1550,16 +1477,10 @@ BOOL SymGlobalsInit(
     //
     // Init dbghelp pointers and allocate context.
     //
-    RtlSecureZeroMemory(&g_SymGlobals.ApiSet, sizeof(DBGHELP_PTRS));
-
     if (SympInitPointers(hDbg, &g_SymGlobals.ApiSet)) {
 
-        if (ProcessHandle == NULL) {
-            g_SymGlobals.ProcessHandle = NtCurrentProcess();
-        }
-        else {
-            g_SymGlobals.ProcessHandle = ProcessHandle;
-        }
+        g_SymGlobals.ProcessHandle = (ProcessHandle == NULL) ?
+            NtCurrentProcess() : ProcessHandle;
 
         if (lpSymbolPath) {
             _strcpy(g_SymGlobals.szSymbolsPath, lpSymbolPath);
@@ -1575,7 +1496,6 @@ BOOL SymGlobalsInit(
         }
 
         symOptions = SymOptions;
-
         if (symOptions == 0) {
             symOptions = SYMOPT_DEFERRED_LOADS |
                 SYMOPT_CASE_INSENSITIVE |
@@ -1584,7 +1504,6 @@ BOOL SymGlobalsInit(
         }
 
         g_SymGlobals.ApiSet.SymSetOptions(symOptions);
-
         g_SymGlobals.Options = symOptions;
 
         bResult = g_SymGlobals.ApiSet.SymInitializeW(
@@ -1617,21 +1536,27 @@ BOOL SymGlobalsInit(
     return bResult;
 }
 
-/// <summary>
-/// Free allocated resources, called once.
-/// </summary>
-/// <returns></returns>
+/**
+* Free global symbol parser resources
+*
+* @return TRUE on success, FALSE on failure
+*/
 BOOL SymGlobalsFree()
 {
     BOOL bResult = FALSE;
 
+    if (!g_SymGlobals.Initialized)
+        return FALSE;
+
     if (g_SymGlobals.ApiSet.SymCleanup) {
         g_SymGlobals.ApiSet.SymCleanup(g_SymGlobals.ProcessHandle);
 
-        if (g_SymGlobals.DllHandle)
+        if (g_SymGlobals.DllHandle) {
             bResult = FreeLibrary(g_SymGlobals.DllHandle);
-
+            g_SymGlobals.DllHandle = NULL;
+        }
     }
 
+    g_SymGlobals.Initialized = FALSE;
     return bResult;
 }

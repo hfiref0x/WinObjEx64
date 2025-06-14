@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2021 - 2024
+*  (C) COPYRIGHT AUTHORS, 2021 - 2025
 *
 *  TITLE:       HASH.C
 *
-*  VERSION:     2.05
+*  VERSION:     2.08
 *
-*  DATE:        12 Apr 2024
+*  DATE:        12 Jun 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -15,6 +15,8 @@
 *
 *******************************************************************************/
 #include "global.h"
+
+#define DEFAULT_ALIGN_BYTES 8
 
 /*
 * CreateHashContext
@@ -44,6 +46,8 @@ NTSTATUS CreateHashContext(
     }
 
     do {
+
+        context->HeapHandle = HeapHandle;
 
         ntStatus = BCryptOpenAlgorithmProvider(&context->AlgHandle,
             AlgId,
@@ -103,8 +107,6 @@ NTSTATUS CreateHashContext(
         if (!NT_SUCCESS(ntStatus))
             break;
 
-        context->HeapHandle = HeapHandle;
-
         *Context = context;
         return STATUS_SUCCESS;
 
@@ -112,6 +114,7 @@ NTSTATUS CreateHashContext(
 
     if (context->Hash) HeapFree(HeapHandle, 0, context->Hash);
     if (context->HashObject) HeapFree(HeapHandle, 0, context->HashObject);
+    if (context->AlgHandle) BCryptCloseAlgorithmProvider(context->AlgHandle, 0);
     HeapFree(HeapHandle, 0, context);
 
     return ntStatus;
@@ -129,10 +132,14 @@ VOID DestroyHashContext(
     _In_ PCNG_CTX Context
 )
 {
-    HANDLE heapHandle = Context->HeapHandle;
+    HANDLE heapHandle;
 
-    BCryptCloseAlgorithmProvider(Context->AlgHandle, 0);
+    if (!Context) return;
 
+    heapHandle = Context->HeapHandle;
+
+    if (Context->AlgHandle)
+        BCryptCloseAlgorithmProvider(Context->AlgHandle, 0);
     if (Context->HashHandle)
         BCryptDestroyHash(Context->HashHandle);
     if (Context->Hash)
@@ -142,8 +149,6 @@ VOID DestroyHashContext(
 
     HeapFree(heapHandle, 0, Context);
 }
-
-#define DEFAULT_ALIGN_BYTES 8
 
 /*
 * HashpAddPad
@@ -157,29 +162,23 @@ NTSTATUS HashpAddPad(
     _In_ ULONG PaddingSize,
     _In_ PCNG_CTX HashContext)
 {
+    static const UCHAR zeroPad[DEFAULT_ALIGN_BYTES] = { 0 };
     NTSTATUS ntStatus = STATUS_SUCCESS;
-    ULONG cbPad = PaddingSize, i;
-    UCHAR pbInput[DEFAULT_ALIGN_BYTES] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+    ULONG remainingPad = PaddingSize;
+    ULONG blockSize;
 
-    if (cbPad >= DEFAULT_ALIGN_BYTES) {
+    if (PaddingSize == 0)
+        return STATUS_SUCCESS;
 
-        i = (cbPad >> 3);
-        do {
-#pragma warning(push)
-#pragma warning(disable: 28193)
-            ntStatus = BCryptHashData(HashContext->HashHandle,
-                (PUCHAR)pbInput, DEFAULT_ALIGN_BYTES, 0);
-#pragma warning(pop)
-            cbPad -= DEFAULT_ALIGN_BYTES;
-            --i;
-
-        } while (i);
-
-    }
-
-    if (cbPad) {
+    while (remainingPad > 0) {
+        blockSize = min(remainingPad, DEFAULT_ALIGN_BYTES);
         ntStatus = BCryptHashData(HashContext->HashHandle,
-            (PUCHAR)pbInput, cbPad, 0);
+            (PUCHAR)zeroPad, blockSize, 0);
+
+        if (!NT_SUCCESS(ntStatus))
+            break;
+
+        remainingPad -= blockSize;
     }
 
     return ntStatus;
@@ -197,19 +196,14 @@ DWORD HashpGetSizeOfHeaders(
     _In_ PIMAGE_NT_HEADERS NtHeaders
 )
 {
-    PIMAGE_OPTIONAL_HEADER64 opt64;
-    PIMAGE_OPTIONAL_HEADER32 opt32;
-
     switch (NtHeaders->OptionalHeader.Magic) {
     case IMAGE_NT_OPTIONAL_HDR64_MAGIC:
-        opt64 = (PIMAGE_OPTIONAL_HEADER64)&NtHeaders->OptionalHeader;
-        return opt64->SizeOfHeaders;
+        return ((PIMAGE_OPTIONAL_HEADER64)&NtHeaders->OptionalHeader)->SizeOfHeaders;
     case IMAGE_NT_OPTIONAL_HDR32_MAGIC:
-        opt32 = (PIMAGE_OPTIONAL_HEADER32)&NtHeaders->OptionalHeader;
-        return opt32->SizeOfHeaders;
+        return ((PIMAGE_OPTIONAL_HEADER32)&NtHeaders->OptionalHeader)->SizeOfHeaders;
+    default:
+        return 0;
     }
-
-    return 0;
 }
 
 /*
@@ -224,7 +218,7 @@ BOOLEAN HashpGetExcludeRange(
     _In_ PFILE_VIEW_INFO ViewInformation
 )
 {
-    ULONG securityOffset = 0, checksumOffset = 0, c, numberOfSections;
+    ULONG securityOffset = 0, checksumOffset = 0, endOfLastSection, numberOfSections;
     PIMAGE_DATA_DIRECTORY dataDirectory = NULL;
 
     PIMAGE_SECTION_HEADER sectionTableEntry;
@@ -272,11 +266,10 @@ BOOLEAN HashpGetExcludeRange(
         }
 
         sectionTableEntry = IMAGE_FIRST_SECTION(ViewInformation->NtHeaders);
-
-        c = sectionTableEntry[numberOfSections - 1].PointerToRawData +
+        endOfLastSection = sectionTableEntry[numberOfSections - 1].PointerToRawData +
             sectionTableEntry[numberOfSections - 1].SizeOfRawData;
 
-        if (dataDirectory->VirtualAddress < c) {
+        if (dataDirectory->VirtualAddress < endOfLastSection) {
             ViewInformation->Status = StatusBadSecurityDirectoryVA;
             return FALSE;
         }
@@ -286,8 +279,7 @@ BOOLEAN HashpGetExcludeRange(
             return FALSE;
         }
 
-        c = ViewInformation->FileSize.LowPart - dataDirectory->VirtualAddress;
-        if (dataDirectory->Size > c) {
+        if (dataDirectory->Size > (ViewInformation->FileSize.LowPart - dataDirectory->VirtualAddress)) {
             ViewInformation->Status = StatusBadSecurityDirectorySize;
             return FALSE;
         }
@@ -318,26 +310,19 @@ NTSTATUS HashLoadFile(
 
     ntStatus = supMapInputFileForRead(ViewInformation, PartialMap);
     if (NT_SUCCESS(ntStatus)) {
-
         ntStatus = STATUS_INVALID_IMAGE_FORMAT;
-
         if (supIsValidImage(ViewInformation)) {
-
             ViewInformation->NtHeaders = RtlImageNtHeader(ViewInformation->ViewBase);
             if (ViewInformation->NtHeaders) {
-
                 if (HashpGetExcludeRange(ViewInformation)) {
                     return STATUS_SUCCESS;
                 }
-
             }
             else {
                 ViewInformation->Status = StatusBadNtHeaders;
             }
         }
-
     }
-
     supDestroyFileViewInfo(ViewInformation);
     return ntStatus;
 }
@@ -347,7 +332,7 @@ NTSTATUS HashLoadFile(
 *
 * Purpose:
 *
-* Compute page hash for PE headers (WDAC compliant)
+* Compute page hash for PE headers (WDAC compliant), buffer based processing
 *
 */
 BOOLEAN CalculateFirstPageHash(
@@ -362,11 +347,9 @@ BOOLEAN CalculateFirstPageHash(
     PVOID pvImage = ViewInformation->ViewBase;
 
     __try {
-
         offset = 0;
 
         while (offset < PageSize) {
-
             if (offset == ViewInformation->ExcludeData.ChecksumOffset)
                 offset += RTL_FIELD_SIZE(IMAGE_OPTIONAL_HEADER, CheckSum);
             else if (offset == ViewInformation->ExcludeData.SecurityOffset)
@@ -394,7 +377,6 @@ BOOLEAN CalculateFirstPageHash(
             (PUCHAR)HashContext->Hash,
             HashContext->HashSize,
             0);
-
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {
         ViewInformation->Status = StatusExceptionOccurred;
@@ -418,8 +400,8 @@ BOOLEAN CalculateAuthenticodeHash(
 )
 {
     NTSTATUS ntStatus = STATUS_INVALID_IMAGE_FORMAT;
-    ULONG securityOffset, checksumOffset, cbInput, sz, cbPad;
-    ULONG fileOffset = 0;
+    ULONG securityOffset, checksumOffset, paddingSize;
+    ULONG fileOffset = 0, dataSize;
     PVOID imageBase;
     PIMAGE_DATA_DIRECTORY dataDirectory;
 
@@ -430,49 +412,43 @@ BOOLEAN CalculateAuthenticodeHash(
         securityOffset = ViewInformation->ExcludeData.SecurityOffset;
         dataDirectory = ViewInformation->ExcludeData.SecurityDirectory;
 
-        //
-        // Handle checksum offset.
-        //
-        cbInput = checksumOffset;
-
+        // 1. Start of file to checksum
         ntStatus = BCryptHashData(HashContext->HashHandle,
-            (PUCHAR)imageBase, cbInput, 0);
+            (PUCHAR)imageBase, checksumOffset, 0);
 
         if (NT_SUCCESS(ntStatus)) {
 
-            //
-            // Handle security offset.
-            //
+            // Skip checksum
             fileOffset = checksumOffset + RTL_FIELD_SIZE(IMAGE_OPTIONAL_HEADER, CheckSum);
 
-            cbInput = securityOffset - fileOffset;
-
+            // 2. After checksum to security directory
+            dataSize = securityOffset - fileOffset;
             ntStatus = BCryptHashData(HashContext->HashHandle,
-                (PUCHAR)RtlOffsetToPointer(imageBase, fileOffset), cbInput, 0);
+                (PUCHAR)RtlOffsetToPointer(imageBase, fileOffset), dataSize, 0);
 
             if (NT_SUCCESS(ntStatus)) {
 
+                // Skip security directory
                 fileOffset = securityOffset + sizeof(IMAGE_DATA_DIRECTORY);
 
-                if (dataDirectory->VirtualAddress == 0)
-                {
-                    cbInput = ViewInformation->FileSize.LowPart - fileOffset;
+                // 3. After security directory to end or certificate table
+                if (dataDirectory->VirtualAddress == 0) {
+                    dataSize = ViewInformation->FileSize.LowPart - fileOffset;
                 }
-                else
-                {
-                    cbInput = dataDirectory->VirtualAddress - fileOffset;
+                else {
+                    dataSize = dataDirectory->VirtualAddress - fileOffset;
                 }
 
                 ntStatus = BCryptHashData(HashContext->HashHandle,
-                    (PUCHAR)RtlOffsetToPointer(imageBase, fileOffset), cbInput, 0);
+                    (PUCHAR)RtlOffsetToPointer(imageBase, fileOffset), dataSize, 0);
 
                 if (NT_SUCCESS(ntStatus)) {
 
-                    sz = (cbInput % DEFAULT_ALIGN_BYTES);
-                    if (sz) {
-
-                        cbPad = (DEFAULT_ALIGN_BYTES - sz);
-                        ntStatus = HashpAddPad(cbPad, HashContext);
+                    // 4. Add padding if needed
+                    paddingSize = (dataSize % DEFAULT_ALIGN_BYTES);
+                    if (paddingSize) {
+                        paddingSize = (DEFAULT_ALIGN_BYTES - paddingSize);
+                        ntStatus = HashpAddPad(paddingSize, HashContext);
                         if (!NT_SUCCESS(ntStatus))
                             return FALSE;
                     }
@@ -508,22 +484,9 @@ LPWSTR ComputeHashForFile(
 
     if (NT_SUCCESS(CreateHashContext(HeapHandle, lpAlgId, &hashContext))) {
 
-        if (FirstPageHashOnly) {
-
-            bComputed = CalculateFirstPageHash(
-                PageSize,
-                ViewInformation,
-                hashContext);
-
-        }
-        else {
-
-            bComputed = CalculateAuthenticodeHash(
-                ViewInformation,
-                hashContext);
-
-        }
-
+        bComputed = FirstPageHashOnly ?
+            CalculateFirstPageHash(PageSize, ViewInformation, hashContext) :
+            CalculateAuthenticodeHash(ViewInformation, hashContext);
 
         if (bComputed) {
             lpszHash = (LPWSTR)supPrintHash((PUCHAR)hashContext->Hash,

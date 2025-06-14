@@ -103,7 +103,7 @@ WOBJ_TYPE_DESC g_TypeWinstation = { L"WindowStation", OBTYPE_HASH_WINSTATION, Ob
 WOBJ_TYPE_DESC g_TypeWmiGuid = { L"WmiGuid", 0x36d9823c, ObjectTypeWMIGuid, IDI_ICON_WMIGUID, IDS_DESC_WMIGUID };
 
 // Maximum object type index value for lookup table sizing
-#define MAX_OBJECT_TYPE_INDEX    ObjectTypeWMIGuid
+#define MAX_OBJECT_TYPE_INDEX    ObjectTypeUnknown
 
 #define OBJECT_TYPE_ENTRIES \
     X(g_TypeActivationObject) \

@@ -78,7 +78,6 @@ SAPIDB g_sapiDB;
 SCMDB g_scmDB;
 
 SYM_LOADING_STATE g_SymLoadState;
-HWND g_hBannerDialog = NULL;
 
 int __cdecl supxHandlesLookupCallback(
     void const* first,
@@ -221,6 +220,30 @@ FORCEINLINE PVOID supHeapAlloc(
     _In_ SIZE_T Size)
 {
     return supHeapAllocEx(g_obexHeap, Size);
+}
+
+/*
+* supHeapReAlloc
+*
+* Purpose:
+*
+* Wrapper for supHeapReAlloc with WinObjEx heap.
+*
+*/
+PVOID supHeapReAlloc(
+    _Frees_ptr_opt_ PVOID Memory,
+    _In_ SIZE_T Size
+)
+{
+    if (Size == 0) {
+        if (Memory)
+            supHeapFree(Memory);
+        return NULL;
+    }
+    if (Memory) {
+        return RtlReAllocateHeap(g_obexHeap, HEAP_GENERATE_EXCEPTIONS, Memory, Size);
+    }
+    return RtlAllocateHeap(g_obexHeap, HEAP_GENERATE_EXCEPTIONS, Size);
 }
 
 /*
@@ -7992,7 +8015,7 @@ LPWSTR supPrintHash(
     PWCHAR  lpText;
     BYTE    x;
 
-    lpText = (LPWSTR)supHeapAlloc(sizeof(WCHAR) + ((SIZE_T)Length * 2 * sizeof(WCHAR)));
+    lpText = (LPWSTR)supHeapAlloc((2 * (SIZE_T)Length + 1) * sizeof(WCHAR));
     if (lpText) {
 
         for (c = 0; c < Length; ++c) {
@@ -10163,7 +10186,7 @@ VOID CALLBACK supSymCallbackReportEvent(
     _In_opt_ LPCWSTR StatusText
 )
 {
-    HWND hwndBanner = g_hBannerDialog;
+    HWND hwndBanner = g_SymLoadState.hBannerDialog;;
 
     if (!hwndBanner || !IsWindow(hwndBanner))
         return;
@@ -10304,7 +10327,7 @@ DWORD WINAPI supSymLoadDialogThreadProc(
         (LPARAM)&bannerData);
 
     if (pParams->hDialogWindow) {
-        g_hBannerDialog = pParams->hDialogWindow;
+        g_SymLoadState.hBannerDialog = pParams->hDialogWindow;
 
         SetWindowPos(
             pParams->hDialogWindow,
@@ -10332,7 +10355,7 @@ DWORD WINAPI supSymLoadDialogThreadProc(
             }
         }
 
-        g_hBannerDialog = NULL;
+        g_SymLoadState.hBannerDialog = NULL;
     }
     else {
         SetEvent(pParams->hDialogInitialized);
@@ -10377,7 +10400,7 @@ BOOL supLoadSymbolsForNtImage(
 
     g_SymLoadState.IsCompleted = FALSE;
     g_SymLoadState.IsCancelled = FALSE;
-    g_hBannerDialog = NULL;
+    g_SymLoadState.hBannerDialog = NULL;
 
     hDialogInitialized = CreateEvent(NULL, TRUE, FALSE, NULL);
     hCompletionEvent = CreateEvent(NULL, TRUE, FALSE, NULL);

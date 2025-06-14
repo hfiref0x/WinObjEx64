@@ -132,6 +132,7 @@ typedef struct _SYMBOL_LOAD_PARAMS {
 typedef struct _SYM_LOADING_STATE {
     BOOL IsCancelled;
     BOOL IsCompleted;
+    HWND hBannerDialog;
 } SYM_LOADING_STATE, * PSYM_LOADING_STATE;
 
 extern SYM_LOADING_STATE g_SymLoadState;

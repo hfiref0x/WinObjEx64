@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2023
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       EXTRAS.C
 *
-*  VERSION:     2.03
+*  VERSION:     2.05
 *
-*  DATE:        27 Jul 2023
+*  DATE:        13 Jun 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -56,8 +56,8 @@ VOID extrasSimpleListResize(
     RECT r, szr;
     HWND hwnd, hwndStatusBar;
 
-    RtlSecureZeroMemory(&r, sizeof(RECT));
-    RtlSecureZeroMemory(&szr, sizeof(RECT));
+    RtlZeroMemory(&r, sizeof(RECT));
+    RtlZeroMemory(&szr, sizeof(RECT));
 
     hwnd = GetDlgItem(hwndDlg, ID_EXTRASLIST);
     hwndStatusBar = GetDlgItem(hwndDlg, ID_EXTRASLIST_STATUSBAR);

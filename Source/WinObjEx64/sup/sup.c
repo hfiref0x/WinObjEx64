@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.08
 *
-*  DATE:        10 Jun 2025
+*  DATE:        13 Jun 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -77,7 +77,8 @@ OBEX_CONFIG g_LoadedParametersBlock;
 SAPIDB g_sapiDB;
 SCMDB g_scmDB;
 
-HWND BannerWindow = NULL;
+SYM_LOADING_STATE g_SymLoadState;
+HWND g_hBannerDialog = NULL;
 
 int __cdecl supxHandlesLookupCallback(
     void const* first,
@@ -954,138 +955,6 @@ VOID supSetWaitCursor(
 {
     ShowCursor(fSet);
     SetCursor(LoadCursor(NULL, fSet ? IDC_WAIT : IDC_ARROW));
-}
-
-/*
-* supSymCallbackReportEvent
-*
-* Purpose:
-*
-* Banner output callback for symbols loading.
-*
-*/
-VOID CALLBACK supSymCallbackReportEvent(
-    _In_ LPCWSTR EventText
-)
-{
-    SendDlgItemMessage(BannerWindow, IDC_LOADING_MSG, EM_REPLACESEL, (WPARAM)0, (LPARAM)EventText);
-    SendDlgItemMessage(BannerWindow, IDC_LOADING_MSG, EM_REPLACESEL, (WPARAM)0, (LPARAM)(LPWSTR)L"\r\n");
-}
-
-/*
-* supxLoadBannerDialog
-*
-* Purpose:
-*
-* Wait window banner dialog procedure.
-*
-*/
-INT_PTR CALLBACK supxLoadBannerDialog(
-    _In_ HWND   hwndDlg,
-    _In_ UINT   uMsg,
-    _In_ WPARAM wParam,
-    _In_ LPARAM lParam
-)
-{
-    SUP_BANNER_DATA* pvData;
-    UNREFERENCED_PARAMETER(wParam);
-
-    switch (uMsg) {
-
-    case WM_INITDIALOG:
-
-        if (lParam) {
-            pvData = (SUP_BANNER_DATA*)lParam;
-            SendDlgItemMessage(hwndDlg, IDC_LOADING_MSG, EM_SETLIMITTEXT, 0, 0);
-            supCenterWindowPerScreen(hwndDlg);
-            if (pvData->lpCaption) SetWindowText(hwndDlg, pvData->lpCaption);
-            SendDlgItemMessage(hwndDlg, IDC_LOADING_MSG, EM_REPLACESEL, (WPARAM)0, (LPARAM)pvData->lpText);
-        }
-        return TRUE;
-
-    case WM_CLOSE:
-        DestroyWindow(hwndDlg);
-        BannerWindow = NULL;
-        break;
-
-    }
-
-    return FALSE;
-}
-
-/*
-* supUpdateLoadBannerText
-*
-* Purpose:
-*
-* Set new text for banner window.
-*
-*/
-VOID supUpdateLoadBannerText(
-    _In_ LPCWSTR lpText,
-    _In_ BOOL UseList
-)
-{
-    if (BannerWindow) {
-        if (UseList) {
-            SendDlgItemMessage(BannerWindow, IDC_LOADING_MSG, EM_REPLACESEL, (WPARAM)0, (LPARAM)lpText);
-            SendDlgItemMessage(BannerWindow, IDC_LOADING_MSG, EM_REPLACESEL, (WPARAM)0, (LPARAM)(LPWSTR)L"\r\n");
-        }
-        else {
-            SetDlgItemText(BannerWindow, IDC_LOADING_MSG, lpText);
-        }
-    }
-
-}
-
-/*
-* supDisplayLoadBanner
-*
-* Purpose:
-*
-* Display borderless banner window to inform user about operation that need some wait.
-*
-*/
-VOID supDisplayLoadBanner(
-    _In_ LPCWSTR lpMessage,
-    _In_opt_ LPCWSTR lpCaption
-)
-{
-    SUP_BANNER_DATA bannerData;
-
-    bannerData.lpText = lpMessage;
-    bannerData.lpCaption = lpCaption;
-
-    BannerWindow = CreateDialogParam(
-        g_WinObj.hInstance,
-        MAKEINTRESOURCE(IDD_DIALOG_LOADLIST),
-        0,
-        supxLoadBannerDialog,
-        (LPARAM)&bannerData);
-
-    if (BannerWindow) {
-        supSetWaitCursor(TRUE);
-        SetCapture(BannerWindow);
-    }
-}
-
-/*
-* supCloseLoadBanner
-*
-* Purpose:
-*
-* End load banner display.
-*
-*/
-VOID supCloseLoadBanner(
-    VOID
-)
-{
-    if (BannerWindow) {
-        supSetWaitCursor(FALSE);
-        ReleaseCapture();
-        SendMessage(BannerWindow, WM_CLOSE, 0, 0);
-    }
 }
 
 /*
@@ -10167,10 +10036,8 @@ ULONG supFilterCreateList(
 
                             RtlCopyMemory(pFltEntry->FilterNameBuffer,
                                 buffer->FilterNameBuffer,
-                                pFltEntry->FilterNameLength);
-                           
+                                pFltEntry->FilterNameLength);                          
                         }
-
 
                         InsertHeadList(FltListHead, &pFltEntry->ListEntry);
                         cFlt += 1;
@@ -10187,4 +10054,411 @@ ULONG supFilterCreateList(
     }
 
     return cFlt;
+}
+
+/*
+* supSymLoadWorker
+*
+* Purpose:
+*
+* Worker thread to load symbols while keeping UI responsive.
+*
+*/
+DWORD WINAPI supSymLoadWorker(LPVOID lpParameter)
+{
+    PSYMBOL_LOAD_PARAMS pParams;
+    BOOL bResult = FALSE;
+
+    pParams = (PSYMBOL_LOAD_PARAMS)lpParameter;
+    if (!pParams)
+        return 0;
+
+    __try {
+        bResult = pParams->SymContext->Parser.LoadModule(
+            pParams->SymContext,
+            pParams->ImageFileName,
+            pParams->ImageBase,
+            pParams->SizeOfImage);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        bResult = FALSE;
+    }
+
+    SetEvent(pParams->hCompletionEvent);
+
+    return bResult ? 1 : 0;
+}
+
+/*
+* supCallbackReportEvent
+*
+* Purpose:
+*
+* Add event to the log and output it into optional callback.
+*
+*/
+VOID supCallbackReportEvent(
+    _In_ ULONG ActionCode,
+    _In_ PIMAGEHLP_DEFERRED_SYMBOL_LOAD Action,
+    _In_ PFNSUPSYMCALLBACK UserCallback
+)
+{
+    WCHAR szLogMessage[MAX_PATH * 2];
+    WCHAR szStatusText[MAX_PATH];
+    WOBJ_ENTRY_TYPE entryType = EntryTypeInformation;
+
+    szLogMessage[0] = 0;
+    szStatusText[0] = 0;
+
+    switch (ActionCode) {
+    case CBA_DEFERRED_SYMBOL_LOAD_START:
+        RtlStringCchPrintfSecure(szLogMessage, RTL_NUMBER_OF(szLogMessage),
+            TEXT("Loading symbols for 0x%p %ws..."),
+            Action->BaseOfImage,
+            Action->FileName);
+
+        RtlStringCchPrintfSecure(szStatusText, RTL_NUMBER_OF(szStatusText),
+            TEXT("Loading symbols..."));
+        break;
+
+    case CBA_DEFERRED_SYMBOL_LOAD_COMPLETE:
+        RtlStringCchPrintfSecure(szLogMessage, RTL_NUMBER_OF(szLogMessage),
+            TEXT("Loaded symbols for 0x%p %ws"),
+            Action->BaseOfImage,
+            Action->FileName);
+
+        RtlStringCchPrintfSecure(szStatusText, RTL_NUMBER_OF(szStatusText),
+            TEXT("Symbols loaded successfully"));
+        break;
+
+    case CBA_DEFERRED_SYMBOL_LOAD_FAILURE:
+        RtlStringCchPrintfSecure(szLogMessage, RTL_NUMBER_OF(szLogMessage),
+            TEXT("*** ERROR: Could not load symbols for 0x%p %ws"),
+            Action->BaseOfImage,
+            Action->FileName);
+
+        RtlStringCchPrintfSecure(szStatusText, RTL_NUMBER_OF(szStatusText),
+            TEXT("Failed to load symbols"));
+
+        entryType = EntryTypeError;
+        break;
+    }
+
+    logAdd(entryType, szLogMessage);
+
+    if (UserCallback)
+        UserCallback(szLogMessage, szStatusText);
+}
+
+/*
+* supSymCallbackReportEvent
+*
+* Purpose:
+*
+* Banner output callback for symbols loading.
+*
+*/
+VOID CALLBACK supSymCallbackReportEvent(
+    _In_ LPCWSTR EventText,
+    _In_opt_ LPCWSTR StatusText
+)
+{
+    HWND hwndBanner = g_hBannerDialog;
+
+    if (!hwndBanner || !IsWindow(hwndBanner))
+        return;
+
+    if (EventText) {
+        SendDlgItemMessage(hwndBanner, IDC_LOADING_MSG, EM_REPLACESEL, (WPARAM)0, (LPARAM)EventText);
+        SendDlgItemMessage(hwndBanner, IDC_LOADING_MSG, EM_REPLACESEL, (WPARAM)0, (LPARAM)(LPWSTR)L"\r\n");
+        SendDlgItemMessage(hwndBanner, IDC_LOADING_MSG, EM_SETSEL, (WPARAM)-1, (LPARAM)-1);
+    }
+
+    if (StatusText) {
+        SetDlgItemText(hwndBanner, IDC_STATUS_TEXT, StatusText);
+    }
+}
+
+/*
+* supxLoadBannerDialog
+*
+* Purpose:
+*
+* Wait window banner dialog procedure.
+*
+*/
+INT_PTR CALLBACK supxLoadBannerDialog(
+    _In_ HWND   hwndDlg,
+    _In_ UINT   uMsg,
+    _In_ WPARAM wParam,
+    _In_ LPARAM lParam
+)
+{
+    static DWORD64 dwStartTime = 0;
+    static DWORD64 dwElapsedSecs = 0;
+    static HANDLE hCancelEvent = NULL;
+    static BOOL bAllowCancel = FALSE;
+    static BOOL bClosePending = FALSE;
+    static DWORD64 dwCloseStartTime = 0;
+
+    WCHAR szTimeElapsed[64];
+    SUP_BANNER_DATA* pvData;
+
+    switch (uMsg) {
+    case WM_INITDIALOG:
+        if (lParam) {
+            pvData = (SUP_BANNER_DATA*)lParam;
+            SendDlgItemMessage(hwndDlg, IDC_LOADING_MSG, EM_SETLIMITTEXT, 0, 0);
+            supCenterWindowPerScreen(hwndDlg);
+
+            if (pvData->lpCaption)
+                SetWindowText(hwndDlg, pvData->lpCaption);
+
+            SendDlgItemMessage(hwndDlg, IDC_LOADING_MSG, EM_REPLACESEL, (WPARAM)0, (LPARAM)pvData->lpText);
+
+            hCancelEvent = pvData->hCancelEvent;
+            bAllowCancel = (hCancelEvent != NULL);
+
+            dwStartTime = GetTickCount64();
+            dwElapsedSecs = 0;
+            bClosePending = FALSE;
+
+            SetTimer(hwndDlg, 1, 100, NULL);
+        }
+        return TRUE;
+
+    case WM_TIMER:
+        if (wParam == 1) {
+            // Update elapsed time every second
+            if ((GetTickCount64() - dwStartTime) / 1000 != dwElapsedSecs) {
+                dwElapsedSecs = (GetTickCount64() - dwStartTime) / 1000;
+                RtlStringCchPrintfSecure(szTimeElapsed, RTL_NUMBER_OF(szTimeElapsed),
+                    TEXT("Time elapsed: %02u:%02u"), (DWORD)(dwElapsedSecs / 60), (DWORD)(dwElapsedSecs % 60));
+                SetDlgItemText(hwndDlg, IDC_TIME_ELAPSED, szTimeElapsed);
+            }
+
+            if (bClosePending) {
+                if ((GetTickCount64() - dwCloseStartTime) >= 500) {
+                    bClosePending = FALSE;
+                    SendMessage(hwndDlg, WM_CLOSE, 0, 0);
+                    return TRUE;
+                }
+            }
+            else if (g_SymLoadState.IsCompleted) {
+                bClosePending = TRUE;
+                dwCloseStartTime = GetTickCount64();
+            }
+        }
+        break;
+
+    case WM_COMMAND:
+        if (LOWORD(wParam) == IDCANCEL && bAllowCancel) {
+            InterlockedExchange((PLONG)&g_SymLoadState.IsCancelled, 1);
+            if (hCancelEvent) {
+                SetEvent(hCancelEvent);
+            }
+            SendMessage(hwndDlg, WM_CLOSE, 0, 0);
+            return TRUE;
+        }
+        break;
+
+    case WM_CLOSE:
+        KillTimer(hwndDlg, 1);
+        DestroyWindow(hwndDlg);
+        PostQuitMessage(0);
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+/*
+* supSymLoadDialogThreadProc
+*
+* Purpose:
+*
+* Thread procedure for displaying and managing the symbol loading dialog.
+*
+*/
+DWORD WINAPI supSymLoadDialogThreadProc(
+    _In_ LPVOID lpParameter
+)
+{
+    BOOL bRet;
+    PSUP_BANNER_DATA pParams = (PSUP_BANNER_DATA)lpParameter;
+    MSG msg;
+    SUP_BANNER_DATA bannerData;
+
+    if (!pParams)
+        return 0;
+
+    bannerData.lpText = pParams->lpText;
+    bannerData.lpCaption = pParams->lpCaption;
+    bannerData.hCancelEvent = pParams->hCancelEvent;
+
+    pParams->hDialogWindow = CreateDialogParam(
+        g_WinObj.hInstance,
+        MAKEINTRESOURCE(IDD_DIALOG_LOADLIST),
+        0,
+        supxLoadBannerDialog,
+        (LPARAM)&bannerData);
+
+    if (pParams->hDialogWindow) {
+        g_hBannerDialog = pParams->hDialogWindow;
+
+        SetWindowPos(
+            pParams->hDialogWindow,
+            HWND_TOPMOST,
+            0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE
+        );
+
+        ShowWindow(pParams->hDialogWindow, SW_SHOW);
+        UpdateWindow(pParams->hDialogWindow);
+
+        SetEvent(pParams->hDialogInitialized);
+
+        while ((bRet = GetMessage(&msg, NULL, 0, 0)) != 0) {
+            if (bRet == -1)
+                break;
+
+            if (WaitForSingleObject(pParams->hCompletionEvent, 0) == WAIT_OBJECT_0) {
+                g_SymLoadState.IsCompleted = TRUE;
+            }
+
+            if (!IsDialogMessage(pParams->hDialogWindow, &msg)) {
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+            }
+        }
+
+        g_hBannerDialog = NULL;
+    }
+    else {
+        SetEvent(pParams->hDialogInitialized);
+    }
+
+    return 0;
+}
+
+/*
+* supLoadSymbolsForNtImage
+*
+* Purpose:
+*
+* Load symbols for OS mapped image.
+*
+*/
+BOOL supLoadSymbolsForNtImage(
+    _In_ PSYMCONTEXT SymContext,
+    _In_ LPCWSTR ImageFileName,
+    _In_ PVOID ImageBase,
+    _In_ DWORD SizeOfImage
+)
+{
+    BOOL bResult = FALSE;
+    HANDLE hDialogThread = NULL;
+    HANDLE hSymLoadingThread = NULL;
+    HANDLE hDialogInitialized = NULL;
+    HANDLE hCompletionEvent = NULL;
+    HANDLE hCancelEvent = NULL;
+    SUP_BANNER_DATA dialogParams;
+    SYMBOL_LOAD_PARAMS symbolParams;
+    DWORD dwExitCode = 0;
+    DWORD dwWaitResult;
+
+    HANDLE waitHandles[2];
+
+    if (SymContext == NULL)
+        return FALSE;
+
+    if (SymContext->ModuleBase != 0)
+        return TRUE;
+
+    g_SymLoadState.IsCompleted = FALSE;
+    g_SymLoadState.IsCancelled = FALSE;
+    g_hBannerDialog = NULL;
+
+    hDialogInitialized = CreateEvent(NULL, TRUE, FALSE, NULL);
+    hCompletionEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    hCancelEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+
+    if (!hDialogInitialized || !hCompletionEvent || !hCancelEvent) {
+        if (hDialogInitialized) CloseHandle(hDialogInitialized);
+        if (hCompletionEvent) CloseHandle(hCompletionEvent);
+        if (hCancelEvent) CloseHandle(hCancelEvent);
+        return FALSE;
+    }
+
+    dialogParams.lpText = L"Loading symbols, please wait...\r\n";
+    dialogParams.lpCaption = L"Symbol Loading";
+    dialogParams.hDialogInitialized = hDialogInitialized;
+    dialogParams.hCancelEvent = hCancelEvent;
+    dialogParams.hCompletionEvent = hCompletionEvent;
+    dialogParams.hDialogWindow = NULL;
+
+    hDialogThread = CreateThread(NULL, 0, supSymLoadDialogThreadProc, &dialogParams, 0, NULL);
+    if (!hDialogThread) {
+        CloseHandle(hDialogInitialized);
+        CloseHandle(hCompletionEvent);
+        CloseHandle(hCancelEvent);
+        return FALSE;
+    }
+
+    WaitForSingleObject(hDialogInitialized, INFINITE);
+    CloseHandle(hDialogInitialized);
+
+    symbolParams.SymContext = SymContext;
+    symbolParams.ImageFileName = ImageFileName;
+    symbolParams.ImageBase = (DWORD64)ImageBase;
+    symbolParams.SizeOfImage = SizeOfImage;
+    symbolParams.hCancelEvent = hCancelEvent;
+    symbolParams.hCompletionEvent = hCompletionEvent;
+
+    hSymLoadingThread = CreateThread(NULL, 0, supSymLoadWorker, &symbolParams, 0, NULL);
+    if (!hSymLoadingThread) {
+        SetEvent(hCompletionEvent);
+        WaitForSingleObject(hDialogThread, INFINITE);
+
+        CloseHandle(hDialogThread);
+        CloseHandle(hCompletionEvent);
+        CloseHandle(hCancelEvent);
+        return FALSE;
+    }
+
+    waitHandles[0] = hCompletionEvent;
+    waitHandles[1] = hCancelEvent;
+
+    while (TRUE) {
+        dwWaitResult = WaitForMultipleObjects(2, waitHandles, FALSE, 100);
+        if (dwWaitResult != WAIT_TIMEOUT)
+            break;
+
+        if (g_SymLoadState.IsCancelled) {
+            TerminateThread(hSymLoadingThread, 0);
+            logAdd(EntryTypeWarning, TEXT("Symbols loading are interrupted by user"));
+            break;
+        }
+    }
+
+    if (dwWaitResult == WAIT_OBJECT_0) {
+        GetExitCodeThread(hSymLoadingThread, &dwExitCode);
+        bResult = (dwExitCode != 0);
+    }
+    else {
+        bResult = FALSE;
+    }
+
+    CloseHandle(hSymLoadingThread);
+
+    SetEvent(hCompletionEvent);
+    g_SymLoadState.IsCompleted = TRUE;
+
+    WaitForSingleObject(hDialogThread, 3000);
+    CloseHandle(hDialogThread);
+
+    CloseHandle(hCompletionEvent);
+    CloseHandle(hCancelEvent);
+
+    return bResult;
 }

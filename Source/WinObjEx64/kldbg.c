@@ -149,7 +149,7 @@ ULONG_PTR ObFindAddress(
                 ScanPattern,
                 ScanPatternSize))
             {
-                if (currentIndex + ScanPatternSize + sizeof(LONG) <= NumberOfBytes) {
+                if ((ULONG_PTR)currentIndex + (ULONG_PTR)ScanPatternSize + sizeof(LONG) <= NumberOfBytes) {
                     relativeOffset = *(PLONG)(PtrCode + currentIndex + ScanPatternSize);
                     resultAddress = (ULONG_PTR)PtrCode + currentIndex + decodedInstruction.len + relativeOffset;
                     resultAddress = ImageBase + resultAddress - MappedImageBase;
@@ -2881,43 +2881,6 @@ BOOL kdReadSystemMemory2(
 }
 
 /*
-* kdLoadSymbolsForNtImage
-*
-* Purpose:
-*
-* Load symbols for OS mapped image.
-*
-*/
-BOOL kdLoadSymbolsForNtImage(
-    _In_ PSYMCONTEXT SymContext,
-    _In_ LPCWSTR ImageFileName,
-    _In_ PVOID ImageBase,
-    _In_ DWORD SizeOfImage
-)
-{
-    BOOL bResult = FALSE;
-
-    if (SymContext == NULL)
-        return FALSE;
-
-    if (SymContext->ModuleBase != 0)
-        return TRUE;
-
-    supDisplayLoadBanner(TEXT("Please wait...\r\n"), TEXT("Symbols loading"));
-
-    bResult = SymContext->Parser.LoadModule(
-        SymContext,
-        ImageFileName,
-        (DWORD64)ImageBase,
-        SizeOfImage);
-
-    Sleep(100);
-    supCloseLoadBanner();
-
-    return bResult;
-}
-
-/*
 * kdLoadNtKernelImage
 *
 * Purpose:
@@ -2963,7 +2926,7 @@ BOOL kdLoadNtKernelImage(
 
         if (Context->NtOsImageMap) {
            
-            kdLoadSymbolsForNtImage(
+            supLoadSymbolsForNtImage(
                 (PSYMCONTEXT)g_kdctx.NtOsSymContext,
                 szFileName,
                 Context->NtOsImageMap,
@@ -3797,64 +3760,6 @@ BOOL kdGetAddressFromSymbol(
 }
 
 /*
-* symCallbackReportEvent
-*
-* Purpose:
-*
-* Add event to the log and output it into optional callback.
-*
-*/
-VOID symCallbackReportEvent(
-    _In_ ULONG ActionCode,
-    _In_ PIMAGEHLP_DEFERRED_SYMBOL_LOAD Action,
-    _In_ PFNSUPSYMCALLBACK UserCallback
-)
-{
-    WCHAR szText[MAX_PATH * 2];
-    WOBJ_ENTRY_TYPE entryType = EntryTypeInformation;
-
-    szText[0] = 0;
-
-    switch (ActionCode) {
-
-    case CBA_DEFERRED_SYMBOL_LOAD_START:
-
-        RtlStringCchPrintfSecure(szText, RTL_NUMBER_OF(szText),
-            TEXT("Loading symbols for 0x%p %ws..."),
-            Action->BaseOfImage,
-            Action->FileName);
-
-        break;
-
-    case CBA_DEFERRED_SYMBOL_LOAD_COMPLETE:
-
-        RtlStringCchPrintfSecure(szText, RTL_NUMBER_OF(szText),
-            TEXT("Loaded symbols for 0x%p %ws"),
-            Action->BaseOfImage,
-            Action->FileName);
-
-        break;
-
-    case CBA_DEFERRED_SYMBOL_LOAD_FAILURE:
-
-        RtlStringCchPrintfSecure(szText, RTL_NUMBER_OF(szText),
-            TEXT("*** ERROR: Could not load symbols for 0x%p %ws..."),
-            Action->BaseOfImage,
-            Action->FileName);
-
-        entryType = EntryTypeError;
-
-        break;
-
-    }
-
-    logAdd(entryType, szText);
-
-    if (UserCallback)
-        UserCallback(szText);
-}
-
-/*
 * symCallbackProc
 *
 * Purpose:
@@ -3876,8 +3781,7 @@ BOOL CALLBACK symCallbackProc(
     case CBA_DEFERRED_SYMBOL_LOAD_START:
     case CBA_DEFERRED_SYMBOL_LOAD_COMPLETE:
     case CBA_DEFERRED_SYMBOL_LOAD_FAILURE:
-
-        symCallbackReportEvent(ActionCode,
+        supCallbackReportEvent(ActionCode,
             (PIMAGEHLP_DEFERRED_SYMBOL_LOAD)CallbackData,
             (PFNSUPSYMCALLBACK)UserContext);
 

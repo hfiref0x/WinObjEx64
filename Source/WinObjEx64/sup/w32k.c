@@ -1247,7 +1247,7 @@ ULONG SdtWin32kInitializeOnce(
             // Load symbols for win32k.sys
             //
             if (symContext)
-                kdLoadSymbolsForNtImage(symContext, szModuleFileName, hModule, 0);
+                supLoadSymbolsForNtImage(symContext, szModuleFileName, hModule, 0);
 
             //
             // This is win11 next layout.

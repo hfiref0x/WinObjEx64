@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.08
 *
-*  DATE:        11 Jun 2025
+*  DATE:        13 Jun 2025
 *
 *  Common header file for the program support routines.
 *
@@ -111,6 +111,31 @@ typedef struct _SUP_FLT_ENTRY {
     PWCHAR FilterNameBuffer;
 } SUP_FLT_ENTRY, * PSUP_FLT_ENTRY;
 
+typedef struct _SUP_BANNER_DATA {
+    LPCWSTR lpText;
+    LPCWSTR lpCaption;
+    HANDLE hDialogInitialized;
+    HANDLE hCancelEvent;
+    HANDLE hCompletionEvent;
+    HWND hDialogWindow;
+} SUP_BANNER_DATA, * PSUP_BANNER_DATA;
+
+typedef struct _SYMBOL_LOAD_PARAMS {
+    PSYMCONTEXT SymContext;
+    LPCWSTR ImageFileName;
+    DWORD64 ImageBase;
+    DWORD SizeOfImage;
+    HANDLE hCancelEvent;
+    HANDLE hCompletionEvent;
+} SYMBOL_LOAD_PARAMS, * PSYMBOL_LOAD_PARAMS;
+
+typedef struct _SYM_LOADING_STATE {
+    BOOL IsCancelled;
+    BOOL IsCompleted;
+} SYM_LOADING_STATE, * PSYM_LOADING_STATE;
+
+extern SYM_LOADING_STATE g_SymLoadState;
+
 #define FLTMGR_LINK_HANDLE_FUNCID 3
 #define FLTMGR_FIND_FIRST_FUNCID  9
 #define FLTMGR_FIND_NEXT_FUNCID   0xA
@@ -187,7 +212,9 @@ typedef NTSTATUS(CALLBACK* pfnLoadDriverCallback)(
     );
 
 typedef VOID(CALLBACK* PFNSUPSYMCALLBACK)(
-    _In_ LPCWSTR EventText);
+    _In_ LPCWSTR EventText,
+    _In_opt_ LPCWSTR StatusText
+    );
 
 typedef struct _PROCESS_MITIGATION_POLICIES_ALL {
     PROCESS_MITIGATION_DEP_POLICY DEPPolicy;
@@ -290,11 +317,6 @@ typedef struct _FILE_VIEW_INFO {
     PIMAGE_NT_HEADERS NtHeaders;
     FILE_EXCLUDE_DATA ExcludeData;
 } FILE_VIEW_INFO, * PFILE_VIEW_INFO;
-
-typedef struct _SUP_BANNER_DATA {
-    LPCWSTR lpText;
-    LPCWSTR lpCaption;
-} SUP_BANNER_DATA, * PSUP_BANNER_DATA;
 
 //
 // Fast event
@@ -541,17 +563,6 @@ VOID supCenterWindowPerScreen(
 
 VOID supSetWaitCursor(
     _In_ BOOL fSet);
-
-VOID supUpdateLoadBannerText(
-    _In_ LPCWSTR lpText,
-    _In_ BOOL UseList);
-
-VOID supCloseLoadBanner(
-    VOID);
-
-VOID supDisplayLoadBanner(
-    _In_ LPCWSTR lpMessage,
-    _In_opt_ LPCWSTR lpCaption);
 
 HIMAGELIST supLoadImageList(
     _In_ HINSTANCE hInst,
@@ -1203,9 +1214,6 @@ HANDLE supCreateDialogWorkerThread(
     _In_opt_ __drv_aliasesMem LPVOID lpParameter,
     _In_ DWORD dwCreationFlags);
 
-VOID CALLBACK supSymCallbackReportEvent(
-    _In_ LPCWSTR EventText);
-
 VOID supBuildCurrentObjectList(
     _In_ PVOID ListHead);
 
@@ -1273,3 +1281,18 @@ VOID supFilterDestroyList(
 BOOL supFilterFindByName(
     _In_ PLIST_ENTRY FltListHead,
     _In_ LPCWSTR Name);
+
+BOOL supLoadSymbolsForNtImage(
+    _In_ PSYMCONTEXT SymContext,
+    _In_ LPCWSTR ImageFileName,
+    _In_ PVOID ImageBase,
+    _In_ DWORD SizeOfImage);
+
+VOID CALLBACK supSymCallbackReportEvent(
+    _In_ LPCWSTR EventText,
+    _In_opt_ LPCWSTR StatusText);
+
+VOID supCallbackReportEvent(
+    _In_ ULONG ActionCode,
+    _In_ PIMAGEHLP_DEFERRED_SYMBOL_LOAD Action,
+    _In_ PFNSUPSYMCALLBACK UserCallback);

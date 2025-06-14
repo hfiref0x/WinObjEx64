@@ -563,12 +563,6 @@ BOOL kdFindKiServiceTable(
     _In_ ULONG_PTR KernelImageBase,
     _Inout_ KSERVICE_TABLE_DESCRIPTOR* ServiceTable);
 
-BOOL kdLoadSymbolsForNtImage(
-    _In_ PSYMCONTEXT SymContext,
-    _In_ LPCWSTR ImageFileName,
-    _In_ PVOID ImageBase,
-    _In_ DWORD SizeOfImage);
-
 BOOL kdReadSystemMemory2(
     _In_opt_ LPCWSTR CallerFunction,
     _In_ ULONG_PTR Address,
@@ -702,10 +696,6 @@ __forceinline ULONG_PTR kdAdjustAddressToNtOsBase(
     _In_ LONG Relative
 )
 {
-    ULONG_PTR Address;
-
-    Address = (ULONG_PTR)CodeBase + Offset + InstructionLength + Relative;
-    Address = (ULONG_PTR)g_kdctx.NtOsBase + Address - (ULONG_PTR)g_kdctx.NtOsImageMap;
-
-    return Address;
+    return (ULONG_PTR)g_kdctx.NtOsBase + ((CodeBase + Offset + InstructionLength + Relative) 
+        - (ULONG_PTR)g_kdctx.NtOsImageMap);
 }

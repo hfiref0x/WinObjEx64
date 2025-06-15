@@ -30,7 +30,7 @@ jobs:
         run: |
           mkdir Package\Application
           copy Source\WinObjEx64\output\x64\Release\bin\WinObjEx64.exe Package\Application
-          copy Docs\WinObjEx64.chm Package
+          copy Docs\WinObjEx64.chm Package\Application
           
       - name: Build WinObjEx64 Plugins
         working-directory: ./Source

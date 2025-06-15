@@ -7,11 +7,11 @@ It has been upgraded to include context plugins and multi-instance support.
 
  - **ImageScope section object viewer**
 
-<img src="https://raw.githubusercontent.com/hfiref0x/WinObjEx64/master/Screenshots/ImsSection.png" width="600" />
+<img src="https://raw.githubusercontent.com/hfiref0x/WinObjEx64/master/Docs/Screenshots/ImsSection.png" width="600" />
 
 New WinObjEx64 context plugin. Display information about section object that is backed by an image file. Show version info fields, printable strings.
 
-<img src="https://raw.githubusercontent.com/hfiref0x/WinObjEx64/master/Screenshots/ImsStrings.png" width="600" />
+<img src="https://raw.githubusercontent.com/hfiref0x/WinObjEx64/master/Docs/Screenshots/ImsStrings.png" width="600" />
 
 
  - **Other**

@@ -3,7 +3,7 @@
 # WinObjEx64
 ## Windows Object Explorer 64-bit
 
-<img src="https://raw.githubusercontent.com/hfiref0x/WinObjEx64/master/Screenshots/MainWindow.png" width="600" />
+<img src="https://raw.githubusercontent.com/hfiref0x/WinObjEx64/master/Docs/Screenshots/MainWindow.png" width="600" />
 
 WinObjEx64 is an advanced utility that lets you explore the Windows Object Manager namespace. For certain object types, you can double-click on it or use the "Properties..." toolbar button to get more information, such as description, attributes, resource usage etc. WinObjEx64 let you view and edit object-related security information if you have required access rights.
 
@@ -235,7 +235,7 @@ WinObjEx64 comes with full source code. To build from source, you need Microsoft
  
 # What is new
 
-[Whats New in 2.0.0](https://github.com/hfiref0x/WinObjEx64/blob/master/Compiled/WHATSNEW_200.md)
+[Whats New in 2.0.0](https://github.com/hfiref0x/WinObjEx64/blob/master/Docs/WHATSNEW_200.md)
 
 [Complete changelog](https://github.com/hfiref0x/WinObjEx64/blob/master/Source/CHANGELOG.txt)
 

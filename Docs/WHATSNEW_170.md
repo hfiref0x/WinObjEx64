@@ -3,7 +3,7 @@
 
  - **W32pServiceTable viewer**
 
-<img src="https://raw.githubusercontent.com/hfiref0x/WinObjEx64/master/Screenshots/W32pServiceTableView.png" width="600" />
+<img src="https://raw.githubusercontent.com/hfiref0x/WinObjEx64/master/Docs/Screenshots/W32pServiceTableView.png" width="600" />
  
 W32pServiceTable is a service table of Win32k - a Windows User and GDI subsystem driver. It is a secondary system service table (where first is a ntoskrnl managed KiServiceTable). This table can be saved to text file from popup menu.
 
@@ -11,13 +11,13 @@ This feature available starting from Windows 10 1607 (RS1 14393) and require run
 
  - **Process list**
 
-<img src="https://raw.githubusercontent.com/hfiref0x/WinObjEx64/master/Screenshots/ProcessList.png" width="600" />
+<img src="https://raw.githubusercontent.com/hfiref0x/WinObjEx64/master/Docs/Screenshots/ProcessList.png" width="600" />
 
 Simple process list dialog. Display tree of running processes, their id, address of EPROCESS structure, user and domain name. Additionally this list uses highlighting similar to SysInternals Process Explorer. You can copy EPROCESS address value from popup menu. To view all process information program must run elevated.
 
  - **Callbacks viewer**
 
-<img src="https://raw.githubusercontent.com/hfiref0x/WinObjEx64/master/Screenshots/CallbacksView.png" width="600" />
+<img src="https://raw.githubusercontent.com/hfiref0x/WinObjEx64/master/Docs/Screenshots/CallbacksView.png" width="600" />
 
 List of system wide driver callbacks and notify routines registered with the following API:
 
@@ -46,14 +46,14 @@ List of system wide driver callbacks and notify routines registered with the fol
 
  - **Callback object type viewer**
 
-<img src="https://raw.githubusercontent.com/hfiref0x/WinObjEx64/master/Screenshots/CallbackObjectView.png" width="600" />
+<img src="https://raw.githubusercontent.com/hfiref0x/WinObjEx64/master/Docs/Screenshots/CallbackObjectView.png" width="600" />
 
 Viewer of registered callbacks for Callback object type. Drivers can create callbacks with ExCreateCallback API and register them with ExRegisterCallback.
 
 
  - **Improved OBJECT_TYPE view**
 
-<img src="https://raw.githubusercontent.com/hfiref0x/WinObjEx64/master/Screenshots/ObjectTypeView.png" width="600" />
+<img src="https://raw.githubusercontent.com/hfiref0x/WinObjEx64/master/Docs/Screenshots/ObjectTypeView.png" width="600" />
 
 Improved display of structured dump for OBJECT_TYPE and substructure OBJECT_TYPE_INITIALIZER by including newly added Windows 10 fields.
 

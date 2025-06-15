@@ -3,7 +3,7 @@
 
  - **CmControlVector viewer**
 
-<img src="https://raw.githubusercontent.com/hfiref0x/WinObjEx64/master/Screenshots/CmControlVector.png" width="600" />
+<img src="https://raw.githubusercontent.com/hfiref0x/WinObjEx64/master/Docs/Screenshots/CmControlVector.png" width="600" />
 
 View contents of CmControlVector ntoskrnl parameters array. Can display actual values of variables or dump them when driver support is enabled.
 

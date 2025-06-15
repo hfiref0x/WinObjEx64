@@ -17,10 +17,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v2
 
       - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v2
+        uses: microsoft/setup-msbuild@v1.1.3
 
       - name: Restore NuGet packages (Main)
         working-directory: ./Source
@@ -32,13 +32,11 @@ jobs:
 
       - name: Build WinObjEx64
         working-directory: ./Source
-        run: |
-          msbuild WinObjEx64.sln /m /p:Configuration=${{env.BUILD_CONFIGURATION}} /p:Platform=${{env.PLATFORM}}
+        run: msbuild /m /p:Platform=x64 /p:Configuration=Release WinObjEx64.sln
 
       - name: Build WinObjEx64 Plugins
         working-directory: ./Source
-        run: |
-          msbuild WinObjEx64_Plugins.sln /m /p:Configuration=${{env.BUILD_CONFIGURATION}} /p:Platform=${{env.PLATFORM}}
+        run: msbuild /m /p:Platform=x64 /p:Configuration=Release WinObjEx64_Plugins.sln
 
       # Adjust paths below to match your actual output folders
       - name: Upload WinObjEx64 artifacts

@@ -412,11 +412,25 @@ DWORD WINAPI PmpWorkerThread(
                         // Initialize plugin and initialize main menu entry if not initialized.
                         //
                         __try {
+                            PluginEntry->Plugin.cbSize = sizeof(WINOBJEX_PLUGIN);
+                            PluginEntry->Plugin.AbiVersion = WINOBJEX_PLUGIN_ABI_VERSION;
                             PluginInitialized = PluginInit(&PluginEntry->Plugin);
                         }
                         __except (WOBJ_EXCEPTION_FILTER_LOG) {
                             PmpShowInitializationError(ParentWindow, GetExceptionCode(), fdata.cFileName);
                             PluginInitialized = FALSE;
+                        }
+
+                        // Strict check ABI
+                        if (PluginInitialized) {
+                            if (PluginEntry->Plugin.cbSize < sizeof(WINOBJEX_PLUGIN) ||
+                                PluginEntry->Plugin.AbiVersion != WINOBJEX_PLUGIN_ABI_VERSION ||
+                                PluginEntry->Plugin.RequiredPluginSystemVersion > WOBJ_PLUGIN_SYSTEM_VERSION)
+                            {
+                                // Incompatible plugin, report and skip
+                                PmpReportInvalidPlugin(szPluginPath);
+                                PluginInitialized = FALSE;
+                            }
                         }
 
                         if (PluginInitialized) {
@@ -669,7 +683,7 @@ VOID PmProcessEntry(
                 (PluginEntry->Plugin.StopPlugin == NULL))
                 return;
 
-            if (!PluginEntry->Plugin.SupportMultipleInstances) {
+            if (!PluginEntry->Plugin.Capabilities.u1.SupportMultipleInstances) {
                 if (PluginEntry->Plugin.State == PluginRunning) {
 
                     _strcpy(szMessage, TEXT("The following plugin \""));
@@ -706,7 +720,7 @@ VOID PmProcessEntry(
             // Check plugin requirements.
             //
 
-            if (g_WinObj.IsWine && PluginEntry->Plugin.SupportWine == FALSE) {
+            if (g_WinObj.IsWine && PluginEntry->Plugin.Capabilities.u1.SupportWine == FALSE) {
                 
                 MessageBox(ParentWindow, 
                     TEXT("This plugin does not support Wine"), 
@@ -715,7 +729,7 @@ VOID PmProcessEntry(
                 return;
             }
 
-            if (PluginEntry->Plugin.NeedAdmin && g_kdctx.IsFullAdmin == FALSE) {
+            if (PluginEntry->Plugin.Capabilities.u1.NeedAdmin && g_kdctx.IsFullAdmin == FALSE) {
                 
                 MessageBox(ParentWindow, 
                     TEXT("This plugin requires administrator privileges and cannot be run.\n\nIf your account is in an Administrator group make sure you run WinObjEx64 elevated."), 
@@ -724,7 +738,7 @@ VOID PmProcessEntry(
                 return;
             }
 
-            if (PluginEntry->Plugin.NeedDriver && kdIoDriverLoaded() == FALSE) {
+            if (PluginEntry->Plugin.Capabilities.u1.NeedDriver && kdIoDriverLoaded() == FALSE) {
                 
                 MessageBox(ParentWindow, 
                     TEXT("This plugin requires driver usage to run"), 
@@ -1029,28 +1043,28 @@ VOID PmpShowPluginInfo(
 
     supDisableRedraw(hwndDlg);
 
-    if (PluginData->Plugin.NeedAdmin)
+    if (PluginData->Plugin.Capabilities.u1.NeedAdmin)
         lpType = TEXT("Yes");
     else
         lpType = TEXT("No");
 
     SetDlgItemText(hwndDlg, IDC_PLUGIN_ADMIN, lpType);
 
-    if (PluginData->Plugin.NeedDriver)
+    if (PluginData->Plugin.Capabilities.u1.NeedDriver)
         lpType = TEXT("Yes");
     else
         lpType = TEXT("No");
 
     SetDlgItemText(hwndDlg, IDC_PLUGIN_DRIVER, lpType);
 
-    if (PluginData->Plugin.SupportWine)
+    if (PluginData->Plugin.Capabilities.u1.SupportWine)
         lpType = TEXT("Yes");
     else
         lpType = TEXT("No");
 
     SetDlgItemText(hwndDlg, IDC_PLUGIN_WINE, lpType);
 
-    if (PluginData->Plugin.SupportMultipleInstances)
+    if (PluginData->Plugin.Capabilities.u1.SupportMultipleInstances)
         lpType = TEXT("Yes");
     else
         lpType = TEXT("No");

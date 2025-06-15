@@ -220,8 +220,8 @@ BYTE ObGetObjectHeaderOffset(
 *
 * Purpose:
 *
-* Calculate address of specific header information structure based on
-* object header flags and object address.
+*   Calculate address of specific header information structure based on
+*   object header flags and object address.
 *
 * Parameters:
 *   ObjectInfoMask      - Information mask from object header
@@ -240,7 +240,7 @@ BOOL ObHeaderToNameInfoAddress(
     _In_ OBJ_HEADER_INFO_FLAG InfoFlag
 )
 {
-    BYTE      headerOffset;
+    BYTE headerOffset;
     ULONG_PTR calculatedAddress;
 
     if (HeaderInfoAddress == NULL)
@@ -458,8 +458,15 @@ BOOLEAN ObpValidateSidBuffer(
 *
 * Purpose:
 *
-* Walk each boundary descriptor entry, validate it and run callback.
+*   Walk each boundary descriptor entry, validate it and run callback.
 *
+* Parameters:
+*   BoundaryDescriptor - Pointer to the boundary descriptor structure.
+*   Callback           - Callback function to call for each entry.
+*   Context            - Caller-defined context passed to the callback.
+*
+* Return Value:
+*   NTSTATUS code indicating success or reason for failure.
 */
 NTSTATUS ObEnumerateBoundaryDescriptorEntries(
     _In_ OBJECT_BOUNDARY_DESCRIPTOR* BoundaryDescriptor,
@@ -2536,9 +2543,17 @@ BOOL ObQueryFullNamespacePath(
 *
 * Purpose:
 *
-* Helper function to query directory objects with proper buffer allocation.
-* Returns allocated buffer with directory information or NULL on failure.
+*   Helper function to query directory objects with proper buffer allocation.
+*   Returns allocated buffer with directory information or NULL on failure.
 *
+* Parameters:
+*   DirectoryHandle - Handle to the directory object.
+*   Context         - Pointer to the context variable (input/output).
+*   IsWine          - TRUE if running under Wine, FALSE otherwise.
+*   ReturnLength    - Pointer to variable to receive the buffer size used (optional).
+*
+* Return Value:
+*   Pointer to allocated directory information buffer, or NULL on failure.
 */
 POBJECT_DIRECTORY_INFORMATION ObQueryObjectDirectory(
     _In_ HANDLE DirectoryHandle,
@@ -2553,7 +2568,7 @@ POBJECT_DIRECTORY_INFORMATION ObQueryObjectDirectory(
 
     // Wine has a different implementation, use fixed buffer size
     if (IsWine) {
-        bufferSize = 1024 * 64;
+        bufferSize = WINE_DIRECTORY_QUERY_BUFFER_SIZE;
     }
     else {
         // Request required buffer length for non-Wine systems
@@ -3482,9 +3497,9 @@ BOOLEAN kdQueryKernelShims(
 *
 * Purpose:
 *
-* Find CM_CONTROL_VECTOR structure in mapped kernel image.
-* The function works by first locating the "ProtectionMode" string
-* and then finding the reference to it in the kernel image.
+*   Find CM_CONTROL_VECTOR structure in mapped kernel image.
+*   The function works by first locating the "ProtectionMode" string
+*   and then finding the reference to it in the kernel image.
 *
 * Parameters:
 *   Context - Kernel debugging context containing NtOsImageMap
@@ -3514,6 +3529,7 @@ PVOID kdQueryCmControlVector(
 
     sectionTableEntry = IMAGE_FIRST_SECTION(ntHeaders);
 
+    // First, find the address of the "ProtectionMode" string.
     for (i = 0; i < ntHeaders->FileHeader.NumberOfSections; i++, sectionTableEntry++) {
         sectionBase = (PBYTE)Context->NtOsImageMap + sectionTableEntry->VirtualAddress;
         sectionSize = sectionTableEntry->Misc.VirtualSize;

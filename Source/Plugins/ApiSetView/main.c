@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2022
+*  (C) COPYRIGHT AUTHORS, 2019 - 2025
 *
-*  TITLE:       MAIN.H
+*  TITLE:       MAIN.C
 *
-*  VERSION:     1.13
+*  VERSION:     1.14
 *
-*  DATE:        11 May 2022
+*  DATE:        14 Jun 2025
 *
 *  WinObjEx64 ApiSetView plugin.
 *
@@ -19,15 +19,18 @@
 
 #include "global.h"
 
+#define APISETVIEW_PLUGIN_MAJOR_VERSION 1
+#define APISETVIEW_PLUGIN_MINOR_VERSION 2
+
 //
 // Plugin entry.
 //
-WINOBJEX_PLUGIN* g_Plugin = NULL;
+WINOBJEX_PLUGIN* g_plugin = NULL;
 
-HINSTANCE g_ThisDLL = NULL;
+HINSTANCE g_thisDll = NULL;
 GUI_CONTEXT g_ctx;
 
-volatile DWORD m_PluginState = PLUGIN_RUNNING;
+volatile DWORD g_pluginState = PLUGIN_RUNNING;
 
 /*
 * ClipboardCopy
@@ -43,23 +46,37 @@ VOID ClipboardCopy(
 )
 {
     LPWSTR  lptstrCopy;
-    HGLOBAL hglbCopy;
+    HGLOBAL hglbCopy = NULL;
     SIZE_T  dwSize;
+    BOOL    dataSet = FALSE;
 
-    if (OpenClipboard(NULL)) {
+    if (!OpenClipboard(NULL))
+        return;
+
+    __try {
         EmptyClipboard();
         dwSize = cbText + sizeof(UNICODE_NULL);
         hglbCopy = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, dwSize);
-        if (hglbCopy != NULL) {
-            lptstrCopy = (LPWSTR)GlobalLock(hglbCopy);
-            if (lptstrCopy) {
-                RtlCopyMemory(lptstrCopy, lpText, cbText);
-            }
-            GlobalUnlock(hglbCopy);
-            if (!SetClipboardData(CF_UNICODETEXT, hglbCopy))
-                GlobalFree(hglbCopy);
+        if (hglbCopy == NULL)
+            __leave;
+
+        lptstrCopy = (LPWSTR)GlobalLock(hglbCopy);
+        if (lptstrCopy == NULL)
+            __leave;
+
+        RtlCopyMemory(lptstrCopy, lpText, cbText);
+        GlobalUnlock(hglbCopy);
+
+        dataSet = SetClipboardData(CF_UNICODETEXT, hglbCopy) != NULL;
+        if (dataSet) {
+            hglbCopy = NULL;
         }
+    }
+    __finally {
         CloseClipboard();
+        if (hglbCopy != NULL) {
+            GlobalFree(hglbCopy);
+        }
     }
 }
 
@@ -353,12 +370,12 @@ BOOL InitTreeList(
     _Out_ HWND* pTreeListHwnd
 )
 {
-    HWND TreeList;
-    HDITEM hdritem;
+    HWND treeList;
+    HDITEM hdrItem;
     RECT rc;
 
     UINT uDpi;
-    INT dpiScaledX, dpiScaledY, iScaledWidth, iScaledHeight, iScaleSubX, iScaleSubY;
+    INT dpiScaledX, dpiScaledY, scaledWidth, scaledHeight, scaleSubX, scaleSubY;
 
     if (pTreeListHwnd == NULL) {
         return FALSE;
@@ -370,38 +387,38 @@ BOOL InitTreeList(
 
     GetWindowRect(hwndParent, &rc);
 
-    iScaleSubX = MulDiv(24, uDpi, DefaultSystemDpi);
-    iScaleSubY = MulDiv(140, uDpi, DefaultSystemDpi);
-    iScaledWidth = (rc.right - rc.left) - dpiScaledX - iScaleSubX;
-    iScaledHeight = (rc.bottom - rc.top) - dpiScaledY - iScaleSubY;
+    scaleSubX = MulDiv(24, uDpi, DefaultSystemDpi);
+    scaleSubY = MulDiv(140, uDpi, DefaultSystemDpi);
+    scaledWidth = (rc.right - rc.left) - dpiScaledX - scaleSubX;
+    scaledHeight = (rc.bottom - rc.top) - dpiScaledY - scaleSubY;
 
-    TreeList = CreateWindowEx(WS_EX_CLIENTEDGE, WC_TREELIST, NULL,
+    treeList = CreateWindowEx(WS_EX_CLIENTEDGE, WC_TREELIST, NULL,
         WS_VISIBLE | WS_CHILD | WS_TABSTOP | TLSTYLE_COLAUTOEXPAND | TLSTYLE_LINKLINES,
         dpiScaledX, dpiScaledY,
-        iScaledWidth, iScaledHeight, hwndParent, NULL, NULL, NULL);
+        scaledWidth, scaledHeight, hwndParent, NULL, NULL, NULL);
 
-    if (TreeList == NULL) {
+    if (treeList == NULL) {
         *pTreeListHwnd = NULL;
         return FALSE;
     }
 
-    *pTreeListHwnd = TreeList;
+    *pTreeListHwnd = treeList;
 
-    RtlSecureZeroMemory(&hdritem, sizeof(hdritem));
-    hdritem.mask = HDI_FORMAT | HDI_TEXT | HDI_WIDTH;
-    hdritem.fmt = HDF_LEFT | HDF_BITMAP_ON_RIGHT | HDF_STRING;
+    RtlSecureZeroMemory(&hdrItem, sizeof(hdrItem));
+    hdrItem.mask = HDI_FORMAT | HDI_TEXT | HDI_WIDTH;
+    hdrItem.fmt = HDF_LEFT | HDF_BITMAP_ON_RIGHT | HDF_STRING;
 
-    hdritem.cxy = 340;
-    hdritem.pszText = TEXT("Namespace");
-    TreeList_InsertHeaderItem(TreeList, 0, &hdritem);
+    hdrItem.cxy = 340;
+    hdrItem.pszText = TEXT("Namespace");
+    TreeList_InsertHeaderItem(treeList, 0, &hdrItem);
 
-    hdritem.cxy = 130;
-    hdritem.pszText = TEXT("Flags");
-    TreeList_InsertHeaderItem(TreeList, 1, &hdritem);
+    hdrItem.cxy = 130;
+    hdrItem.pszText = TEXT("Flags");
+    TreeList_InsertHeaderItem(treeList, 1, &hdrItem);
 
-    hdritem.cxy = 200;
-    hdritem.pszText = TEXT("Alias");
-    TreeList_InsertHeaderItem(TreeList, 2, &hdritem);
+    hdrItem.cxy = 200;
+    hdrItem.pszText = TEXT("Alias");
+    TreeList_InsertHeaderItem(treeList, 2, &hdrItem);
 
     return TRUE;
 }
@@ -462,7 +479,7 @@ INT_PTR CALLBACK PluginDialogProc(
         break;
 
     case WM_CLOSE:
-        InterlockedExchange((PLONG)&m_PluginState, PLUGIN_STOP);
+        InterlockedExchange((PLONG)&g_pluginState, PLUGIN_STOP);
         PostQuitMessage(0);
         break;
 
@@ -527,19 +544,6 @@ INT_PTR CALLBACK PluginDialogProc(
             {
                 SetWindowText(g_ctx.SearchEdit, TEXT(""));
                 _strcpy(g_ctx.SchemaFileName, szFileName);
-
-                /*
-                szFilterOption[0] = 0;
-                if (GetWindowText(
-                    g_ctx.SearchEdit,
-                    szFilterOption,
-                    MAX_PATH))
-                {
-                    if (szFilterOption[0] != 0) {
-                        lpFilter = szFilterOption;
-                    }
-                }
-                */
                 ListApiSetFromFile(g_ctx.SchemaFileName, NULL);
             }
             break;
@@ -554,10 +558,6 @@ INT_PTR CALLBACK PluginDialogProc(
             TreeListCopyItemValueToClipboard(g_ctx.TreeList,
                 g_ctx.tlSubItemHit);
 
-            break;
-
-
-        default:
             break;
         }
 
@@ -588,8 +588,8 @@ VOID PluginFreeGlobalResources()
         g_ctx.PluginHeap = NULL;
     }
 
-    if (g_Plugin->StateChangeCallback)
-        g_Plugin->StateChangeCallback(g_Plugin, PluginStopped, NULL);
+    if (g_plugin && g_plugin->StateChangeCallback)
+        g_plugin->StateChangeCallback(g_plugin, PluginStopped, NULL);
 }
 
 /*
@@ -615,7 +615,7 @@ DWORD WINAPI PluginThread(
     icex.dwICC = ICC_LISTVIEW_CLASSES | ICC_TREEVIEW_CLASSES;
     InitCommonControlsEx(&icex);
 
-    CreateDialogParam(g_ThisDLL,
+    CreateDialogParam(g_thisDll,
         MAKEINTRESOURCE(IDD_ASDIALOG),
         NULL,
         PluginDialogProc,
@@ -630,7 +630,7 @@ DWORD WINAPI PluginThread(
         TranslateMessage(&msg1);
         DispatchMessage(&msg1);
 
-    } while (rv != 0 && InterlockedAdd((PLONG)&m_PluginState, PLUGIN_RUNNING) == PLUGIN_RUNNING);
+    } while (rv != 0 && InterlockedAdd((PLONG)&g_pluginState, PLUGIN_RUNNING) == PLUGIN_RUNNING);
 
     PluginFreeGlobalResources();
 
@@ -644,16 +644,22 @@ DWORD WINAPI PluginThread(
 *
 * Run actual plugin code in dedicated thread.
 *
+* Parameters:
+*   ParamBlock - Plugin parameters passed from WinObjEx64
+*
+* Return:
+*   STATUS_SUCCESS - Plugin started successfully
+*   STATUS_UNSUCCESSFUL - Failed to start plugin
 */
 NTSTATUS CALLBACK StartPlugin(
     _In_ PWINOBJEX_PARAM_BLOCK ParamBlock
 )
 {
-    DWORD ThreadId;
-    NTSTATUS Status;
-    WINOBJEX_PLUGIN_STATE State = PluginInitialization;
+    DWORD threadId;
+    NTSTATUS status;
+    WINOBJEX_PLUGIN_STATE state = PluginInitialization;
 
-    InterlockedExchange((PLONG)&m_PluginState, PLUGIN_RUNNING);
+    InterlockedExchange((PLONG)&g_pluginState, PLUGIN_RUNNING);
 
     RtlSecureZeroMemory(&g_ctx, sizeof(g_ctx));
 
@@ -664,30 +670,27 @@ NTSTATUS CALLBACK StartPlugin(
 
         RtlCopyMemory(&g_ctx.ParamBlock, ParamBlock, sizeof(WINOBJEX_PARAM_BLOCK));
 
-        g_ctx.WorkerThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)PluginThread, (PVOID)NULL, 0, &ThreadId);
+        g_ctx.WorkerThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)PluginThread, (PVOID)NULL, 0, &threadId);
         if (g_ctx.WorkerThread) {
-            Status = STATUS_SUCCESS;
+            status = STATUS_SUCCESS;
+            state = PluginRunning;
         }
         else {
-            Status = STATUS_UNSUCCESSFUL;
+            status = STATUS_UNSUCCESSFUL;
+            state = PluginError;
             HeapDestroy(g_ctx.PluginHeap);
             g_ctx.PluginHeap = NULL;
         }
 
-        if (NT_SUCCESS(Status))
-            State = PluginRunning;
-        else
-            State = PluginError;
-
-        if (g_Plugin->StateChangeCallback)
-            g_Plugin->StateChangeCallback(g_Plugin, State, NULL);
+        if (g_plugin && g_plugin->StateChangeCallback)
+            g_plugin->StateChangeCallback(g_plugin, state, NULL);
 
     }
     else {
-        Status = STATUS_MEMORY_NOT_ALLOCATED;
+        status = STATUS_MEMORY_NOT_ALLOCATED;
     }
 
-    return Status;
+    return status;
 }
 
 /*
@@ -695,7 +698,7 @@ NTSTATUS CALLBACK StartPlugin(
 *
 * Purpose:
 *
-* Stop plugin execution.
+* Stop plugin execution and cleanup resources.
 *
 */
 void CALLBACK StopPlugin(
@@ -703,15 +706,15 @@ void CALLBACK StopPlugin(
 )
 {
     if (g_ctx.WorkerThread) {
-        InterlockedExchange((PLONG)&m_PluginState, PLUGIN_STOP);//force stop
+        InterlockedExchange((PLONG)&g_pluginState, PLUGIN_STOP);//force stop
         if (WaitForSingleObject(g_ctx.WorkerThread, 1000) == WAIT_TIMEOUT) {
             TerminateThread(g_ctx.WorkerThread, 0);
         }
         CloseHandle(g_ctx.WorkerThread);
         g_ctx.WorkerThread = NULL;
 
-        if (g_Plugin->StateChangeCallback)
-            g_Plugin->StateChangeCallback(g_Plugin, PluginStopped, NULL);
+        if (g_plugin && g_plugin->StateChangeCallback)
+            g_plugin->StateChangeCallback(g_plugin, PluginStopped, NULL);
     }
 }
 
@@ -727,10 +730,25 @@ BOOLEAN CALLBACK PluginInit(
     _Inout_ PWINOBJEX_PLUGIN PluginData
 )
 {
-    if (g_Plugin)
+    // Don't initialize twice
+    if (g_plugin) {
         return FALSE;
+    }
 
     __try {
+
+        if (PluginData == NULL) {
+            return FALSE;
+        }
+
+        if (PluginData->cbSize < sizeof(WINOBJEX_PLUGIN)) {
+            return FALSE;
+        }
+
+        if (PluginData->AbiVersion != WINOBJEX_PLUGIN_ABI_VERSION) {
+            return FALSE;
+        }
+
         //
         // Set plugin name to be displayed in WinObjEx64 UI.
         //
@@ -761,19 +779,19 @@ BOOLEAN CALLBACK PluginInit(
         //
         // Setup permissions.
         //
-        PluginData->NeedAdmin = FALSE;
-        PluginData->SupportWine = FALSE;
-        PluginData->NeedDriver = FALSE;
+        PluginData->Capabilities.u1.NeedAdmin = FALSE;
+        PluginData->Capabilities.u1.SupportWine = FALSE;
+        PluginData->Capabilities.u1.NeedDriver = FALSE;
 
-        PluginData->MajorVersion = 1;
-        PluginData->MinorVersion = 1;
+        PluginData->MajorVersion = APISETVIEW_PLUGIN_MAJOR_VERSION;
+        PluginData->MinorVersion = APISETVIEW_PLUGIN_MINOR_VERSION;
 
         //
         // Set plugin type.
         //
         PluginData->Type = DefaultPlugin;
 
-        g_Plugin = PluginData;
+        g_plugin = PluginData;
 
         return TRUE;
     }
@@ -788,8 +806,15 @@ BOOLEAN CALLBACK PluginInit(
 *
 * Purpose:
 *
-* Dummy dll entrypoint.
+* DLL entry point.
 *
+* Parameters:
+*   hinstDLL - DLL instance handle
+*   fdwReason - Reason for calling function
+*   lpvReserved - Reserved
+*
+* Return:
+*   TRUE - Always
 */
 BOOL WINAPI DllMain(
     _In_ HINSTANCE hinstDLL,
@@ -800,7 +825,7 @@ BOOL WINAPI DllMain(
     UNREFERENCED_PARAMETER(lpvReserved);
 
     if (fdwReason == DLL_PROCESS_ATTACH) {
-        g_ThisDLL = hinstDLL;
+        g_thisDll = hinstDLL;
         DisableThreadLibraryCalls(hinstDLL);
     }
     return TRUE;

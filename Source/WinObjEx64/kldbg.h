@@ -130,6 +130,8 @@ typedef ULONG_PTR *PUTable;
 #define OBP_ERROR_NONAME_LITERAL L"<noname>"
 #define OBP_ERROR_NONAME_LITERAL_SIZE (sizeof(OBP_ERROR_NONAME_LITERAL) - sizeof(UNICODE_NULL))
 
+#define WINE_DIRECTORY_QUERY_BUFFER_SIZE (64 * 1024)
+
 //
 // Predefined strings
 //

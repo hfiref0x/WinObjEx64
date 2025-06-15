@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.14
+*  VERSION:     1.16
 *
-*  DATE:        04 Jun 2024
+*  DATE:        14 Jun 2024
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -212,23 +212,37 @@ VOID supClipboardCopy(
 )
 {
     LPWSTR  lptstrCopy;
-    HGLOBAL hglbCopy;
+    HGLOBAL hglbCopy = NULL;
     SIZE_T  dwSize;
+    BOOL    dataSet = FALSE;
 
-    if (OpenClipboard(NULL)) {
+    if (!OpenClipboard(NULL))
+        return;
+
+    __try {
         EmptyClipboard();
         dwSize = cbText + sizeof(UNICODE_NULL);
         hglbCopy = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, dwSize);
-        if (hglbCopy != NULL) {
-            lptstrCopy = (LPWSTR)GlobalLock(hglbCopy);
-            if (lptstrCopy) {
-                RtlCopyMemory(lptstrCopy, lpText, cbText);
-            }
-            GlobalUnlock(hglbCopy);
-            if (!SetClipboardData(CF_UNICODETEXT, hglbCopy))
-                GlobalFree(hglbCopy);
+        if (hglbCopy == NULL)
+            __leave;
+
+        lptstrCopy = (LPWSTR)GlobalLock(hglbCopy);
+        if (lptstrCopy == NULL)
+            __leave;
+
+        RtlCopyMemory(lptstrCopy, lpText, cbText);
+        GlobalUnlock(hglbCopy);
+
+        dataSet = SetClipboardData(CF_UNICODETEXT, hglbCopy) != NULL;
+        if (dataSet) {
+            hglbCopy = NULL;
         }
+    }
+    __finally {
         CloseClipboard();
+        if (hglbCopy != NULL) {
+            GlobalFree(hglbCopy);
+        }
     }
 }
 
@@ -505,7 +519,7 @@ BOOL supTreeListCopyItemValueToClipboard(
         else {
             if (tlSubItemHit == 0) {
                 lpCopyData = szText;
-                cbCopyData = sizeof(szText);
+                cbCopyData = sizeof(szText); // copy everything
             }
         }
 

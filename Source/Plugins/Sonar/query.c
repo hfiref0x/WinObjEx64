@@ -4,9 +4,9 @@
 *
 *  TITLE:       QUERY.C
 *
-*  VERSION:     1.05
+*  VERSION:     1.16
 *
-*  DATE:        14 May 2025
+*  DATE:        14 Jun 2025
 *
 *  Query NDIS specific data.
 *
@@ -102,6 +102,8 @@ ULONG_PTR QueryProtocolList(
     WCHAR                           szBuffer[MAX_PATH * 2];
 
     do {
+        if (g_ctx.ParamBlock.GetInstructionLength == NULL)
+            break;
 
         //
         // Query NDIS.sys base
@@ -426,17 +428,19 @@ PVOID DumpUnicodeString(
     Size = (SIZE_T)tempString.Length + MAX_PATH;
     DumpedString = (PVOID)HeapMemoryAlloc(Size);
     if (DumpedString) {
-        if (g_ctx.ParamBlock.ReadSystemMemoryEx((ULONG_PTR)tempString.Buffer,
+        if (!g_ctx.ParamBlock.ReadSystemMemoryEx((ULONG_PTR)tempString.Buffer,
             DumpedString,
             tempString.Length,
             &readBytes))
         {
-            if (readBytes != tempString.Length) {
-                HeapMemoryFree(DumpedString);
-                return NULL;
-            }
+            HeapMemoryFree(DumpedString);
+            return NULL;
         }
 
+        if (readBytes != tempString.Length) {
+            HeapMemoryFree(DumpedString);
+            return NULL;
+        }
     }
 
     return DumpedString;

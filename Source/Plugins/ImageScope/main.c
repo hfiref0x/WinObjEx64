@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.20
 *
-*  DATE:        08 Jun 2025
+*  DATE:        14 Jun 2025
 *
 *  WinObjEx64 ImageScope plugin.
 *
@@ -19,19 +19,30 @@
 
 #include "global.h"
 
+#define IMAGESCOPE_PLUGIN_MAJOR_VERSION 1
+#define IMAGESCOPE_PLUGIN_MINOR_VERSION 2
+
 //
 // Dll instance.
 //
-HINSTANCE g_ThisDLL = NULL;
+HINSTANCE g_thisDll = NULL;
 
-volatile DWORD g_PluginState = PLUGIN_RUNNING;
+volatile DWORD g_pluginState = PLUGIN_RUNNING;
 
 //
 // Plugin entry.
 //
-WINOBJEX_PLUGIN* g_Plugin = NULL;
-volatile LONG m_RefCount = 0;
+WINOBJEX_PLUGIN* g_plugin = NULL;
+volatile LONG g_refCount = 0;
 
+/*
+* PmpCopyObjectData
+*
+* Purpose:
+*
+* Create copies of object directory and name.
+*
+*/
 BOOL PmpCopyObjectData(
     _In_ WINOBJEX_PARAM_OBJECT* Source,
     _In_ WINOBJEX_PARAM_OBJECT* Dest
@@ -66,8 +77,8 @@ VOID PluginFreeGlobalResources(
     supFreeDuplicatedUnicodeString(NtCurrentPeb()->ProcessHeap,
         &Context->ParamBlock.Object.Name, TRUE);
 
-    if (g_Plugin->StateChangeCallback)
-        g_Plugin->StateChangeCallback(g_Plugin, PluginStopped, NULL);
+    if (g_plugin && g_plugin->StateChangeCallback)
+        g_plugin->StateChangeCallback(g_plugin, PluginStopped, NULL);
 
 }
 
@@ -84,21 +95,21 @@ DWORD WINAPI PluginThread(
 )
 {
     ULONG uResult = 0;
-    GUI_CONTEXT* Context = (GUI_CONTEXT*)Parameter;
+    GUI_CONTEXT* context = (GUI_CONTEXT*)Parameter;
 
-    if (Context == NULL)
+    if (context == NULL)
         return (DWORD)-1;
 
-    InterlockedIncrement(&m_RefCount);
+    InterlockedIncrement(&g_refCount);
 
     __try {
-        if (g_Plugin->GuiInitCallback == NULL) { // this is required callback
+        if (g_plugin->GuiInitCallback == NULL) { // this is required callback
             kdDebugPrint("Gui init callback required\r\n");
             __leave;
         }
 
-        if (!g_Plugin->GuiInitCallback(g_Plugin,
-            g_ThisDLL,
+        if (!g_plugin->GuiInitCallback(g_plugin,
+            g_thisDll,
             (WNDPROC)MainWindowProc,
             NULL))
         {
@@ -106,12 +117,12 @@ DWORD WINAPI PluginThread(
             __leave;
         }
 
-        uResult = (ULONG)RunUI(Context);
+        uResult = (ULONG)RunUI(context);
     }
     __finally {
-        InterlockedDecrement(&m_RefCount);
-        PluginFreeGlobalResources(Context);
-        supHeapFree(Context);
+        InterlockedDecrement(&g_refCount);
+        PluginFreeGlobalResources(context);
+        supHeapFree(context);
     }
 
     ExitThread(uResult);
@@ -130,10 +141,10 @@ NTSTATUS CALLBACK StartPlugin(
 )
 {
     BOOL deallocateContext = FALSE;
-    DWORD ThreadId;
-    NTSTATUS Status = STATUS_UNSUCCESSFUL;
-    WINOBJEX_PLUGIN_STATE State = PluginInitialization;
-    HANDLE WorkerThread, SectionHandle = NULL;
+    DWORD threadId;
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    WINOBJEX_PLUGIN_STATE state = PluginInitialization;
+    HANDLE workerThread, sectionHandle = NULL;
     GUI_CONTEXT* Context;
 
     WCHAR szError[100];
@@ -157,20 +168,19 @@ NTSTATUS CALLBACK StartPlugin(
             &Context->ParamBlock.Object))
         {
             deallocateContext = TRUE;
-            Status = STATUS_MEMORY_NOT_ALLOCATED;
+            status = STATUS_MEMORY_NOT_ALLOCATED;
             __leave;
         }
 
-        Status = Context->ParamBlock.OpenNamedObjectByType(
-            &SectionHandle,
+        status = Context->ParamBlock.OpenNamedObjectByType(
+            &sectionHandle,
             ObjectTypeSection,
             &Context->ParamBlock.Object.Directory,
             &Context->ParamBlock.Object.Name,
             SECTION_QUERY | SECTION_MAP_READ);
 
-        if (!NT_SUCCESS(Status)) {
-
-            StringCbPrintf(szError, 100, TEXT("Could not open section, 0x%lX"), Status);
+        if (!NT_SUCCESS(status)) {
+            StringCbPrintf(szError, 100, TEXT("Could not open section, 0x%lX"), status);
 
             MessageBox(
                 ParamBlock->ParentWindow,
@@ -178,80 +188,80 @@ NTSTATUS CALLBACK StartPlugin(
                 T_PLUGIN_NAME,
                 MB_ICONERROR);
 
-            if (g_Plugin && g_Plugin->StateChangeCallback)
-                g_Plugin->StateChangeCallback(g_Plugin, PluginStopped, NULL);
+            if (g_plugin && g_plugin->StateChangeCallback)
+                g_plugin->StateChangeCallback(g_plugin, PluginStopped, NULL);
 
             deallocateContext = TRUE;
-            Status = STATUS_SUCCESS;
+            status = STATUS_SUCCESS;
             __leave;
         }
 
         // Map section
-        Status = supMapSection(
-            SectionHandle,
+        status = supMapSection(
+            sectionHandle,
             &Context->SectionAddress,
             &Context->SectionViewSize);
 
-        NtClose(SectionHandle);
-        SectionHandle = NULL;
+        NtClose(sectionHandle);
+        sectionHandle = NULL;
 
-        if (!NT_SUCCESS(Status)) {
+        if (!NT_SUCCESS(status)) {
 
-            if (Status == STATUS_NOT_SUPPORTED) {
+            if (status == STATUS_NOT_SUPPORTED) {
                 MessageBox(ParamBlock->ParentWindow,
                     TEXT("This section does not represent mapped image, unable to continue."),
                     T_PLUGIN_NAME,
                     MB_ICONINFORMATION);
             }
             else {
-                StringCbPrintf(szError, 100, TEXT("Could not map section, 0x%lX"), Status);
+                StringCbPrintf(szError, 100, TEXT("Could not map section, 0x%lX"), status);
                 MessageBox(ParamBlock->ParentWindow, szError,
                     T_PLUGIN_NAME,
                     MB_ICONERROR);
             }
 
             // Stop plugin if we cannot open section, but do not fail with error as we already displayed it.
-            if (g_Plugin && g_Plugin->StateChangeCallback)
-                g_Plugin->StateChangeCallback(g_Plugin, PluginStopped, NULL);
+            if (g_plugin && g_plugin->StateChangeCallback)
+                g_plugin->StateChangeCallback(g_plugin, PluginStopped, NULL);
 
-            Status = STATUS_SUCCESS;
+            status = STATUS_SUCCESS;
             deallocateContext = TRUE;
             __leave;
         }
 
-        WorkerThread = CreateThread(
+        workerThread = CreateThread(
             NULL,
             0,
             (LPTHREAD_START_ROUTINE)PluginThread,
             (PVOID)Context,
             0,
-            &ThreadId);
+            &threadId);
 
-        if (WorkerThread) {
-            Status = STATUS_SUCCESS;
-            CloseHandle(WorkerThread);
-            WorkerThread = NULL;
-            State = PluginRunning;
+        if (workerThread) {
+            status = STATUS_SUCCESS;
+            CloseHandle(workerThread);
+            workerThread = NULL;
+            state = PluginRunning;
         }
         else {
-            Status = STATUS_UNSUCCESSFUL;
-            State = PluginError;
+            status = STATUS_UNSUCCESSFUL;
+            state = PluginError;
             deallocateContext = TRUE;
         }
     }
     __finally {
-        if (SectionHandle) {
-            NtClose(SectionHandle);
+        if (sectionHandle) {
+            NtClose(sectionHandle);
         }
 
         if (deallocateContext && Context) {
             supHeapFree(Context);
         }
 
-        if (g_Plugin && g_Plugin->StateChangeCallback)
-            g_Plugin->StateChangeCallback(g_Plugin, State, NULL);
+        if (g_plugin && g_plugin->StateChangeCallback)
+            g_plugin->StateChangeCallback(g_plugin, state, NULL);
     }
-    return Status;
+    return status;
 }
 
 /*
@@ -267,14 +277,14 @@ void CALLBACK StopPlugin(
 )
 {
     // Signal stop
-    InterlockedExchange((PLONG)&g_PluginState, PLUGIN_STOP);
+    InterlockedExchange((PLONG)&g_pluginState, PLUGIN_STOP);
 
     // Wait for all references to be released
-    while (InterlockedCompareExchange(&m_RefCount, 0, 0) > 0)
+    while (InterlockedCompareExchange(&g_refCount, 0, 0) > 0)
         Sleep(50);
 
-    if (g_Plugin && g_Plugin->GuiShutdownCallback)
-        g_Plugin->GuiShutdownCallback(g_Plugin, g_ThisDLL, NULL);
+    if (g_plugin && g_plugin->GuiShutdownCallback)
+        g_plugin->GuiShutdownCallback(g_plugin, g_thisDll, NULL);
 
 }
 
@@ -290,10 +300,24 @@ BOOLEAN CALLBACK PluginInit(
     _Inout_ PWINOBJEX_PLUGIN PluginData
 )
 {
-    if (g_Plugin)
+    // Don't initialize twice
+    if (g_plugin) {
         return FALSE;
+    }
 
     __try {
+
+        if (PluginData == NULL) {
+            return FALSE;
+        }
+
+        if (PluginData->cbSize < sizeof(WINOBJEX_PLUGIN)) {
+            return FALSE;
+        }
+
+        if (PluginData->AbiVersion != WINOBJEX_PLUGIN_ABI_VERSION) {
+            return FALSE;
+        }
 
         //
         // Set plugin name to be displayed in WinObjEx64 UI.
@@ -323,16 +347,15 @@ BOOLEAN CALLBACK PluginInit(
         PluginData->StopPlugin = (pfnStopPlugin)&StopPlugin;
 
         //
-        // Setup permissions.
+        // Setup capabilities.
         //
-        PluginData->NeedAdmin = FALSE;
-        PluginData->SupportWine = TRUE;
-        PluginData->NeedDriver = FALSE;
+        PluginData->Capabilities.u1.NeedAdmin = FALSE;
+        PluginData->Capabilities.u1.SupportWine = TRUE;
+        PluginData->Capabilities.u1.NeedDriver = FALSE;
+        PluginData->Capabilities.u1.SupportMultipleInstances = TRUE;
 
-        PluginData->SupportMultipleInstances = TRUE;
-
-        PluginData->MajorVersion = 1;
-        PluginData->MinorVersion = 1;
+        PluginData->MajorVersion = IMAGESCOPE_PLUGIN_MAJOR_VERSION;
+        PluginData->MinorVersion = IMAGESCOPE_PLUGIN_MINOR_VERSION;
 
         //
         // Set plugin type.
@@ -349,7 +372,7 @@ BOOLEAN CALLBACK PluginInit(
 
         PluginData->SupportedObjectsIds[0] = ObjectTypeSection;
 
-        g_Plugin = PluginData;
+        g_plugin = PluginData;
 
         return TRUE;
     }
@@ -364,7 +387,7 @@ BOOLEAN CALLBACK PluginInit(
 *
 * Purpose:
 *
-* Dummy dll entrypoint.
+* Dll entry point.
 *
 */
 BOOL WINAPI DllMain(
@@ -376,7 +399,7 @@ BOOL WINAPI DllMain(
     UNREFERENCED_PARAMETER(lpvReserved);
 
     if (fdwReason == DLL_PROCESS_ATTACH) {
-        g_ThisDLL = hinstDLL;
+        g_thisDll = hinstDLL;
         DisableThreadLibraryCalls(hinstDLL);
     }
     return TRUE;

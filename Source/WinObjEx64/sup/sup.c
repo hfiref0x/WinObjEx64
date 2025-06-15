@@ -435,23 +435,37 @@ VOID supClipboardCopy(
 )
 {
     LPWSTR  lptstrCopy;
-    HGLOBAL hglbCopy;
+    HGLOBAL hglbCopy = NULL;
     SIZE_T  dwSize;
+    BOOL    dataSet = FALSE;
 
-    if (OpenClipboard(NULL)) {
+    if (!OpenClipboard(NULL))
+        return;
+
+    __try {
         EmptyClipboard();
         dwSize = cbText + sizeof(UNICODE_NULL);
         hglbCopy = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, dwSize);
-        if (hglbCopy != NULL) {
-            lptstrCopy = (LPWSTR)GlobalLock(hglbCopy);
-            if (lptstrCopy) {
-                RtlCopyMemory(lptstrCopy, lpText, cbText);
-            }
-            GlobalUnlock(hglbCopy);
-            if (!SetClipboardData(CF_UNICODETEXT, hglbCopy))
-                GlobalFree(hglbCopy);
+        if (hglbCopy == NULL)
+            __leave;
+
+        lptstrCopy = (LPWSTR)GlobalLock(hglbCopy);
+        if (lptstrCopy == NULL)
+            __leave;
+
+        RtlCopyMemory(lptstrCopy, lpText, cbText);
+        GlobalUnlock(hglbCopy);
+
+        dataSet = SetClipboardData(CF_UNICODETEXT, hglbCopy) != NULL;
+        if (dataSet) {
+            hglbCopy = NULL;
         }
+    }
+    __finally {
         CloseClipboard();
+        if (hglbCopy != NULL) {
+            GlobalFree(hglbCopy);
+        }
     }
 }
 

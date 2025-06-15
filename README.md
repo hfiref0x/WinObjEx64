@@ -1,4 +1,5 @@
 [![Build status](https://ci.appveyor.com/api/projects/status/dxsbgm90sahgwbo0?svg=true)](https://ci.appveyor.com/project/hfiref0x/winobjex64)
+![Build WinObjEx64 and Plugins](https://github.com/hfiref0x/WinObjEx64/actions/workflows/msbuild.yml/badge.svg)
 
 # WinObjEx64
 ## Windows Object Explorer 64-bit

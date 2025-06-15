@@ -28,13 +28,9 @@ jobs:
 
       - name: Build WinObjEx64 package
         run: |
-          mkdir Package
-          copy Source\WinObjEx64\output\x64\Release\bin\WinObjEx64.exe Package
+          mkdir Package\Application
+          copy Source\WinObjEx64\output\x64\Release\bin\WinObjEx64.exe Package\Application
           copy Docs\WinObjEx64.chm Package
-
-      - name: Zip WinObjEx64 package
-        run: |
-          Compress-Archive -Path Package\* -DestinationPath Package\WinObjEx64.zip          
           
       - name: Build WinObjEx64 Plugins
         working-directory: ./Source
@@ -47,18 +43,15 @@ jobs:
           copy Source\Plugins\Sonar\output\x64\Release\bin\Sonar.dll Package\Plugins
           copy Source\Plugins\ExamplePlugin\output\x64\Release\bin\ExamplePlugin.dll Package\Plugins
           copy Source\Plugins\ImageScope\output\x64\Release\bin\ImageScope.dll Package\Plugins
-      - name: Zip all plugins
-        run: |
-          Compress-Archive -Path Package\Plugins\* -DestinationPath Package\WinObjEx64_Plugins.zip
 
       - name: Upload WinObjEx64 artifacts
         uses: actions/upload-artifact@v4
         with:
           name: WinObjEx64
-          path: Package\WinObjEx64.zip
+          path: Package\Application\*
 
       - name: Upload WinObjEx64 Plugins artifact (zip)
         uses: actions/upload-artifact@v4
         with:
           name: WinObjEx64_Plugins
-          path: Package\WinObjEx64_Plugins.zip
+          path: Package\Plugins\*

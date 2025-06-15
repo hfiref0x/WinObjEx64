@@ -28,18 +28,21 @@ jobs:
 
       - name: Build WinObjEx64 Plugins
         working-directory: ./Source
-        run: msbuild /m /p:Platform=x64 /p:Configuration=Release WinObjEx64_Plugins.sln
+        run: msbuild /m /p:Platform=x64 /p:PostBuildEventUseInBuild=false /p:Configuration=Release WinObjEx64_Plugins.sln
 
       - name: Upload WinObjEx64 artifacts
         uses: actions/upload-artifact@v4
         with:
           name: WinObjEx64
           path: |
-            Source\WinObjEx64\output\x64\Release\*.exe
+            Source\WinObjEx64\output\x64\Release\bin\WinObjEx64.exe
 
       - name: Upload WinObjEx64 Plugins artifacts
         uses: actions/upload-artifact@v4
         with:
           name: WinObjEx64_Plugins
           path: |
-            Source\Plugins\*\output\x64\Release\*.dll
+            Source\Plugins\ApiSetView\output\x64\Release\bin\ApiSetView.dll
+            Source\Plugins\Sonar\output\x64\Release\bin\Sonar.dll
+            Source\Plugins\ExamplePlugin\output\x64\Release\bin\ExamplePlugin.dll
+            Source\Plugins\ImageScope\output\x64\Release\bin\ImageScope.dll

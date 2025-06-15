@@ -2,11 +2,11 @@
 *
 *  (C) COPYRIGHT AUTHORS, 2019 - 2025
 *
-*  TITLE:       MAIN.H
+*  TITLE:       MAIN.C
 *
-*  VERSION:     1.15
+*  VERSION:     1.16
 *
-*  DATE:        11 May 2025
+*  DATE:        14 Jun 2025
 *
 *  WinObjEx64 Sonar plugin.
 *
@@ -19,6 +19,9 @@
 
 #include "global.h"
 
+#define SONAR_PLUGIN_MAJOR_VERSION 1
+#define SONAR_PLUGIN_MINOR_VERSION 2
+
 //
 // Maximum tested build Sonar is known to work.
 //
@@ -27,12 +30,12 @@
 //
 // Dll instance.
 //
-HINSTANCE g_ThisDLL = NULL;
+HINSTANCE g_thisDll = NULL;
 
 //
 // Run state.
 //
-volatile DWORD m_PluginState = PLUGIN_RUNNING;
+volatile DWORD g_pluginState = PLUGIN_RUNNING;
 
 //
 // Number of listview columns.
@@ -47,7 +50,7 @@ SONARCONTEXT g_ctx;
 //
 // Plugin entry.
 //
-WINOBJEX_PLUGIN* g_Plugin = NULL;
+WINOBJEX_PLUGIN* g_plugin = NULL;
 
 VOID ListProtocols(
     _In_ BOOL bRefresh);
@@ -365,9 +368,10 @@ VOID OnResize(
 )
 {
     RECT r, szr;
+    HDWP hDeferPos;
 
-    RtlSecureZeroMemory(&r, sizeof(RECT));
-    RtlSecureZeroMemory(&szr, sizeof(RECT));
+    RtlZeroMemory(&r, sizeof(RECT));
+    RtlZeroMemory(&szr, sizeof(RECT));
 
     SendMessage(g_ctx.StatusBar, WM_SIZE, 0, 0);
 
@@ -375,17 +379,23 @@ VOID OnResize(
     GetClientRect(g_ctx.StatusBar, &szr);
     g_ctx.SplitterMaxY = r.bottom - Y_SPLITTER_MIN;
 
-    SetWindowPos(g_ctx.TreeList, 0,
+    hDeferPos = BeginDeferWindowPos(7);
+    if (!hDeferPos) return;
+
+    hDeferPos = DeferWindowPos(hDeferPos, g_ctx.TreeList, 0,
         0, 0,
         r.right,
         g_ctx.SplitterPosY,
         SWP_NOOWNERZORDER);
 
-    SetWindowPos(g_ctx.ListView, 0,
+    hDeferPos = DeferWindowPos(hDeferPos, g_ctx.ListView, 0,
         0, g_ctx.SplitterPosY + Y_SPLITTER_SIZE,
         r.right,
         r.bottom - g_ctx.SplitterPosY - Y_SPLITTER_SIZE - szr.bottom,
         SWP_NOOWNERZORDER);
+
+    EndDeferWindowPos(hDeferPos);
+    InvalidateRect(hwndDlg, NULL, FALSE);
 }
 
 /*
@@ -542,9 +552,9 @@ VOID DumpHandlers(
     for (i = 0; i < Count; i++) {
         if ((ULONG_PTR)Handlers[i] > g_ctx.ParamBlock.SystemRangeStart) {
 
-            StringCchPrintf(szBuffer, 
-                RTL_NUMBER_OF(szBuffer), 
-                TEXT("0x%p"), 
+            StringCchPrintf(szBuffer,
+                RTL_NUMBER_OF(szBuffer),
+                TEXT("0x%p"),
                 Handlers[i]);
 
             if (ntsupFindModuleEntryByAddress(
@@ -1176,7 +1186,7 @@ LRESULT CALLBACK MainWindowProc(
         break;
 
     case WM_CLOSE:
-        InterlockedExchange((PLONG)&m_PluginState, PLUGIN_STOP);
+        InterlockedExchange((PLONG)&g_pluginState, PLUGIN_STOP);
         PostQuitMessage(0);
         break;
 
@@ -1208,11 +1218,11 @@ VOID PluginFreeGlobalResources(
         g_ctx.PluginHeap = NULL;
     }
 
-    if (g_Plugin->StateChangeCallback)
-        g_Plugin->StateChangeCallback(g_Plugin, PluginStopped, NULL);
+    if (g_plugin->StateChangeCallback)
+        g_plugin->StateChangeCallback(g_plugin, PluginStopped, NULL);
 
-    if (g_Plugin->GuiShutdownCallback)
-        g_Plugin->GuiShutdownCallback(g_Plugin, g_ThisDLL, NULL);
+    if (g_plugin->GuiShutdownCallback)
+        g_plugin->GuiShutdownCallback(g_plugin, g_thisDll, NULL);
 
 }
 
@@ -1228,28 +1238,26 @@ DWORD WINAPI PluginThread(
     _In_ PVOID Parameter
 )
 {
-    HICON       hIcon;
-    LONG_PTR    wndStyles;
-    HWND        MainWindow;
-
-    HDITEM      hdritem;
-
     BOOL rv;
+    HRESULT hr = S_FALSE;
+    HICON hIcon;
+    LONG_PTR wndStyles;
+    HWND MainWindow;
+    HDITEM hdritem;
     MSG msg1;
-
     WCHAR szClassName[100];
 
     UNREFERENCED_PARAMETER(Parameter);
 
     do {
 
-        if (g_Plugin->GuiInitCallback == NULL) { // this is required callback
+        if (g_plugin->GuiInitCallback == NULL) { // this is required callback
             kdDebugPrint("Gui init callback required\r\n");
             break;
         }
 
-        if (!g_Plugin->GuiInitCallback(g_Plugin,
-            g_ThisDLL,
+        if (!g_plugin->GuiInitCallback(g_plugin,
+            g_thisDll,
             (WNDPROC)MainWindowProc,
             NULL))
         {
@@ -1257,11 +1265,7 @@ DWORD WINAPI PluginThread(
             break;
         }
 
-#pragma warning(push)
-#pragma warning(disable: 6031)
-        CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-#pragma warning(pop)
-
+        hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
         g_ctx.CurrentDPI = g_ctx.ParamBlock.CurrentDPI;
 
         //
@@ -1270,7 +1274,7 @@ DWORD WINAPI PluginThread(
         StringCchPrintf(szClassName,
             RTL_NUMBER_OF(szClassName),
             TEXT("%wsWndClass"),
-            g_Plugin->Name);
+            g_plugin->Name);
 
         //
         // Create main window.
@@ -1286,7 +1290,7 @@ DWORD WINAPI PluginThread(
             SCALE_DPI_VALUE(600, g_ctx.CurrentDPI),
             NULL,
             NULL,
-            g_ThisDLL,
+            g_thisDll,
             NULL);
 
         if (MainWindow == 0) {
@@ -1311,7 +1315,7 @@ DWORD WINAPI PluginThread(
             0,
             MainWindow,
             NULL,
-            g_ThisDLL,
+            g_thisDll,
             NULL);
 
         if (g_ctx.StatusBar == 0) {
@@ -1453,11 +1457,15 @@ DWORD WINAPI PluginThread(
             TranslateMessage(&msg1);
             DispatchMessage(&msg1);
 
-        } while (rv != 0 && InterlockedAdd((PLONG)&m_PluginState, PLUGIN_RUNNING) == PLUGIN_RUNNING);
+        } while (rv != 0 && InterlockedAdd((PLONG)&g_pluginState, PLUGIN_RUNNING) == PLUGIN_RUNNING);
 
     } while (FALSE);
 
     DestroyWindow(g_ctx.MainWindow);
+
+    if (hr == S_OK || hr == S_FALSE) {
+        CoUninitialize();
+    }
 
     PluginFreeGlobalResources();
 
@@ -1480,7 +1488,7 @@ NTSTATUS CALLBACK StartPlugin(
     NTSTATUS Status;
     WINOBJEX_PLUGIN_STATE State = PluginInitialization;
 
-    InterlockedExchange((PLONG)&m_PluginState, PLUGIN_RUNNING);
+    InterlockedExchange((PLONG)&g_pluginState, PLUGIN_RUNNING);
 
     RtlSecureZeroMemory(&g_ctx, sizeof(g_ctx));
 
@@ -1507,8 +1515,8 @@ NTSTATUS CALLBACK StartPlugin(
     else
         State = PluginError;
 
-    if (g_Plugin->StateChangeCallback)
-        g_Plugin->StateChangeCallback(g_Plugin, State, NULL);
+    if (g_plugin->StateChangeCallback)
+        g_plugin->StateChangeCallback(g_plugin, State, NULL);
 
     return Status;
 }
@@ -1526,7 +1534,7 @@ void CALLBACK StopPlugin(
 )
 {
     if (g_ctx.WorkerThread) {
-        InterlockedExchange((PLONG)&m_PluginState, PLUGIN_STOP);//force stop
+        InterlockedExchange((PLONG)&g_pluginState, PLUGIN_STOP);//force stop
         if (WaitForSingleObject(g_ctx.WorkerThread, 1000) == WAIT_TIMEOUT) {
 #pragma warning(push)
 #pragma warning(disable: 6258)
@@ -1556,10 +1564,23 @@ BOOLEAN CALLBACK PluginInit(
     _Inout_ PWINOBJEX_PLUGIN PluginData
 )
 {
-    if (g_Plugin)
+    // Don't initialize twice
+    if (g_plugin) {
         return FALSE;
+    }
 
     __try {
+        if (PluginData == NULL) {
+            return FALSE;
+        }
+
+        if (PluginData->cbSize < sizeof(WINOBJEX_PLUGIN)) {
+            return FALSE;
+        }
+
+        if (PluginData->AbiVersion != WINOBJEX_PLUGIN_ABI_VERSION) {
+            return FALSE;
+        }
 
         //
         // Set plugin name to be displayed in WinObjEx64 UI.
@@ -1589,21 +1610,21 @@ BOOLEAN CALLBACK PluginInit(
         PluginData->StopPlugin = (pfnStopPlugin)&StopPlugin;
 
         //
-        // Setup permissions.
+        // Setup capabilities.
         //
-        PluginData->NeedAdmin = TRUE;
-        PluginData->SupportWine = FALSE;
-        PluginData->NeedDriver = TRUE;
+        PluginData->Capabilities.u1.NeedAdmin = TRUE;
+        PluginData->Capabilities.u1.SupportWine = FALSE;
+        PluginData->Capabilities.u1.NeedDriver = TRUE;
 
-        PluginData->MajorVersion = 1;
-        PluginData->MinorVersion = 1;
+        PluginData->MajorVersion = SONAR_PLUGIN_MAJOR_VERSION;
+        PluginData->MinorVersion = SONAR_PLUGIN_MINOR_VERSION;
 
         //
         // Set plugin type.
         //
         PluginData->Type = DefaultPlugin;
 
-        g_Plugin = PluginData;
+        g_plugin = PluginData;
 
         return TRUE;
     }
@@ -1632,7 +1653,7 @@ BOOL WINAPI DllMain(
     switch (fdwReason) {
 
     case DLL_PROCESS_ATTACH:
-        g_ThisDLL = hinstDLL;
+        g_thisDll = hinstDLL;
         DisableThreadLibraryCalls(hinstDLL);
         break;
     }

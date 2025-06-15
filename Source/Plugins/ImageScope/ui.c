@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020 - 2022
+*  (C) COPYRIGHT AUTHORS, 2020 - 2025
 *
 *  TITLE:       UI.C
 *
-*  VERSION:     1.10
+*  VERSION:     1.20
 *
-*  DATE:        11 Jun 2021
+*  DATE:        14 Jun 2025
 *
 *  WinObjEx64 ImageScope UI.
 *
@@ -25,13 +25,13 @@ INT_PTR CALLBACK TabsWndProc(
     _In_ WPARAM wParam,
     _In_ LPARAM lParam);
 
-static IMS_TAB ImsTabs[] = {
+static IMS_TAB imsTabs[] = {
     { IDD_TABDLG_SECTION, TabIdSection, TabsWndProc, TEXT("Section") },
     { IDD_TABDLG_VSINFO, TabIdVSInfo, TabsWndProc, TEXT("VersionInfo") },
     { IDD_TABDLG_STRINGS, TabIdStrings, TabsWndProc, TEXT("Strings") }
 };
 
-static VALUE_DESC PEImageFileChars[] = {
+static VALUE_DESC peImageFileChars[] = {
     { TEXT("RelocsStripped"), IMAGE_FILE_RELOCS_STRIPPED },
     { TEXT("Executable"), IMAGE_FILE_EXECUTABLE_IMAGE },
     { TEXT("LineNumsStripped"), IMAGE_FILE_LINE_NUMS_STRIPPED },
@@ -47,7 +47,7 @@ static VALUE_DESC PEImageFileChars[] = {
     { TEXT("UpSystemOnly"), IMAGE_FILE_UP_SYSTEM_ONLY }
 };
 
-static VALUE_DESC PEDllChars[] = {
+static VALUE_DESC peDllChars[] = {
     { TEXT("HighEntropyVA"), IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA },
     { TEXT("DynamicBase"), IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE },
     { TEXT("ForceIntegrity"), IMAGE_DLLCHARACTERISTICS_FORCE_INTEGRITY },
@@ -70,29 +70,29 @@ typedef enum _ValueDumpType {
 } ValueDumpType;
 
 VOID SectionDumpUlong(
-    _In_ HWND TreeList,
-    _In_ HTREEITEM RootItem,
-    _In_ ULONG Value,
-    _In_ LPWSTR ValueName,
-    _In_opt_ LPWSTR ValueDesc,
-    _In_ ValueDumpType DumpType
+    _In_ HWND treeList,
+    _In_ HTREEITEM rootItem,
+    _In_ ULONG value,
+    _In_ LPWSTR valueName,
+    _In_opt_ LPWSTR valueDesc,
+    _In_ ValueDumpType dumpType
 )
 {
-    TL_SUBITEMS_FIXED subitems;
+    TL_SUBITEMS_FIXED subItems;
     LPWSTR lpFormat;
     WCHAR szText[PRINTF_BUFFER_LENGTH];
 
-    RtlSecureZeroMemory(&subitems, sizeof(subitems));
+    RtlSecureZeroMemory(&subItems, sizeof(subItems));
     szText[0] = 0;
-    subitems.Count = 2;
-    subitems.Text[0] = szText;
+    subItems.Count = 2;
+    subItems.Text[0] = szText;
 
-    if (ValueDesc)
-        subitems.Text[1] = ValueDesc;
+    if (valueDesc)
+        subItems.Text[1] = valueDesc;
     else
-        subitems.Text[1] = EMPTY_STRING;
+        subItems.Text[1] = EMPTY_STRING;
 
-    switch (DumpType) {
+    switch (dumpType) {
     case UShortDump:
         lpFormat = TEXT("0x%hX");
         break;
@@ -112,72 +112,70 @@ VOID SectionDumpUlong(
         szText,
         PRINTF_BUFFER_LENGTH,
         lpFormat,
-        Value);
+        value);
 
     supTreeListAddItem(
-        TreeList,
-        RootItem,
+        treeList,
+        rootItem,
         TVIF_TEXT | TVIF_STATE,
         (UINT)0,
         (UINT)0,
-        ValueName,
-        &subitems);
-
+        valueName,
+        &subItems);
 }
 
 VOID SectionDumpFlags(
-    _In_ HWND TreeList,
-    _In_ HTREEITEM RootItem,
-    _In_ ULONG Flags,
-    _In_ PVALUE_DESC FlagsDescriptions,
-    _In_ ULONG MaxDescriptions,
-    _In_ LPWSTR ValueName,
-    _In_ ValueDumpType DumpType
+    _In_ HWND treeList,
+    _In_ HTREEITEM rootItem,
+    _In_ ULONG flags,
+    _In_ PVALUE_DESC flagsDescriptions,
+    _In_ ULONG maxDescriptions,
+    _In_ LPWSTR valueName,
+    _In_ ValueDumpType dumpType
 )
 {
     UINT i, j;
     LPWSTR lpType;
-    ULONG scanFlags = Flags;
-    TL_SUBITEMS_FIXED subitems;
+    ULONG scanFlags = flags;
+    TL_SUBITEMS_FIXED subItems;
 
     WCHAR szValue[PRINTF_BUFFER_LENGTH];
 
     RtlSecureZeroMemory(&szValue, sizeof(szValue));
-    RtlSecureZeroMemory(&subitems, sizeof(subitems));
+    RtlSecureZeroMemory(&subItems, sizeof(subItems));
 
     j = 0;
     lpType = NULL;
     if (scanFlags) {
-        for (i = 0; i < MaxDescriptions; i++) {
-            if (scanFlags & FlagsDescriptions[i].dwValue) {
-                lpType = FlagsDescriptions[i].lpDescription;
-                subitems.Count = 2;
+        for (i = 0; i < maxDescriptions; i++) {
+            if (scanFlags & flagsDescriptions[i].dwValue) {
+                lpType = flagsDescriptions[i].lpDescription;
+                subItems.Count = 2;
 
                 //add first entry with name
                 if (j == 0) {
-
                     StringCchPrintf(szValue, PRINTF_BUFFER_LENGTH,
                         TEXT("0x%08lX"), scanFlags);
 
-                    subitems.Text[0] = szValue;
-                    subitems.Text[1] = lpType;
+                    subItems.Text[0] = szValue;
+                    subItems.Text[1] = lpType;
                 }
                 else {
                     //add subentry
-                    subitems.Text[0] = EMPTY_STRING;
-                    subitems.Text[1] = lpType;
+                    subItems.Text[0] = EMPTY_STRING;
+                    subItems.Text[1] = lpType;
                 }
 
                 supTreeListAddItem(
-                    TreeList,
-                    RootItem,
+                    treeList,
+                    rootItem,
                     TVIF_TEXT | TVIF_STATE,
                     0,
                     0,
-                    (j == 0) ? ValueName : EMPTY_STRING,
-                    &subitems);
+                    (j == 0) ? valueName : EMPTY_STRING,
+                    &subItems);
 
-                scanFlags &= ~FlagsDescriptions[i].dwValue;
+                scanFlags &= ~flagsDescriptions[i].dwValue;
                 j++;
             }
             if (scanFlags == 0) {
@@ -186,43 +184,42 @@ VOID SectionDumpFlags(
         }
     }
     else {
-        SectionDumpUlong(TreeList, RootItem, Flags, ValueName, NULL, DumpType);
+        SectionDumpUlong(treeList, rootItem, flags, valueName, NULL, dumpType);
     }
 }
 
 VOID SectionDumpUnicodeString(
-    _In_ HWND TreeList,
+    _In_ HWND treeList,
     _In_ HTREEITEM hParent,
-    _In_ LPWSTR StringName,
+    _In_ LPWSTR stringName,
     _In_ PUNICODE_STRING pString,
-    _In_ DWORD ItemState,
-    _In_ DWORD StateMask
+    _In_ DWORD itemState,
+    _In_ DWORD stateMask
 )
 {
-    HTREEITEM           h_tviSubItem;
-    TL_SUBITEMS_FIXED   subitems;
+    HTREEITEM           hSubItem;
+    TL_SUBITEMS_FIXED   subItems;
     WCHAR               szValue[PRINTF_BUFFER_LENGTH];
 
-    RtlSecureZeroMemory(&subitems, sizeof(subitems));
-    subitems.Count = 2;
+    RtlSecureZeroMemory(&subItems, sizeof(subItems));
+    subItems.Count = 2;
 
-    subitems.Text[0] = EMPTY_STRING;
-    subitems.Text[1] = TEXT("UNICODE_STRING");
+    subItems.Text[0] = EMPTY_STRING;
+    subItems.Text[1] = TEXT("UNICODE_STRING");
 
-    h_tviSubItem = supTreeListAddItem(
-        TreeList,
+    hSubItem = supTreeListAddItem(
+        treeList,
         hParent,
         TVIF_TEXT | TVIF_STATE,
-        ItemState,
-        StateMask,
-        StringName,
-        &subitems);
-
+        itemState,
+        stateMask,
+        stringName,
+        &subItems);
 
     //
     // Add UNICODE_STRING.Length
     //
-    RtlSecureZeroMemory(&subitems, sizeof(subitems));
+    RtlSecureZeroMemory(&subItems, sizeof(subItems));
     RtlSecureZeroMemory(szValue, sizeof(szValue));
 
     StringCchPrintf(
@@ -231,24 +228,24 @@ VOID SectionDumpUnicodeString(
         TEXT("0x%hX"),
         pString->Length);
 
-    subitems.Count = 2;
-    subitems.Text[0] = szValue;
-    subitems.Text[1] = EMPTY_STRING;
+    subItems.Count = 2;
+    subItems.Text[0] = szValue;
+    subItems.Text[1] = EMPTY_STRING;
 
     supTreeListAddItem(
-        TreeList,
-        h_tviSubItem,
+        treeList,
+        hSubItem,
         TVIF_TEXT,
         0,
         0,
         TEXT("Length"),
-        &subitems);
+        &subItems);
 
     //
     // Add UNICODE_STRING.MaximumLength
     //
     RtlSecureZeroMemory(szValue, sizeof(szValue));
-    RtlSecureZeroMemory(&subitems, sizeof(subitems));
+    RtlSecureZeroMemory(&subItems, sizeof(subItems));
 
     StringCchPrintf(
         szValue,
@@ -256,64 +253,62 @@ VOID SectionDumpUnicodeString(
         TEXT("0x%hX"),
         pString->MaximumLength);
 
-    subitems.Count = 2;
-    subitems.Text[0] = szValue;
-    subitems.Text[1] = EMPTY_STRING;
+    subItems.Count = 2;
+    subItems.Text[0] = szValue;
+    subItems.Text[1] = EMPTY_STRING;
 
     supTreeListAddItem(
-        TreeList,
-        h_tviSubItem,
+        treeList,
+        hSubItem,
         TVIF_TEXT,
         0,
         0,
         TEXT("MaximumLength"),
-        &subitems);
+        &subItems);
 
     //
     // Add UNICODE_STRING.Buffer
     //
-    RtlSecureZeroMemory(&subitems, sizeof(subitems));
-    subitems.Count = 2;
+    RtlSecureZeroMemory(&subItems, sizeof(subItems));
+    subItems.Count = 2;
 
     if (pString->Buffer == NULL) {
-        subitems.Text[0] = TEXT("NULL");
-        subitems.Text[1] = EMPTY_STRING;
+        subItems.Text[0] = TEXT("NULL");
+        subItems.Text[1] = EMPTY_STRING;
     }
     else {
         RtlSecureZeroMemory(&szValue, sizeof(szValue));
         szValue[0] = TEXT('0');
         szValue[1] = TEXT('x');
         u64tohex((ULONG_PTR)pString->Buffer, &szValue[2]);
-        subitems.Text[0] = szValue;
-        subitems.Text[1] = pString->Buffer;
+        subItems.Text[0] = szValue;
+        subItems.Text[1] = pString->Buffer;
     }
 
     supTreeListAddItem(
-        TreeList,
-        h_tviSubItem,
+        treeList,
+        hSubItem,
         TVIF_TEXT,
         0,
         0,
         TEXT("Buffer"),
-        &subitems);
-
+        &subItems);
 }
 
 VOID SectionDumpImageFileName(
-    _In_ GUI_CONTEXT* Context
+    _In_ GUI_CONTEXT* context
 )
 {
-    OBJECT_NAME_INFORMATION* ObjectNameInfo = NULL;
-    PVOID BaseAddress = Context->SectionAddress;
+    OBJECT_NAME_INFORMATION* objectNameInfo = NULL;
+    PVOID baseAddress = context->SectionAddress;
     NTSTATUS ntStatus;
     SIZE_T returnedLength = 0;
     HTREEITEM tviRoot;
 
     do {
-
         ntStatus = NtQueryVirtualMemory(
             NtCurrentProcess(),
-            BaseAddress,
+            baseAddress,
             MemoryMappedFilenameInformation,
             NULL,
             0,
@@ -325,8 +320,8 @@ VOID SectionDumpImageFileName(
         //
         // Allocate required buffer.
         //      
-        ObjectNameInfo = (OBJECT_NAME_INFORMATION*)supHeapAlloc(returnedLength);
-        if (ObjectNameInfo == NULL)
+        objectNameInfo = (OBJECT_NAME_INFORMATION*)supHeapAlloc(returnedLength);
+        if (objectNameInfo == NULL)
             break;
 
         //
@@ -334,16 +329,15 @@ VOID SectionDumpImageFileName(
         //
         ntStatus = NtQueryVirtualMemory(
             NtCurrentProcess(),
-            BaseAddress,
+            baseAddress,
             MemoryMappedFilenameInformation,
-            ObjectNameInfo,
+            objectNameInfo,
             returnedLength,
             &returnedLength);
 
         if (NT_SUCCESS(ntStatus)) {
-
             tviRoot = supTreeListAddItem(
-                Context->TreeList,
+                context->TreeList,
                 NULL,
                 TVIF_TEXT | TVIF_STATE,
                 (UINT)TVIS_EXPANDED,
@@ -352,27 +346,23 @@ VOID SectionDumpImageFileName(
                 NULL);
 
             if (tviRoot) {
-
                 SectionDumpUnicodeString(
-                    Context->TreeList,
+                    context->TreeList,
                     tviRoot,
                     TEXT("Name"),
-                    &ObjectNameInfo->Name,
+                    &objectNameInfo->Name,
                     TVIS_EXPANDED,
                     TVIS_EXPANDED);
-
             }
-
         }
-
     } while (FALSE);
 
-    if (ObjectNameInfo)
-        supHeapFree(ObjectNameInfo);
+    if (objectNameInfo)
+        supHeapFree(objectNameInfo);
 }
 
 VOID SectionDumpStructs(
-    _In_ GUI_CONTEXT* Context
+    _In_ GUI_CONTEXT* context
 )
 {
     BOOL bInternalPresent = FALSE;
@@ -386,15 +376,14 @@ VOID SectionDumpStructs(
 
     LPWSTR lpDesc;
     HTREEITEM tviRoot;
-    TL_SUBITEMS_FIXED subitems;
+    TL_SUBITEMS_FIXED subItems;
 
     __try {
-
-        ntStatus = Context->ParamBlock.OpenNamedObjectByType(
+        ntStatus = context->ParamBlock.OpenNamedObjectByType(
             &sectionHandle,
             ObjectTypeSection,
-            &Context->ParamBlock.Object.Directory,
-            &Context->ParamBlock.Object.Name,
+            &context->ParamBlock.Object.Directory,
+            &context->ParamBlock.Object.Name,
             SECTION_QUERY);
 
         if (!NT_SUCCESS(ntStatus))
@@ -421,7 +410,7 @@ VOID SectionDumpStructs(
         sectionHandle = NULL;
 
         tviRoot = supTreeListAddItem(
-            Context->TreeList,
+            context->TreeList,
             NULL,
             TVIF_TEXT | TVIF_STATE,
             (UINT)TVIS_EXPANDED,
@@ -430,45 +419,44 @@ VOID SectionDumpStructs(
             NULL);
 
         if (tviRoot) {
-
-            RtlSecureZeroMemory(&subitems, sizeof(subitems));
+            RtlSecureZeroMemory(&subItems, sizeof(subItems));
             szText[0] = 0;
-            subitems.Count = 2;
-            subitems.Text[0] = szText;
-            subitems.Text[1] = EMPTY_STRING;
+            subItems.Count = 2;
+            subItems.Text[0] = szText;
+            subItems.Text[1] = EMPTY_STRING;
 
             StringCchPrintf(szText, PRINTF_BUFFER_LENGTH, TEXT("0x%p"), sii.TransferAddress);
             supTreeListAddItem(
-                Context->TreeList,
+                context->TreeList,
                 tviRoot,
                 TVIF_TEXT | TVIF_STATE,
                 (UINT)0,
                 (UINT)0,
                 TEXT("TransferAddress"),
-                &subitems);
+                &subItems);
 
-            SectionDumpUlong(Context->TreeList, tviRoot,
+            SectionDumpUlong(context->TreeList, tviRoot,
                 sii.ZeroBits, TEXT("ZeroBits"), NULL, UlongDump);
 
             StringCchPrintf(szText, PRINTF_BUFFER_LENGTH, TEXT("0x%I64X"), sii.MaximumStackSize);
             supTreeListAddItem(
-                Context->TreeList,
+                context->TreeList,
                 tviRoot,
                 TVIF_TEXT | TVIF_STATE,
                 (UINT)0,
                 (UINT)0,
                 TEXT("MaximumStackSize"),
-                &subitems);
+                &subItems);
 
             StringCchPrintf(szText, PRINTF_BUFFER_LENGTH, TEXT("0x%I64X"), sii.CommittedStackSize);
             supTreeListAddItem(
-                Context->TreeList,
+                context->TreeList,
                 tviRoot,
                 TVIF_TEXT | TVIF_STATE,
                 (UINT)0,
                 (UINT)0,
                 TEXT("CommittedStackSize"),
-                &subitems);
+                &subItems);
 
             switch (sii.SubSystemType) {
             case IMAGE_SUBSYSTEM_NATIVE:
@@ -509,7 +497,7 @@ VOID SectionDumpStructs(
                 break;
             }
 
-            SectionDumpUlong(Context->TreeList, tviRoot,
+            SectionDumpUlong(context->TreeList, tviRoot,
                 sii.SubSystemType, TEXT("SubSystemType"), lpDesc, UlongDump);
 
             StringCchPrintf(
@@ -519,7 +507,7 @@ VOID SectionDumpStructs(
                 sii.SubSystemMajorVersion,
                 sii.SubSystemMinorVersion);
 
-            SectionDumpUlong(Context->TreeList, tviRoot,
+            SectionDumpUlong(context->TreeList, tviRoot,
                 sii.SubSystemVersion, TEXT("SubSystemVersion"), szText, UlongDump);
 
             StringCchPrintf(
@@ -529,20 +517,20 @@ VOID SectionDumpStructs(
                 sii.MajorOperatingSystemVersion,
                 sii.MinorOperatingSystemVersion);
 
-            SectionDumpUlong(Context->TreeList, tviRoot,
+            SectionDumpUlong(context->TreeList, tviRoot,
                 sii.OperatingSystemVersion, TEXT("OperatingSystemVersion"), szText, UlongDump);
 
-            SectionDumpFlags(Context->TreeList, tviRoot,
+            SectionDumpFlags(context->TreeList, tviRoot,
                 sii.ImageCharacteristics,
-                PEImageFileChars,
-                RTL_NUMBER_OF(PEImageFileChars),
+                peImageFileChars,
+                RTL_NUMBER_OF(peImageFileChars),
                 TEXT("ImageCharacteristics"),
                 UShortDump);
 
-            SectionDumpFlags(Context->TreeList, tviRoot,
+            SectionDumpFlags(context->TreeList, tviRoot,
                 sii.DllCharacteristics,
-                PEDllChars,
-                RTL_NUMBER_OF(PEDllChars),
+                peDllChars,
+                RTL_NUMBER_OF(peDllChars),
                 TEXT("DllCharacteristics"),
                 UShortDump);
 
@@ -558,33 +546,32 @@ VOID SectionDumpStructs(
                 break;
             }
 
-            SectionDumpUlong(Context->TreeList, tviRoot,
+            SectionDumpUlong(context->TreeList, tviRoot,
                 sii.Machine, TEXT("Machine"), lpDesc, UShortDump);
 
-            SectionDumpUlong(Context->TreeList, tviRoot,
+            SectionDumpUlong(context->TreeList, tviRoot,
                 (ULONG)sii.ImageContainsCode, TEXT("ImageContainsCode"), NULL, BooleanDump);
 
-            SectionDumpUlong(Context->TreeList, tviRoot,
+            SectionDumpUlong(context->TreeList, tviRoot,
                 (ULONG)sii.ImageFlags, TEXT("ImageFlags"), NULL, UCharDump);
 
-            SectionDumpUlong(Context->TreeList, tviRoot,
+            SectionDumpUlong(context->TreeList, tviRoot,
                 sii.LoaderFlags, TEXT("LoaderFlags"), NULL, UlongDump);
 
-            SectionDumpUlong(Context->TreeList, tviRoot,
+            SectionDumpUlong(context->TreeList, tviRoot,
                 sii.ImageFileSize, TEXT("ImageFileSize"), NULL, UlongDump);
 
-            SectionDumpUlong(Context->TreeList, tviRoot,
+            SectionDumpUlong(context->TreeList, tviRoot,
                 sii.CheckSum, TEXT("CheckSum"), NULL, UlongDump);
-
         }
 
-        SectionDumpImageFileName(Context);
+        SectionDumpImageFileName(context);
 
         if (bInternalPresent == FALSE)
             __leave;
 
         tviRoot = supTreeListAddItem(
-            Context->TreeList,
+            context->TreeList,
             NULL,
             TVIF_TEXT | TVIF_STATE,
             (UINT)TVIS_EXPANDED,
@@ -593,12 +580,9 @@ VOID SectionDumpStructs(
             NULL);
 
         if (tviRoot) {
-
-            SectionDumpUlong(Context->TreeList, tviRoot,
+            SectionDumpUlong(context->TreeList, tviRoot,
                 sii2.ExtendedFlags, TEXT("ExtendedFlags"), NULL, UlongDump);
-
         }
-
     }
     __finally {
         if (sectionHandle)
@@ -614,7 +598,7 @@ VOID SectionDumpStructs(
         }
 
         supStatusBarSetText(
-            Context->StatusBar,
+            context->StatusBar,
             0,
             szText);
     }
@@ -631,7 +615,7 @@ VOID SectionDumpStructs(
 BOOL CALLBACK VsInfoStringsEnumCallback(
     _In_ PWCHAR key,
     _In_ PWCHAR value,
-    _In_ PWCHAR langid,
+    _In_ PWCHAR langId,
     _In_opt_ LPVOID cbparam
 )
 {
@@ -655,14 +639,14 @@ BOOL CALLBACK VsInfoStringsEnumCallback(
     ListView_SetItem(hwndList, &lvItem);
 
     szLangId[0] = 0;
-    StringCchPrintf(szLangId, _countof(szLangId), TEXT("0x%ws"), langid);
+    StringCchPrintf(szLangId, _countof(szLangId), TEXT("0x%ws"), langId);
 
     lvItem.iSubItem = 2;
     lvItem.pszText = szLangId;
     lvItem.iItem = itemIndex;
     ListView_SetItem(hwndList, &lvItem);
 
-    return TRUE;//continue enum
+    return TRUE; // continue enum
 }
 
 /*
@@ -675,7 +659,7 @@ BOOL CALLBACK VsInfoStringsEnumCallback(
 */
 VOID VsInfoTabOnInit(
     _In_ HWND hWndDlg,
-    _In_ GUI_CONTEXT* Context
+    _In_ GUI_CONTEXT* context
 )
 {
     WCHAR szText[100];
@@ -689,7 +673,7 @@ VOID VsInfoTabOnInit(
         LVCFMT_LEFT,
         TEXT("Name"),
         120,
-        Context->CurrentDPI);
+        context->CurrentDPI);
 
     supAddListViewColumn(hwndList,
         1,
@@ -699,7 +683,7 @@ VOID VsInfoTabOnInit(
         LVCFMT_LEFT,
         TEXT("Value"),
         300,
-        Context->CurrentDPI);
+        context->CurrentDPI);
 
     supAddListViewColumn(hwndList,
         2,
@@ -709,7 +693,7 @@ VOID VsInfoTabOnInit(
         LVCFMT_LEFT,
         TEXT("LangId"),
         100,
-        Context->CurrentDPI);
+        context->CurrentDPI);
 
     ListView_SetExtendedListViewStyle(hwndList,
         LVS_EX_FULLROWSELECT | LVS_EX_LABELTIP | LVS_EX_DOUBLEBUFFER);
@@ -719,7 +703,7 @@ VOID VsInfoTabOnInit(
     SendMessage(hwndList, WM_SETREDRAW, (WPARAM)FALSE, (LPARAM)0);
 
     if (PEImageEnumVersionFields(
-        Context->SectionAddress,
+        context->SectionAddress,
         &VsInfoStringsEnumCallback,
         NULL,
         (LPVOID)hwndList))
@@ -736,7 +720,7 @@ VOID VsInfoTabOnInit(
     SendMessage(hwndList, WM_SETREDRAW, (WPARAM)TRUE, (LPARAM)0);
 
     supStatusBarSetText(
-        Context->StatusBar,
+        context->StatusBar,
         0,
         szText);
 }
@@ -751,16 +735,16 @@ VOID VsInfoTabOnInit(
 */
 VOID SectionTabOnInit(
     _In_ HWND hWndDlg,
-    _In_ GUI_CONTEXT* Context
+    _In_ GUI_CONTEXT* context
 )
 {
     RECT rc;
     HWND hwndList;
-    HDITEM hdritem;
+    HDITEM hdrItem;
 
     GetClientRect(hWndDlg, &rc);
 
-    TabCtrl_AdjustRect(Context->TabHeader->hwndTab, FALSE, &rc);
+    TabCtrl_AdjustRect(context->TabHeader->hwndTab, FALSE, &rc);
 
     hwndList = CreateWindowEx(WS_EX_STATICEDGE, WC_TREELIST, NULL,
         WS_VISIBLE | WS_CHILD | WS_TABSTOP | TLSTYLE_COLAUTOEXPAND | TLSTYLE_LINKLINES,
@@ -771,38 +755,36 @@ VOID SectionTabOnInit(
         hWndDlg, NULL, NULL, NULL);
 
     if (hwndList) {
+        RtlSecureZeroMemory(&hdrItem, sizeof(hdrItem));
+        hdrItem.mask = HDI_FORMAT | HDI_TEXT | HDI_WIDTH;
+        hdrItem.fmt = HDF_LEFT | HDF_BITMAP_ON_RIGHT | HDF_STRING;
+        hdrItem.cxy = ScaleDPI(220, context->CurrentDPI);
+        hdrItem.pszText = TEXT("Field");
+        TreeList_InsertHeaderItem(hwndList, 0, &hdrItem);
+        hdrItem.cxy = ScaleDPI(130, context->CurrentDPI);
+        hdrItem.pszText = TEXT("Value");
+        TreeList_InsertHeaderItem(hwndList, 1, &hdrItem);
+        hdrItem.cxy = ScaleDPI(210, context->CurrentDPI);
+        hdrItem.pszText = TEXT("Additional Information");
+        TreeList_InsertHeaderItem(hwndList, 2, &hdrItem);
 
-        RtlSecureZeroMemory(&hdritem, sizeof(hdritem));
-        hdritem.mask = HDI_FORMAT | HDI_TEXT | HDI_WIDTH;
-        hdritem.fmt = HDF_LEFT | HDF_BITMAP_ON_RIGHT | HDF_STRING;
-        hdritem.cxy = ScaleDPI(220, Context->CurrentDPI);
-        hdritem.pszText = TEXT("Field");
-        TreeList_InsertHeaderItem(hwndList, 0, &hdritem);
-        hdritem.cxy = ScaleDPI(130, Context->CurrentDPI);
-        hdritem.pszText = TEXT("Value");
-        TreeList_InsertHeaderItem(hwndList, 1, &hdritem);
-        hdritem.cxy = ScaleDPI(210, Context->CurrentDPI);
-        hdritem.pszText = TEXT("Additional Information");
-        TreeList_InsertHeaderItem(hwndList, 2, &hdritem);
-
-        Context->TreeList = hwndList;
-        SectionDumpStructs(Context);
+        context->TreeList = hwndList;
+        SectionDumpStructs(context);
     }
-
 }
 
 #pragma warning(push)
 #pragma warning(disable: 6262)
 UINT AddStringsToList(
     _In_ HWND hWndDlg,
-    _In_ PVOID BaseAddress,
-    _In_ PSTRING_PTR ChainHead,
-    _In_ BOOLEAN IsUnicode
+    _In_ PVOID baseAddress,
+    _In_ PSTRING_PTR chainHead,
+    _In_ BOOLEAN isUnicode
 )
 {
     INT nLength, iItem;
     UINT stringCount = 0;
-    PSTRING_PTR chain = ChainHead;
+    PSTRING_PTR chain = chainHead;
     HWND hwndList = GetDlgItem(hWndDlg, IDC_LIST);
     LV_ITEM lvItem;
     WCHAR szBuffer[UNICODE_STRING_MAX_CHARS];
@@ -812,38 +794,32 @@ UINT AddStringsToList(
     lvItem.mask = LVIF_TEXT;
 
     while (chain) {
-
-        if (IsUnicode) {
-
+        if (isUnicode) {
             _strncpy(szBuffer,
                 UNICODE_STRING_MAX_CHARS,
-                (PWCHAR)RtlOffsetToPointer(BaseAddress, chain->ofpstr),
+                (PWCHAR)RtlOffsetToPointer(baseAddress, chain->ofpstr),
                 chain->length);
 
             nLength = chain->length;
-
         }
         else {
-
             nLength = MultiByteToWideChar(CP_ACP, 0,
-                (PCHAR)RtlOffsetToPointer(BaseAddress, chain->ofpstr),
+                (PCHAR)RtlOffsetToPointer(baseAddress, chain->ofpstr),
                 chain->length,
                 szBuffer,
                 UNICODE_STRING_MAX_CHARS);
 
             if (nLength)
                 szBuffer[nLength] = 0;
-
         }
 
         if (nLength) {
-
             lvItem.pszText = szBuffer;
             lvItem.iItem = INT_MAX;
             lvItem.iSubItem = 0;
             iItem = ListView_InsertItem(hwndList, &lvItem);
 
-            lvItem.pszText = (IsUnicode) ? TEXT("U") : TEXT("A");
+            lvItem.pszText = (isUnicode) ? TEXT("U") : TEXT("A");
             lvItem.iSubItem = 1;
             lvItem.iItem = iItem;
             ListView_SetItem(hwndList, &lvItem);
@@ -860,16 +836,16 @@ UINT AddStringsToList(
 
 VOID ScanRegions(
     _In_ HWND hWndDlg,
-    _In_ HANDLE ScanHeap,
-    _In_ GUI_CONTEXT* Context
+    _In_ HANDLE scanHeap,
+    _In_ GUI_CONTEXT* context
 )
 {
     ULONG cAnsi = 0;
     ULONG cUnicode = 0;
 
     NTSTATUS ntStatus;
-    SIZE_T totalLength = Context->SectionViewSize, curPos = 0, dummy;
-    PVOID baseAddress = Context->SectionAddress;
+    SIZE_T totalLength = context->SectionViewSize, curPos = 0, dummy;
+    PVOID baseAddress = context->SectionAddress;
     PSTRING_PTR chain = NULL;
     MEMORY_BASIC_INFORMATION mbi;
     WCHAR szBuffer[100];
@@ -877,7 +853,6 @@ VOID ScanRegions(
     RtlZeroMemory(&mbi, sizeof(mbi));
 
     do {
-
         ntStatus = NtQueryVirtualMemory(
             NtCurrentProcess(),
             baseAddress,
@@ -887,28 +862,22 @@ VOID ScanRegions(
             &dummy);
 
         if (NT_SUCCESS(ntStatus)) {
-
             curPos += mbi.RegionSize;
 
             if (mbi.State & MEM_COMMIT) {
-
-                if (!(mbi.Protect & (PAGE_GUARD |
-                    PAGE_NOACCESS)))
-                {
+                if (!(mbi.Protect & (PAGE_GUARD | PAGE_NOACCESS))) {
                     if (mbi.Protect & (PAGE_READONLY |
                         PAGE_READWRITE |
                         PAGE_EXECUTE |
                         PAGE_EXECUTE_READ |
                         PAGE_EXECUTE_READWRITE))
                     {
-
                         chain = EnumImageStringsA(
-                            ScanHeap,
+                            scanHeap,
                             baseAddress,
                             (ULONG)mbi.RegionSize);
 
                         if (chain) {
-
                             cAnsi += AddStringsToList(
                                 hWndDlg,
                                 baseAddress,
@@ -917,31 +886,26 @@ VOID ScanRegions(
                         }
 
                         chain = EnumImageStringsW(
-                            ScanHeap,
+                            scanHeap,
                             baseAddress,
                             (ULONG)mbi.RegionSize);
 
                         if (chain) {
-
                             cUnicode += AddStringsToList(
                                 hWndDlg,
                                 baseAddress,
                                 chain,
                                 TRUE);
                         }
-
                     }
-
                 }
             }
-
         }
         else {
-
             curPos += PAGE_SIZE;
         }
 
-        baseAddress = RtlOffsetToPointer(Context->SectionAddress, curPos);
+        baseAddress = RtlOffsetToPointer(context->SectionAddress, curPos);
 
     } while (curPos < totalLength);
 
@@ -953,7 +917,7 @@ VOID ScanRegions(
         cAnsi, cUnicode);
 
     supStatusBarSetText(
-        Context->StatusBar,
+        context->StatusBar,
         0,
         szBuffer);
 }
@@ -968,38 +932,32 @@ VOID ScanRegions(
 */
 VOID StringsTabOnShow(
     _In_ HWND hWndDlg,
-    _In_ GUI_CONTEXT* Context
+    _In_ GUI_CONTEXT* context
 )
 {
     PVOID heapHandle = NULL;
     HWND hwndList = GetDlgItem(hWndDlg, IDC_LIST);
 
     __try {
-
         SendMessage(hwndList, WM_SETREDRAW, (WPARAM)FALSE, (LPARAM)0);
         supSetWaitCursor(TRUE);
 
         heapHandle = HeapCreate(0, UNICODE_STRING_MAX_CHARS * sizeof(WCHAR), 0);
         if (heapHandle) {
-
-
             ScanRegions(
                 hWndDlg,
                 heapHandle,
-                Context);
+                context);
 
             HeapDestroy(heapHandle);
             heapHandle = NULL;
         }
-
     }
     __finally {
-
         SendMessage(hwndList, WM_SETREDRAW, (WPARAM)TRUE, (LPARAM)0);
         supSetWaitCursor(FALSE);
         if (heapHandle)
             HeapDestroy(heapHandle);
-
     }
 }
 
@@ -1013,22 +971,21 @@ VOID StringsTabOnShow(
 */
 VOID StringsTabOnInit(
     _In_ HWND hWndDlg,
-    _In_ GUI_CONTEXT* Context
+    _In_ GUI_CONTEXT* context
 )
 {
     HWND hwndList = GetDlgItem(hWndDlg, IDC_LIST);
 
     if (hwndList) {
-
         supAddListViewColumn(hwndList,
             0,
             0,
             0,
             I_IMAGENONE,
             LVCFMT_LEFT,
-            TEXT("Sring"),
+            TEXT("String"),
             MAX_PATH,
-            Context->CurrentDPI);
+            context->CurrentDPI);
 
         supAddListViewColumn(hwndList,
             1,
@@ -1038,7 +995,7 @@ VOID StringsTabOnInit(
             LVCFMT_CENTER,
             TEXT("Type"),
             80,
-            Context->CurrentDPI);
+            context->CurrentDPI);
 
         ListView_SetExtendedListViewStyle(hwndList, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
         SetWindowTheme(hwndList, TEXT("Explorer"), NULL);
@@ -1055,31 +1012,29 @@ VOID StringsTabOnInit(
 */
 VOID TabOnInit(
     _In_ HWND hWndDlg,
-    _In_ GUI_CONTEXT* Context
+    _In_ GUI_CONTEXT* context
 )
 {
     INT iSel;
 
-    if (Context == NULL)
+    if (context == NULL)
         return;
 
-    iSel = TabCtrl_GetCurSel(Context->TabHeader->hwndTab);
+    iSel = TabCtrl_GetCurSel(context->TabHeader->hwndTab);
 
     switch (iSel) {
-
     case TabIdSection:
-        SectionTabOnInit(hWndDlg, Context);
+        SectionTabOnInit(hWndDlg, context);
         break;
     case TabIdVSInfo:
-        VsInfoTabOnInit(hWndDlg, Context);
+        VsInfoTabOnInit(hWndDlg, context);
         break;
     case TabIdStrings:
-        StringsTabOnInit(hWndDlg, Context);
+        StringsTabOnInit(hWndDlg, context);
         break;
     default:
         break;
     }
-
 }
 
 /*
@@ -1096,18 +1051,17 @@ INT_PTR TabOnShow(
 )
 {
     INT iSel;
-    GUI_CONTEXT* Context = GetProp(hWndDlg, T_IMS_PROP);
+    GUI_CONTEXT* context = GetProp(hWndDlg, T_IMS_PROP);
 
-    if (Context == NULL)
+    if (context == NULL)
         return 0;
 
-    iSel = TabCtrl_GetCurSel(Context->TabHeader->hwndTab);
+    iSel = TabCtrl_GetCurSel(context->TabHeader->hwndTab);
 
     switch (iSel) {
-
     case TabIdStrings:
         if (fShow)
-            StringsTabOnShow(hWndDlg, Context);
+            StringsTabOnShow(hWndDlg, context);
         break;
     default:
         break;
@@ -1132,12 +1086,12 @@ VOID TabsOnContextMenu(
     UINT uPos = 0;
     POINT pt1;
     HMENU hMenu;
-    GUI_CONTEXT* Context = GetProp(hWndDlg, T_IMS_PROP);
+    GUI_CONTEXT* context = GetProp(hWndDlg, T_IMS_PROP);
 
-    if (Context == NULL)
+    if (context == NULL)
         return;
 
-    iSel = TabCtrl_GetCurSel(Context->TabHeader->hwndTab);
+    iSel = TabCtrl_GetCurSel(context->TabHeader->hwndTab);
 
     switch (iSel) {
     case TabIdVSInfo:
@@ -1145,7 +1099,6 @@ VOID TabsOnContextMenu(
         if (GetCursorPos(&pt1)) {
             hMenu = CreatePopupMenu();
             if (hMenu) {
-
                 //
                 // Add "Copy %item%" menu item.
                 //
@@ -1154,8 +1107,8 @@ VOID TabsOnContextMenu(
                     ID_MENU_LIST_COPY,
                     uPos,
                     &pt1,
-                    &Context->LvItemHit,
-                    &Context->LvColumnHit))
+                    &context->LvItemHit,
+                    &context->LvColumnHit))
                 {
                     uPos++;
                     InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
@@ -1178,13 +1131,13 @@ VOID TabsDumpList(
 {
     INT iSel, iColumns;
     LPWSTR lpFileName;
-    GUI_CONTEXT* Context = GetProp(hWndDlg, T_IMS_PROP);
+    GUI_CONTEXT* context = GetProp(hWndDlg, T_IMS_PROP);
     HWND hwndList = GetDlgItem(hWndDlg, IDC_LIST);
 
-    if (Context == NULL)
+    if (context == NULL)
         return;
 
-    iSel = TabCtrl_GetCurSel(Context->TabHeader->hwndTab);
+    iSel = TabCtrl_GetCurSel(context->TabHeader->hwndTab);
 
     switch (iSel) {
     case TabIdVSInfo:
@@ -1206,14 +1159,12 @@ VOID TabsListViewCopyItem(
     _In_ HWND hWndDlg
 )
 {
-    GUI_CONTEXT* Context = GetProp(hWndDlg, T_IMS_PROP);
+    GUI_CONTEXT* context = GetProp(hWndDlg, T_IMS_PROP);
 
-    if (Context) {
-
+    if (context) {
         supListViewCopyItemValueToClipboard(GetDlgItem(hWndDlg, IDC_LIST),
-            Context->LvItemHit,
-            Context->LvColumnHit);
-
+            context->LvItemHit,
+            context->LvColumnHit);
     }
 }
 
@@ -1233,16 +1184,13 @@ INT_PTR CALLBACK TabsWndProc(
 )
 {
     switch (uMsg) {
-
     case WM_INITDIALOG:
         SetProp(hWnd, T_IMS_PROP, (HANDLE)lParam);
         TabOnInit(hWnd, (GUI_CONTEXT*)lParam);
         break;
 
     case WM_COMMAND:
-
         switch (GET_WM_COMMAND_ID(wParam, lParam)) {
-
         case ID_MENU_LIST_DUMP:
             TabsDumpList(hWnd);
             break;
@@ -1254,7 +1202,6 @@ INT_PTR CALLBACK TabsWndProc(
         default:
             break;
         }
-
         break;
 
     case WM_CONTEXTMENU:
@@ -1284,30 +1231,29 @@ INT_PTR CALLBACK TabsWndProc(
 *
 */
 VOID CALLBACK OnTabResize(
-    _In_ TABHDR* TabHeader
+    _In_ TABHDR* tabHeader
 )
 {
     RECT hwndRect;
     INT iSel;
     HWND hwndList = 0;
-    GUI_CONTEXT* Context;
+    GUI_CONTEXT* context;
 
-    Context = (GUI_CONTEXT*)GetProp(TabHeader->hwndDisplay, T_IMS_PROP);
-    if (Context == NULL)
+    context = (GUI_CONTEXT*)GetProp(tabHeader->hwndDisplay, T_IMS_PROP);
+    if (context == NULL)
         return;
 
-    iSel = TabCtrl_GetCurSel(TabHeader->hwndTab);
-    GetClientRect(TabHeader->hwndDisplay, &hwndRect);
+    iSel = TabCtrl_GetCurSel(tabHeader->hwndTab);
+    GetClientRect(tabHeader->hwndDisplay, &hwndRect);
 
     switch (iSel) {
-
     case TabIdSection:
-        hwndList = Context->TreeList;
+        hwndList = context->TreeList;
         break;
 
     case TabIdVSInfo:
     case TabIdStrings:
-        hwndList = GetDlgItem(TabHeader->hwndDisplay, IDC_LIST);
+        hwndList = GetDlgItem(tabHeader->hwndDisplay, IDC_LIST);
         break;
 
     default:
@@ -1317,9 +1263,9 @@ VOID CALLBACK OnTabResize(
     if (hwndList == NULL)
         return;
 
-    GetClientRect(TabHeader->hwndDisplay, &hwndRect);
+    GetClientRect(tabHeader->hwndDisplay, &hwndRect);
 
-    TabCtrl_AdjustRect(TabHeader->hwndTab, FALSE, &hwndRect);
+    TabCtrl_AdjustRect(tabHeader->hwndTab, FALSE, &hwndRect);
 
     SetWindowPos(hwndList,
         HWND_TOP,
@@ -1328,7 +1274,6 @@ VOID CALLBACK OnTabResize(
         hwndRect.right,
         hwndRect.bottom,
         SWP_NOOWNERZORDER);
-
 }
 
 /*
@@ -1343,31 +1288,28 @@ VOID OnResize(
     _In_ HWND hWnd
 )
 {
-    GUI_CONTEXT* Context;
+    GUI_CONTEXT* context;
     RECT r, szr;
 
-    Context = (GUI_CONTEXT*)GetWindowLongPtr(hWnd, GWLP_USERDATA);
-    if (Context) {
-
-        SendMessage(Context->StatusBar, WM_SIZE, 0, 0);
+    context = (GUI_CONTEXT*)GetWindowLongPtr(hWnd, GWLP_USERDATA);
+    if (context) {
+        SendMessage(context->StatusBar, WM_SIZE, 0, 0);
 
         GetClientRect(hWnd, &r);
-        GetClientRect(Context->StatusBar, &szr);
+        GetClientRect(context->StatusBar, &szr);
 
         //resize of the tab control
-        if (Context->TabHeader != NULL) {
-
+        if (context->TabHeader != NULL) {
             SetWindowPos(
-                Context->TabHeader->hwndTab,
+                context->TabHeader->hwndTab,
                 HWND_TOP,
                 0,
                 0,
                 r.right,
                 r.bottom - szr.bottom,
-                0);
+                SWP_NOACTIVATE | SWP_NOZORDER);
 
-            TabResizeTabWindow(Context->TabHeader);
-
+            TabResizeTabWindow(context->TabHeader);
         }
     }
 }
@@ -1385,14 +1327,14 @@ VOID OnNotify(
     _In_ LPNMHDR nmhdr
 )
 {
-    GUI_CONTEXT* Context;
+    GUI_CONTEXT* context;
 
-    if (InterlockedAdd((PLONG)&g_PluginState, PLUGIN_RUNNING) == PLUGIN_STOP)
+    if (InterlockedAdd((PLONG)&g_pluginState, PLUGIN_RUNNING) == PLUGIN_STOP)
         return;
 
-    Context = (GUI_CONTEXT*)GetWindowLongPtr(hWnd, GWLP_USERDATA);
-    if (Context) {
-        TabOnChangeTab(Context->TabHeader, nmhdr);
+    context = (GUI_CONTEXT*)GetWindowLongPtr(hWnd, GWLP_USERDATA);
+    if (context) {
+        TabOnChangeTab(context->TabHeader, nmhdr);
     }
 }
 
@@ -1401,11 +1343,11 @@ VOID OnGetMinMax(
     _In_ PMINMAXINFO mmInfo
 )
 {
-    GUI_CONTEXT* Context;
-    Context = (GUI_CONTEXT*)GetWindowLongPtr(hWnd, GWLP_USERDATA);
-    if (Context) {
-        mmInfo->ptMinTrackSize.x = ScaleDPI(640, Context->CurrentDPI);
-        mmInfo->ptMinTrackSize.y = ScaleDPI(480, Context->CurrentDPI);
+    GUI_CONTEXT* context;
+    context = (GUI_CONTEXT*)GetWindowLongPtr(hWnd, GWLP_USERDATA);
+    if (context) {
+        mmInfo->ptMinTrackSize.x = ScaleDPI(640, context->CurrentDPI);
+        mmInfo->ptMinTrackSize.y = ScaleDPI(480, context->CurrentDPI);
     }
 }
 
@@ -1425,7 +1367,6 @@ LRESULT CALLBACK MainWindowProc(
 )
 {
     switch (uMsg) {
-
     case WM_CLOSE:
         PostQuitMessage(0);
         break;
@@ -1460,7 +1401,7 @@ LRESULT CALLBACK MainWindowProc(
 *
 */
 BOOL RunUI(
-    _In_ GUI_CONTEXT* Context
+    _In_ GUI_CONTEXT* context
 )
 {
     INT i;
@@ -1480,10 +1421,10 @@ BOOL RunUI(
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 #pragma warning(pop)
 
-    Context->CurrentDPI = Context->ParamBlock.CurrentDPI;
+    context->CurrentDPI = context->ParamBlock.CurrentDPI;
 
-    Context->LvColumnHit = -1;
-    Context->LvItemHit = -1;
+    context->LvColumnHit = -1;
+    context->LvItemHit = -1;
 
     //
     // Window class once.
@@ -1491,38 +1432,38 @@ BOOL RunUI(
     StringCchPrintf(szClassName,
         RTL_NUMBER_OF(szClassName),
         TEXT("%wsWndClass"),
-        g_Plugin->Name);
+        g_plugin->Name);
 
-     lpTitle = IMAGESCOPE_WNDTITLE;
+    lpTitle = IMAGESCOPE_WNDTITLE;
 
     //
     // Create main window.
     //
-    Context->MainWindow = CreateWindowEx(
+    context->MainWindow = CreateWindowEx(
         0,
         szClassName,
         lpTitle,
         WS_VISIBLE | WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
-        ScaleDPI(640, Context->CurrentDPI),
-        ScaleDPI(480, Context->CurrentDPI),
+        ScaleDPI(640, context->CurrentDPI),
+        ScaleDPI(480, context->CurrentDPI),
         NULL,
         NULL,
-        g_ThisDLL,
+        g_thisDll,
         NULL);
 
-    if (Context->MainWindow == 0) {
+    if (context->MainWindow == 0) {
         kdDebugPrint("Could not create main window, err = %lu\r\n", GetLastError());
         return FALSE;
     }
 
-    SetWindowLongPtr(Context->MainWindow, GWLP_USERDATA, (LONG_PTR)Context);
+    SetWindowLongPtr(context->MainWindow, GWLP_USERDATA, (LONG_PTR)context);
 
     //
     // Status Bar window.
     //
-    Context->StatusBar = CreateWindowEx(
+    context->StatusBar = CreateWindowEx(
         0,
         STATUSCLASSNAME,
         NULL,
@@ -1531,45 +1472,43 @@ BOOL RunUI(
         0,
         0,
         0,
-        Context->MainWindow,
+        context->MainWindow,
         NULL,
-        g_ThisDLL,
+        g_thisDll,
         NULL);
 
-    if (Context->StatusBar == 0) {
+    if (context->StatusBar == 0) {
         kdDebugPrint("Could not create statusbar window, err = %lu\r\n", GetLastError());
         return FALSE;
     }
 
-    Context->TabHeader = TabCreateControl(
-        g_ThisDLL,
-        Context->MainWindow,
+    context->TabHeader = TabCreateControl(
+        g_thisDll,
+        context->MainWindow,
         NULL,
         NULL,
         (TABRESIZECALLBACK)&OnTabResize,
         (TABCALLBACK_ALLOCMEM)&supHeapAlloc,
         (TABCALLBACK_FREEMEM)&supHeapFree);
 
-    if (Context->TabHeader == NULL) {
+    if (context->TabHeader == NULL) {
         kdDebugPrint("Could not create tabcontrol window\r\n");
         return FALSE;
     }
 
-    for (i = 0; i < _countof(ImsTabs); i++) {
-
-        TabAddPage(Context->TabHeader,
-            ImsTabs[i].ResourceId,
-            ImsTabs[i].WndProc,
-            ImsTabs[i].TabCaption,
+    for (i = 0; i < _countof(imsTabs); i++) {
+        TabAddPage(context->TabHeader,
+            imsTabs[i].ResourceId,
+            imsTabs[i].WndProc,
+            imsTabs[i].TabCaption,
             I_IMAGENONE,
-            (LPARAM)Context);
-
+            (LPARAM)context);
     }
 
-    TabOnSelChanged(Context->TabHeader);
+    TabOnSelChanged(context->TabHeader);
 
-    //call resize
-    SendMessage(Context->MainWindow, WM_SIZE, 0, 0);
+    // call resize
+    SendMessage(context->MainWindow, WM_SIZE, 0, 0);
 
     do {
         rv = GetMessage(&msg1, NULL, 0, 0);
@@ -1580,10 +1519,10 @@ BOOL RunUI(
         TranslateMessage(&msg1);
         DispatchMessage(&msg1);
 
-    } while (rv != 0 && InterlockedAdd((PLONG)&g_PluginState, PLUGIN_RUNNING) == PLUGIN_RUNNING);
+    } while (rv != 0 && InterlockedAdd((PLONG)&g_pluginState, PLUGIN_RUNNING) == PLUGIN_RUNNING);
 
-    TabDestroyControl(Context->TabHeader);
-    DestroyWindow(Context->MainWindow);
+    TabDestroyControl(context->TabHeader);
+    DestroyWindow(context->MainWindow);
 
     return TRUE;
 }

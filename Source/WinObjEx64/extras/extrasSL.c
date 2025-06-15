@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSL.C
 *
-*  VERSION:     2.07
+*  VERSION:     2.08
 *
-*  DATE:        11 May 2025
+*  DATE:        11 Jun 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -510,7 +510,7 @@ VOID SLCacheListItems(
         return;
     }
 
-    supListViewEnableRedraw(Context->ListView, FALSE);
+    supDisableRedraw(Context->ListView);
 
     enumContext.lpFilterByName = FilterByName;
     enumContext.DialogContext = Context;
@@ -525,7 +525,7 @@ VOID SLCacheListItems(
 
     SetWindowText(Context->hwndDlg, szBuffer);
 
-    supListViewEnableRedraw(Context->ListView, TRUE);
+    supEnableRedraw(Context->ListView);
 }
 
 /*

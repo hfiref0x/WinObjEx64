@@ -72,7 +72,8 @@ typedef BOOL(CALLBACK* PNTSUPMEMFREE)(
 
 #define ntsupProcessHeap() NtCurrentPeb()->ProcessHeap
 
-#define NTQSI_MAX_BUFFER_LENGTH (512 * 1024 * 1024)
+#define MAX_NTSUP_BUFFER_SIZE (512 * 1024 * 1024) //512MB
+#define MAX_NTSUP_ENV_SCAN 4096
 
 typedef struct _OBJSCANPARAM {
     PCWSTR Buffer;

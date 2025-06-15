@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2022
+*  (C) COPYRIGHT AUTHORS, 2019 - 2025
 *
 *  TITLE:       QUERY.C
 *
-*  VERSION:     1.12
+*  VERSION:     1.14
 *
-*  DATE:        11 May 2022
+*  DATE:        14 Jun 2025
 *
 *  Query and output ApiSet specific data.
 *
@@ -29,20 +29,20 @@ typedef VOID(CALLBACK* pfnApiSetQueryMap)(
     _In_ HTREEITEM RootItem,              \
     _In_opt_ LPCWSTR FilterByName)
 
-VALUE_DESC g_ApiSetEntryFlags[] = {
+VALUE_DESC g_apiSetEntryFlags[] = {
     { API_SET_SCHEMA_ENTRY_FLAGS_SEALED, L"Sealed" },
     { API_SET_SCHEMA_ENTRY_FLAGS_EXTENSION, L"Extension" }
 };
 
 /*
-* DiplayErrorText
+* DisplayErrorText
 *
 * Purpose:
 *
 * In debug build send string to debugger else show message box.
 *
 */
-VOID DiplayErrorText(
+VOID DisplayErrorText(
     _In_ LPWSTR ErrorMsg)
 {
 #ifdef _DEBUG
@@ -73,7 +73,7 @@ HTREEITEM TreeListAddItem(
     TVINSERTSTRUCT tvitem;
     PTL_SUBITEMS si = (PTL_SUBITEMS)subitems;
 
-    RtlSecureZeroMemory(&tvitem, sizeof(tvitem));
+    RtlZeroMemory(&tvitem, sizeof(tvitem));
     tvitem.hParent = hParent;
     tvitem.item.mask = mask;
     tvitem.item.state = state;
@@ -152,7 +152,7 @@ HTREEITEM OutNamespaceEntry(
 
     WCHAR szBuffer[20];
 
-    RtlSecureZeroMemory(&tlSubItems, sizeof(tlSubItems));
+    RtlZeroMemory(&tlSubItems, sizeof(tlSubItems));
 
     flagsValue = Flags;
     
@@ -160,10 +160,10 @@ HTREEITEM OutNamespaceEntry(
     // Output first flag from combination.
     //
     if (flagsValue) {
-        for (i = 0; i < RTL_NUMBER_OF(g_ApiSetEntryFlags); i++) {
-            if (flagsValue & g_ApiSetEntryFlags[i].Value) {
-                lpText = (LPTSTR)g_ApiSetEntryFlags[i].Desc;
-                flagsValue &= ~g_ApiSetEntryFlags[i].Value;
+        for (i = 0; i < RTL_NUMBER_OF(g_apiSetEntryFlags); i++) {
+            if (flagsValue & g_apiSetEntryFlags[i].Value) {
+                lpText = (LPTSTR)g_apiSetEntryFlags[i].Desc;
+                flagsValue &= ~g_apiSetEntryFlags[i].Value;
                 break;
             }
         }
@@ -199,11 +199,11 @@ HTREEITEM OutNamespaceEntry(
     // List rest of the flags.
     //
     if (h_tviRootItem && flagsValue) {
-        for (i = 0; i < RTL_NUMBER_OF(g_ApiSetEntryFlags); i++) {
-            if (flagsValue & g_ApiSetEntryFlags[i].Value) {
+        for (i = 0; i < RTL_NUMBER_OF(g_apiSetEntryFlags); i++) {
+            if (flagsValue & g_apiSetEntryFlags[i].Value) {
 
-                flagsValue &= ~g_ApiSetEntryFlags[i].Value;
-                tlSubItems.Text[0] = (LPTSTR)g_ApiSetEntryFlags[i].Desc;
+                flagsValue &= ~g_apiSetEntryFlags[i].Value;
+                tlSubItems.Text[0] = (LPTSTR)g_apiSetEntryFlags[i].Desc;
                 tlSubItems.Text[1] = T_EmptyString;
                 tlSubItems.Count = 2;
 
@@ -325,33 +325,35 @@ void OutNamespaceValue(
 */
 APISET_QUERY_ROUTINE(ListApiSetV2)
 {
-    API_SET_NAMESPACE_ARRAY_V2* Namespace = (API_SET_NAMESPACE_ARRAY_V2*)ApiSetMap;
+    API_SET_NAMESPACE_ARRAY_V2* namespace = (API_SET_NAMESPACE_ARRAY_V2*)ApiSetMap;
 
     ULONG i, j;
 
-    API_SET_NAMESPACE_ENTRY_V2* NsEntry;
-    API_SET_VALUE_ARRAY_V2* ValuesArray;
-    API_SET_VALUE_ENTRY_V2* ValueEntry;
+    API_SET_NAMESPACE_ENTRY_V2* nsEntry;
+    API_SET_VALUE_ARRAY_V2* valuesArray;
+    API_SET_VALUE_ENTRY_V2* valueEntry;
 
     HTREEITEM hSubItem;
 
     LPWSTR lpEntryName;
 
-    for (i = 0; i < Namespace->Count; i++) {
+    for (i = 0; i < namespace->Count; i++) {
 
-        NsEntry = &Namespace->Array[i];
+        nsEntry = &namespace->Array[i];
 
         lpEntryName = GetApiSetEntryName(
-            (PBYTE)Namespace,
-            NsEntry->NameOffset,
-            NsEntry->NameLength);
+            (PBYTE)namespace,
+            nsEntry->NameOffset,
+            nsEntry->NameLength);
 
         if (lpEntryName) {
 
             if (FilterByName) {
 
-                if (_strstri(lpEntryName, FilterByName) == NULL)
+                if (_strstri(lpEntryName, FilterByName) == NULL) {
+                    HeapFree(g_ctx.PluginHeap, 0, lpEntryName);
                     continue;
+                }
 
             }
 
@@ -368,22 +370,22 @@ APISET_QUERY_ROUTINE(ListApiSetV2)
             //
             // List values array.
             //
-            ValuesArray = (API_SET_VALUE_ARRAY_V2*)RtlOffsetToPointer(
-                Namespace,
-                NsEntry->DataOffset);
+            valuesArray = (API_SET_VALUE_ARRAY_V2*)RtlOffsetToPointer(
+                namespace,
+                nsEntry->DataOffset);
 
-            for (j = 0; j < ValuesArray->Count; j++) {
+            for (j = 0; j < valuesArray->Count; j++) {
 
-                ValueEntry = &ValuesArray->Array[j];
+                valueEntry = &valuesArray->Array[j];
 
-                if (!API_SET_EMPTY_NAMESPACE_VALUE(ValueEntry)) {
+                if (!API_SET_EMPTY_NAMESPACE_VALUE(valueEntry)) {
                     OutNamespaceValue(
                         hSubItem,
-                        (PBYTE)Namespace,
-                        ValueEntry->ValueOffset,
-                        ValueEntry->ValueLength,
-                        ValueEntry->NameOffset,
-                        ValueEntry->NameLength,
+                        (PBYTE)namespace,
+                        valueEntry->ValueOffset,
+                        valueEntry->ValueLength,
+                        valueEntry->NameOffset,
+                        valueEntry->NameLength,
                         0);
                 }
             }
@@ -402,40 +404,42 @@ APISET_QUERY_ROUTINE(ListApiSetV2)
 */
 APISET_QUERY_ROUTINE(ListApiSetV4)
 {
-    API_SET_NAMESPACE_ARRAY_V4* Namespace = (API_SET_NAMESPACE_ARRAY_V4*)ApiSetMap;
+    API_SET_NAMESPACE_ARRAY_V4* namespace = (API_SET_NAMESPACE_ARRAY_V4*)ApiSetMap;
 
     ULONG i, j;
 
-    API_SET_NAMESPACE_ENTRY_V4* NsEntry;
-    API_SET_VALUE_ARRAY_V4* ValuesArray;
-    API_SET_VALUE_ENTRY_V4* ValueEntry;
+    API_SET_NAMESPACE_ENTRY_V4* nsEntry;
+    API_SET_VALUE_ARRAY_V4* valuesArray;
+    API_SET_VALUE_ENTRY_V4* valueEntry;
 
     HTREEITEM hSubItem;
 
     LPWSTR lpEntryName;
 
-    for (i = 0; i < Namespace->Count; i++) {
+    for (i = 0; i < namespace->Count; i++) {
 
-        NsEntry = &Namespace->Array[i];
+        nsEntry = &namespace->Array[i];
 
         lpEntryName = GetApiSetEntryName(
-            (PBYTE)Namespace,
-            NsEntry->NameOffset,
-            NsEntry->NameLength);
+            (PBYTE)namespace,
+            nsEntry->NameOffset,
+            nsEntry->NameLength);
 
         if (lpEntryName) {
 
             if (FilterByName) {
 
-                if (_strstri(lpEntryName, FilterByName) == NULL)
+                if (_strstri(lpEntryName, FilterByName) == NULL) {
+                    HeapFree(g_ctx.PluginHeap, 0, lpEntryName);
                     continue;
+                }
 
             }
 
             hSubItem = OutNamespaceEntry(
                 RootItem,
                 lpEntryName,
-                NsEntry->Flags);
+                nsEntry->Flags);
 
             //
             // Namespace entry name no longer needed.
@@ -445,23 +449,23 @@ APISET_QUERY_ROUTINE(ListApiSetV4)
             //
             // List values array.
             //
-            ValuesArray = (API_SET_VALUE_ARRAY_V4*)RtlOffsetToPointer(
-                Namespace,
-                NsEntry->DataOffset);
+            valuesArray = (API_SET_VALUE_ARRAY_V4*)RtlOffsetToPointer(
+                namespace,
+                nsEntry->DataOffset);
 
-            for (j = 0; j < ValuesArray->Count; j++) {
+            for (j = 0; j < valuesArray->Count; j++) {
 
-                ValueEntry = &ValuesArray->Array[j];
+                valueEntry = &valuesArray->Array[j];
 
-                if (!API_SET_EMPTY_NAMESPACE_VALUE(ValueEntry)) {
+                if (!API_SET_EMPTY_NAMESPACE_VALUE(valueEntry)) {
                     OutNamespaceValue(
                         hSubItem,
-                        (PBYTE)Namespace,
-                        ValueEntry->ValueOffset,
-                        ValueEntry->ValueLength,
-                        ValueEntry->NameOffset,
-                        ValueEntry->NameLength,
-                        ValueEntry->Flags);
+                        (PBYTE)namespace,
+                        valueEntry->ValueOffset,
+                        valueEntry->ValueLength,
+                        valueEntry->NameOffset,
+                        valueEntry->NameLength,
+                        valueEntry->Flags);
                 }
             }
 
@@ -479,80 +483,77 @@ APISET_QUERY_ROUTINE(ListApiSetV4)
 */
 APISET_QUERY_ROUTINE(ListApiSetV6)
 {
-    API_SET_NAMESPACE_ARRAY_V6* Namespace = (API_SET_NAMESPACE_ARRAY_V6*)ApiSetMap;
+    API_SET_NAMESPACE_ARRAY_V6* namespace = (API_SET_NAMESPACE_ARRAY_V6*)ApiSetMap;
 
     ULONG i, j;
 
-    API_SET_NAMESPACE_ENTRY_V6* NsEntry;
-    API_SET_VALUE_ENTRY_V6* ValueEntry;
+    API_SET_NAMESPACE_ENTRY_V6* nsEntry;
+    API_SET_VALUE_ENTRY_V6* valueEntry;
 
     HTREEITEM hSubItem;
 
     LPWSTR lpEntryName;
 
-    NsEntry = (API_SET_NAMESPACE_ENTRY_V6*)RtlOffsetToPointer(
-        Namespace,
-        Namespace->NamespaceEntryOffset);
+    nsEntry = (API_SET_NAMESPACE_ENTRY_V6*)RtlOffsetToPointer(
+        namespace,
+        namespace->NamespaceEntryOffset);
 
-    for (i = 0; i < Namespace->Count; i++) {
+    for (i = 0; i < namespace->Count; i++) {
 
         lpEntryName = GetApiSetEntryName(
-            (PBYTE)Namespace,
-            NsEntry->NameOffset,
-            NsEntry->NameLength);
+            (PBYTE)namespace,
+            nsEntry->NameOffset,
+            nsEntry->NameLength);
 
         if (lpEntryName) {
 
-            if (FilterByName) {
-
-                if (_strstri(lpEntryName, FilterByName) == NULL) {
-                    goto NextEntry;
-                }
-
+            if (FilterByName && _strstri(lpEntryName, FilterByName) == NULL) {
+                HeapFree(g_ctx.PluginHeap, 0, lpEntryName);
             }
+            else {
+                hSubItem = OutNamespaceEntry(
+                    RootItem,
+                    lpEntryName,
+                    nsEntry->Flags);
 
-            hSubItem = OutNamespaceEntry(
-                RootItem,
-                lpEntryName,
-                NsEntry->Flags);
+                //
+                // Namespace entry name no longer needed.
+                //
+                HeapFree(g_ctx.PluginHeap, 0, lpEntryName);
 
-            //
-            // List values array.
-            //
-            ValueEntry = (API_SET_VALUE_ENTRY_V6*)RtlOffsetToPointer(
-                Namespace,
-                NsEntry->DataOffset);
+                //
+                // List values array.
+                //
+                valueEntry = (API_SET_VALUE_ENTRY_V6*)RtlOffsetToPointer(
+                    namespace,
+                    nsEntry->DataOffset);
 
-            for (j = 0; j < NsEntry->Count; j++) {
+                for (j = 0; j < nsEntry->Count; j++) {
 
-                if (!API_SET_EMPTY_NAMESPACE_VALUE(ValueEntry)) {
-                    OutNamespaceValue(
-                        hSubItem,
-                        (PBYTE)Namespace,
-                        ValueEntry->ValueOffset,
-                        ValueEntry->ValueLength,
-                        ValueEntry->NameOffset,
-                        ValueEntry->NameLength,
-                        ValueEntry->Flags);
+                    if (!API_SET_EMPTY_NAMESPACE_VALUE(valueEntry)) {
+                        OutNamespaceValue(
+                            hSubItem,
+                            (PBYTE)namespace,
+                            valueEntry->ValueOffset,
+                            valueEntry->ValueLength,
+                            valueEntry->NameOffset,
+                            valueEntry->NameLength,
+                            valueEntry->Flags);
+                    }
+
+                    valueEntry = (API_SET_VALUE_ENTRY_V6*)RtlOffsetToPointer(
+                        valueEntry,
+                        sizeof(API_SET_VALUE_ENTRY_V6));
+
                 }
-
-                ValueEntry = (API_SET_VALUE_ENTRY_V6*)RtlOffsetToPointer(
-                    ValueEntry,
-                    sizeof(API_SET_VALUE_ENTRY_V6));
-
             }
-
-
-        NextEntry:
-            HeapFree(g_ctx.PluginHeap, 0, lpEntryName);
-
         } //if (lpEntryName)
 
         //
         // Go to next entry.
         //
-        NsEntry = (API_SET_NAMESPACE_ENTRY_V6*)RtlOffsetToPointer(
-            NsEntry,
+        nsEntry = (API_SET_NAMESPACE_ENTRY_V6*)RtlOffsetToPointer(
+            nsEntry,
             sizeof(API_SET_NAMESPACE_ENTRY_V6));
     }
 }
@@ -573,7 +574,7 @@ BOOL ResolveDllData(
 {
     ULONG dataSize = 0;
     UINT i;
-    ULONG schemaVersion = 0;
+    ULONG currentSchemaVersion = 0;
 
     PIMAGE_NT_HEADERS ntHeaders;
     IMAGE_SECTION_HEADER* sectionTableEntry;
@@ -585,6 +586,8 @@ BOOL ResolveDllData(
     baseAddress = (PBYTE)(((ULONG_PTR)DllHandle) & ~3);
 
     ntHeaders = RtlImageNtHeader(baseAddress);
+    if (ntHeaders == NULL)
+        return FALSE;
 
     sectionTableEntry = IMAGE_FIRST_SECTION(ntHeaders);
 
@@ -610,9 +613,9 @@ BOOL ResolveDllData(
         return FALSE;
     }
 
-    schemaVersion = *(ULONG*)dataPtr;
+    currentSchemaVersion = *(ULONG*)dataPtr;
 
-    *SchemaVersion = schemaVersion;
+    *SchemaVersion = currentSchemaVersion;
     *ApiSetData = dataPtr;
 
     return TRUE;
@@ -633,7 +636,7 @@ VOID WINAPI ListApiSetFromFileWorker(
     _In_ ULONG SchemaVersion
 )
 {
-    pfnApiSetQueryMap queryMapRoutine;
+    pfnApiSetQueryMap queryMapRoutine = NULL;
 
     WCHAR szBuffer[MAX_PATH * 2];
 
@@ -677,21 +680,16 @@ VOID WINAPI ListApiSetFromFileWorker(
             (PVOID)NULL);
 
         if (h_tviSubItem) {
-
             switch (SchemaVersion) {
-
             case API_SET_SCHEMA_VERSION_V2:
                 queryMapRoutine = (pfnApiSetQueryMap)ListApiSetV2;
                 break;
-
             case API_SET_SCHEMA_VERSION_V4:
                 queryMapRoutine = (pfnApiSetQueryMap)ListApiSetV4;
                 break;
-
             case API_SET_SCHEMA_VERSION_V6:
                 queryMapRoutine = (pfnApiSetQueryMap)ListApiSetV6;
                 break;
-
             default:
                 queryMapRoutine = NULL;
                 break;
@@ -714,11 +712,9 @@ VOID WINAPI ListApiSetFromFileWorker(
                     GetExceptionCode(),
                     SchemaVersion);
 
-                DiplayErrorText(szBuffer);
+                DisplayErrorText(szBuffer);
 
             }
-
-
         }
     }
 
@@ -770,7 +766,7 @@ VOID ListApiSetFromFile(
     }
 
     if (lpFileName == NULL) {
-        DiplayErrorText(TEXT("ApiSet dll filename not specified"));
+        DisplayErrorText(TEXT("ApiSet dll filename not specified"));
         return;
     }
 
@@ -779,11 +775,8 @@ VOID ListApiSetFromFile(
     //
 
     hApiSetDll = LoadLibraryEx(lpFileName, NULL, LOAD_LIBRARY_AS_DATAFILE);
-
     if (hApiSetDll) {
-
         if (ResolveDllData(hApiSetDll, &dataPtr, &schemaVersion)) {
-
             if (schemaVersion != API_SET_SCHEMA_VERSION_V2 &&
                 schemaVersion != API_SET_SCHEMA_VERSION_V4 &&
                 schemaVersion != API_SET_SCHEMA_VERSION_V6)
@@ -792,25 +785,23 @@ VOID ListApiSetFromFile(
                     MAX_PATH,
                     TEXT("ApiSetView: Unknown schema version %lu"), schemaVersion);
 
-                DiplayErrorText(szErrorMsg);
+                DisplayErrorText(szErrorMsg);
             }
             else {
-
                 ListApiSetFromFileWorker(
                     lpFileName,
                     FilterByName,
                     dataPtr,
                     schemaVersion);
-
             }
         }
         else {
-            DiplayErrorText(TEXT("ApiSetView: could not resolve data, probably not apiset file or data corrupted"));
+            DisplayErrorText(TEXT("ApiSetView: could not resolve data, probably not apiset file or data corrupted"));
         }
 
         FreeLibrary(hApiSetDll);
     }
     else {
-        DiplayErrorText(TEXT("ApiSetView: could not load apiset library"));
+        DisplayErrorText(TEXT("ApiSetView: could not load apiset library"));
     }
 }

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2024
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     2.05
+*  VERSION:     2.08
 *
-*  DATE:        07 Jun 2024
+*  DATE:        11 Jun 2025
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -115,7 +115,7 @@
 #define MM_SYSTEM_RANGE_START_8 0xFFFF800000000000
 
 #define TEXT_SECTION ".text"
-#define TEXT_SECTION_LEGNTH sizeof(TEXT_SECTION)
+#define TEXT_SECTION_LENGTH sizeof(TEXT_SECTION)
 
 #define PAGE_SECTION "PAGE"
 #define PAGE_SECTION_LENGTH sizeof(PAGE_SECTION)
@@ -129,6 +129,8 @@ typedef ULONG_PTR *PUTable;
 #define OBP_ERROR_NAME_LITERAL_SIZE (sizeof(OBP_ERROR_NAME_LITERAL) - sizeof(UNICODE_NULL))
 #define OBP_ERROR_NONAME_LITERAL L"<noname>"
 #define OBP_ERROR_NONAME_LITERAL_SIZE (sizeof(OBP_ERROR_NONAME_LITERAL) - sizeof(UNICODE_NULL))
+
+#define WINE_DIRECTORY_QUERY_BUFFER_SIZE (64 * 1024)
 
 //
 // Predefined strings
@@ -524,6 +526,12 @@ BOOL ObQueryFullNamespacePath(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PUNICODE_STRING Path);
 
+POBJECT_DIRECTORY_INFORMATION ObQueryObjectDirectory(
+    _In_ HANDLE DirectoryHandle,
+    _Inout_ PULONG Context,
+    _In_ BOOL IsWine,
+    _Out_ PULONG ReturnLength);
+
 PVOID kdCreateObjectTypesList(
     VOID);
 
@@ -556,12 +564,6 @@ BOOL kdFindKiServiceTable(
     _In_ ULONG_PTR MappedImageBase,
     _In_ ULONG_PTR KernelImageBase,
     _Inout_ KSERVICE_TABLE_DESCRIPTOR* ServiceTable);
-
-BOOL kdLoadSymbolsForNtImage(
-    _In_ PSYMCONTEXT SymContext,
-    _In_ LPCWSTR ImageFileName,
-    _In_ PVOID ImageBase,
-    _In_ DWORD SizeOfImage);
 
 BOOL kdReadSystemMemory2(
     _In_opt_ LPCWSTR CallerFunction,
@@ -696,10 +698,6 @@ __forceinline ULONG_PTR kdAdjustAddressToNtOsBase(
     _In_ LONG Relative
 )
 {
-    ULONG_PTR Address;
-
-    Address = (ULONG_PTR)CodeBase + Offset + InstructionLength + Relative;
-    Address = (ULONG_PTR)g_kdctx.NtOsBase + Address - (ULONG_PTR)g_kdctx.NtOsImageMap;
-
-    return Address;
+    return (ULONG_PTR)g_kdctx.NtOsBase + ((CodeBase + Offset + InstructionLength + Relative) 
+        - (ULONG_PTR)g_kdctx.NtOsImageMap);
 }

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2022
+*  (C) COPYRIGHT AUTHORS, 2019 - 2025
 *
 *  TITLE:       PLUGINMNGR.H
 *
-*  VERSION:     2.00
+*  VERSION:     2.08
 *
-*  DATE:        19 Jun 2022
+*  DATE:        14 Jun 2025
 *
 *  Common header file for the plugin manager.
 *
@@ -19,7 +19,12 @@
 
 #pragma once
 
-#define WOBJ_PLUGIN_SYSTEM_VERSION 20006
+#define WOBJ_PLUGIN_SYSTEM_VERSION 25006
+
+//
+// Plugin ABI/capabilities version
+//
+#define WINOBJEX_PLUGIN_ABI_VERSION 0x0100
 
 //
 // Plugin init routine name.
@@ -43,7 +48,7 @@
 // Plugins prior to 1.87 had "WinObjEx64 Plugin" description field.
 // Make a new one to distinguish them because changes in plugin system are too complex.
 //
-#define WINOBJEX_PLUGIN_DESCRIPTION TEXT("WinObjEx64 Plugin V1.1")
+#define WINOBJEX_PLUGIN_DESCRIPTION TEXT("WinObjEx64 Plugin V1.2")
 
 typedef BOOL(CALLBACK* pfnReadSystemMemoryEx)(
     _In_ ULONG_PTR Address,
@@ -68,6 +73,7 @@ typedef struct _WINOBJEX_PARAM_OBJECT {
 } WINOBJEX_PARAM_OBJECT, * PWINOBJEX_PARAM_OBJECT;
 
 typedef struct _WINOBJEX_PARAM_BLOCK {
+    ULONG cbSize;
     HWND ParentWindow;
     HINSTANCE Instance;
     ULONG_PTR SystemRangeStart;
@@ -80,6 +86,7 @@ typedef struct _WINOBJEX_PARAM_BLOCK {
     pfnGetInstructionLength GetInstructionLength;
     pfnOpenNamedObjectByType OpenNamedObjectByType;
 
+    ULONG Reserved[8];
 } WINOBJEX_PARAM_BLOCK, * PWINOBJEX_PARAM_BLOCK;
 
 typedef NTSTATUS(CALLBACK* pfnStartPlugin)(
@@ -125,10 +132,18 @@ typedef VOID(CALLBACK* pfnGuiShutdownCallback)(
 #define PLUGIN_MAX_SUPPORTED_OBJECT_ID 0xff
 
 typedef struct _WINOBJEX_PLUGIN {
-    BOOLEAN NeedAdmin;
-    BOOLEAN NeedDriver;
-    BOOLEAN SupportWine;
-    BOOLEAN SupportMultipleInstances;
+    ULONG cbSize;
+    ULONG AbiVersion;
+    union {
+        ULONG Flags;
+        struct {
+            ULONG NeedAdmin : 1;
+            ULONG NeedDriver : 1;
+            ULONG SupportWine : 1;
+            ULONG SupportMultipleInstances : 1;
+            ULONG Reserved : 28;
+        } u1;
+    } Capabilities;
     WINOBJEX_PLUGIN_TYPE Type;
     WINOBJEX_PLUGIN_STATE State;
     WORD MajorVersion;
@@ -143,6 +158,8 @@ typedef struct _WINOBJEX_PLUGIN {
     pfnStateChangeCallback StateChangeCallback;
     pfnGuiInitCallback GuiInitCallback;
     pfnGuiShutdownCallback GuiShutdownCallback;
+
+    ULONG Reserved[8];
 } WINOBJEX_PLUGIN, * PWINOBJEX_PLUGIN;
 
 typedef struct _WINOBJEX_PLUGIN_INTERNAL {

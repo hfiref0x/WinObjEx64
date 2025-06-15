@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2023
+*  (C) COPYRIGHT AUTHORS, 2019 - 2025
 *
 *  TITLE:       EXTRASPSLIST.C
 *
-*  VERSION:     2.02
+*  VERSION:     2.08
 *
-*  DATE:        10 Jul 2023
+*  DATE:        13 Jun 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -40,6 +40,27 @@ typedef struct _TL_SUBITEMS_PSLIST {
     LPTSTR      CustomTooltip;
     LPTSTR      Text[PSLIST_CELLS_COUNT];
 } TL_SUBITEMS_PSLIST, * PTL_SUBITEMS_PSLIST;
+
+/*
+* PID -> HTREEITEM hash map for fast parent lookups
+*/
+#define PSLIST_PIDMAP_HASH_SIZE 512
+
+typedef struct _PIDMAP_ENTRY {
+    ULONG_PTR pid;
+    HTREEITEM hItem;
+    struct _PIDMAP_ENTRY* next;
+} PIDMAP_ENTRY, * PPIDMAP_ENTRY;
+
+typedef struct _PIDMAP {
+    PPIDMAP_ENTRY buckets[PSLIST_PIDMAP_HASH_SIZE];
+} PIDMAP, * PPIDMAP;
+
+static PIDMAP PsListPidMap;
+
+static size_t pidmap_hash(ULONG_PTR pid) {
+    return (pid ^ (pid >> 16)) % PSLIST_PIDMAP_HASH_SIZE;
+}
 
 #define Y_SPLITTER_SIZE 4
 #define Y_SPLITTER_MIN  200
@@ -127,6 +148,99 @@ LEGEND_MAP LegendControls[] = {
     { IDC_PCTL_PROTECTED_PROCESS, PS_COLOR_PROTECTED }
 };
 
+/*
+* PsListPidMapInit
+*
+* Purpose:
+*
+* Initializes the PID -> HTREEITEM hash map.
+*
+*/
+VOID PsListPidMapInit(
+    _In_ PPIDMAP map
+)
+{
+    RtlSecureZeroMemory(map->buckets, sizeof(map->buckets));
+}
+
+/*
+* PsListPidMapFree
+*
+* Purpose:
+*
+* Frees all entries in the PID -> HTREEITEM hash map.
+*
+*/
+VOID PsListPidMapFree(
+    _In_ PPIDMAP map
+)
+{
+    for (size_t i = 0; i < PSLIST_PIDMAP_HASH_SIZE; ++i) {
+        PPIDMAP_ENTRY entry = map->buckets[i];
+        while (entry) {
+            PPIDMAP_ENTRY tmp = entry;
+            entry = entry->next;
+            supHeapFree(tmp);
+        }
+        map->buckets[i] = NULL;
+    }
+}
+
+/*
+* PsListPidMapInsert
+*
+* Purpose:
+*
+* Inserts a new PID -> HTREEITEM mapping into the hash map.
+*
+*/
+BOOL PsListPidMapInsert(
+    _In_ PPIDMAP map,
+    _In_ ULONG_PTR pid,
+    _In_ HTREEITEM hItem
+)
+{
+    size_t idx = pidmap_hash(pid);
+    PPIDMAP_ENTRY entry = (PPIDMAP_ENTRY)supHeapAlloc(sizeof(PIDMAP_ENTRY));
+    if (!entry) return FALSE;
+    entry->pid = pid;
+    entry->hItem = hItem;
+    entry->next = map->buckets[idx];
+    map->buckets[idx] = entry;
+    return TRUE;
+}
+
+/*
+* PsListPidMapFind
+*
+* Purpose:
+*
+* Looks up the HTREEITEM for a given PID in the hash map.
+*
+*/
+HTREEITEM PsListPidMapFind(
+    _In_ PPIDMAP map,
+    _In_ ULONG_PTR pid
+)
+{
+    size_t idx = pidmap_hash(pid);
+    PPIDMAP_ENTRY entry = map->buckets[idx];
+    while (entry) {
+        if (entry->pid == pid)
+            return entry->hItem;
+        entry = entry->next;
+    }
+    return NULL;
+}
+
+/*
+* PsLegendDialogProc
+*
+* Purpose:
+*
+* Legend dialog procedure.
+*
+*/
 INT_PTR CALLBACK PsLegendDialogProc(
     _In_ HWND   hwndDlg,
     _In_ UINT   uMsg,
@@ -166,7 +280,7 @@ INT_PTR CALLBACK PsLegendDialogProc(
 
                 hwndControl = GetDlgItem(hwndDlg, LegendControls[i].Control);
                 if (hwndControl) {
-                    RtlSecureZeroMemory(&rect, sizeof(rect));
+                    RtlZeroMemory(&rect, sizeof(rect));
                     GetClientRect(hwndControl, (LPRECT)&rect);
                     MapWindowPoints(hwndControl, hwndDlg, (LPPOINT)&rect, 2);
                     hb = CreateSolidBrush(LegendControls[i].Color);
@@ -289,8 +403,8 @@ INT_PTR PsListDialogResize(
 {
     RECT r, szr;
 
-    RtlSecureZeroMemory(&r, sizeof(RECT));
-    RtlSecureZeroMemory(&szr, sizeof(RECT));
+    RtlZeroMemory(&r, sizeof(RECT));
+    RtlZeroMemory(&szr, sizeof(RECT));
 
     SendMessage(PsDlgContext.StatusBar, WM_SIZE, 0, 0);
     GetClientRect(PsDlgContext.hwndDlg, &r);
@@ -427,13 +541,11 @@ PROP_UNNAMED_OBJECT_INFO* PsListGetObjectEntry(
     _In_opt_ HTREEITEM hTreeItem)
 {
     INT nSelected;
-    TVITEMEX itemex;
+    TVITEMEX itemex = { 0 };
     TL_SUBITEMS_PSLIST* subitems = NULL;
     PROP_UNNAMED_OBJECT_INFO* ObjectEntry = NULL;
 
     if (bTreeList) {
-
-        RtlSecureZeroMemory(&itemex, sizeof(itemex));
 
         if (hTreeItem) {
             itemex.hItem = hTreeItem;
@@ -765,83 +877,10 @@ HTREEITEM AddProcessEntryTreeList(
         supHeapFree(lpUserName);
     if (lpCaption)
         supHeapFree(lpCaption);
+    
+    PsListPidMapInsert(&PsListPidMap, HandleToULong(uniqueProcessId), hTreeItem);
 
     return hTreeItem;
-}
-
-typedef BOOL(CALLBACK* FINDITEMCALLBACK)(
-    HWND TreeList,
-    HTREEITEM htItem,
-    ULONG_PTR UserContext
-    );
-
-/*
-* FindItemByProcessIdCallback
-*
-* Purpose:
-*
-* Search callback.
-*
-*/
-BOOL CALLBACK FindItemMatchCallback(
-    _In_ HWND TreeList,
-    _In_ HTREEITEM htItem,
-    _In_ ULONG_PTR UserContext
-)
-{
-    HANDLE              ParentProcessId = (HANDLE)UserContext;
-    TL_SUBITEMS_PSLIST* subitems = NULL;
-    TVITEMEX            itemex;
-
-    PROP_UNNAMED_OBJECT_INFO* Entry;
-
-    RtlSecureZeroMemory(&itemex, sizeof(itemex));
-    itemex.hItem = htItem;
-    TreeList_GetTreeItem(TreeList, &itemex, &subitems);
-
-    if (subitems) {
-        if (subitems->UserParam == NULL)
-            return FALSE;
-
-        Entry = (PROP_UNNAMED_OBJECT_INFO*)subitems->UserParam;
-        return (ParentProcessId == Entry->ClientId.UniqueProcess);
-    }
-
-    return FALSE;
-}
-
-/*
-* FindItemRecursive
-*
-* Purpose:
-*
-* Recursive find item.
-*
-*/
-HTREEITEM FindItemRecursive(
-    _In_ HWND TreeList,
-    _In_ HTREEITEM htStart,
-    _In_ FINDITEMCALLBACK FindItemCallback,
-    _In_ ULONG_PTR UserContext
-)
-{
-    HTREEITEM htItemMatch = NULL;
-    HTREEITEM htItemCurrent = htStart;
-
-    if (FindItemCallback == NULL)
-        return NULL;
-
-    while (htItemCurrent != NULL && htItemMatch == NULL) {
-        if (FindItemCallback(TreeList, htItemCurrent, UserContext)) {
-            htItemMatch = htItemCurrent;
-        }
-        else {
-            htItemMatch = FindItemRecursive(TreeList,
-                TreeList_GetChild(TreeList, htItemCurrent), FindItemCallback, UserContext);
-        }
-        htItemCurrent = TreeList_GetNextSibling(TreeList, htItemCurrent);
-    }
-    return htItemMatch;
 }
 
 /*
@@ -853,13 +892,13 @@ HTREEITEM FindItemRecursive(
 *
 */
 HTREEITEM FindParentItem(
-    _In_ HWND TreeList,
     _In_ HANDLE ParentProcessId
 )
 {
-    HTREEITEM htiRoot = TreeList_GetRoot(TreeList);
-    return FindItemRecursive(TreeList,
-        htiRoot, FindItemMatchCallback, (ULONG_PTR)ParentProcessId);
+    if (!ParentProcessId)
+        return NULL;
+
+    return PsListPidMapFind(&PsListPidMap, HandleToULong(ParentProcessId));
 }
 
 /*
@@ -945,6 +984,8 @@ DWORD WINAPI CreateThreadListProc(
 
     DWORD dwWaitResult;
 
+    supDisableRedraw(PsDlgContext.ListView);
+
     __try {
 
         dwWaitResult = WaitForSingleObject(g_PsListWait, INFINITE);
@@ -1004,8 +1045,6 @@ DWORD WINAPI CreateThreadListProc(
             SortedHandleList = supHandlesCreateFilteredAndSortedList(GetCurrentProcessId(), FALSE);
             stlptr = stl;
 
-            supListViewEnableRedraw(PsDlgContext.ListView, FALSE);
-
             for (i = 0; i < ThreadCount; i++, stlptr++) {
 
                 threadEntry = (PROP_UNNAMED_OBJECT_INFO*)stlptr->EntryPtr;
@@ -1016,7 +1055,7 @@ DWORD WINAPI CreateThreadListProc(
                 szBuffer[0] = 0;
                 ultostr(HandleToULong(threadEntry->ClientId.UniqueThread), szBuffer);
 
-                RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
+                RtlZeroMemory(&lvitem, sizeof(lvitem));
                 lvitem.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM;
                 lvitem.iItem = MAXINT;
                 lvitem.iImage = I_IMAGENONE;
@@ -1138,8 +1177,6 @@ DWORD WINAPI CreateThreadListProc(
                 PsListCompareFunc,
                 PsDlgContext.lvColumnToSort);
 
-            supListViewEnableRedraw(PsDlgContext.ListView, TRUE);
-
         }
     }
     __finally {
@@ -1156,6 +1193,7 @@ DWORD WINAPI CreateThreadListProc(
         supSetWaitCursor(FALSE);
 
         ReleaseMutex(g_PsListWait);
+        supEnableRedraw(PsDlgContext.ListView);
     }
 
     return 0;
@@ -1213,6 +1251,7 @@ DWORD WINAPI CreateProcessListProc(
 
             TreeList_ClearTree(PsDlgContext.TreeList);
             ListView_DeleteAllItems(PsDlgContext.ListView);
+            PsListPidMapInit(&PsListPidMap);
 
             if (bRefresh) {
                 supDestroyHeap(g_PsListHeap);
@@ -1287,8 +1326,7 @@ DWORD WINAPI CreateProcessListProc(
                 if (List.ProcessEntry->UniqueProcessId == 0)
                     continue;
 
-                ViewRootHandle = FindParentItem(PsDlgContext.TreeList,
-                    List.ProcessEntry->InheritedFromUniqueProcessId);
+                ViewRootHandle = FindParentItem(List.ProcessEntry->InheritedFromUniqueProcessId);
 
                 ObjectAddress = 0;
                 ProcessHandle = supPHLGetEntry(&g_PsListHead, List.ProcessEntry->UniqueProcessId);
@@ -1338,6 +1376,9 @@ DWORD WINAPI CreateProcessListProc(
         if (SortedHandleList) supHeapFree(SortedHandleList);
         supPHLFree(&g_PsListHead, FALSE);
         supFreeSCMSnapshot(&ServicesList);
+
+        PsListPidMapFree(&PsListPidMap);
+
         supSetWaitCursor(FALSE);
 
         InterlockedExchange((PLONG)&g_IsRefresh, FALSE);
@@ -1566,7 +1607,7 @@ INT_PTR CALLBACK PsListDialogProc(
 
     case WM_CONTEXTMENU:
 
-        RtlSecureZeroMemory(&crc, sizeof(crc));
+        RtlZeroMemory(&crc, sizeof(crc));
 
         TreeListControl = TreeList_GetTreeControlWindow(PsDlgContext.TreeList);
 
@@ -1862,7 +1903,7 @@ DWORD extrasPsListDialogWorkerThread(
         }
 
         if (PsDlgContext.TreeList) {
-            RtlSecureZeroMemory(&hdritem, sizeof(hdritem));
+            RtlZeroMemory(&hdritem, sizeof(hdritem));
             hdritem.mask = HDI_FORMAT | HDI_TEXT | HDI_WIDTH;
             hdritem.fmt = HDF_LEFT | HDF_BITMAP_ON_RIGHT | HDF_STRING;
             hdritem.cxy = 300;

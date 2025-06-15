@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2021 - 2022
+*  (C) COPYRIGHT AUTHORS, 2021 - 2025
 *
 *  TITLE:       PROPALPCPORT.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.08
 *
-*  DATE:        19 Jun 2022
+*  DATE:        12 Jun 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -473,7 +473,7 @@ VOID AlpcPortListSetInfo(
     WCHAR szBuffer[100];
 
     ListView_DeleteAllItems(pDlgContext->ListView);
-    supListViewEnableRedraw(pDlgContext->ListView, FALSE);
+    supDisableRedraw(pDlgContext->ListView);
 
     if (AlpcPortEnumerateClients(Context->ObjectInfo.ObjectAddress,
         (POUTPUT_CLIENTS_CALLBACK)AlpcPortEnumerateCallback,
@@ -490,7 +490,7 @@ VOID AlpcPortListSetInfo(
         SetDlgItemText(hwndDlg, ID_ALPCLISTMSG, TEXT("Error, not all connections listed"));
 
     }
-    supListViewEnableRedraw(pDlgContext->ListView, TRUE);
+    supEnableRedraw(pDlgContext->ListView);
 }
 
 /*

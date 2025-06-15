@@ -55,9 +55,9 @@
 #include "ui.h"
 
 //declared in main.c
-extern HINSTANCE g_ThisDLL;
-extern volatile DWORD g_PluginState;
-extern WINOBJEX_PLUGIN* g_Plugin;
+extern HINSTANCE g_thisDll;
+extern volatile DWORD g_pluginState;
+extern WINOBJEX_PLUGIN* g_plugin;
 
 #ifdef _DEBUG
 #define kdDebugPrint(f, ...) DbgPrint(f, __VA_ARGS__)

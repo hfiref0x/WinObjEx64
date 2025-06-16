@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.08
 *
-*  DATE:        13 Jun 2025
+*  DATE:        15 Jun 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -231,16 +231,19 @@ FORCEINLINE PVOID supHeapAlloc(
 *
 */
 PVOID supHeapReAlloc(
-    _Frees_ptr_opt_ PVOID Memory,
+    _When_(Size == 0, _Frees_ptr_opt_)
+    _When_(Size > 0 && Memory != NULL, _In_)
+    _When_(Size > 0 && Memory == NULL, _Null_)
+    PVOID Memory,
     _In_ SIZE_T Size
 )
 {
     if (Size == 0) {
-        if (Memory)
+        if (Memory != NULL)
             supHeapFree(Memory);
         return NULL;
     }
-    if (Memory) {
+    if (Memory != NULL) {
         return RtlReAllocateHeap(g_obexHeap, HEAP_GENERATE_EXCEPTIONS, Memory, Size);
     }
     return RtlAllocateHeap(g_obexHeap, HEAP_GENERATE_EXCEPTIONS, Size);

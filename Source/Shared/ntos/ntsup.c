@@ -347,7 +347,7 @@ PVOID ntsupFindModuleEntryByName_U(
 }
 
 /*
-* ntsupFindModuleNameByAddress
+* ntsupFindModuleEntryByAddress
 *
 * Purpose:
 *

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2023
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     2.03
+*  VERSION:     2.08
 *
-*  DATE:        27 Jul 2023
+*  DATE:        16 Jun 2025
 *
 *  Program entry point and main window handler.
 *
@@ -1753,6 +1753,13 @@ DWORD guiCreateMainWindowAndComponents(
 
         if (Globals->MainWindowSplitter == NULL)
             dwResult = INIT_ERROR_NOSPLITTERWND;
+
+        //
+        // Bring main window to front.
+        //
+        if (g_kdctx.NtOsSymContext != NULL) {
+            SetForegroundWindow(Globals->MainWindow);
+        }
 
     } while (FALSE);
 

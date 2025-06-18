@@ -1759,6 +1759,7 @@ DWORD guiCreateMainWindowAndComponents(
         //
         if (g_kdctx.NtOsSymContext != NULL) {
             SetForegroundWindow(Globals->MainWindow);
+            SetActiveWindow(Globals->MainWindow);
         }
 
     } while (FALSE);

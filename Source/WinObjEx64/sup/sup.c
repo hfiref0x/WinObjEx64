@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.08
 *
-*  DATE:        15 Jun 2025
+*  DATE:        16 Jun 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -10339,20 +10339,12 @@ DWORD WINAPI supSymLoadDialogThreadProc(
     pParams->hDialogWindow = CreateDialogParam(
         g_WinObj.hInstance,
         MAKEINTRESOURCE(IDD_DIALOG_LOADLIST),
-        0,
+        NULL,
         supxLoadBannerDialog,
         (LPARAM)&bannerData);
 
     if (pParams->hDialogWindow) {
         g_SymLoadState.hBannerDialog = pParams->hDialogWindow;
-
-        SetWindowPos(
-            pParams->hDialogWindow,
-            HWND_TOPMOST,
-            0, 0, 0, 0,
-            SWP_NOMOVE | SWP_NOSIZE
-        );
-
         ShowWindow(pParams->hDialogWindow, SW_SHOW);
         UpdateWindow(pParams->hDialogWindow);
 
@@ -10437,7 +10429,7 @@ BOOL supLoadSymbolsForNtImage(
     dialogParams.hCompletionEvent = hCompletionEvent;
     dialogParams.hDialogWindow = NULL;
 
-    hDialogThread = CreateThread(NULL, 0, supSymLoadDialogThreadProc, &dialogParams, 0, NULL);
+    hDialogThread = supCreateThread(supSymLoadDialogThreadProc, &dialogParams, 0);
     if (!hDialogThread) {
         CloseHandle(hDialogInitialized);
         CloseHandle(hCompletionEvent);
@@ -10455,7 +10447,7 @@ BOOL supLoadSymbolsForNtImage(
     symbolParams.hCancelEvent = hCancelEvent;
     symbolParams.hCompletionEvent = hCompletionEvent;
 
-    hSymLoadingThread = CreateThread(NULL, 0, supSymLoadWorker, &symbolParams, 0, NULL);
+    hSymLoadingThread = supCreateThread(supSymLoadWorker, &symbolParams, 0);
     if (!hSymLoadingThread) {
         SetEvent(hCompletionEvent);
         WaitForSingleObject(hDialogThread, INFINITE);

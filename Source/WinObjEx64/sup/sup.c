@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.08
 *
-*  DATE:        16 Jun 2025
+*  DATE:        23 Jun 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -683,6 +683,7 @@ VOID supShowHelp(
     if (g_WinObj.HtmlHelpW == NULL) {
         g_WinObj.HtmlHelpW = (pfnHtmlHelpW)GetProcAddress(hHtmlOcx, MAKEINTRESOURCEA(0xF));
         if (g_WinObj.HtmlHelpW == NULL) {
+            FreeLibrary(hHtmlOcx);
             return;
         }
     }
@@ -1268,45 +1269,63 @@ LPWSTR supGetItemText(
     _In_ HWND ListView,
     _In_ INT nItem,
     _In_ INT nSubItem,
-    _Out_opt_ PSIZE_T lpSize //length in bytes
+    _Out_opt_ PSIZE_T lpSize // length in bytes
 )
 {
-    INT     len;
-    LPARAM  sz = 0;
+    INT len = MAX_PATH;
+    INT sz = -1; 
     LV_ITEM item;
+    LPWSTR buffer = NULL;
 
     RtlSecureZeroMemory(&item, sizeof(item));
-
     item.iItem = nItem;
     item.iSubItem = nSubItem;
-    len = 128;
+
     do {
-        len *= 2;
-        item.cchTextMax = len;
-        if (item.pszText) {
-            supHeapFree(item.pszText);
-            item.pszText = NULL;
+        if (buffer) {
+            supHeapFree(buffer);
+            buffer = NULL;
         }
-        item.pszText = (LPWSTR)supHeapAlloc(len * sizeof(WCHAR));
-        if (item.pszText == NULL) {
+
+        buffer = (LPWSTR)supHeapAlloc(len * sizeof(WCHAR));
+        if (buffer == NULL) {
             sz = 0;
             break;
         }
-        sz = SendMessage(ListView, LVM_GETITEMTEXT, (WPARAM)item.iItem, (LPARAM)&item);
-    } while (sz == (LPARAM)len - 1);
 
-    //empty string
-    if (sz == 0) {
-        if (item.pszText) {
-            supHeapFree(item.pszText);
-            item.pszText = NULL;
+        item.pszText = buffer;
+        item.cchTextMax = len;
+
+        sz = (INT)SendMessage(ListView, LVM_GETITEMTEXT, (WPARAM)nItem, (LPARAM)&item);
+        if (sz < 0) {
+            // general fuckup
+            supHeapFree(buffer);
+            buffer = NULL;
+            sz = 0;
+            break;
         }
+
+        if (sz < len - 1) {
+            break;
+        }
+
+        if (len > INT_MAX / 2) {
+            break;
+        }
+        len *= 2;
+
+    } while (TRUE);
+
+    if (sz == 0 && buffer) {
+        supHeapFree(buffer);
+        buffer = NULL;
     }
 
     if (lpSize) {
-        *lpSize = sz * sizeof(WCHAR);
+        *lpSize = (SIZE_T)sz * sizeof(WCHAR);
     }
-    return item.pszText;
+
+    return buffer;
 }
 
 /*

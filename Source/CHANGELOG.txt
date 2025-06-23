@@ -1,3 +1,15 @@
+v2.0.8
+fixed various spelling errors throughout the codebase and documentation 
+plugins have been upgraded to the new interface version, improving compatibility and extensibility 
+fixed memory leaks in several plugins and addressed application-wide memory leaks 
+performed internal refactoring for objects management, which should theoretically improve performance 
+optimized the process tree view, resulting in better performance for the process list dialog, especially with large process sets 
+improved Authenticode hash calculations, adding better padding logic and enhanced error handling 
+updated the object search dialog logic for better handling of large/big search queries 
+updated the MSVC compiler versions database for more accurate build/version reporting 
+updated RTLs (ntos, ntsup, ntldr, tabctrl, symparser) to their latest versions for improved stability and feature support 
+support Vista again (limited set of features), as per feature request #44 
+
 v2.0.7
 win11 24h2 compatibility improvements
 

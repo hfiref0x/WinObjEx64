@@ -621,17 +621,18 @@ VOID supShowHelp(
     LRESULT lRet;
     HMODULE hHtmlOcx;
     LPWSTR  s;
-    WCHAR   szOcxPath[MAX_PATH + 1];
+    WCHAR   szOcxPath[MAX_PATH];
     WCHAR   szBuffer[MAX_PATH * 2];
     WCHAR   szHelpFile[MAX_PATH * 2];
     BOOL    bHelpFileFound = FALSE;
+    WCHAR   szHelpFileName[] = L"\\winobjex64.chm";
 
     //
     //  Check if CHM file exist and remember filename.
     //
     RtlSecureZeroMemory(szHelpFile, sizeof(szHelpFile));
     if (GetCurrentDirectory(MAX_PATH, szHelpFile)) {
-        _strcat(szHelpFile, L"\\winobjex64.chm");
+        _strcat(szHelpFile, szHelpFileName);
         if (PathFileExists(szHelpFile)) {
             bHelpFileFound = TRUE;
         }
@@ -641,19 +642,18 @@ VOID supShowHelp(
     // If not found, check executable's directory.
     //
     if (!bHelpFileFound) {
-        WCHAR szExePath[MAX_PATH + 1];
-        WCHAR *pSlash;
+        WCHAR szExeName[MAX_PATH];
+        WCHAR szExePath[MAX_PATH];
+
+        RtlSecureZeroMemory(szExeName, sizeof(szExeName));
         RtlSecureZeroMemory(szExePath, sizeof(szExePath));
-        if (GetModuleFileName(NULL, szExePath, MAX_PATH)) {
-            // Remove the executable name to get the directory.
-            pSlash = wcsrchr(szExePath, L'\\');
-            if (pSlash) {
-                *(pSlash + 1) = 0; // Keep the trailing backslash
-                _strcpy(szHelpFile, szExePath);
-                _strcat(szHelpFile, L"winobjex64.chm");
-                if (PathFileExists(szHelpFile)) {
-                    bHelpFileFound = TRUE;
-                }
+        RtlSecureZeroMemory(szHelpFile, sizeof(szHelpFile));
+        if (GetModuleFileName(NULL, szExeName, MAX_PATH)) {
+            _filepath(szExeName, szExePath);
+            _strcpy(szHelpFile, szExePath);
+            _strcat(szHelpFile, szHelpFileName + 1);  // Path seperator is already included
+            if (PathFileExists(szHelpFile)) {
+                bHelpFileFound = TRUE;
             }
         }
     }

@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     2.08
+*  VERSION:     2.09
 *
-*  DATE:        11 Jun 2025
+*  DATE:        10 Aug 2025
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -131,6 +131,7 @@ typedef ULONG_PTR *PUTable;
 #define OBP_ERROR_NONAME_LITERAL_SIZE (sizeof(OBP_ERROR_NONAME_LITERAL) - sizeof(UNICODE_NULL))
 
 #define WINE_DIRECTORY_QUERY_BUFFER_SIZE (64 * 1024)
+#define OB_MAX_DIRECTORY_ENUM_ITER (64 * 1024)
 
 //
 // Predefined strings

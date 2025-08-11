@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     2.08
+*  VERSION:     2.09
 *
-*  DATE:        23 Jun 2025
+*  DATE:        10 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -244,9 +244,9 @@ PVOID supHeapReAlloc(
         return NULL;
     }
     if (Memory != NULL) {
-        return RtlReAllocateHeap(g_obexHeap, HEAP_GENERATE_EXCEPTIONS, Memory, Size);
+        return RtlReAllocateHeap(g_obexHeap, HEAP_ZERO_MEMORY, Memory, Size);
     }
-    return RtlAllocateHeap(g_obexHeap, HEAP_GENERATE_EXCEPTIONS, Size);
+    return RtlAllocateHeap(g_obexHeap, HEAP_ZERO_MEMORY, Size);
 }
 
 /*
@@ -434,7 +434,7 @@ BOOL supInitTreeListForDump(
 */
 VOID supClipboardCopy(
     _In_ LPCWSTR lpText,
-    _In_ SIZE_T cbText
+    _In_ SIZE_T cbTextInBytes
 )
 {
     LPWSTR  lptstrCopy;
@@ -447,7 +447,7 @@ VOID supClipboardCopy(
 
     __try {
         EmptyClipboard();
-        dwSize = cbText + sizeof(UNICODE_NULL);
+        dwSize = cbTextInBytes + sizeof(UNICODE_NULL);
         hglbCopy = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, dwSize);
         if (hglbCopy == NULL)
             __leave;
@@ -456,7 +456,7 @@ VOID supClipboardCopy(
         if (lptstrCopy == NULL)
             __leave;
 
-        RtlCopyMemory(lptstrCopy, lpText, cbText);
+        RtlCopyMemory(lptstrCopy, lpText, cbTextInBytes);
         GlobalUnlock(hglbCopy);
 
         dataSet = SetClipboardData(CF_UNICODETEXT, hglbCopy) != NULL;
@@ -579,7 +579,14 @@ BOOL supDumpSyscallTableConverted(
 
     *Table = NULL;
 
+    if (ServiceLimit == 0)
+        return FALSE;
+
+    if (ServiceLimit > (ULONG_MAX / sizeof(ULONG)))
+        return FALSE;
+
     memIO = ServiceLimit * sizeof(ULONG);
+
     ServiceTableDumped = (PULONG)supHeapAlloc(memIO);
     if (ServiceTableDumped) {
         if (kdReadSystemMemory(
@@ -594,7 +601,7 @@ BOOL supDumpSyscallTableConverted(
                 *Table = ConvertedTable;
                 for (ServiceId = 0; ServiceId < ServiceLimit; ServiceId++) {
                     Offset = ((LONG32)ServiceTableDumped[ServiceId] >> 4);
-                    ConvertedTable[ServiceId] = ServiceTableAddress + Offset;
+                    ConvertedTable[ServiceId] = (ULONG_PTR)(ServiceTableAddress + Offset);
                 }
                 bResult = TRUE;
             }
@@ -626,6 +633,8 @@ VOID supShowHelp(
     WCHAR   szHelpFile[MAX_PATH * 2];
     BOOL    bHelpFileFound = FALSE;
     WCHAR   szHelpFileName[] = L"\\winobjex64.chm";
+    WCHAR   szExeName[MAX_PATH];
+    WCHAR   szExePath[MAX_PATH];
 
     //
     //  Check if CHM file exist and remember filename.
@@ -642,9 +651,6 @@ VOID supShowHelp(
     // If not found, check executable's directory.
     //
     if (!bHelpFileFound) {
-        WCHAR szExeName[MAX_PATH];
-        WCHAR szExePath[MAX_PATH];
-
         RtlSecureZeroMemory(szExeName, sizeof(szExeName));
         RtlSecureZeroMemory(szExePath, sizeof(szExePath));
         RtlSecureZeroMemory(szHelpFile, sizeof(szHelpFile));
@@ -824,7 +830,7 @@ BOOL supFreeDuplicatedUnicodeString(
 * Purpose:
 *
 * Duplicate existing UNICODE_STRING to another without RtlDuplicateUnicodeString.
-* 
+*
 * Note: Use supFreeDuplicatedUnicodeString to release allocated memory.
 *
 */
@@ -1269,7 +1275,7 @@ PVOID supGetObjectTypesInfo(
         buffer = supHeapAlloc((SIZE_T)bufferSize);
     }
 
-    if (NT_SUCCESS(ntStatus)) {        
+    if (NT_SUCCESS(ntStatus)) {
         return buffer;
     }
 
@@ -1297,7 +1303,7 @@ LPWSTR supGetItemText(
 )
 {
     INT len = MAX_PATH;
-    INT sz = -1; 
+    INT sz = -1;
     LV_ITEM item;
     LPWSTR buffer = NULL;
 
@@ -1364,7 +1370,7 @@ LPWSTR supGetItemText2(
     _In_ HWND ListView,
     _In_ INT nItem,
     _In_ INT nSubItem,
-    _In_ WCHAR* pszText,
+    _In_ WCHAR * pszText,
     _In_ UINT cchText
 )
 {
@@ -1628,7 +1634,7 @@ BOOL supTreeListAddCopyValueItem(
     _In_ UINT uId,
     _In_ UINT uPos,
     _In_ LPARAM lParam,
-    _In_ INT *pSubItemHit
+    _In_ INT * pSubItemHit
 )
 {
     HDHITTESTINFO hti;
@@ -1683,9 +1689,9 @@ BOOL supListViewAddCopyValueItem(
     _In_ HWND hwndLv,
     _In_ UINT uId,
     _In_ UINT uPos,
-    _In_ POINT* lpPoint,
-    _Out_ INT* pItemHit,
-    _Out_ INT* pColumnHit
+    _In_ POINT * lpPoint,
+    _Out_ INT * pItemHit,
+    _Out_ INT * pColumnHit
 )
 {
     LVHITTESTINFO lvht;
@@ -1966,18 +1972,18 @@ VOID supxSetProcessMitigationPolicies()
         // Disabled due to multiple incompatibilities, including their own HtmlHelp functions
         // Fixes WOX2007-005.
         //
-         if (g_NtBuildNumber > NT_WIN8_BLUE) {
+        if (g_NtBuildNumber > NT_WIN8_BLUE) {
 
-             policyInfo.Policy = (PROCESS_MITIGATION_POLICY)ProcessDynamicCodePolicy;
-             policyInfo.DynamicCodePolicy.Flags = 0;
-             policyInfo.DynamicCodePolicy.ProhibitDynamicCode = TRUE;
+            policyInfo.Policy = (PROCESS_MITIGATION_POLICY)ProcessDynamicCodePolicy;
+            policyInfo.DynamicCodePolicy.Flags = 0;
+            policyInfo.DynamicCodePolicy.ProhibitDynamicCode = TRUE;
 
-             NtSetInformationProcess(NtCurrentProcess(),
-                 ProcessMitigationPolicy,
-                 &policyInfo,
-                 sizeof(PROCESS_MITIGATION_POLICY_INFORMATION));
+            NtSetInformationProcess(NtCurrentProcess(),
+                ProcessMitigationPolicy,
+                &policyInfo,
+                sizeof(PROCESS_MITIGATION_POLICY_INFORMATION));
 
-         }
+        }
     }
 }
 
@@ -2147,8 +2153,8 @@ VOID supShutdown(
 BOOL supxEnumServicesStatus(
     _In_ SC_HANDLE schSCManager,
     _In_ ULONG ServiceType,
-    _Out_ PBYTE* Services,
-    _Out_ DWORD* ServicesReturned
+    _Out_ PBYTE * Services,
+    _Out_ DWORD * ServicesReturned
 )
 {
     LPBYTE servicesBuffer = NULL;
@@ -2211,7 +2217,7 @@ BOOL supxEnumServicesStatus(
 */
 BOOL supCreateSCMSnapshot(
     _In_ ULONG ServiceType,
-    _Out_opt_ SCMDB* Snapshot
+    _Out_opt_ SCMDB * Snapshot
 )
 {
     SC_HANDLE schSCManager;
@@ -2260,7 +2266,7 @@ BOOL supCreateSCMSnapshot(
 *
 */
 VOID supFreeSCMSnapshot(
-    _In_opt_ SCMDB* Snapshot)
+    _In_opt_ SCMDB * Snapshot)
 {
     if (Snapshot) {
         if ((Snapshot->Entries) && (Snapshot->NumberOfEntries))
@@ -2292,10 +2298,10 @@ VOID supFreeSCMSnapshot(
 BOOL sapiQueryDeviceProperty(
     _In_ HANDLE SnapshotHeap,
     _In_ HDEVINFO hDevInfo,
-    _In_ SP_DEVINFO_DATA* pDevInfoData,
+    _In_ SP_DEVINFO_DATA * pDevInfoData,
     _In_ ULONG Property,
-    _Out_ LPWSTR* PropertyBuffer,
-    _Out_opt_ ULONG* PropertyBufferSize
+    _Out_ LPWSTR * PropertyBuffer,
+    _Out_opt_ ULONG * PropertyBufferSize
 )
 {
     BOOL   result;
@@ -2839,7 +2845,7 @@ BOOL supQueryDriverDescription(
 BOOL supGetVersionInfoFromSection(
     _In_ HANDLE SectionHandle,
     _Out_opt_ PDWORD VersionInfoSize,
-    _Out_ LPVOID* VersionData
+    _Out_ LPVOID * VersionData
 )
 {
     HANDLE sectionHandle = NULL;
@@ -3400,7 +3406,7 @@ BOOLEAN supQuerySecureBootState(
     if (pbSecureBoot) {
         *pbSecureBoot = (dwState == 1);
         return TRUE;
-    }  
+    }
 
     return FALSE;
 }
@@ -3414,7 +3420,7 @@ BOOLEAN supQuerySecureBootState(
 *
 */
 BOOLEAN supxGetWindowStationName(
-    _Out_ UNICODE_STRING* pusWinstaName
+    _Out_ UNICODE_STRING * pusWinstaName
 )
 {
     LPWSTR WindowStationsDir = L"\\Windows\\WindowStations";
@@ -3444,7 +3450,7 @@ BOOLEAN supxGetWindowStationName(
 *
 */
 HWINSTA supOpenWindowStationFromContext(
-    _In_ PROP_OBJECT_INFO* Context,
+    _In_ PROP_OBJECT_INFO * Context,
     _In_ BOOL fInherit,
     _In_ ACCESS_MASK dwDesiredAccess)
 {
@@ -3691,9 +3697,9 @@ NTSTATUS supIsProtectedProcess(
     exbi.Size = sizeof(PROCESS_EXTENDED_BASIC_INFORMATION);
     ntStatus = NtQueryInformationProcess(hProcess, ProcessBasicInformation,
         &exbi, sizeof(exbi), &requredLength);
-    
+
     if (NT_SUCCESS(ntStatus)) {
-        *pbProtected  = (exbi.IsProtectedProcess != 0);
+        *pbProtected = (exbi.IsProtectedProcess != 0);
     }
 
     return ntStatus;
@@ -4499,8 +4505,8 @@ NTSTATUS supOpenLinkedToken(
 *
 */
 NTSTATUS supOpenTokenByParam(
-    _In_ CLIENT_ID* ClientId,
-    _In_ OBJECT_ATTRIBUTES* ObjectAttributes,
+    _In_ CLIENT_ID * ClientId,
+    _In_ OBJECT_ATTRIBUTES * ObjectAttributes,
     _In_ ACCESS_MASK TokenDesiredAccess,
     _In_ BOOL IsThreadToken,
     _Out_ PHANDLE TokenHandle)
@@ -4635,7 +4641,7 @@ BOOL supxCanOpenObjectType(
 *
 */
 NTSTATUS supOpenNamedObjectByType(
-    _Out_ HANDLE* ObjectHandle,
+    _Out_ HANDLE * ObjectHandle,
     _In_ ULONG TypeIndex,
     _In_ PUNICODE_STRING ObjectDirectory,
     _In_ PUNICODE_STRING ObjectName,
@@ -4856,7 +4862,7 @@ BOOL supEnumHandleDump(
 *
 */
 BOOL supxEnumAlpcPortsCallback(
-    _In_ SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX* HandleEntry,
+    _In_ SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX * HandleEntry,
     _In_opt_ PVOID UserContext)
 {
     BOOL        fSelfProcess = FALSE, fAlloc = FALSE, bStopEnum = FALSE;
@@ -4989,7 +4995,7 @@ BOOL supxEnumAlpcPortsCallback(
 NTSTATUS supOpenPortObjectByName(
     _Out_ PHANDLE ObjectHandle,
     _In_ ACCESS_MASK DesiredAccess,
-     _In_ PUNICODE_STRING ObjectName
+    _In_ PUNICODE_STRING ObjectName
 )
 {
     USHORT alpcPortTypeIndex;
@@ -5075,7 +5081,7 @@ NTSTATUS supOpenPortObjectByName(
 NTSTATUS supOpenPortObjectFromContext(
     _Out_ PHANDLE ObjectHandle,
     _In_ ACCESS_MASK DesiredAccess,
-    _In_ PROP_OBJECT_INFO* Context
+    _In_ PROP_OBJECT_INFO * Context
 )
 {
     NTSTATUS ntStatus = STATUS_UNSUCCESSFUL;
@@ -5113,10 +5119,10 @@ NTSTATUS supOpenPortObjectFromContext(
 *
 */
 HANDLE supOpenObjectFromContext(
-    _In_ PROP_OBJECT_INFO* Context,
-    _In_ OBJECT_ATTRIBUTES* ObjectAttributes,
+    _In_ PROP_OBJECT_INFO * Context,
+    _In_ OBJECT_ATTRIBUTES * ObjectAttributes,
     _In_ ACCESS_MASK DesiredAccess,
-    _Out_ NTSTATUS* Status
+    _Out_ NTSTATUS * Status
 )
 {
     HANDLE hObject = NULL, hPrivateNamespace = NULL;
@@ -5368,7 +5374,7 @@ HANDLE supOpenObjectFromContext(
 *
 */
 BOOL supCloseObjectFromContext(
-    _In_ PROP_OBJECT_INFO* Context,
+    _In_ PROP_OBJECT_INFO * Context,
     _In_ HANDLE hObject
 )
 {
@@ -5751,7 +5757,7 @@ NTSTATUS supOpenProcessTokenEx(
 */
 INT supPrintTimeToBuffer(
     _In_ PLARGE_INTEGER Time,
-    _In_ WCHAR* lpszBuffer,
+    _In_ WCHAR * lpszBuffer,
     _In_ SIZE_T cchBuffer
 )
 {
@@ -5834,7 +5840,7 @@ _Success_(return)
 BOOL supGetTreeViewItemParam(
     _In_ HWND hwndTreeView,
     _In_ HTREEITEM hTreeItem,
-    _Out_ PVOID* outParam
+    _Out_ PVOID * outParam
 )
 {
     TV_ITEM tvi;
@@ -6004,7 +6010,7 @@ LPWSTR supIntegrityToString(
 BOOL supLookupSidUserAndDomainEx(
     _In_ PSID Sid,
     _In_ LSA_HANDLE PolicyHandle,
-    _Out_ LPWSTR* lpSidUserAndDomain
+    _Out_ LPWSTR * lpSidUserAndDomain
 )
 {
     BOOL bResult = FALSE;
@@ -6170,7 +6176,7 @@ int __cdecl supxHandlesLookupCallback2(
     int i;
     PSUP_HANDLE_DUMP_ENTRY elem1 = (PSUP_HANDLE_DUMP_ENTRY)first;
     PSUP_HANDLE_DUMP_ENTRY elem2 = (PSUP_HANDLE_DUMP_ENTRY)second;
-    
+
     ULONG_PTR FirstObject = (ULONG_PTR)elem1->Object;
     ULONG_PTR SecondObject = (ULONG_PTR)elem2->Object;
 
@@ -6355,7 +6361,7 @@ BOOL supPHLCreate(
 )
 {
     ULONG NextEntryDelta = 0;
-    ULONG numberOfThreads = 0, numberOfProcesses = 0;
+    ULONG numberOfThreads = 0, numberOfProcesses = 0, cEntries = 0;
     PHL_ENTRY* PsListItem;
     union {
         PSYSTEM_PROCESS_INFORMATION ProcessEntry;
@@ -6388,7 +6394,7 @@ BOOL supPHLCreate(
             }
 
             InsertHeadList(ListHead, &PsListItem->ListEntry);
-
+            cEntries += 1;
         }
 
     } while (NextEntryDelta);
@@ -6396,7 +6402,7 @@ BOOL supPHLCreate(
     *NumberOfThreads = numberOfThreads;
     *NumberOfProcesses = numberOfProcesses;
 
-    return ((numberOfProcesses > 0) && (numberOfThreads > 0));
+    return cEntries > 0;
 }
 
 /*
@@ -6508,11 +6514,11 @@ PVOID supSLCacheRead(
         PolicyData = (KEY_VALUE_PARTIAL_INFORMATION*)supHeapAlloc(DataLength + sizeof(KEY_VALUE_PARTIAL_INFORMATION));
         if (PolicyData) {
 
-            Status = NtQueryValueKey(KeyHandle, 
+            Status = NtQueryValueKey(KeyHandle,
                 &ProductPolicyValue,
-                KeyValuePartialInformation, 
-                PolicyData, 
-                DataLength, 
+                KeyValuePartialInformation,
+                PolicyData,
+                DataLength,
                 &DataLength);
 
             if (NT_SUCCESS(Status) && (PolicyData->Type == REG_BINARY)) {
@@ -6559,21 +6565,22 @@ BOOLEAN supSLCacheEnumerate(
 * Use the shell view for the desktop using the shell windows automation to find the
 * desktop web browser and then grabs its view.
 *
-* N.B. Taken entirely from Windows SDK sample.
-*
 */
 HRESULT supxGetShellViewForDesktop(
     REFIID riid,
     void** ppv
 )
 {
-    IShellWindows* psw;
+    IShellWindows* psw = NULL;
     HRESULT hr;
-    HWND hwnd;
-    IDispatch* pdisp;
-    IShellBrowser* psb;
+    HWND hwnd = NULL;
+    IDispatch* pdisp = NULL;
+    IShellBrowser* psb = NULL;
     VARIANT vtEmpty;
-    IShellView* psv;
+    IShellView* psv = NULL;
+
+    if (ppv == NULL)
+        return E_POINTER;
 
     *ppv = NULL;
 
@@ -6589,7 +6596,6 @@ HRESULT supxGetShellViewForDesktop(
             hr = IUnknown_QueryService(pdisp, SID_STopLevelBrowser, IID_PPV_ARGS(&psb));
             if (SUCCEEDED(hr))
             {
-
                 hr = psb->QueryActiveShellView(&psv);
                 if (SUCCEEDED(hr))
                 {
@@ -6611,12 +6617,12 @@ HRESULT supxGetShellViewForDesktop(
 
     VariantInit(&vtEmpty);
 
-    hr = CoCreateInstance(&CLSID_ShellWindows, NULL, CLSCTX_LOCAL_SERVER, &IID_IShellWindows, &psw);
+    hr = CoCreateInstance(&CLSID_ShellWindows, NULL, CLSCTX_LOCAL_SERVER, &IID_IShellWindows, (void**)&psw);
     if (SUCCEEDED(hr))
     {
         if (S_OK == psw->lpVtbl->FindWindowSW(psw, &vtEmpty, &vtEmpty, SWC_DESKTOP, (long*)(LONG_PTR)&hwnd, SWFO_NEEDDISPATCH, &pdisp))
         {
-            hr = IUnknown_QueryService((IUnknown*)pdisp, &SID_STopLevelBrowser, &IID_IShellBrowser, &psb);
+            hr = IUnknown_QueryService((IUnknown*)pdisp, &SID_STopLevelBrowser, &IID_IShellBrowser, (void**)&psb);
             if (SUCCEEDED(hr))
             {
                 hr = psb->lpVtbl->QueryActiveShellView(psb, &psv);
@@ -6648,15 +6654,22 @@ HRESULT supxGetShellViewForDesktop(
 * From a shell view object gets its automation interface and from that gets the shell
 * application object that implements IShellDispatch2 and related interfaces.
 *
-* N.B. Taken entirely from Windows SDK sample.
-*
 */
-HRESULT supxGetShellDispatchFromView(IShellView * psv, REFIID riid, void** ppv)
+HRESULT supxGetShellDispatchFromView(
+    IShellView * psv,
+    REFIID riid,
+    void** ppv
+)
 {
     HRESULT hr;
-    IDispatch* pdispBackground;
-    IShellFolderViewDual* psfvd;
-    IDispatch* pdisp;
+    IDispatch* pdispBackground = NULL;
+    IShellFolderViewDual* psfvd = NULL;
+    IDispatch* pdisp = NULL;
+
+    if (ppv == NULL)
+        return E_POINTER;
+    if (psv == NULL)
+        return E_INVALIDARG;
 
     *ppv = NULL;
 
@@ -6681,10 +6694,10 @@ HRESULT supxGetShellDispatchFromView(IShellView * psv, REFIID riid, void** ppv)
 
 #else
 
-    hr = psv->lpVtbl->GetItemObject(psv, SVGIO_BACKGROUND, &IID_IDispatch, &pdispBackground);
+    hr = psv->lpVtbl->GetItemObject(psv, SVGIO_BACKGROUND, &IID_IDispatch, (void**)&pdispBackground);
     if (SUCCEEDED(hr))
     {
-        hr = pdispBackground->lpVtbl->QueryInterface(pdispBackground, &IID_IShellFolderViewDual, &psfvd);
+        hr = pdispBackground->lpVtbl->QueryInterface(pdispBackground, &IID_IShellFolderViewDual, (void**)&psfvd);
         if (SUCCEEDED(hr))
         {
             hr = psfvd->lpVtbl->get_Application(psfvd, &pdisp);
@@ -6716,101 +6729,102 @@ HRESULT supShellExecInExplorerProcess(
     _In_opt_ PCWSTR pszArguments
 )
 {
-    HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-    IShellView* psv;
-    IShellDispatch2* psd;
-    BSTR bstrFile, bstrArgs = NULL;
+    HRESULT hr;
+    IShellView* psv = NULL;
+    IShellDispatch2* psd = NULL;
+    BSTR bstrFile = NULL, bstrArgs = NULL;
     VARIANT vtEmpty, vtArgs;
 
-    if (SUCCEEDED(hr)) {
+    hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    if (FAILED(hr))
+        return hr;
+
+    if (!pszFile) {
+        CoUninitialize();
+        return E_INVALIDARG;
+    }
+
+    VariantInit(&vtEmpty);
+    VariantInit(&vtArgs);
 
 #ifdef __cplusplus
 
-        hr = supxGetShellViewForDesktop(IID_PPV_ARGS(&psv));
-        if (SUCCEEDED(hr))
-        {
-            hr = supxGetShellDispatchFromView(psv, IID_PPV_ARGS(&psd));
-            if (SUCCEEDED(hr))
-            {
-                bstrFile = SysAllocString(pszFile);
-                hr = bstrFile ? S_OK : E_OUTOFMEMORY;
-                if (SUCCEEDED(hr))
-                {
-                    VariantInit(&vtArgs);
-                    VariantInit(&vtEmpty);
+    hr = supxGetShellViewForDesktop(IID_PPV_ARGS(&psv));
+    if (FAILED(hr)) goto Cleanup;
 
-                    if (pszArguments) {
-                        bstrArgs = SysAllocString(pszArguments);
-                        hr = bstrArgs ? S_OK : E_OUTOFMEMORY;
+    hr = supxGetShellDispatchFromView(psv, IID_PPV_ARGS(&psd));
+    if (FAILED(hr)) goto Cleanup;
 
-                        if (SUCCEEDED(hr)) {
-                            vtArgs.vt = VT_BSTR;
-                            vtArgs.bstrVal = bstrArgs;
+    bstrFile = SysAllocString(pszFile);
+    if (!bstrFile) {
+        hr = E_OUTOFMEMORY;
+        goto Cleanup;
+    }
 
-                            hr = psd->ShellExecuteW(bstrFile,
-                                vtArgs, vtEmpty, vtEmpty, vtEmpty);
-
-                            SysFreeString(bstrFile);
-                        }
-                    }
-                    else {
-
-                        hr = psd->ShellExecuteW(bstrFile,
-                            vtEmpty, vtEmpty, vtEmpty, vtEmpty);
-
-                    }
-
-                }
-                psd->Release();
-            }
-            psv->Release();
+    if (pszArguments) {
+        bstrArgs = SysAllocString(pszArguments);
+        if (!bstrArgs) {
+            hr = E_OUTOFMEMORY;
+            goto Cleanup;
         }
+        vtArgs.vt = VT_BSTR;
+        vtArgs.bstrVal = bstrArgs;
+
+        hr = psd->ShellExecuteW(bstrFile,
+            vtArgs, vtEmpty, vtEmpty, vtEmpty);
+    }
+    else {
+        hr = psd->ShellExecuteW(bstrFile,
+            vtEmpty, vtEmpty, vtEmpty, vtEmpty);
+    }
 
 #else
-        hr = supxGetShellViewForDesktop(&IID_IShellView, &psv);
-        if (SUCCEEDED(hr)) {
-            hr = supxGetShellDispatchFromView(psv, &IID_IShellDispatch2, &psd);
-            if (SUCCEEDED(hr))
-            {
-                bstrFile = SysAllocString(pszFile);
-                hr = bstrFile ? S_OK : E_OUTOFMEMORY;
-                if (SUCCEEDED(hr))
-                {
-                    VariantInit(&vtArgs);
-                    VariantInit(&vtEmpty);
 
-                    if (pszArguments) {
+    hr = supxGetShellViewForDesktop(&IID_IShellView, &psv);
+    if (FAILED(hr)) goto Cleanup;
 
-                        bstrArgs = SysAllocString(pszArguments);
-                        hr = bstrArgs ? S_OK : E_OUTOFMEMORY;
+    hr = supxGetShellDispatchFromView(psv, &IID_IShellDispatch2, &psd);
+    if (FAILED(hr)) goto Cleanup;
 
-                        if (SUCCEEDED(hr)) {
-                            vtArgs.vt = VT_BSTR;
-                            vtArgs.bstrVal = bstrArgs;
-
-                            hr = psd->lpVtbl->ShellExecuteW(psd, bstrFile,
-                                vtArgs, vtEmpty, vtEmpty, vtEmpty);
-
-                            SysFreeString(bstrArgs);
-                        }
-                    }
-                    else {
-
-                        hr = psd->lpVtbl->ShellExecuteW(psd, bstrFile,
-                            vtEmpty, vtEmpty, vtEmpty, vtEmpty);
-
-                    }
-
-                    SysFreeString(bstrFile);
-                }
-
-                psd->lpVtbl->Release(psd);
-            }
-            psv->lpVtbl->Release(psv);
-        }
-#endif
-        CoUninitialize();
+    bstrFile = SysAllocString(pszFile);
+    if (!bstrFile) {
+        hr = E_OUTOFMEMORY;
+        goto Cleanup;
     }
+
+    if (pszArguments) {
+        bstrArgs = SysAllocString(pszArguments);
+        if (!bstrArgs) {
+            hr = E_OUTOFMEMORY;
+            goto Cleanup;
+        }
+        vtArgs.vt = VT_BSTR;
+        vtArgs.bstrVal = bstrArgs;
+
+        hr = psd->lpVtbl->ShellExecuteW(psd, bstrFile,
+            vtArgs, vtEmpty, vtEmpty, vtEmpty);
+    }
+    else {
+        hr = psd->lpVtbl->ShellExecuteW(psd, bstrFile,
+            vtEmpty, vtEmpty, vtEmpty, vtEmpty);
+    }
+
+#endif
+
+Cleanup:
+
+#ifdef __cplusplus
+    if (psd) psd->Release();
+    if (psv) psv->Release();
+#else
+    if (psd) psd->lpVtbl->Release(psd);
+    if (psv) psv->lpVtbl->Release(psv);
+#endif
+
+    if (bstrArgs) SysFreeString(bstrArgs);
+    if (bstrFile) SysFreeString(bstrFile);
+
+    CoUninitialize();
     return hr;
 }
 
@@ -6857,93 +6871,144 @@ BOOLEAN supLoadIconForObjectType(
     return FALSE;
 }
 
+typedef struct _REGSTACK_ENTRY {
+    WCHAR SubKey[MAX_PATH + 1];
+} REGSTACK_ENTRY, * PREGSTACK_ENTRY;
+
 /*
-* supxDeleteKeyRecursive
+* supxDeleteKeyTreeWorker
 *
 * Purpose:
 *
-* Delete key and all it subkeys/values.
+* Delete key and it subkeys/values.
 *
 */
-BOOL supxDeleteKeyRecursive(
+BOOL supxDeleteKeyTreeWorker(
     _In_ HKEY hKeyRoot,
-    _In_ LPWSTR lpSubKey)
+    _In_ LPWSTR lpSubKey
+)
 {
-    LPWSTR lpEnd;
+    HKEY hKey;
     LONG lResult;
     DWORD dwSize;
-    WCHAR szName[MAX_PATH + 1];
-    HKEY hKey;
     FILETIME ftWrite;
+    WCHAR szName[MAX_PATH + 1];
+    WCHAR workingPath[MAX_PATH * 2];
+    USHORT depthStack[256]; // depth (path length in WCHARs, excluding terminator)
+    INT sp = -1;
+    SIZE_T baseLen, curLen;
+    SIZE_T nameLen;
+    BOOL hasTrailingSlash;
+    PWCHAR p;
+
+    if (lpSubKey == NULL || lpSubKey[0] == 0)
+        return FALSE;
+
+    RtlSecureZeroMemory(depthStack, sizeof(depthStack));
+    _strncpy(workingPath, RTL_NUMBER_OF(workingPath), lpSubKey, RTL_NUMBER_OF(workingPath) - 1);
 
     //
-    // Attempt to delete key as is.
+    // Try fast delete first.
     //
-    lResult = RegDeleteKey(hKeyRoot, lpSubKey);
-    if (lResult == ERROR_SUCCESS)
+    lResult = RegDeleteKey(hKeyRoot, workingPath);
+    if (lResult == ERROR_SUCCESS || lResult == ERROR_FILE_NOT_FOUND)
         return TRUE;
 
-    //
-    // Try to open key to check if it exist.
-    //
-    lResult = RegOpenKeyEx(hKeyRoot, lpSubKey, 0, KEY_READ, &hKey);
+    lResult = RegOpenKeyEx(hKeyRoot, workingPath, 0, KEY_READ, &hKey);
     if (lResult != ERROR_SUCCESS) {
         if (lResult == ERROR_FILE_NOT_FOUND)
             return TRUE;
-        else
-            return FALSE;
+        return FALSE;
     }
-
-    //
-    // Add slash to the key path if not present.
-    //
-    lpEnd = _strend(lpSubKey);
-    if (*(lpEnd - 1) != TEXT('\\')) {
-        *lpEnd++ = TEXT('\\');
-        *lpEnd = TEXT('\0');
-    }
-
-    //
-    // Enumerate subkeys and call this func for each.
-    //
-    dwSize = MAX_PATH;
-    lResult = RegEnumKeyEx(hKey, 0, szName, &dwSize, NULL,
-        NULL, NULL, &ftWrite);
-
-    if (lResult == ERROR_SUCCESS) {
-
-        do {
-
-            _strncpy(lpEnd, MAX_PATH, szName, MAX_PATH);
-
-            if (!supxDeleteKeyRecursive(hKeyRoot, lpSubKey))
-                break;
-
-            dwSize = MAX_PATH;
-
-            lResult = RegEnumKeyEx(hKey, 0, szName, &dwSize, NULL,
-                NULL, NULL, &ftWrite);
-
-        } while (lResult == ERROR_SUCCESS);
-    }
-
-    lpEnd--;
-    *lpEnd = TEXT('\0');
-
     RegCloseKey(hKey);
 
     //
-    // Delete current key, all it subkeys should be already removed.
+    // Normalize base path: remove trailing backslashes (keep root form if any).
     //
-    lResult = RegDeleteKey(hKeyRoot, lpSubKey);
-    if (lResult == ERROR_SUCCESS)
-        return TRUE;
+    baseLen = _strlen(workingPath);
+    while (baseLen > 0 && workingPath[baseLen - 1] == L'\\') {
+        workingPath[baseLen - 1] = 0;
+        baseLen--;
+    }
+    if (baseLen == 0)
+        return FALSE;
 
-    return FALSE;
+    ++sp;
+    depthStack[sp] = (USHORT)baseLen;
+
+    while (sp >= 0) {
+
+        curLen = depthStack[sp];
+        workingPath[curLen] = 0;
+
+        lResult = RegOpenKeyEx(hKeyRoot, workingPath, 0, KEY_READ, &hKey);
+        if (lResult != ERROR_SUCCESS) {
+            if (lResult == ERROR_FILE_NOT_FOUND) {
+                sp--;
+                continue;
+            }
+            return FALSE;
+        }
+
+        dwSize = MAX_PATH;
+        lResult = RegEnumKeyEx(hKey, 0, szName, &dwSize, NULL, NULL, NULL, &ftWrite);
+
+        if (lResult == ERROR_NO_MORE_ITEMS) {
+
+            RegCloseKey(hKey);
+            RegDeleteKey(hKeyRoot, workingPath);
+            sp--;
+            continue;
+        }
+
+        if (lResult != ERROR_SUCCESS) {
+            RegCloseKey(hKey);
+            return FALSE;
+        }
+
+        RegCloseKey(hKey);
+
+        //
+        // Append child: workingPath + '\' + child + '\'.
+        //
+        nameLen = dwSize;
+        hasTrailingSlash = (curLen > 0 && workingPath[curLen - 1] == L'\\');
+
+        //
+        // Ensure capacity: base + optional '\' + name + optional '\' + 0.
+        //
+        if (curLen + (hasTrailingSlash ? 0 : 1) + nameLen + 1 + 1 >= RTL_NUMBER_OF(workingPath))
+            return FALSE;
+
+        p = workingPath + curLen;
+        if (!hasTrailingSlash) {
+            *p++ = L'\\';
+            curLen++;
+        }
+
+        _strncpy(p, RTL_NUMBER_OF(workingPath) - curLen, szName, nameLen);
+        p[nameLen] = 0;
+        curLen += nameLen;
+
+        //
+        // Add trailing backslash to simplify appending next level.
+        //
+        p = workingPath + curLen;
+        *p++ = L'\\';
+        *p = 0;
+        curLen++;
+
+        if (++sp >= (INT)RTL_NUMBER_OF(depthStack))
+            return FALSE;
+
+        depthStack[sp] = (USHORT)curLen;
+    }
+
+    return TRUE;
 }
 
 /*
-* supRegDeleteKeyRecursive
+* supRegDeleteKeyTree
 *
 * Purpose:
 *
@@ -6954,14 +7019,19 @@ BOOL supxDeleteKeyRecursive(
 * SubKey should not be longer than 260 chars.
 *
 */
-BOOL supRegDeleteKeyRecursive(
+BOOL supRegDeleteKeyTree(
     _In_ HKEY hKeyRoot,
     _In_ LPCWSTR lpSubKey)
 {
     WCHAR szKeyName[MAX_PATH * 2];
+
+    if (lpSubKey == NULL)
+        return FALSE;
+
     RtlSecureZeroMemory(szKeyName, sizeof(szKeyName));
-    _strncpy(szKeyName, MAX_PATH * 2, lpSubKey, MAX_PATH);
-    return supxDeleteKeyRecursive(hKeyRoot, szKeyName);
+    _strncpy(szKeyName, RTL_NUMBER_OF(szKeyName), lpSubKey, RTL_NUMBER_OF(szKeyName) - 1);
+
+    return supxDeleteKeyTreeWorker(hKeyRoot, szKeyName);
 }
 
 /*
@@ -7035,8 +7105,8 @@ ULONG supHashUnicodeString(
 *
 */
 NTSTATUS supCreateSystemAdminAccessSD(
-    _Out_ PSECURITY_DESCRIPTOR* SecurityDescriptor,
-    _Out_ PACL* DefaultAcl
+    _Out_ PSECURITY_DESCRIPTOR * SecurityDescriptor,
+    _Out_ PACL * DefaultAcl
 )
 {
     NTSTATUS ntStatus = STATUS_UNSUCCESSFUL;
@@ -7257,7 +7327,7 @@ BOOLEAN supIsFileImageSection(
 BOOLEAN supIsDriverShimmed(
     _In_ PKSE_ENGINE_DUMP KseEngineDump,
     _In_ PVOID DriverBaseAddress,
-    _Out_opt_ GUID* ShimGUID)
+    _Out_opt_ GUID * ShimGUID)
 {
     PLIST_ENTRY Entry, NextEntry, ListHead;
     KSE_SHIMMED_DRIVER* ShimmedDriver;
@@ -7281,14 +7351,14 @@ BOOLEAN supIsDriverShimmed(
     {
         ShimmedDriver = CONTAINING_RECORD(Entry, KSE_SHIMMED_DRIVER, ListEntry);
         if (DriverBaseAddress == ShimmedDriver->DriverBaseAddress) {
-            
+
             if (ShimGUID) {
                 if (ShimmedDriver->ShimGuid)
                     kdReadSystemMemory((ULONG_PTR)ShimmedDriver->ShimGuid,
-                    ShimGUID,
-                    sizeof(GUID));
+                        ShimGUID,
+                        sizeof(GUID));
             }
-            
+
             return TRUE;
         }
     }
@@ -7702,7 +7772,7 @@ VOID supQueryAlpcPortObjectTypeIndex(
 */
 NTSTATUS supQueryProcessImageFileNameWin32(
     _In_ HANDLE UniqueProcessId,
-    _Out_ PUNICODE_STRING* ProcessImageFileName
+    _Out_ PUNICODE_STRING * ProcessImageFileName
 )
 {
     NTSTATUS ntStatus;
@@ -7886,7 +7956,7 @@ wchar_t* supExtractFileName(
 VOID supObjectDumpHandlePopupMenu(
     _In_ HWND hwndDlg,
     _In_ HWND hwndTreeList,
-    _In_ INT *pSubItemHit,
+    _In_ INT * pSubItemHit,
     _In_ LPARAM lParam
 )
 {
@@ -7904,7 +7974,7 @@ VOID supObjectDumpHandlePopupMenu(
             ID_OBJECT_COPY,
             0,
             lParam,
-            pSubItemHit)) 
+            pSubItemHit))
         {
             TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, hwndDlg, NULL);
         }
@@ -8412,50 +8482,69 @@ BOOLEAN supIsValidImage(
     _In_ PFILE_VIEW_INFO ViewInformation
 )
 {
-    PIMAGE_DOS_HEADER dosHeader = (PIMAGE_DOS_HEADER)ViewInformation->ViewBase;
-    PIMAGE_NT_HEADERS ntHeaders = NULL;
+    PIMAGE_DOS_HEADER dosHeader;
+    PIMAGE_NT_HEADERS ntHeaders;
+    ULONG fileSize, ntOffset, neededSize;
+    USHORT secCount;
 
     ViewInformation->Status = StatusUnknownError;
 
+    if (ViewInformation->ViewBase == NULL)
+        return FALSE;
+
+    fileSize = ViewInformation->FileSize.LowPart;
+
     __try {
+
+        if (fileSize < sizeof(IMAGE_DOS_HEADER)) {
+            ViewInformation->Status = StatusBadDosMagic;
+            return FALSE;
+        }
+
+        dosHeader = (PIMAGE_DOS_HEADER)ViewInformation->ViewBase;
 
         if (dosHeader->e_magic != IMAGE_DOS_SIGNATURE) {
             ViewInformation->Status = StatusBadDosMagic;
             return FALSE;
         }
 
-        if (dosHeader->e_lfanew == 0 ||
-            (ULONG)dosHeader->e_lfanew > ViewInformation->FileSize.LowPart ||
-            (((ULONG)dosHeader->e_lfanew + PE_SIGNATURE_SIZE +
-                (ULONG)sizeof(IMAGE_FILE_HEADER)) >= ViewInformation->FileSize.LowPart) ||
-            dosHeader->e_lfanew >= RTLP_IMAGE_MAX_DOS_HEADER)
-        {
+        ntOffset = (ULONG)dosHeader->e_lfanew;
+
+        if (ntOffset == 0 ||
+            ntOffset > RTLP_IMAGE_MAX_DOS_HEADER ||
+            ntOffset > fileSize - sizeof(IMAGE_NT_HEADERS)) {
             ViewInformation->Status = StatusBadNewExeOffset;
             return FALSE;
         }
 
-        if (((ULONG)dosHeader->e_lfanew +
-            sizeof(IMAGE_NT_HEADERS) +
-            (16 * sizeof(IMAGE_SECTION_HEADER))) <= (ULONG)dosHeader->e_lfanew)
-        {
-            ViewInformation->Status = StatusBadNewExeOffset;
-            return FALSE;
-        }
+        ntHeaders = (PIMAGE_NT_HEADERS)((PBYTE)ViewInformation->ViewBase + ntOffset);
 
-        ntHeaders = (PIMAGE_NT_HEADERS)((PCHAR)ViewInformation->ViewBase + (ULONG)dosHeader->e_lfanew);
         if (ntHeaders->Signature != IMAGE_NT_SIGNATURE) {
             ViewInformation->Status = StatusBadNtSignature;
             return FALSE;
         }
 
-        if ((ULONG)dosHeader->e_lfanew >= ntHeaders->OptionalHeader.SizeOfImage) {
-            ViewInformation->Status = StatusBadNewExeOffset;
+        secCount = ntHeaders->FileHeader.NumberOfSections;
+
+        if (secCount == 0 || secCount > MM_MAXIMUM_IMAGE_SECTIONS) {
+            ViewInformation->Status = StatusBadSectionCount;
+            return FALSE;
+        }
+
+        //
+        // Ensure section headers array fits in file.
+        //
+        neededSize = ntOffset +
+            sizeof(IMAGE_NT_HEADERS) +
+            (secCount - 1) * sizeof(IMAGE_SECTION_HEADER);
+
+        if (neededSize < ntOffset || neededSize > fileSize) {
+            ViewInformation->Status = StatusBadNtHeaders;
             return FALSE;
         }
 
         if (ntHeaders->FileHeader.SizeOfOptionalHeader == 0 ||
-            ntHeaders->FileHeader.SizeOfOptionalHeader & (sizeof(ULONG_PTR) - 1))
-        {
+            (ntHeaders->FileHeader.SizeOfOptionalHeader & (sizeof(ULONG_PTR) - 1))) {
             ViewInformation->Status = StatusBadOptionalHeader;
             return FALSE;
         }
@@ -8466,13 +8555,16 @@ BOOLEAN supIsValidImage(
         }
 
         if (ntHeaders->FileHeader.Machine != IMAGE_FILE_MACHINE_AMD64 &&
-            ntHeaders->FileHeader.Machine != IMAGE_FILE_MACHINE_I386)
-        {
+            ntHeaders->FileHeader.Machine != IMAGE_FILE_MACHINE_I386) {
             ViewInformation->Status = StatusBadFileHeaderMachine;
             return FALSE;
         }
 
-        return supxValidateNtHeader(ntHeaders, &ViewInformation->Status);
+        if (!supxValidateNtHeader(ntHeaders, &ViewInformation->Status))
+            return FALSE;
+
+        ViewInformation->NtHeaders = ntHeaders;
+        return TRUE;
 
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {
@@ -8752,7 +8844,7 @@ NTSTATUS supUnloadDriver(
 
     if (NT_SUCCESS(status)) {
         if (fRemove)
-            supRegDeleteKeyRecursive(HKEY_LOCAL_MACHINE, &szBuffer[keyOffset]);
+            supRegDeleteKeyTree(HKEY_LOCAL_MACHINE, &szBuffer[keyOffset]);
     }
 
     return status;
@@ -8995,7 +9087,7 @@ HANDLE supCreateThread(
 )
 {
     HANDLE threadHandle;
-    
+
     threadHandle = CreateThread(NULL,
         0,
         lpStartAddress,
@@ -9050,7 +9142,7 @@ HANDLE supCreateDialogWorkerThread(
 *
 * Build full path to current object.
 *
-* If IncludeName is FALSE then result path does not 
+* If IncludeName is FALSE then result path does not
 * include object name except for root directory.
 *
 * e.g.
@@ -9058,9 +9150,9 @@ HANDLE supCreateDialogWorkerThread(
 * For \\ABC           result will be \\
 * For \\ABC\\DEF      result will be \\ABC
 *
-* If IncludeName is TRUE then result path *will* 
+* If IncludeName is TRUE then result path *will*
 * include object name
-* 
+*
 * e.g.
 * For \\              result will be \\
 * For \\ABC           result will be \\ABC
@@ -9251,9 +9343,9 @@ BOOL supNormalizeUnicodeStringForDisplay(
     PWCH stringBuffer, src, dst;
     ULONG i;
 
-    stringBuffer = (PWCH)supHeapAllocEx(HeapHandle, 
+    stringBuffer = (PWCH)supHeapAllocEx(HeapHandle,
         SourceString->Length + sizeof(UNICODE_NULL));
-    
+
     if (stringBuffer) {
 
         dst = stringBuffer;
@@ -9348,28 +9440,55 @@ BOOL supResolveSymbolicLinkTarget(
     NTSTATUS ntStatus;
     UNICODE_STRING linkTarget;
     OBJECT_ATTRIBUTES obja;
-    PWCH stringBuffer;
+    PWCH stringBuffer = NULL;
 
-    if (LinkHandle == NULL) {
+    RtlInitEmptyUnicodeString(LinkTarget, NULL, 0);
+
+    do {
         //
-        // There is no handle, open it.
+        // If there is no handle - open it.
         //
-        InitializeObjectAttributes(&obja, LinkName, OBJ_CASE_INSENSITIVE, RootDirectoryHandle, NULL);
-        if (!NT_SUCCESS(NtOpenSymbolicLinkObject(&hObject, SYMBOLIC_LINK_QUERY, &obja)))
-            return FALSE;
-    }
-    else {
-        hObject = LinkHandle;
-    }
+        if (LinkHandle == NULL) {
+            InitializeObjectAttributes(&obja, LinkName, OBJ_CASE_INSENSITIVE, RootDirectoryHandle, NULL);
+            ntStatus = NtOpenSymbolicLinkObject(&hObject, SYMBOLIC_LINK_QUERY, &obja);
+            if (!NT_SUCCESS(ntStatus))
+                break;
+        }
+        else {
+            hObject = LinkHandle;
+        }
 
-    RtlInitEmptyUnicodeString(&linkTarget, NULL, 0);
-    ntStatus = NtQuerySymbolicLinkObject(hObject, &linkTarget, &rLen);
+        RtlInitEmptyUnicodeString(&linkTarget, NULL, 0);
+        ntStatus = NtQuerySymbolicLinkObject(hObject, &linkTarget, &rLen);
 
-    if (ntStatus == STATUS_BUFFER_TOO_SMALL ||
-        ntStatus == STATUS_BUFFER_OVERFLOW)
-    {
-        stringBuffer = (PWCH)supHeapAlloc(rLen + sizeof(UNICODE_NULL));
-        if (stringBuffer) {
+        //
+        // Test if empty string and return appropriate result.
+        //
+        if (NT_SUCCESS(ntStatus) && rLen == 0) {
+
+            LinkTarget->Buffer = (PWCH)supHeapAlloc(sizeof(WCHAR));
+            if (LinkTarget->Buffer) {
+                LinkTarget->Buffer[0] = 0;
+                LinkTarget->Length = 0;
+                LinkTarget->MaximumLength = (USHORT)sizeof(WCHAR);
+                bResult = TRUE;
+            }
+            break;
+        }
+
+        if (ntStatus == STATUS_BUFFER_TOO_SMALL ||
+            ntStatus == STATUS_BUFFER_OVERFLOW ||
+            (NT_SUCCESS(ntStatus) && rLen > 0))
+        {
+            //
+            // Make sure there is a space for terminator.
+            //
+            if (rLen > UNICODE_STRING_MAX_BYTES - sizeof(WCHAR))
+                break;
+
+            stringBuffer = (PWCH)supHeapAlloc(rLen + sizeof(UNICODE_NULL));
+            if (stringBuffer == NULL)
+                break;
 
             linkTarget.Buffer = stringBuffer;
             linkTarget.Length = 0;
@@ -9377,23 +9496,26 @@ BOOL supResolveSymbolicLinkTarget(
 
             ntStatus = NtQuerySymbolicLinkObject(hObject, &linkTarget, &rLen);
             if (NT_SUCCESS(ntStatus)) {
-                *LinkTarget = linkTarget;
+                LinkTarget->Buffer = stringBuffer;
+                LinkTarget->Length = linkTarget.Length;
+                LinkTarget->MaximumLength = linkTarget.MaximumLength;
                 bResult = TRUE;
             }
-            else {
-                supHeapFree(stringBuffer);
-            }
-
         }
 
+    } while (FALSE);
+
+    if (!bResult) {
+        if (stringBuffer)
+            supHeapFree(stringBuffer);
+        RtlInitEmptyUnicodeString(LinkTarget, NULL, 0);
     }
 
     //
-    // If there is no input handle close what we opened.
+    // If there is no input handle close what we have opened.
     //
-    if (LinkHandle == NULL) {
-        if (hObject) NtClose(hObject);
-    }
+    if (LinkHandle == NULL && hObject)
+        NtClose(hObject);
 
     return bResult;
 }
@@ -9447,16 +9569,16 @@ VOID supClipboardCopyUnicodeStringRaw(
     _In_ PUNICODE_STRING String
 )
 {
+    SIZE_T bytes;
     BYTE* src, * end;
     PWCH copyBuffer, dst;
-    SIZE_T length;
     BYTE x;
 
     //
     // '0', 'x', ',', ' ', 'A', 'B' = 6 * sizeof(WCHAR)
     //
-    length = 100 + ((SIZE_T)String->Length * 12);
-    copyBuffer = (PWCH)supHeapAlloc(length);
+    bytes = 100 + ((SIZE_T)String->Length * 12);;
+    copyBuffer = (PWCH)supHeapAlloc(bytes);
     if (copyBuffer == NULL)
         return;
 
@@ -9465,7 +9587,7 @@ VOID supClipboardCopyUnicodeStringRaw(
     dst = _strcat(copyBuffer, TEXT("] = {"));
 
     src = (BYTE*)String->Buffer;
-    end = (BYTE*)RtlOffsetToPointer(String->Buffer, String->Length);
+    end = (BYTE*)RtlOffsetToPointer(String->Buffer, bytes);
     while (src < end) {
 
         *dst++ = '0';
@@ -9481,8 +9603,10 @@ VOID supClipboardCopyUnicodeStringRaw(
         }
     }
 
-    *dst++ = 0;
-    _strcat(copyBuffer, TEXT("}; "));
+    *dst++ = '}';
+    *dst++ = ';';
+    *dst++ = ' ';
+    *dst = 0;
 
     supClipboardCopy(copyBuffer, _strlen(copyBuffer) * sizeof(WCHAR));
     supHeapFree(copyBuffer);
@@ -9494,7 +9618,7 @@ VOID supClipboardCopyUnicodeStringRaw(
 * Purpose:
 *
 * Return offset to substring if found and ULLONG_MAX instead.
-* 
+*
 * Case Insensitive.
 *
 */
@@ -9503,40 +9627,33 @@ SIZE_T supFindUnicodeStringSubString(
     _In_ PUNICODE_STRING SubString
 )
 {
-    SIZE_T length1;
-    SIZE_T length2;
-    UNICODE_STRING string1;
-    UNICODE_STRING string2;
-    WCHAR c;
+    SIZE_T lenMain;
+    SIZE_T lenSub;
+    WCHAR c0;
     SIZE_T i;
 
-    if (SubString == NULL)
-        return 0;
-
-    length1 = String->Length / sizeof(WCHAR);
-    length2 = SubString->Length / sizeof(WCHAR);
-
-    if (length2 > length1)
+    if (SubString == NULL || String == NULL)
         return ULLONG_MAX;
 
-    if (length2 == 0)
+    lenMain = String->Length / sizeof(WCHAR);
+    lenSub = SubString->Length / sizeof(WCHAR);
+
+    if (lenSub == 0)
         return 0;
+    if (lenSub > lenMain)
+        return ULLONG_MAX;
 
-    string1.Buffer = String->Buffer;
-    string1.Length = SubString->Length - sizeof(WCHAR);
-    string2.Buffer = SubString->Buffer;
-    string2.Length = SubString->Length - sizeof(WCHAR);
-
-    c = RtlUpcaseUnicodeChar(*string2.Buffer++);
-
-    for (i = length1 - length2 + 1; i != 0; i--) {
-        if (RtlUpcaseUnicodeChar(*string1.Buffer++) == c &&
-            RtlEqualUnicodeString(&string1, &string2, TRUE))
-        {
-            return (ULONG_PTR)(string1.Buffer - String->Buffer - 1);
+    c0 = RtlUpcaseUnicodeChar(SubString->Buffer[0]);
+    for (i = 0; i <= lenMain - lenSub; i++) {
+        if (RtlUpcaseUnicodeChar(String->Buffer[i]) == c0) {
+            UNICODE_STRING m, s;
+            m.Buffer = &String->Buffer[i];
+            m.Length = (USHORT)(lenSub * sizeof(WCHAR));
+            s = *SubString;
+            if (RtlEqualUnicodeString(&m, &s, TRUE))
+                return i;
         }
     }
-
     return ULLONG_MAX;
 }
 
@@ -9552,46 +9669,74 @@ BOOL supImageFixSections(
     _In_ LPVOID Buffer
 )
 {
-    PIMAGE_DOS_HEADER idh = NULL;
-    PIMAGE_FILE_HEADER fh1 = NULL;
-    PIMAGE_NT_HEADERS ImageHeaders = NULL;
-    PIMAGE_SECTION_HEADER Section = NULL;
-    DWORD vaddr, secalign, vsize, part;
-    WORD i, c;
+    PIMAGE_DOS_HEADER dos;
+    PIMAGE_NT_HEADERS nth;
+    PIMAGE_FILE_HEADER fh;
+    PIMAGE_SECTION_HEADER sec;
+    DWORD i;
+    DWORD secalign;
+    ULONGLONG vaddr, addSize;
+    WORD numberOfSections;
 
     __try {
 
-        idh = (PIMAGE_DOS_HEADER)Buffer;
-        fh1 = (PIMAGE_FILE_HEADER)((ULONG_PTR)Buffer + ((PIMAGE_DOS_HEADER)Buffer)->e_lfanew + sizeof(DWORD));
-        if (fh1->Machine != IMAGE_FILE_MACHINE_AMD64) {
+        dos = (PIMAGE_DOS_HEADER)Buffer;
+        if (dos->e_magic != IMAGE_DOS_SIGNATURE)
             return FALSE;
-        }
-        
-        ImageHeaders = (PIMAGE_NT_HEADERS)((PBYTE)Buffer + idh->e_lfanew);
-        Section = IMAGE_FIRST_SECTION(ImageHeaders);
-        secalign = ImageHeaders->OptionalHeader.SectionAlignment;
-        c = ImageHeaders->FileHeader.NumberOfSections;
 
-        vaddr = Section->VirtualAddress;
-        for (i = 0; i < c; i++) {
+        if (dos->e_lfanew == 0 ||
+            dos->e_lfanew > RTLP_IMAGE_MAX_DOS_HEADER)
+            return FALSE;
 
-            //recalculate virtual size/address for each section
-            vsize = Section->Misc.VirtualSize;
-            part = vsize % secalign;
-            if (part != 0) {
-                vsize = vsize + secalign - part;
-            }
-            Section->SizeOfRawData = vsize;
-            Section->PointerToRawData = vaddr;
-            vaddr += vsize;
-            Section = (PIMAGE_SECTION_HEADER)((PBYTE)Section + sizeof(IMAGE_SECTION_HEADER));
+        nth = (PIMAGE_NT_HEADERS)((PBYTE)Buffer + dos->e_lfanew);
+        if (nth->Signature != IMAGE_NT_SIGNATURE)
+            return FALSE;
+
+        fh = &nth->FileHeader;
+        numberOfSections = fh->NumberOfSections;
+
+        if (numberOfSections == 0 ||
+            numberOfSections > MM_MAXIMUM_IMAGE_SECTIONS)
+            return FALSE;
+
+        if (nth->OptionalHeader.SectionAlignment == 0)
+            return FALSE;
+
+        secalign = nth->OptionalHeader.SectionAlignment;
+
+        sec = IMAGE_FIRST_SECTION(nth);
+        vaddr = sec->VirtualAddress;
+
+        for (i = 0; i < numberOfSections; i++, sec++) {
+
+            DWORD vsize, alignedSize;
+
+            vsize = sec->Misc.VirtualSize;
+            if (vsize == 0)
+                vsize = sec->SizeOfRawData;
+
+            addSize = vsize;
+            addSize = (addSize + (secalign - 1)) & ~(ULONGLONG)(secalign - 1);
+
+            if (addSize > ULONG_MAX)
+                return FALSE;
+
+            alignedSize = (DWORD)addSize;
+
+            sec->SizeOfRawData = alignedSize;
+            sec->PointerToRawData = (DWORD)vaddr;
+
+            vaddr += alignedSize;
+            if (vaddr > ULONG_MAX) 
+                return FALSE;
         }
+
+        return TRUE;
 
     }
     __except (WOBJ_EXCEPTION_FILTER_LOG) {
         return FALSE;
     }
-    return TRUE;
 }
 
 /*
@@ -9846,6 +9991,8 @@ BOOLEAN supEnablePrivilegeWithCheck(
             ntStatus = STATUS_PRIVILEGE_NOT_HELD;
         }
 
+        bResult = NT_SUCCESS(ntStatus);
+
     } while (FALSE);
 
     if (tokenHandle)
@@ -9997,7 +10144,7 @@ NTSTATUS supxFilterFindNext(
 * Purpose:
 *
 * Find filter by name.
-* 
+*
 * N.B. Case insensitive since filter and driver names seems case insensitive as declared without matching.
 *
 */
@@ -10053,7 +10200,7 @@ VOID supFilterDestroyList(
     {
         Item = CONTAINING_RECORD(Entry, SUP_FLT_ENTRY, ListEntry);
 
-        if (Item->FilterNameBuffer) 
+        if (Item->FilterNameBuffer)
             supHeapFree(Item->FilterNameBuffer);
 
         RemoveEntryList(Entry);
@@ -10119,7 +10266,7 @@ ULONG supFilterCreateList(
 
                             RtlCopyMemory(pFltEntry->FilterNameBuffer,
                                 buffer->FilterNameBuffer,
-                                pFltEntry->FilterNameLength);                          
+                                pFltEntry->FilterNameLength);
                         }
 
                         InsertHeadList(FltListHead, &pFltEntry->ListEntry);

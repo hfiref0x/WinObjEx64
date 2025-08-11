@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     2.08
+*  VERSION:     2.09
 *
-*  DATE:        13 Jun 2025
+*  DATE:        10 Aug 2025
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -135,7 +135,7 @@ ULONG_PTR ObFindAddress(
 
     while (currentIndex < NumberOfBytes) {
 
-        if (currentIndex + ScanPatternSize >= NumberOfBytes)
+        if (currentIndex + ScanPatternSize + sizeof(LONG) > NumberOfBytes)
             break;
 
         hde64_disasm((void*)(PtrCode + currentIndex), &decodedInstruction);
@@ -149,7 +149,7 @@ ULONG_PTR ObFindAddress(
                 ScanPattern,
                 ScanPatternSize))
             {
-                if ((ULONG_PTR)currentIndex + (ULONG_PTR)ScanPatternSize + sizeof(LONG) <= NumberOfBytes) {
+                if (currentIndex + ScanPatternSize + sizeof(LONG) <= NumberOfBytes) {
                     relativeOffset = *(PLONG)(PtrCode + currentIndex + ScanPatternSize);
                     resultAddress = (ULONG_PTR)PtrCode + currentIndex + decodedInstruction.len + relativeOffset;
                     resultAddress = ImageBase + resultAddress - MappedImageBase;
@@ -251,6 +251,9 @@ BOOL ObHeaderToNameInfoAddress(
 
     headerOffset = ObGetObjectHeaderOffset(ObjectInfoMask, InfoFlag);
     if (headerOffset == 0)
+        return FALSE;
+
+    if (headerOffset > ObjectHeaderAddress)
         return FALSE;
 
     calculatedAddress = ObjectHeaderAddress - headerOffset;
@@ -979,7 +982,7 @@ _Success_(return)
 BOOLEAN kdDumpUnicodeString(
     _In_ PUNICODE_STRING InputString,
     _Out_ PUNICODE_STRING OutputString,
-    _Out_opt_ PVOID* ReferenceStringBuffer,
+    _Out_opt_ PVOID * ReferenceStringBuffer,
     _In_ BOOLEAN IsKernelPointer
 )
 {
@@ -1508,7 +1511,7 @@ PVOID ObGetCallbackBlockRoutine(
 BOOL kdpFindKiServiceTableByPattern(
     _In_ ULONG_PTR MappedImageBase,
     _In_ ULONG_PTR KernelImageBase,
-    _Out_ ULONG_PTR* Address
+    _Out_ ULONG_PTR * Address
 )
 {
     ULONG signatureSize;
@@ -1574,7 +1577,7 @@ BOOL kdpFindKiServiceTableByPattern(
 BOOL kdFindKiServiceTable(
     _In_ ULONG_PTR MappedImageBase,
     _In_ ULONG_PTR KernelImageBase,
-    _Inout_ KSERVICE_TABLE_DESCRIPTOR* ServiceTable
+    _Inout_ KSERVICE_TABLE_DESCRIPTOR * ServiceTable
 )
 {
     ULONG_PTR varAddress = 0;
@@ -1718,7 +1721,7 @@ POBEX_OBJECT_INFORMATION ObpCopyObjectBasicInfo(
 )
 {
     ULONG_PTR HeaderAddress = 0, InfoHeaderAddress = 0;
-    OBJECT_HEADER ObjectHeader, *pObjectHeader;
+    OBJECT_HEADER ObjectHeader, * pObjectHeader;
     POBEX_OBJECT_INFORMATION lpData = NULL;
 
     //
@@ -1850,7 +1853,7 @@ POBEX_OBJECT_INFORMATION ObpFindObjectInDirectory(
 )
 {
     BOOL bFound = FALSE;
-    ULONG i;
+    ULONG i, iterationLimit = OB_MAX_DIRECTORY_ENUM_ITER;
     OBJECT_HEADER ObjectHeader;
     OBJECT_DIRECTORY DirectoryObject;
     OBJECT_DIRECTORY_ENTRY DirectoryEntry;
@@ -1894,7 +1897,10 @@ POBEX_OBJECT_INFORMATION ObpFindObjectInDirectory(
 
             LookupItem = HeadItem;
 
-            do {
+            //
+            // Iterate items in hash bucket with iteration guard.
+            //
+            while (LookupItem != 0 && iterationLimit--) {
 
                 //
                 // Read object directory entry, exit on fail.
@@ -1964,7 +1970,7 @@ POBEX_OBJECT_INFORMATION ObpFindObjectInDirectory(
             NextItem:
                 LookupItem = (ULONG_PTR)DirectoryEntry.ChainLink;
 
-            } while (LookupItem != 0);
+            } //while
 
 
         } // HeadItem != 0
@@ -1972,7 +1978,7 @@ POBEX_OBJECT_INFORMATION ObpFindObjectInDirectory(
 
     return NULL;
 }
- 
+
 /*
 * ObGetObjectAddressForDirectory
 *
@@ -2001,7 +2007,7 @@ BOOL ObGetObjectAddressForDirectory(
         lpTypeIndex);
 
     NtClose(hDirectory);
-    
+
     return bFound;
 }
 
@@ -2115,6 +2121,7 @@ BOOL ObpEnumeratePrivateNamespaceTable(
 {
     BOOL          bStopEnumeration = FALSE;
     ULONG         i, j = 0;
+    ULONG         dirIterLimit = OB_MAX_DIRECTORY_ENUM_ITER, chainIterLimit = OB_MAX_DIRECTORY_ENUM_ITER;
     ULONG_PTR     ObjectHeaderAddress, HeadItem, LookupItem, InfoHeaderAddress;
     HANDLE        ListHeap = (HANDLE)Context;
     PLIST_ENTRY   Next, Head;
@@ -2149,7 +2156,7 @@ BOOL ObpEnumeratePrivateNamespaceTable(
         Head = (PLIST_ENTRY)(TableAddress + (i * sizeof(LIST_ENTRY)));
         Next = ListEntry.Flink;
 
-        while (Next != Head) {
+        while (Next != Head && dirIterLimit--) {
 
             RtlSecureZeroMemory(&LookupEntry, sizeof(OBJECT_NAMESPACE_ENTRY));
 
@@ -2178,82 +2185,83 @@ BOOL ObpEnumeratePrivateNamespaceTable(
 
                     LookupItem = HeadItem;
 
-                    do {
+                    while (LookupItem != 0 && chainIterLimit--) {
 
                         RtlSecureZeroMemory(&Entry, sizeof(OBJECT_DIRECTORY_ENTRY));
 
-                        if (kdReadSystemMemory(LookupItem,
+                        if (!kdReadSystemMemory(LookupItem,
                             &Entry,
-                            sizeof(OBJECT_DIRECTORY_ENTRY))) {
-
-                            RtlSecureZeroMemory(&ObjectHeader, sizeof(OBJECT_HEADER));
-                            ObjectHeaderAddress = (ULONG_PTR)OBJECT_TO_OBJECT_HEADER(Entry.Object);
-
-                            if (kdReadSystemMemory(ObjectHeaderAddress,
-                                &ObjectHeader,
-                                sizeof(OBJECT_HEADER)))
-                            {
-
-                               //
-                               // Allocate object entry
-                               //
-                                ObjectEntry = (POBJREF)supHeapAllocEx(ListHeap,
-                                    sizeof(OBJREF));
-
-                                if (ObjectEntry) {
-
-                                    //
-                                    // Save object address, header and type index.
-                                    //
-                                    ObjectEntry->ObjectAddress = (ULONG_PTR)Entry.Object;
-                                    ObjectEntry->HeaderAddress = ObjectHeaderAddress;
-
-                                    //
-                                    // Save index as is (decoded if needed later).
-                                    //
-                                    ObjectEntry->TypeIndex = ObjectHeader.TypeIndex;
-
-                                    //
-                                    // Save object namespace/lookup entry address.
-                                    //
-                                    ObjectEntry->PrivateNamespace.NamespaceDirectoryAddress =
-                                        (ULONG_PTR)LookupEntry.NamespaceRootDirectory;
-
-                                    ObjectEntry->PrivateNamespace.NamespaceLookupEntry =
-                                        (ULONG_PTR)Next;
-
-                                    ObjectEntry->PrivateNamespace.SizeOfBoundaryInformation =
-                                        LookupEntry.SizeOfBoundaryInformation;
-
-                                    //
-                                    // Query object name.
-                                    //
-                                    InfoHeaderAddress = 0;
-
-                                    if (ObHeaderToNameInfoAddress(ObjectHeader.InfoMask,
-                                        ObjectHeaderAddress,
-                                        &InfoHeaderAddress,
-                                        HeaderNameInfoFlag))
-                                    {
-                                        //
-                                        // Copy object name if exist.
-                                        //
-                                        ObQueryNameStringFromAddress(ListHeap, InfoHeaderAddress, &ObjectEntry->Name);
-
-                                    }
-
-                                    bStopEnumeration = Callback(ObjectEntry, Context);
-                                    if (bStopEnumeration)
-                                        return TRUE;
-
-                                } //if (ObjectEntry)
-                            }
-                            LookupItem = (ULONG_PTR)Entry.ChainLink;
-                        }
-                        else {
+                            sizeof(OBJECT_DIRECTORY_ENTRY)))
+                        {
                             LookupItem = 0;
+                            continue;
                         }
-                    } while (LookupItem != 0);
+
+                        RtlSecureZeroMemory(&ObjectHeader, sizeof(OBJECT_HEADER));
+                        ObjectHeaderAddress = (ULONG_PTR)OBJECT_TO_OBJECT_HEADER(Entry.Object);
+
+                        if (kdReadSystemMemory(ObjectHeaderAddress,
+                            &ObjectHeader,
+                            sizeof(OBJECT_HEADER)))
+                        {
+
+                            //
+                            // Allocate object entry
+                            //
+                            ObjectEntry = (POBJREF)supHeapAllocEx(ListHeap,
+                                sizeof(OBJREF));
+
+                            if (ObjectEntry) {
+
+                                //
+                                // Save object address, header and type index.
+                                //
+                                ObjectEntry->ObjectAddress = (ULONG_PTR)Entry.Object;
+                                ObjectEntry->HeaderAddress = ObjectHeaderAddress;
+
+                                //
+                                // Save index as is (decoded if needed later).
+                                //
+                                ObjectEntry->TypeIndex = ObjectHeader.TypeIndex;
+
+                                //
+                                // Save object namespace/lookup entry address.
+                                //
+                                ObjectEntry->PrivateNamespace.NamespaceDirectoryAddress =
+                                    (ULONG_PTR)LookupEntry.NamespaceRootDirectory;
+
+                                ObjectEntry->PrivateNamespace.NamespaceLookupEntry =
+                                    (ULONG_PTR)Next;
+
+                                ObjectEntry->PrivateNamespace.SizeOfBoundaryInformation =
+                                    LookupEntry.SizeOfBoundaryInformation;
+
+                                //
+                                // Query object name.
+                                //
+                                InfoHeaderAddress = 0;
+
+                                if (ObHeaderToNameInfoAddress(ObjectHeader.InfoMask,
+                                    ObjectHeaderAddress,
+                                    &InfoHeaderAddress,
+                                    HeaderNameInfoFlag))
+                                {
+                                    //
+                                    // Copy object name if exist.
+                                    //
+                                    ObQueryNameStringFromAddress(ListHeap, InfoHeaderAddress, &ObjectEntry->Name);
+
+                                }
+
+                                bStopEnumeration = Callback(ObjectEntry, Context);
+                                if (bStopEnumeration)
+                                    return TRUE;
+
+                            } //if (ObjectEntry)
+                        }
+                        LookupItem = (ULONG_PTR)Entry.ChainLink;
+
+                    } //while
                 }
             }
 
@@ -2328,7 +2336,7 @@ BOOL ObpDumpNameElementSpecial(
     if (element.Buffer == NULL) {
         return FALSE;
     }
-    
+
     _strcpy(element.Buffer, SpecialElement);
     element.Length = (USHORT)(Size - sizeof(UNICODE_NULL));
     element.MaximumLength = (USHORT)Size;
@@ -2513,14 +2521,14 @@ BOOL ObQueryFullNamespacePath(
             while ((Next != NULL) && (Next != &ListHead)) {
 
                 pathElement = CONTAINING_RECORD(Next, OB_NAME_ELEMENT, ListEntry);
-                
-                *string++ = OBJ_NAME_PATH_SEPARATOR; 
+
+                *string++ = OBJ_NAME_PATH_SEPARATOR;
                 length += OBJ_NAME_PATH_SEPARATOR_SIZE;
-                
+
                 RtlCopyMemory(string, pathElement->Name.Buffer, pathElement->Name.Length);
                 string = (PWSTR)RtlOffsetToPointer(string, pathElement->Name.Length);
                 length += pathElement->Name.Length;
-                
+
                 supFreeUnicodeString(g_obexHeap, &pathElement->Name);
 
                 Next = Next->Flink;
@@ -2607,7 +2615,7 @@ POBJECT_DIRECTORY_INFORMATION ObQueryObjectDirectory(
 BOOLEAN kdConnectDriver(
     VOID)
 {
-    WDRV_PROVIDER *provider;
+    WDRV_PROVIDER* provider;
 
     if (kdIoDriverLoaded()) return TRUE;
 
@@ -2759,7 +2767,7 @@ VOID kdReportErrorByFunction(
 )
 {
     WCHAR szBuffer[WOBJ_MAX_MESSAGE];
-    
+
     RtlStringCchPrintfSecure(szBuffer,
         ARRAYSIZE(szBuffer),
         TEXT("%ws, %ws"),
@@ -2844,25 +2852,24 @@ BOOL kdReadSystemMemory2(
     _Out_opt_ PULONG NumberOfBytesRead
 )
 {
+    BOOL bResult = FALSE, fullRead = FALSE;
     NTSTATUS ntStatus;
     ULONG numberOfBytesRead = 0;
     LPCWSTR lpSrcFunction;
-    IO_STATUS_BLOCK iost;
+    IO_STATUS_BLOCK iostPartial;
 
     PWDRV_CONTEXT driverContext = &g_kdctx.DriverContext;
 
     if (NumberOfBytesRead)
         *NumberOfBytesRead = 0;
 
-    if (driverContext->Provider == NULL) {
+    if (driverContext->Provider == NULL)
         return FALSE;
-    }
 
-    if (driverContext->Provider->Callbacks.ReadSystemMemory == NULL) {
+    if (driverContext->Provider->Callbacks.ReadSystemMemory == NULL)
         return FALSE;
-    }
 
-    BOOL bResult = driverContext->Provider->Callbacks.ReadSystemMemory(driverContext,
+    bResult = driverContext->Provider->Callbacks.ReadSystemMemory(driverContext,
         Address,
         Buffer,
         BufferSize,
@@ -2871,25 +2878,21 @@ BOOL kdReadSystemMemory2(
     if (NumberOfBytesRead)
         *NumberOfBytesRead = numberOfBytesRead;
 
-    if (CallerFunction)
-        lpSrcFunction = CallerFunction;
-    else
-        lpSrcFunction = __FUNCTIONW__;
-
+    lpSrcFunction = (CallerFunction ? CallerFunction : __FUNCTIONW__);
     ntStatus = driverContext->LastNtStatus;
 
-    if (bResult == FALSE) {
+    fullRead = (bResult && numberOfBytesRead == BufferSize);
+
+    if (!bResult) {
         kdReportReadError(lpSrcFunction, Address, BufferSize, ntStatus, &driverContext->IoStatusBlock);
+        return FALSE;
     }
-    else {
-        //
-        // Incomplete read.
-        //
-        if (numberOfBytesRead != BufferSize) {
-            iost.Status = STATUS_PARTIAL_COPY;
-            iost.Information = numberOfBytesRead;
-            kdReportReadError(lpSrcFunction, Address, BufferSize, ntStatus, &iost);
-        }
+
+    if (!fullRead) {
+        iostPartial.Status = STATUS_PARTIAL_COPY;
+        iostPartial.Information = numberOfBytesRead;
+        kdReportReadError(lpSrcFunction, Address, BufferSize, ntStatus, &iostPartial);
+        return FALSE;
     }
 
     return bResult;
@@ -2940,7 +2943,7 @@ BOOL kdLoadNtKernelImage(
             DONT_RESOLVE_DLL_REFERENCES);
 
         if (Context->NtOsImageMap) {
-           
+
             supLoadSymbolsForNtImage(
                 (PSYMCONTEXT)g_kdctx.NtOsSymContext,
                 szFileName,
@@ -2988,6 +2991,7 @@ BOOL kdQuerySystemInformation(
         else {
             Context->SystemRangeStart = MM_SYSTEM_RANGE_START_8;
         }
+        logAdd(EntryTypeWarning, TEXT("SystemRangeStart fallback value applied"));
     }
 
     //
@@ -3153,35 +3157,25 @@ BOOLEAN kdpQueryMmUnloadedDrivers(
                 //
                 // Call ExAlloc/MiAlloc
                 //
-                if (instLength == 5) {
+                if (instLength == 5 && ptrCode[Index] == 0xE8) {
 
-                    if (ptrCode[Index] == 0xE8) {
+                    //
+                    // Fetch next instruction
+                    //
+                    tempOffset = Index + instLength;
 
-                        //
-                        // Fetch next instruction
-                        //
-                        tempOffset = Index + instLength;
+                    hde64_disasm(RtlOffsetToPointer(ptrCode, tempOffset), &hs);
+                    if (hs.flags & F_ERROR)
+                        break;
 
-                        hde64_disasm(RtlOffsetToPointer(ptrCode, tempOffset), &hs);
-                        if (hs.flags & F_ERROR)
-                            break;
-
-                        //
-                        // Must be MOV
-                        //
-                        if (hs.len == 7) {
-
-                            if (ptrCode[tempOffset] == 0x48) {
-
-                                Index = tempOffset;
-                                instLength = hs.len;
-
-                                relativeValue = *(PLONG)(ptrCode + tempOffset + (hs.len - 4));
-                                break;
-
-                            }
-
-                        }
+                    //
+                    // Must be MOV
+                    //
+                    if (hs.len == 7 && ptrCode[tempOffset] == 0x48) {
+                        Index = tempOffset;
+                        instLength = hs.len;
+                        relativeValue = *(PLONG)(ptrCode + tempOffset + (hs.len - 4));
+                        break;
                     }
 
                 }
@@ -3287,6 +3281,11 @@ BOOL kdEnumerateMmUnloadedDrivers(
                         bytesRead,
                         &bytesRead))
                     {
+                        bResult = FALSE;
+                        break;
+                    }
+
+                    if (bytesRead < wLength) {
                         bResult = FALSE;
                         break;
                     }
@@ -3588,7 +3587,7 @@ PVOID kdQueryCmControlVector(
 *
 */
 BOOLEAN kdIsSymAvailable(
-    _In_opt_ SYMCONTEXT* SymContext
+    _In_opt_ SYMCONTEXT * SymContext
 )
 {
     if (SymContext == NULL)
@@ -3609,10 +3608,10 @@ BOOLEAN kdIsSymAvailable(
 *
 */
 BOOL kdGetFieldOffsetFromSymbol(
-    _In_ KLDBGCONTEXT* Context,
+    _In_ KLDBGCONTEXT * Context,
     _In_ LPCWSTR SymbolName,
     _In_ LPCWSTR FieldName,
-    _Out_ ULONG* Offset
+    _Out_ ULONG * Offset
 )
 {
     BOOL bResult = FALSE;
@@ -3673,7 +3672,7 @@ BOOL kdGetAddressFromSymbolEx(
     _In_ LPCWSTR SymbolName,
     _In_ PVOID ImageBase,
     _In_ ULONG_PTR ImageSize,
-    _Inout_ ULONG_PTR* Address
+    _Inout_ ULONG_PTR * Address
 )
 {
     BOOL bResult = FALSE;
@@ -3760,9 +3759,9 @@ BOOL kdGetAddressFromSymbolEx(
 *
 */
 BOOL kdGetAddressFromSymbol(
-    _In_ KLDBGCONTEXT* Context,
+    _In_ KLDBGCONTEXT * Context,
     _In_ LPCWSTR SymbolName,
-    _Inout_ ULONG_PTR* Address
+    _Inout_ ULONG_PTR * Address
 )
 {
     PSYMCONTEXT symContext = (PSYMCONTEXT)Context->NtOsSymContext;
@@ -3905,6 +3904,7 @@ PVOID kdCreateObjectTypesList(
     OBTYPE_LIST* list;
     POBJECT_TYPES_INFORMATION pObjectTypes = (POBJECT_TYPES_INFORMATION)supGetObjectTypesInfo();
     POBJECT_TYPE_INFORMATION pObject;
+    BOOL bSuccess = FALSE;
 
     union {
         union {
@@ -3921,43 +3921,45 @@ PVOID kdCreateObjectTypesList(
         sizeof(OBTYPE_LIST) +
         sizeof(OBTYPE_ENTRY) * pObjectTypes->NumberOfTypes);
 
-    if (list) {
+    if (list == NULL) {
+        supHeapFree(pObjectTypes);
+        return NULL;
+    }
 
-        list->Buffer = pObjectTypes;
+    list->Buffer = pObjectTypes;
 
-        __try {
+    __try {
+        pObject = OBJECT_TYPES_FIRST_ENTRY(pObjectTypes);
 
-            pObject = OBJECT_TYPES_FIRST_ENTRY(pObjectTypes);
+        for (i = 0; i < pObjectTypes->NumberOfTypes; i++) {
 
-            for (i = 0; i < pObjectTypes->NumberOfTypes; i++) {
+            ObjectTypeEntry.Ref = (PBYTE)pObject;
 
-                ObjectTypeEntry.Ref = (PBYTE)pObject;
-
-                if (g_NtBuildNumber >= NT_WIN8_RTM) {
-                    list->Types[i].TypeIndex = ObjectTypeEntry.u1.ObjectV2->TypeIndex;
-                    list->Types[i].TypeName = &ObjectTypeEntry.u1.ObjectV2->TypeName;
-                    list->Types[i].PoolType = ObjectTypeEntry.u1.ObjectV2->PoolType;
-                }
-                else {
-                    list->Types[i].TypeIndex = (i + 2);
-                    list->Types[i].TypeName = &ObjectTypeEntry.u1.Object->TypeName;
-                    list->Types[i].PoolType = ObjectTypeEntry.u1.Object->PoolType;
-                }
-
-                list->NumberOfTypes += 1;
-                pObject = OBJECT_TYPES_NEXT_ENTRY(pObject);
+            if (g_NtBuildNumber >= NT_WIN8_RTM) {
+                list->Types[i].TypeIndex = ObjectTypeEntry.u1.ObjectV2->TypeIndex;
+                list->Types[i].TypeName = &ObjectTypeEntry.u1.ObjectV2->TypeName;
+                list->Types[i].PoolType = ObjectTypeEntry.u1.ObjectV2->PoolType;
+            }
+            else {
+                list->Types[i].TypeIndex = (i + 2);
+                list->Types[i].TypeName = &ObjectTypeEntry.u1.Object->TypeName;
+                list->Types[i].PoolType = ObjectTypeEntry.u1.Object->PoolType;
             }
 
+            list->NumberOfTypes += 1;
+            pObject = OBJECT_TYPES_NEXT_ENTRY(pObject);
         }
-        __except (WOBJ_EXCEPTION_FILTER_LOG) {
-            return NULL;
-        }
-
+        bSuccess = TRUE;
     }
-    else {
-        supHeapFree(pObjectTypes);
+    __except (WOBJ_EXCEPTION_FILTER_LOG) {
+        bSuccess = FALSE;
     }
 
+    if (!bSuccess) {
+        supHeapFree(list->Buffer);
+        supHeapFree(list);
+        return NULL;
+    }
     return list;
 }
 

@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     2.08
+*  VERSION:     2.09
 *
-*  DATE:        13 Jun 2025
+*  DATE:        10 Aug 2025
 *
 *  Common header file for the program support routines.
 *
@@ -645,7 +645,7 @@ VOID supShowProperties(
 
 VOID supClipboardCopy(
     _In_ LPCWSTR lpText,
-    _In_ SIZE_T cbText);
+    _In_ SIZE_T cbTextInBytes);
 
 LPWSTR supGetItemText(
     _In_ HWND ListView,
@@ -997,7 +997,7 @@ NTSTATUS supOpenTokenByParam(
     _In_ BOOL IsThreadToken,
     _Out_ PHANDLE TokenHandle);
 
-BOOL supRegDeleteKeyRecursive(
+BOOL supRegDeleteKeyTree(
     _In_ HKEY hKeyRoot,
     _In_ LPCWSTR lpSubKey);
 

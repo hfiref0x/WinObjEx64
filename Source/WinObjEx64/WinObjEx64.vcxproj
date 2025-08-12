@@ -418,6 +418,7 @@
     <ClCompile Include="props\propType.c" />
     <ClCompile Include="sdviewDlg.c" />
     <ClCompile Include="sysinfoDlg.c" />
+    <ClCompile Include="tests\ntsup_tests.c" />
     <ClCompile Include="tests\testunit.c" />
   </ItemGroup>
   <ItemGroup>
@@ -472,6 +473,7 @@
     <ClInclude Include="props\propSecurityConsts.h" />
     <ClInclude Include="props\propTypeConsts.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="tests\ntsup_tests.h" />
     <ClInclude Include="tests\testunit.h" />
     <ClInclude Include="ui.h" />
   </ItemGroup>

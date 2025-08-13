@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2023
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       LOG.H
 *
-*  VERSION:     2.03
+*  VERSION:     2.09
 *
-*  DATE:        27 Jul 2022
+*  DATE:        13 Aug 2025
 *
 *  Header file for simplified log support.
 *
@@ -45,7 +45,9 @@ typedef struct _WOBJ_LOG_ENTRY {
 
 typedef struct _WOBJ_LOG {
     BOOL Initialized;
+    BOOL LockInitialized;
     ULONG Count;
+    ULONGLONG TotalWritten;
     CRITICAL_SECTION Lock;
     WOBJ_LOG_ENTRY *Entries;
 } WOBJ_LOG, * PWOBJ_LOG;
@@ -59,7 +61,7 @@ VOID logFree();
 
 VOID logAdd(
     _In_ WOBJ_ENTRY_TYPE EntryType,
-    _In_ WCHAR* Message);
+    _In_ const WCHAR* Message);
 
 BOOL logEnumEntries(
     _In_ PLOGENUMERATECALLBACK EnumCallback,

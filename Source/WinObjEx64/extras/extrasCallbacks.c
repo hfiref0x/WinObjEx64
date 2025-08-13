@@ -746,6 +746,51 @@ static const BYTE CiCallbackIndexes_Win11_22H2_25H2[] = {
     Id_CipIsDeveloperModeEnabled
 };
 
+typedef struct _CI_INDEX_MAP {
+    ULONG MinBuild;
+    ULONG MaxBuild;
+    ULONG RequiredSize; // 0 = any size
+    const BYTE* Table;
+    ULONG Count;
+} CI_INDEX_MAP, * PCI_INDEX_MAP;
+
+static CI_INDEX_MAP g_CiIndexMap[] = {
+    // Windows 7 (RTM..SP1)
+    { NT_WIN7_RTM, NT_WIN7_SP1, 0, CiCallbackIndexes_Win7, RTL_NUMBER_OF(CiCallbackIndexes_Win7) },
+
+    // Windows 8 / 8.1
+    { NT_WIN8_RTM, NT_WIN8_RTM, 0, CiCallbackIndexes_Win8,  RTL_NUMBER_OF(CiCallbackIndexes_Win8)  },
+    { NT_WIN8_BLUE, NT_WIN8_BLUE, 0, CiCallbackIndexes_Win81, RTL_NUMBER_OF(CiCallbackIndexes_Win81) },
+
+    // TH1 / TH2
+    { NT_WIN10_THRESHOLD1, NT_WIN10_THRESHOLD2, 0, CiCallbackIndexes_Win10Threshold, RTL_NUMBER_OF(CiCallbackIndexes_Win10Threshold) },
+
+    // RS1
+    { NT_WIN10_REDSTONE1, NT_WIN10_REDSTONE1, 0, CiCallbackIndexes_Win10RS1, RTL_NUMBER_OF(CiCallbackIndexes_Win10RS1) },
+
+    // RS2
+    { NT_WIN10_REDSTONE2, NT_WIN10_REDSTONE2, 0, CiCallbackIndexes_Win10RS2, RTL_NUMBER_OF(CiCallbackIndexes_Win10RS2) },
+
+    // RS3
+    { NT_WIN10_REDSTONE3, NT_WIN10_REDSTONE3, 0, CiCallbackIndexes_Win10RS3, RTL_NUMBER_OF(CiCallbackIndexes_Win10RS3) },
+
+    // RS4 .. 19H2 (original table)
+    { NT_WIN10_REDSTONE4, NT_WIN10_19H2, 0, CiCallbackIndexes_Win10RS4_21H2, RTL_NUMBER_OF(CiCallbackIndexes_Win10RS4_21H2) },
+
+    // 20H1 .. 22H2 size-dependent (put size-specific first)
+    { NT_WIN10_20H1, NT_WIN10_22H2, CBT_SIZE_VB_V2, CiCallbackIndexes_Win1021H2_V2, RTL_NUMBER_OF(CiCallbackIndexes_Win1021H2_V2) },
+    { NT_WIN10_20H1, NT_WIN10_22H2, 0,             CiCallbackIndexes_Win10RS4_21H2, RTL_NUMBER_OF(CiCallbackIndexes_Win10RS4_21H2) },
+
+    // Windows Server 2022 (same build band as 21H2 server)
+    { NT_WINSRV_21H1, NT_WINSRV_21H1, 0, CiCallbacksIndexes_WinSrv21H2, RTL_NUMBER_OF(CiCallbacksIndexes_WinSrv21H2) },
+
+    // Windows 11 21H2
+    { NT_WIN11_21H2, NT_WIN11_21H2, 0, CiCallbackIndexes_Win11_21H1, RTL_NUMBER_OF(CiCallbackIndexes_Win11_21H1) },
+
+    // Windows 11 22H2 .. 25H2
+    { NT_WIN11_22H2, NT_WIN11_25H2, 0, CiCallbackIndexes_Win11_22H2_25H2, RTL_NUMBER_OF(CiCallbackIndexes_Win11_22H2_25H2) }
+};
+
 /*
 * GetCiRoutineNameFromIndex
 *
@@ -756,106 +801,40 @@ static const BYTE CiCallbackIndexes_Win11_22H2_25H2[] = {
 */
 LPWSTR GetCiRoutineNameFromIndex(
     _In_ ULONG Index,
-    _In_ ULONG_PTR CiCallbacksSize)
+    _In_ ULONG_PTR CiCallbacksSize
+)
 {
-    ULONG ArrayCount = 0, index;
-    CONST BYTE* Indexes;
+    ULONG i, nameIndex;
+    CI_INDEX_MAP* map = NULL;
+    const BYTE* indexes;
 
-    switch (g_NtBuildNumber) {
+    for (i = 0; i < RTL_NUMBER_OF(g_CiIndexMap); i++) {
 
-    case NT_WIN7_RTM:
-    case NT_WIN7_SP1:
-        Indexes = CiCallbackIndexes_Win7;
-        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win7);
-        break;
-
-    case NT_WIN8_RTM:
-        Indexes = CiCallbackIndexes_Win8;
-        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win8);
-        break;
-
-    case NT_WIN8_BLUE:
-        Indexes = CiCallbackIndexes_Win81;
-        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win81);
-        break;
-
-    case NT_WIN10_THRESHOLD1:
-    case NT_WIN10_THRESHOLD2:
-        Indexes = CiCallbackIndexes_Win10Threshold;
-        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win10Threshold);
-        break;
-
-    case NT_WIN10_REDSTONE1:
-        Indexes = CiCallbackIndexes_Win10RS1;
-        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win10RS1);
-        break;
-
-    case NT_WIN10_REDSTONE2:
-        Indexes = CiCallbackIndexes_Win10RS2;
-        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win10RS2);
-        break;
-
-    case NT_WIN10_REDSTONE3:
-        Indexes = CiCallbackIndexes_Win10RS3;
-        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win10RS3);
-        break;
-
-    case NT_WIN10_REDSTONE4:
-    case NT_WIN10_REDSTONE5:
-    case NT_WIN10_19H1:
-    case NT_WIN10_19H2:
-        Indexes = CiCallbackIndexes_Win10RS4_21H2;
-        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win10RS4_21H2);
-        break;
-
-    case NT_WIN10_20H1:
-    case NT_WIN10_20H2:
-    case NT_WIN10_21H1:
-    case NT_WIN10_21H2:
-    case NT_WIN10_22H2:
-
-        switch (CiCallbacksSize) {
-        case CBT_SIZE_VB_V2:
-            Indexes = CiCallbackIndexes_Win1021H2_V2;
-            ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win1021H2_V2);
-            break;
-
-        case CBT_SIZE_VB_V1:
-        default:
-            Indexes = CiCallbackIndexes_Win10RS4_21H2;
-            ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win10RS4_21H2);
-            break;
+        if ((g_NtBuildNumber >= g_CiIndexMap[i].MinBuild) &&
+            (g_NtBuildNumber <= g_CiIndexMap[i].MaxBuild))
+        {
+            if (g_CiIndexMap[i].RequiredSize == 0 ||
+                g_CiIndexMap[i].RequiredSize == CiCallbacksSize)
+            {
+                map = &g_CiIndexMap[i];
+                break;
+            }
         }
-        break;
-
-    case NT_WINSRV_21H1:
-        Indexes = CiCallbacksIndexes_WinSrv21H2;
-        ArrayCount = RTL_NUMBER_OF(CiCallbacksIndexes_WinSrv21H2);
-        break;
-
-    case NT_WIN11_21H2:
-        Indexes = CiCallbackIndexes_Win11_21H1;
-        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win11_21H1);
-        break;
-
-    case NT_WIN11_22H2:
-    case NT_WIN11_23H2:
-    case NT_WIN11_24H2:
-    case NT_WIN11_25H2:
-    default:
-        Indexes = CiCallbackIndexes_Win11_22H2_25H2;
-        ArrayCount = RTL_NUMBER_OF(CiCallbackIndexes_Win11_22H2_25H2);
-        break;
     }
 
-    if (Index >= ArrayCount)
+    if (map == NULL)
         return T_CannotQuery;
 
-    index = Indexes[Index];
-    if (index >= RTL_NUMBER_OF(CiCallbackNames))
+    if (Index >= map->Count)
         return T_CannotQuery;
 
-    return (LPWSTR)CiCallbackNames[index];
+    indexes = map->Table;
+    nameIndex = indexes[Index];
+
+    if (nameIndex >= RTL_NUMBER_OF(CiCallbackNames))
+        return T_CannotQuery;
+
+    return (LPWSTR)CiCallbackNames[nameIndex];
 }
 
 /*

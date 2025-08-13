@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2024
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     2.05
+*  VERSION:     2.09
 *
-*  DATE:        25 May 2024
+*  DATE:        13 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -31,12 +31,13 @@ VOID AboutDialogInit(
     HWND hwndDlg
 )
 {
-    BOOLEAN  bSecureBoot = FALSE;
-    BOOLEAN  bHVCIEnabled = FALSE, bHVCIStrict = FALSE, bHVCIIUMEnabled = FALSE;
-    HANDLE   hImage;
-    WCHAR    szBuffer[MAX_PATH];
-
-    PCHAR    wine_ver, wine_str;
+    BOOLEAN bSecureBoot = FALSE;
+    BOOLEAN bHVCIEnabled = FALSE, bHVCIStrict = FALSE, bHVCIIUMEnabled = FALSE;
+    PCHAR wine_ver;
+    SIZE_T verLen, totalLen, i;
+    HANDLE hImage;
+    WCHAR szBuffer[MAX_PATH];
+    PWCHAR wbuf;
 
     FIRMWARE_TYPE firmwareType;
 
@@ -124,15 +125,19 @@ VOID AboutDialogInit(
     //   
     if (g_WinObj.IsWine) {
         wine_ver = GetWineVersion();
-        wine_str = (PCHAR)supHeapAlloc(_strlen_a(wine_ver) + MAX_PATH);
-        if (wine_str) {
-            _strcpy_a(wine_str, "Wine ");
-            _strcat_a(wine_str, wine_ver);
-            SetDlgItemTextA(hwndDlg, ID_ABOUT_OSNAME, wine_str);
-            supHeapFree(wine_str);
+        if (wine_ver == NULL)
+            wine_ver = "Unknown";
+        verLen = _strlen_a(wine_ver);
+        totalLen = verLen + 5 + 1; // "Wine " + 0
+        wbuf = (PWCHAR)supHeapAlloc(totalLen * sizeof(WCHAR));
+        if (wbuf) {
+            _strcpy(wbuf, L"Wine ");
+            for (i = 0; i < verLen; i++)
+                wbuf[5 + i] = (WCHAR)(UCHAR)wine_ver[i];
+            wbuf[5 + verLen] = 0;
+            SetDlgItemText(hwndDlg, ID_ABOUT_OSNAME, wbuf);
+            supHeapFree(wbuf);
         }
-        SetDlgItemText(hwndDlg, ID_ABOUT_ADVINFO, szBuffer);
-
     }
     else {
         SetDlgItemText(hwndDlg, ID_ABOUT_OSNAME, szBuffer);

@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASCALLBACKS.C
 *
-*  VERSION:     2.07
+*  VERSION:     2.09
 *
-*  DATE:        15 May 2025
+*  DATE:        13 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -23,6 +23,16 @@
 
 static HANDLE SysCbThreadHandle = NULL;
 static FAST_EVENT SysCbInitializedEvent = FAST_EVENT_INIT;
+
+//
+// Scan limit constants.
+//
+#define SCAN_LIMIT_NEAR    64
+#define SCAN_LIMIT_SMALL   128
+#define SCAN_LIMIT_MEDIUM  256
+#define SCAN_LIMIT_LARGE   512
+#define SCAN_LIMIT_XLARGE  640
+#define SCAN_LIMIT_XXLARGE 1024
 
 #define CBDLG_TRACKSIZE_MIN_X 640
 #define CBDLG_TRACKSIZE_MIN_Y 480
@@ -116,6 +126,26 @@ typedef NTSTATUS(CALLBACK* POBEX_QUERYCALLBACK_ROUTINE)(
     _In_ LPWSTR CallbackType,                         \
     _In_ ULONG_PTR KernelVariableAddress,             \
     _In_ PRTL_PROCESS_MODULES Modules)
+
+//
+// Generic upper bound to protect against corrupted kernel lists/arrays causing infinite loops.
+//
+#define MAX_LIST_ITERATIONS 0x10000
+
+#define LIST_ITERATION_GUARD(it) \
+    if ((it)++ >= MAX_LIST_ITERATIONS) { \
+        logAdd(EntryTypeWarning, TEXT("List traversal limit reached")); \
+        break; \
+    }
+
+//
+// Returns TRUE if next Flink assigned, FALSE if not in kernel mode address range.
+// Valid kernel pointers must be >= g_kdctx.SystemRangeStart.
+//
+#define SET_NEXT_FLINK_CHECK(ListEntryVar, NextFlinkExpr, MsgLiteral) \
+    (((ULONG_PTR)(NextFlinkExpr) < g_kdctx.SystemRangeStart) ? \
+        (logAdd(EntryTypeWarning, TEXT(MsgLiteral)), FALSE) : \
+        ((ListEntryVar).Flink = (NextFlinkExpr), TRUE))
 
 typedef struct _OBEX_CALLBACK_DISPATCH_ENTRY {
     ULONG_PTR QueryFlags;
@@ -870,11 +900,11 @@ ULONG_PTR ComputeAddressInsideNtOs(
 */
 OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacksEx)
 {
-    BOOL        bFound = FALSE;
-    PBYTE       ptrCode;
-    ULONG_PTR   cbSize = 0, ulTag = 0, Index = 0, kvarAddress = 0;
-    LONG        Rel = 0;
-    hde64s      hs;
+    BOOL bFound = FALSE;
+    PBYTE ptrCode;
+    ULONG_PTR cbSize = 0, ulTag = 0, Index = 0, kvarAddress = 0;
+    LONG Rel = 0;
+    hde64s hs;
 
     UNREFERENCED_PARAMETER(QueryFlags);
 
@@ -904,7 +934,6 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacksEx)
             break;
 
         if (hs.len == 7) { //mov     r8, cs:CiCompareSigningLevels
-
             if ((ptrCode[Index] == 0x4C) &&
                 (ptrCode[Index + 1] == 0x8B) &&
                 (ptrCode[Index + 2] == 0x05))
@@ -916,7 +945,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacksEx)
 
         Index += hs.len;
 
-    } while (Index < 64);
+    } while (Index < SCAN_LIMIT_NEAR);
 
     if (Rel == 0) {
         logAdd(EntryTypeWarning, TEXT("CiCallbacks relative offset is not found"));
@@ -948,11 +977,8 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacksEx)
     }
 
     for (Index = 0; Index < RTL_NUMBER_OF(g_CbtMapping); Index++) {
-
         if (g_CbtMapping[Index].Build == g_NtBuildNumber) {
-
             bFound = TRUE;
-
             //
             // Validate for known table values.
             //
@@ -961,9 +987,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacksEx)
             {
                 return kvarAddress;
             }
-
         }
-
     }
 
     if (bFound == FALSE)
@@ -984,16 +1008,14 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
 {
     ULONG_PTR kvarAddress = 0;
 
-    PBYTE   Signature = NULL, ptrCode = NULL, InstructionMatchPattern = NULL;
-    ULONG   SignatureSize = 0, InstructionMatchLength;
-    ULONG   InstructionExactMatchLength;
-
-    PVOID   SectionBase;
-    ULONG   SectionSize = 0, Index;
+    PBYTE Signature = NULL, ptrCode = NULL, InstructionMatchPattern = NULL;
+    ULONG SignatureSize = 0, InstructionMatchLength;
+    ULONG InstructionExactMatchLength;
+    PVOID SectionBase;
+    ULONG SectionSize = 0, Index;
     LPCWSTR KVARName;
-
-    LONG    Rel = 0;
-    hde64s  hs;
+    LONG Rel = 0;
+    hde64s hs;
 
     do {
 
@@ -1001,33 +1023,18 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
         // Symbols query.
         //
         if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
-
-            if (g_NtBuildNumber < NT_WIN8_RTM) {
-
-                KVARName = (LPCWSTR)KVAR_g_CiCallbacks;
-
-            }
-            else {
-
-                KVARName = (LPCWSTR)KVAR_SeCiCallbacks;
-
-            }
-
+            KVARName = (g_NtBuildNumber < NT_WIN8_RTM) ? (LPCWSTR)KVAR_g_CiCallbacks : (LPCWSTR)KVAR_SeCiCallbacks;
             kdGetAddressFromSymbol(&g_kdctx,
                 KVARName,
                 &kvarAddress);
-
         }
 
         //
         // Pattern searching.
         //
         if (kvarAddress == 0) {
-
             if (g_NtBuildNumber >= NT_WIN10_REDSTONE5) {
-
                 kvarAddress = FindCiCallbacksEx(QueryFlags);
-
             }
             else {
 
@@ -1083,7 +1090,6 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
                     Signature = SeCiCallbacksPattern_17134_17763;
                     SignatureSize = sizeof(SeCiCallbacksPattern_17134_17763);
                     break;
-
                 }
 
                 ptrCode = (PBYTE)supFindPattern(
@@ -1137,7 +1143,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindCiCallbacks)
                     }
                     Index += hs.len;
 
-                } while (Index < 64);
+                } while (Index < SCAN_LIMIT_NEAR);
 
                 kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
 
@@ -1167,7 +1173,6 @@ BOOL IopFileSystemIsKnownPattern(
 )
 {
     BOOL bResult = FALSE;
-
     BYTE inst3byte;
     BYTE nextInstructionByte1, nextInstructionByte2;
 
@@ -1180,12 +1185,6 @@ BOOL IopFileSystemIsKnownPattern(
 
         switch (g_NtBuildNumber)
         {
-        case NT_WIN11_21H2:
-            inst3byte = 0x0D;
-            nextInstructionByte1 = 0x48;
-            nextInstructionByte2 = 0xE9;
-            break;
-
         case NT_WIN11_22H2:
         case NT_WIN11_23H2:
             inst3byte = 0x15;
@@ -1229,15 +1228,11 @@ ULONG LookupIopFileSystemQueueHeads_w7(
     _Inout_ ULONG_PTR* IopNetworkFileSystemQueueHead
 )
 {
-    ULONG Index, Count;
-    LONG Rel;
+    ULONG Index = 0, Count = 0;
+    LONG Rel = 0;
     ULONG_PTR kvarAddress;
     hde64s hs;
-
     PBYTE ptrCode = Buffer;
-    Index = 0;
-    Rel = 0;
-    Count = 0;
 
     do {
         hde64_disasm(ptrCode + Index, &hs);
@@ -1287,7 +1282,7 @@ ULONG LookupIopFileSystemQueueHeads_w7(
 
         Index += hs.len;
 
-    } while (Index < 512);
+    } while (Index < SCAN_LIMIT_LARGE);
 
     return Count;
 }
@@ -1309,15 +1304,11 @@ ULONG LookupIopFileSystemQueueHeads_w8_11(
     _Inout_ ULONG_PTR* IopNetworkFileSystemQueueHead
 )
 {
-    ULONG Index, Count;
-    LONG Rel;
+    ULONG Index = 0, Count = 0;
+    LONG Rel = 0;
     ULONG_PTR kvarAddress;
     hde64s hs;
-
     PBYTE ptrCode = Buffer;
-    Index = 0;
-    Rel = 0;
-    Count = 0;
 
     do {
         hde64_disasm(ptrCode + Index, &hs);
@@ -1386,7 +1377,7 @@ ULONG LookupIopFileSystemQueueHeads_w8_11(
 
         Index += hs.len;
 
-    } while (Index < 512);
+    } while (Index < SCAN_LIMIT_LARGE);
 
     return Count;
 }
@@ -1408,7 +1399,7 @@ BOOL FindIopFileSystemQueueHeads(
     _Out_ ULONG_PTR* IopNetworkFileSystemQueueHead
 )
 {
-    BOOL bSymQuerySuccess = FALSE, bReoder;
+    BOOL bSymQuerySuccess = FALSE;
     ULONG Count = 0;
     ULONG_PTR kvarAddress = 0;
     PBYTE ptrCode;
@@ -1485,14 +1476,8 @@ BOOL FindIopFileSystemQueueHeads(
             IopNetworkFileSystemQueueHead);
     }
     else {
-
-        //
-        // Since WIN11 24H2 pointer usage in this function is reordered.
-        //
-        bReoder = (g_NtBuildNumber >= NT_WIN11_24H2);
-
         Count = LookupIopFileSystemQueueHeads_w8_11(ptrCode,
-            bReoder,
+            (g_NtBuildNumber >= NT_WIN11_24H2),  // Since WIN11 24H2 pointer usage in this function is reordered.
             IopCdRomFileSystemQueueHead,
             IopDiskFileSystemQueueHead,
             IopTapeFileSystemQueueHead,
@@ -1518,11 +1503,9 @@ BOOL IopFsNotifyChangeIsKnownPattern(
 )
 {
     BOOL bResult = FALSE;
-
     BYTE nextInstructionByte1;
 
-    switch (g_NtBuildNumber)
-    {
+    switch (g_NtBuildNumber) {
     case NT_WIN11_24H2:
     case NT_WIN11_25H2:
         nextInstructionByte1 = 0x48;
@@ -1559,7 +1542,7 @@ BOOL IopFsNotifyChangeIsKnownPattern(
 */
 OBEX_FINDCALLBACK_ROUTINE(FindIopFsNotifyChangeQueueHead)
 {
-    ULONG Index;
+    ULONG Index = 0;
     LONG Rel = 0;
     ULONG_PTR kvarAddress = 0;
     PBYTE ptrCode;
@@ -1568,11 +1551,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindIopFsNotifyChangeQueueHead)
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
-
         kdGetAddressFromSymbol(&g_kdctx,
             KVAR_IopFsNotifyChangeQueueHead,
             &kvarAddress);
-
     }
 
     if (kvarAddress == 0) {
@@ -1582,9 +1563,6 @@ OBEX_FINDCALLBACK_ROUTINE(FindIopFsNotifyChangeQueueHead)
 
         if (ptrCode == NULL)
             return 0;
-
-        Index = 0;
-        Rel = 0;
 
         do {
             hde64_disasm(ptrCode + Index, &hs);
@@ -1606,10 +1584,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindIopFsNotifyChangeQueueHead)
 
             Index += hs.len;
 
-        } while (Index < 256);
+        } while (Index < SCAN_LIMIT_MEDIUM);
 
         kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
-
     }
 
     return kvarAddress;
@@ -1636,11 +1613,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindRtlpDebugPrintCallbackList)
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
-
         kdGetAddressFromSymbol(&g_kdctx,
             KVAR_RtlpDebugPrintCallbackList,
             &kvarAddress);
-
     }
 
     if (kvarAddress == 0) {
@@ -1677,10 +1652,12 @@ OBEX_FINDCALLBACK_ROUTINE(FindRtlpDebugPrintCallbackList)
 
             Index += hs.len;
 
-        } while (Index < 64);
+        } while (Index < SCAN_LIMIT_NEAR);
 
-        if (Rel == 0)
+        if (Rel == 0) {
+            logAdd(EntryTypeWarning, TEXT("DbgpInsertDebugPrintCallback relative offset is not found"));
             return 0;
+        }
 
         ptrCode = ptrCode + Index + (hs.len) + Rel;
         Index = 0;
@@ -1711,7 +1688,12 @@ OBEX_FINDCALLBACK_ROUTINE(FindRtlpDebugPrintCallbackList)
 
             Index += hs.len;
 
-        } while (Index < 512);
+        } while (Index < SCAN_LIMIT_LARGE);
+
+        if (Rel == 0) {
+            logAdd(EntryTypeWarning, TEXT("RtlpDebugPrintCallbackList relative offset is not found"));
+            return 0;
+        }
 
         kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
 
@@ -1741,11 +1723,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindPopRegisteredPowerSettingCallbacks)
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
-
         kdGetAddressFromSymbol(&g_kdctx,
             KVAR_PopRegisteredPowerSettingCallbacks,
             &kvarAddress);
-
     }
 
     if (kvarAddress == 0) {
@@ -1759,7 +1739,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindPopRegisteredPowerSettingCallbacks)
         Index = 0;
         Rel = 0;
 
-        ScanBytes = (g_NtBuildNumber < NT_WIN11_25H2) ? 512 : 640;
+        ScanBytes = (g_NtBuildNumber < NT_WIN11_25H2) ? SCAN_LIMIT_LARGE : SCAN_LIMIT_XLARGE;
 
         do {
             hde64_disasm(ptrCode + Index, &hs);
@@ -1811,36 +1791,21 @@ OBEX_FINDCALLBACK_ROUTINE(FindSeFileSystemNotifyRoutinesHead)
     ULONG Index;
     LONG Rel = 0;
     ULONG_PTR kvarAddress = 0;
-    LPCWSTR lpVarName;
     LPSTR lpCallbackName;
     PBYTE ptrCode;
     hde64s hs;
 
-
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
-
-        if (Extended)
-            lpVarName = KVAR_SeFileSystemNotifyRoutinesExHead;
-        else
-            lpVarName = KVAR_SeFileSystemNotifyRoutinesHead;
-
         kdGetAddressFromSymbol(&g_kdctx,
-            lpVarName,
+            (Extended) ? KVAR_SeFileSystemNotifyRoutinesExHead : KVAR_SeFileSystemNotifyRoutinesHead,
             &kvarAddress);
-
     }
 
     if (kvarAddress == 0) {
-
         //
         // Routines have similar design.
         //
-        if (Extended) {
-            lpCallbackName = "SeRegisterLogonSessionTerminatedRoutineEx";
-        }
-        else {
-            lpCallbackName = "SeRegisterLogonSessionTerminatedRoutine";
-        }
+        lpCallbackName = Extended ? "SeRegisterLogonSessionTerminatedRoutineEx" : "SeRegisterLogonSessionTerminatedRoutine";
 
         ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, lpCallbackName);
         if (ptrCode == NULL)
@@ -1872,7 +1837,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindSeFileSystemNotifyRoutinesHead)
 
             Index += hs.len;
 
-        } while (Index < 128);
+        } while (Index < SCAN_LIMIT_SMALL);
 
         kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
 
@@ -1898,7 +1863,6 @@ OBEX_FINDCALLBACK_ROUTINE(FindObjectTypeCallbackListHeadByType)
     LPWSTR TypeName = NULL;
     POBEX_OBJECT_INFORMATION CurrentObject = NULL;
     PVOID ObjectTypeInformation = NULL;
-
     UNICODE_STRING usName;
 
     union {
@@ -1918,8 +1882,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindObjectTypeCallbackListHeadByType)
     case ObjectTypeThread: //PsThreadType
         TypeName = TEXT("Thread");
         break;
-    case ObjectTypeDesktop:
-        //ExDesktopObjectType
+    case ObjectTypeDesktop: //ExDesktopObjectType
         TypeName = TEXT("Desktop");
         break;
     default:
@@ -2005,36 +1968,21 @@ OBEX_FINDCALLBACK_ROUTINE(FindIopNotifyShutdownQueueHeadHead)
     ULONG Index;
     LONG Rel = 0;
     ULONG_PTR kvarAddress = 0;
-    LPCWSTR lpVarName;
     LPSTR lpCallbackName;
     PBYTE ptrCode;
     hde64s hs;
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
-
-        if (bLastChance)
-            lpVarName = KVAR_IopNotifyLastChanceShutdownQueueHead;
-        else
-            lpVarName = KVAR_IopNotifyShutdownQueueHead;
-
         kdGetAddressFromSymbol(&g_kdctx,
-            lpVarName,
+            (bLastChance) ? KVAR_IopNotifyLastChanceShutdownQueueHead : KVAR_IopNotifyShutdownQueueHead,
             &kvarAddress);
-
     }
 
     if (kvarAddress == 0) {
-
         //
         // Routines have similar design.
         //
-        if (bLastChance) {
-            lpCallbackName = "IoRegisterLastChanceShutdownNotification";
-        }
-        else {
-            lpCallbackName = "IoRegisterShutdownNotification";
-        }
-
+        lpCallbackName = (bLastChance) ? "IoRegisterLastChanceShutdownNotification" : "IoRegisterShutdownNotification";
         ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, lpCallbackName);
         if (ptrCode == NULL)
             return 0;
@@ -2060,7 +2008,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindIopNotifyShutdownQueueHeadHead)
 
             Index += hs.len;
 
-        } while (Index < 128);
+        } while (Index < SCAN_LIMIT_SMALL);
 
         kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
 
@@ -2083,7 +2031,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindIopNotifyShutdownQueueHeadHead)
 OBEX_FINDCALLBACK_ROUTINE(FindCmCallbackHead)
 {
     BOOL bFound = FALSE;
-    ULONG Index, resultOffset;
+    ULONG Index, resultOffset = 0;
     LONG Rel = 0, FirstInstructionLength;
     ULONG_PTR kvarAddress = 0;
     PBYTE ptrCode;
@@ -2092,22 +2040,18 @@ OBEX_FINDCALLBACK_ROUTINE(FindCmCallbackHead)
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
-
         kdGetAddressFromSymbol(&g_kdctx,
             KVAR_CallbackListHead,
             &kvarAddress);
-
     }
 
     if (kvarAddress == 0) {
-
         ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, "CmUnRegisterCallback");
         if (ptrCode == NULL)
             return 0;
 
         Index = 0;
         Rel = 0;
-        resultOffset = 0;
 
         do {
             hde64_disasm(ptrCode + Index, &hs);
@@ -2175,10 +2119,14 @@ OBEX_FINDCALLBACK_ROUTINE(FindCmCallbackHead)
 
             Index += hs.len;
 
-        } while (Index < 256);
+        } while (Index < SCAN_LIMIT_MEDIUM);
+
+        if (resultOffset == 0) {
+            logAdd(EntryTypeWarning, TEXT("CmCallbackHead offset is not found"));
+            return 0;
+        }
 
         kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, resultOffset, 0, Rel);
-
     }
 
     return kvarAddress;
@@ -2205,18 +2153,13 @@ OBEX_FINDCALLBACK_ROUTINE(FindKeBugCheckReasonCallbackHead)
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
-
         kdGetAddressFromSymbol(&g_kdctx,
             KVAR_KeBugCheckReasonCallbackListHead,
             &kvarAddress);
-
     }
 
     if (kvarAddress == 0) {
-
-        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
-            "KeRegisterBugCheckReasonCallback");
-
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, "KeRegisterBugCheckReasonCallback");
         if (ptrCode == NULL)
             return 0;
 
@@ -2242,10 +2185,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindKeBugCheckReasonCallbackHead)
 
             Index += hs.len;
 
-        } while (Index < 512);
+        } while (Index < SCAN_LIMIT_LARGE);
 
         kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
-
     }
 
     return kvarAddress;
@@ -2272,18 +2214,13 @@ OBEX_FINDCALLBACK_ROUTINE(FindKeBugCheckCallbackHead)
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
-
         kdGetAddressFromSymbol(&g_kdctx,
             KVAR_KeBugCheckCallbackListHead,
             &kvarAddress);
-
     }
 
     if (kvarAddress == 0) {
-
-        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
-            "KeRegisterBugCheckCallback");
-
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, "KeRegisterBugCheckCallback");
         if (ptrCode == NULL)
             return 0;
 
@@ -2309,10 +2246,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindKeBugCheckCallbackHead)
 
             Index += hs.len;
 
-        } while (Index < 512);
+        } while (Index < SCAN_LIMIT_LARGE);
 
         kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
-
     }
 
     return kvarAddress;
@@ -2340,18 +2276,13 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspLoadImageNotifyRoutine)
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
-
         kdGetAddressFromSymbol(&g_kdctx,
             KVAR_PspLoadImageNotifyRoutine,
             &kvarAddress);
-
     }
 
     if (kvarAddress == 0) {
-
-        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
-            "PsRemoveLoadImageNotifyRoutine");
-
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, "PsRemoveLoadImageNotifyRoutine");
         if (ptrCode == NULL)
             return 0;
 
@@ -2376,10 +2307,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspLoadImageNotifyRoutine)
 
             Index += hs.len;
 
-        } while (Index < 128);
+        } while (Index < SCAN_LIMIT_SMALL);
 
         kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
-
     }
 
     return kvarAddress;
@@ -2407,17 +2337,13 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspCreateThreadNotifyRoutine)
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
-
         kdGetAddressFromSymbol(&g_kdctx,
             KVAR_PspCreateThreadNotifyRoutine,
             &kvarAddress);
-
     }
 
     if (kvarAddress == 0) {
-
-        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
-            "PsRemoveCreateThreadNotifyRoutine");
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, "PsRemoveCreateThreadNotifyRoutine");
 
         if (ptrCode == NULL)
             return 0;
@@ -2443,10 +2369,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspCreateThreadNotifyRoutine)
 
             Index += hs.len;
 
-        } while (Index < 128);
+        } while (Index < SCAN_LIMIT_SMALL);
 
         kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
-
     }
 
     return kvarAddress;
@@ -2473,18 +2398,13 @@ OBEX_FINDCALLBACK_ROUTINE(FindDbgkLmdCallbacks)
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
-
         kdGetAddressFromSymbol(&g_kdctx,
             KVAR_DbgkLmdCallbacks,
             &kvarAddress);
-
     }
 
     if (kvarAddress == 0) {
-
-        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
-            "DbgkLkmdUnregisterCallback");
-
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, "DbgkLkmdUnregisterCallback");
         if (ptrCode == NULL)
             return 0;
 
@@ -2515,10 +2435,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindDbgkLmdCallbacks)
 
             Index += hs.len;
 
-        } while (Index < 64);
+        } while (Index < SCAN_LIMIT_NEAR);
 
         kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
-
     }
 
     return kvarAddress;
@@ -2547,18 +2466,13 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspCreateProcessNotifyRoutine)
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
-
         kdGetAddressFromSymbol(&g_kdctx,
             KVAR_PspCreateProcessNotifyRoutine,
             &kvarAddress);
-
     }
 
     if (kvarAddress == 0) {
-
-        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
-            "PsSetCreateProcessNotifyRoutine");
-
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, "PsSetCreateProcessNotifyRoutine");
         if (ptrCode == NULL)
             return 0;
 
@@ -2589,10 +2503,12 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspCreateProcessNotifyRoutine)
 
             Index += hs.len;
 
-        } while (Index < 64);
+        } while (Index < SCAN_LIMIT_NEAR);
 
-        if (Rel == 0)
+        if (Rel == 0) {
+            logAdd(EntryTypeWarning, TEXT("PspSetCreateProcessNotifyRoutine relative offset is not found"));
             return 0;
+        }
 
         ptrCode = ptrCode + Index + (hs.len) + Rel;
         Index = 0;
@@ -2616,10 +2532,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspCreateProcessNotifyRoutine)
 
             Index += hs.len;
 
-        } while (Index < 128);
+        } while (Index < SCAN_LIMIT_SMALL);
 
         kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
-
     }
 
     return kvarAddress;
@@ -2637,28 +2552,22 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspCreateProcessNotifyRoutine)
 */
 OBEX_FINDCALLBACK_ROUTINE(FindPsAltSystemCallHandlers)
 {
+    ULONG Index, InstructionExactMatchLength;
+    LONG Rel = 0;
     ULONG_PTR kvarAddress = 0;
-
-    ULONG   Index, InstructionExactMatchLength;
-    PBYTE   ptrCode;
-    LONG    Rel = 0;
-    hde64s  hs;
+    PBYTE ptrCode;
+    hde64s hs;
 
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
-
         kdGetAddressFromSymbol(&g_kdctx,
             KVAR_PsAltSystemCallHandlers,
             &kvarAddress);
-
     }
 
     if (kvarAddress == 0) {
-
-        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
-            "PsRegisterAltSystemCallHandler");
-
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, "PsRegisterAltSystemCallHandler");
         if (ptrCode == NULL)
             return 0;
 
@@ -2688,10 +2597,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindPsAltSystemCallHandlers)
             }
             Index += hs.len;
 
-        } while (Index < 128);
+        } while (Index < SCAN_LIMIT_SMALL);
 
         kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
-
     }
 
     return kvarAddress;
@@ -2721,18 +2629,13 @@ OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
-
         kdGetAddressFromSymbol(&g_kdctx,
             KVAR_ExpHostList,
             &kvarAddress);
-
     }
 
     if (kvarAddress == 0) {
-
-        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
-            "ExRegisterExtension");
-
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, "ExRegisterExtension");
         if (ptrCode == NULL)
             return 0;
 
@@ -2768,7 +2671,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
 
             ptrCode = (PBYTE)supFindPattern(
                 (PBYTE)ptrCode,
-                1024,
+                SCAN_LIMIT_XXLARGE,
                 Signature,
                 SignatureSize);
 
@@ -2793,7 +2696,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
 
                 Index += hs.len;
 
-            } while (Index < 64);
+            } while (Index < SCAN_LIMIT_NEAR);
 
         }
         else {
@@ -2817,11 +2720,13 @@ OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
 
                 Index += hs.len;
 
-            } while (Index < 512);
+            } while (Index < SCAN_LIMIT_LARGE);
         }
 
-        if (Rel == 0)
+        if (Rel == 0) {
+            logAdd(EntryTypeWarning, TEXT("ExpFindHost relative offset is not found"));
             return 0;
+        }
 
         //
         // Examine ExpFindHost
@@ -2843,9 +2748,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
                     hs.len,
                     Rel);
             }
-
         }
-
     }
 
     return kvarAddress;
@@ -2873,9 +2776,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindExpCallbackListHead)
     if (g_NtBuildNumber < NT_WIN8_BLUE)
         return 0;
 
-    ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
-        "ExCreateCallback");
-
+    ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, "ExCreateCallback");
     if (ptrCode == NULL)
         return 0;
 
@@ -2901,7 +2802,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindExpCallbackListHead)
 
         Index += hs.len;
 
-    } while (Index < 512);
+    } while (Index < SCAN_LIMIT_LARGE);
 
     return ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
 }
@@ -2944,20 +2845,14 @@ OBEX_FINDCALLBACK_ROUTINE(FindPoCoalescingCallbacks)
         checkByte = 0x15;
     }
 
-
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
-
         kdGetAddressFromSymbol(&g_kdctx,
             lpSymbolName,
             &kvarAddress);
-
     }
 
     if (kvarAddress == 0) {
-
-        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
-            "PoRegisterCoalescingCallback");
-
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, "PoRegisterCoalescingCallback");
         if (ptrCode == NULL)
             return 0;
 
@@ -2983,7 +2878,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindPoCoalescingCallbacks)
 
             Index += hs.len;
 
-        } while (Index < 256);
+        } while (Index < SCAN_LIMIT_MEDIUM);
 
         kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
     }
@@ -3021,18 +2916,13 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspPicoProviderRoutines)
     }
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
-
         kdGetAddressFromSymbol(&g_kdctx,
             KVAR_PspPicoProviderRoutines,
             &kvarAddress);
-
     }
 
     if (kvarAddress == 0) {
-
-        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
-            "PsRegisterPicoProvider");
-
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, "PsRegisterPicoProvider");
         if (ptrCode == NULL)
             return 0;
 
@@ -3058,10 +2948,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspPicoProviderRoutines)
 
             Index += hs.len;
 
-        } while (Index < 256);
+        } while (Index < SCAN_LIMIT_MEDIUM);
 
         kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
-
     }
 
     return kvarAddress;
@@ -3095,18 +2984,13 @@ OBEX_FINDCALLBACK_ROUTINE(FindKiNmiCallbackListHead)
         return 0;
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
-
         kdGetAddressFromSymbol(&g_kdctx,
             KVAR_KiNmiCallbackListHead,
             &kvarAddress);
-
     }
 
     if (kvarAddress == 0) {
-
-        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
-            "KeDeregisterNmiCallback");
-
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, "KeDeregisterNmiCallback");
         if (ptrCode == NULL)
             return 0;
 
@@ -3140,14 +3024,11 @@ OBEX_FINDCALLBACK_ROUTINE(FindKiNmiCallbackListHead)
 
                 Index += hs.len;
 
-            } while (Index < 256);
-
-
+            } while (Index < SCAN_LIMIT_MEDIUM);
         }
         else {
 
             do {
-
                 hde64_disasm(ptrCode + Index, &hs);
                 if (hs.flags & F_ERROR)
                     break;
@@ -3162,7 +3043,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindKiNmiCallbackListHead)
 
                 Index += hs.len;
 
-            } while (Index < 64);
+            } while (Index < SCAN_LIMIT_NEAR);
 
             if (Rel != 0) {
 
@@ -3199,15 +3080,10 @@ OBEX_FINDCALLBACK_ROUTINE(FindKiNmiCallbackListHead)
                     }
 
                     Index += hs.len;
-
-                } while (Index < 128);
-
+                } while (Index < SCAN_LIMIT_SMALL);
             }
-
         }
-
         kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
-
     }
 
     return kvarAddress;
@@ -3240,18 +3116,13 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspSiloMonitorList)
         return 0;
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
-
         kdGetAddressFromSymbol(&g_kdctx,
             KVAR_PspSiloMonitorList,
             &kvarAddress);
-
     }
 
     if (kvarAddress == 0) {
-
-        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
-            "PsStartSiloMonitor");
-
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, "PsStartSiloMonitor");
         if (ptrCode == NULL)
             return 0;
 
@@ -3282,10 +3153,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindPspSiloMonitorList)
 
             Index += hs.len;
 
-        } while (Index < 512);
+        } while (Index < SCAN_LIMIT_LARGE);
 
         kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
-
     }
 
     return kvarAddress;
@@ -3316,11 +3186,9 @@ OBEX_FINDCALLBACK_ROUTINE(FindEmpCallbackListHead)
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
-
         kdGetAddressFromSymbol(&g_kdctx,
             KVAR_EmpCallbackListHead,
             &kvarAddress);
-
     }
 
     if (kvarAddress == 0) {
@@ -3383,7 +3251,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindEmpCallbackListHead)
 
             Index += hs.len;
 
-        } while (Index < 64);
+        } while (Index < SCAN_LIMIT_NEAR);
 
         if (Rel != 0) {
 
@@ -3412,7 +3280,6 @@ OBEX_FINDCALLBACK_ROUTINE(FindEmpCallbackListHead)
         }
 
         kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
-
     }
 
     return kvarAddress;
@@ -3442,18 +3309,13 @@ OBEX_FINDCALLBACK_ROUTINE(FindPnpDeviceClassNotifyList)
     UNREFERENCED_PARAMETER(QueryFlags);
 
     if (kdIsSymAvailable((PSYMCONTEXT)g_kdctx.NtOsSymContext)) {
-
         kdGetAddressFromSymbol(&g_kdctx,
             KVAR_PnpDeviceClassNotifyList,
             &kvarAddress);
-
     }
 
     if (kvarAddress == 0) {
-
-        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap,
-            "IoRegisterPlugPlayNotification");
-
+        ptrCode = (PBYTE)GetProcAddress((HMODULE)g_kdctx.NtOsImageMap, "IoRegisterPlugPlayNotification");
         if (ptrCode == NULL)
             return 0;
 
@@ -3483,7 +3345,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindPnpDeviceClassNotifyList)
 
         ptrCode = (PBYTE)supFindPattern(
             ptrCode,
-            1024,
+            SCAN_LIMIT_XXLARGE,
             Signature,
             SignatureSize);
 
@@ -3515,7 +3377,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindPnpDeviceClassNotifyList)
 
             Index += hs.len;
 
-        } while (Index < 64);
+        } while (Index < SCAN_LIMIT_NEAR);
 
         kvarAddress = ComputeAddressInsideNtOs((ULONG_PTR)ptrCode, Index, hs.len, Rel);
     }
@@ -3612,7 +3474,6 @@ VOID AddEntryToList(
     szAddress[1] = L'x';
     szAddress[2] = 0;
     u64tohex(Function, &szAddress[2]);
-    TreeListSubItems.Text[0] = szAddress;
 
     RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
 
@@ -3621,13 +3482,16 @@ VOID AddEntryToList(
         (PVOID)Function,
         &moduleIndex))
     {
-        MultiByteToWideChar(
+        if (MultiByteToWideChar(
             CP_ACP,
             0,
             (LPCSTR)&Modules->Modules[moduleIndex].FullPathName,
-            (INT)_strlen_a((char*)Modules->Modules[moduleIndex].FullPathName),
+            -1,
             szBuffer,
-            MAX_PATH);
+            MAX_PATH) == 0)
+        {
+            _strcpy(szBuffer, TEXT("Unknown Module"));
+        }
     }
     else {
         _strcpy(szBuffer, TEXT("Unknown Module"));
@@ -3708,7 +3572,6 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPsCallbacks)
     ULONG c;
     ULONG_PTR Address, Function;
     EX_FAST_REF Callbacks[PspNotifyRoutinesLimit];
-
     HTREEITEM RootItem;
 
     //
@@ -3722,7 +3585,6 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPsCallbacks)
     if (kdReadSystemMemory(KernelVariableAddress,
         &Callbacks, sizeof(Callbacks)))
     {
-
         for (c = 0; c < PspNotifyRoutinesLimit; c++) {
 
             if (Callbacks[c].Value) {
@@ -3740,7 +3602,6 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPsCallbacks)
             }
         }
     }
-
 }
 
 /*
@@ -3756,7 +3617,6 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpDbgkLCallbacks)
     ULONG c;
     ULONG_PTR Address, Function;
     EX_FAST_REF Callbacks[DbgkLmdCount];
-
     HTREEITEM RootItem;
 
     //
@@ -3770,11 +3630,8 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpDbgkLCallbacks)
     if (kdReadSystemMemory(KernelVariableAddress,
         &Callbacks, sizeof(Callbacks)))
     {
-
         for (c = 0; c < DbgkLmdCount; c++) {
-
             if (Callbacks[c].Value > g_kdctx.SystemRangeStart) {
-
                 Address = (ULONG_PTR)ObGetObjectFastReference(Callbacks[c]);
                 Function = (ULONG_PTR)ObGetCallbackBlockRoutine((PVOID)Address);
                 if (Function < g_kdctx.SystemRangeStart)
@@ -3788,7 +3645,6 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpDbgkLCallbacks)
             }
         }
     }
-
 }
 
 /*
@@ -3803,7 +3659,6 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPsAltSystemCallHandlers)
 {
     ULONG i;
     ULONG_PTR AltSystemCallHandlers[MAX_ALT_SYSTEM_CALL_HANDLERS];
-
     HTREEITEM RootItem;
 
     //
@@ -3817,9 +3672,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPsAltSystemCallHandlers)
     if (kdReadSystemMemory(KernelVariableAddress,
         &AltSystemCallHandlers, sizeof(AltSystemCallHandlers)))
     {
-
         for (i = 0; i < MAX_ALT_SYSTEM_CALL_HANDLERS; i++) {
-
             if (AltSystemCallHandlers[i] > g_kdctx.SystemRangeStart) {
 
                 AddEntryToList(TreeList,
@@ -3827,11 +3680,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPsAltSystemCallHandlers)
                     AltSystemCallHandlers[i],
                     NULL,
                     Modules);
-
             }
         }
     }
-
 }
 
 /*
@@ -3845,10 +3696,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPsAltSystemCallHandlers)
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpKeBugCheckCallbacks)
 {
     ULONG_PTR ListHead = KernelVariableAddress;
+    SIZE_T GuardIter = 0;
     LIST_ENTRY ListEntry;
-
     KBUGCHECK_CALLBACK_RECORD CallbackRecord;
-
     HTREEITEM RootItem;
 
     //
@@ -3875,7 +3725,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpKeBugCheckCallbacks)
     // Walk list entries.
     //
     while ((ULONG_PTR)ListEntry.Flink != ListHead) {
-
+        LIST_ITERATION_GUARD(GuardIter);
         RtlSecureZeroMemory(&CallbackRecord, sizeof(CallbackRecord));
 
         if (!kdReadSystemMemory((ULONG_PTR)ListEntry.Flink,
@@ -3891,9 +3741,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpKeBugCheckCallbacks)
             NULL,
             Modules);
 
-        ListEntry.Flink = CallbackRecord.Entry.Flink;
+        if (!SET_NEXT_FLINK_CHECK(ListEntry, CallbackRecord.Entry.Flink, "KeBugCheckCallbacks NULL Flink"))
+            break;
     }
-
 }
 
 /*
@@ -3946,11 +3796,9 @@ LPWSTR KeBugCheckReasonToString(
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpKeBugCheckReasonCallbacks)
 {
     ULONG_PTR ListHead = KernelVariableAddress;
-
+    SIZE_T GuardIter = 0;
     LIST_ENTRY ListEntry;
-
     KBUGCHECK_REASON_CALLBACK_RECORD CallbackRecord;
-
     HTREEITEM RootItem;
 
     //
@@ -3977,7 +3825,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpKeBugCheckReasonCallbacks)
     // Walk list entries.
     //
     while ((ULONG_PTR)ListEntry.Flink != ListHead) {
-
+        LIST_ITERATION_GUARD(GuardIter);
         RtlSecureZeroMemory(&CallbackRecord, sizeof(CallbackRecord));
 
         if (!kdReadSystemMemory((ULONG_PTR)ListEntry.Flink,
@@ -3993,9 +3841,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpKeBugCheckReasonCallbacks)
             KeBugCheckReasonToString(CallbackRecord.Reason),
             Modules);
 
-        ListEntry.Flink = CallbackRecord.Entry.Flink;
+        if (!SET_NEXT_FLINK_CHECK(ListEntry, CallbackRecord.Entry.Flink, "KeBugCheckReasonCallbacks NULL Flink"))
+            break;
     }
-
 }
 
 /*
@@ -4009,13 +3857,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpKeBugCheckReasonCallbacks)
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpCmCallbacks)
 {
     ULONG_PTR ListHead = KernelVariableAddress;
-
+    SIZE_T GuardIter = 0;
     LIST_ENTRY ListEntry;
-
     CM_CALLBACK_CONTEXT_BLOCK CallbackRecord;
-
     HTREEITEM RootItem;
-
     WCHAR szCookie[100];
 
     //
@@ -4044,7 +3889,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCmCallbacks)
     // Walk list entries.
     //
     while ((ULONG_PTR)ListEntry.Flink != ListHead) {
-
+        LIST_ITERATION_GUARD(GuardIter);
         RtlSecureZeroMemory(&CallbackRecord, sizeof(CallbackRecord));
 
         if (!kdReadSystemMemory((ULONG_PTR)ListEntry.Flink,
@@ -4065,9 +3910,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCmCallbacks)
             szCookie,
             Modules);
 
-        ListEntry.Flink = CallbackRecord.CallbackListEntry.Flink;
+        if (!SET_NEXT_FLINK_CHECK(ListEntry, CallbackRecord.CallbackListEntry.Flink, "CmCallbacks NULL Flink"))
+            break;
     }
-
 }
 
 /*
@@ -4081,18 +3926,13 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCmCallbacks)
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoCallbacks)
 {
     ULONG_PTR ListHead = KernelVariableAddress;
-
+    SIZE_T GuardIter = 0;
     LIST_ENTRY ListEntry;
-
     SHUTDOWN_PACKET EntryPacket;
-
     DEVICE_OBJECT DeviceObject;
-
     DRIVER_OBJECT DriverObject;
-
     PVOID Routine;
     LPWSTR lpDescription;
-
     HTREEITEM RootItem;
 
     //
@@ -4119,7 +3959,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoCallbacks)
     // Walk list entries.
     //
     while ((ULONG_PTR)ListEntry.Flink != ListHead) {
-
+        LIST_ITERATION_GUARD(GuardIter);
         RtlSecureZeroMemory(&EntryPacket, sizeof(EntryPacket));
 
         if (!kdReadSystemMemory(
@@ -4159,7 +3999,6 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoCallbacks)
                     lpDescription = TEXT("IRP_MJ_SHUTDOWN");
                 }
             }
-
         }
 
         AddEntryToList(TreeList,
@@ -4168,9 +4007,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoCallbacks)
             lpDescription,
             Modules);
 
-        ListEntry.Flink = EntryPacket.ListEntry.Flink;
+        if (!SET_NEXT_FLINK_CHECK(ListEntry, EntryPacket.ListEntry.Flink, "IoShutdownCallbacks NULL Flink")) 
+            break;
     }
-
 }
 
 VOID AddObCallbackEntry(
@@ -4189,14 +4028,11 @@ VOID AddObCallbackEntry(
     BOOL bAltitudePresent = (Altitude && AltitudeSize);
 
     Size = MAX_PATH * sizeof(WCHAR);
-
     if (bAltitudePresent)
         Size += AltitudeSize;
 
     lpText = (LPWSTR)supHeapAlloc(Size);
-
     if (lpText) {
-
         _strcpy(lpText, CallbackType);
 
         if (bAltitudePresent) {
@@ -4228,17 +4064,12 @@ VOID AddObCallbackEntry(
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpObCallbacks)
 {
     ULONG_PTR ListHead = KernelVariableAddress;
-
+    SIZE_T GuardIter = 0;
     LPWSTR lpAltitudeBuffer;
-
     SIZE_T AltitudeSize = 0;
-
     LIST_ENTRY ListEntry;
-
     OB_CALLBACK_CONTEXT_BLOCK CallbackEntry;
-
     OB_REGISTRATION RegEntry;
-
     HTREEITEM RootItem;
 
     //
@@ -4265,6 +4096,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpObCallbacks)
     // Walk list entries.
     //
     while ((ULONG_PTR)ListEntry.Flink != ListHead) {
+        LIST_ITERATION_GUARD(GuardIter);
 
         lpAltitudeBuffer = NULL;
         RtlSecureZeroMemory(&CallbackEntry, sizeof(CallbackEntry));
@@ -4284,13 +4116,15 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpObCallbacks)
             (PVOID)&RegEntry,
             sizeof(OB_REGISTRATION)))
         {
-            AltitudeSize = 8 + (SIZE_T)RegEntry.Altitude.Length;
+            AltitudeSize = 100 + (SIZE_T)RegEntry.Altitude.Length;
             lpAltitudeBuffer = (LPWSTR)supHeapAlloc(AltitudeSize);
             if (lpAltitudeBuffer) {
-
-                kdReadSystemMemory((ULONG_PTR)RegEntry.Altitude.Buffer,
+                if (!kdReadSystemMemory((ULONG_PTR)RegEntry.Altitude.Buffer,
                     (PVOID)lpAltitudeBuffer,
-                    RegEntry.Altitude.Length);
+                    RegEntry.Altitude.Length))
+                {
+                    _strcpy(lpAltitudeBuffer, TEXT("Cannot read altitude"));
+                }
             }
         }
 
@@ -4298,7 +4132,6 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpObCallbacks)
         // Output PreCallback.
         //
         if ((ULONG_PTR)CallbackEntry.PreCallback > g_kdctx.SystemRangeStart) {
-
             AddObCallbackEntry(TreeList,
                 RootItem,
                 TEXT("PreCallback"),
@@ -4307,14 +4140,12 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpObCallbacks)
                 lpAltitudeBuffer,
                 AltitudeSize,
                 Modules);
-
         }
 
         //
         // Output PostCallback.
         //
         if ((ULONG_PTR)CallbackEntry.PostCallback > g_kdctx.SystemRangeStart) {
-
             AddObCallbackEntry(TreeList,
                 RootItem,
                 TEXT("PostCallback"),
@@ -4323,14 +4154,12 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpObCallbacks)
                 lpAltitudeBuffer,
                 AltitudeSize,
                 Modules);
-
         }
 
-        ListEntry.Flink = CallbackEntry.CallbackListEntry.Flink;
-
         if (lpAltitudeBuffer) supHeapFree(lpAltitudeBuffer);
+        if (!SET_NEXT_FLINK_CHECK(ListEntry, CallbackEntry.CallbackListEntry.Flink, "ObCallbacks NULL Flink"))
+            break;
     }
-
 }
 
 /*
@@ -4374,9 +4203,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpSeFileSystemCallbacks)
     //
     Next = (ULONG_PTR)SeEntry.Next;
     while (Next) {
-
         RtlSecureZeroMemory(&SeEntry, sizeof(SeEntry));
-
         if (!kdReadSystemMemory(Next,
             (PVOID)&SeEntry,
             sizeof(SeEntry)))
@@ -4391,9 +4218,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpSeFileSystemCallbacks)
             Modules);
 
         Next = (ULONG_PTR)SeEntry.Next;
-
     }
-
 }
 
 /*
@@ -4418,7 +4243,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCallbacks)
 
     ULONG ReadSize;
     ULONG_PTR ListHead = KernelVariableAddress;
-    SIZE_T BufferSize;
+    SIZE_T BufferSize, GuardIter = 0;
     LPWSTR GuidString;
     PVOID Buffer = NULL;
     PVOID CallbackRoutine = NULL;
@@ -4440,16 +4265,12 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCallbacks)
     //
     // Determinate size of structure to read.
     //
-    ReadSize = sizeof(POP_POWER_SETTING_REGISTRATION_V1);
-    if (g_NtBuildNumber >= NT_WIN10_REDSTONE1)
-        ReadSize = sizeof(POP_POWER_SETTING_REGISTRATION_V2);
+    ReadSize = (g_NtBuildNumber >= NT_WIN10_REDSTONE1) ? sizeof(POP_POWER_SETTING_REGISTRATION_V2) : sizeof(POP_POWER_SETTING_REGISTRATION_V1);
 
     do {
-
         //
         // Allocate read buffer with enough size.
         // 
-
         BufferSize = sizeof(POP_POWER_SETTING_REGISTRATION_V1) + sizeof(POP_POWER_SETTING_REGISTRATION_V2);
         Buffer = supHeapAlloc(BufferSize);
         if (Buffer == NULL)
@@ -4472,7 +4293,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCallbacks)
         // Walk list entries.
         //
         while ((ULONG_PTR)ListEntry.Flink != ListHead) {
-
+            LIST_ITERATION_GUARD(GuardIter);
             RtlSecureZeroMemory(Buffer, BufferSize);
 
             if (!kdReadSystemMemory((ULONG_PTR)ListEntry.Flink,
@@ -4518,7 +4339,8 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCallbacks)
             //
             // Next item address, ListEntry offset version independent.
             //
-            ListEntry.Flink = CallbackData.Versions.v1->Link.Flink;
+            if (!SET_NEXT_FLINK_CHECK(ListEntry, CallbackData.Versions.v1->Link.Flink, "PoCallbacks NULL Flink"))
+                break;
         }
 
     } while (FALSE);
@@ -4538,11 +4360,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpDbgPrintCallbacks)
 {
     ULONG_PTR ListHead = KernelVariableAddress;
     ULONG_PTR RecordAddress;
-
+    SIZE_T GuardIter = 0;
     LIST_ENTRY ListEntry;
-
     RTL_CALLBACK_REGISTER CallbackRecord;
-
     HTREEITEM RootItem;
 
     //
@@ -4569,11 +4389,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpDbgPrintCallbacks)
     // Walk list entries.
     //
     while ((ULONG_PTR)ListEntry.Flink != ListHead) {
+        LIST_ITERATION_GUARD(GuardIter);
 
         RtlSecureZeroMemory(&CallbackRecord, sizeof(CallbackRecord));
-
         RecordAddress = (ULONG_PTR)ListEntry.Flink - FIELD_OFFSET(RTL_CALLBACK_REGISTER, ListEntry);
-
         if (!kdReadSystemMemory((ULONG_PTR)RecordAddress,
             &CallbackRecord,
             sizeof(CallbackRecord)))
@@ -4582,17 +4401,16 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpDbgPrintCallbacks)
         }
 
         if (CallbackRecord.DebugPrintCallback) {
-
             AddEntryToList(TreeList,
                 RootItem,
                 (ULONG_PTR)CallbackRecord.DebugPrintCallback,
                 NULL,
                 Modules);
-
         }
-        ListEntry.Flink = CallbackRecord.ListEntry.Flink;
-    }
 
+        if (!SET_NEXT_FLINK_CHECK(ListEntry, CallbackRecord.ListEntry.Flink, "DbgPrintCallbacks NULL Flink"))
+            break;
+    }
 }
 
 /*
@@ -4605,12 +4423,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpDbgPrintCallbacks)
 */
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoFsRegistrationCallbacks)
 {
+    SIZE_T GuardIter = 0;
     LIST_ENTRY ListEntry;
-
     NOTIFICATION_PACKET CallbackRecord;
-
     ULONG_PTR ListHead = KernelVariableAddress;
-
     HTREEITEM RootItem;
 
     //
@@ -4637,7 +4453,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoFsRegistrationCallbacks)
     // Walk list entries.
     //
     while ((ULONG_PTR)ListEntry.Flink != ListHead) {
-
+        LIST_ITERATION_GUARD(GuardIter);
         RtlSecureZeroMemory(&CallbackRecord, sizeof(CallbackRecord));
 
         if (!kdReadSystemMemory((ULONG_PTR)ListEntry.Flink,
@@ -4648,18 +4464,16 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoFsRegistrationCallbacks)
         }
 
         if (CallbackRecord.NotificationRoutine) {
-
             AddEntryToList(TreeList,
                 RootItem,
                 (ULONG_PTR)CallbackRecord.NotificationRoutine,
                 NULL,
                 Modules);
-
         }
 
-        ListEntry.Flink = CallbackRecord.ListEntry.Flink;
+        if (!SET_NEXT_FLINK_CHECK(ListEntry, CallbackRecord.ListEntry.Flink, "IoFsRegistrationCallbacks NULL Flink"))
+            break;
     }
-
 }
 
 /*
@@ -4673,19 +4487,13 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoFsRegistrationCallbacks)
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoFileSystemCallbacks)
 {
     BOOL bNeedFree;
-
+    SIZE_T GuardIter = 0;
     LIST_ENTRY ListEntry, NextEntry;
-
     ULONG_PTR ListHead = KernelVariableAddress;
-
     ULONG_PTR DeviceObjectAddress = 0, BaseAddress = 0;
-
     DEVICE_OBJECT DeviceObject;
-
     DRIVER_OBJECT DriverObject;
-
     LPWSTR lpType;
-
     HTREEITEM RootItem;
 
     //
@@ -4712,7 +4520,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoFileSystemCallbacks)
     // Walk list entries.
     //
     while ((ULONG_PTR)ListEntry.Flink != ListHead) {
-
+        LIST_ITERATION_GUARD(GuardIter);
         RtlSecureZeroMemory(&DeviceObject, sizeof(DeviceObject));
 
         DeviceObjectAddress = (ULONG_PTR)ListEntry.Flink - FIELD_OFFSET(DEVICE_OBJECT, Queue);
@@ -4796,12 +4604,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoFileSystemCallbacks)
             break;
         }
 
-        if (NextEntry.Flink == NULL)
+        if (!SET_NEXT_FLINK_CHECK(ListEntry, NextEntry.Flink, "IoFileSystemCallbacks NULL Flink"))
             break;
-
-        ListEntry.Flink = NextEntry.Flink;
     }
-
 }
 
 /*
@@ -4815,13 +4620,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpIoFileSystemCallbacks)
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks)
 {
     HTREEITEM RootItem;
-
     PULONG_PTR CallbacksData, DataPtr;
-
     LPWSTR CallbackName;
-
     ULONG_PTR CallbacksSize = 0, EffectiveSize;
-
     ULONG i, c;
 
     //
@@ -4845,24 +4646,19 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks)
                 for (i = 0; i < c; i++) {
 
                     CallbackName = GetCiRoutineNameFromIndex(i, 0);
-
                     if (CallbacksData[i]) {
-
                         AddEntryToList(TreeList,
                             RootItem,
                             CallbacksData[i],
                             CallbackName,
                             Modules);
-
                     }
-
                 }
             }
             supVirtualFree(CallbacksData);
         }
     }
     else {
-
         //
         // Probe size element.
         //
@@ -4911,21 +4707,15 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks)
                 c = (ULONG)(EffectiveSize / sizeof(ULONG_PTR));
 
                 for (i = 0; i < c; i++) {
-
                     CallbackName = GetCiRoutineNameFromIndex(i, CallbacksSize);
-
                     if (*DataPtr) {
-
                         AddEntryToList(TreeList,
                             RootItem,
                             *DataPtr,
                             CallbackName,
                             Modules);
-
                     }
-
                     DataPtr++;
-
                 }
             }
 
@@ -4944,15 +4734,14 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpCiCallbacks)
 */
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpExHostCallbacks)
 {
-    LIST_ENTRY ListEntry;
-
     ULONG HostEntrySize;
-
+    SIZE_T GuardIter = 0;
     ULONG_PTR ListHead = KernelVariableAddress;
     ULONG_PTR* HostTableDump;
     ULONG NumberOfCallbacks, i;
     PVOID NotificationRoutine;
     PVOID FunctionTable, HostEntryBuffer = NULL;
+    LIST_ENTRY ListEntry;
     HTREEITEM RootItem;
 
     union {
@@ -4963,15 +4752,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExHostCallbacks)
         PBYTE Ref;
     } hostEntry;
 
-
     do {
-
         // Starting build 26080 (25H2) the structures were updated
-        if (g_NtBuildNumber < NT_WIN11_25H2)
-            HostEntrySize = sizeof(EX_HOST_ENTRY_V1);
-        else
-            HostEntrySize = sizeof(EX_HOST_ENTRY_V2);
-
+        HostEntrySize = (g_NtBuildNumber < NT_WIN11_25H2) ? sizeof(EX_HOST_ENTRY_V1) : sizeof(EX_HOST_ENTRY_V2);
         HostEntryBuffer = supHeapAlloc(HostEntrySize);
         if (HostEntryBuffer == NULL)
             break;
@@ -5002,7 +4785,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExHostCallbacks)
         // Walk list entries.
         //
         while ((ULONG_PTR)ListEntry.Flink != ListHead) {
-
+            LIST_ITERATION_GUARD(GuardIter);
             //
             // Since this buffer now allocated, on a first call it will be empty. Zero it when iteration is over.
             //
@@ -5046,7 +4829,6 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExHostCallbacks)
                 if (FunctionTable) {
                     HostTableDump = (ULONG_PTR*)supHeapAlloc(NumberOfCallbacks * sizeof(PVOID));
                     if (HostTableDump) {
-
                         if (kdReadSystemMemory(
                             (ULONG_PTR)FunctionTable,
                             HostTableDump,
@@ -5064,7 +4846,6 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExHostCallbacks)
                             }
 
                         }
-
                         supHeapFree(HostTableDump);
                     }
                 }
@@ -5073,7 +4854,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExHostCallbacks)
             //
             // ListEntry is on the same offset.
             //
-            ListEntry.Flink = hostEntry.Versions.v1->ListEntry.Flink;
+            if (!SET_NEXT_FLINK_CHECK(ListEntry, hostEntry.Versions.v1->ListEntry.Flink, "ExHostCallbacks NULL Flink"))
+                break;
+
             RtlSecureZeroMemory(HostEntryBuffer, HostEntrySize);
         }
 
@@ -5094,14 +4877,11 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExHostCallbacks)
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpExpCallbackListCallbacks)
 {
     LIST_ENTRY ListEntry, NextEntry, RegistrationsListEntry;
-
     CALLBACK_OBJECT_V2 CallbackObject;
     CALLBACK_REGISTRATION CallbackRegistration;
-
+    SIZE_T GuardIter = 0, GuardSubIter;
     ULONG_PTR ListHead = KernelVariableAddress, RegistrationsListHead;
-
     ULONG_PTR CallbackObjectAddress;
-
     HTREEITEM RootItem, SubItem;
 
     //
@@ -5128,7 +4908,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExpCallbackListCallbacks)
     // Walk list entries.
     //
     while ((ULONG_PTR)ListEntry.Flink != ListHead) {
-
+        LIST_ITERATION_GUARD(GuardIter);
         RtlSecureZeroMemory(&CallbackObject, sizeof(CallbackObject));
 
         CallbackObjectAddress = (ULONG_PTR)ListEntry.Flink - FIELD_OFFSET(CALLBACK_OBJECT_V2, ExpCallbackList);
@@ -5153,10 +4933,11 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExpCallbackListCallbacks)
         //
         // Walk RegisteredCallbacks list entry.
         //
+        GuardSubIter = 0;
         RegistrationsListHead = CallbackObjectAddress + FIELD_OFFSET(CALLBACK_OBJECT_V2, RegisteredCallbacks);
         RegistrationsListEntry.Flink = CallbackObject.RegisteredCallbacks.Flink;
         while ((ULONG_PTR)RegistrationsListEntry.Flink != RegistrationsListHead) {
-
+            LIST_ITERATION_GUARD(GuardSubIter);
             //
             // Read callback registration data.
             //
@@ -5168,13 +4949,14 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExpCallbackListCallbacks)
                 break;
             }
 
-            RegistrationsListEntry.Flink = CallbackRegistration.Link.Flink;
-
             AddEntryToList(TreeList,
                 SubItem,
                 (ULONG_PTR)CallbackRegistration.CallbackFunction,
                 TEXT("Callback registration"),
                 Modules);
+
+            if (!SET_NEXT_FLINK_CHECK(RegistrationsListEntry, CallbackRegistration.Link.Flink, "ExpCallbackRegistrationsList(1) NULL Flink"))
+                break;
         }
 
         //
@@ -5190,10 +4972,8 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExpCallbackListCallbacks)
             break;
         }
 
-        if (NextEntry.Flink == NULL)
+        if (!SET_NEXT_FLINK_CHECK(ListEntry, NextEntry.Flink, "ExpCallbackRegistrationsList(2) NULL Flink"))
             break;
-
-        ListEntry.Flink = NextEntry.Flink;
     }
 }
 
@@ -5208,11 +4988,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpExpCallbackListCallbacks)
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCoalescingCallbacks)
 {
     ULONG CallbacksCount, i;
-
-    LIST_ENTRY ListEntry;
-
+    SIZE_T GuardIter = 0;
     ULONG_PTR ListHead = KernelVariableAddress;
     ULONG_PTR objectFastRef, callbackAddress;
+    LIST_ENTRY ListEntry;
 
     union {
         PO_COALESCING_CALLBACK_V1 v1;
@@ -5220,7 +4999,6 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCoalescingCallbacks)
     } callbackObject;
 
     EX_FAST_REF Callbacks[PopCoalescingCallbackRoutineCount_V2];
-
     HTREEITEM RootItem;
 
     //
@@ -5234,27 +5012,19 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCoalescingCallbacks)
     // Before Win10 RS4 this list implemented as the array of the fixed size.
     //
     if (g_NtBuildNumber < NT_WIN10_REDSTONE4) {
-
         RtlSecureZeroMemory(Callbacks, sizeof(Callbacks));
 
         //
         // Before Win10 RS3 this list is limited to 8 callbacks.
         // In Win10 RS3 this list increased up to 32 callbacks.
         //
-        if (g_NtBuildNumber < NT_WIN10_REDSTONE3)
-            CallbacksCount = PopCoalescingCallbackRoutineCount_V1;
-        else
-            CallbacksCount = PopCoalescingCallbackRoutineCount_V2;
-
+        CallbacksCount = (g_NtBuildNumber < NT_WIN10_REDSTONE3) ? PopCoalescingCallbackRoutineCount_V1 : PopCoalescingCallbackRoutineCount_V2;
         if (kdReadSystemMemory(KernelVariableAddress,
             &Callbacks,
             CallbacksCount * sizeof(EX_FAST_REF)))
         {
-
             for (i = 0; i < CallbacksCount; i++) {
-
                 if (Callbacks[i].Value) {
-
                     objectFastRef = (ULONG_PTR)ObGetObjectFastReference(Callbacks[i]);
                     RtlSecureZeroMemory(&callbackObject, sizeof(callbackObject));
 
@@ -5268,8 +5038,6 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCoalescingCallbacks)
                             L"CoalescingCallback",
                             Modules);
                     }
-
-
                 }
             }
         }
@@ -5293,11 +5061,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCoalescingCallbacks)
         // Walk list entries.
         //
         while ((ULONG_PTR)ListEntry.Flink != ListHead) {
-
+            LIST_ITERATION_GUARD(GuardIter);
             RtlSecureZeroMemory(&callbackObject, sizeof(callbackObject));
 
             callbackAddress = (ULONG_PTR)ListEntry.Flink - FIELD_OFFSET(PO_COALESCING_CALLBACK_V2, Link);
-
             if (!kdReadSystemMemory(callbackAddress,
                 &callbackObject.v2,
                 sizeof(callbackObject.v2)))
@@ -5311,9 +5078,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPoCoalescingCallbacks)
                 L"CoalescingCallback",
                 Modules);
 
-            ListEntry.Flink = callbackObject.v2.Link.Flink;
+            if (!SET_NEXT_FLINK_CHECK(ListEntry, callbackObject.v2.Link.Flink, "CoalescingCallback NULL Flink"))
+                break;
         }
-
     }
 }
 
@@ -5349,10 +5116,8 @@ LPWSTR PspPicoProviderNameFromIndex(
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpPspPicoProviderRoutines)
 {
     SIZE_T i, c;
-
     PULONG_PTR picoRoutines;
     SIZE_T dataSize;
-
     HTREEITEM RootItem;
 
     if (!supIsLxssAvailable())
@@ -5380,13 +5145,11 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPspPicoProviderRoutines)
 
         picoRoutines = (PULONG_PTR)supHeapAlloc(ALIGN_UP(dataSize, PULONG_PTR));
         if (picoRoutines) {
-
             if (kdReadSystemMemory(KernelVariableAddress + sizeof(SIZE_T),
                 picoRoutines,
                 (ULONG)dataSize))
             {
                 c = dataSize / sizeof(ULONG_PTR);
-
                 for (i = 0; i < c; i++) {
                     if (picoRoutines[i] > g_kdctx.SystemRangeStart) {
                         AddEntryToList(TreeList,
@@ -5397,12 +5160,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPspPicoProviderRoutines)
                     }
                 }
             }
-
             supHeapFree(picoRoutines);
         }
-
     }
-
 }
 
 /*
@@ -5415,6 +5175,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPspPicoProviderRoutines)
 */
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpKiNmiCallbackListHead)
 {
+    SIZE_T GuardIter = 0;
     ULONG_PTR Next;
     KNMI_HANDLER_CALLBACK NmiEntry;
     HTREEITEM RootItem;
@@ -5443,7 +5204,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpKiNmiCallbackListHead)
     //
     Next = (ULONG_PTR)NmiEntry.Next;
     while (Next) {
-
+        LIST_ITERATION_GUARD(GuardIter);
         RtlSecureZeroMemory(&NmiEntry, sizeof(NmiEntry));
 
         if (!kdReadSystemMemory(Next,
@@ -5460,9 +5221,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpKiNmiCallbackListHead)
             Modules);
 
         Next = (ULONG_PTR)NmiEntry.Next;
-
     }
-
 }
 
 /*
@@ -5475,10 +5234,10 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpKiNmiCallbackListHead)
 */
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpPspSiloMonitorList)
 {
-    LIST_ENTRY ListEntry;
+    SIZE_T GuardIter = 0;
     ULONG_PTR ListHead = KernelVariableAddress;
+    LIST_ENTRY ListEntry;
     HTREEITEM RootItem;
-
     SERVER_SILO_MONITOR SiloMonitor;
 
     //
@@ -5505,7 +5264,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPspSiloMonitorList)
     // Walk list entries.
     //
     while ((ULONG_PTR)ListEntry.Flink != ListHead) {
-
+        LIST_ITERATION_GUARD(GuardIter);
         RtlSecureZeroMemory(&SiloMonitor, sizeof(SiloMonitor));
 
         if (!kdReadSystemMemory(
@@ -5532,12 +5291,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPspSiloMonitorList)
                 Modules);
         }
 
-        if (SiloMonitor.ListEntry.Flink == NULL)
+        if (!SET_NEXT_FLINK_CHECK(ListEntry, SiloMonitor.ListEntry.Flink, "SiloMonitor NULL Flink"))
             break;
-
-        ListEntry.Flink = SiloMonitor.ListEntry.Flink;
     }
-
 }
 
 /*
@@ -5550,13 +5306,12 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPspSiloMonitorList)
 */
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpEmpCallbackListHead)
 {
-    SINGLE_LIST_ENTRY Head;
+    SIZE_T GuardIter = 0;
     LPWSTR GuidString;
     ULONG_PTR ListHead = KernelVariableAddress, Next, RecordAddress;
+    SINGLE_LIST_ENTRY Head;
     HTREEITEM RootItem;
-
     EMP_CALLBACK_DB_RECORD CallbackRecord;
-
     UNICODE_STRING ConvertedGuid;
 
     //
@@ -5580,7 +5335,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpEmpCallbackListHead)
 
     Next = (ULONG_PTR)Head.Next;
     while (Next) {
-
+        LIST_ITERATION_GUARD(GuardIter);
         RtlSecureZeroMemory(&CallbackRecord, sizeof(CallbackRecord));
         RecordAddress = (ULONG_PTR)Next - FIELD_OFFSET(EMP_CALLBACK_DB_RECORD, List);
 
@@ -5622,12 +5377,11 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpEmpCallbackListHead)
 */
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpPnpDeviceClassNotifyList)
 {
-    LIST_ENTRY ListEntry;
+    SIZE_T GuardIter = 0;
     ULONG_PTR ListHead = KernelVariableAddress;
-    HTREEITEM RootItem;
-
     LPWSTR GuidString;
-
+    LIST_ENTRY ListEntry;
+    HTREEITEM RootItem;
     DEVICE_CLASS_NOTIFY_ENTRY NotifyEntry;
     UNICODE_STRING ConvertedGuid;
 
@@ -5655,7 +5409,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPnpDeviceClassNotifyList)
     // Walk list entries.
     //
     while ((ULONG_PTR)ListEntry.Flink != ListHead) {
-
+        LIST_ITERATION_GUARD(GuardIter);
         RtlSecureZeroMemory(&NotifyEntry, sizeof(NotifyEntry));
 
         if (!kdReadSystemMemory(
@@ -5667,7 +5421,6 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPnpDeviceClassNotifyList)
         }
 
         if (NotifyEntry.CallbackRoutine != NULL) {
-
             if (NT_SUCCESS(RtlStringFromGUID(&NotifyEntry.ClassGuid, &ConvertedGuid)))
                 GuidString = ConvertedGuid.Buffer;
             else
@@ -5683,12 +5436,9 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPnpDeviceClassNotifyList)
                 RtlFreeUnicodeString(&ConvertedGuid);
         }
 
-        if (NotifyEntry.ListEntry.Flink == NULL)
+        if (!SET_NEXT_FLINK_CHECK(ListEntry, NotifyEntry.ListEntry.Flink, "PnpDeviceClassNotifyList NULL Flink"))
             break;
-
-        ListEntry.Flink = NotifyEntry.ListEntry.Flink;
     }
-
 }
 
 /*
@@ -5722,34 +5472,29 @@ OBEX_QUERYCALLBACK_ROUTINE(QueryIopFsListsCallbacks)
     }
 
     if (g_SystemCallbacks.IopDiskFileSystemQueueHead) {
-
         DisplayRoutine(TreeList,
             TEXT("IoDiskFs"),
             g_SystemCallbacks.IopDiskFileSystemQueueHead,
             Modules);
     }
     if (g_SystemCallbacks.IopCdRomFileSystemQueueHead) {
-
         DisplayRoutine(TreeList,
             TEXT("IoCdRomFs"),
             g_SystemCallbacks.IopCdRomFileSystemQueueHead,
             Modules);
     }
     if (g_SystemCallbacks.IopNetworkFileSystemQueueHead) {
-
         DisplayRoutine(TreeList,
             TEXT("IoNetworkFs"),
             g_SystemCallbacks.IopNetworkFileSystemQueueHead,
             Modules);
     }
     if (g_SystemCallbacks.IopTapeFileSystemQueueHead) {
-
         DisplayRoutine(TreeList,
             TEXT("IoTapeFs"),
             g_SystemCallbacks.IopTapeFileSystemQueueHead,
             Modules);
     }
-
     return STATUS_SUCCESS;
 }
 
@@ -5820,16 +5565,13 @@ VOID DisplayCallbacksList(
     _In_ HWND TreeList,
     _In_ HWND StatusBar)
 {
-    NTSTATUS QueryStatus;
     ULONG i;
+    NTSTATUS QueryStatus;
     PRTL_PROCESS_MODULES Modules = NULL;
-
     PWSTR lpStatusMsg;
-
     WCHAR szText[200];
 
     do {
-
         if (g_kdctx.NtOsImageMap == NULL) {
             lpStatusMsg = TEXT("Error, ntoskrnl image is not mapped!");
             supStatusBarSetText(StatusBar, 1, lpStatusMsg);
@@ -5846,7 +5588,6 @@ VOID DisplayCallbacksList(
         //
         // List callbacks.
         //
-
         for (i = 0; i < RTL_NUMBER_OF(g_CallbacksDispatchTable); i++) {
             QueryStatus = g_CallbacksDispatchTable[i].QueryRoutine(
                 g_CallbacksDispatchTable[i].QueryFlags,
@@ -5867,11 +5608,9 @@ VOID DisplayCallbacksList(
                         g_CallbacksDispatchTable[i].CallbackType);
 
                     logAdd(EntryTypeWarning, szText);
-
 #endif
                 }
                 else {
-
                     RtlStringCchPrintfSecure(szText,
                         RTL_NUMBER_OF(szText),
                         TEXT("Callback type %ws, error 0x%lX"),
@@ -5920,7 +5659,6 @@ VOID SysCbDialogHandlePopupMenu(
 
     hMenu = CreatePopupMenu();
     if (hMenu) {
-
         if (supTreeListAddCopyValueItem(hMenu,
             pDlgContext->TreeList,
             ID_OBJECT_COPY,
@@ -5930,9 +5668,7 @@ VOID SysCbDialogHandlePopupMenu(
         {
             InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
         }
-
         InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_VIEW_REFRESH, T_VIEW_REFRESH);
-
         TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, hwndDlg, NULL);
         DestroyMenu(hMenu);
     }
@@ -5985,7 +5721,8 @@ VOID SysCbDialogContentRefresh(
 )
 {
     UNREFERENCED_PARAMETER(hwndDlg);
-    if (fResetContent) TreeList_ClearTree(pDlgContext->TreeList);
+    if (fResetContent)
+        TreeList_ClearTree(pDlgContext->TreeList);
     g_CallbacksCount = 0;
     supTreeListEnableRedraw(pDlgContext->TreeList, FALSE);
     DisplayCallbacksList(pDlgContext->TreeList, pDlgContext->StatusBar);
@@ -6071,7 +5808,6 @@ INT_PTR CALLBACK SysCbDialogProc(
         break;
 
     case WM_GETMINMAXINFO:
-
         if (lParam) {
             supSetMinMaxTrackSize((PMINMAXINFO)lParam,
                 CBDLG_TRACKSIZE_MIN_X,
@@ -6081,7 +5817,6 @@ INT_PTR CALLBACK SysCbDialogProc(
         break;
 
     case WM_SIZE:
-
         pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
         if (pDlgContext) {
             SysCbDialogResize(hwndDlg, pDlgContext->StatusBar, pDlgContext->TreeList);
@@ -6089,7 +5824,6 @@ INT_PTR CALLBACK SysCbDialogProc(
         break;
 
     case WM_CLOSE:
-
         pDlgContext = (EXTRASCONTEXT*)RemoveProp(hwndDlg, T_DLGCONTEXT);
         if (pDlgContext) {
             extrasRemoveDlgIcon(pDlgContext);
@@ -6103,15 +5837,12 @@ INT_PTR CALLBACK SysCbDialogProc(
         break;
 
     case WM_COMMAND:
-
         switch (GET_WM_COMMAND_ID(wParam, lParam)) {
-
         case IDCANCEL:
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
             break;
 
         case ID_OBJECT_COPY:
-
             pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
             if (pDlgContext) {
 
@@ -6122,7 +5853,6 @@ INT_PTR CALLBACK SysCbDialogProc(
             break;
 
         case ID_VIEW_REFRESH:
-
             pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
             if (pDlgContext) {
                 SysCbDialogContentRefresh(hwndDlg, pDlgContext, TRUE);
@@ -6133,7 +5863,6 @@ INT_PTR CALLBACK SysCbDialogProc(
         break;
 
     case WM_CONTEXTMENU:
-
         pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
         if (pDlgContext) {
             SysCbDialogHandlePopupMenu(hwndDlg, pDlgContext, lParam);
@@ -6218,14 +5947,11 @@ VOID extrasCreateCallbacksDialog(
     EXTRASCONTEXT* pDlgContext;
 
     if (!SysCbThreadHandle) {
-
         pDlgContext = (EXTRASCONTEXT*)supHeapAlloc(sizeof(EXTRASCONTEXT));
         if (pDlgContext) {
             pDlgContext->tlSubItemHit = -1;
-
             SysCbThreadHandle = supCreateDialogWorkerThread(extrasSysCbDialogWorkerThread, pDlgContext, 0);
             supWaitForFastEvent(&SysCbInitializedEvent, NULL);
-
         }
     }
 }

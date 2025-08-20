@@ -149,11 +149,11 @@ typedef void(__cdecl *pqsort)(
     );
 
 //declared in main.c
-extern pswprintf_s rtl_swprintf_s;
-extern pqsort rtl_qsort;
+extern pswprintf_s _swprintf_s;
+extern pqsort _qsort;
 
-#define RtlStringCchPrintfSecure rtl_swprintf_s
-#define RtlQuickSort rtl_qsort
+#define RtlStringCchPrintfSecure _swprintf_s
+#define RtlQuickSort _qsort
 
 typedef struct _WINOBJ_STATS {
     ULONG TotalHeapAlloc;

@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.09
 *
-*  DATE:        12 Aug 2025
+*  DATE:        19 Aug 2025
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -120,13 +120,13 @@ ULONG_PTR ObFindAddress(
     _In_ ULONG_PTR ImageBase,
     _In_ ULONG_PTR MappedImageBase,
     _In_ ULONG ReqInstructionLength,
-    _In_ PBYTE PtrCode,
+    _In_reads_bytes_(NumberOfBytes) PBYTE PtrCode,
     _In_ ULONG NumberOfBytes,
-    _In_ PBYTE ScanPattern,
+    _In_reads_bytes_(ScanPatternSize) PBYTE ScanPattern,
     _In_ ULONG ScanPatternSize)
 {
     ULONG_PTR resultAddress = 0;
-    ULONG currentIndex = 0;
+    ULONG currentIndex = 0, required;
     LONG relativeOffset = 0;
     hde64s decodedInstruction;
 
@@ -135,7 +135,8 @@ ULONG_PTR ObFindAddress(
 
     while (currentIndex < NumberOfBytes) {
 
-        if (currentIndex + ScanPatternSize + sizeof(LONG) > NumberOfBytes)
+        required = ScanPatternSize + (ULONG)sizeof(LONG);
+        if (required > NumberOfBytes || currentIndex > NumberOfBytes - required)
             break;
 
         hde64_disasm((void*)(PtrCode + currentIndex), &decodedInstruction);
@@ -149,7 +150,7 @@ ULONG_PTR ObFindAddress(
                 ScanPattern,
                 ScanPatternSize))
             {
-                if (currentIndex + ScanPatternSize + sizeof(LONG) <= NumberOfBytes) {
+                if (currentIndex <= NumberOfBytes - required) {
                     relativeOffset = *(PLONG)(PtrCode + currentIndex + ScanPatternSize);
                     resultAddress = (ULONG_PTR)PtrCode + currentIndex + decodedInstruction.len + relativeOffset;
                     resultAddress = ImageBase + resultAddress - MappedImageBase;
@@ -233,10 +234,11 @@ BYTE ObGetObjectHeaderOffset(
 *   TRUE if address was successfully calculated and is valid
 *   FALSE otherwise
 */
+_Success_(return)
 BOOL ObHeaderToNameInfoAddress(
     _In_ UCHAR ObjectInfoMask,
     _In_ ULONG_PTR ObjectHeaderAddress,
-    _Inout_ PULONG_PTR HeaderInfoAddress,
+    _Out_ PULONG_PTR HeaderInfoAddress,
     _In_ OBJ_HEADER_INFO_FLAG InfoFlag
 )
 {
@@ -277,7 +279,7 @@ BOOL ObHeaderToNameInfoAddress(
 *
 */
 NTSTATUS ObIsValidUnicodeStringWorker(
-    _In_ PCUNICODE_STRING SourceString,
+    _In_opt_ PCUNICODE_STRING SourceString,
     _In_ CONST SIZE_T cchMax,
     _In_ DWORD dwFlags
 )
@@ -362,8 +364,8 @@ NTSTATUS ObIsValidUnicodeStringEx(
 *
 */
 NTSTATUS ObCopyBoundaryDescriptor(
-    _In_ OBJECT_NAMESPACE_ENTRY* NamespaceLookupEntry,
-    _Out_ POBJECT_BOUNDARY_DESCRIPTOR* BoundaryDescriptor,
+    _In_ _Notnull_ OBJECT_NAMESPACE_ENTRY* NamespaceLookupEntry,
+    _Outptr_result_maybenull_ POBJECT_BOUNDARY_DESCRIPTOR* BoundaryDescriptor,
     _Out_opt_ PULONG BoundaryDescriptorSize
 )
 {
@@ -566,6 +568,7 @@ NTSTATUS ObEnumerateBoundaryDescriptorEntries(
 * Use supVirtualFree to free returned buffer.
 *
 */
+_Ret_maybenull_
 PVOID ObpDumpObjectWithSpecifiedSize(
     _In_ ULONG_PTR ObjectAddress,
     _In_ ULONG ObjectSize,
@@ -610,6 +613,7 @@ PVOID ObpDumpObjectWithSpecifiedSize(
 * Use supVirtualFree to free returned buffer.
 *
 */
+_Ret_maybenull_
 PVOID ObDumpObjectTypeVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
@@ -659,6 +663,7 @@ PVOID ObDumpObjectTypeVersionAware(
 * Use supVirtualFree to free returned buffer.
 *
 */
+_Ret_maybenull_
 PVOID ObDumpAlpcPortObjectVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
@@ -696,7 +701,7 @@ PVOID ObDumpAlpcPortObjectVersionAware(
 }
 
 /*
-* ObxDumpDirectoryObjectVersionAware
+* ObDumpDirectoryObjectVersionAware
 *
 * Purpose:
 *
@@ -705,6 +710,7 @@ PVOID ObDumpAlpcPortObjectVersionAware(
 * Use supVirtualFree to free returned buffer.
 *
 */
+_Ret_maybenull_
 PVOID ObDumpDirectoryObjectVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
@@ -754,6 +760,7 @@ PVOID ObDumpDirectoryObjectVersionAware(
 * Use supVirtualFree to free returned buffer.
 *
 */
+_Ret_maybenull_
 PVOID ObDumpSymbolicLinkObjectVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
@@ -822,6 +829,7 @@ PVOID ObDumpSymbolicLinkObjectVersionAware(
 * Use supVirtualFree to free returned buffer.
 *
 */
+_Ret_maybenull_
 PVOID ObDumpDeviceMapVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
@@ -866,6 +874,7 @@ PVOID ObDumpDeviceMapVersionAware(
 * Use supVirtualFree to free returned buffer.
 *
 */
+_Ret_maybenull_
 PVOID ObDumpDriverExtensionVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
@@ -915,6 +924,7 @@ PVOID ObDumpDriverExtensionVersionAware(
 * Use supVirtualFree to free returned buffer.
 *
 */
+_Ret_maybenull_
 PVOID ObDumpFltFilterObjectVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
@@ -1710,6 +1720,7 @@ BOOL ObQueryNameStringFromAddress(
 *   Pointer to OBJINFO structure allocated from WinObjEx heap and filled with kernel data.
 *
 */
+_Ret_maybenull_
 POBEX_OBJECT_INFORMATION ObpCopyObjectBasicInfo(
     _In_ ULONG_PTR ObjectAddress,
     _In_ ULONG_PTR ObjectHeaderAddress,
@@ -1797,6 +1808,7 @@ POBEX_OBJECT_INFORMATION ObpCopyObjectBasicInfo(
 * Returned object memory must be released with supHeapFree when object is no longer needed.
 *
 */
+_Ret_maybenull_
 POBEX_OBJECT_INFORMATION ObQueryObjectByAddress(
     _In_ ULONG_PTR ObjectAddress
 )
@@ -1844,6 +1856,7 @@ POBEX_OBJECT_INFORMATION ObQueryObjectByAddress(
 * this routine change as we rely here only on HashBuckets which is on same offset.
 *
 */
+_Ret_maybenull_
 POBEX_OBJECT_INFORMATION ObpFindObjectInDirectory(
     _In_ PUNICODE_STRING ObjectName,
     _In_ ULONG_PTR DirectoryAddress
@@ -2017,6 +2030,7 @@ BOOL ObGetObjectAddressForDirectory(
 * Returned object memory must be released with supHeapFree when object is no longer needed.
 *
 */
+_Ret_maybenull_
 POBEX_OBJECT_INFORMATION ObQueryObjectInDirectory(
     _In_ PUNICODE_STRING ObjectName,
     _In_ PUNICODE_STRING DirectoryName
@@ -2045,6 +2059,7 @@ POBEX_OBJECT_INFORMATION ObQueryObjectInDirectory(
 * Read UniqueProcessId field from object of Process type.
 *
 */
+_Success_(return)
 BOOL ObGetProcessId(
     _In_ ULONG_PTR ProcessObject,
     _Out_ PHANDLE UniqueProcessId
@@ -2076,6 +2091,7 @@ BOOL ObGetProcessId(
 * Read ImageFileName field from object of Process type.
 *
 */
+_Success_(return)
 BOOL ObGetProcessImageFileName(
     _In_ ULONG_PTR ProcessObject,
     _Inout_ PUNICODE_STRING ImageFileName
@@ -2560,6 +2576,7 @@ BOOL ObQueryFullNamespacePath(
 * Return Value:
 *   Pointer to allocated directory information buffer, or NULL on failure.
 */
+_Ret_maybenull_
 POBJECT_DIRECTORY_INFORMATION ObQueryObjectDirectory(
     _In_ HANDLE DirectoryHandle,
     _Inout_ PULONG Context,
@@ -2844,7 +2861,7 @@ VOID kdReportReadError(
 BOOL kdReadSystemMemory2(
     _In_opt_ LPCWSTR CallerFunction,
     _In_ ULONG_PTR Address,
-    _Inout_ PVOID Buffer,
+    _Inout_updates_bytes_(BufferSize) PVOID Buffer,
     _In_ ULONG BufferSize,
     _Out_opt_ PULONG NumberOfBytesRead
 )
@@ -3893,6 +3910,7 @@ VOID symShutdown()
 * Create simple list of system object types.
 *
 */
+_Ret_maybenull_
 PVOID kdCreateObjectTypesList(
     VOID
 )

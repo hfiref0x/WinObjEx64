@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       EXTRASPN.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.09
 *
-*  DATE:        19 Jun 2022
+*  DATE:        19 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -473,7 +473,7 @@ VOID PNDlgShowNamespaceInfo(
         &BoundaryDescriptor,
         NULL);
 
-    if (NT_SUCCESS(ntStatus)) {
+    if (NT_SUCCESS(ntStatus) && BoundaryDescriptor) {
 
         //
         // Namespace root directory.

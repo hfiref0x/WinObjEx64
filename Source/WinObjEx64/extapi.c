@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017 - 2022
+*  (C) COPYRIGHT AUTHORS, 2017 - 2025
 *
 *  TITLE:       EXTAPI.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.09
 *
-*  DATE:        19 Jun 2022
+*  DATE:        19 Aug 2025
 *
 *  Support unit for pre Windows 10 missing APIs.
 *
@@ -19,6 +19,10 @@
 #include "global.h"
 
 EXTENDED_API_SET g_ExtApiSet;
+
+#define RESOLVE_API(set, mod, field, type, name) \
+    set->field = (type)GetProcAddress(mod, name); \
+    if (set->field) set->NumberOfAPI += 1;
 
 /*
 * ExApiSetInit
@@ -36,29 +40,16 @@ NTSTATUS ExApiSetInit(
 {
     NTSTATUS Status;
     HMODULE hNtdll, hUser32;
+    PEXTENDED_API_SET set = &g_ExtApiSet;
 
     RtlSecureZeroMemory(&g_ExtApiSet, sizeof(g_ExtApiSet));
 
-
     hNtdll = GetModuleHandle(TEXT("ntdll.dll"));
     if (hNtdll) {
-        //
-        // New Partition API introduced in Windows 10 TH1.
-        //
-        g_ExtApiSet.NtOpenPartition = (pfnNtOpenPartition)GetProcAddress(hNtdll, "NtOpenPartition");
-
-        if (g_ExtApiSet.NtOpenPartition) {
-            g_ExtApiSet.NumberOfAPI += 1;
-        }
-
-        //
+        // Available since Windows 10 TH1.
+        RESOLVE_API(set, hNtdll, NtOpenPartition, pfnNtOpenPartition, "NtOpenPartition");
         // Available since Windows 10 REDSTONE 1.
-        //
-        g_ExtApiSet.NtOpenRegistryTransaction = (pfnNtOpenRegistryTransaction)GetProcAddress(hNtdll, "NtOpenRegistryTransaction");
-
-        if (g_ExtApiSet.NtOpenRegistryTransaction) {
-            g_ExtApiSet.NumberOfAPI += 1;
-        }
+        RESOLVE_API(set, hNtdll, NtOpenRegistryTransaction, pfnNtOpenRegistryTransaction, "NtOpenRegistryTransaction");
     }
 
     //
@@ -66,29 +57,11 @@ NTSTATUS ExApiSetInit(
     //
     hUser32 = GetModuleHandle(TEXT("user32.dll"));
     if (hUser32) {
-        g_ExtApiSet.IsImmersiveProcess = (pfnIsImmersiveProcess)GetProcAddress(hUser32, "IsImmersiveProcess");
-        if (g_ExtApiSet.IsImmersiveProcess) {
-            g_ExtApiSet.NumberOfAPI += 1;
-        }
-        g_ExtApiSet.GetAwarenessFromDpiAwarenessContext =
-            (pfnGetAwarenessFromDpiAwarenessContext)GetProcAddress(hUser32, "GetAwarenessFromDpiAwarenessContext");
-        if (g_ExtApiSet.GetAwarenessFromDpiAwarenessContext) {
-            g_ExtApiSet.NumberOfAPI += 1;
-        }
-        g_ExtApiSet.GetDpiForSystem = (pfnGetDpiForSystem)GetProcAddress(hUser32, "GetDpiForSystem");
-        if (g_ExtApiSet.GetDpiForSystem) {
-            g_ExtApiSet.NumberOfAPI += 1;
-        }
-        g_ExtApiSet.GetDpiForWindow = (pfnGetDpiForWindow)GetProcAddress(hUser32, "GetDpiForWindow");
-        if (g_ExtApiSet.GetDpiForWindow) {
-            g_ExtApiSet.NumberOfAPI += 1;
-        }
-        g_ExtApiSet.GetThreadDpiAwarenessContext = (pfnGetThreadDpiAwarenessContext)
-            GetProcAddress(hUser32, "GetThreadDpiAwarenessContext");
-        if (g_ExtApiSet.GetThreadDpiAwarenessContext) {
-            g_ExtApiSet.NumberOfAPI += 1;
-        }
-
+        RESOLVE_API(set, hUser32, IsImmersiveProcess, pfnIsImmersiveProcess, "IsImmersiveProcess");
+        RESOLVE_API(set, hUser32, GetAwarenessFromDpiAwarenessContext, pfnGetAwarenessFromDpiAwarenessContext, "GetAwarenessFromDpiAwarenessContext");
+        RESOLVE_API(set, hUser32, GetDpiForSystem, pfnGetDpiForSystem, "GetDpiForSystem");
+        RESOLVE_API(set, hUser32, GetDpiForWindow, pfnGetDpiForWindow, "GetDpiForWindow");
+        RESOLVE_API(set, hUser32, GetThreadDpiAwarenessContext, pfnGetThreadDpiAwarenessContext, "GetThreadDpiAwarenessContext");
     }
 
     Status = (g_ExtApiSet.NumberOfAPI == EXTAPI_ALL_MAPPED) ?

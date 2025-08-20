@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTSUP.C
 *
-*  VERSION:     2.24
+*  VERSION:     2.25
 *
-*  DATE:        10 Aug 2025
+*  DATE:        18 Aug 2025
 *
 *  Native API support functions.
 *
@@ -157,7 +157,10 @@ VOID ntsupSha256Update(
     }
 
     while (off + 64 <= Length) {
+#pragma warning(push)
+#pragma warning(disable: 6385)
         ntsupSha256Transform(Ctx, p + off);
+#pragma warning(pop)
         off += 64;
     }
 

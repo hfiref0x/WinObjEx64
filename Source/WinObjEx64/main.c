@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     2.08
+*  VERSION:     2.09
 *
-*  DATE:        16 Jun 2025
+*  DATE:        16 Aug 2025
 *
 *  Program entry point and main window handler.
 *
@@ -25,8 +25,8 @@
 #define MAINWND_TRACKSIZE_MIN_X 400
 #define MAINWND_TRACKSIZE_MIN_Y 256
 
-pswprintf_s rtl_swprintf_s;
-pqsort rtl_qsort;
+pswprintf_s _swprintf_s;
+pqsort _qsort;
 
 static LONG	g_SplitterPos = 180;
 static LONG	g_SortColumn = 0;
@@ -1784,24 +1784,24 @@ BOOL InitMSVCRT(
     DllHandle = GetModuleHandle(TEXT("ntdll.dll"));
 
     if (DllHandle) {
-        rtl_swprintf_s = (pswprintf_s)GetProcAddress(DllHandle, "swprintf_s");
-        rtl_qsort = (pqsort)GetProcAddress(DllHandle, "qsort");
+        _swprintf_s = (pswprintf_s)GetProcAddress(DllHandle, "swprintf_s");
+        _qsort = (pqsort)GetProcAddress(DllHandle, "qsort");
     }
 
-    if (rtl_swprintf_s == NULL ||
-        rtl_qsort == NULL)
+    if (_swprintf_s == NULL ||
+        _qsort == NULL)
     {
         DllHandle = GetModuleHandle(TEXT("msvcrt.dll"));
         if (DllHandle == NULL)
             DllHandle = LoadLibraryEx(TEXT("msvcrt.dll"), NULL, 0);
 
         if (DllHandle) {
-            rtl_swprintf_s = (pswprintf_s)GetProcAddress(DllHandle, "swprintf_s");
-            rtl_qsort = (pqsort)GetProcAddress(DllHandle, "qsort");
+            _swprintf_s = (pswprintf_s)GetProcAddress(DllHandle, "swprintf_s");
+            _qsort = (pqsort)GetProcAddress(DllHandle, "qsort");
         }
     }
 
-    return ((rtl_swprintf_s != NULL) && (rtl_qsort != NULL));
+    return ((_swprintf_s != NULL) && (_qsort != NULL));
 }
 
 /*

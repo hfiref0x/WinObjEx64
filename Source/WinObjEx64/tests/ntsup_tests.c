@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.09
 *
-*  DATE:        10 Aug 2025
+*  DATE:        19 Aug 2025
 *
 *  NTSup test code used while debug.
 *
@@ -22,8 +22,9 @@
 #include "ntos\ntsup.h"
 #pragma warning(push)
 #pragma warning(disable:28251) //Inconsistent annotation for any intrin, "feature" of the latest MSVC
+#pragma warning(disable: 6387) //_Param_(1) could be '0'
+#pragma warning(disable: 28159) //GetTickCount
 #include <intrin.h>
-#pragma warning(pop)
 
 static ULONG g_FailCount = 0;
 static BOOL g_Verbose = TRUE;
@@ -893,3 +894,4 @@ VOID Test_HashImageSections()
             DbgPrint("[TEST] ntsupHashImageSections%lu tests FAILED.\n", g_FailCount);
     }
 }
+#pragma warning(pop)

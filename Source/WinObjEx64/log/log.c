@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.09
 *
-*  DATE:        13 Aug 2025
+*  DATE:        20 Aug 2025
 *
 *  Simplified log.
 *
@@ -141,7 +141,7 @@ BOOL logEnumEntries(
     _In_ PVOID CallbackContext
 )
 {
-    ULONG i, start, end, cap, logicalCount;
+    ULONG i, start, idx, cap, logicalCount;
     BOOL bResult = FALSE;
 
     if (EnumCallback == NULL)
@@ -152,31 +152,22 @@ BOOL logEnumEntries(
 
     __try {
         EnterCriticalSection(&g_WinObjLog.Lock);
-        if (g_WinObjLog.Initialized) {
+        if (g_WinObjLog.Initialized && g_WinObjLog.Entries) {
             cap = WOBJ_MAX_LOG_CAPACITY;
-            if (g_WinObjLog.Count >= cap)
-                g_WinObjLog.Count = 0;
 
-            logicalCount = (g_WinObjLog.TotalWritten < cap) ? g_WinObjLog.Count : cap;
             if (g_WinObjLog.TotalWritten < cap) {
-                for (i = 0; i < logicalCount; i++) {
-                    if (!EnumCallback(&g_WinObjLog.Entries[i], CallbackContext))
-                        break;
-                }
+                logicalCount = g_WinObjLog.Count;
+                start = 0;
             }
             else {
-                start = g_WinObjLog.Count;
-                end = (g_WinObjLog.Count == 0) ? cap - 1 : g_WinObjLog.Count - 1;
-                for (i = start; i < cap; i++) {
-                    if (!EnumCallback(&g_WinObjLog.Entries[i], CallbackContext))
-                        break;
-                }
-                if (i == cap && g_WinObjLog.Count != 0) {
-                    for (i = 0; i <= end; i++) {
-                        if (!EnumCallback(&g_WinObjLog.Entries[i], CallbackContext))
-                            break;
-                    }
-                }
+                logicalCount = cap;
+                start = g_WinObjLog.Count; // oldest entry index when wrapped
+            }
+
+            for (i = 0; i < logicalCount; i++) {
+                idx = (start + i) % cap;
+                if (!EnumCallback(&g_WinObjLog.Entries[idx], CallbackContext))
+                    break;
             }
         }
         bResult = TRUE;
@@ -201,37 +192,39 @@ VOID LogViewerPrintEntry(
     _In_ LPWSTR lpMessage,
     _In_ BOOL bHighlight)
 {
-    LONG StartPos = 0;
-
+    LONG startPos, endPos;
     CHARFORMAT format;
     CHARRANGE range;
 
-    range.cpMax = INT_MAX;
-    range.cpMin = INT_MAX;
+    // Move caret to end
+    range.cpMax = range.cpMin = INT_MAX;
+    SendMessage(hwndRichEdit, EM_EXSETSEL, 0, (LPARAM)&range);
 
-    SendMessage(hwndRichEdit, EM_EXSETSEL, (WPARAM)0, (LPARAM)&range);
-    SendMessage(hwndRichEdit, EM_EXGETSEL, (WPARAM)0, (LPARAM)&range);
-    StartPos = range.cpMin;
+    // Insert newline if not the first line
+    if (SendMessage(hwndRichEdit, WM_GETTEXTLENGTH, 0, 0) > 0)
+        SendMessage(hwndRichEdit, EM_REPLACESEL, 0, (LPARAM)L"\r\n");
 
-    if (StartPos) {
-        SendMessage(hwndRichEdit, EM_REPLACESEL, (WPARAM)0, (LPARAM)L"\r\n");
-        StartPos++;
-    }
+    // After inserting newline, get start position for new entry
+    SendMessage(hwndRichEdit, EM_EXGETSEL, 0, (LPARAM)&range);
+    startPos = range.cpMin;
 
-    SendMessage(hwndRichEdit, EM_REPLACESEL, (WPARAM)0, (LPARAM)lpMessage);
+    // Insert the message
+    SendMessage(hwndRichEdit, EM_REPLACESEL, 0, (LPARAM)lpMessage);
 
-    range.cpMin = StartPos;
-    range.cpMax = (LONG)_strlen(lpMessage) + StartPos;
-    SendMessage(hwndRichEdit, EM_EXSETSEL, (WPARAM)0, (LPARAM)&range);
+    // Get end position after message insertion
+    SendMessage(hwndRichEdit, EM_EXGETSEL, 0, (LPARAM)&range);
+    endPos = range.cpMin;
 
-    format.cbSize = sizeof(CHARFORMAT);
+    // Select just inserted message
+    range.cpMin = startPos;
+    range.cpMax = endPos;
+    SendMessage(hwndRichEdit, EM_EXSETSEL, 0, (LPARAM)&range);
+
+    // Apply formatting (bold when highlight requested)
+    RtlSecureZeroMemory(&format, sizeof(format));
+    format.cbSize = sizeof(format);
     format.dwMask = CFM_BOLD;
-    if (bHighlight) {
-        format.dwEffects = CFE_BOLD;
-    }
-    else {
-        format.dwEffects = 0;
-    }
+    format.dwEffects = bHighlight ? CFE_BOLD : 0;
     SendMessage(hwndRichEdit, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&format);
 }
 
@@ -328,7 +321,6 @@ VOID LogViewerListLog(
     charRange.cpMax = 0;
     charRange.cpMin = 0;
     SendMessage(hwndList, EM_EXSETSEL, (WPARAM)0, (LPARAM)&charRange);
-
 }
 
 /*
@@ -367,6 +359,8 @@ VOID LogViewerCopyToClipboard(
             gt.lpDefaultChar = NULL;
             gt.lpUsedDefChar = NULL;
             SendMessage(hwndControl, EM_GETTEXTEX, (WPARAM)&gt, (LPARAM)Buffer);
+
+            Buffer[BufferSizeChars] = L'\0';
 
             supClipboardCopy(Buffer, AllocSize);
 
@@ -437,5 +431,4 @@ VOID LogViewerShowDialog(
         hwndParent,
         (DLGPROC)&LogViewerDialogProc,
         0);
-
 }

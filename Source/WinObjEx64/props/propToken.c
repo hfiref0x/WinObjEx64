@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2022
+*  (C) COPYRIGHT AUTHORS, 2019 - 2025
 *
 *  TITLE:       PROPTOKEN.C
 *
-*  VERSION:     2.01
+*  VERSION:     2.09
 *
-*  DATE:        01 Dec 2022
+*  DATE:        21 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -17,14 +17,25 @@
 #include "global.h"
 #include "propDlg.h"
 
-HWND g_hwndTokenPageList;
-INT g_lvTokenPageSelectedItem;
-INT g_lvTokenPageColumnHit;
-
 #define T_TOKEN_PROP_CID_PID    TEXT("propTokenPid")
 #define T_TOKEN_PROP_CID_TID    TEXT("propTokenTid")
 #define T_TOKEN_PROP_TYPE       TEXT("propTokenType")
 
+//
+// Small context for this dialog.
+//
+typedef struct _TOKEN_PAGE_CONTEXT {
+    HWND hwndList;
+    INT  lvSelectedItem;
+    INT  lvColumnHit;
+} TOKEN_PAGE_CONTEXT, * PTOKEN_PAGE_CONTEXT;
+
+static PTOKEN_PAGE_CONTEXT TokenPageGetContext(
+    _In_ HWND hwndDlg
+)
+{
+    return (PTOKEN_PAGE_CONTEXT)GetProp(hwndDlg, T_DLGCONTEXT);
+}
 
 /*
 * TokenPageShowError
@@ -66,29 +77,35 @@ VOID TokenPageInitControls(
 )
 {
     LVGROUP lvg;
+    PTOKEN_PAGE_CONTEXT pCtx;
 
-    g_hwndTokenPageList = GetDlgItem(hwndDlg, IDC_TOKEN_PRIVLIST);
-    g_lvTokenPageSelectedItem = -1;
-    g_lvTokenPageColumnHit = -1;
+    pCtx = TokenPageGetContext(hwndDlg);
+    if (pCtx == NULL) {
+        return;
+    }
+
+    pCtx->hwndList = GetDlgItem(hwndDlg, IDC_TOKEN_PRIVLIST);
+    pCtx->lvSelectedItem = -1;
+    pCtx->lvColumnHit = -1;
 
     //
     // Set listview style flags and theme.
     //
-    supSetListViewSettings(g_hwndTokenPageList,
+    supSetListViewSettings(pCtx->hwndList,
         LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
         FALSE,
         TRUE,
         NULL,
         0);
 
-    SendMessage(g_hwndTokenPageList, LVM_ENABLEGROUPVIEW, 1, 0);
+    SendMessage(pCtx->hwndList, LVM_ENABLEGROUPVIEW, 1, 0);
 
-    supAddListViewColumn(g_hwndTokenPageList, 0, 0, 0,
+    supAddListViewColumn(pCtx->hwndList, 0, 0, 0,
         I_IMAGENONE,
         LVCFMT_LEFT,
         TEXT("Name"), 400);
 
-    supAddListViewColumn(g_hwndTokenPageList, 1, 1, 1,
+    supAddListViewColumn(pCtx->hwndList, 1, 1, 1,
         I_IMAGENONE,
         LVCFMT_LEFT,
         TEXT("Status"), 150);
@@ -101,18 +118,18 @@ VOID TokenPageInitControls(
     lvg.pszHeader = TEXT("Privileges");
     lvg.cchHeader = (INT)_strlen(lvg.pszHeader);
     lvg.iGroupId = 0;
-    SendMessage(g_hwndTokenPageList, LVM_INSERTGROUP, (WPARAM)0, (LPARAM)&lvg);
+    SendMessage(pCtx->hwndList, LVM_INSERTGROUP, (WPARAM)0, (LPARAM)&lvg);
 
     lvg.pszHeader = TEXT("Groups");
     lvg.cchHeader = (INT)_strlen(lvg.pszHeader);
     lvg.iGroupId = 1;
-    SendMessage(g_hwndTokenPageList, LVM_INSERTGROUP, (WPARAM)1, (LPARAM)&lvg);
+    SendMessage(pCtx->hwndList, LVM_INSERTGROUP, (WPARAM)1, (LPARAM)&lvg);
 
     if (IsAppContainer) {
         lvg.pszHeader = TEXT("Capabilities");
         lvg.cchHeader = (INT)_strlen(lvg.pszHeader);
         lvg.iGroupId = 2;
-        SendMessage(g_hwndTokenPageList, LVM_INSERTGROUP, (WPARAM)2, (LPARAM)&lvg);
+        SendMessage(pCtx->hwndList, LVM_INSERTGROUP, (WPARAM)2, (LPARAM)&lvg);
     }
 
     SetDlgItemText(hwndDlg, IDC_TOKEN_USER, T_CannotQuery);
@@ -131,24 +148,33 @@ VOID TokenPageInitControls(
 VOID TokenPageListAdd(
     _In_ INT GroupIndex,
     _In_ LPWSTR lpName,
-    _In_ LPWSTR lpStatus
+    _In_ LPWSTR lpStatus,
+    _In_ HWND hwndDlg
 )
 {
     INT nIndex;
     LVITEM lvitem;
+    PTOKEN_PAGE_CONTEXT pCtx;
+
+    pCtx = TokenPageGetContext(hwndDlg);
+    if (pCtx == NULL)
+        return;
 
     RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
     lvitem.mask = LVIF_TEXT | LVIF_GROUPID;
     lvitem.pszText = lpName;
     lvitem.iItem = MAXINT;
     lvitem.iGroupId = GroupIndex;
-    nIndex = ListView_InsertItem(g_hwndTokenPageList, &lvitem);
+    nIndex = ListView_InsertItem(pCtx->hwndList, &lvitem);
+    if (nIndex == -1) { // insertion failed
+        return;
+    }
 
     lvitem.mask = LVIF_TEXT;
     lvitem.iSubItem = 1;
     lvitem.pszText = lpStatus;
     lvitem.iItem = nIndex;
-    ListView_SetItem(g_hwndTokenPageList, &lvitem);
+    ListView_SetItem(pCtx->hwndList, &lvitem);
 }
 
 /*
@@ -251,7 +277,7 @@ VOID TokenPageListInfo(
                         _strcat(szBuffer, TEXT(", Default Enabled"));
                     }
 
-                    TokenPageListAdd(0, szPrivName, szBuffer);
+                    TokenPageListAdd(0, szPrivName, szBuffer, hwndDlg);
                 }
 
             }
@@ -302,7 +328,7 @@ VOID TokenPageListInfo(
                         _strcat(szBuffer, ElementName);
                     }
 
-                    TokenPageListAdd(1, UserAndDomain, szBuffer);
+                    TokenPageListAdd(1, UserAndDomain, szBuffer, hwndDlg);
 
                     supHeapFree(UserAndDomain);
                 }
@@ -340,7 +366,7 @@ VOID TokenPageListInfo(
 
                 }
             }
-            else                 
+            else
                 _strcpy(szBuffer, TEXT("No"));
 
 
@@ -439,7 +465,7 @@ VOID TokenPageListInfo(
                     if (pTokenGroups->Groups[i].Sid) {
                         ElementName = NULL;
                         if (ConvertSidToStringSid(pTokenGroups->Groups[i].Sid, &ElementName)) {
-                            TokenPageListAdd(2, ElementName, TEXT("Capabilities"));
+                            TokenPageListAdd(2, ElementName, TEXT("Capabilities"), hwndDlg);
                             LocalFree(ElementName);
                         }
                     }
@@ -462,7 +488,7 @@ VOID TokenPageListInfo(
             (PVOID)&TokenStats, sizeof(TOKEN_STATISTICS), &r)))
         {
             szBuffer[0] = 0;
-            RtlStringCchPrintfSecure(szBuffer, MAX_PATH, L"0x%x-%x$", 
+            RtlStringCchPrintfSecure(szBuffer, MAX_PATH, L"0x%x-%x$",
                 TokenStats.AuthenticationId.HighPart,
                 TokenStats.AuthenticationId.LowPart);
             SetDlgItemText(hwndDlg, IDC_TOKEN_AUTHID, szBuffer);
@@ -642,7 +668,7 @@ VOID TokenPageShowAdvancedProperties(
             TokenObject.ClientId.UniqueProcess);
 
     }
-    
+
     RtlInitUnicodeString(&usObjectName, szFakeName);
 
     propConfig.hwndParent = hwndDlg;
@@ -669,19 +695,24 @@ VOID TokenPageHandlePopup(
 )
 {
     HMENU hMenu;
+    PTOKEN_PAGE_CONTEXT pCtx;
 
     UNREFERENCED_PARAMETER(lpUserParam);
+
+    pCtx = TokenPageGetContext(hwndDlg);
+    if (pCtx == NULL)
+        return;
 
     hMenu = CreatePopupMenu();
     if (hMenu) {
 
         if (supListViewAddCopyValueItem(hMenu,
-            g_hwndTokenPageList,
+            pCtx->hwndList,
             ID_OBJECT_COPY,
             0,
             lpPoint,
-            &g_lvTokenPageSelectedItem,
-            &g_lvTokenPageColumnHit))
+            &pCtx->lvSelectedItem,
+            &pCtx->lvColumnHit))
         {
             TrackPopupMenu(hMenu,
                 TPM_RIGHTBUTTON | TPM_LEFTALIGN,
@@ -710,16 +741,21 @@ INT_PTR TokenPageDialogOnCommand(
 )
 {
     INT_PTR Result = 0;
+    PTOKEN_PAGE_CONTEXT pCtx;
 
     UNREFERENCED_PARAMETER(lParam);
+
+    pCtx = TokenPageGetContext(hwndDlg);
+    if (pCtx == NULL)
+        return 0;
 
     switch (GET_WM_COMMAND_ID(wParam, lParam)) {
     case ID_OBJECT_COPY:
 
-        supListViewCopyItemValueToClipboard(g_hwndTokenPageList,
-            g_lvTokenPageSelectedItem,
-            g_lvTokenPageColumnHit);
-        
+        supListViewCopyItemValueToClipboard(pCtx->hwndList,
+            pCtx->lvSelectedItem,
+            pCtx->lvColumnHit);
+
         Result = 1;
         break;
     case IDC_TOKEN_ADVANCED:
@@ -751,10 +787,22 @@ INT_PTR TokenPageDialogOnInit(
 {
     PROPSHEETPAGE* pSheet = NULL;
     PROP_OBJECT_INFO* Context = NULL;
+    PTOKEN_PAGE_CONTEXT pCtx;
 
     pSheet = (PROPSHEETPAGE*)lParam;
     if (pSheet) {
         Context = (PROP_OBJECT_INFO*)pSheet->lParam;
+
+        //
+        // Allocate and attach per-dialog context.
+        //
+        pCtx = (PTOKEN_PAGE_CONTEXT)supHeapAlloc(sizeof(TOKEN_PAGE_CONTEXT));
+        if (pCtx) {
+            pCtx->hwndList = NULL;
+            pCtx->lvSelectedItem = -1;
+            pCtx->lvColumnHit = -1;
+            SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)pCtx);
+        }
 
         //
         // Remember client id.
@@ -798,17 +846,21 @@ INT_PTR CALLBACK TokenPageDialogProc(
     _In_  LPARAM lParam
 )
 {
+    PTOKEN_PAGE_CONTEXT pCtx;
+
     switch (uMsg) {
 
     case WM_CONTEXTMENU:
 
-        supHandleContextMenuMsgForListView(hwndDlg,
-            wParam,
-            lParam,
-            g_hwndTokenPageList,
-            (pfnPopupMenuHandler)TokenPageHandlePopup,
-            NULL);
-
+        pCtx = TokenPageGetContext(hwndDlg);
+        if (pCtx) {
+            supHandleContextMenuMsgForListView(hwndDlg,
+                wParam,
+                lParam,
+                pCtx->hwndList,
+                (pfnPopupMenuHandler)TokenPageHandlePopup,
+                NULL);
+        }
         break;
 
     case WM_COMMAND:
@@ -818,6 +870,10 @@ INT_PTR CALLBACK TokenPageDialogProc(
         return TokenPageDialogOnInit(hwndDlg, lParam);
 
     case WM_DESTROY:
+        pCtx = (PTOKEN_PAGE_CONTEXT)RemoveProp(hwndDlg, T_DLGCONTEXT);
+        if (pCtx) {
+            supHeapFree(pCtx);
+        }
         RemoveProp(hwndDlg, T_TOKEN_PROP_CID_PID);
         RemoveProp(hwndDlg, T_TOKEN_PROP_CID_TID);
         RemoveProp(hwndDlg, T_TOKEN_PROP_TYPE);

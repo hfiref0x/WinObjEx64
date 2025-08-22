@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2021 - 2022
+*  (C) COPYRIGHT AUTHORS, 2021 - 2025
 *
 *  TITLE:       PROPSECTION.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.09
 *
-*  DATE:        19 Jun 2022
+*  DATE:        21 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -177,12 +177,10 @@ VOID CALLBACK SectionControlAreaOutput(
             i = 0;
             j = 0;
             do {
-
+                //
+                // Special case. This flag is 6 bits.
+                //
                 if (i == 20) {
-
-                    //
-                    // This flag is 6 bits.
-                    //
                     propObDumpUlong(TreeList,
                         treeSubItem,
                         (LPWSTR)T_SectionFlags[20],
@@ -196,7 +194,6 @@ VOID CALLBACK SectionControlAreaOutput(
 
                 }
                 else {
-
                     propObDumpByte(TreeList,
                         treeSubItem,
                         (LPWSTR)T_SectionFlags[j],
@@ -236,7 +233,6 @@ VOID CALLBACK SectionControlAreaOutput(
             0, 0);
 
     }
-
 }
 
 /*
@@ -307,8 +303,7 @@ VOID CALLBACK SectionSegmentOutput(
         lpFieldName = TEXT("FirstMappedVa");
         lpDesc = T_EmptyString;
 
-        if (ControlArea->u.Flags.Image)
-        {
+        if (ControlArea->u.Flags.Image) {
             lpFieldName = TEXT("ImageInformation");
             lpDesc = T_PMI_SECTION_IMAGE_INFORMATION;
         }
@@ -385,8 +380,6 @@ VOID CALLBACK SectionMiReverseViewMapOutput(
             // Process map view.
             //
             lpFieldName = TEXT("VadsProcess");
-
-
             if (ObGetProcessId(kernelAddress, &processId)) {
 
                 bExtQuery = NT_SUCCESS(supQueryProcessImageFileNameWin32(processId, &pusFileName));
@@ -407,14 +400,12 @@ VOID CALLBACK SectionMiReverseViewMapOutput(
             }
 
             if (bExtQuery == FALSE) {
-
                 if (ObGetProcessImageFileName(kernelAddress, &usImageFileName)) {
                     lpProcessName = usImageFileName.Buffer;
                 }
                 else {
                     lpProcessName = T_Unknown;
                 }
-
             }
 
             break;
@@ -449,7 +440,6 @@ VOID CALLBACK SectionMiReverseViewMapOutput(
             //
             lpFieldName = TEXT("Unrecognized");
             break;
-
         }
 
         propObDumpAddress(TreeList,
@@ -487,22 +477,9 @@ HTREEITEM CALLBACK SectionObjectCreateNode(
     TL_SUBITEMS_FIXED subitems;
 
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
-
     subitems.Count = 2;
-
-    if (FirstValue) {       
-        subitems.Text[0] = FirstValue;
-    }
-    else {
-        subitems.Text[0] = T_EmptyString;
-    }
-
-    if (SecondValue) {
-        subitems.Text[1] = SecondValue;
-    }
-    else {
-        subitems.Text[1] = T_EmptyString;
-    }
+    subitems.Text[0] = (FirstValue != NULL) ? FirstValue : T_EmptyString;
+    subitems.Text[1] = (SecondValue != NULL) ? SecondValue : T_EmptyString;
 
     return supTreeListAddItem(TreeList,
         NULL,
@@ -736,7 +713,6 @@ VOID SectionPropertiesCreate(
         }
 
         supTreeListEnableRedraw(DlgContext->TreeList, TRUE);
-
     }
 }
 
@@ -786,7 +762,6 @@ INT_PTR CALLBACK SectionPropertiesDialogProc(
             }
             break;
         }
-
         break;
 
     case WM_DESTROY:

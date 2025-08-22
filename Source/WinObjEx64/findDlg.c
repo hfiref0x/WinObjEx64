@@ -4,9 +4,9 @@
 *
 *  TITLE:       FINDDLG.C
 *
-*  VERSION:     2.08
+*  VERSION:     2.09
 *
-*  DATE:        12 Jun 2025
+*  DATE:        21 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -187,13 +187,13 @@ VOID FindDlgAddListItem(
     lvItem.iImage = ObManagerGetImageIndexByTypeName(TypeName->Buffer);
     lvItem.iItem = MAXINT;
     lvItemIndex = ListView_InsertItem(hList, &lvItem);
-
-    lvItem.mask = LVIF_TEXT;
-    lvItem.iSubItem = 1;
-    lvItem.pszText = TypeName->Buffer;
-    lvItem.iItem = lvItemIndex;
-    ListView_SetItem(hList, &lvItem);
-
+    if (lvItemIndex >= 0) {
+        lvItem.mask = LVIF_TEXT;
+        lvItem.iSubItem = 1;
+        lvItem.pszText = TypeName->Buffer;
+        lvItem.iItem = lvItemIndex;
+        ListView_SetItem(hList, &lvItem);
+    }
     if (bNeedFree)
         supFreeDuplicatedUnicodeString(g_obexHeap, &normalizedString, FALSE);
 }

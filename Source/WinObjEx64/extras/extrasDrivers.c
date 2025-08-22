@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
-*  VERSION:     2.08
+*  VERSION:     2.09
 *
-*  DATE:        12 Jun 2025
+*  DATE:        21 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -790,32 +790,32 @@ BOOL DrvListCbEnumerateUnloadedDrivers(
         lvitem.pszText = lpName;
 
         lvItemIndex = ListView_InsertItem(hwndList, &lvitem);
+        if (lvItemIndex >= 0) {
+            lvitem.pszText = szBuffer;
 
-        lvitem.pszText = szBuffer;
+            //StartAddress
+            szBuffer[0] = L'0';
+            szBuffer[1] = L'x';
+            szBuffer[2] = 0;
+            u64tohex((ULONG_PTR)Entry->StartAddress, &szBuffer[2]);
+            lvitem.iSubItem = 1;
+            lvitem.iItem = lvItemIndex;
+            ListView_SetItem(hwndList, &lvitem);
 
-        //StartAddress
-        szBuffer[0] = L'0';
-        szBuffer[1] = L'x';
-        szBuffer[2] = 0;
-        u64tohex((ULONG_PTR)Entry->StartAddress, &szBuffer[2]);
-        lvitem.iSubItem = 1;
-        lvitem.iItem = lvItemIndex;
-        ListView_SetItem(hwndList, &lvitem);
+            //EndAddress
+            szBuffer[0] = L'0';
+            szBuffer[1] = L'x';
+            szBuffer[2] = 0;
+            u64tohex((ULONG_PTR)Entry->EndAddress, &szBuffer[2]);
+            lvitem.iSubItem = 2;
+            ListView_SetItem(hwndList, &lvitem);
 
-        //EndAddress
-        szBuffer[0] = L'0';
-        szBuffer[1] = L'x';
-        szBuffer[2] = 0;
-        u64tohex((ULONG_PTR)Entry->EndAddress, &szBuffer[2]);
-        lvitem.iSubItem = 2;
-        ListView_SetItem(hwndList, &lvitem);
-
-        //CurrentTime
-        szBuffer[0] = 0;
-        supPrintTimeConverted(&Entry->CurrentTime, szBuffer, RTL_NUMBER_OF(szBuffer));
-        lvitem.iSubItem = 3;
-        ListView_SetItem(hwndList, &lvitem);
-
+            //CurrentTime
+            szBuffer[0] = 0;
+            supPrintTimeConverted(&Entry->CurrentTime, szBuffer, RTL_NUMBER_OF(szBuffer));
+            lvitem.iSubItem = 3;
+            ListView_SetItem(hwndList, &lvitem);
+        }
     }
 
     return FALSE;
@@ -928,6 +928,8 @@ VOID DrvListDrivers(
         lvitem.iImage = g_TypeDriver.ImageIndex;
         lvitem.pszText = szBuffer;
         lvItemIndex = ListView_InsertItem(hwndList, &lvitem);
+        if (lvItemIndex == -1)
+            break;
 
         //Name
         RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));

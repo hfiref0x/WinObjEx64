@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.09
 *
-*  DATE:        19 Aug 2025
+*  DATE:        21 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -190,25 +190,26 @@ BOOL CALLBACK PNDlgEnumerateCallback(
     lvItem.pszText = objectName.Buffer;
     lvItem.lParam = (LPARAM)Entry;
     lvItemIndex = ListView_InsertItem(PnDlgContext.ListView, &lvItem);
+    if (lvItemIndex >= 0) {
+        //Type
+        lvItem.mask = LVIF_TEXT;
+        lvItem.iSubItem = 1;
+        lvItem.pszText = typeDesc->Name;
+        lvItem.iItem = lvItemIndex;
+        ListView_SetItem(PnDlgContext.ListView, &lvItem);
 
-    //Type
-    lvItem.mask = LVIF_TEXT;
-    lvItem.iSubItem = 1;
-    lvItem.pszText = typeDesc->Name;
-    lvItem.iItem = lvItemIndex;
-    ListView_SetItem(PnDlgContext.ListView, &lvItem);
+        //RootDirectory address
+        szBuffer[0] = L'0';
+        szBuffer[1] = L'x';
+        szBuffer[2] = 0;
+        u64tohex(Entry->PrivateNamespace.NamespaceDirectoryAddress, &szBuffer[2]);
 
-    //RootDirectory address
-    szBuffer[0] = L'0';
-    szBuffer[1] = L'x';
-    szBuffer[2] = 0;
-    u64tohex(Entry->PrivateNamespace.NamespaceDirectoryAddress, &szBuffer[2]);
+        lvItem.iSubItem = 2;
+        lvItem.pszText = szBuffer;
+        ListView_SetItem(PnDlgContext.ListView, &lvItem);
 
-    lvItem.iSubItem = 2;
-    lvItem.pszText = szBuffer;
-    ListView_SetItem(PnDlgContext.ListView, &lvItem);
-
-    PNSNumberOfObjects += 1;
+        PNSNumberOfObjects += 1;
+    }
 
     if (bNeedFree) {
         supFreeDuplicatedUnicodeString(PNSObjectsHeap,

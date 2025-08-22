@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2024
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     2.06
+*  VERSION:     2.09
 *
-*  DATE:        11 Oct 2024
+*  DATE:        21 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -2080,7 +2080,7 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpDeviceObject)
     propObDumpAddress(hwndTreeList, h_tviWcb, L"DeviceContext", NULL, devObject.Queue.Wcb.DeviceContext, 0, 0);
 
     //Queue->Wcb->NumberOfMapRegisters
-    propObDumpUlong(hwndTreeList, h_tviWcb, L"DeviceContext", NULL, devObject.Queue.Wcb.NumberOfMapRegisters, FALSE, FALSE, 0, 0);
+    propObDumpUlong(hwndTreeList, h_tviWcb, L"NumberOfMapRegisters", NULL, devObject.Queue.Wcb.NumberOfMapRegisters, FALSE, FALSE, 0, 0);
 
     //Queue->Wcb->DeviceObject
     propDumpObjectForAddress(hwndTreeList, h_tviWcb, L"DeviceObject",
@@ -2433,7 +2433,7 @@ VOID propObDumpDeviceMap(
             for (i = 0; i < RTL_NUMBER_OF(DeviceMapStruct.Versions.DeviceMapCompat->DriveType); i++) {
 
                 RtlStringCchPrintfSecure(szBuffer,
-                    MAX_PATH,
+                    RTL_NUMBER_OF(szBuffer),
                     TEXT("[ %i ]"),
                     i);
 
@@ -2506,7 +2506,7 @@ VOID propObDumpDirectoryObjectInternal(
     HTREEITEM               h_tviRootItem, h_tviSubItem, h_tviEntry;
     LPWSTR                  lpType;
     TL_SUBITEMS_FIXED       subitems;
-    WCHAR                   szId[MAX_PATH + 1], szValue[MAX_PATH + 1];
+    WCHAR                   szId[100], szValue[100];
 
     ULONG ObjectVersion = 0;
     ULONG ObjectSize = 0;
@@ -2562,7 +2562,7 @@ VOID propObDumpDirectoryObjectInternal(
         RtlSecureZeroMemory(szId, sizeof(szId));
 
         RtlStringCchPrintfSecure(szId,
-            MAX_PATH,
+            RTL_NUMBER_OF(szId),
             TEXT("[ %i ]"),
             i);
 
@@ -2981,7 +2981,7 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpSyncObject)
         if (Mutant->OwnerThread != NULL) {
 
             RtlStringCchPrintfSecure(szValue,
-                MAX_PATH,
+                RTL_NUMBER_OF(szValue),
                 TEXT("Held %d times"),
                 Header->SignalState);
 

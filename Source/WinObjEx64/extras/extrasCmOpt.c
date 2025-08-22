@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASCMOPT.C
 *
-*  VERSION:     2.08
+*  VERSION:     2.09
 *
-*  DATE:        10 Jun 2025
+*  DATE:        21 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -379,6 +379,8 @@ VOID CmpOptDlgAddEntry(
         lvitem.pszText = CmControlVector.Version.v1->KeyPath;
         lvitem.iImage = g_TypeKey.ImageIndex;
         lvItemIndex = ListView_InsertItem(hwndList, &lvitem);
+        if (lvItemIndex == -1)
+            return;
 
         //
         // ValueName

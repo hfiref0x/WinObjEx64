@@ -187,6 +187,8 @@ VOID CALLBACK OutputAclEntryCallback(
     lvItem.pszText = Entry->lpAceType;
     lvItem.cchTextMax = (INT)_strlen(lvItem.pszText);
     lvItemIndex = ListView_InsertItem(hwndList, &lvItem);
+    if (lvItemIndex == -1)
+        return;
 
     lvItem.mask = LVIF_TEXT;
 

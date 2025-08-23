@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.09
 *
-*  DATE:        13 Aug 2025
+*  DATE:        22 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -5930,6 +5930,10 @@ VOID extrasCreateCallbacksDialog(
         if (pDlgContext) {
             pDlgContext->tlSubItemHit = -1;
             SysCbThreadHandle = supCreateDialogWorkerThread(extrasSysCbDialogWorkerThread, pDlgContext, 0);
+            if (SysCbThreadHandle == NULL) {
+                supHeapFree(pDlgContext);
+                return;
+            }
             supWaitForFastEvent(&SysCbInitializedEvent, NULL);
         }
     }

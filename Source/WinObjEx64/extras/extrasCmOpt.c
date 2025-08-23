@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.09
 *
-*  DATE:        21 Aug 2025
+*  DATE:        22 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -754,6 +754,9 @@ DWORD extrasCmOptDialogWorkerThread(
 
     supSetFastEvent(&CmOptInitializedEvent);
 
+    if (hwndDlg == NULL)
+        return ERROR_NOT_ENOUGH_MEMORY;
+
     do {
 
         bResult = GetMessage(&message, NULL, 0, 0);
@@ -792,15 +795,15 @@ VOID extrasCreateCmOptDialog(
     EXTRASCONTEXT* pDlgContext;
 
     if (!CmOptThreadHandle) {
-
         pDlgContext = (EXTRASCONTEXT*)supHeapAlloc(sizeof(EXTRASCONTEXT));
         if (pDlgContext) {
-
             pDlgContext->tlSubItemHit = -1;
             CmOptThreadHandle = supCreateDialogWorkerThread(extrasCmOptDialogWorkerThread, pDlgContext , 0);
+            if (CmOptThreadHandle == NULL) {
+                supHeapFree(pDlgContext);
+                return;
+            }
             supWaitForFastEvent(&CmOptInitializedEvent, NULL);
-
         }
-
     }
 }

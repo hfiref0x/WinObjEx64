@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.09
 *
-*  DATE:        21 Aug 2025
+*  DATE:        22 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -900,10 +900,9 @@ VOID FindDlgCreate(
 )
 {
     if (!FindDialogThreadHandle) {
-
         RtlSecureZeroMemory(&g_FindDlgContext, sizeof(g_FindDlgContext));
         FindDialogThreadHandle = supCreateDialogWorkerThread(FindpDlgWorkerThread, NULL, 0);
-        supWaitForFastEvent(&FindDialogInitializedEvent, NULL);
-
+        if (FindDialogThreadHandle) 
+            supWaitForFastEvent(&FindDialogInitializedEvent, NULL);
     }
 }

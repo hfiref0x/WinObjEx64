@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2023
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       EXTRAS.H
 *
-*  VERSION:     2.01
+*  VERSION:     2.09
 *
-*  DATE:        20 Mar 2023
+*  DATE:        21 Aug 2025
 *
 *  Common header file for Extras dialogs.
 *
@@ -88,3 +88,34 @@ VOID extrasShowDialogById(
 
 VOID extrasHandleSettingsChange(
     EXTRASCONTEXT* Context);
+
+//
+// Dialog handlers.
+//
+
+VOID extrasCreateCallbacksDialog(
+    VOID);
+
+VOID extrasCreateCmOptDialog(
+    VOID);
+
+VOID extrasCreateDriversDialog(
+    _In_ DRIVERS_DLG_MODE Mode);
+
+VOID extrasCreateIpcDialog(
+    _In_ IPC_DLG_MODE Mode);
+
+VOID extrasCreatePNDialog(
+    VOID);
+
+VOID extrasCreatePsListDialog(
+    VOID);
+
+VOID extrasCreateSLCacheDialog(
+    VOID);
+
+VOID extrasCreateSSDTDialog(
+    _In_ SSDT_DLG_MODE Mode);
+
+VOID extrasCreateUsdDialog(
+    VOID);

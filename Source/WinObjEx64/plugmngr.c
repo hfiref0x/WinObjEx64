@@ -4,9 +4,9 @@
 *
 *  TITLE:       PLUGMNGR.C
 *
-*  VERSION:     2.08
+*  VERSION:     2.09
 *
-*  DATE:        13 Jun 2025
+*  DATE:        22 Aug 2025
 *
 *  Plugin manager.
 *
@@ -1266,9 +1266,8 @@ VOID PmViewPlugins(
 )
 {
     if (!PmDlgThreadHandle) {
-
         PmDlgThreadHandle = supCreateDialogWorkerThread(PmViewPluginsWorkerThread, NULL, 0);
-        supWaitForFastEvent(&PmDlgInitializedEvent, NULL);
-
+        if (PmDlgThreadHandle)
+            supWaitForFastEvent(&PmDlgInitializedEvent, NULL);
     }
 }

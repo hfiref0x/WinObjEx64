@@ -409,9 +409,6 @@
     <ClInclude Include="props\props.h">
       <Filter>Source Files\props</Filter>
     </ClInclude>
-    <ClInclude Include="extras\extrasHandlers.h">
-      <Filter>Source Files\extras</Filter>
-    </ClInclude>
     <ClInclude Include="sup\w32k.h">
       <Filter>Source Files\sup</Filter>
     </ClInclude>

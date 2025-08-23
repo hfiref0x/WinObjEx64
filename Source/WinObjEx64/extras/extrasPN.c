@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.09
 *
-*  DATE:        21 Aug 2025
+*  DATE:        22 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -763,7 +763,7 @@ VOID PNDialogOnClose(
 *
 * Purpose:
 *
-* Private Namespace Dialog WM_INITDIALOG handler.
+* Private Namespace dialog WM_INITDIALOG handler.
 *
 */
 VOID PNDialogOnInit(
@@ -922,7 +922,6 @@ DWORD extrasPNDialogWorkerThread(
 
     UNREFERENCED_PARAMETER(Parameter);
 
-
     RtlSecureZeroMemory(&PnDlgContext, sizeof(PnDlgContext));
     
     hwndDlg = CreateDialogParam(g_WinObj.hInstance, 
@@ -1017,12 +1016,10 @@ DWORD extrasPNDialogWorkerThread(
 VOID extrasCreatePNDialog(
     VOID
 )
-{
-   
+{  
     if (!PnDlgThreadHandle) {
-
         PnDlgThreadHandle = supCreateDialogWorkerThread(extrasPNDialogWorkerThread, NULL, 0);
-        supWaitForFastEvent(&PnDlgInitializedEvent, NULL);
-
+        if (PnDlgThreadHandle)
+            supWaitForFastEvent(&PnDlgInitializedEvent, NULL);
     }
 }

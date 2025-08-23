@@ -447,7 +447,6 @@
     <ClInclude Include="extapi.h" />
     <ClInclude Include="extras\extras.h" />
     <ClInclude Include="extras\extrasCallbacksPatterns.h" />
-    <ClInclude Include="extras\extrasHandlers.h" />
     <ClInclude Include="global.h" />
     <ClInclude Include="hash.h" />
     <ClInclude Include="hde\hde64.h" />

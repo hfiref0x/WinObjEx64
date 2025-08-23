@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRAS.C
 *
-*  VERSION:     2.05
+*  VERSION:     2.09
 *
-*  DATE:        13 Jun 2025
+*  DATE:        22 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -16,7 +16,6 @@
 *******************************************************************************/
 #include "global.h"
 #include "extras.h"
-#include "extrasHandlers.h"
 
 /*
 * extrasHandleSettingsChange

@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.09
 *
-*  DATE:        21 Aug 2025
+*  DATE:        22 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -668,9 +668,12 @@ VOID DrvDumpDriver(
         DumpInfo->ParentWindow = Context->hwndDlg;
 
         DumpDialogThreadHandle = supCreateThread(DumpDialogWorkerThread, (PVOID)DumpInfo, 0);
-        if (DumpDialogThreadHandle) {
-            supWaitForFastEvent(&DumpDialogInitializedEvent, NULL);
+        if (DumpDialogThreadHandle == NULL) {
+            if (DumpInfo->Buffer) supHeapFree(DumpInfo->Buffer);
+            supHeapFree(DumpInfo);
+            break;
         }
+        supWaitForFastEvent(&DumpDialogInitializedEvent, NULL);
 
     } while (FALSE);
 
@@ -929,7 +932,7 @@ VOID DrvListDrivers(
         lvitem.pszText = szBuffer;
         lvItemIndex = ListView_InsertItem(hwndList, &lvitem);
         if (lvItemIndex == -1)
-            break;
+            continue;
 
         //Name
         RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
@@ -1646,11 +1649,13 @@ DWORD extrasDrvDlgWorkerThread(
         &DrvDlgProc,
         (LPARAM)pDlgContext);
 
-    acceleratorTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
-
     fastEvent = DrvDlgInitializedEvents[pDlgContext->DialogMode];
-
     supSetFastEvent(&fastEvent);
+
+    if (hwndDlg == NULL)
+        return ERROR_NOT_ENOUGH_MEMORY;
+
+    acceleratorTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
 
     do {
 
@@ -1698,11 +1703,10 @@ VOID extrasCreateDriversDialog(
         return;
 
     if (!DrvDlgThreadHandles[Mode]) {
-
         RtlSecureZeroMemory(&DrvDlgContext[Mode], sizeof(EXTRASCONTEXT));
         DrvDlgContext[Mode].DialogMode = Mode;
         DrvDlgThreadHandles[Mode] = supCreateDialogWorkerThread(extrasDrvDlgWorkerThread, (PVOID)&DrvDlgContext[Mode], 0);
-        supWaitForFastEvent(&DrvDlgInitializedEvents[Mode], NULL);
-
+        if (DrvDlgThreadHandles[Mode])
+            supWaitForFastEvent(&DrvDlgInitializedEvents[Mode], NULL);
     }
 }

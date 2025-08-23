@@ -754,21 +754,20 @@ DWORD extrasCmOptDialogWorkerThread(
 
     supSetFastEvent(&CmOptInitializedEvent);
 
-    if (hwndDlg == NULL)
-        return ERROR_NOT_ENOUGH_MEMORY;
+    if (hwndDlg) {
+        do {
 
-    do {
+            bResult = GetMessage(&message, NULL, 0, 0);
+            if (bResult == -1)
+                break;
 
-        bResult = GetMessage(&message, NULL, 0, 0);
-        if (bResult == -1)
-            break;
+            if (!IsDialogMessage(hwndDlg, &message)) {
+                TranslateMessage(&message);
+                DispatchMessage(&message);
+            }
 
-        if (!IsDialogMessage(hwndDlg, &message)) {
-            TranslateMessage(&message);
-            DispatchMessage(&message);
-        }
-
-    } while (bResult != 0);
+        } while (bResult != 0);
+    }
 
     supResetFastEvent(&CmOptInitializedEvent);
 

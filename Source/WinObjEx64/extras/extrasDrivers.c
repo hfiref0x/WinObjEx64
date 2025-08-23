@@ -1314,20 +1314,21 @@ VOID DrvListSetTooltip(
 *
 */
 LRESULT CALLBACK DrvListViewHookProc(
-    HWND hwnd,
-    UINT uMsg,
-    WPARAM wParam,
-    LPARAM lParam
+    _In_ HWND hwnd,
+    _In_ UINT uMsg,
+    _In_ WPARAM wParam,
+    _In_ LPARAM lParam
 )
 {
-    HWND hwndTT = (HWND)DrvDlgContext[DrvModeNormal].TooltipInfo;
-
+    HWND hwndTT;
     LVHITTESTINFO ht;
     TOOLINFO toolInfo;
-
     BOOL bCheckPass = FALSE;
+    static int oldX = -1, oldY = -1;
+    static int lastItem = -1;
+    INT currentItem;
 
-    static int oldX, oldY;
+    hwndTT = (HWND)DrvDlgContext[DrvModeNormal].TooltipInfo;
 
     switch (uMsg) {
 
@@ -1337,26 +1338,45 @@ LRESULT CALLBACK DrvListViewHookProc(
         ht.pt.x = GET_X_LPARAM(lParam);
         ht.pt.y = GET_Y_LPARAM(lParam);
 
-        do {
+        if (ChildWindowFromPoint(hwnd, ht.pt) == hwnd) {
+            if (ListView_SubItemHitTest(hwnd, &ht) != -1) {
+                bCheckPass = (ht.iSubItem == COLUMN_DRVLIST_DRIVER_NAME);
+            }
+        }
 
-            if (ChildWindowFromPoint(hwnd, ht.pt) != hwnd)
-                break;
-
-            if (-1 == ListView_SubItemHitTest(hwnd, &ht))
-                break;
-
-            bCheckPass = (ht.iSubItem == COLUMN_DRVLIST_DRIVER_NAME);
-
-        } while (FALSE);
-
-        if (bCheckPass == FALSE) {
-            SendMessage(hwndTT, TTM_TRACKACTIVATE, FALSE, (LPARAM)&toolInfo);
+        //
+        // If tooltip window is not available, skip tooltip actions.
+        //
+        if (hwndTT == NULL || !IsWindow(hwndTT)) {
+            lastItem = -1;
+            oldX = oldY = -1;
             break;
         }
 
-        if ((ht.flags & LVHT_ONITEM) &&
-            ((ht.pt.x != oldX) || (ht.pt.y != oldY)))
-        {
+        //
+        // Deactivate tooltip if not on the name column or no item.
+        //
+        if (!bCheckPass || !(ht.flags & LVHT_ONITEM)) {
+
+            if (lastItem != -1) {
+                RtlSecureZeroMemory(&toolInfo, sizeof(toolInfo));
+                toolInfo.cbSize = sizeof(toolInfo);
+                toolInfo.hwnd = DrvDlgContext[DrvModeNormal].hwndDlg;
+                toolInfo.uId = ID_EXTRASLIST;
+                SendMessage(hwndTT, TTM_TRACKACTIVATE, FALSE, (LPARAM)&toolInfo);
+            }
+
+            lastItem = -1;
+            oldX = oldY = -1;
+            break;
+        }
+
+        //
+        // At this point we are over a name subitem on an item.
+        // Only update tooltip when the hovered item changed or cursor moved sufficiently.
+        //
+        currentItem = ht.iItem;
+        if ((currentItem != lastItem) || (ht.pt.x != oldX) || (ht.pt.y != oldY)) {
             oldX = ht.pt.x;
             oldY = ht.pt.y;
 
@@ -1366,13 +1386,15 @@ LRESULT CALLBACK DrvListViewHookProc(
             toolInfo.uFlags = TTF_TRACK;
             toolInfo.uId = ID_EXTRASLIST;
 
-            DrvListSetTooltip(hwnd, hwndTT, &toolInfo, ht.iItem);
+            DrvListSetTooltip(hwnd, hwndTT, &toolInfo, currentItem);
 
             GetCursorPos(&ht.pt);
             SendMessage(hwndTT, TTM_TRACKACTIVATE, (WPARAM)TRUE, (LPARAM)&toolInfo);
             ht.pt.x += 20;
             ht.pt.y += 20;
             SendMessage(hwndTT, TTM_TRACKPOSITION, 0, (LPARAM)MAKELONG(ht.pt.x, ht.pt.y));
+
+            lastItem = currentItem;
         }
 
         break;
@@ -1652,26 +1674,25 @@ DWORD extrasDrvDlgWorkerThread(
     fastEvent = DrvDlgInitializedEvents[pDlgContext->DialogMode];
     supSetFastEvent(&fastEvent);
 
-    if (hwndDlg == NULL)
-        return ERROR_NOT_ENOUGH_MEMORY;
-
     acceleratorTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
 
-    do {
+    if (hwndDlg) {
+        do {
 
-        bResult = GetMessage(&message, NULL, 0, 0);
-        if (bResult == -1)
-            break;
+            bResult = GetMessage(&message, NULL, 0, 0);
+            if (bResult == -1)
+                break;
 
-        if (IsDialogMessage(hwndDlg, &message)) {
-            TranslateAccelerator(hwndDlg, acceleratorTable, &message);
-        }
-        else {
-            TranslateMessage(&message);
-            DispatchMessage(&message);
-        }
+            if (IsDialogMessage(hwndDlg, &message)) {
+                TranslateAccelerator(hwndDlg, acceleratorTable, &message);
+            }
+            else {
+                TranslateMessage(&message);
+                DispatchMessage(&message);
+            }
 
-    } while (bResult != 0);
+        } while (bResult != 0);
+    }
 
     supResetFastEvent(&fastEvent);
 

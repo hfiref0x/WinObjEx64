@@ -1015,26 +1015,25 @@ DWORD extrasIpcDialogWorkerThread(
     fastEvent = IpcDlgInitializedEvents[pDlgContext->DialogMode];
     supSetFastEvent(&fastEvent);
 
-    if (hwndDlg == NULL)
-        return ERROR_NOT_ENOUGH_MEMORY;
-
     acceleratorTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
 
-    do {
+    if (hwndDlg) {
+        do {
 
-        bResult = GetMessage(&message, NULL, 0, 0);
-        if (bResult == -1)
-            break;
+            bResult = GetMessage(&message, NULL, 0, 0);
+            if (bResult == -1)
+                break;
 
-        if (IsDialogMessage(hwndDlg, &message)) {
-            TranslateAccelerator(hwndDlg, acceleratorTable, &message);
-        }
-        else {
-            TranslateMessage(&message);
-            DispatchMessage(&message);
-        }
+            if (IsDialogMessage(hwndDlg, &message)) {
+                TranslateAccelerator(hwndDlg, acceleratorTable, &message);
+            }
+            else {
+                TranslateMessage(&message);
+                DispatchMessage(&message);
+            }
 
-    } while (bResult != 0);
+        } while (bResult != 0);
+    }
 
     supResetFastEvent(&fastEvent);
 

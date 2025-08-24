@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       PROPSECURITY.C
 *
-*  VERSION:     2.01
+*  VERSION:     2.09
 *
-*  DATE:        18 Dec 2022
+*  DATE:        21 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -415,6 +415,14 @@ HRESULT STDMETHODCALLTYPE GetAccessRights(
     return S_OK;
 }
 
+/*
+* GetSecurity
+*
+* Purpose:
+*
+* Query object security descriptor and return it to security UI.
+*
+*/
 HRESULT STDMETHODCALLTYPE GetSecurity(
     _In_ IObjectSecurity* This,
     _In_ SECURITY_INFORMATION RequestedInformation,
@@ -422,59 +430,70 @@ HRESULT STDMETHODCALLTYPE GetSecurity(
     _In_ BOOL fDefault
 )
 {
-    HRESULT                hResult;
-    HANDLE                 hObject;
-    ULONG                  bytesNeeded;
+    HRESULT                hResult = E_FAIL;
+    HANDLE                 hObject = NULL;
+    ULONG                  bytesNeeded = 0x100;
     NTSTATUS               status;
     ACCESS_MASK            DesiredAccess;
-    PSECURITY_DESCRIPTOR   PSD;
+    PSECURITY_DESCRIPTOR   pSD;
 
     if (fDefault) {
         return E_NOTIMPL;
     }
 
     //open object
-    hObject = NULL;
     DesiredAccess = propGetObjectAccessMask(RequestedInformation, FALSE);
-
     if (!This->OpenObjectMethod(This->ObjectContext, &hObject, DesiredAccess)) {
         return HRESULT_FROM_WIN32(GetLastError());
     }
 
-    //query object SD
-    //warning: system free SD with LocalFree on security dialog destroy
-    bytesNeeded = 0x100;
-    PSD = LocalAlloc(LPTR, bytesNeeded);
-    if (PSD == NULL) {
-        hResult = HRESULT_FROM_WIN32(GetLastError());
-        goto Done;
-    }
-
-    status = NtQuerySecurityObject(hObject, RequestedInformation,
-        PSD, bytesNeeded, &bytesNeeded);
-
-    if (status == STATUS_BUFFER_TOO_SMALL) {
-        LocalFree(PSD);
-        PSD = LocalAlloc(LPTR, bytesNeeded);
-        if (PSD == NULL) {
+    do {
+        //query object SD
+        //warning: system free SD with LocalFree on security dialog destroy
+        pSD = LocalAlloc(LPTR, bytesNeeded);
+        if (pSD == NULL) {
             hResult = HRESULT_FROM_WIN32(GetLastError());
-            goto Done;
+            break;
         }
-        status = NtQuerySecurityObject(
-            hObject,
+
+        status = NtQuerySecurityObject(hObject,
             RequestedInformation,
-            PSD,
+            pSD,
             bytesNeeded,
-            &bytesNeeded
-        );
-    }
+            &bytesNeeded);
 
-    hResult = HRESULT_FROM_WIN32(RtlNtStatusToDosError(status));
-    *ppSecurityDescriptor = PSD;
+        if (status == STATUS_BUFFER_TOO_SMALL) {
+            LocalFree(pSD);
+            pSD = LocalAlloc(LPTR, bytesNeeded);
+            if (pSD == NULL) {
+                hResult = HRESULT_FROM_WIN32(GetLastError());
+                break;
+            }
 
-Done:
-    //cleanup
+            status = NtQuerySecurityObject(
+                hObject,
+                RequestedInformation,
+                pSD,
+                bytesNeeded,
+                &bytesNeeded);
+        }
+
+        if (!NT_SUCCESS(status)) {
+            hResult = HRESULT_FROM_WIN32(RtlNtStatusToDosError(status));
+            break;
+        }
+
+        *ppSecurityDescriptor = pSD;
+        pSD = NULL; //ownership transfered to caller
+        hResult = S_OK;
+
+    } while (FALSE);
+
+    // cleanup
     This->CloseObjectMethod(This->ObjectContext, hObject);
+    if (pSD) {
+        LocalFree(pSD);
+    }
     return hResult;
 }
 

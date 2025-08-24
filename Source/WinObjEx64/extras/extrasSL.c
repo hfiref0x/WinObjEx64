@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSL.C
 *
-*  VERSION:     2.08
+*  VERSION:     2.09
 *
-*  DATE:        11 Jun 2025
+*  DATE:        22 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -154,8 +154,8 @@ VOID SLCacheDialogDisplayDescriptorData(
     _In_ INT iItem
 )
 {
+    ULONG dwValue;
     SL_KMEM_CACHE_VALUE_DESCRIPTOR* CacheDescriptor;
-
     LPWSTR lpText, DataType;
     PCHAR DataPtr;
     WCHAR szBuffer[32];
@@ -214,29 +214,27 @@ VOID SLCacheDialogDisplayDescriptorData(
     // Display Data.
     //
     switch (CacheDescriptor->Type) {
-
     case SL_DATA_DWORD:
-
         DataPtr = RtlOffsetToPointer(CacheDescriptor,
             (ULONG_PTR)FIELD_OFFSET(SL_KMEM_CACHE_VALUE_DESCRIPTOR, Name) + CacheDescriptor->NameLength);
-
-        szBuffer[0] = 0;
-        ultostr((ULONG)*DataPtr, szBuffer);
-        SetDlgItemText(hwndDlg, IDC_SLVALUE, szBuffer);
-
+        if (CacheDescriptor->DataLength >= sizeof(ULONG)) {
+            dwValue = *(PULONG)DataPtr;
+            szBuffer[0] = 0;
+            ultostr(dwValue, szBuffer);
+            SetDlgItemText(hwndDlg, IDC_SLVALUE, szBuffer);
+        }
+        else {
+            SetDlgItemText(hwndDlg, IDC_SLVALUE, TEXT("<invalid size>"));
+        }
         break;
 
     case SL_DATA_SZ:
         lpText = (LPWSTR)supHeapAlloc(CacheDescriptor->DataLength + sizeof(WCHAR));
         if (lpText) {
-
             DataPtr = RtlOffsetToPointer(CacheDescriptor,
                 (ULONG_PTR)FIELD_OFFSET(SL_KMEM_CACHE_VALUE_DESCRIPTOR, Name) + CacheDescriptor->NameLength);
-
             RtlCopyMemory(lpText, DataPtr, CacheDescriptor->DataLength);
-
             SetDlgItemText(hwndDlg, IDC_SLVALUE, lpText);
-
             supHeapFree(lpText);
         }
         break;
@@ -245,9 +243,7 @@ VOID SLCacheDialogDisplayDescriptorData(
         SetDlgItemText(hwndDlg, IDC_SLVALUE, TEXT("Binary data, use \"View\" button to open an external viewer"));
         EnableWindow(GetDlgItem(hwndDlg, IDC_SLVALUE_VIEWWITH), TRUE);
         break;
-
     }
-
 }
 
 /*
@@ -453,14 +449,15 @@ BOOL CALLBACK SLCacheEnumerateCallback(
         }
 
         //Type
-        lvItem.mask = LVIF_TEXT;
-        lvItem.iSubItem = 1;
-        lvItem.pszText = EntryType;
-        lvItem.iItem = lvItemIndex;
-        ListView_SetItem(Context->DialogContext->ListView, &lvItem);
+        if (lvItemIndex >= 0) {
+            lvItem.mask = LVIF_TEXT;
+            lvItem.iSubItem = 1;
+            lvItem.pszText = EntryType;
+            lvItem.iItem = lvItemIndex;
+            ListView_SetItem(Context->DialogContext->ListView, &lvItem);
+        }
 
         supHeapFree(EntryName);
-
     }
     return FALSE;
 }
@@ -757,18 +754,20 @@ DWORD extrasSLCacheDialogWorkerThread(
 
     supSetFastEvent(&SLCacheDlgInitializedEvent);
 
-    do {
+    if (hwndDlg) {
+        do {
 
-        bResult = GetMessage(&message, NULL, 0, 0);
-        if (bResult == -1)
-            break;
+            bResult = GetMessage(&message, NULL, 0, 0);
+            if (bResult == -1)
+                break;
 
-        if (!IsDialogMessage(hwndDlg, &message)) {
-            TranslateMessage(&message);
-            DispatchMessage(&message);
-        }
+            if (!IsDialogMessage(hwndDlg, &message)) {
+                TranslateMessage(&message);
+                DispatchMessage(&message);
+            }
 
-    } while (bResult != 0);
+        } while (bResult != 0);
+    }
 
     supResetFastEvent(&SLCacheDlgInitializedEvent);
 
@@ -795,14 +794,14 @@ VOID extrasCreateSLCacheDialog(
     EXTRASCONTEXT* pDlgContext;
 
     if (!SLCacheDlgThreadHandle) {
-
         pDlgContext = (EXTRASCONTEXT*)supHeapAlloc(sizeof(EXTRASCONTEXT));
         if (pDlgContext) {
-
             SLCacheDlgThreadHandle = supCreateDialogWorkerThread(extrasSLCacheDialogWorkerThread, pDlgContext, 0);
+            if (SLCacheDlgThreadHandle == NULL) {
+                supHeapFree(pDlgContext);
+                return;
+            }
             supWaitForFastEvent(&SLCacheDlgInitializedEvent, NULL);
-
         }
-
     }
 }

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2022
+*  (C) COPYRIGHT AUTHORS, 2022 - 2025
 *
 *  TITLE:       WDRVPRV.H
 *
-*  VERSION:     1.93
+*  VERSION:     2.09
 *
-*  DATE:        22 Apr 2022
+*  DATE:        20 Aug 2025
 *
 *  Common header file for WinObjEx64 driver providers.
 *
@@ -25,10 +25,11 @@ typedef enum _WDRVPRVTYPE {
     wdrvWinObjEx64 = 1,
     // WinIO based driver
     wdrvWinIo = 2,
-    // Rkhdrv series driver
-    wdrvRkhDrv5 = 3,
+    // Rkhdrv series driver deprecated
     // Alice driver
     wdrvAlice = 4,
+    // Ronova kernel driver
+    wdrvRonova = 5,
     wdrvMax
 } WDRVPRVTYPE;
 

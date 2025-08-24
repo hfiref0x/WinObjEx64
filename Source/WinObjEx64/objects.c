@@ -4,9 +4,9 @@
 *
 *  TITLE:       OBJECTS.C
 *
-*  VERSION:     2.08
+*  VERSION:     2.09
 *
-*  DATE:        13 Jun 2025
+*  DATE:        19 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -355,7 +355,7 @@ WOBJ_TYPE_DESC* ObManagerLookupByHash(
 *
 * Purpose:
 *
-* Returns object description entry by type name.
+* Returns object description entry by type name or g_TypeUnknown if none found.
 *
 */
 WOBJ_TYPE_DESC* ObManagerGetEntryByTypeName(

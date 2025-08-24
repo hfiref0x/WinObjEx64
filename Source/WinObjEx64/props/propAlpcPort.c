@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPALPCPORT.C
 *
-*  VERSION:     2.08
+*  VERSION:     2.09
 *
-*  DATE:        12 Jun 2025
+*  DATE:        21 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -233,17 +233,12 @@ BOOL AlpcPortEnumerateClients(
     BOOLEAN bSuccess = FALSE;
     ULONG objectSize = 0, objectVersion = 0;
     SIZE_T cEntries = 0;
-
-    ULONG_PTR kernelAddress, comsListHead, serverPortAddress, clientPortAddress;
-
-    LIST_ENTRY comsListEntry, comsNextEntry;
+    ULONG_PTR kernelAddress, listHead, serverPortAddress, clientPortAddress;
+    LIST_ENTRY listEntry, nextEntry;
     ALPC_PORT_REF selfPort, clientPort;
-
     ALPC_COMMUNICATION_INFO_COMPAT comsInfo;
-
     ULONG offset = FIELD_OFFSET(ALPC_COMMUNICATION_INFO_COMPAT, CommunicationList);
 
-   
     *NumberOfClients = 0;
 
     //
@@ -260,15 +255,15 @@ BOOL AlpcPortEnumerateClients(
     do {
 
         kernelAddress = (ULONG_PTR)selfPort.u1.Port7600->CommunicationInfo;
-        comsListHead = kernelAddress + offset;
+        listHead = kernelAddress + offset;
 
-        comsListEntry.Flink = comsListEntry.Blink = NULL;
+        listEntry.Flink = listEntry.Blink = NULL;
 
         //
         // Read entry head.
         //
-        if (!kdReadSystemMemory(comsListHead,
-            &comsListEntry,
+        if (!kdReadSystemMemory(listHead,
+            &listEntry,
             sizeof(LIST_ENTRY)))
         {
             break;
@@ -277,19 +272,18 @@ BOOL AlpcPortEnumerateClients(
         //
         // Walk list entries.
         //
-        while ((ULONG_PTR)comsListEntry.Flink != comsListHead) {
+        while ((ULONG_PTR)listEntry.Flink != listHead) {
 
-            kernelAddress = (ULONG_PTR)comsListEntry.Flink - offset;
+            kernelAddress = (ULONG_PTR)listEntry.Flink - offset;
 
             RtlSecureZeroMemory(&comsInfo, sizeof(comsInfo));
-
             if (!kdReadSystemMemory(kernelAddress,
                 &comsInfo,
                 sizeof(comsInfo)))
             {
                 break;
             }
-            
+
 
             serverPortAddress = (ULONG_PTR)comsInfo.ServerCommunicationPort;
             clientPortAddress = (ULONG_PTR)comsInfo.ClientCommunicationPort;
@@ -298,7 +292,6 @@ BOOL AlpcPortEnumerateClients(
                 &objectVersion);
 
             if (clientPort.Ref) {
-
                 OutputCallback(
                     ListView,
                     serverPortAddress,
@@ -306,8 +299,7 @@ BOOL AlpcPortEnumerateClients(
                     (ULONG_PTR)clientPort.u1.Port7600->OwnerProcess);
 
                 cEntries += 1;
-
-                supVirtualFree(selfPort.Ref);
+                supVirtualFree(clientPort.Ref);
             }
             else {
                 break;
@@ -316,19 +308,17 @@ BOOL AlpcPortEnumerateClients(
             //
             // Read next entry.
             //
-            comsListEntry = comsInfo.CommunicationList;
-
-            comsNextEntry.Flink = comsNextEntry.Blink = NULL;
-
+            listEntry = comsInfo.CommunicationList;
+            nextEntry.Flink = nextEntry.Blink = NULL;
             if (!kdReadSystemMemory(
-                (ULONG_PTR)comsListEntry.Flink,
-                &comsNextEntry,
+                (ULONG_PTR)listEntry.Flink,
+                &nextEntry,
                 sizeof(LIST_ENTRY)))
             {
                 break;
             }
 
-            if (comsNextEntry.Flink == NULL)
+            if (nextEntry.Flink == NULL)
                 break;
         }
 
@@ -383,6 +373,8 @@ VOID CALLBACK AlpcPortEnumerateCallback(
     lvitem.pszText = szBuffer;
     lvitem.iItem = MAXINT;
     nIndex = ListView_InsertItem(ListView, &lvitem);
+    if (nIndex == -1)
+        return;
 
     //
     // ClientPortAddress

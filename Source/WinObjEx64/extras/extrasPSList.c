@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASPSLIST.C
 *
-*  VERSION:     2.08
+*  VERSION:     2.09
 *
-*  DATE:        13 Jun 2025
+*  DATE:        22 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -590,7 +590,6 @@ VOID PsListHandleObjectProp(
     PROP_CONFIG propConfig;
     UNICODE_STRING usObjectName;
 
-
     if (bProcessList) {
 
         //
@@ -641,7 +640,7 @@ VOID PsListHandleObjectProp(
     //
     // Create fake name for display.
     //
-    sz = 1024 + (SIZE_T)ImageName->Length;
+    sz = sizeof(UNICODE_NULL) + 64 + ImageName->Length;
     lpName = (LPWSTR)supHeapAlloc(sz);
     if (lpName == NULL)
         return;
@@ -731,8 +730,8 @@ HTREEITEM AddProcessEntryTreeList(
     PROP_UNNAMED_OBJECT_INFO* objectEntry;
     TL_SUBITEMS_PSLIST subitems;
 
-    ULONG cbCaption;
-    PWSTR lpCaption = NULL, lpValue, lpUserName = NULL;
+    SIZE_T cbProcessName;
+    PWSTR lpProcessName = NULL, lpUserName = NULL;
     BOOL bIsProtected = FALSE;
     WCHAR szEPROCESS[32], szPid[32];
 
@@ -745,34 +744,32 @@ HTREEITEM AddProcessEntryTreeList(
     //
     // Id + Name
     //
-    cbCaption = 32;
+    cbProcessName = 32;
     if (objectEntry->ImageName.Length) {
-        cbCaption += objectEntry->ImageName.Length;
+        cbProcessName += objectEntry->ImageName.Length + sizeof(UNICODE_NULL);
     }
     else {
         if (uniqueProcessId == 0) {
-            cbCaption += T_IDLE_PROCESS_LENGTH;
+            cbProcessName += T_IDLE_PROCESS_LENGTH;
         }
     }
 
     RtlSecureZeroMemory(&subitems, sizeof(subitems));
 
-    lpCaption = (PWSTR)supHeapAlloc(cbCaption);
-    if (lpCaption) {
+    lpProcessName = (PWSTR)supHeapAlloc(cbProcessName);
+    if (lpProcessName) {
 
         if (uniqueProcessId == 0) {
-            lpValue = T_IDLE_PROCESS;
+            _strcpy(lpProcessName, T_IDLE_PROCESS);
         }
         else {
-            if (objectEntry->ImageName.Buffer) {
-                lpValue = objectEntry->ImageName.Buffer;
+            if (objectEntry->ImageName.Buffer && objectEntry->ImageName.Length) {
+                RtlCopyMemory(lpProcessName, objectEntry->ImageName.Buffer, objectEntry->ImageName.Length);
             }
             else {
-                lpValue = T_Unknown;
+                _strcpy(lpProcessName, T_Unknown);
             }
         }
-
-        _strcpy(lpCaption, lpValue);
     }
 
     //
@@ -870,13 +867,13 @@ HTREEITEM AddProcessEntryTreeList(
         TVIF_TEXT | TVIF_STATE,
         TVIS_EXPANDED,
         TVIS_EXPANDED,
-        lpCaption,
+        lpProcessName,
         &subitems);
 
     if (lpUserName)
         supHeapFree(lpUserName);
-    if (lpCaption)
-        supHeapFree(lpCaption);
+    if (lpProcessName)
+        supHeapFree(lpProcessName);
     
     PsListPidMapInsert(&PsListPidMap, HandleToULong(uniqueProcessId), hTreeItem);
 
@@ -1063,6 +1060,8 @@ DWORD WINAPI CreateThreadListProc(
                 lvitem.cchTextMax = MAX_PATH;
                 lvitem.lParam = (LPARAM)threadEntry;
                 ItemIndex = ListView_InsertItem(PsDlgContext.ListView, &lvitem);
+                if (ItemIndex == -1)
+                    continue;
 
                 //
                 // Priority
@@ -1993,12 +1992,9 @@ VOID extrasCreatePsListDialog(
     VOID
 )
 {
-
     if (!PsListDlgThreadHandle) {
-
         PsListDlgThreadHandle = supCreateDialogWorkerThread(extrasPsListDialogWorkerThread, NULL, 0);
-        supWaitForFastEvent(&PsListDlgInitializedEvent, NULL);
-
+        if (PsListDlgThreadHandle)
+            supWaitForFastEvent(&PsListDlgInitializedEvent, NULL);
     }
-
 }

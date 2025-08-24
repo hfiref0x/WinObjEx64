@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     2.08
+*  VERSION:     2.09
 *
-*  DATE:        11 Jun 2025
+*  DATE:        19 Aug 2025
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -131,6 +131,7 @@ typedef ULONG_PTR *PUTable;
 #define OBP_ERROR_NONAME_LITERAL_SIZE (sizeof(OBP_ERROR_NONAME_LITERAL) - sizeof(UNICODE_NULL))
 
 #define WINE_DIRECTORY_QUERY_BUFFER_SIZE (64 * 1024)
+#define OB_MAX_DIRECTORY_ENUM_ITER (64 * 1024)
 
 //
 // Predefined strings
@@ -433,8 +434,8 @@ NTSTATUS ObIsValidUnicodeStringEx(
     _In_ DWORD dwFlags);
 
 NTSTATUS ObCopyBoundaryDescriptor(
-    _In_ OBJECT_NAMESPACE_ENTRY *NamespaceLookupEntry,
-    _Out_ POBJECT_BOUNDARY_DESCRIPTOR *BoundaryDescriptor,
+    _In_ _Notnull_ OBJECT_NAMESPACE_ENTRY* NamespaceLookupEntry,
+    _Outptr_result_maybenull_ POBJECT_BOUNDARY_DESCRIPTOR* BoundaryDescriptor,
     _Out_opt_ PULONG BoundaryDescriptorSize);
 
 NTSTATUS ObEnumerateBoundaryDescriptorEntries(
@@ -450,57 +451,68 @@ UCHAR ObDecodeTypeIndex(
     _In_ PVOID Object,
     _In_ UCHAR EncodedTypeIndex);
 
+_Ret_maybenull_
 PVOID ObDumpDirectoryObjectVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
     _Out_ PULONG Version);
 
+_Ret_maybenull_
 PVOID ObDumpObjectTypeVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
     _Out_ PULONG Version);
 
+_Ret_maybenull_
 PVOID ObDumpAlpcPortObjectVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
     _Out_ PULONG Version);
 
+_Ret_maybenull_
 PVOID ObDumpSymbolicLinkObjectVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
     _Out_ PULONG Version);
 
+_Ret_maybenull_
 PVOID ObDumpDeviceMapVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
     _Out_ PULONG Version);
 
+_Ret_maybenull_
 PVOID ObDumpDriverExtensionVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
     _Out_ PULONG Version);
 
+_Ret_maybenull_
 PVOID ObDumpFltFilterObjectVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
     _Out_ PULONG Version);
 
+_Ret_maybenull_
 POBEX_OBJECT_INFORMATION ObQueryObjectByAddress(
     _In_ ULONG_PTR ObjectAddress);
 
+_Success_(return)
 BOOL ObGetProcessImageFileName(
     _In_ ULONG_PTR ProcessObject,
     _Inout_ PUNICODE_STRING ImageFileName);
 
+_Success_(return)
 BOOL ObGetProcessId(
     _In_ ULONG_PTR ProcessObject,
     _Out_ PHANDLE UniqueProcessId);
 
+_Success_(return)
 BOOL ObHeaderToNameInfoAddress(
-    _In_    UCHAR ObjectInfoMask,
-    _In_    ULONG_PTR ObjectHeaderAddress,
-    _Inout_ PULONG_PTR HeaderInfoAddress,
-    _In_    OBJ_HEADER_INFO_FLAG InfoFlag);
+    _In_ UCHAR ObjectInfoMask,
+    _In_ ULONG_PTR ObjectHeaderAddress,
+    _Out_ PULONG_PTR HeaderInfoAddress,
+    _In_ OBJ_HEADER_INFO_FLAG InfoFlag);
 
 _Success_(return)
 BOOL ObQueryNameStringFromAddress(
@@ -514,6 +526,7 @@ BOOL ObGetObjectAddressForDirectory(
     _Out_ PULONG_PTR lpRootAddress,
     _Out_opt_ PUSHORT lpTypeIndex);
 
+_Ret_maybenull_
 POBEX_OBJECT_INFORMATION ObQueryObjectInDirectory(
     _In_ PUNICODE_STRING ObjectName,
     _In_ PUNICODE_STRING DirectoryName);
@@ -526,12 +539,14 @@ BOOL ObQueryFullNamespacePath(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PUNICODE_STRING Path);
 
+_Ret_maybenull_
 POBJECT_DIRECTORY_INFORMATION ObQueryObjectDirectory(
     _In_ HANDLE DirectoryHandle,
     _Inout_ PULONG Context,
     _In_ BOOL IsWine,
     _Out_ PULONG ReturnLength);
 
+_Ret_maybenull_
 PVOID kdCreateObjectTypesList(
     VOID);
 
@@ -568,7 +583,7 @@ BOOL kdFindKiServiceTable(
 BOOL kdReadSystemMemory2(
     _In_opt_ LPCWSTR CallerFunction,
     _In_ ULONG_PTR Address,
-    _Inout_ PVOID Buffer,
+    _Inout_updates_bytes_(BufferSize) PVOID Buffer,
     _In_ ULONG BufferSize,
     _Out_opt_ PULONG NumberOfBytesRead);
 

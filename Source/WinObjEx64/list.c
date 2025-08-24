@@ -4,9 +4,9 @@
 *
 *  TITLE:       LIST.C
 *
-*  VERSION:     2.08
+*  VERSION:     2.09
 *
-*  DATE:        12 Jun 2025
+*  DATE:        19 Aug 2025
 *
 *  Program main object listing and search logic.
 *
@@ -22,10 +22,13 @@ HANDLE ListObjectsHeap = NULL;
 HANDLE TreeObjectsHeap = NULL;
 
 BOOLEAN ListHeapCreate(
-    _Inout_ PHANDLE HeapHandle
+    _Inout_ _At_(*HeapHandle, _Pre_valid_) _At_(*HeapHandle, _Post_valid_) PHANDLE HeapHandle
 )
 {
     HANDLE handle;
+
+    if (HeapHandle == NULL) 
+        return FALSE;
 
     if (*HeapHandle)
         supDestroyHeap(*HeapHandle);
@@ -100,8 +103,8 @@ POBEX_ITEM AllocateObjectItem(
 *
 */
 LPWSTR GetNextSub(
-    _In_ LPWSTR ObjectFullPathName,
-    _In_ LPWSTR Sub
+    _In_ _Notnull_ LPWSTR ObjectFullPathName,
+    _Out_writes_(MAX_PATH + 1) LPWSTR Sub
 )
 {
     SIZE_T i;
@@ -128,12 +131,12 @@ LPWSTR GetNextSub(
 *
 */
 VOID ListToObject(
-    _In_ LPWSTR ObjectName
+    _In_z_ LPWSTR ObjectName
 )
 {
-    BOOL        currentfound = FALSE;
-    INT         i, iSelectedItem;
+    INT         i, iSelectedItem, listItemCount;
     HTREEITEM   lastfound, item;
+    LPWSTR      pathPtr, nextPathPtr;
     LVITEM      lvitem;
     TVITEMEX    ritem;
     WCHAR       object[MAX_PATH + 1], sobject[MAX_PATH + 1];
@@ -145,18 +148,17 @@ VOID ListToObject(
         return;
 
     object[0] = 0;
-    ObjectName++;
+    pathPtr = ObjectName + 1;
     item = TreeView_GetRoot(g_hwndObjectTree);
     lastfound = item;
 
-    while ((item != NULL) && (*ObjectName != 0)) {
+    while ((item != NULL) && (*pathPtr != 0)) {
 
         item = TreeView_GetChild(g_hwndObjectTree, item);
         RtlSecureZeroMemory(object, sizeof(object));
-        ObjectName = GetNextSub(ObjectName, object);
-        currentfound = FALSE;
+        nextPathPtr = GetNextSub(pathPtr, object);
 
-        do {
+        while (item != NULL) {
             RtlSecureZeroMemory(&ritem, sizeof(ritem));
             RtlSecureZeroMemory(&sobject, sizeof(sobject));
             ritem.mask = TVIF_TEXT;
@@ -168,22 +170,34 @@ VOID ListToObject(
                 break;
 
             if (_strcmpi(sobject, object) == 0) {
-                if (item)
-                    lastfound = item;
+                lastfound = item;
                 break;
             }
 
             item = TreeView_GetNextSibling(g_hwndObjectTree, item);
-        } while (item != NULL);
+        }
+
+        // Matching node found, continue with next path component
+        if ((item != NULL) && (*nextPathPtr != 0)) {
+            pathPtr = nextPathPtr;
+            continue;
+        }
+
+        // Last component found, select it and return
+        if ((item != NULL) && (*nextPathPtr == 0)) {
+            TreeView_SelectItem(g_hwndObjectTree, lastfound);
+            SetFocus(g_hwndObjectTree);
+            return;
+        }
+
+        // Not found
+        break;
     }
 
     TreeView_SelectItem(g_hwndObjectTree, lastfound);
 
-    if (currentfound) // final target was a subdir
-        return;
-
-    for (i = 0; i < MAXINT; i++) {
-
+    listItemCount = ListView_GetItemCount(g_hwndObjectList);
+    for (i = 0; i < listItemCount; i++) {
         RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
         RtlSecureZeroMemory(&sobject, sizeof(sobject));
         lvitem.mask = LVIF_TEXT;
@@ -747,11 +761,6 @@ VOID FindObject(
             ObGetPredefinedUnicodeString(OBP_DIRECTORY),
             TRUE))
         {
-            if (subDirectory.Buffer) {
-                supHeapFree(subDirectory.Buffer);
-                subDirectory.Buffer = NULL;
-            }
-
             if (AppendDirectoryPath(DirectoryName, &infoBuffer->Name, &subDirectory)) {
                 FindObject(&subDirectory, NameSubstring, TypeName, List);
                 supHeapFree(subDirectory.Buffer);

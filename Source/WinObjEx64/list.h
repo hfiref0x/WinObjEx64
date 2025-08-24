@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       LIST.H
 *
-*  VERSION:     2.00
+*  VERSION:     2.09
 *
-*  DATE:        19 Jun 2022
+*  DATE:        19 Aug 2025
 *
 *  Common header file for the program object listing logic.
 *
@@ -43,7 +43,7 @@ VOID ListHeapDestroy(
     VOID);
 
 VOID ListToObject(
-    _In_ LPWSTR ObjectName);
+    _In_z_ LPWSTR ObjectName);
 
 VOID ListObjectDirectoryTree(
     _In_ PUNICODE_STRING SubDirName,

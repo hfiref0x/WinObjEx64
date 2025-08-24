@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASCMOPT.C
 *
-*  VERSION:     2.08
+*  VERSION:     2.09
 *
-*  DATE:        10 Jun 2025
+*  DATE:        22 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -379,6 +379,8 @@ VOID CmpOptDlgAddEntry(
         lvitem.pszText = CmControlVector.Version.v1->KeyPath;
         lvitem.iImage = g_TypeKey.ImageIndex;
         lvItemIndex = ListView_InsertItem(hwndList, &lvitem);
+        if (lvItemIndex == -1)
+            return;
 
         //
         // ValueName
@@ -752,18 +754,20 @@ DWORD extrasCmOptDialogWorkerThread(
 
     supSetFastEvent(&CmOptInitializedEvent);
 
-    do {
+    if (hwndDlg) {
+        do {
 
-        bResult = GetMessage(&message, NULL, 0, 0);
-        if (bResult == -1)
-            break;
+            bResult = GetMessage(&message, NULL, 0, 0);
+            if (bResult == -1)
+                break;
 
-        if (!IsDialogMessage(hwndDlg, &message)) {
-            TranslateMessage(&message);
-            DispatchMessage(&message);
-        }
+            if (!IsDialogMessage(hwndDlg, &message)) {
+                TranslateMessage(&message);
+                DispatchMessage(&message);
+            }
 
-    } while (bResult != 0);
+        } while (bResult != 0);
+    }
 
     supResetFastEvent(&CmOptInitializedEvent);
 
@@ -790,15 +794,15 @@ VOID extrasCreateCmOptDialog(
     EXTRASCONTEXT* pDlgContext;
 
     if (!CmOptThreadHandle) {
-
         pDlgContext = (EXTRASCONTEXT*)supHeapAlloc(sizeof(EXTRASCONTEXT));
         if (pDlgContext) {
-
             pDlgContext->tlSubItemHit = -1;
             CmOptThreadHandle = supCreateDialogWorkerThread(extrasCmOptDialogWorkerThread, pDlgContext , 0);
+            if (CmOptThreadHandle == NULL) {
+                supHeapFree(pDlgContext);
+                return;
+            }
             supWaitForFastEvent(&CmOptInitializedEvent, NULL);
-
         }
-
     }
 }

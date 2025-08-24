@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2022 - 2024
+*  (C) COPYRIGHT AUTHORS, 2022 - 2025
 *
 *  TITLE:       SYSINFODLG.C
 *
-*  VERSION:     2.05
+*  VERSION:     2.09
 *
-*  DATE:        04 Jun 2024
+*  DATE:        20 Aug 2025
 * 
 *  System Information Dialog.
 *
@@ -50,41 +50,49 @@ VOID AddParameterValue(
     _In_ LPCWSTR Parameter,
     _In_ LPCWSTR Value)
 {
-    LONG StartPos = 0;
+    CHARFORMAT cfBold, cfNormal;
+    CHARRANGE range;
+    LONG start, end;
 
-    CHARFORMAT CharFormat;
-    CHARRANGE CharRange, SelectedRange;
+    // Prepare CHARFORMATs for bold and normal text
+    RtlSecureZeroMemory(&cfBold, sizeof(cfBold));
+    cfBold.cbSize = sizeof(cfBold);
+    cfBold.dwMask = CFM_BOLD;
+    cfBold.dwEffects = CFE_BOLD;
 
-    CharRange.cpMax = INT_MAX;
-    CharRange.cpMin = INT_MAX;
+    RtlSecureZeroMemory(&cfNormal, sizeof(cfNormal));
+    cfNormal.cbSize = sizeof(cfNormal);
+    cfNormal.dwMask = CFM_BOLD;
 
-    SendMessage(OutputWindow, EM_EXSETSEL, (WPARAM)0, (LPARAM)&CharRange);
-    SendMessage(OutputWindow, EM_EXGETSEL, (WPARAM)0, (LPARAM)&SelectedRange);
-    StartPos = SelectedRange.cpMin;
+    // Move caret to end of text
+    range.cpMin = range.cpMax = INT_MAX;
+    SendMessage(OutputWindow, EM_EXSETSEL, 0, (LPARAM)&range);
 
-    RtlSecureZeroMemory(&CharFormat, sizeof(CharFormat));
-    CharFormat.cbSize = sizeof(CharFormat);
-    CharFormat.dwMask = CFM_BOLD;
-    CharFormat.dwEffects = 0;
+    // Add newline if not the first line
+    if (SendMessage(OutputWindow, WM_GETTEXTLENGTH, 0, 0) > 0)
+        SendMessage(OutputWindow, EM_REPLACESEL, 0, (LPARAM)L"\r\n");
 
-    SendMessage(OutputWindow, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&CharFormat);
+    // Mark parameter start, insert parameter, mark parameter end
+    SendMessage(OutputWindow, EM_EXGETSEL, 0, (LPARAM)&range);
+    start = range.cpMin;
+    SendMessage(OutputWindow, EM_REPLACESEL, 0, (LPARAM)Parameter);
+    SendMessage(OutputWindow, EM_EXGETSEL, 0, (LPARAM)&range);
+    end = range.cpMin;
 
-    if (StartPos) {
-        SendMessage(OutputWindow, EM_REPLACESEL, (WPARAM)0, (LPARAM)L"\r\n");
-        StartPos += 1;
-    }
+    // Bold only the parameter
+    range.cpMin = start;
+    range.cpMax = end;
+    SendMessage(OutputWindow, EM_EXSETSEL, 0, (LPARAM)&range);
+    SendMessage(OutputWindow, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cfBold);
 
-    SendMessage(OutputWindow, EM_REPLACESEL, (WPARAM)0, (LPARAM)Parameter);
-    SendMessage(OutputWindow, EM_REPLACESEL, (WPARAM)0, (LPARAM)L"\t");
-    SendMessage(OutputWindow, EM_REPLACESEL, (WPARAM)0, (LPARAM)Value);
+    // Move caret to end and set normal style
+    range.cpMin = range.cpMax = INT_MAX;
+    SendMessage(OutputWindow, EM_EXSETSEL, 0, (LPARAM)&range);
+    SendMessage(OutputWindow, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cfNormal);
 
-    CharFormat.dwEffects = CFE_BOLD;
-
-    CharRange.cpMin = StartPos;
-    CharRange.cpMax = (LONG)_strlen(Parameter) + StartPos + 1;
-
-    SendMessage(OutputWindow, EM_EXSETSEL, (WPARAM)0, (LPARAM)&CharRange);
-    SendMessage(OutputWindow, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&CharFormat);
+    // Insert tab and value as normal
+    SendMessage(OutputWindow, EM_REPLACESEL, 0, (LPARAM)L"\t");
+    SendMessage(OutputWindow, EM_REPLACESEL, 0, (LPARAM)Value);
 }
 
 /*
@@ -215,6 +223,8 @@ VOID SysInfoCollectInformation(
 
     HWND hwndOutput = GetDlgItem(hwndDlg, IDC_GLOBALS);
 
+    size_t Remaining;
+
     RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
     RtlSecureZeroMemory(szTemp, sizeof(szTemp));
 
@@ -262,8 +272,9 @@ VOID SysInfoCollectInformation(
         RtlStringCchPrintfSecure(szBuffer, MAX_PATH, TEXT("Wine v%ws, reported as "), szWineVer);
     }
 
+    Remaining = RTL_NUMBER_OF(szBuffer) - _strlen(szBuffer);
     RtlStringCchPrintfSecure(_strend(szBuffer),
-        100,
+        (ULONG)Remaining,
         TEXT("Windows NT %1u.%1u (build %u"),
         g_WinObj.osver.dwMajorVersion,
         g_WinObj.osver.dwMinorVersion,
@@ -359,11 +370,13 @@ VOID SysInfoCollectInformation(
     AddParameterValueBool(hwndOutput, TEXT("Internal.IsDebugPrivAssigned"), g_kdctx.IsDebugPrivAssigned);
     AddParameterValue32Hex(hwndOutput, TEXT("Internal.NameNormalizationSymbol"), (ULONG)g_ObNameNormalizationSymbol);
 
-    if (obConfig->SymbolsDbgHelpDllValid) {
-        AddParameterValue(hwndOutput, TEXT("Parameters.SymbolsDbgHelpDll"), obConfig->szSymbolsDbgHelpDll);
-    }
-    if (obConfig->SymbolsPathValid) {
-        AddParameterValue(hwndOutput, TEXT("Parameters.SymbolsPath"), obConfig->szSymbolsPath);
+    if (obConfig) {
+        if (obConfig->SymbolsDbgHelpDllValid) {
+            AddParameterValue(hwndOutput, TEXT("Parameters.SymbolsDbgHelpDll"), obConfig->szSymbolsDbgHelpDll);
+        }
+        if (obConfig->SymbolsPathValid) {
+            AddParameterValue(hwndOutput, TEXT("Parameters.SymbolsPath"), obConfig->szSymbolsPath);
+        }
     }
 
     AddParameterValueBool(hwndOutput, TEXT("MitigationFlags.ASLRPolicy"), g_kdctx.MitigationFlags.ASLRPolicy);
@@ -383,8 +396,8 @@ VOID SysInfoCollectInformation(
     case wdrvAlice:
         lpType = L"Alice";
         break;
-    case wdrvRkhDrv5:
-        lpType = L"Rkhdrv5";
+    case wdrvRonova:
+        lpType = L"Ronova";
         break;
     case wdrvWinIo:
         lpType = L"WinIo";
@@ -430,7 +443,13 @@ VOID SysInfoCollectInformation(
     //
     // Firmware type
     //
-    fmType = g_kdctx.Data->FirmwareType;
+    if (g_kdctx.Data) {
+        fmType = g_kdctx.Data->FirmwareType;
+    }
+    else {
+        fmType = (FIRMWARE_TYPE)-1;
+    }
+
     switch (fmType) {
 
     case FirmwareTypeBios:
@@ -459,7 +478,7 @@ VOID SysInfoCollectInformation(
     AddParameterValue64Hex(hwndOutput, TEXT("System.MinimumUserModeAddress"), (ULONG_PTR)g_kdctx.MinimumUserModeAddress);
     AddParameterValue64Hex(hwndOutput, TEXT("System.MaximumUserModeAddress"), (ULONG_PTR)g_kdctx.MaximumUserModeAddress);
 
-    if (g_kdctx.IsFullAdmin) {
+    if (g_kdctx.IsFullAdmin && g_kdctx.Data) {
 
         //
         // List kldbg data if there is something to show since this data fetched dynamically during usage.
@@ -549,8 +568,7 @@ VOID SysInfoCollectInformation(
     //
     // Speculation Control flags.
     //
-    SpecControlInfo.v2.Flags2 = 0;
-    SpecControlInfo.v2.Flags = 0;
+    RtlSecureZeroMemory(&SpecControlInfo, sizeof(SpecControlInfo));
     bytesIO = sizeof(SpecControlInfo);
     ntStatus = NtQuerySystemInformation(SystemSpeculationControlInformation, &SpecControlInfo, bytesIO, &bytesIO);
     if (NT_SUCCESS(ntStatus)) {
@@ -634,8 +652,8 @@ VOID SysInfoCopyToClipboard(
     _In_ HWND hwndDlg
 )
 {
-    SIZE_T BufferSize;
-    PWCHAR Buffer;
+    SIZE_T charCount, bufferSize;
+    PWCHAR buffer;
 
     GETTEXTLENGTHEX gtl;
     GETTEXTEX gt;
@@ -645,25 +663,25 @@ VOID SysInfoCopyToClipboard(
     gtl.flags = GTL_USECRLF;
     gtl.codepage = 1200;
 
-    BufferSize = SendMessage(hwndControl, EM_GETTEXTLENGTHEX, (WPARAM)&gtl, 0);
-    if (BufferSize) {
+    charCount = (SIZE_T)SendMessage(hwndControl, EM_GETTEXTLENGTHEX, (WPARAM)&gtl, 0);
+    if (charCount) {
 
-        BufferSize *= sizeof(WCHAR);
+        bufferSize = (charCount + 1) * sizeof(WCHAR);
 
-        Buffer = (PWCHAR)supHeapAlloc(BufferSize);
-        if (Buffer) {
+        buffer = (PWCHAR)supHeapAlloc(bufferSize);
+        if (buffer) {
 
             gt.flags = GT_USECRLF;
-            gt.cb = (ULONG)BufferSize;
+            gt.cb = (ULONG)bufferSize;
 
             gt.codepage = 1200;
             gt.lpDefaultChar = NULL;
             gt.lpUsedDefChar = NULL;
-            SendMessage(hwndControl, EM_GETTEXTEX, (WPARAM)&gt, (LPARAM)Buffer);
+            SendMessage(hwndControl, EM_GETTEXTEX, (WPARAM)&gt, (LPARAM)buffer);
+            buffer[charCount] = L'\0';
+            supClipboardCopy(buffer, bufferSize);
 
-            supClipboardCopy(Buffer, BufferSize);
-
-            supHeapFree(Buffer);
+            supHeapFree(buffer);
         }
     }
 }

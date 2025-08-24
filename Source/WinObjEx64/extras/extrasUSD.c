@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASUSD.C
 *
-*  VERSION:     2.07
+*  VERSION:     2.09
 *
-*  DATE:        04 Feb 2025
+*  DATE:        22 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -233,15 +233,12 @@ VOID UsdDumpSharedRegion(
     PKUSER_SHARED_DATA  pUserSharedData;
 
 
-    do {
+    __try {
 
         pUserSharedData = (KUSER_SHARED_DATA* const)MM_SHARED_USER_DATA_VA;
 
-        if (IsBadReadPtr(pUserSharedData, sizeof(KUSER_SHARED_DATA)))
-            break;
-
         if (!supInitTreeListForDump(hwndParent, &g_UsdDlgContext.TreeList))
-            break;
+            return;
 
         //
         // KUSER_SHARED_DATA
@@ -257,7 +254,7 @@ VOID UsdDumpSharedRegion(
             (PVOID)NULL);
 
         if (h_tviRootItem == NULL) {
-            break;
+            return;
         }
 
         //
@@ -619,7 +616,10 @@ VOID UsdDumpSharedRegion(
             (COLORREF)0,
             (COLORREF)0);
 
-    } while (FALSE);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return;
+    }
 }
 
 /*
@@ -757,22 +757,25 @@ DWORD extrasUsdDialogWorkerThread(
         &UsdDialogProc,
         0);
 
-    g_UsdDlgContext.hwndDlg = hwndDlg;
 
     supSetFastEvent(&UsdDlgInitializedEvent);
 
-    do {
+    if (hwndDlg) {
+        g_UsdDlgContext.hwndDlg = hwndDlg;
 
-        bResult = GetMessage(&message, NULL, 0, 0);
-        if (bResult == -1)
-            break;
+        do {
 
-        if (!IsDialogMessage(hwndDlg, &message)) {
-            TranslateMessage(&message);
-            DispatchMessage(&message);
-        }
+            bResult = GetMessage(&message, NULL, 0, 0);
+            if (bResult == -1)
+                break;
 
-    } while (bResult != 0);
+            if (!IsDialogMessage(hwndDlg, &message)) {
+                TranslateMessage(&message);
+                DispatchMessage(&message);
+            }
+
+        } while (bResult != 0);
+    }
 
     supResetFastEvent(&UsdDlgInitializedEvent);
 
@@ -796,14 +799,11 @@ VOID extrasCreateUsdDialog(
     VOID
 )
 {
-
     if (!UsdDlgThreadHandle) {
-
         RtlSecureZeroMemory(&g_UsdDlgContext, sizeof(g_UsdDlgContext));
         g_UsdDlgContext.tlSubItemHit = -1;
-
         UsdDlgThreadHandle = supCreateDialogWorkerThread(extrasUsdDialogWorkerThread, NULL, 0);
-        supWaitForFastEvent(&UsdDlgInitializedEvent, NULL);
-
+        if (UsdDlgThreadHandle)
+            supWaitForFastEvent(&UsdDlgInitializedEvent, NULL);
     }
 }

@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPPROCESS.C
 *
-*  VERSION:     2.08
+*  VERSION:     2.09
 *
-*  DATE:        12 Jun 2025
+*  DATE:        21 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -108,10 +108,12 @@ INT CALLBACK ProcessListCompareFunc(
         //
         Value1 = strtou64(lpItem1);
         Value2 = strtou64(lpItem2);
-        if (pDlgContext->bInverseSort)
-            nResult = Value2 > Value1;
+        if (Value1 < Value2)
+            nResult = pDlgContext->bInverseSort ? 1 : -1;
+        else if (Value1 > Value2)
+            nResult = pDlgContext->bInverseSort ? -1 : 1;
         else
-            nResult = Value1 > Value2;
+            nResult = 0;
         break;
 
     }
@@ -400,7 +402,7 @@ BOOL ProcessEnumHandlesCallback(
     _In_ PVOID UserContext
 )
 {
-    PPS_HANDLE_DUMP_ENUM_CONTEXT userCtx = (PPS_HANDLE_DUMP_ENUM_CONTEXT)UserContext;
+    PHANDLE_DUMP_ENUM_CONTEXT userCtx = (PHANDLE_DUMP_ENUM_CONTEXT)UserContext;
 
     //
     // Is this what we want?
@@ -417,7 +419,7 @@ BOOL ProcessEnumHandlesCallback(
                 HandleEntry);
         }
     }
-
+    // Continue enumeration
     return FALSE;
 }
 
@@ -445,7 +447,7 @@ VOID ProcessListSetInfo(
     HICON                           hIcon;
     PSYSTEM_HANDLE_INFORMATION_EX   pHandles = NULL;
 
-    PS_HANDLE_DUMP_ENUM_CONTEXT     enumContext;
+    HANDLE_DUMP_ENUM_CONTEXT        enumContext;
 
     //empty process list images
     ImageList_RemoveAll(pDlgContext->ImageList);

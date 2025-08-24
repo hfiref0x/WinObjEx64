@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2022
+*  (C) COPYRIGHT AUTHORS, 2022 - 2025
 *
 *  TITLE:       WDRVPRV.C
 *
-*  VERSION:     1.93
+*  VERSION:     2.09
 *
-*  DATE:        22 Apr 2022
+*  DATE:        20 Aug 2025
 *
 *  Driver providers abstraction layer.
 *
@@ -21,7 +21,9 @@
 #include "drivers/winio.h"
 
 #ifdef _USE_OWN_DRIVER
+
 #ifdef _USE_WINIO
+
 #define WDRV_PROVIDER_TYPE wdrvWinIo
 static WDRV_PROVIDER g_wdpEntry = {
     WINIO_DRV_NAME,
@@ -36,9 +38,28 @@ static WDRV_PROVIDER g_wdpEntry = {
     WDrvProvPostOpen,
     WinIoReadSystemMemory
 };
+
+#elif defined(_USE_RONOVA)
+
+#define WDRV_PROVIDER_TYPE wdrvRonova
+static WDRV_PROVIDER g_wdpEntry = {
+    L"rnv64hkt",
+    L"ronova",
+    WDRVPROV_FLAGS_UEFI_REQUIRED,
+    WDrvStartDriver,
+    WDrvStopDriver,
+    WDrvOpenDriver,
+    NULL, //register
+    NULL, //unregister
+    NULL, //preopen
+    NULL, //postopen
+    WDbgDrvReadSystemMemory
+};
+
 #else
+
 #define WDRV_PROVIDER_TYPE wdrvWinObjEx64
-static WDRV_PROVIDER g_wdpEntry = { 
+static WDRV_PROVIDER g_wdpEntry = {
     L"wodbgdrv",
     L"wodbgdrv",
     WDRVPROV_FLAGS_NONE,
@@ -49,9 +70,11 @@ static WDRV_PROVIDER g_wdpEntry = {
     NULL, //unregister
     NULL, //preopen
     NULL, //postopen
-    WDbgDrvReadSystemMemory 
+    WDbgDrvReadSystemMemory
 };
+
 #endif
+
 #else
 
 #define WDRV_PROVIDER_TYPE wdrvMicrosoft
@@ -66,26 +89,32 @@ static WDRV_PROVIDER g_wdpEntry = {
     NULL, //unregister
     NULL, //preopen
     NULL, //postopen
-    WDbgDrvReadSystemMemory 
+    WDbgDrvReadSystemMemory
 };
-#endif
+
+#endif /* _USE_OWN_DRIVER */
 
 #define PHY_ADDRESS_MASK                0x000ffffffffff000ull
+#define PHY_ADDRESS_MASK_1GB_PAGES      0x000fffffc0000000ull
 #define PHY_ADDRESS_MASK_2MB_PAGES      0x000fffffffe00000ull
+#define VADDR_ADDRESS_MASK_1GB_PAGES    0x000000003fffffffull
 #define VADDR_ADDRESS_MASK_2MB_PAGES    0x00000000001fffffull
 #define VADDR_ADDRESS_MASK_4KB_PAGES    0x0000000000000fffull
 #define ENTRY_PRESENT_BIT               1
 #define ENTRY_PAGE_SIZE_BIT             0x0000000000000080ull
 
 
-int PwEntryToPhyAddr(ULONG_PTR entry, ULONG_PTR* phyaddr)
+static inline BOOLEAN PwEntryToPhyAddr(
+    _In_ ULONG_PTR entry,
+    _Out_ ULONG_PTR* phyaddr)
 {
-    if (entry & ENTRY_PRESENT_BIT) {
-        *phyaddr = entry & PHY_ADDRESS_MASK;
-        return 1;
+    if ((entry & ENTRY_PRESENT_BIT) == 0) {
+        *phyaddr = 0;
+        return FALSE;
     }
 
-    return 0;
+    *phyaddr = entry & PHY_ADDRESS_MASK;
+    return TRUE;
 }
 
 NTSTATUS PwVirtualToPhysical(
@@ -98,6 +127,9 @@ NTSTATUS PwVirtualToPhysical(
     NTSTATUS    ntStatus;
     ULONG_PTR   pml4_cr3, selector, table, entry = 0;
     INT         r, shift;
+    
+    if (PhysicalAddress == NULL)
+        return STATUS_INVALID_PARAMETER;
 
     ntStatus = QueryPML4Routine(DeviceHandle, &pml4_cr3);
     if (!NT_SUCCESS(ntStatus))
@@ -118,14 +150,24 @@ NTSTATUS PwVirtualToPhysical(
         if (!NT_SUCCESS(ntStatus))
             return ntStatus;
 
-        if (PwEntryToPhyAddr(entry, &table) == 0)
+        if (!PwEntryToPhyAddr(entry, &table))
             return STATUS_INTERNAL_ERROR;
 
-        if ((r == 2) && ((entry & ENTRY_PAGE_SIZE_BIT) != 0)) {
-            table &= PHY_ADDRESS_MASK_2MB_PAGES;
-            table += VirtualAddress & VADDR_ADDRESS_MASK_2MB_PAGES;
-            *PhysicalAddress = table;
-            return STATUS_SUCCESS;
+        if (entry & ENTRY_PAGE_SIZE_BIT)
+        {
+            if (r == 1) {
+                table &= PHY_ADDRESS_MASK_1GB_PAGES;
+                table += VirtualAddress & VADDR_ADDRESS_MASK_1GB_PAGES;
+                *PhysicalAddress = table;
+                return STATUS_SUCCESS;
+            }
+
+            if (r == 2) {
+                table &= PHY_ADDRESS_MASK_2MB_PAGES;
+                table += VirtualAddress & VADDR_ADDRESS_MASK_2MB_PAGES;
+                *PhysicalAddress = table;
+                return STATUS_SUCCESS;
+            }
         }
     }
 
@@ -167,12 +209,8 @@ BOOL WINAPI WDrvProvPostOpen(
     // Check if we need to forcebly set SD.
     //
     if (Context->Provider->ForceSD) {
-
-
         ntStatus = supCreateSystemAdminAccessSD(&driverSD, &defaultAcl);
-
         if (NT_SUCCESS(ntStatus)) {
-
             ntStatus = NtSetSecurityObject(deviceHandle,
                 DACL_SECURITY_INFORMATION,
                 driverSD);
@@ -183,7 +221,7 @@ BOOL WINAPI WDrvProvPostOpen(
             if (NT_SUCCESS(ntStatus)) {
 
                 //
-                // Remove WRITE_DAC from result handle.
+                // Remove WRITE_DAC from resulting handle by duplicating with reduced rights.
                 //
                 if (NT_SUCCESS(NtDuplicateObject(NtCurrentProcess(),
                     deviceHandle,
@@ -196,13 +234,9 @@ BOOL WINAPI WDrvProvPostOpen(
                     NtClose(deviceHandle);
                     deviceHandle = strHandle;
                 }
-
             }
-
             Context->DeviceHandle = deviceHandle;
-
         }
-
     }
 
     return (deviceHandle != NULL);
@@ -255,7 +289,7 @@ BOOL WDrvExtractDriverResource(
         0,
         NULL,
         CREATE_ALWAYS,
-        0,
+        FILE_ATTRIBUTE_NORMAL,
         NULL);
 
     if (hFile == INVALID_HANDLE_VALUE) {
@@ -358,9 +392,7 @@ NTSTATUS WDrvOpenDriver(
     ULONG openFlags = GENERIC_WRITE | GENERIC_READ;
 
     if (Context->Provider->Callbacks.PreOpenDriver) {
-
         Context->Provider->Callbacks.PreOpenDriver((PVOID)Context);
-
     }
 
     if (Context->Provider->ForceSD)
@@ -374,11 +406,8 @@ NTSTATUS WDrvOpenDriver(
         Context->DeviceHandle = deviceHandle;
 
         if (Context->Provider->Callbacks.PostOpenDriver) {
-
             Context->Provider->Callbacks.PostOpenDriver((PVOID)Context);
-
         }
-
     }
 
     return ntStatus;
@@ -403,21 +432,16 @@ NTSTATUS WDrvStartDriver(
     // Check if driver already loaded.
     //
     if (supIsObjectExists((LPWSTR)L"\\Device", Context->Provider->DeviceName)) {
-
         Context->IsOurLoad = FALSE;
         bLoaded = TRUE;
-
     }
     else {
-
         ntStatus = WDrvLoadDriver(Context);
         bLoaded = NT_SUCCESS(ntStatus);
         Context->IsOurLoad = bLoaded;
-
     }
 
     if (bLoaded) {
-
         Context->LoadStatus = ntStatus;
         ntStatus = Context->Provider->Callbacks.OpenDriver(Context);
         Context->OpenStatus = ntStatus;
@@ -444,24 +468,8 @@ VOID WDrvStopDriver(
 
     ntStatus = supUnloadDriver(lpDriverName, TRUE);
     if (NT_SUCCESS(ntStatus)) {
-
         supDeleteFileWithWait(1000, 5, lpFullFileName);
     }
-}
-
-VOID WDrvFallBackOnLoad(
-    _Inout_ PWDRV_CONTEXT* Context
-)
-{
-    PWDRV_CONTEXT ctx = *Context;
-
-    if (ctx->DeviceHandle)
-        NtClose(ctx->DeviceHandle);
-
-    ctx->Provider->Callbacks.StopDriver(ctx);
-
-    supHeapFree(ctx);
-    *Context = NULL;
 }
 
 /*
@@ -486,18 +494,16 @@ NTSTATUS WDrvProvCreate(
     //
     // Enable debug privilege.
     //
-    if (!supEnablePrivilege(SE_DEBUG_PRIVILEGE, TRUE)) {
+    if (!supEnablePrivilege(SE_DEBUG_PRIVILEGE, TRUE))
         return STATUS_PRIVILEGE_NOT_HELD;
-    }
 
     provider = &g_wdpEntry;
 
     //
     // UEFI compat check.
     //
-    if (provider->UefiRequired && (FirmwareType != FirmwareTypeUefi)) {
+    if (provider->UefiRequired && (FirmwareType != FirmwareTypeUefi))
         return STATUS_NOT_SUPPORTED;
-    }
 
     Context->Provider = provider;
 
@@ -505,16 +511,13 @@ NTSTATUS WDrvProvCreate(
     // Load and open driver.
     //
     ntStatus = Context->Provider->Callbacks.StartDriver(Context);
-
     if (NT_SUCCESS(ntStatus)) {
-
-        if (Context->Provider->Callbacks.RegisterDriver)
+        if (Context->Provider->Callbacks.RegisterDriver) // optional routine
             if (!Context->Provider->Callbacks.RegisterDriver(Context->DeviceHandle,
                 (PVOID)Context))
             {
                 ntStatus = STATUS_INTERNAL_ERROR;
             }
-
     }
 
     return ntStatus;
@@ -536,11 +539,8 @@ VOID WDrvProvRelease(
     HANDLE deviceHandle;
 
     if (Context) {
-
         provider = Context->Provider;
-
         if (provider) {
-
             deviceHandle = Context->DeviceHandle;
             if (deviceHandle) {
                 if (provider->Callbacks.UnregisterDriver)
@@ -550,13 +550,10 @@ VOID WDrvProvRelease(
                 NtClose(deviceHandle);
             }
 
-            if (provider->NoUnloadSupported == 0) {
-
+            if (provider->NoUnloadSupported == 0 && provider->Callbacks.StopDriver != NULL) {
                 provider->Callbacks.StopDriver(Context);
             }
         }
-
         RtlSecureZeroMemory(Context, sizeof(WDRV_CONTEXT));
-
     }
 }

@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     2.08
+*  VERSION:     2.09
 *
-*  DATE:        11 Jun 2025
+*  DATE:        22 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -125,47 +125,49 @@ VOID SdtListOutputTable(
         lvItem.iImage = iImage; //imagelist id
         lvItem.pszText = szBuffer;
         lvIndex = ListView_InsertItem(Context->ListView, &lvItem);
+        if (lvIndex >= 0) {
 
-        //Name
-        lvItem.mask = LVIF_TEXT;
-        lvItem.iSubItem = 1;
-        lvItem.pszText = (LPWSTR)SdtTableEntry->Table[i].Name;
-        lvItem.iItem = lvIndex;
-        ListView_SetItem(Context->ListView, &lvItem);
+            //Name
+            lvItem.mask = LVIF_TEXT;
+            lvItem.iSubItem = 1;
+            lvItem.pszText = (LPWSTR)SdtTableEntry->Table[i].Name;
+            lvItem.iItem = lvIndex;
+            ListView_SetItem(Context->ListView, &lvItem);
 
-        //Address
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-        szBuffer[0] = L'0';
-        szBuffer[1] = L'x';
-        u64tohex(SdtTableEntry->Table[i].Address, &szBuffer[2]);
+            //Address
+            RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+            szBuffer[0] = L'0';
+            szBuffer[1] = L'x';
+            u64tohex(SdtTableEntry->Table[i].Address, &szBuffer[2]);
 
-        lvItem.iSubItem = 2;
-        lvItem.pszText = szBuffer;
-        ListView_SetItem(Context->ListView, &lvItem);
+            lvItem.iSubItem = 2;
+            lvItem.pszText = szBuffer;
+            ListView_SetItem(Context->ListView, &lvItem);
 
-        //Module
-        RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+            //Module
+            RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
 
-        if (ntsupFindModuleEntryByAddress(
-            Modules,
-            (PVOID)SdtTableEntry->Table[i].Address,
-            &moduleIndex))
-        {
-            MultiByteToWideChar(
-                CP_ACP,
-                0,
-                (LPCSTR)&Modules->Modules[moduleIndex].FullPathName,
-                (INT)_strlen_a((char*)Modules->Modules[moduleIndex].FullPathName),
-                szBuffer,
-                MAX_PATH);
+            if (ntsupFindModuleEntryByAddress(
+                Modules,
+                (PVOID)SdtTableEntry->Table[i].Address,
+                &moduleIndex))
+            {
+                MultiByteToWideChar(
+                    CP_ACP,
+                    0,
+                    (LPCSTR)&Modules->Modules[moduleIndex].FullPathName,
+                    -1,
+                    szBuffer,
+                    MAX_PATH);
+            }
+            else {
+                _strcpy(szBuffer, TEXT("Unknown Module"));
+            }
+
+            lvItem.iSubItem = 3;
+            lvItem.pszText = szBuffer;
+            ListView_SetItem(Context->ListView, &lvItem);
         }
-        else {
-            _strcpy(szBuffer, TEXT("Unknown Module"));
-        }
-
-        lvItem.iSubItem = 3;
-        lvItem.pszText = szBuffer;
-        ListView_SetItem(Context->ListView, &lvItem);
     }
 }
 
@@ -272,7 +274,7 @@ BOOL SdtListCreateTable(
                         CP_ACP,
                         0,
                         ServiceName,
-                        (INT)_strlen_a(ServiceName),
+                        -1,
                         KiServiceTable.Table[KiServiceTable.Limit].Name,
                         MAX_PATH);
 
@@ -753,7 +755,7 @@ BOOL SdtListCreateTableShadow(
                         CP_ACP,
                         0,
                         tableEntry->Name,
-                        (INT)_strlen_a(tableEntry->Name),
+                        -1,
                         ServiceEntry->Name,
                         MAX_PATH);
 
@@ -1378,12 +1380,11 @@ DWORD extrasSSDTDialogWorkerThread(
     _In_ PVOID Parameter
 )
 {
+    HANDLE prev;
     HWND hwndDlg;
     BOOL bResult;
     MSG message;
     HACCEL acceleratorTable;
-    HANDLE workerThread;
-    FAST_EVENT fastEvent;
     EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)Parameter;
 
     hwndDlg = CreateDialogParam(
@@ -1397,36 +1398,33 @@ DWORD extrasSSDTDialogWorkerThread(
 
     acceleratorTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
 
-    fastEvent = SdtDlgInitializedEvents[pDlgContext->DialogMode];
+    supSetFastEvent(&SdtDlgInitializedEvents[pDlgContext->DialogMode]);
 
-    supSetFastEvent(&fastEvent);
+    if (hwndDlg) {
+        do {
 
-    do {
+            bResult = GetMessage(&message, NULL, 0, 0);
+            if (bResult == -1)
+                break;
 
-        bResult = GetMessage(&message, NULL, 0, 0);
-        if (bResult == -1)
-            break;
+            if (IsDialogMessage(hwndDlg, &message)) {
+                TranslateAccelerator(hwndDlg, acceleratorTable, &message);
+            }
+            else {
+                TranslateMessage(&message);
+                DispatchMessage(&message);
+            }
 
-        if (IsDialogMessage(hwndDlg, &message)) {
-            TranslateAccelerator(hwndDlg, acceleratorTable, &message);
-        }
-        else {
-            TranslateMessage(&message);
-            DispatchMessage(&message);
-        }
+        } while (bResult != 0);
+    }
 
-    } while (bResult != 0);
-
-    supResetFastEvent(&fastEvent);
+    supResetFastEvent(&SdtDlgInitializedEvents[pDlgContext->DialogMode]);
 
     if (acceleratorTable)
         DestroyAcceleratorTable(acceleratorTable);
 
-    workerThread = SdtDlgThreadHandles[pDlgContext->DialogMode];
-    if (workerThread) {
-        NtClose(workerThread);
-        SdtDlgThreadHandles[pDlgContext->DialogMode] = NULL;
-    }
+    prev = InterlockedExchangePointer((PVOID*)&SdtDlgThreadHandles[pDlgContext->DialogMode], NULL); 
+    if (prev) CloseHandle(prev);
 
     if (pDlgContext->DialogMode == SST_Win32k)
         SdtWin32kUninitialize(&g_SDTCtx);
@@ -1450,11 +1448,10 @@ VOID extrasCreateSSDTDialog(
         return;
 
     if (!SdtDlgThreadHandles[Mode]) {
-
         RtlSecureZeroMemory(&SSTDlgContext[Mode], sizeof(EXTRASCONTEXT));
         SSTDlgContext[Mode].DialogMode = Mode;
         SdtDlgThreadHandles[Mode] = supCreateDialogWorkerThread(extrasSSDTDialogWorkerThread, (PVOID)&SSTDlgContext[Mode], 0);
-        supWaitForFastEvent(&SdtDlgInitializedEvents[Mode], NULL);
-
+        if (SdtDlgThreadHandles[Mode])
+            supWaitForFastEvent(&SdtDlgInitializedEvents[Mode], NULL);
     }
 }

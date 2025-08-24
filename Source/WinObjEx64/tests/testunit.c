@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2023
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       TESTUNIT.C
 *
-*  VERSION:     2.04
+*  VERSION:     2.09
 *
-*  DATE:        01 Dec 2023
+*  DATE:        10 Aug 2025
 *
 *  Test code used while debug.
 *
@@ -25,6 +25,7 @@
 #include <intrin.h>
 #pragma warning(pop)
 #include <aclapi.h>
+#include "ntsup_tests.h"
 
 HANDLE g_TestNamespace = NULL, g_TestMutex = NULL;
 HANDLE g_TestMailslot = NULL;
@@ -1363,12 +1364,12 @@ VOID TestStart(
     VOID
 )
 {
- //   TestCall();
- //   TestRegistryTransaction();
+    //TestCall();
+    //TestRegistryTransaction();
     //TestTransactionResourceManager();
- //   TestCreateBogusObjects();
+    //TestCreateBogusObjects();
     //TestCmControlVector();
- //   TestObCallback();
+    //TestObCallback();
     //TestSectionControlArea();
     //TestSymbols();
     //TestSectionImage();
@@ -1390,7 +1391,12 @@ VOID TestStart(
     //TestThread();
     PreHashTypes();
     //TestJob();
-    TestDefineDosDevice();
+    //TestDefineDosDevice();
+    Test_WriteBufferToFile();
+    Test_FindModuleNameByAddress();
+    Test_GetLoadedModulesListEx();
+    Test_GetSystemInfoEx();
+    Test_HashImageSections();
 }
 
 VOID TestStop(

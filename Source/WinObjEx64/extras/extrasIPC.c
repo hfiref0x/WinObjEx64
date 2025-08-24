@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASIPC.C
 *
-*  VERSION:     2.08
+*  VERSION:     2.09
 *
-*  DATE:        11 Jun 2025
+*  DATE:        22 Aug 2025
 *
 *  IPC supported: Pipes, Mailslots
 *
@@ -33,6 +33,8 @@
 
 //maximum number of possible pages
 #define EXTRAS_IPC_MAX_PAGE 2
+
+#define IPC_QUERY_MAX_ENTRIES 1000
 
 static HPROPSHEETPAGE IpcPages[EXTRAS_IPC_MAX_PAGE];//object, security
 static EXTRASCONTEXT IpcDlgContext[EXTRAS_IPC_MAX_PAGE];
@@ -429,15 +431,22 @@ VOID IpcDlgShowProperties(
     LPWSTR objectName, objectPathCombined;
     UNICODE_STRING objectPathNt;
 
+    objectName = supGetItemText(pDlgContext->ListView, iItem, 0, NULL);
+    if (objectName == NULL)
+        return;
+
+    objectPathCombined = IpcCreateObjectPathWithName(objectName,
+        (IPC_DLG_MODE)pDlgContext->DialogMode);
+    if (objectPathCombined == NULL) {
+        supHeapFree(objectName);
+        return;
+    }
+
     RtlSecureZeroMemory(&propConfig, sizeof(propConfig));
     propConfig.ContextType = propNormal;
     propConfig.ObjectTypeIndex = ObjectTypeFile;
 
-    objectName = supGetItemText(pDlgContext->ListView, iItem, 0, NULL);
-    objectPathCombined = IpcCreateObjectPathWithName(objectName,
-        (IPC_DLG_MODE)pDlgContext->DialogMode);
-
-    RtlInitUnicodeString(&objectPathNt, objectPathCombined);
+    RtlInitUnicodeString(&objectPathNt, objectPathCombined); //freed by propContextDestroy
     propConfig.NtObjectPath = &objectPathNt;
 
     Context = propContextCreate(&propConfig);
@@ -555,7 +564,8 @@ VOID IpcDlgQueryInfo(
 )
 {
     BOOLEAN                     bRestartScan;
-    ULONG                       QuerySize;
+    INT                         c;
+    ULONG                       querySize, fnameChars;
     HANDLE                      hObject = NULL;
     LPWSTR                      lpObjectRoot;
     FILE_DIRECTORY_INFORMATION* DirectoryInfo = NULL;
@@ -564,14 +574,10 @@ VOID IpcDlgQueryInfo(
     UNICODE_STRING              uStr;
     IO_STATUS_BLOCK             iost;
     LVITEM                      lvitem;
-    INT                         c;
+    EXTRASCALLBACK              callbackParam;
+    WCHAR                       nameBuf[MAX_PATH * 2];
 
-    EXTRASCALLBACK callbackParam;
-
-    if (Mode == IpcModeMailSlots)
-        lpObjectRoot = DEVICE_MAILSLOT;
-    else
-        lpObjectRoot = DEVICE_NAMED_PIPE;
+    lpObjectRoot = (Mode == IpcModeMailSlots) ? DEVICE_MAILSLOT : DEVICE_NAMED_PIPE;
 
     if (bRefresh)
         ListView_DeleteAllItems(ListView);
@@ -592,8 +598,8 @@ VOID IpcDlgQueryInfo(
         if (!NT_SUCCESS(status) || (hObject == NULL))
             __leave;
 
-        QuerySize = 0x1000;
-        DirectoryInfo = (FILE_DIRECTORY_INFORMATION*)supHeapAlloc((SIZE_T)QuerySize);
+        querySize = PAGE_SIZE;
+        DirectoryInfo = (FILE_DIRECTORY_INFORMATION*)supHeapAlloc((SIZE_T)querySize);
         if (DirectoryInfo == NULL)
             __leave;
 
@@ -605,7 +611,7 @@ VOID IpcDlgQueryInfo(
 
             status = NtQueryDirectoryFile(hObject, NULL, NULL, NULL, &iost,
                 DirectoryInfo,
-                QuerySize,
+                querySize,
                 FileDirectoryInformation,
                 TRUE, //ReturnSingleEntry
                 NULL,
@@ -620,16 +626,21 @@ VOID IpcDlgQueryInfo(
             }
 
             //Name
+            fnameChars = (DirectoryInfo->FileNameLength / sizeof(WCHAR));
+            if (fnameChars >= RTL_NUMBER_OF(nameBuf)) fnameChars = RTL_NUMBER_OF(nameBuf) - 1;
+            RtlCopyMemory(nameBuf, DirectoryInfo->FileName, fnameChars * sizeof(WCHAR));
+            nameBuf[fnameChars] = L'\0';
+
             RtlSecureZeroMemory(&lvitem, sizeof(lvitem));
             lvitem.mask = LVIF_TEXT | LVIF_IMAGE;
-            lvitem.pszText = DirectoryInfo->FileName;
+            lvitem.pszText = nameBuf;
             lvitem.iItem = MAXINT;
             ListView_InsertItem(ListView, &lvitem);
             bRestartScan = FALSE;
-            RtlSecureZeroMemory(DirectoryInfo, QuerySize);
+            RtlSecureZeroMemory(DirectoryInfo, querySize);
 
             c++;
-            if (c > 1000) {//its a trap
+            if (c > IPC_QUERY_MAX_ENTRIES) {//its a trap
                 break;
             }
         }
@@ -987,11 +998,11 @@ DWORD extrasIpcDialogWorkerThread(
     _In_ PVOID Parameter
 )
 {
+    HANDLE prev;
     HWND hwndDlg;
     BOOL bResult;
     MSG message;
     HACCEL acceleratorTable;
-    HANDLE workerThread;
     FAST_EVENT fastEvent;
     EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)Parameter;
 
@@ -1001,38 +1012,36 @@ DWORD extrasIpcDialogWorkerThread(
         &IpcDlgProc,
         (LPARAM)pDlgContext);
 
-    acceleratorTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
-
     fastEvent = IpcDlgInitializedEvents[pDlgContext->DialogMode];
-
     supSetFastEvent(&fastEvent);
 
-    do {
+    acceleratorTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
 
-        bResult = GetMessage(&message, NULL, 0, 0);
-        if (bResult == -1)
-            break;
+    if (hwndDlg) {
+        do {
 
-        if (IsDialogMessage(hwndDlg, &message)) {
-            TranslateAccelerator(hwndDlg, acceleratorTable, &message);
-        }
-        else {
-            TranslateMessage(&message);
-            DispatchMessage(&message);
-        }
+            bResult = GetMessage(&message, NULL, 0, 0);
+            if (bResult == -1)
+                break;
 
-    } while (bResult != 0);
+            if (IsDialogMessage(hwndDlg, &message)) {
+                TranslateAccelerator(hwndDlg, acceleratorTable, &message);
+            }
+            else {
+                TranslateMessage(&message);
+                DispatchMessage(&message);
+            }
+
+        } while (bResult != 0);
+    }
 
     supResetFastEvent(&fastEvent);
 
     if (acceleratorTable)
         DestroyAcceleratorTable(acceleratorTable);
 
-    workerThread = IpcDlgThreadHandles[pDlgContext->DialogMode];
-    if (workerThread) {
-        NtClose(workerThread);
-        IpcDlgThreadHandles[pDlgContext->DialogMode] = NULL;
-    }
+    prev = InterlockedExchangePointer((PVOID*)&IpcDlgThreadHandles[pDlgContext->DialogMode], NULL);
+    if (prev) CloseHandle(prev);
 
     return 0;
 }
@@ -1053,12 +1062,11 @@ VOID extrasCreateIpcDialog(
         return;
 
     if (!IpcDlgThreadHandles[Mode]) {
-
         RtlSecureZeroMemory(&IpcDlgContext[Mode], sizeof(EXTRASCONTEXT));
         IpcDlgContext[Mode].DialogMode = Mode;
         IpcDlgThreadHandles[Mode] = supCreateDialogWorkerThread(extrasIpcDialogWorkerThread, (PVOID)&IpcDlgContext[Mode], 0);
-        supWaitForFastEvent(&IpcDlgInitializedEvents[Mode], NULL);
+        if (IpcDlgThreadHandles[Mode])
+            supWaitForFastEvent(&IpcDlgInitializedEvents[Mode], NULL);
 
     }
-
 }

@@ -264,6 +264,9 @@
     <ClCompile Include="..\Shared\minirtl\_filename.c">
       <Filter>Minirtl</Filter>
     </ClCompile>
+    <ClCompile Include="tests\ntsup_tests.c">
+      <Filter>Source Files\tests</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc">
@@ -406,14 +409,14 @@
     <ClInclude Include="props\props.h">
       <Filter>Source Files\props</Filter>
     </ClInclude>
-    <ClInclude Include="extras\extrasHandlers.h">
-      <Filter>Source Files\extras</Filter>
-    </ClInclude>
     <ClInclude Include="sup\w32k.h">
       <Filter>Source Files\sup</Filter>
     </ClInclude>
     <ClInclude Include="..\Shared\minirtl\_filename.h">
       <Filter>Minirtl</Filter>
+    </ClInclude>
+    <ClInclude Include="tests\ntsup_tests.h">
+      <Filter>Source Files\tests</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

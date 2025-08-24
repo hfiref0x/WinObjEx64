@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2024
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       LOG.C
 *
-*  VERSION:     2.04
+*  VERSION:     2.09
 *
-*  DATE:        31 Jan 2024
+*  DATE:        20 Aug 2025
 *
 *  Simplified log.
 *
@@ -17,6 +17,22 @@
 *
 *******************************************************************************/
 #include "global.h"
+
+//
+// Map entry type to text and highlight flag.
+//
+typedef struct _LOG_TYPE_MAP {
+    WOBJ_ENTRY_TYPE Type;
+    LPCWSTR TypeText;
+    BOOL Highlight;
+} LOG_TYPE_MAP;
+
+static const LOG_TYPE_MAP g_LogTypeMap[] = {
+    { EntryTypeError, L"Error", TRUE },
+    { EntryTypeSuccess, L"Success", FALSE },
+    { EntryTypeInformation, L"Information", FALSE },
+    { EntryTypeWarning, L"Warning", TRUE }
+};
 
 static WOBJ_LOG g_WinObjLog;
 
@@ -31,11 +47,12 @@ static WOBJ_LOG g_WinObjLog;
 VOID logCreate()
 {
     RtlSecureZeroMemory(&g_WinObjLog, sizeof(g_WinObjLog));
+    InitializeCriticalSection(&g_WinObjLog.Lock);
+    g_WinObjLog.LockInitialized = TRUE;
 
     g_WinObjLog.Entries = (WOBJ_LOG_ENTRY*)supVirtualAlloc(
         sizeof(WOBJ_LOG_ENTRY) * WOBJ_MAX_LOG_CAPACITY);
     if (g_WinObjLog.Entries) {
-        InitializeCriticalSection(&g_WinObjLog.Lock);
         g_WinObjLog.Initialized = TRUE;
         logAdd(EntryTypeInformation, TEXT("Program startup, log created"));
     }
@@ -51,12 +68,20 @@ VOID logCreate()
 */
 VOID logFree()
 {
+    if (!g_WinObjLog.LockInitialized)
+        return;
+
     EnterCriticalSection(&g_WinObjLog.Lock);
     g_WinObjLog.Initialized = FALSE;
+    if (g_WinObjLog.Entries) {
+        supVirtualFree(g_WinObjLog.Entries);
+        g_WinObjLog.Entries = NULL;
+    }
     g_WinObjLog.Count = 0;
-    supVirtualFree(g_WinObjLog.Entries);
+    g_WinObjLog.TotalWritten = 0;
     LeaveCriticalSection(&g_WinObjLog.Lock);
     DeleteCriticalSection(&g_WinObjLog.Lock);
+    g_WinObjLog.LockInitialized = FALSE;
 }
 
 /*
@@ -71,10 +96,14 @@ VOID logFree()
 */
 VOID logAdd(
     _In_ WOBJ_ENTRY_TYPE EntryType,
-    _In_ WCHAR* Message
+    _In_ const WCHAR* Message
 )
 {
     ULONG Index;
+
+    if (!g_WinObjLog.LockInitialized)
+        return;
+
     EnterCriticalSection(&g_WinObjLog.Lock);
 
     if (g_WinObjLog.Initialized) {
@@ -83,14 +112,17 @@ VOID logAdd(
 
         g_WinObjLog.Entries[Index].Type = EntryType;
         GetSystemTimeAsFileTime((PFILETIME)&g_WinObjLog.Entries[Index].LoggedTime);
-        _strncpy(g_WinObjLog.Entries[Index].MessageData, WOBJ_MAX_MESSAGE, Message, WOBJ_MAX_MESSAGE);
+        _strncpy(g_WinObjLog.Entries[Index].MessageData,
+            WOBJ_MAX_MESSAGE,
+            Message ? Message : L"(null)",
+            WOBJ_MAX_MESSAGE);
 
         Index += 1;
         if (Index >= WOBJ_MAX_LOG_CAPACITY)
             Index = 0;
 
         g_WinObjLog.Count = Index;
-
+        g_WinObjLog.TotalWritten++;
     }
 
     LeaveCriticalSection(&g_WinObjLog.Lock);
@@ -109,24 +141,36 @@ BOOL logEnumEntries(
     _In_ PVOID CallbackContext
 )
 {
-    ULONG i;
+    ULONG i, start, idx, cap, logicalCount;
     BOOL bResult = FALSE;
 
     if (EnumCallback == NULL)
         return FALSE;
 
+    if (!g_WinObjLog.LockInitialized)
+        return FALSE;
+
     __try {
         EnterCriticalSection(&g_WinObjLog.Lock);
+        if (g_WinObjLog.Initialized && g_WinObjLog.Entries) {
+            cap = WOBJ_MAX_LOG_CAPACITY;
 
-        if (g_WinObjLog.Initialized) {
-            for (i = 0; i < g_WinObjLog.Count; i++) {
-                if (!EnumCallback(&g_WinObjLog.Entries[i], CallbackContext))
+            if (g_WinObjLog.TotalWritten < cap) {
+                logicalCount = g_WinObjLog.Count;
+                start = 0;
+            }
+            else {
+                logicalCount = cap;
+                start = g_WinObjLog.Count; // oldest entry index when wrapped
+            }
+
+            for (i = 0; i < logicalCount; i++) {
+                idx = (start + i) % cap;
+                if (!EnumCallback(&g_WinObjLog.Entries[idx], CallbackContext))
                     break;
             }
         }
-
         bResult = TRUE;
-
     }
     __finally {
         LeaveCriticalSection(&g_WinObjLog.Lock);
@@ -148,37 +192,39 @@ VOID LogViewerPrintEntry(
     _In_ LPWSTR lpMessage,
     _In_ BOOL bHighlight)
 {
-    LONG StartPos = 0;
-
+    LONG startPos, endPos;
     CHARFORMAT format;
     CHARRANGE range;
 
-    range.cpMax = INT_MAX;
-    range.cpMin = INT_MAX;
+    // Move caret to end
+    range.cpMax = range.cpMin = INT_MAX;
+    SendMessage(hwndRichEdit, EM_EXSETSEL, 0, (LPARAM)&range);
 
-    SendMessage(hwndRichEdit, EM_EXSETSEL, (WPARAM)0, (LPARAM)&range);
-    SendMessage(hwndRichEdit, EM_EXGETSEL, (WPARAM)0, (LPARAM)&range);
-    StartPos = range.cpMin;
+    // Insert newline if not the first line
+    if (SendMessage(hwndRichEdit, WM_GETTEXTLENGTH, 0, 0) > 0)
+        SendMessage(hwndRichEdit, EM_REPLACESEL, 0, (LPARAM)L"\r\n");
 
-    if (StartPos) {
-        SendMessage(hwndRichEdit, EM_REPLACESEL, (WPARAM)0, (LPARAM)L"\r\n");
-        StartPos++;
-    }
+    // After inserting newline, get start position for new entry
+    SendMessage(hwndRichEdit, EM_EXGETSEL, 0, (LPARAM)&range);
+    startPos = range.cpMin;
 
-    SendMessage(hwndRichEdit, EM_REPLACESEL, (WPARAM)0, (LPARAM)lpMessage);
+    // Insert the message
+    SendMessage(hwndRichEdit, EM_REPLACESEL, 0, (LPARAM)lpMessage);
 
-    range.cpMin = StartPos;
-    range.cpMax = (LONG)_strlen(lpMessage) + StartPos;
-    SendMessage(hwndRichEdit, EM_EXSETSEL, (WPARAM)0, (LPARAM)&range);
+    // Get end position after message insertion
+    SendMessage(hwndRichEdit, EM_EXGETSEL, 0, (LPARAM)&range);
+    endPos = range.cpMin;
 
-    format.cbSize = sizeof(CHARFORMAT);
+    // Select just inserted message
+    range.cpMin = startPos;
+    range.cpMax = endPos;
+    SendMessage(hwndRichEdit, EM_EXSETSEL, 0, (LPARAM)&range);
+
+    // Apply formatting (bold when highlight requested)
+    RtlSecureZeroMemory(&format, sizeof(format));
+    format.cbSize = sizeof(format);
     format.dwMask = CFM_BOLD;
-    if (bHighlight) {
-        format.dwEffects = CFE_BOLD;
-    }
-    else {
-        format.dwEffects = 0;
-    }
+    format.dwEffects = bHighlight ? CFE_BOLD : 0;
     SendMessage(hwndRichEdit, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&format);
 }
 
@@ -195,30 +241,23 @@ BOOL CALLBACK LogViewerAddEntryCallback(
     _In_ PVOID CallbackContext
 )
 {
-    BOOL bHighlight = FALSE;
+    BOOL bHighlight = FALSE, found = FALSE;
+    SIZE_T j;
     HWND hwndList = (HWND)CallbackContext;
     TIME_FIELDS tFields = { 0, 0, 0, 0, 0, 0, 0, 0 };
-    LPWSTR lpType;
+    LPWSTR lpType = L"Unspecified";
     WCHAR szMessage[WOBJ_MAX_MESSAGE + 128];
 
-    switch (Entry->Type) {
-    case EntryTypeError:
-        bHighlight = TRUE;
-        lpType = TEXT("Error");
-        break;
-    case EntryTypeSuccess:
-        lpType = TEXT("Success");
-        break;
-    case EntryTypeWarning:
-        bHighlight = TRUE;
-        lpType = TEXT("Warning");
-        break;
-    case EntryTypeInformation:
-        lpType = TEXT("Information");
-        break;
-    default:
-        lpType = TEXT("Unspecified");
-        break;
+    for (j = 0; j < RTL_NUMBER_OF(g_LogTypeMap); j++) {
+        if (g_LogTypeMap[j].Type == Entry->Type) {
+            lpType = (LPWSTR)g_LogTypeMap[j].TypeText;
+            bHighlight = g_LogTypeMap[j].Highlight;
+            found = TRUE;
+            break;
+        }
+    }
+    if (!found) {
+        bHighlight = FALSE;
     }
 
     szMessage[0] = 0;
@@ -278,11 +317,10 @@ VOID LogViewerListLog(
     InvalidateRect(hwndList, NULL, TRUE);
 
     SendMessage(hwndList, EM_SETEVENTMASK, (WPARAM)0, (LPARAM)ENM_SELCHANGE);
-    
+
     charRange.cpMax = 0;
     charRange.cpMin = 0;
     SendMessage(hwndList, EM_EXSETSEL, (WPARAM)0, (LPARAM)&charRange);
-
 }
 
 /*
@@ -297,8 +335,8 @@ VOID LogViewerCopyToClipboard(
     _In_ HWND hwndDlg
 )
 {
-    SIZE_T BufferSize;
-    PWCHAR Buffer;
+    SIZE_T BufferSizeChars, AllocSize;
+    PWCHAR Buffer = NULL;
 
     GETTEXTLENGTHEX gtl;
     GETTEXTEX gt;
@@ -308,23 +346,23 @@ VOID LogViewerCopyToClipboard(
     gtl.flags = GTL_USECRLF;
     gtl.codepage = 1200;
 
-    BufferSize = SendMessage(hwndControl, EM_GETTEXTLENGTHEX, (WPARAM)&gtl, 0);
-    if (BufferSize) {
-
-        BufferSize *= sizeof(WCHAR);
-
-        Buffer = (PWCHAR)supHeapAlloc(BufferSize);
+    BufferSizeChars = SendMessage(hwndControl, EM_GETTEXTLENGTHEX, (WPARAM)&gtl, 0);
+    if (BufferSizeChars) {
+        AllocSize = (BufferSizeChars + 1) * sizeof(WCHAR);
+        Buffer = (PWCHAR)supHeapAlloc(AllocSize);
         if (Buffer) {
 
             gt.flags = GT_USECRLF;
-            gt.cb = (ULONG)BufferSize;
+            gt.cb = (ULONG)AllocSize;
 
             gt.codepage = 1200;
             gt.lpDefaultChar = NULL;
             gt.lpUsedDefChar = NULL;
             SendMessage(hwndControl, EM_GETTEXTEX, (WPARAM)&gt, (LPARAM)Buffer);
 
-            supClipboardCopy(Buffer, BufferSize);
+            Buffer[BufferSizeChars] = L'\0';
+
+            supClipboardCopy(Buffer, AllocSize);
 
             supHeapFree(Buffer);
         }
@@ -393,5 +431,4 @@ VOID LogViewerShowDialog(
         hwndParent,
         (DLGPROC)&LogViewerDialogProc,
         0);
-
 }

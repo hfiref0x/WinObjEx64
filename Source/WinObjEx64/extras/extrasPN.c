@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       EXTRASPN.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.09
 *
-*  DATE:        19 Jun 2022
+*  DATE:        22 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -190,25 +190,26 @@ BOOL CALLBACK PNDlgEnumerateCallback(
     lvItem.pszText = objectName.Buffer;
     lvItem.lParam = (LPARAM)Entry;
     lvItemIndex = ListView_InsertItem(PnDlgContext.ListView, &lvItem);
+    if (lvItemIndex >= 0) {
+        //Type
+        lvItem.mask = LVIF_TEXT;
+        lvItem.iSubItem = 1;
+        lvItem.pszText = typeDesc->Name;
+        lvItem.iItem = lvItemIndex;
+        ListView_SetItem(PnDlgContext.ListView, &lvItem);
 
-    //Type
-    lvItem.mask = LVIF_TEXT;
-    lvItem.iSubItem = 1;
-    lvItem.pszText = typeDesc->Name;
-    lvItem.iItem = lvItemIndex;
-    ListView_SetItem(PnDlgContext.ListView, &lvItem);
+        //RootDirectory address
+        szBuffer[0] = L'0';
+        szBuffer[1] = L'x';
+        szBuffer[2] = 0;
+        u64tohex(Entry->PrivateNamespace.NamespaceDirectoryAddress, &szBuffer[2]);
 
-    //RootDirectory address
-    szBuffer[0] = L'0';
-    szBuffer[1] = L'x';
-    szBuffer[2] = 0;
-    u64tohex(Entry->PrivateNamespace.NamespaceDirectoryAddress, &szBuffer[2]);
+        lvItem.iSubItem = 2;
+        lvItem.pszText = szBuffer;
+        ListView_SetItem(PnDlgContext.ListView, &lvItem);
 
-    lvItem.iSubItem = 2;
-    lvItem.pszText = szBuffer;
-    ListView_SetItem(PnDlgContext.ListView, &lvItem);
-
-    PNSNumberOfObjects += 1;
+        PNSNumberOfObjects += 1;
+    }
 
     if (bNeedFree) {
         supFreeDuplicatedUnicodeString(PNSObjectsHeap,
@@ -473,7 +474,7 @@ VOID PNDlgShowNamespaceInfo(
         &BoundaryDescriptor,
         NULL);
 
-    if (NT_SUCCESS(ntStatus)) {
+    if (NT_SUCCESS(ntStatus) && BoundaryDescriptor) {
 
         //
         // Namespace root directory.
@@ -762,7 +763,7 @@ VOID PNDialogOnClose(
 *
 * Purpose:
 *
-* Private Namespace Dialog WM_INITDIALOG handler.
+* Private Namespace dialog WM_INITDIALOG handler.
 *
 */
 VOID PNDialogOnInit(
@@ -921,7 +922,6 @@ DWORD extrasPNDialogWorkerThread(
 
     UNREFERENCED_PARAMETER(Parameter);
 
-
     RtlSecureZeroMemory(&PnDlgContext, sizeof(PnDlgContext));
     
     hwndDlg = CreateDialogParam(g_WinObj.hInstance, 
@@ -1016,12 +1016,10 @@ DWORD extrasPNDialogWorkerThread(
 VOID extrasCreatePNDialog(
     VOID
 )
-{
-   
+{  
     if (!PnDlgThreadHandle) {
-
         PnDlgThreadHandle = supCreateDialogWorkerThread(extrasPNDialogWorkerThread, NULL, 0);
-        supWaitForFastEvent(&PnDlgInitializedEvent, NULL);
-
+        if (PnDlgThreadHandle)
+            supWaitForFastEvent(&PnDlgInitializedEvent, NULL);
     }
 }

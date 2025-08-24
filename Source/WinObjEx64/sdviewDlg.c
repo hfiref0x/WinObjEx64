@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020 - 2022
+*  (C) COPYRIGHT AUTHORS, 2020 - 2025
 *
 *  TITLE:       SDVIEWDLG.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.09
 *
-*  DATE:        19 Jun 2022
+*  DATE:        22 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -187,6 +187,8 @@ VOID CALLBACK OutputAclEntryCallback(
     lvItem.pszText = Entry->lpAceType;
     lvItem.cchTextMax = (INT)_strlen(lvItem.pszText);
     lvItemIndex = ListView_InsertItem(hwndList, &lvItem);
+    if (lvItemIndex == -1)
+        return;
 
     lvItem.mask = LVIF_TEXT;
 
@@ -1201,10 +1203,12 @@ VOID SDViewDialogCreate(
 
     context = AllocateSDViewContext(ObjectType);
     if (context) {
-
         supInitFastEvent(&SDViewDialogFinalizedEvent);
         SDViewDialogThreadHandle = supCreateDialogWorkerThread(SDViewDialogWorkerThread, context, 0);
+        if (SDViewDialogThreadHandle == NULL) {
+            FreeSDViewContext(context);
+            return;
+        }
         supWaitForFastEvent(&SDViewDialogInitializedEvent, NULL);
-
     }
 }

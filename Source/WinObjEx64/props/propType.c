@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2025
 *
 *  TITLE:       PROPTYPE.C
 *
-*  VERSION:     2.01
+*  VERSION:     2.09
 *
-*  DATE:        18 Dec 2022
+*  DATE:        21 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -43,6 +43,8 @@ VOID propSetTypeFlagValue(
     lvitem.pszText = lpFlag;
     lvitem.iItem = MAXINT;
     nIndex = ListView_InsertItem(hListView, &lvitem);
+    if (nIndex == -1)
+        return;
 
     RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
     szBuffer[0] = L'0';
@@ -69,7 +71,7 @@ VOID propSetTypeDecodeValue(
     _In_ INT TypeIndex
 )
 {
-    INT	        i, Count;
+    INT	        i, Count, bitIndex;
     DWORD       u;
     PVALUE_DESC Desc = NULL;
 
@@ -279,15 +281,12 @@ VOID propSetTypeDecodeValue(
     }
     //set unknown to anything else
     if (Value != 0) {
-        u = 0x00000001;
-        while (Value) {
+        for (bitIndex = 0; bitIndex < 32 && Value != 0; bitIndex++) {
+            u = (1U << bitIndex);
             if (Value & u) {
                 propSetTypeFlagValue(hListView, T_Unknown, u);
                 Value &= ~u;
             }
-            u *= 2;
-            if (u >= MAXIMUM_ALLOWED)
-                break;
         }
     }
 }
@@ -631,7 +630,7 @@ VOID propSetTypeInfo(
             g_WinObj.hInstance,
             Context->TypeDescription->ResourceStringId,
             szType,
-            (MAX_PATH * sizeof(WCHAR)) - sizeof(UNICODE_NULL)))
+            RTL_NUMBER_OF(szType)))
         {
             lpTypeDescription = szType;
         }
@@ -672,7 +671,7 @@ VOID propSetTypeInfo(
                 g_WinObj.hInstance,
                 Context->ShadowTypeDescription->ResourceStringId,
                 szType,
-                (MAX_PATH * 2) - sizeof(UNICODE_NULL)))
+                RTL_NUMBER_OF(szType)))
             {
                 lpTypeDescription = szType;
             }

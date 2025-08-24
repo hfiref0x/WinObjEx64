@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     2.08
+*  VERSION:     2.09
 *
-*  DATE:        13 Jun 2025
+*  DATE:        21 Aug 2025
 *
 *  Common header file for the program support routines.
 *
@@ -167,13 +167,13 @@ typedef struct _ALPCPORT_ENUM_CONTEXT {
     _Out_ HANDLE ObjectHandle;
 } ALPCPORT_ENUM_CONTEXT, * PALPCPORT_ENUM_CONTEXT;
 
-typedef struct _PS_HANDLE_DUMP_ENUM_CONTEXT {
+typedef struct _HANDLE_DUMP_ENUM_CONTEXT {
     _In_ USHORT ObjectTypeIndex;
     _In_ ULONG_PTR ObjectAddress;
     _In_ HWND ListView;
     _In_ HIMAGELIST ImageList;
     _In_ PVOID ProcessList;
-} PS_HANDLE_DUMP_ENUM_CONTEXT, *PPS_HANDLE_DUMP_ENUM_CONTEXT;
+} HANDLE_DUMP_ENUM_CONTEXT, *PHANDLE_DUMP_ENUM_CONTEXT;
 
 typedef struct _WINSTA_DESC {
     LPCWSTR lpszWinSta;
@@ -645,7 +645,7 @@ VOID supShowProperties(
 
 VOID supClipboardCopy(
     _In_ LPCWSTR lpText,
-    _In_ SIZE_T cbText);
+    _In_ SIZE_T cbTextInBytes);
 
 LPWSTR supGetItemText(
     _In_ HWND ListView,
@@ -997,7 +997,7 @@ NTSTATUS supOpenTokenByParam(
     _In_ BOOL IsThreadToken,
     _Out_ PHANDLE TokenHandle);
 
-BOOL supRegDeleteKeyRecursive(
+BOOL supRegDeleteKeyTree(
     _In_ HKEY hKeyRoot,
     _In_ LPCWSTR lpSubKey);
 

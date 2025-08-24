@@ -27,7 +27,6 @@ winobjex64\excepth.h
 * Extras menu handler *
 winobjex64\extras\extras.c
 winobjex64\extras\extras.h
-winobjex64\extras\extrasHandlers.h
 
 * Windows 7/8/8.1 missing API support *
 winobjex64\extapi.c

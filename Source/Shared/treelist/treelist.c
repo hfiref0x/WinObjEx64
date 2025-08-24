@@ -4,9 +4,9 @@
 *
 *  TITLE:       TREELIST.C
 *
-*  VERSION:     1.35
+*  VERSION:     1.36
 *
-*  DATE:        10 Jun 2022
+*  DATE:        20 Sep 2022
 *
 *  TreeList control.
 *
@@ -474,6 +474,7 @@ LRESULT CALLBACK TreeListHookProc(
     PTL_SUBITEMS    subitems;
     TOOLINFO        tool;
     HDC             dc;
+    HGDIOBJ         prevFont;
     ULONG_PTR       subid;
 
     switch (uMsg) {
@@ -550,8 +551,9 @@ LRESULT CALLBACK TreeListHookProc(
 
                     /*fake DrawText for calculating bounding rectangle*/
                     dc = GetDC(hwnd);
-                    SelectObject(dc, (HGDIOBJ)SendMessage(hwnd, WM_GETFONT, 0, 0));
+                    prevFont = SelectObject(dc, (HGDIOBJ)SendMessage(hwnd, WM_GETFONT, 0, 0));
                     DrawText(dc, subitems->Text[subid - 1], -1, &rc, DT_VCENTER | DT_SINGLELINE | DT_CALCRECT);
+                    SelectObject(dc, prevFont);
                     ReleaseDC(hwnd, dc);
 
                     if (rc.right < hr.right - 2) // no overflow
@@ -583,20 +585,30 @@ PTL_SUBITEMS PackSubitems(HANDLE hHeap, IN PTL_SUBITEMS Subitems)
     ULONG           i;
     LPTSTR          strings;
 
+    if (Subitems == NULL)
+        return NULL;
+
     /*
     size of header + variable length array .Text[1] part
     */
-    header_size = sizeof(TL_SUBITEMS) + (Subitems->Count * sizeof(LPTSTR));
+    header_size = sizeof(TL_SUBITEMS);
+    if (Subitems->Count > 1) {
+        header_size += (Subitems->Count - 1) * sizeof(LPTSTR);
+    }
 
     /*
     total size of all strings including terminating zeros
     */
 
     strings_size = 0;
-    for (i = 0; i < Subitems->Count; i++)
-        strings_size += (_strlen(Subitems->Text[i]) + 1) * sizeof(TCHAR);
-
-    strings_size += (_strlen(Subitems->CustomTooltip) + 1) * sizeof(TCHAR);
+    for (i = 0; i < Subitems->Count; i++) {
+        if (Subitems->Text[i])
+            strings_size += (_strlen(Subitems->Text[i]) + 1) * sizeof(TCHAR);
+    }
+    
+    if (Subitems->CustomTooltip != NULL) {
+        strings_size += (_strlen(Subitems->CustomTooltip) + 1) * sizeof(TCHAR);
+    }
 
     newsubitems = (PTL_SUBITEMS)HeapAlloc(hHeap, 0, header_size + strings_size);
     if (!newsubitems)
@@ -606,15 +618,20 @@ PTL_SUBITEMS PackSubitems(HANDLE hHeap, IN PTL_SUBITEMS Subitems)
     *newsubitems = *Subitems;
 
     for (i = 0; i < Subitems->Count; i++) {
-        newsubitems->Text[i] = strings;
-        _strcpy(strings, Subitems->Text[i]);
-        strings += _strlen(Subitems->Text[i]) + 1;
+        if (Subitems->Text[i]) {
+            newsubitems->Text[i] = strings;
+            _strcpy(strings, Subitems->Text[i]);
+            strings += _strlen(Subitems->Text[i]) + 1;
+        }
     }
 
     if (Subitems->CustomTooltip != NULL)
     {
         newsubitems->CustomTooltip = strings;
         _strcpy(strings, Subitems->CustomTooltip);
+    }
+    else {
+        newsubitems->CustomTooltip = NULL;
     }
 
     return newsubitems;
@@ -941,6 +958,10 @@ LRESULT CALLBACK TreeListWindowProc(
         break;
 
     case WM_DESTROY:
+        if (tl_theme) {
+            CloseThemeData(tl_theme);
+            tl_theme = NULL;
+        }
         DestroyWindow((HWND)GetWindowLongPtr(hwnd, TL_TOOLTIPS_SLOT));
         HeapDestroy((HANDLE)GetWindowLongPtr(hwnd, TL_HEAP_SLOT));
     }

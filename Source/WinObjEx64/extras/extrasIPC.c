@@ -998,11 +998,11 @@ DWORD extrasIpcDialogWorkerThread(
     _In_ PVOID Parameter
 )
 {
+    HANDLE prev;
     HWND hwndDlg;
     BOOL bResult;
     MSG message;
     HACCEL acceleratorTable;
-    HANDLE workerThread;
     FAST_EVENT fastEvent;
     EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)Parameter;
 
@@ -1040,11 +1040,8 @@ DWORD extrasIpcDialogWorkerThread(
     if (acceleratorTable)
         DestroyAcceleratorTable(acceleratorTable);
 
-    workerThread = IpcDlgThreadHandles[pDlgContext->DialogMode];
-    if (workerThread) {
-        NtClose(workerThread);
-        IpcDlgThreadHandles[pDlgContext->DialogMode] = NULL;
-    }
+    prev = InterlockedExchangePointer((PVOID*)&IpcDlgThreadHandles[pDlgContext->DialogMode], NULL);
+    if (prev) CloseHandle(prev);
 
     return 0;
 }

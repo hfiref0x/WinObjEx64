@@ -156,7 +156,7 @@ VOID SdtListOutputTable(
                     CP_ACP,
                     0,
                     (LPCSTR)&Modules->Modules[moduleIndex].FullPathName,
-                    (INT)_strlen_a((char*)Modules->Modules[moduleIndex].FullPathName),
+                    -1,
                     szBuffer,
                     MAX_PATH);
             }
@@ -274,7 +274,7 @@ BOOL SdtListCreateTable(
                         CP_ACP,
                         0,
                         ServiceName,
-                        (INT)_strlen_a(ServiceName),
+                        -1,
                         KiServiceTable.Table[KiServiceTable.Limit].Name,
                         MAX_PATH);
 
@@ -1380,11 +1380,11 @@ DWORD extrasSSDTDialogWorkerThread(
     _In_ PVOID Parameter
 )
 {
+    HANDLE prev;
     HWND hwndDlg;
     BOOL bResult;
     MSG message;
     HACCEL acceleratorTable;
-    HANDLE workerThread;
     EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)Parameter;
 
     hwndDlg = CreateDialogParam(
@@ -1423,11 +1423,8 @@ DWORD extrasSSDTDialogWorkerThread(
     if (acceleratorTable)
         DestroyAcceleratorTable(acceleratorTable);
 
-    workerThread = SdtDlgThreadHandles[pDlgContext->DialogMode];
-    if (workerThread) {
-        NtClose(workerThread);
-        SdtDlgThreadHandles[pDlgContext->DialogMode] = NULL;
-    }
+    prev = InterlockedExchangePointer((PVOID*)&SdtDlgThreadHandles[pDlgContext->DialogMode], NULL); 
+    if (prev) CloseHandle(prev);
 
     if (pDlgContext->DialogMode == SST_Win32k)
         SdtWin32kUninitialize(&g_SDTCtx);

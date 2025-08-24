@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.09
 *
-*  DATE:        22 Aug 2025
+*  DATE:        23 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -16,6 +16,8 @@
 *******************************************************************************/
 #include "global.h"
 #include "extras.h"
+
+#define DUMP_PROP L"dumpProp"
 
 BOOLEAN DrvDlgShimsEnabled = FALSE;
 
@@ -315,7 +317,6 @@ VOID DrvListViewProperties(
     if (ListView_GetSelectedCount(Context->ListView)) {
         mark = ListView_GetSelectionMark(Context->ListView);
         if (mark >= 0) {
-
             lpItem = supGetItemText(Context->ListView, mark,
                 COLUMN_DRVLIST_MODULE_NAME, NULL);
 
@@ -332,9 +333,7 @@ VOID DrvListViewProperties(
 }
 
 static HANDLE DumpDialogThreadHandle = NULL;
-static HANDLE DumpWorkerThread = NULL;
 static FAST_EVENT DumpDialogInitializedEvent = FAST_EVENT_INIT;
-volatile LONG TerminateDumpOperation = FALSE;
 HWND DumpWorkerWindow = NULL;
 
 typedef struct _OBEX_DRVDUMP {
@@ -343,11 +342,21 @@ typedef struct _OBEX_DRVDUMP {
     _In_ ULONG_PTR DumpAddress;
     _In_ PBYTE Buffer;
     _In_ HWND ParentWindow;
-    _Out_ ULONG ReadSize;
+    _Out_ volatile LONGLONG ReadSize;
     _Out_ NTSTATUS DumpStatus;
+    _In_ HANDLE hCancelEvent;
+    _In_ HANDLE hWorkerThread;
     _In_ WCHAR FileName[MAX_PATH * 2];
 } OBEX_DRVDUMP, * POBEX_DRVDUMP;
 
+/*
+* DrvDumpThread
+*
+* Purpose:
+*
+* Dumper thread worker.
+*
+*/
 DWORD DrvDumpThread(
     _In_ PVOID Parameter
 )
@@ -356,7 +365,17 @@ DWORD DrvDumpThread(
 
     PBYTE buffer;
     ULONG_PTR dumpAddress;
-    ULONG totalSize = dumpInfo->DumpSize, readBytes = 0, i, remainingBytes, memIO = 0;
+    ULONG totalSize;
+    unsigned long long readBytes = 0;
+    ULONG i;
+    ULONG remainingBytes;
+    ULONG memIO = 0;
+    LONGLONG prev;
+
+    if (dumpInfo == NULL)
+        return ERROR_INVALID_PARAMETER;
+
+    totalSize = dumpInfo->DumpSize;
 
     for (i = 0,
         buffer = dumpInfo->Buffer,
@@ -366,20 +385,27 @@ DWORD DrvDumpThread(
         dumpAddress += PAGE_SIZE,
         buffer = (PBYTE)RtlOffsetToPointer(buffer, PAGE_SIZE))
     {
-
-        if (TerminateDumpOperation) {
+        if (dumpInfo->hCancelEvent && WaitForSingleObject(dumpInfo->hCancelEvent, 0) == WAIT_OBJECT_0) {
             dumpInfo->DumpStatus = STATUS_CANCELLED;
+            PostMessage(dumpInfo->ParentWindow, WM_CLOSE, (WPARAM)0, (LPARAM)0);
             return ERROR_CANCELLED;
         }
 
-        kdReadSystemMemoryEx(dumpAddress, buffer, PAGE_SIZE, &memIO);
-        readBytes = InterlockedAdd((LONG*)&dumpInfo->ReadSize, memIO);
+        kdReadSystemMemoryEx(dumpAddress, buffer, PAGE_SIZE, &memIO); // ignore read errors
+        prev = InterlockedExchangeAdd64(&dumpInfo->ReadSize, (LONGLONG)memIO);
+        readBytes = (unsigned long long)(prev + (LONGLONG)memIO);
     }
 
     remainingBytes = totalSize % PAGE_SIZE;
     if (remainingBytes) {
+        if (dumpInfo->hCancelEvent && WaitForSingleObject(dumpInfo->hCancelEvent, 0) == WAIT_OBJECT_0) {
+            dumpInfo->DumpStatus = STATUS_CANCELLED;
+            PostMessage(dumpInfo->ParentWindow, WM_CLOSE, (WPARAM)0, (LPARAM)0);
+            return ERROR_CANCELLED;
+        }
         kdReadSystemMemoryEx(dumpAddress, buffer, remainingBytes, &memIO);
-        readBytes = InterlockedAdd((LONG*)&dumpInfo->ReadSize, memIO);
+        prev = InterlockedExchangeAdd64(&dumpInfo->ReadSize, (LONGLONG)memIO);
+        readBytes = (unsigned long long)(prev + (LONGLONG)memIO);
     }
 
     if (readBytes == 0) {
@@ -392,29 +418,56 @@ DWORD DrvDumpThread(
         dumpInfo->DumpStatus = STATUS_SUCCESS;
     }
 
-    NtClose(DumpWorkerThread);
-    DumpWorkerThread = NULL;
-
+    //
+    // Signal dialog to close and let dialog-thread perform cleanup.
+    //
     PostMessage(dumpInfo->ParentWindow, WM_CLOSE, (WPARAM)0, (LPARAM)0);
     return ERROR_SUCCESS;
 }
 
+/*
+* DumpTerminateWorker
+*
+* Purpose:
+*
+* Request worker cancellation and wait for worker thread to exit.
+*
+*/
 VOID DumpTerminateWorker(
-    VOID
+    _In_ HWND hwndDlg
 )
 {
-    if (DumpWorkerThread) {
-        _InterlockedExchange((LONG*)&TerminateDumpOperation, TRUE);
-        if (WaitForSingleObject(DumpWorkerThread, 20 * 1000) == WAIT_TIMEOUT) {
-            TerminateThread(DumpWorkerThread, ERROR_CANCELLED);
-            NtClose(DumpWorkerThread);
-            DumpWorkerThread = NULL;
-        }
+    OBEX_DRVDUMP* dumpInfo;
+
+    if (hwndDlg == NULL)
+        return;
+
+    dumpInfo = (OBEX_DRVDUMP*)GetProp(hwndDlg, DUMP_PROP);
+    if (dumpInfo == NULL)
+        return;
+
+    if (dumpInfo->hWorkerThread) {
+        //
+        // Request cancellation.
+        //
+        if (dumpInfo->hCancelEvent)
+            SetEvent(dumpInfo->hCancelEvent);
+
+        WaitForSingleObject(dumpInfo->hWorkerThread, 20 * 1000);
+
+        CloseHandle(dumpInfo->hWorkerThread);
+        dumpInfo->hWorkerThread = NULL;
     }
 }
 
-#define DUMP_PROP L"dumpProp"
-
+/*
+* DumpUpdateTimerProc
+*
+* Purpose:
+*
+* Timer proc handler displaying dump progress.
+*
+*/
 VOID DumpUpdateTimerProc(
     HWND hwnd,
     UINT uMsg,
@@ -430,16 +483,13 @@ VOID DumpUpdateTimerProc(
     WCHAR szBuffer[100];
 
     dumpInfo = (OBEX_DRVDUMP*)GetProp(hwnd, DUMP_PROP);
-
     if (dumpInfo) {
-
         szBuffer[0] = 0;
-
         RtlStringCchPrintfSecure(szBuffer,
             RTL_NUMBER_OF(szBuffer),
-            TEXT("Reading %lu (%lu Kb) of %lu (%lu Kb)"),
-            dumpInfo->ReadSize,
-            dumpInfo->ReadSize / 1024,
+            TEXT("Reading %llu (%llu Kb) of %lu (%lu Kb)"),
+            (ULONGLONG)dumpInfo->ReadSize,
+            (ULONGLONG)(dumpInfo->ReadSize / 1024),
             dumpInfo->DumpSize,
             dumpInfo->DumpSize / 1024);
 
@@ -447,6 +497,14 @@ VOID DumpUpdateTimerProc(
     }
 }
 
+/*
+* DrvDumpProgressDialogProc
+*
+* Purpose:
+*
+* Driver dumping progress dialog proc.
+*
+*/
 INT_PTR CALLBACK DrvDumpProgressDialogProc(
     _In_ HWND   hwndDlg,
     _In_ UINT   uMsg,
@@ -464,9 +522,10 @@ INT_PTR CALLBACK DrvDumpProgressDialogProc(
             SetProp(hwndDlg, DUMP_PROP, (HANDLE)dumpInfo);
             supCenterWindowSpecifyParent(hwndDlg, dumpInfo->ParentWindow);
             dumpInfo->ParentWindow = hwndDlg;
-            _InterlockedExchange((LONG*)&TerminateDumpOperation, FALSE);
+            _InterlockedExchange64(&dumpInfo->ReadSize, 0);
+            dumpInfo->hCancelEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+            dumpInfo->hWorkerThread = supCreateThread(DrvDumpThread, (PVOID)dumpInfo, 0);
             SetTimer(hwndDlg, 1, 300, DumpUpdateTimerProc);
-            DumpWorkerThread = supCreateThread(DrvDumpThread, (PVOID)dumpInfo, 0);
         }
         break;
 
@@ -478,8 +537,8 @@ INT_PTR CALLBACK DrvDumpProgressDialogProc(
 
         switch (GET_WM_COMMAND_ID(wParam, lParam)) {
         case IDCANCEL:
+            DumpTerminateWorker(hwndDlg);
             RemoveProp(hwndDlg, DUMP_PROP);
-            DumpTerminateWorker();
             KillTimer(hwndDlg, 1);
             return DestroyWindow(hwndDlg);
         }
@@ -487,6 +546,14 @@ INT_PTR CALLBACK DrvDumpProgressDialogProc(
     return 0;
 }
 
+/*
+* DumpDialogWorkerThread
+*
+* Purpose:
+*
+* Driver dumping dialog proc.
+*
+*/
 DWORD DumpDialogWorkerThread(
     _In_ PVOID Parameter
 )
@@ -495,6 +562,7 @@ DWORD DumpDialogWorkerThread(
     MSG message;
     OBEX_DRVDUMP* dumpInfo = (POBEX_DRVDUMP)Parameter;
     HWND hwndDlg, hwndParent = dumpInfo->ParentWindow;
+    HANDLE prev;
 
     SIZE_T bytesIO;
     WCHAR szBuffer[100];
@@ -511,22 +579,30 @@ DWORD DumpDialogWorkerThread(
 
     supSetFastEvent(&DumpDialogInitializedEvent);
 
-    do {
+    if (hwndDlg) {
+        do {
 
-        bResult = GetMessage(&message, NULL, 0, 0);
-        if (bResult == -1)
-            break;
+            bResult = GetMessage(&message, NULL, 0, 0);
+            if (bResult == -1)
+                break;
 
-        if (!IsDialogMessage(hwndDlg, &message)) {
-            TranslateMessage(&message);
-            DispatchMessage(&message);
-        }
+            if (!IsDialogMessage(hwndDlg, &message)) {
+                TranslateMessage(&message);
+                DispatchMessage(&message);
+            }
 
-    } while (bResult != 0);
+        } while (bResult != 0);
+    }
 
-    if ((NT_SUCCESS(dumpInfo->DumpStatus) 
+    if (dumpInfo->hWorkerThread) {
+        WaitForSingleObject(dumpInfo->hWorkerThread, INFINITE);
+        CloseHandle(dumpInfo->hWorkerThread);
+        dumpInfo->hWorkerThread = NULL;
+    }
+
+    if ((NT_SUCCESS(dumpInfo->DumpStatus)
         || dumpInfo->DumpStatus == STATUS_PARTIAL_COPY)
-        && (dumpInfo->Buffer != NULL)) 
+        && (dumpInfo->Buffer != NULL))
     {
         if (dumpInfo->FixSections)
             supImageFixSections(dumpInfo->Buffer);
@@ -535,11 +611,11 @@ DWORD DumpDialogWorkerThread(
             (SIZE_T)dumpInfo->DumpSize, FALSE, FALSE, NULL);
 
         RtlStringCchPrintfSecure(szBuffer, RTL_NUMBER_OF(szBuffer),
-            TEXT("Read %lu (%lu Kb), Write %lu (%lu Kb), Requested %lu (%lu Kb)"),
-            dumpInfo->ReadSize,
-            dumpInfo->ReadSize / 1024,
-            bytesIO,
-            bytesIO / 1024,
+            TEXT("Read %llu (%llu Kb), Write %llu (%llu Kb), Requested %lu (%lu Kb)"),
+            (ULONGLONG)dumpInfo->ReadSize,
+            (ULONGLONG)(dumpInfo->ReadSize / 1024),
+            (ULONGLONG)bytesIO,
+            (ULONGLONG)(bytesIO / 1024),
             dumpInfo->DumpSize,
             dumpInfo->DumpSize / 1024);
 
@@ -556,6 +632,11 @@ DWORD DumpDialogWorkerThread(
         1,
         szBuffer);
 
+    if (dumpInfo->hCancelEvent) {
+        CloseHandle(dumpInfo->hCancelEvent);
+        dumpInfo->hCancelEvent = NULL;
+    }
+
     if (dumpInfo->Buffer) {
         supHeapFree(dumpInfo->Buffer);
         supHeapFree(dumpInfo);
@@ -563,11 +644,8 @@ DWORD DumpDialogWorkerThread(
 
     supResetFastEvent(&DumpDialogInitializedEvent);
 
-    if (DumpDialogThreadHandle) {
-        NtClose(DumpDialogThreadHandle);
-        DumpDialogThreadHandle = NULL;
-    }
-
+    prev = InterlockedExchangePointer((PVOID*)&DumpDialogThreadHandle, NULL);
+    if (prev) CloseHandle(prev);
     return 0;
 }
 
@@ -633,6 +711,9 @@ VOID DrvDumpDriver(
             szDriverDumpInfo,
             MAX_TEXT_CONVERSION_ULONG64);
 
+        if (!(szDriverDumpInfo[0] == L'0' && (szDriverDumpInfo[1] == L'x')))
+            break;
+
         dumpAddress = hextou64(&szDriverDumpInfo[2]);
         if (dumpAddress < g_kdctx.SystemRangeStart)
             break;
@@ -652,6 +733,12 @@ VOID DrvDumpDriver(
         if (dumpSize == 0)
             break;
 
+        // 1 GB cap.
+        if (dumpSize > 0x40000000) {
+            supStatusBarSetText(Context->StatusBar, 1, TEXT("Dump size too large"));
+            break;
+        }
+
         DumpInfo = (OBEX_DRVDUMP*)supHeapAlloc(sizeof(OBEX_DRVDUMP));
         if (DumpInfo == NULL)
             break;
@@ -666,6 +753,10 @@ VOID DrvDumpDriver(
         DumpInfo->DumpAddress = dumpAddress;
         DumpInfo->DumpSize = dumpSize;
         DumpInfo->ParentWindow = Context->hwndDlg;
+        DumpInfo->ReadSize = 0;
+        DumpInfo->DumpStatus = STATUS_UNSUCCESSFUL;
+        DumpInfo->hCancelEvent = NULL;
+        DumpInfo->hWorkerThread = NULL;
 
         DumpDialogThreadHandle = supCreateThread(DumpDialogWorkerThread, (PVOID)DumpInfo, 0);
         if (DumpDialogThreadHandle == NULL) {
@@ -1035,7 +1126,6 @@ VOID DrvListDrivers(
         (LPARAM)Context);
 
     supEnableRedraw(hwndList);
-
 }
 
 /*
@@ -1657,13 +1747,13 @@ DWORD extrasDrvDlgWorkerThread(
     _In_ PVOID Parameter
 )
 {
-    HWND hwndDlg;
     BOOL bResult;
-    MSG message;
+    HWND hwndDlg;
     HACCEL acceleratorTable;
-    HANDLE workerThread;
-    FAST_EVENT fastEvent;
+    HANDLE prev;
     EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)Parameter;
+    MSG message;
+    FAST_EVENT fastEvent;
 
     hwndDlg = CreateDialogParam(g_WinObj.hInstance,
         MAKEINTRESOURCE(IDD_DIALOG_EXTRASLIST),
@@ -1699,11 +1789,8 @@ DWORD extrasDrvDlgWorkerThread(
     if (acceleratorTable)
         DestroyAcceleratorTable(acceleratorTable);
 
-    workerThread = DrvDlgThreadHandles[pDlgContext->DialogMode];
-    if (workerThread) {
-        NtClose(workerThread);
-        DrvDlgThreadHandles[pDlgContext->DialogMode] = NULL;
-    }
+    prev = InterlockedExchangePointer((PVOID*)&DrvDlgThreadHandles[pDlgContext->DialogMode], NULL);
+    if (prev) CloseHandle(prev);
 
     return 0;
 }

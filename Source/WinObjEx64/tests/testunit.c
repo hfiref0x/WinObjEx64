@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.09
 *
-*  DATE:        10 Aug 2025
+*  DATE:        23 Aug 2025
 *
 *  Test code used while debug.
 *
@@ -48,12 +48,205 @@ typedef struct _QUERY_REQUEST {
 
 #define WOBJEX_TEST_PORT L"\\Rpc Control\\WinObjEx_ServiceTestPort48429"
 
+static ULONG g_RegFailCount = 0;
+static BOOL  g_RegVerbose = TRUE;
+
+#define REG_TEST_ASSERT(expr) do { \
+    if (!(expr)) { \
+        ++g_RegFailCount; \
+        if (g_RegVerbose) { \
+            DbgPrint("ASSERT FAILED: %s (%s:%d)\n", #expr, __FUNCTION__, __LINE__); \
+        } \
+    } \
+} while (0)
+
+static BOOL CreateNestedKey(
+    _In_ LPCWSTR SubPath
+)
+{
+    LONG    lRet;
+    HKEY    hKey = NULL;
+    DWORD   disposition = 0;
+
+    lRet = RegCreateKeyExW(HKEY_CURRENT_USER,
+        SubPath,
+        0,
+        NULL,
+        REG_OPTION_NON_VOLATILE,
+        KEY_WRITE | KEY_READ,
+        NULL,
+        &hKey,
+        &disposition);
+
+    if (hKey) RegCloseKey(hKey);
+    return (lRet == ERROR_SUCCESS);
+}
+
+static BOOL KeyExists(
+    _In_ HKEY Root,
+    _In_ LPCWSTR SubPath
+)
+{
+    HKEY hKey = NULL;
+    LONG lRet;
+
+    lRet = RegOpenKeyExW(Root, SubPath, 0, KEY_READ, &hKey);
+    if (lRet == ERROR_SUCCESS) {
+        RegCloseKey(hKey);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static BOOL CreateValueUnderKey(
+    _In_ LPCWSTR SubPath,
+    _In_ LPCWSTR ValueName,
+    _In_ LPCWSTR Data
+)
+{
+    HKEY hKey = NULL;
+    LONG lRet;
+    lRet = RegOpenKeyExW(HKEY_CURRENT_USER, SubPath, 0, KEY_SET_VALUE, &hKey);
+    if (lRet != ERROR_SUCCESS) {
+        if (!CreateNestedKey(SubPath))
+            return FALSE;
+        if (RegOpenKeyExW(HKEY_CURRENT_USER, SubPath, 0, KEY_SET_VALUE, &hKey) != ERROR_SUCCESS)
+            return FALSE;
+    }
+    lRet = RegSetValueExW(hKey, ValueName, 0, REG_SZ, (const BYTE*)Data, (DWORD)((wcslen(Data) + 1) * sizeof(WCHAR)));
+    RegCloseKey(hKey);
+    return (lRet == ERROR_SUCCESS);
+}
+
+static VOID CleanupTestRoot(
+    _In_ LPCWSTR RootSubKey
+)
+{
+    supRegDeleteKeyTree(HKEY_CURRENT_USER, (LPWSTR)RootSubKey);
+}
+
+/*
+ * Test cases
+ */
+
+static VOID Test_RegDeleteKeyTree_Simple(VOID)
+{
+    const WCHAR* root = L"Software\\WinObjEx64Test\\RegTreeTest";
+    const WCHAR* deep = L"Software\\WinObjEx64Test\\RegTreeTest\\A\\B\\C";
+    BOOL created;
+    BOOL removed;
+    BOOL exists;
+
+    CleanupTestRoot(root);
+
+    created = CreateNestedKey(deep);
+    REG_TEST_ASSERT(created);
+
+    REG_TEST_ASSERT(CreateValueUnderKey(deep, L"v", L"data"));
+
+    removed = supRegDeleteKeyTree(HKEY_CURRENT_USER, (LPWSTR)root);
+    REG_TEST_ASSERT(removed);
+
+    exists = KeyExists(HKEY_CURRENT_USER, root);
+    REG_TEST_ASSERT(!exists);
+}
+
+static VOID Test_RegDeleteKeyTree_NonExistent(VOID)
+{
+    const WCHAR* root = L"Software\\WinObjEx64Test\\RegTreeTest_NonExist";
+    BOOL removed;
+
+    CleanupTestRoot(root);
+
+    removed = supRegDeleteKeyTree(HKEY_CURRENT_USER, (LPWSTR)root);
+    REG_TEST_ASSERT(removed);
+}
+
+static VOID Test_RegDeleteKeyTree_TrailingSlash(VOID)
+{
+    const WCHAR* root = L"Software\\WinObjEx64Test\\RegTreeTrail";
+    const WCHAR* rootWithSlash = L"Software\\WinObjEx64Test\\RegTreeTrail\\";
+    const WCHAR* deep = L"Software\\WinObjEx64Test\\RegTreeTrail\\X\\Y";
+    BOOL created;
+    BOOL removed;
+    BOOL exists;
+
+    CleanupTestRoot(root);
+
+    created = CreateNestedKey(deep);
+    REG_TEST_ASSERT(created);
+    REG_TEST_ASSERT(CreateValueUnderKey(deep, L"v", L"vdata"));
+
+    removed = supRegDeleteKeyTree(HKEY_CURRENT_USER, (LPWSTR)rootWithSlash);
+    REG_TEST_ASSERT(removed);
+
+    exists = KeyExists(HKEY_CURRENT_USER, root);
+    REG_TEST_ASSERT(!exists);
+}
+
+static VOID Test_RegDeleteKeyTree_DeepNested(VOID)
+{
+    const WCHAR* base = L"Software\\WinObjEx64Test\\RegTreeDeep";
+    WCHAR path[512];
+    int i, depth = 20; // deep but within buffer
+    BOOL created;
+    BOOL removed;
+    BOOL exists;
+
+    CleanupTestRoot(base);
+
+    _strcpy(path, base);
+    for (i = 0; i < depth; ++i) {
+        _strcat(path, L"\\L");
+        // add index to ensure unique names if needed
+        // append small numeric suffix
+        WCHAR numbuf[8];
+        RtlStringCchPrintfSecure(numbuf, RTL_NUMBER_OF(numbuf), L"%d", i);
+        _strcat(path, numbuf);
+    }
+
+    created = CreateNestedKey(path);
+    REG_TEST_ASSERT(created);
+    REG_TEST_ASSERT(CreateValueUnderKey(path, L"v", L"d"));
+
+    removed = supRegDeleteKeyTree(HKEY_CURRENT_USER, (LPWSTR)base);
+    REG_TEST_ASSERT(removed);
+
+    exists = KeyExists(HKEY_CURRENT_USER, base);
+    REG_TEST_ASSERT(!exists);
+}
+
+VOID Test_RegDeleteKeyTree(VOID)
+{
+    g_RegFailCount = 0;
+
+    Test_RegDeleteKeyTree_Simple();
+    Test_RegDeleteKeyTree_NonExistent();
+    Test_RegDeleteKeyTree_TrailingSlash();
+    Test_RegDeleteKeyTree_DeepNested();
+
+    if (g_RegVerbose) {
+        if (g_RegFailCount == 0) {
+            DbgPrint("[TEST] supRegDeleteKeyTree PASSED.\n");
+        }
+        else {
+            DbgPrint("[TEST] supRegDeleteKeyTree %lu tests FAILED.\n", g_RegFailCount);
+        }
+    }
+
+    // ensure cleanup of any leftover keys
+    CleanupTestRoot(L"Software\\WinObjEx64Test\\RegTreeTest");
+    CleanupTestRoot(L"Software\\WinObjEx64Test\\RegTreeTrail");
+    CleanupTestRoot(L"Software\\WinObjEx64Test\\RegTreeDeep");
+    CleanupTestRoot(L"Software\\WinObjEx64Test\\RegTreeTest_NonExist");
+}
+
 HANDLE TestGetPortHandle()
 {
     return g_PortHandle;
 }
 
-typedef NTSTATUS (NTAPI* pfnNtCreateRegistryTransaction)(
+typedef NTSTATUS(NTAPI* pfnNtCreateRegistryTransaction)(
     _Out_ PHANDLE Handle,
     _In_ ACCESS_MASK DesiredAccess, //generic + TRANSACTION_*
     _In_ POBJECT_ATTRIBUTES ObjectAttributes,
@@ -67,22 +260,18 @@ VOID TestRegistryTransaction()
     UNICODE_STRING usName;
     pfnNtCreateRegistryTransaction NtCreateRegistryTransaction;
     HMODULE hNtdll;
-    
+
     hNtdll = GetModuleHandle(L"ntdll.dll");
     if (hNtdll) {
-
         NtCreateRegistryTransaction = (pfnNtCreateRegistryTransaction)GetProcAddress(hNtdll, "NtCreateRegistryTransaction");
         if (NtCreateRegistryTransaction != NULL) {
-
             RtlInitUnicodeString(&usName, L"\\RPC Control\\TestRegTransaction");
             InitializeObjectAttributes(&obja, &usName, OBJ_CASE_INSENSITIVE, NULL, NULL);
             ntStatus = NtCreateRegistryTransaction(&hObject, TRANSACTION_ALL_ACCESS, &obja, 0);
             if (NT_SUCCESS(ntStatus)) {
                 __nop();
             }
-
         }
-
     }
 }
 
@@ -207,7 +396,6 @@ VOID TestCreateBogusObjects()
 
         }
     }
-
 }
 
 DWORD WINAPI LPCListener(LPVOID lpThreadParameter)
@@ -433,7 +621,6 @@ VOID TestTimer(
     if (hTimer) {
         SetWaitableTimer(hTimer, &liDueTime, 0, NULL, NULL, 0);
     }
-
 }
 
 VOID TestTransactionResourceManager(
@@ -1018,9 +1205,7 @@ VOID TestSectionImage()
                 if (NT_SUCCESS(ntStatus)) {
                     kdDebugPrint("Mapped\r\n");
                 }
-
             }
-
         }
     }
 }
@@ -1397,6 +1582,7 @@ VOID TestStart(
     Test_GetLoadedModulesListEx();
     Test_GetSystemInfoEx();
     Test_HashImageSections();
+    //Test_RegDeleteKeyTree();
 }
 
 VOID TestStop(

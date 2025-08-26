@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.02
+*  VERSION:     1.03
 *
-*  DATE:        14 Jun 2025
+*  DATE:        22 Aug 2025
 *
 *  WinObjEx64 example and test plugin.
 *
@@ -111,7 +111,7 @@ NTSTATUS CALLBACK StartPlugin(
         State = PluginError;
     }
 
-    if (g_plugin->StateChangeCallback)
+    if (g_plugin && g_plugin->StateChangeCallback)
         g_plugin->StateChangeCallback(g_plugin, State, NULL);
 
     return status;

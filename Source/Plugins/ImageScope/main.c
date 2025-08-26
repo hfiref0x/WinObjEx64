@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.20
+*  VERSION:     1.21
 *
-*  DATE:        14 Jun 2025
+*  DATE:        22 Aug 2025
 *
 *  WinObjEx64 ImageScope plugin.
 *
@@ -76,10 +76,6 @@ VOID PluginFreeGlobalResources(
 
     supFreeDuplicatedUnicodeString(NtCurrentPeb()->ProcessHeap,
         &Context->ParamBlock.Object.Name, TRUE);
-
-    if (g_plugin && g_plugin->StateChangeCallback)
-        g_plugin->StateChangeCallback(g_plugin, PluginStopped, NULL);
-
 }
 
 /*
@@ -103,7 +99,7 @@ DWORD WINAPI PluginThread(
     InterlockedIncrement(&g_refCount);
 
     __try {
-        if (g_plugin->GuiInitCallback == NULL) { // this is required callback
+        if (g_plugin == NULL || g_plugin->GuiInitCallback == NULL) { // this is required callback
             kdDebugPrint("Gui init callback required\r\n");
             __leave;
         }
@@ -172,6 +168,12 @@ NTSTATUS CALLBACK StartPlugin(
             __leave;
         }
 
+        if (Context->ParamBlock.OpenNamedObjectByType == NULL) {
+            deallocateContext = TRUE;
+            status = STATUS_INVALID_PARAMETER;
+            __leave;
+        }
+
         status = Context->ParamBlock.OpenNamedObjectByType(
             &sectionHandle,
             ObjectTypeSection,
@@ -180,16 +182,13 @@ NTSTATUS CALLBACK StartPlugin(
             SECTION_QUERY | SECTION_MAP_READ);
 
         if (!NT_SUCCESS(status)) {
-            StringCbPrintf(szError, 100, TEXT("Could not open section, 0x%lX"), status);
+            StringCbPrintf(szError, sizeof(szError), TEXT("Could not open section, 0x%08X"), (ULONG)status);
 
             MessageBox(
                 ParamBlock->ParentWindow,
                 szError,
                 T_PLUGIN_NAME,
                 MB_ICONERROR);
-
-            if (g_plugin && g_plugin->StateChangeCallback)
-                g_plugin->StateChangeCallback(g_plugin, PluginStopped, NULL);
 
             deallocateContext = TRUE;
             status = STATUS_SUCCESS;
@@ -214,18 +213,16 @@ NTSTATUS CALLBACK StartPlugin(
                     MB_ICONINFORMATION);
             }
             else {
-                StringCbPrintf(szError, 100, TEXT("Could not map section, 0x%lX"), status);
+                StringCbPrintf(szError, sizeof(szError), TEXT("Could not map section, 0x%08X"), (ULONG)status);
                 MessageBox(ParamBlock->ParentWindow, szError,
                     T_PLUGIN_NAME,
                     MB_ICONERROR);
             }
 
             // Stop plugin if we cannot open section, but do not fail with error as we already displayed it.
-            if (g_plugin && g_plugin->StateChangeCallback)
-                g_plugin->StateChangeCallback(g_plugin, PluginStopped, NULL);
-
-            status = STATUS_SUCCESS;
+            state = PluginStopped;
             deallocateContext = TRUE;
+            status = STATUS_SUCCESS;
             __leave;
         }
 

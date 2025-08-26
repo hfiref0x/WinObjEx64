@@ -284,15 +284,12 @@ BOOL supTreeListAddCopyValueItem(
     szHeaderText[0] = 0;
     hdItem.mask = HDI_TEXT;
 
-    hdItem.cchTextMax = sizeof(szHeaderText) - 1;
+    hdItem.cchTextMax = RTL_NUMBER_OF(szHeaderText);
 
     hdItem.pszText = szHeaderText;
     if (TreeList_GetHeaderItem(hwndTreeList, hti.iItem, &hdItem)) {
         *pSubItemHit = hti.iItem;
-
-        _strcpy(szItem, TEXT("Copy \""));
-        _strcat(szItem, szHeaderText);
-        _strcat(szItem, TEXT("\""));
+        StringCchPrintf(szItem, RTL_NUMBER_OF(szItem), TEXT("Copy \"%ws\""), szHeaderText);
         if (InsertMenu(hMenu, uPos, MF_BYCOMMAND, uId, szItem)) {
             return TRUE;
         }

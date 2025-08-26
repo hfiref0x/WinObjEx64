@@ -4,9 +4,9 @@
 *
 *  TITLE:       UI.C
 *
-*  VERSION:     1.20
+*  VERSION:     1.21
 *
-*  DATE:        14 Jun 2025
+*  DATE:        22 Aug 2025
 *
 *  WinObjEx64 ImageScope UI.
 *
@@ -1129,7 +1129,7 @@ VOID TabsDumpList(
     _In_ HWND hWndDlg
 )
 {
-    INT iSel, iColumns;
+    INT iSel;
     LPWSTR lpFileName;
     GUI_CONTEXT* context = GetProp(hWndDlg, T_IMS_PROP);
     HWND hwndList = GetDlgItem(hWndDlg, IDC_LIST);
@@ -1142,17 +1142,15 @@ VOID TabsDumpList(
     switch (iSel) {
     case TabIdVSInfo:
         lpFileName = TEXT("VersionInfo.csv");
-        iColumns = 2;
         break;
     case TabIdStrings:
         lpFileName = TEXT("Strings.csv");
-        iColumns = 1;
         break;
     default:
         return;
     }
 
-    supListViewExportToFile(lpFileName, hWndDlg, hwndList, iColumns);
+    supListViewExportToFile(lpFileName, hWndDlg, hwndList);
 }
 
 VOID TabsListViewCopyItem(
@@ -1519,7 +1517,7 @@ BOOL RunUI(
         TranslateMessage(&msg1);
         DispatchMessage(&msg1);
 
-    } while (rv != 0 && InterlockedAdd((PLONG)&g_pluginState, PLUGIN_RUNNING) == PLUGIN_RUNNING);
+    } while (rv != 0 && InterlockedCompareExchange((PLONG)&g_pluginState, 0, 0) == PLUGIN_RUNNING);
 
     TabDestroyControl(context->TabHeader);
     DestroyWindow(context->MainWindow);

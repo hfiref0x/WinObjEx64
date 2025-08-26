@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.14
+*  VERSION:     1.15
 *
-*  DATE:        14 Jun 2025
+*  DATE:        22 Aug 2025
 *
 *  WinObjEx64 ApiSetView plugin.
 *
@@ -114,17 +114,17 @@ BOOL TreeListCopyItemValueToClipboard(
 
             nIndex = (tlSubItemHit - 1);
             if (nIndex < (INT)pSubItems->Count) {
-
                 lpCopyData = pSubItems->Text[nIndex];
-                cbCopyData = _strlen(lpCopyData) * sizeof(WCHAR);
-
+                if (lpCopyData) {
+                    cbCopyData = (1 + _strlen(lpCopyData)) * sizeof(WCHAR);
+                }
             }
 
         }
         else {
             if (tlSubItemHit == 0) {
                 lpCopyData = szText;
-                cbCopyData = sizeof(szText);
+                cbCopyData = (1 + _strlen(lpCopyData)) * sizeof(WCHAR);
             }
         }
 
@@ -182,15 +182,12 @@ BOOL TreeListAddCopyValueItem(
     szHeaderText[0] = 0;
     hdItem.mask = HDI_TEXT;
 
-    hdItem.cchTextMax = sizeof(szHeaderText) - 1;
+    hdItem.cchTextMax = RTL_NUMBER_OF(szHeaderText) - 1;
 
     hdItem.pszText = szHeaderText;
     if (TreeList_GetHeaderItem(hwndTreeList, hti.iItem, &hdItem)) {
         *pSubItemHit = hti.iItem;
-
-        _strcpy(szItem, TEXT("Copy \""));
-        _strcat(szItem, szHeaderText);
-        _strcat(szItem, TEXT("\""));
+        StringCchPrintf(szItem, RTL_NUMBER_OF(szItem), TEXT("Copy \"%ws\""), szHeaderText);
         if (InsertMenu(hMenu, uPos, MF_BYCOMMAND, uId, szItem)) {
             return TRUE;
         }
@@ -630,7 +627,7 @@ DWORD WINAPI PluginThread(
         TranslateMessage(&msg1);
         DispatchMessage(&msg1);
 
-    } while (rv != 0 && InterlockedAdd((PLONG)&g_pluginState, PLUGIN_RUNNING) == PLUGIN_RUNNING);
+    } while (rv != 0 && InterlockedCompareExchange((PLONG)&g_pluginState, 0, 0) == PLUGIN_RUNNING);
 
     PluginFreeGlobalResources();
 

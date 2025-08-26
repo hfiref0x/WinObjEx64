@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020 - 2022
+*  (C) COPYRIGHT AUTHORS, 2020 - 2025
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     1.10
+*  VERSION:     1.11
 *
-*  DATE:        15 Jun 2022
+*  DATE:        22 Aug 2025
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -58,8 +58,10 @@ VOID supSetWaitCursor(
     _In_ BOOL fSet
 )
 {
-    ShowCursor(fSet);
-    SetCursor(LoadCursor(NULL, fSet ? IDC_WAIT : IDC_ARROW));
+    HCURSOR h = LoadCursor(NULL, fSet ? IDC_WAIT : IDC_ARROW);
+    if (h) {
+        SetCursor(h);
+    }
 }
 
 /*
@@ -77,7 +79,6 @@ NTSTATUS supMapSection(
 )
 {
     NTSTATUS ntStatus;
-    HANDLE dirHandle = NULL;
     SECTION_BASIC_INFORMATION sbi;
     SIZE_T bytesReturned;
 
@@ -120,8 +121,6 @@ NTSTATUS supMapSection(
     __finally {
         if (AbnormalTermination())
             ntStatus = STATUS_ACCESS_VIOLATION;
-        if (dirHandle)
-            NtClose(dirHandle);
     }
 
     return ntStatus;
@@ -159,7 +158,11 @@ BOOL supSaveDialogExecute(
 size_t supxEscStrlen(wchar_t* s)
 {
     size_t  result = 2;
-    wchar_t* s0 = s;
+    wchar_t* s0;
+    if (s == NULL)
+        return 0;
+
+    s0 = s;
 
     while (*s)
     {
@@ -173,13 +176,20 @@ size_t supxEscStrlen(wchar_t* s)
 
 wchar_t* supxEscStrcpy(wchar_t* dst, wchar_t* src)
 {
+    if (dst == NULL || src == NULL)
+        return dst;
+
     *(dst++) = L'"';
 
     while ((*dst = *src) != L'\0')
     {
-        if (*src == L'"')
-            *(++dst) = L'"';
-
+        if (*src == L'"') {
+            ++src;
+            ++dst;
+            *(dst - 0) = L'"';
+            *(dst) = L'\0';
+            continue;
+        }
         ++src;
         ++dst;
     }
@@ -200,11 +210,10 @@ wchar_t* supxEscStrcpy(wchar_t* dst, wchar_t* src)
 */
 BOOL supxListViewExportCSV(
     _In_ HWND List,
-    _In_ INT ColumnCount,
     _In_ PWCHAR FileName)
 {
     HWND            hdr = ListView_GetHeader(List);
-    int             pass, i, c, col_count, icount = 1 + ListView_GetItemCount(List);
+    int             pass, i, c, col_count = Header_GetItemCount(hdr), icount = 1 + ListView_GetItemCount(List);
     HDITEM          ih;
     LVITEM          lvi;
     PWCHAR          text, buffer0 = NULL, buffer = NULL;
@@ -216,11 +225,6 @@ BOOL supxListViewExportCSV(
     text = (PWCHAR)ntsupVirtualAlloc(32768 * sizeof(WCHAR));
     if (!text)
         return FALSE;
-
-    if (ColumnCount < 0)
-        col_count = Header_GetItemCount(hdr);
-    else
-        col_count = ColumnCount;
 
     RtlZeroMemory(&ih, sizeof(HDITEM));
     RtlZeroMemory(&lvi, sizeof(LVITEM));
@@ -304,8 +308,7 @@ BOOL supxListViewExportCSV(
 BOOL supListViewExportToFile(
     _In_ LPWSTR FileName,
     _In_ HWND WindowHandle,
-    _In_ HWND ListView,
-    _In_ INT ColumnCount
+    _In_ HWND ListView
 )
 {
     BOOL bResult = FALSE;
@@ -321,7 +324,7 @@ BOOL supListViewExportToFile(
         SetCapture(WindowHandle);
         supSetWaitCursor(TRUE);
 
-        bResult = supxListViewExportCSV(ListView, ColumnCount, szExportFileName);
+        bResult = supxListViewExportCSV(ListView, szExportFileName);
 
         supSetWaitCursor(FALSE);
         ReleaseCapture();
@@ -409,40 +412,6 @@ INT supAddListViewColumn(
     column.iImage = ImageIndex;
 
     return ListView_InsertColumn(ListViewHwnd, ColumnIndex, &column);
-}
-
-/*
-* supCopyMemory
-*
-* Purpose:
-*
-* Copies bytes between buffers.
-*
-* dest - Destination buffer
-* cbdest - Destination buffer size in bytes
-* src - Source buffer
-* cbsrc - Source buffer size in bytes
-*
-*/
-void supCopyMemory(
-    _Inout_ void* dest,
-    _In_ size_t cbdest,
-    _In_ const void* src,
-    _In_ size_t cbsrc
-)
-{
-    char* d = (char*)dest;
-    char* s = (char*)src;
-
-    if ((dest == 0) || (src == 0) || (cbdest == 0))
-        return;
-    if (cbdest < cbsrc)
-        cbsrc = cbdest;
-
-    while (cbsrc > 0) {
-        *d++ = *s++;
-        cbsrc--;
-    }
 }
 
 /*

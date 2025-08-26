@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.16
+*  VERSION:     1.17
 *
-*  DATE:        14 Jun 2025
+*  DATE:        22 Aug 2025
 *
 *  WinObjEx64 Sonar plugin.
 *
@@ -26,6 +26,11 @@
 // Maximum tested build Sonar is known to work.
 //
 #define SONAR_MAX_TESTED_BUILD NT_WIN11_25H2
+
+//
+// Safety cap for walking kernel lists to avoid infinite loops.
+//
+#define MAX_LIST_TRAVERSAL 100000
 
 //
 // Dll instance.
@@ -150,6 +155,7 @@ BOOL ListOpenQueue(
 )
 {
     BOOL bResult = TRUE;
+    ULONG iter = 0;
     ULONG_PTR ProtocolNextOpen = OpenQueueAddress;
 
     NDIS_OPEN_BLOCK_COMPATIBLE OpenBlock;
@@ -158,6 +164,12 @@ BOOL ListOpenQueue(
     TL_SUBITEMS_FIXED subitems;
 
     do {
+        if (++iter > MAX_LIST_TRAVERSAL) {
+            StatusBarSetText(TEXT("Traversal aborted (too many iterations)"));
+            bResult = FALSE;
+            break;
+        }
+
         RtlSecureZeroMemory(&OpenBlock, sizeof(OpenBlock));
         if (!ReadAndConvertOpenBlock(ProtocolNextOpen, &OpenBlock, NULL)) {
 
@@ -283,6 +295,7 @@ VOID ListProtocols(
     _In_ BOOL bRefresh
 )
 {
+    ULONG iter = 0;
     BOOLEAN bAnyErrors = FALSE;
     NDIS_PROTOCOL_BLOCK_COMPATIBLE ProtoBlock;
 
@@ -329,6 +342,12 @@ VOID ListProtocols(
     // Walk protocol list.
     //
     do {
+        if (++iter > MAX_LIST_TRAVERSAL) {
+            StatusBarSetText(TEXT("Traversal aborted (too many iterations)"));
+            bAnyErrors = TRUE;
+            break;
+        }
+
         RtlSecureZeroMemory(&ProtoBlock, sizeof(ProtoBlock));
         if (!ReadAndConvertProtocolBlock(ProtocolBlockAddress, &ProtoBlock, NULL)) {
 
@@ -969,6 +988,9 @@ VOID OnNotify(
     UNREFERENCED_PARAMETER(hwnd);
     UNREFERENCED_PARAMETER(wParam);
 
+    if (InterlockedCompareExchange((PLONG)&g_pluginState, 0, 0) == PLUGIN_STOP)
+        return;
+
     TreeControl = (HWND)TreeList_GetTreeControlWindow(g_ctx.TreeList);
 
     if (hdr->hwndFrom == TreeControl) {
@@ -1239,7 +1261,7 @@ DWORD WINAPI PluginThread(
 )
 {
     BOOL rv;
-    HRESULT hr = S_FALSE;
+    HRESULT hr = CO_E_NOTINITIALIZED;
     HICON hIcon;
     LONG_PTR wndStyles;
     HWND MainWindow;
@@ -1457,14 +1479,14 @@ DWORD WINAPI PluginThread(
             TranslateMessage(&msg1);
             DispatchMessage(&msg1);
 
-        } while (rv != 0 && InterlockedAdd((PLONG)&g_pluginState, PLUGIN_RUNNING) == PLUGIN_RUNNING);
+        } while (rv != 0 && InterlockedCompareExchange((PLONG)&g_pluginState, 0, 0) == PLUGIN_RUNNING);
 
     } while (FALSE);
 
     DestroyWindow(g_ctx.MainWindow);
 
-    if (hr == S_OK || hr == S_FALSE) {
-        CoUninitialize();
+    if (SUCCEEDED(hr)) { 
+        CoUninitialize(); 
     }
 
     PluginFreeGlobalResources();

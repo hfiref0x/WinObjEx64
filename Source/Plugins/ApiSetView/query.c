@@ -4,9 +4,9 @@
 *
 *  TITLE:       QUERY.C
 *
-*  VERSION:     1.14
+*  VERSION:     1.15
 *
-*  DATE:        14 Jun 2025
+*  DATE:        22 Aug 2025
 *
 *  Query and output ApiSet specific data.
 *
@@ -22,12 +22,14 @@
 typedef VOID(CALLBACK* pfnApiSetQueryMap)(
     _In_ PVOID ApiSetMap,
     _In_ HTREEITEM RootItem,
-    _In_opt_ LPCWSTR FilterByName);
+    _In_opt_ LPCWSTR FilterByName,
+    _In_ SIZE_T ApiSetSize);
 
 #define APISET_QUERY_ROUTINE(n) VOID n(   \
     _In_ PVOID ApiSetMap,                 \
     _In_ HTREEITEM RootItem,              \
-    _In_opt_ LPCWSTR FilterByName)
+    _In_opt_ LPCWSTR FilterByName,        \
+    _In_ SIZE_T ApiSetSize)
 
 VALUE_DESC g_apiSetEntryFlags[] = {
     { API_SET_SCHEMA_ENTRY_FLAGS_SEALED, L"Sealed" },
@@ -84,6 +86,30 @@ HTREEITEM TreeListAddItem(
 }
 
 /*
+* IsRangeValid
+*
+* Purpose:
+*
+* Validate that Offset..Offset+Length lies within 0..BaseSize.
+*
+*/
+BOOLEAN IsRangeValid(
+    _In_ SIZE_T BaseSize,
+    _In_ ULONG Offset,
+    _In_ ULONG Length
+)
+{
+    SIZE_T start = (SIZE_T)Offset;
+    SIZE_T len = (SIZE_T)Length;
+    SIZE_T end;
+
+    if (start > BaseSize) return FALSE;
+    end = start + len;
+    if (end > BaseSize) return FALSE;
+    return TRUE;
+}
+
+/*
 * GetApiSetEntryName
 *
 * Purpose:
@@ -93,38 +119,38 @@ HTREEITEM TreeListAddItem(
 */
 LPWSTR GetApiSetEntryName(
     _In_ PBYTE Namespace,
+    _In_ SIZE_T NamespaceSize,
     _In_ ULONG NameOffset,
     _In_ ULONG NameLength
 )
 {
-    PWSTR lpEntryName, lpStr;
+    PWSTR lpEntryName;
 
     if (NameLength == 0)
         return NULL;
 
-    lpEntryName = HeapAlloc(
-        g_ctx.PluginHeap,
-        HEAP_ZERO_MEMORY,
-        NameLength + sizeof(WCHAR));
+    if ((NameLength % sizeof(WCHAR)) != 0)
+        return NULL;
 
-    if (lpEntryName) {
+    if (!IsRangeValid(NamespaceSize, NameOffset, NameLength))
+        return NULL;
 
-        lpStr = lpEntryName;
+    {
+        SIZE_T cch = NameLength / sizeof(WCHAR);
+        lpEntryName = HeapAlloc(
+            g_ctx.PluginHeap,
+            HEAP_ZERO_MEMORY,
+            (cch + 1) * sizeof(WCHAR));
 
-        //
-        // Copy namespace entry name.
-        //
-        RtlCopyMemory(
-            lpStr,
-            (PWSTR)RtlOffsetToPointer(Namespace, NameOffset),
-            NameLength);
+        if (lpEntryName) {
 
-        //
-        // Add terminating null.
-        //
-        lpStr += (NameLength / sizeof(WCHAR));
-        *lpStr = 0;
+            RtlCopyMemory(
+                lpEntryName,
+                RtlOffsetToPointer(Namespace, NameOffset),
+                NameLength);
 
+            lpEntryName[cch] = 0;
+        }
     }
 
     return lpEntryName;
@@ -155,7 +181,7 @@ HTREEITEM OutNamespaceEntry(
     RtlZeroMemory(&tlSubItems, sizeof(tlSubItems));
 
     flagsValue = Flags;
-    
+
     //
     // Output first flag from combination.
     //
@@ -255,6 +281,7 @@ HTREEITEM OutNamespaceEntry(
 void OutNamespaceValue(
     _In_ HTREEITEM RootItem,
     _In_ PBYTE Namespace,
+    _In_ SIZE_T NamespaceSize,
     _In_ ULONG ValueOffset,
     _In_ ULONG ValueLength,
     _In_ ULONG NameOffset,
@@ -271,6 +298,7 @@ void OutNamespaceValue(
     //
     lpValueName = GetApiSetEntryName(
         Namespace,
+        NamespaceSize,
         ValueOffset,
         ValueLength);
 
@@ -278,6 +306,7 @@ void OutNamespaceValue(
     // Get value alias if present.
     //
     lpAliasName = GetApiSetEntryName(Namespace,
+        NamespaceSize,
         NameOffset,
         NameLength);
 
@@ -343,6 +372,7 @@ APISET_QUERY_ROUTINE(ListApiSetV2)
 
         lpEntryName = GetApiSetEntryName(
             (PBYTE)namespace,
+            ApiSetSize,
             nsEntry->NameOffset,
             nsEntry->NameLength);
 
@@ -370,6 +400,9 @@ APISET_QUERY_ROUTINE(ListApiSetV2)
             //
             // List values array.
             //
+            if (!IsRangeValid(ApiSetSize, nsEntry->DataOffset, sizeof(API_SET_VALUE_ARRAY_V2)))
+                continue;
+
             valuesArray = (API_SET_VALUE_ARRAY_V2*)RtlOffsetToPointer(
                 namespace,
                 nsEntry->DataOffset);
@@ -382,6 +415,7 @@ APISET_QUERY_ROUTINE(ListApiSetV2)
                     OutNamespaceValue(
                         hSubItem,
                         (PBYTE)namespace,
+                        ApiSetSize,
                         valueEntry->ValueOffset,
                         valueEntry->ValueLength,
                         valueEntry->NameOffset,
@@ -422,6 +456,7 @@ APISET_QUERY_ROUTINE(ListApiSetV4)
 
         lpEntryName = GetApiSetEntryName(
             (PBYTE)namespace,
+            ApiSetSize,
             nsEntry->NameOffset,
             nsEntry->NameLength);
 
@@ -449,6 +484,9 @@ APISET_QUERY_ROUTINE(ListApiSetV4)
             //
             // List values array.
             //
+            if (!IsRangeValid(ApiSetSize, nsEntry->DataOffset, sizeof(API_SET_VALUE_ARRAY_V4)))
+                continue;
+
             valuesArray = (API_SET_VALUE_ARRAY_V4*)RtlOffsetToPointer(
                 namespace,
                 nsEntry->DataOffset);
@@ -461,6 +499,7 @@ APISET_QUERY_ROUTINE(ListApiSetV4)
                     OutNamespaceValue(
                         hSubItem,
                         (PBYTE)namespace,
+                        ApiSetSize,
                         valueEntry->ValueOffset,
                         valueEntry->ValueLength,
                         valueEntry->NameOffset,
@@ -500,8 +539,12 @@ APISET_QUERY_ROUTINE(ListApiSetV6)
 
     for (i = 0; i < namespace->Count; i++) {
 
+        if (!IsRangeValid(ApiSetSize, (ULONG)((PBYTE)nsEntry - (PBYTE)namespace), sizeof(API_SET_NAMESPACE_ENTRY_V6)))
+            break;
+
         lpEntryName = GetApiSetEntryName(
             (PBYTE)namespace,
+            ApiSetSize,
             nsEntry->NameOffset,
             nsEntry->NameLength);
 
@@ -534,6 +577,7 @@ APISET_QUERY_ROUTINE(ListApiSetV6)
                         OutNamespaceValue(
                             hSubItem,
                             (PBYTE)namespace,
+                            ApiSetSize,
                             valueEntry->ValueOffset,
                             valueEntry->ValueLength,
                             valueEntry->NameOffset,
@@ -569,7 +613,8 @@ APISET_QUERY_ROUTINE(ListApiSetV6)
 BOOL ResolveDllData(
     _In_ HMODULE DllHandle,
     _Inout_ PVOID* ApiSetData,
-    _Out_ PULONG SchemaVersion
+    _Out_ PULONG SchemaVersion,
+    _Out_opt_ PULONG ApiSetSize
 )
 {
     ULONG dataSize = 0;
@@ -582,6 +627,7 @@ BOOL ResolveDllData(
     PBYTE dataPtr = NULL;
 
     *SchemaVersion = 0;
+    if (ApiSetSize) *ApiSetSize = 0;
 
     baseAddress = (PBYTE)(((ULONG_PTR)DllHandle) & ~3);
 
@@ -613,10 +659,14 @@ BOOL ResolveDllData(
         return FALSE;
     }
 
+    if (dataSize < sizeof(ULONG))
+        return FALSE;
+
     currentSchemaVersion = *(ULONG*)dataPtr;
 
     *SchemaVersion = currentSchemaVersion;
     *ApiSetData = dataPtr;
+    if (ApiSetSize) *ApiSetSize = dataSize;
 
     return TRUE;
 }
@@ -633,7 +683,8 @@ VOID WINAPI ListApiSetFromFileWorker(
     _In_ LPCWSTR SchemaFileName,
     _In_opt_ LPCWSTR FilterByName,
     _In_ PVOID ApiSetData,
-    _In_ ULONG SchemaVersion
+    _In_ ULONG SchemaVersion,
+    _In_ SIZE_T ApiSetSize
 )
 {
     pfnApiSetQueryMap queryMapRoutine = NULL;
@@ -654,7 +705,7 @@ VOID WINAPI ListApiSetFromFileWorker(
     TreeList_ClearTree(g_ctx.TreeList);
     TreeList_RedrawDisable(g_ctx.TreeList);
 
-    StringCchPrintf(szBuffer, MAX_PATH, TEXT("Schema Version %lu"), SchemaVersion);
+    StringCchPrintf(szBuffer, RTL_NUMBER_OF(szBuffer), TEXT("Schema Version %lu"), SchemaVersion);
 
     //
     // Parse and output apiset.
@@ -698,7 +749,7 @@ VOID WINAPI ListApiSetFromFileWorker(
             __try {
 
                 if (queryMapRoutine)
-                    queryMapRoutine(ApiSetData, h_tviSubItem, FilterByName);
+                    queryMapRoutine(ApiSetData, h_tviSubItem, FilterByName, ApiSetSize);
 
             }
             __except (EXCEPTION_EXECUTE_HANDLER) {
@@ -707,7 +758,7 @@ VOID WINAPI ListApiSetFromFileWorker(
 
                 StringCchPrintf(
                     szBuffer,
-                    MAX_PATH,
+                    RTL_NUMBER_OF(szBuffer),
                     TEXT("ApiSetView: Exception %lu thrown while processing apiset, schema version %lu"),
                     GetExceptionCode(),
                     SchemaVersion);
@@ -743,6 +794,7 @@ VOID ListApiSetFromFile(
     HMODULE hApiSetDll;
     LPWSTR lpFileName = NULL;
     PVOID dataPtr = NULL;
+    ULONG dataSize = 0;
     WCHAR szErrorMsg[MAX_PATH + 1];
     WCHAR szSystemDirectory[MAX_PATH + 1];
 
@@ -776,13 +828,13 @@ VOID ListApiSetFromFile(
 
     hApiSetDll = LoadLibraryEx(lpFileName, NULL, LOAD_LIBRARY_AS_DATAFILE);
     if (hApiSetDll) {
-        if (ResolveDllData(hApiSetDll, &dataPtr, &schemaVersion)) {
+        if (ResolveDllData(hApiSetDll, &dataPtr, &schemaVersion, &dataSize)) {
             if (schemaVersion != API_SET_SCHEMA_VERSION_V2 &&
                 schemaVersion != API_SET_SCHEMA_VERSION_V4 &&
                 schemaVersion != API_SET_SCHEMA_VERSION_V6)
             {
                 StringCchPrintf(szErrorMsg,
-                    MAX_PATH,
+                    RTL_NUMBER_OF(szErrorMsg),
                     TEXT("ApiSetView: Unknown schema version %lu"), schemaVersion);
 
                 DisplayErrorText(szErrorMsg);
@@ -792,7 +844,8 @@ VOID ListApiSetFromFile(
                     lpFileName,
                     FilterByName,
                     dataPtr,
-                    schemaVersion);
+                    schemaVersion,
+                    dataSize);
             }
         }
         else {

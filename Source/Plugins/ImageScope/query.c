@@ -4,9 +4,9 @@
 *
 *  TITLE:       QUERY.C
 *
-*  VERSION:     1.20
+*  VERSION:     1.21
 *
-*  DATE:        14 Jun 2025
+*  DATE:        22 Aug 2025
 *
 *  ImageScope main logic.
 *
@@ -19,31 +19,114 @@
 
 #include "global.h"
 
+#define IMGSCOPE_MAX_EXTRACTED_STR 255
+
+static inline BOOL IsWideStartChar(WCHAR c)
+{
+    return ((c >= L'A' && c <= L'Z') ||
+        (c >= L'a' && c <= L'z') ||
+        (c >= L'0' && c <= L'9') ||
+        c == L'(' || c == L'<' || c == L'\"' ||
+        c == L'.' || c == L'%' || c == L'{' ||
+        c == L'\\' || c == L'@');
+}
+
+static inline BOOL IsWideContinueChar(WCHAR c)
+{
+    return (((c >= 0x20) && (c <= 0x7f)) ||
+        c == L'\r' || c == L'\n' || c == L'\t');
+}
+
+static inline BOOL IsAnsiStartChar(UCHAR c)
+{
+    return ((c >= 'A' && c <= 'Z') ||
+        (c >= 'a' && c <= 'z') ||
+        (c >= '0' && c <= '9') ||
+        c == '(' || c == '<' || c == '\"' ||
+        c == '.' || c == '%' || c == '{' ||
+        c == '\\' || c == '@');
+}
+
+static inline BOOL IsAnsiContinueChar(UCHAR c)
+{
+    return (((c >= 0x20) && (c <= 0x7f)) ||
+        c == '\r' || c == '\n' || c == '\t');
+}
+
 ULONG_PTR FORCEINLINE ALIGN_UP_32(
     _In_ ULONG_PTR p)
 {
     return (p + 3) & (~(ULONG_PTR)3);
 }
 
+static inline BOOL IsRangeValid(
+    _In_ SIZE_T BaseSize,
+    _In_ SIZE_T Offset,
+    _In_ SIZE_T Length
+)
+{
+    SIZE_T start = Offset;
+    SIZE_T len = Length;
+
+    if (start >= BaseSize) return FALSE;
+    if (len > BaseSize - start) return FALSE;
+    return TRUE;
+}
+
+/*
+* PEImageEnumVarFileInfo
+*
+* Purpose:
+*
+* Enumerate version info variables in the given module.
+*
+*/
 BOOL PEImageEnumVarFileInfo(
     _In_ PIMGVSTRING hdr,
+    _In_ PVOID BasePtr,
+    _In_ SIZE_T BaseSize,
     _In_ PEnumVarInfoCallback vcallback,
     _In_opt_ PVOID cbparam)
 {
-    ULONG_PTR   vLimit = (ULONG_PTR)hdr + hdr->vshdr.wLength;
+    ULONG_PTR   vLimit;
     PDWORD      value;
     DWORD       uZero = 0;
+    SIZE_T      hdrOffset;
+
+    if (hdr == NULL || vcallback == NULL || BasePtr == NULL)
+        return FALSE;
+
+    hdrOffset = (SIZE_T)((ULONG_PTR)hdr - (ULONG_PTR)BasePtr);
+    if (!IsRangeValid(BaseSize, hdrOffset, sizeof(IMGVARINFO)))
+        return FALSE;
+
+    if (!IsRangeValid(BaseSize, hdrOffset, hdr->vshdr.wLength))
+        return FALSE;
+
+    vLimit = (ULONG_PTR)hdr + hdr->vshdr.wLength;
 
     for (
-        // first child structure
+        /* first child structure */
         hdr = (PIMGVSTRING)ALIGN_UP_32((ULONG_PTR)hdr + sizeof(IMGVARINFO));
         (ULONG_PTR)hdr < vLimit;
         hdr = (PIMGVSTRING)ALIGN_UP_32((ULONG_PTR)hdr + hdr->vshdr.wLength))
     {
-        if (hdr->vshdr.wValueLength == 0)
+        hdrOffset = (SIZE_T)((ULONG_PTR)hdr - (ULONG_PTR)BasePtr);
+        if (!IsRangeValid(BaseSize, hdrOffset, sizeof(IMGVARINFO)))
+            return FALSE;
+
+        if (hdr->vshdr.wValueLength == 0) {
             value = &uZero;
-        else
-            value = (PDWORD)ALIGN_UP_32((ULONG_PTR)&hdr->szKey + (1 + wcslen(hdr->szKey)) * sizeof(WCHAR));
+        }
+        else {
+            SIZE_T valueOffset = (SIZE_T)((ULONG_PTR)&hdr->szKey - (ULONG_PTR)BasePtr);
+            SIZE_T nameChars = (SIZE_T)(1 + wcslen(hdr->szKey));
+            SIZE_T valuePtrOffset = valueOffset + nameChars * sizeof(WCHAR);
+            valuePtrOffset = (SIZE_T)ALIGN_UP_32((ULONG_PTR)valuePtrOffset);
+            if (!IsRangeValid(BaseSize, valuePtrOffset, sizeof(DWORD)))
+                return FALSE;
+            value = (PDWORD)RtlOffsetToPointer(BasePtr, (ULONG_PTR)valuePtrOffset);
+        }
 
         if (!vcallback(hdr->szKey, *value, cbparam))
             return FALSE;
@@ -52,25 +135,61 @@ BOOL PEImageEnumVarFileInfo(
     return TRUE;
 }
 
+/*
+* PEImageEnumStrings
+*
+* Purpose:
+*
+* Enumerate strings in the given module.
+*
+*/
 BOOL PEImageEnumStrings(
     _In_ PIMGVSTRING hdr,
+    _In_ PVOID BasePtr,
+    _In_ SIZE_T BaseSize,
     _In_ PEnumStringInfoCallback callback,
     _In_ PWCHAR langId,
     _In_opt_ PVOID cbparam)
 {
-    ULONG_PTR   vLimit = (ULONG_PTR)hdr + hdr->vshdr.wLength;
+    ULONG_PTR   vLimit;
     PWCHAR      value;
+    SIZE_T      hdrOffset;
+    SIZE_T      keyLenChars;
+
+    if (hdr == NULL || callback == NULL || BasePtr == NULL)
+        return FALSE;
+
+    hdrOffset = (SIZE_T)((ULONG_PTR)hdr - (ULONG_PTR)BasePtr);
+    if (!IsRangeValid(BaseSize, hdrOffset, sizeof(IMGSTRINGTABLE)))
+        return FALSE;
+
+    if (!IsRangeValid(BaseSize, hdrOffset, hdr->vshdr.wLength))
+        return FALSE;
+
+    vLimit = (ULONG_PTR)hdr + hdr->vshdr.wLength;
 
     for (
-        // first child structure
+        /* first child structure */
         hdr = (PIMGVSTRING)ALIGN_UP_32((ULONG_PTR)hdr + sizeof(IMGSTRINGTABLE));
         (ULONG_PTR)hdr < vLimit;
         hdr = (PIMGVSTRING)ALIGN_UP_32((ULONG_PTR)hdr + hdr->vshdr.wLength))
     {
-        if (hdr->vshdr.wValueLength == 0)
+        hdrOffset = (SIZE_T)((ULONG_PTR)hdr - (ULONG_PTR)BasePtr);
+        if (!IsRangeValid(BaseSize, hdrOffset, sizeof(IMGVARINFO)))
+            return FALSE;
+
+        if (hdr->vshdr.wValueLength == 0) {
             value = L"";
-        else
-            value = (PWCHAR)ALIGN_UP_32((ULONG_PTR)&hdr->szKey + (1 + wcslen(hdr->szKey)) * sizeof(WCHAR));
+        }
+        else {
+            keyLenChars = 1 + wcslen(hdr->szKey);
+            SIZE_T keyBytes = keyLenChars * sizeof(WCHAR);
+            SIZE_T valuePtrOffset = (SIZE_T)((ULONG_PTR)&hdr->szKey - (ULONG_PTR)BasePtr) + keyBytes;
+            valuePtrOffset = (SIZE_T)ALIGN_UP_32((ULONG_PTR)valuePtrOffset);
+            if (!IsRangeValid(BaseSize, valuePtrOffset, (SIZE_T)hdr->vshdr.wValueLength))
+                return FALSE;
+            value = (PWCHAR)RtlOffsetToPointer(BasePtr, (ULONG_PTR)valuePtrOffset);
+        }
 
         if (!callback(hdr->szKey, value, langId, cbparam))
             return FALSE;
@@ -79,20 +198,47 @@ BOOL PEImageEnumStrings(
     return TRUE;
 }
 
+/*
+* PEImageEnumStringFileInfo
+*
+* Purpose:
+*
+* Enumerate strings in version info in the given module.
+*
+*/
 BOOL PEImageEnumStringFileInfo(
     _In_ PIMGSTRINGTABLE hdr,
+    _In_ PVOID BasePtr,
+    _In_ SIZE_T BaseSize,
     _In_ PEnumStringInfoCallback callback,
     _In_opt_ PVOID cbparam)
 {
-    ULONG_PTR   vLimit = (ULONG_PTR)hdr + hdr->vshdr.wLength;
+    ULONG_PTR   vLimit;
+    SIZE_T      hdrOffset;
+
+    if (hdr == NULL || callback == NULL || BasePtr == NULL)
+        return FALSE;
+
+    hdrOffset = (SIZE_T)((ULONG_PTR)hdr - (ULONG_PTR)BasePtr);
+    if (!IsRangeValid(BaseSize, hdrOffset, sizeof(IMGSTRINGINFO)))
+        return FALSE;
+
+    if (!IsRangeValid(BaseSize, hdrOffset, hdr->vshdr.wLength))
+        return FALSE;
+
+    vLimit = (ULONG_PTR)hdr + hdr->vshdr.wLength;
 
     for (
-        // first child structure
+        /* first child structure */
         hdr = (PIMGSTRINGTABLE)ALIGN_UP_32((ULONG_PTR)hdr + sizeof(IMGSTRINGINFO));
         (ULONG_PTR)hdr < vLimit;
         hdr = (PIMGSTRINGTABLE)ALIGN_UP_32((ULONG_PTR)hdr + hdr->vshdr.wLength))
     {
-        if (!PEImageEnumStrings((PIMGVSTRING)hdr, callback, hdr->wIdKey, cbparam))
+        hdrOffset = (SIZE_T)((ULONG_PTR)hdr - (ULONG_PTR)BasePtr);
+        if (!IsRangeValid(BaseSize, hdrOffset, hdr->vshdr.wLength))
+            return FALSE;
+
+        if (!PEImageEnumStrings((PIMGVSTRING)hdr, BasePtr, BaseSize, callback, hdr->wIdKey, cbparam))
             return FALSE;
     }
 
@@ -114,12 +260,14 @@ VS_FIXEDFILEINFO* PEImageEnumVersionFields(
     _Inout_opt_ PVOID cbparam)
 {
     HGLOBAL     rPtr = NULL;
-    ULONG_PTR   vLimit, ids[3];
-
+    ULONG_PTR   ids[3];
     VS_FIXEDFILEINFO* vinfo = NULL;
     PIMGVSVERSIONINFO   hdr;
     NTSTATUS status;
     SIZE_T dataSz = 0;
+    ULONG_PTR vLimit;
+    SIZE_T baseSize = 0;
+    PVOID basePtr = NULL;
 
     if (!scallback)
         return NULL;
@@ -140,9 +288,16 @@ VS_FIXEDFILEINFO* PEImageEnumVersionFields(
             NULL);
 
         if (NT_SUCCESS(status)) {
-            // root structure
             hdr = (PIMGVSVERSIONINFO)rPtr;
-            if (hdr == NULL || dataSz < sizeof(IMGVSVERSIONINFO))
+            basePtr = rPtr;
+            baseSize = dataSz;
+
+            if (hdr == NULL || dataSz < sizeof(IMGVSVERSIONINFO)) {
+                __leave;
+            }
+
+            /* validate root header length */
+            if (!IsRangeValid(baseSize, 0, hdr->vshdr.wLength))
                 __leave;
 
             vLimit = (ULONG_PTR)hdr + hdr->vshdr.wLength;
@@ -151,19 +306,26 @@ VS_FIXEDFILEINFO* PEImageEnumVersionFields(
                 vinfo = (VS_FIXEDFILEINFO*)((ULONG_PTR)hdr + sizeof(IMGVSVERSIONINFO));
 
             for (
-                // first child structure
+                /* first child structure */
                 hdr = (PIMGVSVERSIONINFO)ALIGN_UP_32((ULONG_PTR)hdr + hdr->vshdr.wValueLength + sizeof(IMGVSVERSIONINFO));
                 (ULONG_PTR)hdr < vLimit;
                 hdr = (PIMGVSVERSIONINFO)ALIGN_UP_32((ULONG_PTR)hdr + hdr->vshdr.wLength))
             {
+                SIZE_T hdrOffset = (SIZE_T)((ULONG_PTR)hdr - (ULONG_PTR)basePtr);
+                if (!IsRangeValid(baseSize, hdrOffset, sizeof(IMGVSVERSIONINFO)))
+                    break;
+
+                if (!IsRangeValid(baseSize, hdrOffset, hdr->vshdr.wLength))
+                    break;
+
                 if (_strcmp(hdr->wIdString, L"StringFileInfo") == 0) {
-                    if (!PEImageEnumStringFileInfo((PIMGSTRINGTABLE)hdr, scallback, cbparam))
+                    if (!PEImageEnumStringFileInfo((PIMGSTRINGTABLE)hdr, basePtr, baseSize, scallback, cbparam))
                         break;
                 }
 
                 if (vcallback) {
                     if ((_strcmp(hdr->wIdString, L"VarFileInfo") == 0)) {
-                        if (!PEImageEnumVarFileInfo((PIMGVSTRING)hdr, vcallback, cbparam))
+                        if (!PEImageEnumVarFileInfo((PIMGVSTRING)hdr, basePtr, baseSize, vcallback, cbparam))
                             break;
                     }
                 }
@@ -176,7 +338,7 @@ VS_FIXEDFILEINFO* PEImageEnumVersionFields(
     __finally {
         if (AbnormalTermination()) {
             SetLastError((DWORD)STATUS_ACCESS_VIOLATION);
-            return NULL;
+            vinfo = NULL;
         }
     }
 
@@ -194,62 +356,51 @@ VS_FIXEDFILEINFO* PEImageEnumVersionFields(
 PSTRING_PTR EnumImageStringsW(
     _In_ PVOID heapHandle,
     _In_ PWCHAR buffer,
-    _In_ ULONG size
+    _In_ ULONG sizeBytes
 )
 {
-    ULONG       pos = 0, startPos, strSize;
-    WCHAR       c;
-    PSTRING_PTR newPtr, lastPtr = NULL, head = NULL;
+    if (heapHandle == NULL || buffer == NULL || sizeBytes < sizeof(WCHAR))
+        return NULL;
 
-    while (size > 0)
-    {
-        c = buffer[pos];
-        startPos = pos;
-        ++pos;
-        size -= sizeof(WCHAR);
+    SIZE_T unitCount = sizeBytes / sizeof(WCHAR);
+    PWCHAR p = buffer;
+    PWCHAR end = buffer + unitCount;
 
-        if (((c >= L'A') && (c <= L'Z')) ||
-            ((c >= L'a') && (c <= L'z')) ||
-            ((c >= L'0') && (c <= L'9')) ||
-            (c == L'(') || (c == L'<') || (c == L'\"') || (c == L'.') ||
-            (c == L'%') || (c == L'{') || (c == L'\\') || (c == L'@'))
-        {
-            while (size > 0)
-            {
-                c = buffer[pos];
+    PSTRING_PTR head = NULL, last = NULL;
 
-                if (!(((c >= 0x20) && (c <= 0x7f)) ||
-                    (c == L'\r') ||
-                    (c == L'\n') ||
-                    (c == L'\t')))
-                    break;
+    while (p < end) {
+        WCHAR c = *p;
+        if (!IsWideStartChar(c)) {
+            ++p;
+            continue;
+        }
 
-                if ((pos - startPos) >= 255)
-                    break;
+        PWCHAR startPtr = p;
+        SIZE_T len = 1;
+        PWCHAR q = p + 1;
+        while (q < end && len < IMGSCOPE_MAX_EXTRACTED_STR) {
+            WCHAR cc = *q;
+            if (!IsWideContinueChar(cc))
+                break;
+            ++q;
+            ++len;
+        }
 
-                ++pos;
-                size -= sizeof(WCHAR);
-            }
-
-            strSize = pos - startPos;
-
-            if (strSize > 2)
-            {
-                newPtr = RtlAllocateHeap(heapHandle, HEAP_ZERO_MEMORY, sizeof(STRING_PTR));
-                if (newPtr) {
-                    newPtr->length = strSize;
-                    newPtr->pnext = NULL;
-                    newPtr->ofpstr = startPos * sizeof(WCHAR);
-
-                    if (lastPtr != NULL)
-                        lastPtr->pnext = newPtr;
-                    else
-                        head = newPtr;
-
-                    lastPtr = newPtr;
-                }
+        if (len > 2) {
+            PSTRING_PTR node = RtlAllocateHeap(heapHandle, HEAP_ZERO_MEMORY, sizeof(STRING_PTR));
+            if (node) {
+                node->length = (ULONG)len;
+                node->pnext = NULL;
+                node->ofpstr = (ULONG)((ULONG_PTR)(startPtr - buffer) * sizeof(WCHAR));
+                if (last)
+                    last->pnext = node;
+                else
+                    head = node;
+                last = node;
             }
         }
+
+        p = (q > p) ? q : p + 1;
     }
 
     return head;
@@ -269,59 +420,47 @@ PSTRING_PTR EnumImageStringsA(
     _In_ ULONG size
 )
 {
-    ULONG       pos = 0, startPos, strSize;
-    UCHAR       c;
-    PSTRING_PTR newPtr, lastPtr = NULL, head = NULL;
+    if (heapHandle == NULL || buffer == NULL || size == 0)
+        return NULL;
 
-    while (size > 0)
-    {
-        c = buffer[pos];
-        startPos = pos;
-        ++pos;
-        --size;
+    PCHAR p = buffer;
+    PCHAR end = buffer + size;
 
-        if (((c >= 'A') && (c <= 'Z')) ||
-            ((c >= 'a') && (c <= 'z')) ||
-            ((c >= '0') && (c <= '9')) ||
-            (c == '(') || (c == '<') || (c == '\"') || (c == '.') ||
-            (c == '%') || (c == '{') || (c == '\\') || (c == '@'))
-        {
-            while (size > 0)
-            {
-                c = buffer[pos];
+    PSTRING_PTR head = NULL, last = NULL;
 
-                if (!(((c >= 0x20) && (c <= 0x7f)) ||
-                    (c == '\r') ||
-                    (c == '\n') ||
-                    (c == '\t')))
-                    break;
+    while (p < end) {
+        UCHAR c = (UCHAR)*p;
+        if (!IsAnsiStartChar(c)) {
+            ++p;
+            continue;
+        }
 
-                if ((pos - startPos) >= 255)
-                    break;
+        PCHAR startPtr = p;
+        SIZE_T len = 1;
+        PCHAR q = p + 1;
+        while (q < end && len < IMGSCOPE_MAX_EXTRACTED_STR) {
+            UCHAR cc = (UCHAR)*q;
+            if (!IsAnsiContinueChar(cc))
+                break;
+            ++q;
+            ++len;
+        }
 
-                ++pos;
-                --size;
-            }
-
-            strSize = pos - startPos;
-
-            if (strSize > 2)
-            {
-                newPtr = RtlAllocateHeap(heapHandle, HEAP_ZERO_MEMORY, sizeof(STRING_PTR));
-                if (newPtr) {
-                    newPtr->length = strSize;
-                    newPtr->pnext = NULL;
-                    newPtr->ofpstr = startPos;
-
-                    if (lastPtr != NULL)
-                        lastPtr->pnext = newPtr;
-                    else
-                        head = newPtr;
-
-                    lastPtr = newPtr;
-                }
+        if (len > 2) {
+            PSTRING_PTR node = RtlAllocateHeap(heapHandle, HEAP_ZERO_MEMORY, sizeof(STRING_PTR));
+            if (node) {
+                node->length = (ULONG)len;
+                node->pnext = NULL;
+                node->ofpstr = (ULONG)(startPtr - buffer);
+                if (last)
+                    last->pnext = node;
+                else
+                    head = node;
+                last = node;
             }
         }
+
+        p = (q > p) ? q : p + 1;
     }
 
     return head;

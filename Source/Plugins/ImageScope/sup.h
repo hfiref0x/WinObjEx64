@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020 - 2022
+*  (C) COPYRIGHT AUTHORS, 2020 - 2025
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     1.10
+*  VERSION:     1.11
 *
-*  DATE:        15 Jun 2022
+*  DATE:        22 Aug 2025
 *
 *  Common header file for the plugin support routines.
 *
@@ -40,8 +40,7 @@ BOOL supSaveDialogExecute(
 BOOL supListViewExportToFile(
     _In_ LPWSTR FileName,
     _In_ HWND WindowHandle,
-    _In_ HWND ListView,
-    _In_ INT ColumnCount);
+    _In_ HWND ListView);
 
 VOID supStatusBarSetText(
     _In_ HWND hwndStatusBar,
@@ -76,12 +75,6 @@ BOOL supListViewAddCopyValueItem(
     _In_ POINT* lpPoint,
     _Out_ INT* pItemHit,
     _Out_ INT* pColumnHit);
-
-void supCopyMemory(
-    _Inout_ void* dest,
-    _In_ size_t cbdest,
-    _In_ const void* src,
-    _In_ size_t cbsrc);
 
 LPWSTR supGetItemText(
     _In_ HWND ListView,

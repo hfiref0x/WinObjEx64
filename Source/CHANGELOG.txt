@@ -1,21 +1,25 @@
+v2.0.9
+internal rearrangement
+updated RTLs (ntos, ntsup, treelist)
+
 v2.0.8
-fixed various spelling errors throughout the codebase and documentation 
-plugins have been upgraded to the new interface version, improving compatibility and extensibility 
-fixed memory leaks in several plugins and addressed application-wide memory leaks 
-performed internal refactoring for objects management, which should theoretically improve performance 
-optimized the process tree view, resulting in better performance for the process list dialog, especially with large process sets 
-improved Authenticode hash calculations, adding better padding logic and enhanced error handling 
-updated the object search dialog logic for better handling of large/big search queries 
-updated the MSVC compiler versions database for more accurate build/version reporting 
-updated RTLs (ntos, ntsup, ntldr, tabctrl, symparser) to their latest versions for improved stability and feature support 
-support Vista again (limited set of features), as per feature request #44 
+fixed various spelling errors throughout the codebase and documentation
+plugins have been upgraded to the new interface version, improving compatibility and extensibility
+fixed memory leaks in several plugins and addressed application-wide memory leaks
+performed internal refactoring for object management, which should theoretically improve performance
+optimized the process tree view, resulting in better performance for the process list dialog, especially with large process sets
+improved Authenticode hash calculations, adding better padding logic and enhanced error handling
+updated the object search dialog logic for better handling of large/big search queries
+updated the MSVC compiler versions database for more accurate build/version reporting
+updated RTLs (ntos, ntsup, ntldr, tabctrl, symparser) to their latest versions for improved stability and feature support
+support Vista again (limited set of features), as per feature request #44
 
 v2.0.7
 win11 24h2 compatibility improvements
 
 v2.0.6
 win11 24h2/25h2 compatibility improvements
-rtls updated
+RTLs updated
 
 v2.0.5
 added Pnp manager callbacks
@@ -24,10 +28,10 @@ win11 22h2/23h2/24h2 compatibility improvements
 v2.0.4
 win11 23h2 compatibility
 win11+ 24h2 compatibility improvements
-fix tooltip flickering for drivers list
-fix log ui highlight glitch
-fix authenticode hash missing pad bytes (in some cases)
-driver list tooltip now include information if the given driver is registered as filter (admin priv. required)
+fixed tooltip flickering for drivers list
+fixed log UI highlight glitch
+fixed Authenticode hash missing pad bytes (in some cases)
+driver list tooltip now includes information if the given driver is registered as filter (admin priv. required)
 
 v2.0.3
 recent win11 compatibility improvements
@@ -51,54 +55,54 @@ added program statistics (see Help->Statistics)
 added legend window description for process list
 added ability to fix image sections for dumped drivers
 added RegistryTransaction object view and access rights
-moved "Globals" from about box to the View->System Information and rearranged it output
+moved "Globals" from about box to the View->System Information and rearranged its output
 drivers dump operation can now be cancelled
-fix display of PUNICODE_STRING dump
-fix ALPC Port type objects sometimes unable to open while they can be opened
-plugin sdk updated to accommodate new named objects handling 
-imagescope plugin updated to accomodate plugin sdk changes
-elevation required features in "extras" will now request elevation instead of just been disabled
+fixed display of PUNICODE_STRING dump
+fixed ALPC Port type objects sometimes unable to open while they can be opened
+plugin SDK updated to accommodate new named objects handling 
+imagescope plugin updated to accommodate plugin SDK changes
+elevation required features in "extras" will now request elevation instead of just being disabled
 help file updated with drivers and symbols usage
-internal rearrange and minor UI changes
+internal rearrangement and minor UI changes
 
 v1.9.3
 updated SeCiCallbacks search for newest Windows versions
 added Windows Server 2022 support
-fix win32k ApiSet resolving for Win10 21H2
-fix ObCallbacks enumeration issues
+fixed win32k ApiSet resolving for Win10 21H2
+fixed ObCallbacks enumeration issues
 support for various kernel driver helpers
 ported to msvc 2022 (with backward compatibility to 2019)
 bugfixes
-rtls updated
+RTLs updated
 
 v1.9.2
 more Win10/11 21h2 compatibility changes
 added FLT_FILTER, FLT_OBJECT structured dump
-added authenticode hash calculation for loaded drivers (extras->Drivers, use popup menu on driver entry)
+added Authenticode hash calculation for loaded drivers (extras->Drivers, use popup menu on driver entry)
 added coalescing callbacks to callbacks list
 various minor UI changes
-fix misbehavior with recent wine staging 6.x
-internal rearrange
-rtls updated
+fixed misbehavior with recent Wine staging 6.x
+internal rearrangement
+RTLs updated
 
 v1.9.1
 21h2 compatibility improvements
-rtls updated
+RTLs updated
 
 v1.9.0
 added Section object structured dump
 added ALPC port connections list (similar to !alpc /lpc windbg command)
 added MmUnloadedDrivers list
 added ExCreateCallback list to the callbacks list (PR #26)
-updated ApiSet plugin now support in place search filter
-internal rearrange
+updated ApiSet plugin now supports in-place search filter
+internal rearrangement
 
 v1.8.8
-internal rearrange
+internal rearrangement
 view security for alpc ports (most of them)
 security descriptor view dialog (object sid, dacl & sacl)
-fix scm services list query
-fix "jump to file may fail under certain conditions" bug
+fixed SCM services list query
+fixed "jump to file may fail under certain conditions" bug
 various minor UI changes
 21h1 compatibility improvements
 
@@ -110,38 +114,38 @@ plugins system extended and upgraded to support context plugins
 added imagescope plugin for section object types backed by imagefile
 added plugins viewer
 various minor changes
-treelist: fix tooltips flickering on Windows 7
-turn off Spectre nonsense
-rtls update
+treelist: fixed tooltips flickering on Windows 7
+turned off Spectre nonsense
+RTLs updated
 
 v1.8.6
 reimplemented directory object dump to output more data
 added callbacks registered with ExRegisterExtension
-fix for pipes (PR #17)
-internal rearrange
-fix high cpu usage for splitter drag (report/fix by RamMerlabs) 
-fix security dialog regression (reported by RamMerlabs) 
+fixed for pipes (PR #17)
+internal rearrangement
+fixed high CPU usage for splitter drag (report/fix by RamMerlabs) 
+fixed security dialog regression (reported by RamMerlabs) 
 
 v1.8.5
-fix object cookie
-add error log
+fixed object cookie
+added error log
 20h1/20h2 compatibility improvements
 
 v1.8.4
 support of additional helper driver
-fix Windows 7 regressions
+fixed Windows 7 regressions
 
 v1.8.3
-internal rearrange
+internal rearrangement
 ported to msvc 2019 (with backward compatibility to 2017)
-fix current directory value for elevated/system re-launch (reported by RamMerlabs)
+fixed current directory value for elevated/system re-launch (reported by RamMerlabs)
 
 v1.8.2
 added Token object properties
 added PsAltSystemCallHandlers to callbacks dialog
-fix High DPI issues
-fix Pipe security dialog not shown where available
-fix multiple Wine/Wine Staging misbehavior
+fixed High DPI issues
+fixed Pipe security dialog not shown where available
+fixed multiple Wine/Wine Staging misbehavior
 corrected typo in DebugObject description
 more 20H1 support changes
 various minor changes
@@ -160,7 +164,7 @@ added ApiSetView plugin - ApiSetSchema viewer (supported v2, v4, v6)
 v1.7.4
 added software licensing cache view (extras)
 resolve apisets while viewing shadow table in Windows 10 20H1 >= 18890 builds
-fix displaying sid user/domain information for private namespaces
+fixed displaying sid user/domain information for private namespaces
 added refresh (f5) for private namespace dialog
 
 v1.7.3
@@ -177,7 +181,7 @@ added and updated more object type descriptions
 
 v1.7.1
 SeCiCallbacks/g_CiCallbacks, DbgkLmdCallbacks added to the callbacks viewer
-Session object view and access rights, merge pull request #8 #9
+Session object view and access rights, merged pull request #8 #9
 fixed regression added in 1.7.0
 treelist updated
 
@@ -193,15 +197,15 @@ reimplemented service tables extraction code
 v1.6.0
 ported to msvc 2017 (with backward compatibility to 2015)
 reimplemented private namespaces lookup
-object directory dump reflect Win10 changes
+object directory dump reflects Win10 changes
 added alpc port dump and additional dialog
 treelist control updated
 private namespaces dialog updated
 usershareddata dialog updated
-internal rearrange
-merge pull request #7, fix Job object process list display
+internal rearrangement
+merged pull request #7, fixed Job object process list display
 multiple Wine Staging fixes
-rtls updated 
+RTLs updated 
 
 v1.5.5
 tweaked PTL display
@@ -213,7 +217,7 @@ v1.5.3
 OpenWindowStation fix
 
 v1.5.2
-internal rearrange
+internal rearrangement
 
 v1.5.1
 bugfixes
@@ -225,24 +229,24 @@ added file properties for drivers (menu -> extras -> Drivers)
 added FltConnectionPort object dump
 switched to hde instead of ldasm
 fixed Wine behavior along with some bugs
-rtls updated, switched to VS2015 U3
+RTLs updated, switched to VS2015 U3
 note: Windows 10 RS2 (15063), RS1 (14393) supported as well as TH1(10240)/TH2(10586), RS3 supported (16288+ build)
 
-v 1.4.0
+v1.4.0
 drivers list and dump (menu -> extras)
 kiservicetable dump for all supported Windows versions
 some code revision and corrections
 
-v 1.3.0
+v1.3.0
 official support for Windows 10
 private namespaces (menu -> extras)
 
-v 1.2.0
+v1.2.0
 added KUSER_SHARED_DATA dump (menu -> extras)
 code revision and corrections
 ported to msvc 2015
 
-v 1.1.0
+v1.1.0
 added popup menu for Process page 
 added file properties dialog for Process page 
 added descriptions for more object types 
@@ -250,5 +254,5 @@ added named pipes dialog (menu -> extras)
 added information for IoCompletion object type, including structured object body dump2 
 some code revision and corrections 
 
-v 1.0.0 (Feb 23, 2015)
+v1.0.0 (Feb 23, 2015)
 initial release

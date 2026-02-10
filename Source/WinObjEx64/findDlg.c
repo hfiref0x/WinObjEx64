@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2025
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       FINDDLG.C
 *
-*  VERSION:     2.09
+*  VERSION:     2.10
 *
-*  DATE:        22 Aug 2025
+*  DATE:        10 Feb 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -899,10 +899,26 @@ VOID FindDlgCreate(
     VOID
 )
 {
-    if (!FindDialogThreadHandle) {
-        RtlSecureZeroMemory(&g_FindDlgContext, sizeof(g_FindDlgContext));
-        FindDialogThreadHandle = supCreateDialogWorkerThread(FindpDlgWorkerThread, NULL, 0);
-        if (FindDialogThreadHandle) 
-            supWaitForFastEvent(&FindDialogInitializedEvent, NULL);
+    HANDLE hThread;
+
+    if (FindDialogThreadHandle)
+        return;
+
+    RtlSecureZeroMemory(&g_FindDlgContext, sizeof(g_FindDlgContext));
+    hThread = supCreateDialogWorkerThread(FindpDlgWorkerThread, NULL, 0);
+    if (hThread) {
+
+        if (InterlockedCompareExchangePointer(&FindDialogThreadHandle,
+            hThread,
+            NULL) != NULL)
+        {
+            //
+            // Another instance already created, close duplicate.
+            //
+            NtClose(hThread);
+            return;
+        }
+
+        supWaitForFastEvent(&FindDialogInitializedEvent, NULL);
     }
 }

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2025
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     2.09
+*  VERSION:     2.10
 *
-*  DATE:        13 Aug 2025
+*  DATE:        10 Feb 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -41,7 +41,7 @@ VOID AboutDialogInit(
 
     FIRMWARE_TYPE firmwareType;
 
-    SetDlgItemText(hwndDlg, ID_ABOUT_PROGRAM, PROFRAM_NAME_AND_TITLE);
+    SetDlgItemText(hwndDlg, ID_ABOUT_PROGRAM, PROGRAM_NAME_AND_TITLE);
 
     RtlStringCchPrintfSecure(szBuffer,
         MAX_PATH,

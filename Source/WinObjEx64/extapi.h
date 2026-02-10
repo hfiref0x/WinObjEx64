@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       EXTAPI.H
 *
-*  VERSION:     2.00
+*  VERSION:     2.10
 *
-*  DATE:        19 Jun 2022
+*  DATE:        10 Feb 2026
 *
 *  Header for pre Windows 10+ missing API.
 *
@@ -53,6 +53,9 @@ typedef UINT (WINAPI *pfnGetDpiForWindow)(
 typedef UINT (WINAPI *pfnGetDpiForSystem)(
     VOID);
 
+//
+// Only actual number of functions included in the EXTENDED_API_SET structure.
+//
 #define EXTAPI_ALL_MAPPED 7
 
 typedef struct _EXTENDED_API_SET {

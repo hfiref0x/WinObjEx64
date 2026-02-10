@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2025
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       SUP.C
 *
 *  VERSION:     2.10
 *
-*  DATE:        03 Oct 2025
+*  DATE:        10 Feb 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -245,7 +245,7 @@ PVOID supHeapReAlloc(
     if (Memory != NULL) {
         return RtlReAllocateHeap(g_obexHeap, HEAP_ZERO_MEMORY, Memory, Size);
     }
-    return RtlAllocateHeap(g_obexHeap, HEAP_ZERO_MEMORY, Size);
+    return supHeapAllocEx(g_obexHeap, Size);
 }
 
 /*

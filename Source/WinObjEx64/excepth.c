@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       EXCEPTH.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.10
 *
-*  DATE:        19 Jun 2022
+*  DATE:        10 Feb 2026
 *
 *  Exception handler routines.
 *
@@ -95,26 +95,41 @@ VOID exceptShowException(
     _In_ BOOL LastChance
 )
 {
-    WCHAR szFileName[300];
-    WCHAR szMessage[1000];
+    WCHAR szFileName[MAX_PATH * 2];
+    WCHAR szMessage[2048];
+    LPWSTR lpDescription;
 
     RtlSecureZeroMemory(&szMessage, sizeof(szMessage));
-    _strcpy(szMessage, TEXT("Sorry, exception occurred at address: \r\n0x"));
-    u64tohex((ULONG_PTR)ExceptionPointers->ExceptionRecord->ExceptionAddress, _strend(szMessage));
+    RtlSecureZeroMemory(&szFileName, sizeof(szFileName));
+
+    RtlStringCchPrintfSecure(szMessage,
+        RTL_NUMBER_OF(szMessage),
+        TEXT("Sorry, exception occured at address: \r\n0x%llX"),
+        (ULONG_PTR)ExceptionPointers->ExceptionRecord->ExceptionAddress);
 
     if (ExceptionPointers->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {
         switch (ExceptionPointers->ExceptionRecord->ExceptionInformation[0]) {
         case 0:
-            _strcat(szMessage, TEXT("\r\n\nAttempt to read at address: \r\n0x"));
+            lpDescription = TEXT("read");
             break;
         case 1:
-            _strcat(szMessage, TEXT("\r\n\nAttempt to write at address: \r\n0x"));
+            lpDescription = TEXT("write");
+            break;
+        case 8:
+            lpDescription = TEXT("execute");
+            break;
+        default:
+            lpDescription = TEXT("access");
             break;
         }
-        u64tohex(ExceptionPointers->ExceptionRecord->ExceptionInformation[1], _strend(szMessage));
+
+        RtlStringCchPrintfSecure(_strend(szMessage),
+            RTL_NUMBER_OF(szMessage) - _strlen(szMessage),
+            TEXT("\r\n\nAttempt to %ws at address: \r\n0x%llX"),
+            lpDescription,
+            ExceptionPointers->ExceptionRecord->ExceptionInformation[1]);
     }
 
-    RtlSecureZeroMemory(szFileName, sizeof(szFileName));
     GetCurrentDirectory(MAX_PATH, szFileName);
     _strcat(szFileName, TEXT("\\WinObjEx64."));
     ultostr(GetCurrentProcessId(), _strend(szFileName));
@@ -124,14 +139,15 @@ VOID exceptShowException(
 
     if (exceptWriteDump(ExceptionPointers, szFileName)) {
 
-        _strcat(szMessage, TEXT("\r\n\nMinidump saved to "));
-        _strcat(szMessage, szFileName);
-
+        RtlStringCchPrintfSecure(_strend(szMessage),
+            RTL_NUMBER_OF(szMessage) - _strlen(szMessage),
+            TEXT("\r\n\nMinidump saved to %ws"),
+            szFileName);
     }
     else {
         _strcat(szMessage, TEXT("\r\nAnd there is an error while saving minidump :("));
     }
-    if (LastChance) 
+    if (LastChance)
         _strcat(szMessage, TEXT("\r\n\nThe program will be terminated."));
 
     MessageBox(0, szMessage, NULL, MB_ICONERROR);

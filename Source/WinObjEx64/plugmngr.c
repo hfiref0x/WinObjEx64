@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2025
+*  (C) COPYRIGHT AUTHORS, 2019 - 2026
 *
 *  TITLE:       PLUGMNGR.C
 *
-*  VERSION:     2.09
+*  VERSION:     2.10
 *
-*  DATE:        22 Aug 2025
+*  DATE:        10 Feb 2026
 *
 *  Plugin manager.
 *
@@ -85,14 +85,23 @@ VOID PmpReportInvalidPlugin(
 {
     LPWSTR lpCombined;
     SIZE_T cbSize;
+    SIZE_T cchFileName;
 
-    cbSize = (MAX_PATH + _strlen(lpszPluginFileName)) * sizeof(WCHAR);
+    static const WCHAR szPrefix[] = TEXT("File ");
+    static const WCHAR szSuffix[] = TEXT(" is not a valid WinObjEx64 plugin");
+
+    cchFileName = _strlen(lpszPluginFileName);
+
+    cbSize = (RTL_NUMBER_OF(szPrefix) - 1 +
+        cchFileName +
+        RTL_NUMBER_OF(szSuffix) - 1 +
+        1) * sizeof(WCHAR);
 
     lpCombined = (LPWSTR)supHeapAlloc(cbSize);
     if (lpCombined) {
-        _strcpy(lpCombined, TEXT("File "));
+        _strcpy(lpCombined, szPrefix);
         _strcat(lpCombined, lpszPluginFileName);
-        _strcat(lpCombined, TEXT(" is not a valid WinObjEx64 plugin"));
+        _strcat(lpCombined, szSuffix);
         logAdd(EntryTypeInformation, lpCombined);
         supHeapFree(lpCombined);
     }
@@ -845,6 +854,11 @@ VOID PmBuildPluginPopupMenuByObjectType(
     MENUITEMINFO menuItem;
 
     ptrHead = &g_PluginsListHead;
+
+    ASSERT_LIST_ENTRY_VALID(ptrHead);
+    if (IsListEmpty(ptrHead))
+        return;
+
     ptrNext = ptrHead->Flink;
     while ((ptrNext != NULL) && (ptrNext != ptrHead)) {
         pluginEntry = CONTAINING_RECORD(ptrNext, WINOBJEX_PLUGIN_INTERNAL, ListEntry);

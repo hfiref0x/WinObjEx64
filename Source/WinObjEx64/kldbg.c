@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2025
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
 *  VERSION:     2.10
 *
-*  DATE:        19 Nov 2025
+*  DATE:        10 Feb 2026
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -1003,14 +1003,15 @@ BOOLEAN kdDumpUnicodeString(
     if (IsKernelPointer) {
 
         RtlInitEmptyUnicodeString(&string, NULL, 0);
-        if (kdReadSystemMemoryEx((ULONG_PTR)InputString,
+        if (!kdReadSystemMemoryEx((ULONG_PTR)InputString,
             &string,
             sizeof(UNICODE_STRING),
             &readBytes))
         {
-            if (readBytes != sizeof(UNICODE_STRING))
-                return FALSE;
+            return FALSE;
         }
+        if (readBytes != sizeof(UNICODE_STRING))
+            return FALSE;
     }
     else {
         string = *InputString;

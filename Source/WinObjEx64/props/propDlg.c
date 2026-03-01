@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       PROPDLG.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.10
 *
-*  DATE:        19 Jun 2022
+*  DATE:        22 Feb 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -548,8 +548,6 @@ INT propCreatePages(
     HPROPSHEETPAGE hSecurityPage;
 
     IsDriverAssisted = kdConnectDriver();
-
-    nPages = 0;
     RtlSecureZeroMemory(PropPages, sizeof(PropPages));
 
     //

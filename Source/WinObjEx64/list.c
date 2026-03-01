@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2025
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       LIST.C
 *
 *  VERSION:     2.10
 *
-*  DATE:        03 Oct 2025
+*  DATE:        20 Feb 2026
 *
 *  Program main object listing and search logic.
 *
@@ -382,9 +382,6 @@ VOID xxxListObjectDirectoryTree(
         return;
     }
 
-    // Suspend tree redraw for batch operations
-    supDisableRedraw(g_hwndObjectTree);
-
     __try {
         do {
             directoryEntry = ObQueryObjectDirectory(directoryHandle, &queryContext, g_WinObj.IsWine, &rLength);
@@ -407,7 +404,6 @@ VOID xxxListObjectDirectoryTree(
     }
     __finally {
         NtClose(directoryHandle);
-        supEnableRedraw(g_hwndObjectTree);
     }
 }
 
@@ -426,8 +422,12 @@ VOID ListObjectDirectoryTree(
 )
 {
     ListHeapCreate(&TreeObjectsHeap);
-    if (TreeObjectsHeap)
+    if (TreeObjectsHeap) {
+        // Suspend tree redraw for batch operations
+        supDisableRedraw(g_hwndObjectTree);
         xxxListObjectDirectoryTree(TreeObjectsHeap, SubDirName, RootHandle, ViewRootHandle, NULL);
+        supEnableRedraw(g_hwndObjectTree);
+    }
 }
 
 /*

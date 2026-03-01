@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.10
 *
-*  DATE:        10 Feb 2026
+*  DATE:        01 Mar 2026
 *
 *  Common header file for the user interface.
 *
@@ -50,7 +50,7 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 #define PROGRAM_MAJOR_VERSION       2
 #define PROGRAM_MINOR_VERSION       1
 #define PROGRAM_REVISION_NUMBER     0
-#define PROGRAM_BUILD_NUMBER        2602
+#define PROGRAM_BUILD_NUMBER        2603
 
 #ifdef _USE_OWN_DRIVER
 #define PROGRAM_NAME            L"Windows Object Explorer 64-bit (Non-public version)"

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2025
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       MAIN.C
 *
 *  VERSION:     2.10
 *
-*  DATE:        20 Nov 2025
+*  DATE:        20 Feb 2026
 *
 *  Program entry point and main window handler.
 *
@@ -64,7 +64,7 @@ VOID guiExtrasDisableAdminFeatures(
     mii.fState = MFS_DISABLED;
 
     //
-    // These features are not unsupported in Wine.
+    // These features are not supported in Wine.
     //
     if (g_WinObj.IsWine) {
         SetMenuItemInfo(hExtrasSubMenu, ID_EXTRAS_CALLBACKS, FALSE, &mii);

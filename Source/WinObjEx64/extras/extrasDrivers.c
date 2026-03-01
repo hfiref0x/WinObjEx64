@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.10
 *
-*  DATE:        12 Jan 2026
+*  DATE:        22 Feb 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -652,8 +652,8 @@ DWORD DumpDialogWorkerThread(
 
     if (dumpInfo->Buffer) {
         supHeapFree(dumpInfo->Buffer);
-        supHeapFree(dumpInfo);
     }
+    supHeapFree(dumpInfo);
 
     supResetFastEvent(&DumpDialogInitializedEvent);
 

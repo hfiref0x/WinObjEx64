@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2022
+*  (C) COPYRIGHT AUTHORS, 2022 - 2026
 *
 *  TITLE:       SYNC.C
 *
-*  VERSION:     2.00
+*  VERSION:     2.10
 *
-*  DATE:        19 Jun 2022
+*  DATE:        19 Feb 2026
 *
 *  Synchronization primitives.
 * 
@@ -155,6 +155,7 @@ BOOLEAN supWaitForFastEvent(
     BOOLEAN result;
     ULONG_PTR value;
     HANDLE eventHandle;
+    NTSTATUS ntStatus;
 
     value = Event->Value;
     if (value & FAST_EVENT_SET)
@@ -168,8 +169,12 @@ BOOLEAN supWaitForFastEvent(
 
     if (eventHandle == NULL) {
 
-        NtCreateEvent(&eventHandle, EVENT_ALL_ACCESS, NULL, NotificationEvent, FALSE);
-        assert(eventHandle);
+        ntStatus = NtCreateEvent(&eventHandle, EVENT_ALL_ACCESS, NULL, NotificationEvent, FALSE);
+
+        if (!NT_SUCCESS(ntStatus) || (eventHandle == NULL)) {
+            supDereferenceFastEvent(Event, NULL);
+            return FALSE;
+        }
 
         if (NULL != _InterlockedCompareExchangePointer(
             &Event->EventHandle,
@@ -179,7 +184,6 @@ BOOLEAN supWaitForFastEvent(
             NtClose(eventHandle);
             eventHandle = Event->EventHandle;
         }
-
     }
 
     if (!(Event->Value & FAST_EVENT_SET)) {

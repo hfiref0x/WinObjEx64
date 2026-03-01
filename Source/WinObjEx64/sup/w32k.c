@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2023 - 2025
+*  (C) COPYRIGHT AUTHORS, 2023 - 2026
 *
 *  TITLE:       W32K.C
 *
 *  VERSION:     2.10
 *
-*  DATE:        03 Oct 2025
+*  DATE:        20 Feb 2026
 *
 *  Win32k syscall table actual handlers resolving routines.
 *
@@ -55,9 +55,9 @@ BOOL CALLBACK ApiSetSearchPatternCallback(
     _In_ PVOID CallbackContext
 )
 {
+    PSDT_SEARCH_CONTEXT context = (PSDT_SEARCH_CONTEXT)CallbackContext;
     UNREFERENCED_PARAMETER(PatternSize);
 
-    PSDT_SEARCH_CONTEXT context = (PSDT_SEARCH_CONTEXT)CallbackContext;
     context->Result = Buffer;
 
     return TRUE;

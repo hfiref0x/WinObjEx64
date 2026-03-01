@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.10
 *
-*  DATE:        10 Feb 2026
+*  DATE:        27 Feb 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -16,16 +16,14 @@
 *******************************************************************************/
 #include "global.h"
 
-// Define custom message for search completion
 #define WM_FINDOBJECT_SEARCHCOMPLETE (WM_USER + 100)
 
-// Search parameters structure
 typedef struct _FIND_SEARCH_PARAMS {
     HWND hwndDlg;
     BOOLEAN UseName;
     BOOLEAN UseType;
-    WCHAR NameString[MAX_PATH * 2];
-    WCHAR TypeString[MAX_PATH * 2];
+    WCHAR NameString[MAX_PATH + 1];
+    WCHAR TypeString[MAX_PATH + 1];
 } FIND_SEARCH_PARAMS, * PFIND_SEARCH_PARAMS;
 
 #define FINDDLG_TRACKSIZE_MIN_X 548
@@ -33,6 +31,23 @@ typedef struct _FIND_SEARCH_PARAMS {
 
 static HANDLE FindDialogThreadHandle = NULL;
 static FAST_EVENT FindDialogInitializedEvent = FAST_EVENT_INIT;
+
+typedef struct _FINDDLG_RESIZE {
+    BOOL  Initialized;
+    LONG  GroupBoxOptionsMarginRight;
+    LONG  GroupBoxOptionsHeight;
+    LONG  GroupBoxResultsMarginBottom;
+    LONG  ListViewMarginRight;
+    LONG  ListViewMarginBottom;
+    LONG  NameEditMarginRight;
+    LONG  NameEditHeight;
+    LONG  TypeComboOffsetRight;
+    LONG  TypeComboOffsetTop;
+    LONG  FindButtonOffsetRight;
+    LONG  FindButtonOffsetTop;
+    LONG  TypeLabelOffsetRight;
+    LONG  TypeLabelOffsetTop;
+} FINDDLG_RESIZE;
 
 typedef struct _FINDDLG_CONTEXT {
     //
@@ -58,20 +73,7 @@ typedef struct _FINDDLG_CONTEXT {
     //
     // Resize.
     //
-    LONG sizes_init;
-    LONG dx1;
-    LONG dx2;
-    LONG dx3;
-    LONG dx4;
-    LONG dx5;
-    LONG dx6;
-    LONG dx7;
-    LONG dx8;
-    LONG dx9;
-    LONG dx10;
-    LONG dx11;
-    LONG dx12;
-    LONG dx13;
+    FINDDLG_RESIZE Resize;
 
     //
     // Search state
@@ -215,57 +217,57 @@ VOID FindDlgResize(
     HWND  hwnd;
     POINT p0;
     HDWP hDeferPos;
+    FINDDLG_RESIZE* Resize = &Context->Resize;
 
     GetClientRect(hwndDlg, &r2);
 
-    if (Context->sizes_init == 0) {
-        Context->sizes_init = 1;
+    if (Resize->Initialized == FALSE) {
+        Resize->Initialized = TRUE;
 
         RtlSecureZeroMemory(&r1, sizeof(r1));
         GetWindowRect(GetDlgItem(hwndDlg, ID_SEARCH_GROUPBOXOPTIONS), &r1);
-        Context->dx1 = r2.right - (r1.right - r1.left);
-        Context->dx2 = r1.bottom - r1.top;
+        Resize->GroupBoxOptionsMarginRight = r2.right - (r1.right - r1.left);
+        Resize->GroupBoxOptionsHeight = r1.bottom - r1.top;
 
         RtlSecureZeroMemory(&r1, sizeof(r1));
         GetWindowRect(GetDlgItem(hwndDlg, ID_SEARCH_GROUPBOX), &r1);
-        Context->dx3 = r2.bottom - (r1.bottom - r1.top);
+        Resize->GroupBoxResultsMarginBottom = r2.bottom - (r1.bottom - r1.top);
 
         RtlSecureZeroMemory(&r1, sizeof(r1));
         GetWindowRect(GetDlgItem(hwndDlg, ID_SEARCH_LIST), &r1);
-        Context->dx4 = r2.right - (r1.right - r1.left);
-        Context->dx5 = r2.bottom - (r1.bottom - r1.top);
+        Resize->ListViewMarginRight = r2.right - (r1.right - r1.left);
+        Resize->ListViewMarginBottom = r2.bottom - (r1.bottom - r1.top);
 
         RtlSecureZeroMemory(&r1, sizeof(r1));
         GetWindowRect(GetDlgItem(hwndDlg, ID_SEARCH_NAME), &r1);
-        Context->dx6 = r2.right - (r1.right - r1.left);
-        Context->dx7 = r1.bottom - r1.top;
+        Resize->NameEditMarginRight = r2.right - (r1.right - r1.left);
+        Resize->NameEditHeight = r1.bottom - r1.top;
 
         RtlSecureZeroMemory(&r1, sizeof(r1));
         GetWindowRect(GetDlgItem(hwndDlg, ID_SEARCH_TYPE), &r1);
         p0.x = r1.left;
         p0.y = r1.top;
         ScreenToClient(hwndDlg, &p0);
-        Context->dx8 = r2.right - p0.x;
-        Context->dx9 = p0.y;
+        Resize->TypeComboOffsetRight = r2.right - p0.x;
+        Resize->TypeComboOffsetTop = p0.y;
 
         RtlSecureZeroMemory(&r1, sizeof(r1));
         GetWindowRect(GetDlgItem(hwndDlg, ID_SEARCH_FIND), &r1);
         p0.x = r1.left;
         p0.y = r1.top;
         ScreenToClient(hwndDlg, &p0);
-        Context->dx10 = r2.right - p0.x;
-        Context->dx11 = p0.y;
+        Resize->FindButtonOffsetRight = r2.right - p0.x;
+        Resize->FindButtonOffsetTop = p0.y;
 
         RtlSecureZeroMemory(&r1, sizeof(r1));
         GetWindowRect(GetDlgItem(hwndDlg, ID_SEARCH_TYPELABEL), &r1);
         p0.x = r1.left;
         p0.y = r1.top;
         ScreenToClient(hwndDlg, &p0);
-        Context->dx12 = r2.right - p0.x;
-        Context->dx13 = p0.y;
+        Resize->TypeLabelOffsetRight = r2.right - p0.x;
+        Resize->TypeLabelOffsetTop = p0.y;
     }
 
-    // Start batch window positioning for better performance
     hDeferPos = BeginDeferWindowPos(7);
     if (!hDeferPos) return;
 
@@ -274,7 +276,7 @@ VOID FindDlgResize(
     if (hwnd) {
         hDeferPos = DeferWindowPos(hDeferPos, hwnd, 0,
             0, 0,
-            r2.right - Context->dx1, Context->dx2,
+            r2.right - Resize->GroupBoxOptionsMarginRight, Resize->GroupBoxOptionsHeight,
             SWP_NOMOVE | SWP_NOZORDER);
         if (!hDeferPos) return;
     }
@@ -284,7 +286,7 @@ VOID FindDlgResize(
     if (hwnd) {
         hDeferPos = DeferWindowPos(hDeferPos, hwnd, 0,
             0, 0,
-            r2.right - Context->dx1, r2.bottom - Context->dx3,
+            r2.right - Resize->GroupBoxOptionsMarginRight, r2.bottom - Resize->GroupBoxResultsMarginBottom,
             SWP_NOMOVE | SWP_NOZORDER);
         if (!hDeferPos) return;
     }
@@ -294,7 +296,7 @@ VOID FindDlgResize(
     if (hwnd) {
         hDeferPos = DeferWindowPos(hDeferPos, hwnd, 0,
             0, 0,
-            r2.right - Context->dx4, r2.bottom - Context->dx5,
+            r2.right - Resize->ListViewMarginRight, r2.bottom - Resize->ListViewMarginBottom,
             SWP_NOMOVE | SWP_NOZORDER);
         if (!hDeferPos) return;
     }
@@ -304,7 +306,7 @@ VOID FindDlgResize(
     if (hwnd) {
         hDeferPos = DeferWindowPos(hDeferPos, hwnd, 0,
             0, 0,
-            r2.right - Context->dx6, Context->dx7,
+            r2.right - Resize->NameEditMarginRight, Resize->NameEditHeight,
             SWP_NOMOVE | SWP_NOZORDER);
         if (!hDeferPos) return;
     }
@@ -313,7 +315,7 @@ VOID FindDlgResize(
     hwnd = GetDlgItem(hwndDlg, ID_SEARCH_TYPE);
     if (hwnd) {
         hDeferPos = DeferWindowPos(hDeferPos, hwnd, 0,
-            r2.right - Context->dx8, Context->dx9,
+            r2.right - Resize->TypeComboOffsetRight, Resize->TypeComboOffsetTop,
             0, 0,
             SWP_NOSIZE | SWP_NOZORDER);
         if (!hDeferPos) return;
@@ -323,7 +325,7 @@ VOID FindDlgResize(
     hwnd = GetDlgItem(hwndDlg, ID_SEARCH_FIND);
     if (hwnd) {
         hDeferPos = DeferWindowPos(hDeferPos, hwnd, 0,
-            r2.right - Context->dx10, Context->dx11,
+            r2.right - Resize->FindButtonOffsetRight, Resize->FindButtonOffsetTop,
             0, 0,
             SWP_NOSIZE | SWP_NOZORDER);
         if (!hDeferPos) return;
@@ -333,16 +335,14 @@ VOID FindDlgResize(
     hwnd = GetDlgItem(hwndDlg, ID_SEARCH_TYPELABEL);
     if (hwnd) {
         hDeferPos = DeferWindowPos(hDeferPos, hwnd, 0,
-            r2.right - Context->dx12, Context->dx13,
+            r2.right - Resize->TypeLabelOffsetRight, Resize->TypeLabelOffsetTop,
             0, 0,
             SWP_NOSIZE | SWP_NOZORDER);
         if (!hDeferPos) return;
     }
 
-    // Apply all positioning changes at once
     EndDeferWindowPos(hDeferPos);
 
-    // Update status bar separately (it needs special handling)
     SendMessage(Context->StatusBar, WM_SIZE, 0, 0);
 
     InvalidateRect(hwndDlg, NULL, FALSE);
@@ -496,7 +496,6 @@ DWORD WINAPI FindDlgSearchWorkerThread(
     UNICODE_STRING usName, usType;
     PUNICODE_STRING pusName = NULL, pusType = NULL;
 
-    // Set up search strings
     if (searchParams->UseName) {
         RtlInitUnicodeString(&usName, searchParams->NameString);
         pusName = &usName;
@@ -507,13 +506,10 @@ DWORD WINAPI FindDlgSearchWorkerThread(
         pusType = &usType;
     }
 
-    // Perform search
     FindObject(ObGetPredefinedUnicodeString(OBP_ROOT), pusName, pusType, &flist);
 
-    // Update UI from main thread
     SendMessage(hwndDlg, WM_FINDOBJECT_SEARCHCOMPLETE, (WPARAM)flist, 0);
 
-    // Free search parameters
     supHeapFree(searchParams);
     return 0;
 }
@@ -536,16 +532,13 @@ VOID FindDlgHandleSearchComplete(
     ULONG cci = 0;
     WCHAR searchString[MAX_PATH + 1];
 
-    // Return to search mode
     SetDlgItemText(hwndDlg, ID_SEARCH_FIND, TEXT("Search"));
     EnableWindow(GetDlgItem(hwndDlg, ID_SEARCH_FIND), TRUE);
 
-    // Check if search was cancelled
     if (g_FindDlgContext.SearchCancelled) {
         g_FindDlgContext.SearchCancelled = FALSE;
         SetDlgItemText(hwndDlg, ID_SEARCH_STATUSBAR, TEXT("Search cancelled"));
 
-        // Free the result list
         while (flist != NULL) {
             plist = flist->Prev;
             supHeapFree(flist);
@@ -559,10 +552,8 @@ VOID FindDlgHandleSearchComplete(
         return;
     }
 
-    // Begin batch processing
     supDisableRedraw(g_FindDlgContext.SearchList);
 
-    // Process results
     while (flist != NULL) {
         FindDlgAddListItem(g_FindDlgContext.SearchList, &flist->ObjectName, &flist->ObjectType);
         plist = flist->Prev;
@@ -571,19 +562,15 @@ VOID FindDlgHandleSearchComplete(
         cci++;
     }
 
-    // Sort results
     ListView_SortItemsEx(g_FindDlgContext.SearchList,
         &FindDlgCompareFunc, g_FindDlgContext.SortColumn);
 
-    // Update status
     ultostr(cci, searchString);
     _strcat(searchString, TEXT(" matching object(s)."));
     SetDlgItemText(hwndDlg, ID_SEARCH_STATUSBAR, searchString);
 
-    // End batch processing
     supEnableRedraw(g_FindDlgContext.SearchList);
 
-    // Clean up
     if (g_FindDlgContext.SearchThread) {
         CloseHandle(g_FindDlgContext.SearchThread);
         g_FindDlgContext.SearchThread = NULL;
@@ -605,9 +592,7 @@ VOID FindDlgHandleSearch(
     WCHAR searchString[MAX_PATH + 1], typeName[MAX_PATH + 1];
     PFIND_SEARCH_PARAMS searchParams;
 
-    // Cancel ongoing search if any
     if (g_FindDlgContext.SearchThread) {
-        // Signal cancellation
         if (WaitForSingleObject(g_FindDlgContext.SearchThread, 0) == WAIT_TIMEOUT) {
             g_FindDlgContext.SearchCancelled = TRUE;
             SetDlgItemText(hwndDlg, ID_SEARCH_STATUSBAR, TEXT("Cancelling search..."));
@@ -618,21 +603,15 @@ VOID FindDlgHandleSearch(
         g_FindDlgContext.SearchThread = NULL;
     }
 
-    // Prepare for new search
     g_FindDlgContext.SearchCancelled = FALSE;
 
-    RtlSecureZeroMemory(&searchString, sizeof(searchString));
-    RtlSecureZeroMemory(&typeName, sizeof(typeName));
+    GetDlgItemText(hwndDlg, ID_SEARCH_NAME, searchString, ARRAYSIZE(searchString));
+    GetDlgItemText(hwndDlg, ID_SEARCH_TYPE, typeName, ARRAYSIZE(typeName));
 
-    GetDlgItemText(hwndDlg, ID_SEARCH_NAME, (LPWSTR)&searchString, MAX_PATH);
-    GetDlgItemText(hwndDlg, ID_SEARCH_TYPE, (LPWSTR)&typeName, MAX_PATH);
-
-    // Update status and UI
     ListView_DeleteAllItems(g_FindDlgContext.SearchList);
     SetDlgItemText(hwndDlg, ID_SEARCH_STATUSBAR, TEXT("Searching..."));
     EnableWindow(GetDlgItem(hwndDlg, ID_SEARCH_FIND), FALSE);
 
-    // Allocate search params
     searchParams = (PFIND_SEARCH_PARAMS)supHeapAlloc(sizeof(FIND_SEARCH_PARAMS));
     if (searchParams == NULL) {
         SetDlgItemText(hwndDlg, ID_SEARCH_STATUSBAR, TEXT("Memory allocation failed"));
@@ -642,7 +621,6 @@ VOID FindDlgHandleSearch(
 
     searchParams->hwndDlg = hwndDlg;
 
-    // Set up search parameters
     if (searchString[0] == 0) {
         searchParams->UseName = FALSE;
     }
@@ -659,7 +637,6 @@ VOID FindDlgHandleSearch(
         _strcpy(searchParams->TypeString, typeName);
     }
 
-    // Start search thread
     g_FindDlgContext.SearchThread = CreateThread(NULL, 0, FindDlgSearchWorkerThread, searchParams, 0, NULL);
     if (!g_FindDlgContext.SearchThread) {
         supHeapFree(searchParams);
@@ -784,10 +761,9 @@ INT_PTR CALLBACK FindDlgProc(
         break;
 
     case WM_DESTROY:
-        // Cancel any ongoing search
         if (g_FindDlgContext.SearchThread) {
             g_FindDlgContext.SearchCancelled = TRUE;
-            WaitForSingleObject(g_FindDlgContext.SearchThread, 1000);
+            WaitForSingleObject(g_FindDlgContext.SearchThread, INFINITE);
             CloseHandle(g_FindDlgContext.SearchThread);
             g_FindDlgContext.SearchThread = NULL;
         }
@@ -865,6 +841,9 @@ DWORD FindpDlgWorkerThread(
 
     supSetFastEvent(&FindDialogInitializedEvent);
 
+    if (hwndDlg == NULL)
+        goto Cleanup;
+
     do {
 
         bResult = GetMessage(&message, NULL, 0, 0);
@@ -878,6 +857,7 @@ DWORD FindpDlgWorkerThread(
 
     } while (bResult != 0);
 
+Cleanup:
     supResetFastEvent(&FindDialogInitializedEvent);
 
     if (FindDialogThreadHandle) {
@@ -901,7 +881,7 @@ VOID FindDlgCreate(
 {
     HANDLE hThread;
 
-    if (FindDialogThreadHandle)
+    if (InterlockedCompareExchangePointer(&FindDialogThreadHandle, NULL, NULL) != NULL)
         return;
 
     RtlSecureZeroMemory(&g_FindDlgContext, sizeof(g_FindDlgContext));

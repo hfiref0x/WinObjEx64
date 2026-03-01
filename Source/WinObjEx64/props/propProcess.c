@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2025
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       PROPPROCESS.C
 *
-*  VERSION:     2.09
+*  VERSION:     2.10
 *
-*  DATE:        21 Aug 2025
+*  DATE:        22 Feb 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -734,7 +734,7 @@ INT_PTR CALLBACK ProcessListDialogProc(
         return ProcessListHandleNotify(hwndDlg, lParam);
 
     case WM_DESTROY:
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+        pDlgContext = (EXTRASCONTEXT*)RemoveProp(hwndDlg, T_DLGCONTEXT);
         if (pDlgContext) {
             if (pDlgContext->ImageList) {
                 ImageList_Destroy(pDlgContext->ImageList);
@@ -742,7 +742,6 @@ INT_PTR CALLBACK ProcessListDialogProc(
             supHeapFree(pDlgContext);
         }
         RemoveProp(hwndDlg, T_PROPCONTEXT);
-        RemoveProp(hwndDlg, T_DLGCONTEXT);
         break;
 
     case WM_INITDIALOG:

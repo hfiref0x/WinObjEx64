@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.10
 *
-*  DATE:        10 Feb 2026
+*  DATE:        27 Feb 2026
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -2563,7 +2563,16 @@ BOOL ObQueryFullNamespacePath(
             *Path = resultPath;
             bResult = TRUE;
         }
-
+        else {
+            // String allocating failed, cleanup rest of the list.
+            Next = ListHead.Flink;
+            while (Next != &ListHead) {
+                pathElement = CONTAINING_RECORD(Next, OB_NAME_ELEMENT, ListEntry);
+                Next = Next->Flink;
+                supFreeUnicodeString(g_obexHeap, &pathElement->Name);
+                supHeapFree(pathElement);
+            }
+        }
     }
 
     return bResult;
@@ -3250,8 +3259,7 @@ BOOL kdEnumerateMmUnloadedDrivers(
 )
 {
     BOOL                bResult = FALSE, bStopEnumeration = FALSE;
-    HMODULE             hNtOs;
-    ULONG_PTR           NtOsBase, lookupAddress = 0;
+    ULONG_PTR           lookupAddress = 0;
 
     ULONG               bytesRead = 0;
 
@@ -3264,9 +3272,6 @@ BOOL kdEnumerateMmUnloadedDrivers(
     ULONG               Index = 0;
 
     PKLDBG_SYSTEM_ADDRESS kdpMmUnloadedDrivers = &g_kdctx.Data->MmUnloadedDrivers;
-
-    NtOsBase = (ULONG_PTR)g_kdctx.NtOsBase;
-    hNtOs = (HMODULE)g_kdctx.NtOsImageMap;
 
     if (!kdpQueryMmUnloadedDrivers(&g_kdctx))
         return FALSE;
@@ -3283,11 +3288,8 @@ BOOL kdEnumerateMmUnloadedDrivers(
     cbData = MI_UNLOADED_DRIVERS * sizeof(UNLOADED_DRIVERS);
     pvDrivers = (PUNLOADED_DRIVERS)supHeapAlloc(cbData);
     if (pvDrivers) {
-
         bResult = kdReadSystemMemory(lookupAddress, pvDrivers, cbData);
-
         if (bResult) {
-
             for (Index = 0; Index < MI_UNLOADED_DRIVERS; Index++) {
 
                 wMax = pvDrivers[Index].Name.MaximumLength;
@@ -3329,10 +3331,8 @@ BOOL kdEnumerateMmUnloadedDrivers(
                     }
                 }
             } //for
-
-            supHeapFree(pvDrivers);
-
-        }
+        } //if (pvDrivers)
+        supHeapFree(pvDrivers);
     }
 
     supHeapFree(pwStaticBuffer);
@@ -3580,11 +3580,7 @@ PVOID kdQueryCmControlVector(
             continue;
 
         for (offset = 0; offset < sectionSize - sizeof(ULONG_PTR); offset++) {
-
             currentPtr = sectionBase + offset;
-            if (currentPtr + sizeof(ULONG_PTR) > sectionBase + sectionSize)
-                break;
-
             testValue = *(PULONG_PTR)currentPtr;
             if (testValue == signatureAddress) {
                 if (offset >= sizeof(ULONG_PTR)) {

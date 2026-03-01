@@ -91,6 +91,8 @@ VOID PmpReportInvalidPlugin(
     static const WCHAR szSuffix[] = TEXT(" is not a valid WinObjEx64 plugin");
 
     cchFileName = _strlen(lpszPluginFileName);
+    if (cchFileName == 0)
+        return;
 
     cbSize = (RTL_NUMBER_OF(szPrefix) - 1 +
         cchFileName +
@@ -99,9 +101,8 @@ VOID PmpReportInvalidPlugin(
 
     lpCombined = (LPWSTR)supHeapAlloc(cbSize);
     if (lpCombined) {
-        _strcpy(lpCombined, szPrefix);
-        _strcat(lpCombined, lpszPluginFileName);
-        _strcat(lpCombined, szSuffix);
+        RtlStringCchPrintfSecure(lpCombined, cbSize / sizeof(WCHAR),
+            TEXT("%ws%ws%ws"), szPrefix, lpszPluginFileName, szSuffix);
         logAdd(EntryTypeInformation, lpCombined);
         supHeapFree(lpCombined);
     }

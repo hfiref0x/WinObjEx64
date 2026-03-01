@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.10
 *
-*  DATE:        10 Feb 2026
+*  DATE:        22 Feb 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -407,18 +407,20 @@ DWORD StatsDialogWorkerThread(
 
     supSetFastEvent(&StatsDialogInitializedEvent);
 
-    do {
+    if (hwndDlg) {
+        do {
 
-        bResult = GetMessage(&message, NULL, 0, 0);
-        if (bResult == -1)
-            break;
+            bResult = GetMessage(&message, NULL, 0, 0);
+            if (bResult == -1)
+                break;
 
-        if (!IsDialogMessage(hwndDlg, &message)) {
-            TranslateMessage(&message);
-            DispatchMessage(&message);
-        }
+            if (!IsDialogMessage(hwndDlg, &message)) {
+                TranslateMessage(&message);
+                DispatchMessage(&message);
+            }
 
-    } while (bResult != 0);
+        } while (bResult != 0);
+    }
 
     supResetFastEvent(&StatsDialogInitializedEvent);
 

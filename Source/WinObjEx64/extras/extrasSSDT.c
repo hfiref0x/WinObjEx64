@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2025
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       EXTRASSSDT.C
 *
 *  VERSION:     2.10
 *
-*  DATE:        03 Oct 2025
+*  DATE:        07 Mar 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -43,7 +43,8 @@ static SDT_CONTEXT g_SDTCtx = { 0 };
 //
 // UI part
 //
-#define ID_SDTLIST_SAVE 40002
+#define ID_SDTLIST_SAVE             40202
+#define ID_SDTLIST_VIEW_WITH_WDX    40203
 
 #define SDTDLG_TRACKSIZE_MIN_X 640
 #define SDTDLG_TRACKSIZE_MIN_Y 480
@@ -1043,6 +1044,9 @@ VOID SdtHandlePopupMenu(
         InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
         InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_VIEW_REFRESH, T_VIEW_REFRESH);
 
+        if (g_WinObj.WinDependsPresent)
+            InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_SDTLIST_VIEW_WITH_WDX, T_VIEWWITH_WDX);
+
         TrackPopupMenu(hMenu,
             TPM_RIGHTBUTTON | TPM_LEFTALIGN,
             lpPoint->x,
@@ -1344,6 +1348,13 @@ INT_PTR CALLBACK SdtDialogProc(
                 supListViewCopyItemValueToClipboard(pDlgContext->ListView,
                     pDlgContext->lvItemHit,
                     pDlgContext->lvColumnHit);
+            }
+            break;
+
+        case ID_SDTLIST_VIEW_WITH_WDX:
+            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
+            if (pDlgContext) {
+                extrasViewWithWinDepends(pDlgContext, COLUMN_SDTLIST_MODULE);
             }
             break;
 

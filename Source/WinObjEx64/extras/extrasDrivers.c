@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.10
 *
-*  DATE:        22 Feb 2026
+*  DATE:        07 Mar 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -23,10 +23,10 @@ BOOLEAN DrvDlgShimsEnabled = FALSE;
 
 #define ID_DRVLIST_REFRESH   ID_VIEW_REFRESH
 #define ID_DRVLIST_PROP      ID_OBJECT_PROPERTIES
-#define ID_DRVLIST_DUMP      40005
-#define ID_DRVLIST_DUMPFIXED 40006
-#define ID_DRVLIST_SAVE      40007
-
+#define ID_DRVLIST_DUMP      40105
+#define ID_DRVLIST_DUMPFIXED 40106
+#define ID_DRVLIST_SAVE      40107
+#define ID_DRVLIST_VIEW_WDX  40108
 
 #define ID_CALC_HASH_MD5            6000
 #define ID_CALC_HASH_SHA1           6001
@@ -294,6 +294,12 @@ VOID DrvHandlePopupMenu(
                 BCRYPT_SHA256_ALGORITHM);
 
             InsertMenu(hMenu, ++uPos, MF_BYCOMMAND, ID_CALC_HASH_PAGE_SHA256, szMenuText);
+
+            //
+            // View With WinDepends
+            //
+            if (g_WinObj.WinDependsPresent)
+                InsertMenu(hMenu, ++uPos, MF_BYCOMMAND, ID_DRVLIST_VIEW_WDX, T_VIEWWITH_WDX);
 
         }
 
@@ -1275,6 +1281,10 @@ VOID DrvDlgHandleWMCommand(
                 supStatusBarSetText(pDlgContext->StatusBar, 1, T_LIST_EXPORT_SUCCESS);
             }
         }
+        break;
+
+    case ID_DRVLIST_VIEW_WDX:
+        extrasViewWithWinDepends(pDlgContext, COLUMN_DRVLIST_MODULE_NAME);
         break;
 
     case ID_DRVLIST_PROP:

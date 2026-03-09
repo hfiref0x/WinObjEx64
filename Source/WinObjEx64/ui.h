@@ -70,6 +70,7 @@ typedef HWND(WINAPI *pfnHtmlHelpW)(
 #define T_RUNASADMIN            L"R&un as Administrator"
 #define T_RUNASSYSTEM           L"R&un as LocalSystem"
 #define T_EXPORTTOFILE          L"Export List"
+#define T_VIEWWITH_WDX          L"View With WinDepends"
 #define T_JUMPTOFILE            L"Jump to File"
 #define T_VIEW_REFRESH          L"Refresh\tF5"
 #define T_VIEW_PLUGINS          L"View Plugins"

@@ -63,6 +63,14 @@ SUP_SHIM_INFO KsepShimInformation[] = {
     { L"UserCetBasicModeAllowRetTargetNotCetCompat", (GUID*)&ShimCetCompat, L"Intel CET compatibility shim", L"ntos"}
 };
 
+#define WINDEPENDS_KEY_COUNT 3
+
+static LPCWSTR g_WinDependsCommandKeys[WINDEPENDS_KEY_COUNT] = {
+    L"sysfile\\shell\\View in WinDepends\\command",
+    L"drvfile\\shell\\View in WinDepends\\command",
+    L"file\\shell\\View in WinDepends\\command"
+};
+
 LIST_ENTRY supShutdownListHead;
 CRITICAL_SECTION supShutdownListLock;
 
@@ -10692,5 +10700,362 @@ BOOL supLoadSymbolsForNtImage(
     CloseHandle(hCompletionEvent);
     CloseHandle(hCancelEvent);
 
+    return bResult;
+}
+
+/*
+* supxReadRegistryString
+*
+* Purpose:
+*
+* Read default string value from the given registry key.
+*
+*/
+BOOL supxReadRegistryString(
+    _In_ HKEY RootKey,
+    _In_ LPCWSTR SubKey,
+    _Out_ LPWSTR* Value
+)
+{
+    LONG lResult;
+    DWORD cbData;
+    DWORD dwType;
+    HKEY hKey;
+    LPWSTR lpBuffer;
+    LPWSTR lpExpanded;
+    DWORD cchExpanded;
+
+    if (Value == NULL)
+        return FALSE;
+
+    *Value = NULL;
+    hKey = NULL;
+    cbData = 0;
+    dwType = 0;
+    lpBuffer = NULL;
+    lpExpanded = NULL;
+
+    lResult = RegOpenKeyEx(RootKey,
+        SubKey,
+        0,
+        KEY_QUERY_VALUE,
+        &hKey);
+
+    if (lResult != ERROR_SUCCESS)
+        return FALSE;
+
+    lResult = RegQueryValueEx(hKey,
+        NULL,
+        NULL,
+        &dwType,
+        NULL,
+        &cbData);
+
+    if (lResult != ERROR_SUCCESS || cbData < sizeof(WCHAR)) {
+        RegCloseKey(hKey);
+        return FALSE;
+    }
+
+    if ((dwType != REG_SZ) && (dwType != REG_EXPAND_SZ)) {
+        RegCloseKey(hKey);
+        return FALSE;
+    }
+
+    lpBuffer = (LPWSTR)supHeapAlloc(cbData + sizeof(WCHAR));
+    if (lpBuffer == NULL) {
+        RegCloseKey(hKey);
+        return FALSE;
+    }
+
+    lResult = RegQueryValueEx(hKey,
+        NULL,
+        NULL,
+        &dwType,
+        (LPBYTE)lpBuffer,
+        &cbData);
+
+    RegCloseKey(hKey);
+
+    if (lResult != ERROR_SUCCESS) {
+        supHeapFree(lpBuffer);
+        return FALSE;
+    }
+
+    lpBuffer[(cbData / sizeof(WCHAR))] = 0;
+
+    if (dwType == REG_EXPAND_SZ) {
+
+        cchExpanded = ExpandEnvironmentStrings(lpBuffer, NULL, 0);
+        if (cchExpanded == 0) {
+            supHeapFree(lpBuffer);
+            return FALSE;
+        }
+
+        lpExpanded = (LPWSTR)supHeapAlloc(cchExpanded * sizeof(WCHAR));
+        if (lpExpanded == NULL) {
+            supHeapFree(lpBuffer);
+            return FALSE;
+        }
+
+        if (ExpandEnvironmentStrings(lpBuffer, lpExpanded, cchExpanded) == 0) {
+            supHeapFree(lpExpanded);
+            supHeapFree(lpBuffer);
+            return FALSE;
+        }
+
+        supHeapFree(lpBuffer);
+        lpBuffer = lpExpanded;
+    }
+
+    *Value = lpBuffer;
+    return TRUE;
+}
+
+/*
+* supxExtractExecutablePath
+*
+* Purpose:
+*
+* Extract executable path from command line string.
+*
+*/
+BOOL supxExtractExecutablePath(
+    _In_ LPCWSTR lpCommandLine,
+    _Out_writes_(cchBuffer) LPWSTR lpExecutable,
+    _In_ SIZE_T cchBuffer
+)
+{
+    LPCWSTR lpStart, lpEnd;
+    SIZE_T cchCopy;
+    WCHAR szCandidate[MAX_PATH * 4];
+
+    if (lpExecutable == NULL || cchBuffer == 0)
+        return FALSE;
+
+    lpExecutable[0] = 0;
+
+    if (lpCommandLine == NULL || lpCommandLine[0] == 0)
+        return FALSE;
+
+    lpStart = lpCommandLine;
+
+    while (*lpStart == L' ' || *lpStart == L'\t')
+        lpStart++;
+
+    if (*lpStart == L'\"') {
+
+        lpStart++;
+        lpEnd = lpStart;
+
+        while (*lpEnd && *lpEnd != L'\"')
+            lpEnd++;
+
+        if (*lpEnd != L'\"')
+            return FALSE;
+
+        cchCopy = (SIZE_T)(lpEnd - lpStart);
+        if ((cchCopy + 1) > RTL_NUMBER_OF(szCandidate))
+            return FALSE;
+
+        RtlCopyMemory(szCandidate, lpStart, cchCopy * sizeof(WCHAR));
+        szCandidate[cchCopy] = 0;
+    }
+    else {
+
+        lpEnd = lpStart;
+        while (*lpEnd) {
+
+            if (*lpEnd == L' ' || *lpEnd == L'\t') {
+                cchCopy = (SIZE_T)(lpEnd - lpStart);
+                if ((cchCopy + 1) < RTL_NUMBER_OF(szCandidate)) {
+
+                    RtlCopyMemory(szCandidate, lpStart, cchCopy * sizeof(WCHAR));
+                    szCandidate[cchCopy] = 0;
+
+                    if (PathFileExists(szCandidate))
+                        break;
+                }
+            }
+
+            lpEnd++;
+        }
+
+        if (*lpEnd == 0) {
+            cchCopy = _strlen(lpStart);
+            if ((cchCopy + 1) > RTL_NUMBER_OF(szCandidate))
+                return FALSE;
+
+            _strcpy(szCandidate, lpStart);
+        }
+    }
+
+    if (!PathFileExists(szCandidate))
+        return FALSE;
+
+    if ((_strlen(szCandidate) + 1) > cchBuffer)
+        return FALSE;
+
+    _strcpy(lpExecutable, szCandidate);
+    return TRUE;
+}
+
+/*
+* supxBuildCommandLine
+*
+* Purpose:
+*
+* Build command line for WinDepends process creation.
+*
+*/
+BOOL supxBuildCommandLine(
+    _In_ LPCWSTR lpExecutable,
+    _In_ LPCWSTR lpArgument,
+    _Out_writes_(cchBuffer) LPWSTR lpCommandLine,
+    _In_ SIZE_T cchBuffer
+)
+{
+    INT r;
+
+    if (lpExecutable == NULL || lpArgument == NULL || lpCommandLine == NULL || cchBuffer == 0)
+        return FALSE;
+    
+    r = RtlStringCchPrintfSecure(lpCommandLine,
+        cchBuffer,
+        L"\"%ws\" \"%ws\"",
+        lpExecutable,
+        lpArgument);
+
+    return r > 0;
+}
+
+/*
+* supQueryWinDependsExecutable
+*
+* Purpose:
+*
+* Query WinDepends executable path from shell integration registry data.
+*
+*/
+BOOLEAN supQueryWinDependsExecutable(
+    _Out_writes_(cchBuffer) LPWSTR lpExecutable,
+    _In_ SIZE_T cchBuffer
+)
+{
+    UINT i;
+    BOOL bResult;
+    LPWSTR lpCommand;
+
+    if (lpExecutable == NULL || cchBuffer == 0)
+        return FALSE;
+
+    lpExecutable[0] = 0;
+    lpCommand = NULL;
+    bResult = FALSE;
+
+    for (i = 0; i < WINDEPENDS_KEY_COUNT; i++) {
+
+        if (supxReadRegistryString(HKEY_CLASSES_ROOT,
+            g_WinDependsCommandKeys[i],
+            &lpCommand))
+        {
+            bResult = supxExtractExecutablePath(lpCommand, lpExecutable, cchBuffer);
+            supHeapFree(lpCommand);
+            lpCommand = NULL;
+
+            if (bResult)
+                return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+/*
+* supOpenImageInWinDepends
+*
+* Purpose:
+*
+* Launch WinDepends for the specified image file.
+*
+*/
+BOOL supOpenImageInWinDepends(
+    _In_ HWND hwndParent,
+    _In_ LPCWSTR lpImageFileName,
+    _In_ LPCWSTR lpWinDependsFileName
+)
+{
+    BOOL bResult;
+    DWORD cchFullPath;
+    SIZE_T cchCommandLine;
+    WCHAR szExecutable[MAX_PATH + 1];
+    WCHAR szImagePath[MAX_PATH * 4];
+    LPWSTR lpCommandLine;
+    STARTUPINFO si;
+    PROCESS_INFORMATION pi;
+
+    if (lpImageFileName == NULL || lpImageFileName[0] == 0)
+        return FALSE;
+
+    RtlSecureZeroMemory(szExecutable, sizeof(szExecutable));
+    RtlSecureZeroMemory(szImagePath, sizeof(szImagePath));
+
+    cchFullPath = GetFullPathName(lpImageFileName,
+        RTL_NUMBER_OF(szImagePath),
+        szImagePath,
+        NULL);
+
+    if (cchFullPath == 0 || cchFullPath >= RTL_NUMBER_OF(szImagePath))
+        return FALSE;
+
+    if (!PathFileExists(szImagePath))
+        return FALSE;
+
+    if (lpWinDependsFileName) {
+        _strncpy(szExecutable, MAX_PATH, lpWinDependsFileName, MAX_PATH);
+    }
+    else {
+        if (!supQueryWinDependsExecutable(szExecutable, RTL_NUMBER_OF(szExecutable)))
+            return FALSE;
+    }
+
+    cchCommandLine = _strlen(szExecutable) + _strlen(szImagePath) + 8;
+    lpCommandLine = (LPWSTR)supHeapAlloc(cchCommandLine * sizeof(WCHAR));
+    if (lpCommandLine == NULL)
+        return FALSE;
+
+    bResult = supxBuildCommandLine(szExecutable,
+        szImagePath,
+        lpCommandLine,
+        cchCommandLine);
+
+    if (!bResult) {
+        supHeapFree(lpCommandLine);
+        return FALSE;
+    }
+
+    RtlSecureZeroMemory(&si, sizeof(si));
+    RtlSecureZeroMemory(&pi, sizeof(pi));
+    si.cb = sizeof(si);
+
+    bResult = CreateProcess(szExecutable,
+        lpCommandLine,
+        NULL,
+        NULL,
+        FALSE,
+        0,
+        NULL,
+        NULL,
+        &si,
+        &pi);
+
+    if (bResult) {
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+    }
+    else {
+        UNREFERENCED_PARAMETER(hwndParent);
+    }
+
+    supHeapFree(lpCommandLine);
     return bResult;
 }

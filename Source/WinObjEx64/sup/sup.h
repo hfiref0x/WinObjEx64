@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2025
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     2.09
+*  VERSION:     2.10
 *
-*  DATE:        21 Aug 2025
+*  DATE:        07 Mar 2026
 *
 *  Common header file for the program support routines.
 *
@@ -1299,3 +1299,12 @@ VOID supCallbackReportEvent(
     _In_ ULONG ActionCode,
     _In_ PIMAGEHLP_DEFERRED_SYMBOL_LOAD Action,
     _In_ PFNSUPSYMCALLBACK UserCallback);
+
+BOOLEAN supQueryWinDependsExecutable(
+    _Out_writes_(cchBuffer) LPWSTR lpExecutable,
+    _In_ SIZE_T cchBuffer);
+
+BOOL supOpenImageInWinDepends(
+    _In_ HWND hwndParent,
+    _In_ LPCWSTR lpImageFileName,
+    _In_ LPCWSTR lpWinDependsFileName);

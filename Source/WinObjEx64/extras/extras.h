@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.10
 *
-*  DATE:        12 Jan 2026
+*  DATE:        07 Mar 2026
 *
 *  Common header file for Extras dialogs.
 *
@@ -88,7 +88,11 @@ VOID extrasShowDialogById(
     _In_ WORD DialogId);
 
 VOID extrasHandleSettingsChange(
-    EXTRASCONTEXT* Context);
+    _In_ EXTRASCONTEXT* Context);
+
+VOID extrasViewWithWinDepends(
+    _In_ EXTRASCONTEXT* Context,
+    _In_ INT nItem);
 
 //
 // Dialog handlers.

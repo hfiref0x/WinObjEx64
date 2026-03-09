@@ -175,6 +175,7 @@ extern WINOBJ_STATS g_WinObjStats;
 typedef struct _WINOBJ_GLOBALS {
     BOOLEAN IsWine;
     BOOLEAN ListViewDisplayGrid;
+    BOOLEAN WinDependsPresent;
 
     ATOM MainWindowClassAtom;
     ATOM TreeListAtom;
@@ -204,6 +205,7 @@ typedef struct _WINOBJ_GLOBALS {
     WCHAR szWindowsDirectory[MAX_PATH + 1]; //not including backslash
     WCHAR szSystemDirectory[MAX_PATH + 1]; //not including backslash
     WCHAR szProgramDirectory[MAX_PATH + 1]; //not including backslash
+    WCHAR szWinDependsExecutable[MAX_PATH + 1];
 } WINOBJ_GLOBALS, *PWINOBJ_GLOBALS;
 
 extern WINOBJ_GLOBALS g_WinObj;

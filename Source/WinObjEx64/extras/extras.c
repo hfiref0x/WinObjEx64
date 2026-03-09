@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2025
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       EXTRAS.C
 *
 *  VERSION:     2.10
 *
-*  DATE:        10 Sep 2025
+*  DATE:        07 Mar 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -26,7 +26,7 @@
 *
 */
 VOID extrasHandleSettingsChange(
-    EXTRASCONTEXT* Context
+    _In_ EXTRASCONTEXT* Context
 )
 {
     DWORD lvExStyle;
@@ -180,6 +180,38 @@ VOID extrasProcessElevationRequiredDialogs(
     case ID_EXTRAS_SSDT:
         extrasCreateSSDTDialog(SST_Ntos);
         break;
+    }
+}
+
+/*
+* extrasViewWithWinDepends
+*
+* Purpose:
+*
+* Open selected image in WinDepends.
+*
+*/
+VOID extrasViewWithWinDepends(
+    _In_ EXTRASCONTEXT* Context,
+    _In_ INT nItem
+)
+{
+    LPWSTR  lpItem, lpWin32Name;
+    INT     mark;
+
+    if (ListView_GetSelectedCount(Context->ListView)) {
+        mark = ListView_GetSelectionMark(Context->ListView);
+        if (mark >= 0) {
+            lpItem = supGetItemText(Context->ListView, mark, nItem, NULL);
+            if (lpItem) {
+                lpWin32Name = supGetWin32FileName(lpItem);
+                if (lpWin32Name) {
+                    supOpenImageInWinDepends(Context->hwndDlg, lpWin32Name, g_WinObj.szWinDependsExecutable);
+                    supHeapFree(lpWin32Name);
+                }
+                supHeapFree(lpItem);
+            }
+        }
     }
 }
 

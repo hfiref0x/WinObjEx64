@@ -1224,6 +1224,11 @@ DWORD guiInitGlobals(
             break;
         }
 
+        //
+        // Remember WinDepends location (if present).
+        //
+        Globals->WinDependsPresent = supQueryWinDependsExecutable(Globals->szWinDependsExecutable, MAX_PATH);
+
         dwResult = INIT_NO_ERROR;
 
     } while (FALSE);

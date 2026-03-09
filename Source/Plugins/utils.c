@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020 - 2025
+*  (C) COPYRIGHT AUTHORS, 2020 - 2026
 *
 *  TITLE:       UTILS.C
 *
-*  VERSION:     1.20
+*  VERSION:     1.21
 *
-*  DATE:        03 Oct 2025
+*  DATE:        07 Mar 2026
 *
 *  Shared plugins runtime support functions and prototypes.
 *
@@ -283,8 +283,13 @@ BOOL supxListViewExportCSV(
 
             if (f != INVALID_HANDLE_VALUE) {
                 bom = 0xFEFF;
-                WriteFile(f, &bom, sizeof(WORD), &iobytes, NULL);
-                WriteFile(f, buffer0, (DWORD)(total_length * sizeof(WCHAR)), &iobytes, NULL);
+                if (WriteFile(f, &bom, sizeof(WORD), &iobytes, NULL) &&
+                    iobytes == sizeof(WORD) &&
+                    WriteFile(f, buffer0, (DWORD)(total_length * sizeof(WCHAR)), &iobytes, NULL) &&
+                    iobytes == (DWORD)(total_length * sizeof(WCHAR)))
+                {
+                    result = TRUE;
+                }
                 CloseHandle(f);
                 result = TRUE;
             }
@@ -941,7 +946,7 @@ INT supGetMaxOfTwoU64FromHex(
     _In_ BOOL Inverse
 )
 {
-    INT       nResult;
+    INT       nResult = 0;
     LPWSTR    lpItem1 = NULL, lpItem2 = NULL;
     ULONG_PTR ad1, ad2;
     WCHAR     szText[32];
@@ -968,10 +973,13 @@ INT supGetMaxOfTwoU64FromHex(
 
     ad2 = hextou64(&lpItem2[2]);
 
+    if (ad1 < ad2)
+        nResult = -1;
+    else if (ad1 > ad2)
+        nResult = 1;
+
     if (Inverse)
-        nResult = ad1 < ad2;
-    else
-        nResult = ad1 > ad2;
+        nResult = -nResult;
 
     return nResult;
 }

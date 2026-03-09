@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020 - 2025
+*  (C) COPYRIGHT AUTHORS, 2020 - 2026
 *
 *  TITLE:       UI.C
 *
-*  VERSION:     1.22
+*  VERSION:     1.23
 *
-*  DATE:        03 Oct 2025
+*  DATE:        07 Mar 2026
 *
 *  WinObjEx64 ImageScope UI.
 *
@@ -381,7 +381,7 @@ VOID SectionDumpStructs(
     __try {
         ntStatus = context->ParamBlock.OpenNamedObjectByType(
             &sectionHandle,
-            ObjectTypeSection,
+            PluginObjectTypeSection,
             &context->ParamBlock.Object.Directory,
             &context->ParamBlock.Object.Name,
             SECTION_QUERY);

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020 - 2025
+*  (C) COPYRIGHT AUTHORS, 2020 - 2026
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     1.22
+*  VERSION:     1.23
 *
-*  DATE:        03 Oct 2025
+*  DATE:        07 Mar 2026
 *
 *  WinObjEx64 ImageScope plugin.
 *
@@ -176,7 +176,7 @@ NTSTATUS CALLBACK StartPlugin(
 
         status = Context->ParamBlock.OpenNamedObjectByType(
             &sectionHandle,
-            ObjectTypeSection,
+            PluginObjectTypeSection,
             &Context->ParamBlock.Object.Directory,
             &Context->ParamBlock.Object.Name,
             SECTION_QUERY | SECTION_MAP_READ);
@@ -365,9 +365,9 @@ BOOLEAN CALLBACK PluginInit(
         RtlFillMemory(
             PluginData->SupportedObjectsIds,
             sizeof(PluginData->SupportedObjectsIds),
-            ObjectTypeNone);
+            PluginObjectTypeNone);
 
-        PluginData->SupportedObjectsIds[0] = ObjectTypeSection;
+        PluginData->SupportedObjectsIds[0] = (UCHAR)PluginObjectTypeSection;
 
         g_plugin = PluginData;
 

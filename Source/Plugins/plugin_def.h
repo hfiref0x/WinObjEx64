@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2025
+*  (C) COPYRIGHT AUTHORS, 2019 - 2026
 *
 *  TITLE:       PLUGIN_DEF.H
 *
-*  VERSION:     1.12
+*  VERSION:     1.13
 *
-*  DATE:        14 Jun 2025
+*  DATE:        07 Mar 2026
 *
 *  Common header file for the plugin subsystem definitions.
 *
@@ -19,6 +19,9 @@
 
 #pragma once
 
+#ifndef PLUGIN_DEF_H
+#define PLUGIN_DEF_H
+
 #define WOBJ_PLUGIN_SYSTEM_VERSION 25006
 
 //
@@ -27,11 +30,24 @@
 #define WINOBJEX_PLUGIN_ABI_VERSION 0x0100
 
 //
+// Plugin init routine name.
+//
+#define WINOBJEX_PLUGIN_EXPORT "PluginInit"
+
+//
 // Plugin text consts, must include terminating 0.
 //
 #define MAX_PLUGIN_NAME 32
 #define MAX_AUTHORS_NAME 32
 #define MAX_PLUGIN_DESCRIPTION 128
+
+//
+// VERSION_INFO "FileDescription" value used for validating plugin.
+//
+// Plugins prior to 1.87 had "WinObjEx64 Plugin" description field.
+// Make a new one to distinguish them because changes in plugin system are too complex.
+//
+#define WINOBJEX_PLUGIN_DESCRIPTION TEXT("WinObjEx64 Plugin V1.2")
 
 // Plugin run state
 
@@ -40,6 +56,13 @@
 
 // Indicates that plugin need to be stopped
 #define PLUGIN_STOP     1
+
+typedef struct _WINOBJEX_PLUGIN WINOBJEX_PLUGIN, * PWINOBJEX_PLUGIN;
+
+typedef struct _WINOBJEX_PARAM_OBJECT {
+    UNICODE_STRING Name;
+    UNICODE_STRING Directory;
+} WINOBJEX_PARAM_OBJECT, * PWINOBJEX_PARAM_OBJECT;
 
 typedef BOOL(CALLBACK* pfnReadSystemMemoryEx)(
     _In_ ULONG_PTR Address,
@@ -58,11 +81,6 @@ typedef NTSTATUS(*pfnOpenNamedObjectByType)(
     _In_ PUNICODE_STRING ObjectName,
     _In_ ACCESS_MASK DesiredAccess);
 
-typedef struct _WINOBJEX_PARAM_OBJECT {
-    UNICODE_STRING Name;
-    UNICODE_STRING Directory;
-} WINOBJEX_PARAM_OBJECT, * PWINOBJEX_PARAM_OBJECT;
-
 typedef struct _WINOBJEX_PARAM_BLOCK {
     ULONG cbSize; 
     HWND ParentWindow;
@@ -72,21 +90,13 @@ typedef struct _WINOBJEX_PARAM_BLOCK {
     RTL_OSVERSIONINFOW Version;
     WINOBJEX_PARAM_OBJECT Object; // used only by Context plugins during StartPlugin callback
 
-    //sys
+    //sys callbacks
     pfnReadSystemMemoryEx ReadSystemMemoryEx;
     pfnGetInstructionLength GetInstructionLength;
     pfnOpenNamedObjectByType OpenNamedObjectByType;
 
     ULONG Reserved[8];
 } WINOBJEX_PARAM_BLOCK, * PWINOBJEX_PARAM_BLOCK;
-
-typedef NTSTATUS(CALLBACK* pfnStartPlugin)(
-    _In_ PWINOBJEX_PARAM_BLOCK ParamBlock);
-
-typedef void(CALLBACK* pfnStopPlugin)(
-    VOID);
-
-typedef struct _WINOBJEX_PLUGIN WINOBJEX_PLUGIN;
 
 typedef enum _WINOBJEX_PLUGIN_STATE {
     PluginInitialization = 0,
@@ -101,6 +111,96 @@ typedef enum _WINOBJEX_PLUGIN_TYPE {
     ContextPlugin = 1, // Object type specific plugin (shown in popup menu for specified object types)
     InvalidPluginType
 } WINOBJEX_PLUGIN_TYPE;
+
+//
+// Object type indexes for known types, must be in compliance with WOBJ_OBJECT_TYPE values.
+//
+
+#define PluginObjectTypeDevice                        0
+#define PluginObjectTypeDriver                        1
+#define PluginObjectTypeSection                       2
+#define PluginObjectTypePort                          3
+#define PluginObjectTypeSymbolicLink                  4
+#define PluginObjectTypeKey                           5
+#define PluginObjectTypeEvent                         6
+#define PluginObjectTypeJob                           7
+#define PluginObjectTypeMutant                        8
+#define PluginObjectTypeKeyedEvent                    9
+#define PluginObjectTypeType                          10
+#define PluginObjectTypeDirectory                     11
+#define PluginObjectTypeWinstation                    12
+#define PluginObjectTypeCallback                      13
+#define PluginObjectTypeSemaphore                     14
+#define PluginObjectTypeWaitablePort                  15
+#define PluginObjectTypeTimer                         16
+#define PluginObjectTypeSession                       17
+#define PluginObjectTypeController                    18
+#define PluginObjectTypeProfile                       19
+#define PluginObjectTypeEventPair                     20
+#define PluginObjectTypeDesktop                       21
+#define PluginObjectTypeFile                          22
+#define PluginObjectTypeWMIGuid                       23
+#define PluginObjectTypeDebugObject                   24
+#define PluginObjectTypeIoCompletion                  25
+#define PluginObjectTypeProcess                       26
+#define PluginObjectTypeAdapter                       27
+#define PluginObjectTypeToken                         28
+#define PluginObjectTypeETWRegistration               29
+#define PluginObjectTypeThread                        30
+#define PluginObjectTypeTmTx                          31
+#define PluginObjectTypeTmTm                          32
+#define PluginObjectTypeTmRm                          33
+#define PluginObjectTypeTmEn                          34
+#define PluginObjectTypePcwObject                     35
+#define PluginObjectTypeFltConnPort                   36
+#define PluginObjectTypeFltComnPort                   37
+#define PluginObjectTypePowerRequest                  38
+#define PluginObjectTypeETWConsumer                   39
+#define PluginObjectTypeTpWorkerFactory               40
+#define PluginObjectTypeComposition                   41
+#define PluginObjectTypeIRTimer                       42
+#define PluginObjectTypeDxgkSharedResource            43
+#define PluginObjectTypeDxgkSharedSwapChain           44
+#define PluginObjectTypeDxgkSharedSyncObject          45
+#define PluginObjectTypeDxgkCurrentDxgProcessObject   46
+#define PluginObjectTypeDxgkCurrentDxgThreadObject    47
+#define PluginObjectTypeDxgkDisplayManager            48
+#define PluginObjectTypeDxgkDisplayMuxSwitch          49
+#define PluginObjectTypeDxgkSharedBundle              50
+#define PluginObjectTypeDxgkSharedProtectedSession    51
+#define PluginObjectTypeDxgkComposition               52
+#define PluginObjectTypeDxgkSharedKeyedMutex          53
+#define PluginObjectTypeMemoryPartition               54
+#define PluginObjectTypeRegistryTransaction           55
+#define PluginObjectTypeDmaAdapter                    56
+#define PluginObjectTypeDmaDomain                     57
+#define PluginObjectTypeCoverageSampler               58
+#define PluginObjectTypeActivationObject              59
+#define PluginObjectTypeActivityReference             60
+#define PluginObjectTypeCoreMessaging                 61
+#define PluginObjectTypeRawInputManager               62
+#define PluginObjectTypeWaitCompletionPacket          63
+#define PluginObjectTypeIoCompletionReserve           64
+#define PluginObjectTypeUserApcReserve                65
+#define PluginObjectTypeIoRing                        66
+#define PluginObjectTypeTerminal                      67
+#define PluginObjectTypeTerminalEventQueue            68
+#define PluginObjectTypeEnergyTracker                 69
+#define PluginObjectTypeUnknown                       70
+#define PluginObjectTypeAnyType                       0xfe
+#define PluginObjectTypeNone                          0xff
+
+#define PLUGIN_MAX_SUPPORTED_OBJECTS 0xff
+
+typedef NTSTATUS(CALLBACK* pfnStartPlugin)(
+    _In_ PWINOBJEX_PARAM_BLOCK ParamBlock);
+
+typedef void(CALLBACK* pfnStopPlugin)(
+    VOID);
+
+typedef BOOLEAN(CALLBACK* pfnPluginInit)(
+    _Inout_ PWINOBJEX_PLUGIN PluginData
+    );
 
 typedef void(CALLBACK* pfnStateChangeCallback)(
     _In_ WINOBJEX_PLUGIN* PluginData,
@@ -120,86 +220,6 @@ typedef VOID(CALLBACK* pfnGuiShutdownCallback)(
     _Reserved_ PVOID Reserved
     );
 
-//
-// Object type indexes for known types, must be in compliance with WOBJ_OBJECT_TYPE values.
-//
-
-#define ObjectTypeDevice                        0
-#define ObjectTypeDriver                        1
-#define ObjectTypeSection                       2
-#define ObjectTypePort                          3
-#define ObjectTypeSymbolicLink                  4
-#define ObjectTypeKey                           5
-#define ObjectTypeEvent                         6
-#define ObjectTypeJob                           7
-#define ObjectTypeMutant                        8
-#define ObjectTypeKeyedEvent                    9
-#define ObjectTypeType                          10
-#define ObjectTypeDirectory                     11
-#define ObjectTypeWinstation                    12
-#define ObjectTypeCallback                      13
-#define ObjectTypeSemaphore                     14
-#define ObjectTypeWaitablePort                  15
-#define ObjectTypeTimer                         16
-#define ObjectTypeSession                       17
-#define ObjectTypeController                    18
-#define ObjectTypeProfile                       19
-#define ObjectTypeEventPair                     20
-#define ObjectTypeDesktop                       21
-#define ObjectTypeFile                          22
-#define ObjectTypeWMIGuid                       23
-#define ObjectTypeDebugObject                   24
-#define ObjectTypeIoCompletion                  25
-#define ObjectTypeProcess                       26
-#define ObjectTypeAdapter                       27
-#define ObjectTypeToken                         28
-#define ObjectTypeETWRegistration               29
-#define ObjectTypeThread                        30
-#define ObjectTypeTmTx                          31
-#define ObjectTypeTmTm                          32
-#define ObjectTypeTmRm                          33
-#define ObjectTypeTmEn                          34
-#define ObjectTypePcwObject                     35
-#define ObjectTypeFltConnPort                   36
-#define ObjectTypeFltComnPort                   37
-#define ObjectTypePowerRequest                  38
-#define ObjectTypeETWConsumer                   39
-#define ObjectTypeTpWorkerFactory               40
-#define ObjectTypeComposition                   41
-#define ObjectTypeIRTimer                       42
-#define ObjectTypeDxgkSharedResource            43
-#define ObjectTypeDxgkSharedSwapChain           44
-#define ObjectTypeDxgkSharedSyncObject          45
-#define ObjectTypeDxgkCurrentDxgProcessObject   46
-#define ObjectTypeDxgkCurrentDxgThreadObject    47
-#define ObjectTypeDxgkDisplayManager            48
-#define ObjectTypeDxgkDisplayMuxSwitch          49
-#define ObjectTypeDxgkSharedBundle              50
-#define ObjectTypeDxgkSharedProtectedSession    51
-#define ObjectTypeDxgkComposition               52
-#define ObjectTypeDxgkSharedKeyedMutex          53
-#define ObjectTypeMemoryPartition               54
-#define ObjectTypeRegistryTransaction           55
-#define ObjectTypeDmaAdapter                    56
-#define ObjectTypeDmaDomain                     57
-#define ObjectTypeCoverageSampler               58
-#define ObjectTypeActivationObject              59
-#define ObjectTypeActivityReference             60
-#define ObjectTypeCoreMessaging                 61
-#define ObjectTypeRawInputManager               62
-#define ObjectTypeWaitCompletionPacket          63
-#define ObjectTypeIoCompletionReserve           64
-#define ObjectTypeUserApcReserve                65
-#define ObjectTypeIoRing                        66
-#define ObjectTypeTerminal                      67
-#define ObjectTypeTerminalEventQueue            68
-#define ObjectTypeEnergyTracker                 69
-#define ObjectTypeUnknown                       70
-#define ObjectTypeAnyType                       0xfe
-#define ObjectTypeNone                          0xff
-
-#define PLUGIN_MAX_SUPPORTED_OBJECT_ID 0xff
-
 typedef struct _WINOBJEX_PLUGIN {
     ULONG cbSize;
     ULONG AbiVersion;
@@ -218,7 +238,7 @@ typedef struct _WINOBJEX_PLUGIN {
     WORD MajorVersion;
     WORD MinorVersion;
     ULONG RequiredPluginSystemVersion;
-    UCHAR SupportedObjectsIds[PLUGIN_MAX_SUPPORTED_OBJECT_ID]; // Ignored if plugin Type is DefaultPlugin
+    UCHAR SupportedObjectsIds[PLUGIN_MAX_SUPPORTED_OBJECTS]; // Ignored if plugin Type is DefaultPlugin
     WCHAR Name[MAX_PLUGIN_NAME];
     WCHAR Authors[MAX_AUTHORS_NAME];
     WCHAR Description[MAX_PLUGIN_DESCRIPTION];
@@ -230,3 +250,12 @@ typedef struct _WINOBJEX_PLUGIN {
 
     ULONG Reserved[8];
 } WINOBJEX_PLUGIN, * PWINOBJEX_PLUGIN;
+
+typedef struct _WINOBJEX_PLUGIN_INTERNAL {
+    LIST_ENTRY ListEntry;
+    UINT Id;
+    HMODULE Module;
+    WINOBJEX_PLUGIN Plugin;
+} WINOBJEX_PLUGIN_INTERNAL, * PWINOBJEX_PLUGIN_INTERNAL;
+
+#endif /* PLUGIN_DEF_H */

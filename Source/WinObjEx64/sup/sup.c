@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.10
 *
-*  DATE:        10 Feb 2026
+*  DATE:        07 Mar 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1772,7 +1772,7 @@ BOOL supTreeListCopyItemValueToClipboard(
         else {
             if (tlSubItemHit == 0) {
                 lpCopyData = szText;
-                cbCopyData = sizeof(szText);
+                cbCopyData = _strlen(lpCopyData) * sizeof(WCHAR);
             }
         }
 
@@ -4227,9 +4227,9 @@ INT supGetMaxOfTwoU64FromHex(
     _In_ BOOL Inverse
 )
 {
-    INT       nResult;
+    INT       nResult = 0;
     LPWSTR    lpItem1 = NULL, lpItem2 = NULL;
-    ULONG_PTR ad1, ad2;
+    ULONG_PTR ad1 = 0, ad2 = 0;
     WCHAR     szText[MAX_TEXT_CONVERSION_ULONG64];
 
     RtlSecureZeroMemory(&szText, sizeof(szText));
@@ -4254,10 +4254,13 @@ INT supGetMaxOfTwoU64FromHex(
 
     ad2 = hextou64(&lpItem2[2]);
 
+    if (ad1 < ad2)
+        nResult = -1;
+    else if (ad1 > ad2)
+        nResult = 1;
+
     if (Inverse)
-        nResult = ad1 < ad2;
-    else
-        nResult = ad1 > ad2;
+        nResult = -nResult;
 
     return nResult;
 }
@@ -7449,6 +7452,7 @@ BOOL supxListViewExportCSV(
     SIZE_T          total_length;
     DWORD           iobytes;
     HANDLE          f;
+    WORD            bom;
 
     text = (PWCHAR)supVirtualAlloc(32768 * sizeof(WCHAR));
     if (!text)
@@ -7519,10 +7523,14 @@ BOOL supxListViewExportCSV(
 
             if (f != INVALID_HANDLE_VALUE) {
 
-                WriteFile(f, buffer0,
-                    (DWORD)(total_length * sizeof(WCHAR)),
-                    &iobytes, NULL);
-
+                bom = 0xFEFF;
+                if (WriteFile(f, &bom, sizeof(WORD), &iobytes, NULL) &&
+                    iobytes == sizeof(WORD) &&
+                    WriteFile(f, buffer0, (DWORD)(total_length * sizeof(WCHAR)), &iobytes, NULL) &&
+                    iobytes == (DWORD)(total_length * sizeof(WCHAR)))
+                {
+                    result = TRUE;
+                }
                 CloseHandle(f);
                 result = TRUE;
             }

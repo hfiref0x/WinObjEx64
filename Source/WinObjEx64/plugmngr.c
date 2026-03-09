@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.10
 *
-*  DATE:        10 Feb 2026
+*  DATE:        07 Mar 2026
 *
 *  Plugin manager.
 *
@@ -505,8 +505,8 @@ DWORD WINAPI PmpWorkerThread(
                                     MenuItem.wID = PluginEntry->Id;
 
                                     InsertMenuItem(hPluginMenu,
-                                        PluginEntry->Id,
-                                        FALSE,
+                                        GetMenuItemCount(hPluginMenu),
+                                        TRUE,
                                         &MenuItem);
 
                                 }
@@ -596,8 +596,17 @@ VOID PmDestroy()
         __except (EXCEPTION_EXECUTE_HANDLER) {
             ;
         }
+
+        if (PluginEntry->Module) {
+            FreeLibrary(PluginEntry->Module);
+            PluginEntry->Module = NULL;
+        }
+
         supHeapFree(PluginEntry);
     }
+
+    InitializeListHead(&g_PluginsListHead);
+    g_PluginCount = 0;
 }
 
 /*
@@ -758,6 +767,7 @@ VOID PmProcessEntry(
             }
 
             RtlSecureZeroMemory(&ParamBlock, sizeof(ParamBlock));
+            ParamBlock.cbSize = sizeof(ParamBlock);
 
             //
             // Copy selected object data to plugin object.
@@ -829,10 +839,13 @@ BOOLEAN PmpIsSupportedObject(
     if (Plugin->SupportedObjectsIds[0] == ObjectTypeAnyType)
         return TRUE;
 
-    for (i = 0; i < PLUGIN_MAX_SUPPORTED_OBJECT_ID; i++)
-        if (Plugin->SupportedObjectsIds[i] != ObjectTypeNone)
-            if (Plugin->SupportedObjectsIds[i] == ObjectType)
-                return TRUE;
+    for (i = 0; i < PLUGIN_MAX_SUPPORTED_OBJECTS; i++) {
+        if (Plugin->SupportedObjectsIds[i] == ObjectTypeNone)
+            break;
+
+        if (Plugin->SupportedObjectsIds[i] == ObjectType)
+            return TRUE;
+    }
 
     return FALSE;
 }
@@ -1015,7 +1028,7 @@ VOID PmpListSupportedObjectTypes(
     }
     else {
 
-        for (i = 0; i < PLUGIN_MAX_SUPPORTED_OBJECT_ID; i++)
+        for (i = 0; i < PLUGIN_MAX_SUPPORTED_OBJECTS; i++)
             if (Plugin->SupportedObjectsIds[i] != ObjectTypeNone) {
                 lpObjectType = ObManagerGetNameByIndex((WOBJ_OBJECT_TYPE)Plugin->SupportedObjectsIds[i]);
                 SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)lpObjectType);

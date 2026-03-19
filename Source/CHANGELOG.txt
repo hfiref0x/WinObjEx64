@@ -1,7 +1,9 @@
 v2.1.0
+ported to msvc 2026 (with backward compatibility to 2022)
 win11 25H2 compatibility improvements
 fixed incorrect object quota information dump
 more descriptions for object types
+WinDepends support integration for Drivers/SSDT/SSSDT table viewers
 internal rearrangement
 
 v2.0.9

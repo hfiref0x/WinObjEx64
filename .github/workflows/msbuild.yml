@@ -5,7 +5,7 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
-  workflow_dispatch: # Allow manual runs from the Actions tab
+  workflow_dispatch:
 
 env:
   BUILD_CONFIGURATION: Release
@@ -17,10 +17,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v5
 
       - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v2
+        uses: microsoft/setup-msbuild@v3
 
       - name: Build WinObjEx64
         working-directory: ./Source
@@ -31,7 +31,7 @@ jobs:
           mkdir Package\Application
           copy Source\WinObjEx64\output\x64\Release\bin\WinObjEx64.exe Package\Application
           copy Docs\WinObjEx64.chm Package\Application
-          
+
       - name: Build WinObjEx64 Plugins
         working-directory: ./Source
         run: msbuild /m /p:Platform=x64 /p:PostBuildEventUseInBuild=false /p:Configuration=Release /p:PlatformToolset=v143 WinObjEx64_Plugins.sln
@@ -45,14 +45,13 @@ jobs:
           copy Source\Plugins\ImageScope\output\x64\Release\bin\ImageScope.dll Package\Plugins
 
       - name: Upload WinObjEx64 artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: WinObjEx64
           path: Package\Application\*
 
       - name: Upload WinObjEx64 Plugins artifact (zip)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: WinObjEx64_Plugins
           path: Package\Plugins\*
-          

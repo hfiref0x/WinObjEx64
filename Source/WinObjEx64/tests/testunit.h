@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       TESTUNIT.H
 *
-*  VERSION:     2.00
+*  VERSION:     2.11
 *
-*  DATE:        19 Jun 2022
+*  DATE:        22 May 2026
 *
 *  Common header file for test code.
 *
@@ -26,7 +26,11 @@ VOID TestException(_In_ BOOL bNaked);
 HANDLE TestGetPortHandle();
 
 #ifdef _DEBUG
-#define BeginTests()   TestStart()
-#define EndTests()     TestStop()
+#define BeginTests() TestStart()
+#define EndTests() TestStop()
 #define BeginUITests() TestUI()
+#else
+#define BeginTests()
+#define EndTests()
+#define BeginUITests()
 #endif

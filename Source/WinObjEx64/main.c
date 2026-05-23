@@ -1948,9 +1948,7 @@ UINT WinObjExMain()
 
     supInit(bIsFullAdmin);
 
-#ifdef _DEBUG
     BeginTests();
-#endif
 
     initResult = guiCreateMainWindowAndComponents(bIsFullAdmin, &g_WinObj);
     if (initResult != INIT_NO_ERROR) {
@@ -1978,9 +1976,7 @@ UINT WinObjExMain()
         TreeView_SelectItem(g_hwndObjectTree, TreeView_GetRoot(g_hwndObjectTree));
         SetFocus(g_hwndObjectTree);
 
-#ifdef _DEBUG
         BeginUITests();
-#endif
 
         result = guiProcessMainMessageLoop(g_WinObj.hInstance);
     }

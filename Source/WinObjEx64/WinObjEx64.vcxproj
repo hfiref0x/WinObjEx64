@@ -420,6 +420,7 @@
     <ClCompile Include="sysinfoDlg.c" />
     <ClCompile Include="tests\ntsup_tests.c" />
     <ClCompile Include="tests\testunit.c" />
+    <ClCompile Include="tests\uitest.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc">
@@ -474,6 +475,7 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="tests\ntsup_tests.h" />
     <ClInclude Include="tests\testunit.h" />
+    <ClInclude Include="tests\uitest.h" />
     <ClInclude Include="ui.h" />
   </ItemGroup>
   <ItemGroup>

@@ -1976,6 +1976,8 @@ UINT WinObjExMain()
         TreeView_SelectItem(g_hwndObjectTree, TreeView_GetRoot(g_hwndObjectTree));
         SetFocus(g_hwndObjectTree);
 
+        BeginUITests();
+
         result = guiProcessMainMessageLoop(g_WinObj.hInstance);
     }
 

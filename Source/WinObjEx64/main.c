@@ -1948,7 +1948,9 @@ UINT WinObjExMain()
 
     supInit(bIsFullAdmin);
 
+#ifdef _DEBUG
     BeginTests();
+#endif
 
     initResult = guiCreateMainWindowAndComponents(bIsFullAdmin, &g_WinObj);
     if (initResult != INIT_NO_ERROR) {
@@ -1976,7 +1978,9 @@ UINT WinObjExMain()
         TreeView_SelectItem(g_hwndObjectTree, TreeView_GetRoot(g_hwndObjectTree));
         SetFocus(g_hwndObjectTree);
 
-        BeginUITests(); // UI usability tests (debug only, run after full init).
+#ifdef _DEBUG
+        BeginUITests();
+#endif
 
         result = guiProcessMainMessageLoop(g_WinObj.hInstance);
     }
@@ -1992,7 +1996,9 @@ UINT WinObjExMain()
     supShutdown();
     logFree();
 
+#ifdef _DEBUG
     EndTests();
+#endif
 
     return result;
 }

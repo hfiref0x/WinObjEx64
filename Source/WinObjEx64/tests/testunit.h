@@ -29,8 +29,4 @@ HANDLE TestGetPortHandle();
 #define BeginTests()   TestStart()
 #define EndTests()     TestStop()
 #define BeginUITests() TestUI()
-#else
-#define BeginTests()
-#define EndTests()
-#define BeginUITests()
 #endif

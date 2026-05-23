@@ -1992,9 +1992,7 @@ UINT WinObjExMain()
     supShutdown();
     logFree();
 
-#ifdef _DEBUG
     EndTests();
-#endif
 
     return result;
 }

@@ -18,15 +18,19 @@
 *******************************************************************************/
 #pragma once
 
+#include "uitest.h"
+
 VOID TestStart(VOID);
 VOID TestStop(VOID);
 VOID TestException(_In_ BOOL bNaked);
 HANDLE TestGetPortHandle();
 
 #ifdef _DEBUG
-#define BeginTests() TestStart()
-#define EndTests() TestStop()
+#define BeginTests()   TestStart()
+#define EndTests()     TestStop()
+#define BeginUITests() TestUI()
 #else
 #define BeginTests()
 #define EndTests()
+#define BeginUITests()
 #endif

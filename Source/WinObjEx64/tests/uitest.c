@@ -255,10 +255,10 @@ static VOID Test_KeyboardNavigation(VOID)
 */
 static VOID Test_WindowTitle(VOID)
 {
-    WCHAR szTitle[MAX_PATH] = { 0 };
-    int len;
+    WCHAR szTitle[256] = { 0 };
+    INT len;
 
-    len = GetWindowText(g_hwndMain, szTitle, MAX_PATH);
+    len = GetWindowText(g_hwndMain, szTitle, RTL_NUMBER_OF(szTitle));
     UI_TEST_ASSERT(len > 0);
     UI_TEST_ASSERT(_strlen(szTitle) > 0);
 }

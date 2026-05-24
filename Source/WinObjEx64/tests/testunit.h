@@ -18,7 +18,7 @@
 *******************************************************************************/
 #pragma once
 
-#include "uitest.h"
+#include "tests/uitest.h"
 
 VOID TestStart(VOID);
 VOID TestStop(VOID);

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2025
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       PROPTYPE.C
 *
-*  VERSION:     2.09
+*  VERSION:     2.11
 *
-*  DATE:        21 Aug 2025
+*  DATE:        21 May 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -72,70 +72,70 @@ VOID propSetTypeDecodeValue(
 )
 {
     INT	        i, Count, bitIndex;
-    DWORD       u;
+    DWORD       u, remaining, specific;
     PVALUE_DESC Desc = NULL;
 
     switch (TypeIndex) {
 
     case ObjectTypeWMIGuid:
         Desc = a_WmiGuidProp;
-        Count = MAX_KNOWN_WMIGUID_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_WmiGuidProp);
         break;
 
     case ObjectTypeWinstation:
         Desc = a_WinstaProp;
-        Count = MAX_KNOWN_WINSTA_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_WinstaProp);
         break;
 
     case ObjectTypeToken:
         Desc = a_TokenProp;
-        Count = MAX_KNOWN_TOKEN_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_TokenProp);
         break;
 
     case ObjectTypeThread:
         Desc = a_ThreadProp;
-        Count = MAX_KNOWN_THREAD_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_ThreadProp);
         break;
 
     case ObjectTypeIRTimer:
     case ObjectTypeTimer:
         Desc = a_TimerProp;
-        Count = MAX_KNOWN_TIMER_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_TimerProp);
         break;
 
     case ObjectTypeProcess:
         Desc = a_ProcessProp;
-        Count = MAX_KNOWN_PROCESS_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_ProcessProp);
         break;
 
     case ObjectTypeKeyedEvent:
         Desc = a_KeyedEventProp;
-        Count = MAX_KNOWN_KEYEDEVENT_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_KeyedEventProp);
         break;
 
     case ObjectTypeJob:
         Desc = a_JobProp;
-        Count = MAX_KNOWN_JOB_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_JobProp);
         break;
 
     case ObjectTypeSession:
         Desc = a_SessionProp;
-        Count = MAX_KNOWN_SESSION_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_SessionProp);
         break;
 
     case ObjectTypeDesktop:
         Desc = a_DesktopObjectProp;
-        Count = MAX_KNOWN_DESKTOP_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_DesktopObjectProp);
         break;
 
     case ObjectTypeDebugObject:
         Desc = a_DebugObjectProp;
-        Count = MAX_KNOWN_DEBUGOBJECT_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_DebugObjectProp);
         break;
 
     case ObjectTypeCallback:
         Desc = a_CallbackProp;
-        Count = MAX_KNOWN_CALLBACK_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_CallbackProp);
         break;
 
     case ObjectTypeAdapter:
@@ -144,37 +144,37 @@ VOID propSetTypeDecodeValue(
     case ObjectTypeDriver:
     case ObjectTypeFile:
         Desc = a_FileProp;
-        Count = MAX_KNOWN_FILE_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_FileProp);
         break;
 
     case ObjectTypeKey:
         Desc = a_KeyProp;
-        Count = MAX_KNOWN_KEY_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_KeyProp);
         break;
 
     case ObjectTypeType:
         Desc = a_TypeProp;
-        Count = MAX_KNOWN_TYPE_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_TypeProp);
         break;
 
     case ObjectTypeSymbolicLink:
         Desc = a_SymLinkProp;
-        Count = MAX_KNOWN_SYMLINK_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_SymLinkProp);
         break;
 
     case ObjectTypeDirectory:
         Desc = a_DirProp;
-        Count = MAX_KNOWN_DIRECTORY_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_DirProp);
         break;
 
     case ObjectTypeEvent:
         Desc = a_EventProp;
-        Count = MAX_KNOWN_EVENT_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_EventProp);
         break;
 
     case ObjectTypeMutant:
         Desc = a_MutantProp;
-        Count = MAX_KNOWN_MUTANT_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_MutantProp);
         break;
 
         //all ports
@@ -183,74 +183,74 @@ VOID propSetTypeDecodeValue(
     case ObjectTypeWaitablePort:
     case ObjectTypePort:
         Desc = a_PortProp;
-        Count = MAX_KNOWN_PORT_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_PortProp);
         break;
 
     case ObjectTypeProfile:
         Desc = a_ProfileProp;
-        Count = MAX_KNOWN_PROFILE_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_ProfileProp);
         break;
 
     case ObjectTypeSection:
         Desc = a_SectionProp;
-        Count = MAX_KNOWN_SECTION_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_SectionProp);
         break;
 
     case ObjectTypeSemaphore:
         Desc = a_SemaphoreProp;
-        Count = MAX_KNOWN_SEMAPHORE_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_SemaphoreProp);
         break;
 
     case ObjectTypeIoCompletion:
     case ObjectTypeIoCompletionReserve:
         Desc = a_IoCompletionProp;
-        Count = MAX_KNOWN_IOCOMPLETION_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_IoCompletionProp);
         break;
 
         //RegistryTransaction/Transaction Object
     case ObjectTypeRegistryTransaction:
     case ObjectTypeTmTx:
         Desc = a_TmTxProp;
-        Count = MAX_KNOWN_TMTX_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_TmTxProp);
         break;
 
         //Transaction Resource Manager Object
     case ObjectTypeTmRm:
         Desc = a_TmRmProp;
-        Count = MAX_KNOWN_TMRM_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_TmRmProp);
         break;
 
         //Transaction Enlistment Object 
     case ObjectTypeTmEn:
         Desc = a_TmEnProp;
-        Count = MAX_KNOWN_TMEN_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_TmEnProp);
         break;
 
         //Transaction Manager Object
     case ObjectTypeTmTm:
         Desc = a_TmTmProp;
-        Count = MAX_KNOWN_TMTM_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_TmTmProp);
         break;
 
     case ObjectTypeTpWorkerFactory:
         Desc = a_TpwfProp;
-        Count = MAX_KNOWN_TPWORKERFACTORY_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_TpwfProp);
         break;
 
     case ObjectTypePcwObject:
         Desc = a_PcwProp;
-        Count = MAX_KNOWN_PCWOBJECT_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_PcwProp);
         break;
 
     case ObjectTypeComposition:
         Desc = a_CompositionProp;
-        Count = MAX_KNOWN_COMPOSITION_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_CompositionProp);
         break;
 
         //Parition object
     case ObjectTypeMemoryPartition:
         Desc = a_MemPartProp;
-        Count = MAX_KNOWN_MEMPARTITION_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_MemPartProp);
         break;
 
     default:
@@ -258,34 +258,43 @@ VOID propSetTypeDecodeValue(
         break;
     }
 
+    remaining = Value;
+
     //list for selected type
     if (Desc) {
         for (i = 0; i < Count; i++) {
-            if (Value & Desc[i].dwValue) {
+            if (remaining & Desc[i].dwValue) {
                 propSetTypeFlagValue(hListView, Desc[i].lpDescription, Desc[i].dwValue);
-                Value &= ~Desc[i].dwValue;
+                remaining &= ~Desc[i].dwValue;
             }
         }
     }
 
     //list Standard Access Rights if anything left
-    if (Value != 0) {
+    if (remaining != 0) {
         Desc = a_Standard;
-        Count = MAX_KNOWN_STANDARD_ATTRIBUTES;
+        Count = RTL_NUMBER_OF(a_Standard);
         for (i = 0; i < Count; i++) {
-            if (Value & Desc[i].dwValue) {
+            if (remaining & Desc[i].dwValue) {
                 propSetTypeFlagValue(hListView, Desc[i].lpDescription, Desc[i].dwValue);
-                Value &= ~Desc[i].dwValue;
+                remaining &= ~Desc[i].dwValue;
             }
         }
     }
-    //set unknown to anything else
-    if (Value != 0) {
-        for (bitIndex = 0; bitIndex < 32 && Value != 0; bitIndex++) {
+
+    specific = remaining & SPECIFIC_RIGHTS_ALL;
+    if (specific != 0) {
+        propSetTypeFlagValue(hListView, a_Specific[0].lpDescription, specific);
+        remaining &= ~SPECIFIC_RIGHTS_ALL;
+    }
+
+    //list any remaining unknown bits
+    if (remaining != 0) {
+        for (bitIndex = 0; bitIndex < 32 && remaining != 0; bitIndex++) {
             u = (1U << bitIndex);
-            if (Value & u) {
+            if (remaining & u) {
                 propSetTypeFlagValue(hListView, T_Unknown, u);
-                Value &= ~u;
+                remaining &= ~u;
             }
         }
     }
@@ -425,8 +434,7 @@ VOID propSetTypeDecodedAttributes(
 {
     HWND            hListRights, hListAttrbites;
     LRESULT         curSel;
-    DWORD           i, dwFlags, a_Count;
-    PVALUE_DESC     a_Desc;
+    DWORD           i, dwFlags;
 
     hListRights = GetDlgItem(hwndDlg, ID_TYPE_ACL_LIST);
     if (hListRights == NULL) {
@@ -461,13 +469,10 @@ VOID propSetTypeDecodedAttributes(
         //
         // List all known attributes.
         //
-        a_Count = MAX_KNOWN_OBJECT_ATTRIBUTES;
-        a_Desc = a_ObjProp;
-
-        for (i = 0; i < a_Count; i++) {
-            if (dwFlags & a_Desc[i].dwValue) {
-                propSetTypeFlagValue(hListRights, a_Desc[i].lpDescription, a_Desc[i].dwValue);
-                dwFlags &= ~a_Desc[i].dwValue;
+        for (i = 0; i < RTL_NUMBER_OF(a_ObjProp); i++) {
+            if (dwFlags & a_ObjProp[i].dwValue) {
+                propSetTypeFlagValue(hListRights, a_ObjProp[i].lpDescription, a_ObjProp[i].dwValue);
+                dwFlags &= ~a_ObjProp[i].dwValue;
             }
         }
 
@@ -740,7 +745,7 @@ VOID propSetTypeInfo(
 
         //PoolType
         lpTypeDescription = T_Unknown;
-        for (i = 0; i < MAX_KNOWN_POOL_TYPES; i++) {
+        for (i = 0; i < RTL_NUMBER_OF(a_PoolTypes); i++) {
             if (ObjectTypeDump.TypeInfo.PoolType == (POOL_TYPE)a_PoolTypes[i].dwValue) {
                 lpTypeDescription = a_PoolTypes[i].lpDescription;
                 break;

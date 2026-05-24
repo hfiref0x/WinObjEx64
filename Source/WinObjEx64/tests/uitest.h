@@ -4,9 +4,9 @@
 *
 *  TITLE:       UITEST.H
 *
-*  VERSION:     2.10
+*  VERSION:     2.11
 *
-*  DATE:        23 May 2026
+*  DATE:        24 May 2026
 *
 *  Common header file for UI usability test code.
 *

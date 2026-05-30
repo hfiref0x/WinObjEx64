@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2025
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     2.09
+*  VERSION:     2.11
 *
-*  DATE:        21 Aug 2025
+*  DATE:        21 May 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -3159,7 +3159,7 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpObjectType)
     PVOID ObjectTypeInformation = NULL;
     PRTL_PROCESS_MODULES ModulesList = NULL;
     TL_SUBITEMS_FIXED TreeListSubItems;
-    PVOID TypeProcs[MAX_KNOWN_OBJECT_TYPE_PROCEDURES];
+    PVOID TypeProcs[RTL_NUMBER_OF(T_OBJECT_TYPE_PROCS)];
     PVOID SelfDriverBase;
     ULONG SelfDriverSize;
 
@@ -3342,7 +3342,7 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpObjectType)
 
         //Pool Type
         lpType = T_Unknown;
-        for (i = 0; i < MAX_KNOWN_POOL_TYPES; i++) {
+        for (i = 0; i < RTL_NUMBER_OF(a_PoolTypes); i++) {
             if (ObjectType.Versions.ObjectTypeCompatible->TypeInfo.PoolType == (POOL_TYPE)a_PoolTypes[i].dwValue) {
                 lpType = a_PoolTypes[i].lpDescription;
                 break;
@@ -3373,13 +3373,13 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpObjectType)
         SelfDriverBase = ModulesList->Modules[0].ImageBase;
         SelfDriverSize = ModulesList->Modules[0].ImageSize;
 
-        for (i = 0; i < MAX_KNOWN_OBJECT_TYPE_PROCEDURES; i++) {
+        for (i = 0; i < RTL_NUMBER_OF(T_OBJECT_TYPE_PROCS); i++) {
             if (TypeProcs[i]) {
-                propObDumpAddressWithModule(hwndTreeList, h_tviSubItem, T_TYPEPROCEDURES[i], TypeProcs[i],
+                propObDumpAddressWithModule(hwndTreeList, h_tviSubItem, T_OBJECT_TYPE_PROCS[i], TypeProcs[i],
                     ModulesList, SelfDriverBase, SelfDriverSize);
             }
             else {
-                propObDumpAddress(hwndTreeList, h_tviSubItem, T_TYPEPROCEDURES[i], NULL, TypeProcs[i], 0, 0);
+                propObDumpAddress(hwndTreeList, h_tviSubItem, T_OBJECT_TYPE_PROCS[i], NULL, TypeProcs[i], 0, 0);
             }
         }
 

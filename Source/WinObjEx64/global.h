@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2024
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     2.05
+*  VERSION:     2.11
 *
-*  DATE:        05 Jun 2024
+*  DATE:        22 May 2026
 *
 *  Common header file for the Windows Object Explorer.
 *

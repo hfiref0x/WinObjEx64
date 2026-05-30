@@ -4,9 +4,9 @@
 *
 *  TITLE:       LIST.C
 *
-*  VERSION:     2.10
+*  VERSION:     2.11
 *
-*  DATE:        20 Feb 2026
+*  DATE:        21 May 2026
 *
 *  Program main object listing and search logic.
 *
@@ -547,7 +547,7 @@ VOID AddListViewItem(
             bFound = supQueryTypeInfo(&Entry->Name,
                 szBuffer,
                 MAX_PATH,
-                MAX_KNOWN_POOL_TYPES,
+                RTL_NUMBER_OF(a_PoolTypes),
                 a_PoolTypes);
             break;
         }

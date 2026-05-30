@@ -267,6 +267,9 @@
     <ClCompile Include="tests\ntsup_tests.c">
       <Filter>Source Files\tests</Filter>
     </ClCompile>
+    <ClCompile Include="tests\uitest.c">
+      <Filter>Source Files\tests</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc">
@@ -416,6 +419,9 @@
       <Filter>Minirtl</Filter>
     </ClInclude>
     <ClInclude Include="tests\ntsup_tests.h">
+      <Filter>Source Files\tests</Filter>
+    </ClInclude>
+    <ClInclude Include="tests\uitest.h">
       <Filter>Source Files\tests</Filter>
     </ClInclude>
   </ItemGroup>

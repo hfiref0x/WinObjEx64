@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       PROPSECURITYCONSTS.H
 *
-*  VERSION:     2.00
+*  VERSION:     2.11
 *
-*  DATE:        19 Jun 2022
+*  DATE:        12 Jun 2026
 *
 *  Consts header file for Security property sheet.
 *
@@ -31,8 +31,7 @@
 //
 //General Access Values
 //
-#define MAX_KNOWN_GENERAL_ACCESS_VALUE 5
-static SI_ACCESS GeneralAccessValues[MAX_KNOWN_GENERAL_ACCESS_VALUE] = {
+static SI_ACCESS T_GeneralAccessValues[] = {
     SI_ACCESS_DEFAULT_ENTRY(DELETE, L"Delete"),
     SI_ACCESS_DEFAULT_ENTRY(READ_CONTROL, L"Read Control"),
     SI_ACCESS_DEFAULT_ENTRY(WRITE_DAC, L"Write DAC"),
@@ -43,8 +42,7 @@ static SI_ACCESS GeneralAccessValues[MAX_KNOWN_GENERAL_ACCESS_VALUE] = {
 //
 //Section Access Values
 //
-#define MAX_KNOWN_SECTION_ACCESS_VALUE 5
-static SI_ACCESS SectionAccessValues[MAX_KNOWN_SECTION_ACCESS_VALUE] = {
+static SI_ACCESS T_SectionAccessValues[] = {
     SI_ACCESS_DEFAULT_ENTRY(SECTION_QUERY, L"Query"),
     SI_ACCESS_DEFAULT_ENTRY(SECTION_MAP_WRITE, L"Map Write"),
     SI_ACCESS_DEFAULT_ENTRY(SECTION_MAP_READ, L"Map Read"),
@@ -55,8 +53,7 @@ static SI_ACCESS SectionAccessValues[MAX_KNOWN_SECTION_ACCESS_VALUE] = {
 //
 //Directory Access Values
 //
-#define MAX_KNOWN_DIRECTORY_ACCESS_VALUE 4
-static SI_ACCESS DirectoryAccessValues[MAX_KNOWN_DIRECTORY_ACCESS_VALUE] = {
+static SI_ACCESS T_DirectoryAccessValues[] = {
     SI_ACCESS_DEFAULT_ENTRY(DIRECTORY_QUERY, L"Query"),
     SI_ACCESS_DEFAULT_ENTRY(DIRECTORY_TRAVERSE, L"Traverse"),
     SI_ACCESS_DEFAULT_ENTRY(DIRECTORY_CREATE_OBJECT, L"Create Object"),
@@ -66,8 +63,7 @@ static SI_ACCESS DirectoryAccessValues[MAX_KNOWN_DIRECTORY_ACCESS_VALUE] = {
 //
 //File Access Values
 //
-#define MAX_KNOWN_FILE_ACCESS_VALUE 14
-static SI_ACCESS FileAccessValues[MAX_KNOWN_FILE_ACCESS_VALUE] = {
+static SI_ACCESS T_FileAccessValues[] = {
     SI_ACCESS_DEFAULT_ENTRY(FILE_READ_DATA, L"Read Data"),
     SI_ACCESS_DEFAULT_ENTRY(FILE_LIST_DIRECTORY, L"List Directory"),
     SI_ACCESS_DEFAULT_ENTRY(FILE_WRITE_DATA, L"Write Data"),
@@ -87,8 +83,7 @@ static SI_ACCESS FileAccessValues[MAX_KNOWN_FILE_ACCESS_VALUE] = {
 //
 //Event Access Values
 //
-#define MAX_KNOWN_EVENT_ACCESS_VALUE 2
-static SI_ACCESS EventAccessValues[MAX_KNOWN_EVENT_ACCESS_VALUE] = {
+static SI_ACCESS T_EventAccessValues[] = {
     SI_ACCESS_DEFAULT_ENTRY(EVENT_QUERY_STATE, L"Query State"),
     SI_ACCESS_DEFAULT_ENTRY(EVENT_MODIFY_STATE, L"Modify State")
 };
@@ -96,16 +91,14 @@ static SI_ACCESS EventAccessValues[MAX_KNOWN_EVENT_ACCESS_VALUE] = {
 //
 //Mutant Access Values
 //
-#define MAX_KNOWN_MUTANT_ACCESS_VALUE 1
-static SI_ACCESS MutantAccessValues[MAX_KNOWN_MUTANT_ACCESS_VALUE] = {
+static SI_ACCESS T_MutantAccessValues[] = {
     SI_ACCESS_DEFAULT_ENTRY(MUTANT_QUERY_STATE, L"Query State")
 };
 
 //
 //Desktop Access Values
 //
-#define MAX_KNOWN_DESKTOP_ACCESS_VALUE 9
-static SI_ACCESS DesktopAccessValues[MAX_KNOWN_DESKTOP_ACCESS_VALUE] = {
+static SI_ACCESS T_DesktopAccessValues[] = {
     SI_ACCESS_DEFAULT_ENTRY(DESKTOP_READOBJECTS, L"Read Objects"),
     SI_ACCESS_DEFAULT_ENTRY(DESKTOP_CREATEWINDOW, L"Create Window"),
     SI_ACCESS_DEFAULT_ENTRY(DESKTOP_CREATEMENU, L"Create Menu"),
@@ -120,8 +113,7 @@ static SI_ACCESS DesktopAccessValues[MAX_KNOWN_DESKTOP_ACCESS_VALUE] = {
 //
 //WinStation Access Values
 //
-#define MAX_KNOWN_WINSTATION_ACCESS_VALUE 9
-static SI_ACCESS WinStationAccessValues[MAX_KNOWN_WINSTATION_ACCESS_VALUE] = {
+static SI_ACCESS T_WinStationAccessValues[] = {
     SI_ACCESS_DEFAULT_ENTRY(WINSTA_ENUMDESKTOPS, L"Enumerate Desktops"),
     SI_ACCESS_DEFAULT_ENTRY(WINSTA_READATTRIBUTES, L"Read Attributes"),
     SI_ACCESS_DEFAULT_ENTRY(WINSTA_ACCESSCLIPBOARD, L"Access Clipboard"),
@@ -136,8 +128,7 @@ static SI_ACCESS WinStationAccessValues[MAX_KNOWN_WINSTATION_ACCESS_VALUE] = {
 //
 //Key Access Values
 //
-#define MAX_KNOWN_KEY_ACCESS_VALUE 8
-static SI_ACCESS KeyAccessValues[MAX_KNOWN_KEY_ACCESS_VALUE] = {
+static SI_ACCESS T_KeyAccessValues[] = {
     SI_ACCESS_DEFAULT_ENTRY(KEY_QUERY_VALUE, L"Query Value"),
     SI_ACCESS_DEFAULT_ENTRY(KEY_SET_VALUE, L"Set Value"),
     SI_ACCESS_DEFAULT_ENTRY(KEY_CREATE_SUB_KEY, L"Create Subkey"),
@@ -151,8 +142,7 @@ static SI_ACCESS KeyAccessValues[MAX_KNOWN_KEY_ACCESS_VALUE] = {
 //
 //Semaphore Access Values
 //
-#define MAX_KNOWN_SEMAPHORE_ACCESS_VALUE 2
-static SI_ACCESS SemaphoreAccessValues[MAX_KNOWN_SEMAPHORE_ACCESS_VALUE] = {
+static SI_ACCESS T_SemaphoreAccessValues[] = {
     SI_ACCESS_DEFAULT_ENTRY(SEMAPHORE_QUERY_STATE, L"Query State"),
     SI_ACCESS_DEFAULT_ENTRY(SEMAPHORE_MODIFY_STATE, L"Modify State")
 };
@@ -160,8 +150,7 @@ static SI_ACCESS SemaphoreAccessValues[MAX_KNOWN_SEMAPHORE_ACCESS_VALUE] = {
 //
 //Symlink Access Values
 //
-#define MAX_KNOWN_SYMLINK_ACCESS_VALUE 2
-static SI_ACCESS SymlinkAccessValues[MAX_KNOWN_SYMLINK_ACCESS_VALUE] = {
+static SI_ACCESS T_SymlinkAccessValues[] = {
     SI_ACCESS_DEFAULT_ENTRY(SYMBOLIC_LINK_QUERY, L"Link Query"),
     SI_ACCESS_DEFAULT_ENTRY(SYMBOLIC_LINK_SET, L"Link Set")
 };
@@ -169,8 +158,7 @@ static SI_ACCESS SymlinkAccessValues[MAX_KNOWN_SYMLINK_ACCESS_VALUE] = {
 //
 //Timer Access Values
 //
-#define MAX_KNOWN_TIMER_ACCESS_VALUE 2
-static SI_ACCESS TimerAccessValues[MAX_KNOWN_TIMER_ACCESS_VALUE] = {
+static SI_ACCESS T_TimerAccessValues[] = {
     SI_ACCESS_DEFAULT_ENTRY(TIMER_QUERY_STATE, L"Query State"),
     SI_ACCESS_DEFAULT_ENTRY(TIMER_MODIFY_STATE, L"Modify State")
 };
@@ -178,8 +166,7 @@ static SI_ACCESS TimerAccessValues[MAX_KNOWN_TIMER_ACCESS_VALUE] = {
 //
 //Job Access Values
 //
-#define MAX_KNOWN_JOB_ACCESS_VALUE 5
-static SI_ACCESS JobAccessValues[MAX_KNOWN_JOB_ACCESS_VALUE] = {
+static SI_ACCESS T_JobAccessValues[] = {
     SI_ACCESS_DEFAULT_ENTRY(JOB_OBJECT_ASSIGN_PROCESS, L"Assign Process"),
     SI_ACCESS_DEFAULT_ENTRY(JOB_OBJECT_SET_ATTRIBUTES, L"Set Attributes"),
     SI_ACCESS_DEFAULT_ENTRY(JOB_OBJECT_QUERY, L"Query"),
@@ -190,16 +177,14 @@ static SI_ACCESS JobAccessValues[MAX_KNOWN_JOB_ACCESS_VALUE] = {
 //
 //Port Access Values
 //
-#define MAX_KNOWN_PORT_ACCESS_VALUE 1
-static SI_ACCESS PortAccessValues[MAX_KNOWN_PORT_ACCESS_VALUE] = {
+static SI_ACCESS T_PortAccessValues[] = {
     SI_ACCESS_DEFAULT_ENTRY(PORT_CONNECT, L"Connect")
 };
 
 //
 //Session Access Values
 //
-#define MAX_KNOWN_SESSION_ACCESS_VALUE 2
-static SI_ACCESS SessionAccessValues[MAX_KNOWN_SESSION_ACCESS_VALUE] = {
+static SI_ACCESS T_SessionAccessValues[] = {
     SI_ACCESS_DEFAULT_ENTRY(SESSION_QUERY_ACCESS, L"Query"),
     SI_ACCESS_DEFAULT_ENTRY(SESSION_MODIFY_ACCESS, L"Modify")
 };
@@ -207,8 +192,7 @@ static SI_ACCESS SessionAccessValues[MAX_KNOWN_SESSION_ACCESS_VALUE] = {
 //
 //IoCompletion Access Values
 //
-#define MAX_KNOWN_IOCOMPLETION_ACCESS_VALUE 2
-static SI_ACCESS IoCompletionAccessValues[MAX_KNOWN_IOCOMPLETION_ACCESS_VALUE] = {
+static SI_ACCESS T_IoCompletionAccessValues[] = {
     SI_ACCESS_DEFAULT_ENTRY(IO_COMPLETION_QUERY_STATE, L"Query State"),
     SI_ACCESS_DEFAULT_ENTRY(IO_COMPLETION_MODIFY_STATE, L"Modify State")
 };
@@ -216,8 +200,7 @@ static SI_ACCESS IoCompletionAccessValues[MAX_KNOWN_IOCOMPLETION_ACCESS_VALUE] =
 //
 //MemoryPartition Access Values
 //
-#define MAX_KNOWN_MEMORYPARTITION_ACCESS_VALUE 2
-static SI_ACCESS MemoryPartitionAccessValues[MAX_KNOWN_MEMORYPARTITION_ACCESS_VALUE] = {
+static SI_ACCESS T_MemoryPartitionAccessValues[] = {
     SI_ACCESS_DEFAULT_ENTRY(MEMORY_PARTITION_QUERY_ACCESS, L"Query"),
     SI_ACCESS_DEFAULT_ENTRY(MEMORY_PARTITION_MODIFY_ACCESS, L"Modify")
 };
@@ -225,8 +208,7 @@ static SI_ACCESS MemoryPartitionAccessValues[MAX_KNOWN_MEMORYPARTITION_ACCESS_VA
 //
 //Process Access Values
 //
-#define MAX_KNOWN_PROCESS_ACCESS_VALUE 14
-static SI_ACCESS ProcessAccessValues[MAX_KNOWN_PROCESS_ACCESS_VALUE] = {
+static SI_ACCESS T_ProcessAccessValues[] = {
     SI_ACCESS_DEFAULT_ENTRY(PROCESS_TERMINATE, L"Terminate"),
     SI_ACCESS_DEFAULT_ENTRY(PROCESS_CREATE_THREAD, L"Create Thread"),
     SI_ACCESS_DEFAULT_ENTRY(PROCESS_SET_SESSIONID, L"Set Session Id"),
@@ -246,8 +228,7 @@ static SI_ACCESS ProcessAccessValues[MAX_KNOWN_PROCESS_ACCESS_VALUE] = {
 //
 //Thread Access Values
 //
-#define MAX_KNOWN_THREAD_ACCESS_VALUE 13
-static SI_ACCESS ThreadAccessValues[MAX_KNOWN_THREAD_ACCESS_VALUE] = {
+static SI_ACCESS T_ThreadAccessValues[] = {
     SI_ACCESS_DEFAULT_ENTRY(THREAD_TERMINATE, L"Terminate"),
     SI_ACCESS_DEFAULT_ENTRY(THREAD_SUSPEND_RESUME, L"Suspend Resume"),
     SI_ACCESS_DEFAULT_ENTRY(THREAD_ALERT, L"Alert"),
@@ -266,9 +247,7 @@ static SI_ACCESS ThreadAccessValues[MAX_KNOWN_THREAD_ACCESS_VALUE] = {
 //
 //Token Access Values
 //
-#define MAX_KNOWN_TOKEN_ACCESS_VALUE 9
-
-static SI_ACCESS TokenAccessValues[MAX_KNOWN_TOKEN_ACCESS_VALUE] = {
+static SI_ACCESS T_TokenAccessValues[] = {
     SI_ACCESS_DEFAULT_ENTRY(TOKEN_ASSIGN_PRIMARY, L"Assign Primary"),
     SI_ACCESS_DEFAULT_ENTRY(TOKEN_DUPLICATE, L"Duplicate"),
     SI_ACCESS_DEFAULT_ENTRY(TOKEN_IMPERSONATE, L"Impersonate"),
@@ -280,8 +259,7 @@ static SI_ACCESS TokenAccessValues[MAX_KNOWN_TOKEN_ACCESS_VALUE] = {
     SI_ACCESS_DEFAULT_ENTRY(TOKEN_ADJUST_SESSIONID, L"Adjust SessionId")
 };
 
-#define MAX_KNOWN_TRANSACTION_ACCESS_VALUE 7
-static SI_ACCESS TransactionAccessValues[MAX_KNOWN_TRANSACTION_ACCESS_VALUE] = {
+static SI_ACCESS T_TransactionAccessValues[] = {
     SI_ACCESS_DEFAULT_ENTRY(TRANSACTION_QUERY_INFORMATION, L"Query Information"),
     SI_ACCESS_DEFAULT_ENTRY(TRANSACTION_SET_INFORMATION, L"Set Information"),
     SI_ACCESS_DEFAULT_ENTRY(TRANSACTION_ENLIST, L"Enlist"),

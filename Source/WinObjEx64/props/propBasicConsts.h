@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       PROPBASICCONSTS.H
 *
-*  VERSION:     2.00
+*  VERSION:     2.11
 *
-*  DATE:        19 Jun 2022
+*  DATE:        11 Jun 2026
 *
 *  Consts header file for Basic property sheet.
 *
@@ -21,13 +21,13 @@
 #define T_COULD_NOT_QUERY TEXT("*Could not query requested information*")
 
 //OBJECT_HEADER Flags
-static LPCWSTR T_ObjectFlags[8] = {
+static LPCWSTR T_ObjectFlags[] = {
     L"NewObject",
     L"KernelObject",
     L"KernelOnlyAccess",
-    L"Exclusive",
-    L"Permanent",
-    L"DefSecurityQuota",
+    L"ExclusiveObject",
+    L"PermanentObject",
+    L"DefaultSecurityQuota",
     L"SingleHandleEntry",
     L"DeletedInline"
 };
@@ -35,16 +35,13 @@ static LPCWSTR T_ObjectFlags[8] = {
 //
 // Process Trust Label related descriptions.
 //
-
-#define MAX_KNOWN_TRUSTLABEL_PROTECTIONTYPE 3
-static VALUE_DESC TrustLabelProtectionType[MAX_KNOWN_TRUSTLABEL_PROTECTIONTYPE] = {
+static VALUE_DESC TrustLabelProtectionType[] = {
     { L"None",  0x0 },
     { L"PPL", 0x200 },
     { L"PP", 0x400 }
 };
 
-#define MAX_KNOWN_TRUSTLABEL_PROTECTIONLEVEL 6
-static VALUE_DESC TrustLabelProtectionLevel[MAX_KNOWN_TRUSTLABEL_PROTECTIONLEVEL] = {
+static VALUE_DESC TrustLabelProtectionLevel[] = {
     { L"None",  0x0 },
     { L"Authenticode", 0x400 },
     { L"Antimalware", 0x600 },
@@ -53,8 +50,7 @@ static VALUE_DESC TrustLabelProtectionLevel[MAX_KNOWN_TRUSTLABEL_PROTECTIONLEVEL
     { L"WinTcb", 0x2000 }
 };
 
-#define MAX_KNOWN_PROCESS_TYPE_FLAGS 9
-LPCWSTR T_ProcessTypeFlags[MAX_KNOWN_PROCESS_TYPE_FLAGS] = {
+LPCWSTR T_ProcessTypeFlags[] = {
     L"ProtectedProcess",
     L"Wow64Process",
     L"ProcessDeleting",
@@ -66,8 +62,7 @@ LPCWSTR T_ProcessTypeFlags[MAX_KNOWN_PROCESS_TYPE_FLAGS] = {
     L"SubsystemProcess"
 };
 
-#define MAX_KNOWN_PS_PROTECTED_SIGNER 9
-static LPWSTR T_PSPROTECTED_SIGNER[MAX_KNOWN_PS_PROTECTED_SIGNER] = {
+static LPWSTR T_PSPROTECTED_SIGNER[] = {
     L"None",
     L"Authenticode",
     L"CodeGen",
@@ -79,8 +74,7 @@ static LPWSTR T_PSPROTECTED_SIGNER[MAX_KNOWN_PS_PROTECTED_SIGNER] = {
     L"App"
 };
 
-#define MAX_KNOWN_PS_PROTECTED_TYPE 3
-static LPWSTR T_PSPROTECTED_TYPE[MAX_KNOWN_PS_PROTECTED_TYPE] = {
+static LPWSTR T_PSPROTECTED_TYPE[] = {
     L"None",
     L"ProtectedLight",
     L"Protected"

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2025
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       PROPBASIC.C
 *
-*  VERSION:     2.09
+*  VERSION:     2.11
 *
-*  DATE:        21 Aug 2025
+*  DATE:        11 Jun 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -168,6 +168,45 @@ static const MITIGATION_BIT_MAP g_SEHOPPolicyMap[] = {
 VOID propSetBasicInfoEx(
     _In_ HWND hwndDlg,
     _In_ POBEX_OBJECT_INFORMATION InfoObject);
+
+/*
+* propDecodeFlags
+*
+* Purpose:
+*
+* Helper to decode flags from various sources.
+*
+*/
+VOID propDecodeFlags(
+    _In_ ULONG ulFlags,
+    _In_ HWND hwndDlg,
+    _In_ INT iId,
+    _In_ LPCWSTR* pFlagNames,
+    _In_ ULONG ulFlagNamesCount
+)
+{
+    HWND hwndCB = GetDlgItem(hwndDlg, iId);
+    if (hwndCB == NULL)
+        return;
+
+    EnableWindow(hwndCB, (ulFlags > 0) ? TRUE : FALSE);
+    SendMessage(hwndCB, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
+
+    if (ulFlags == 0)
+        return;
+
+    for (ULONG i = 0; i < ulFlagNamesCount; i++) {
+        if (GET_BIT(ulFlags, i))
+            SendMessage(hwndCB,
+                CB_ADDSTRING,
+                (WPARAM)0,
+                (LPARAM)pFlagNames[i]);
+    }
+    SendMessage(hwndCB, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
+}
+
+#define propDecodeFlagsArr(ulFlags, hwndDlg, iId, table) \
+    propDecodeFlags(ulFlags, hwndDlg, iId, table, RTL_NUMBER_OF(table))
 
 /*
 * propSetObjectHeaderAddressInfo
@@ -540,14 +579,14 @@ VOID propSetProcessTrustLabelInfo(
     {
         szBuffer[0] = 0;
 
-        for (i = 0; i < MAX_KNOWN_TRUSTLABEL_PROTECTIONTYPE; i++)
+        for (i = 0; i < RTL_NUMBER_OF(TrustLabelProtectionType); i++)
             if (TrustLabelProtectionType[i].dwValue == ProtectionType)
             {
                 lpType = TrustLabelProtectionType[i].lpDescription;
                 break;
             }
 
-        for (i = 0; i < MAX_KNOWN_TRUSTLABEL_PROTECTIONLEVEL; i++)
+        for (i = 0; i < RTL_NUMBER_OF(TrustLabelProtectionLevel); i++)
             if (TrustLabelProtectionLevel[i].dwValue == ProtectionLevel)
             {
                 lpLevel = TrustLabelProtectionLevel[i].lpDescription;
@@ -590,8 +629,6 @@ VOID propSetDefaultInfo(
     _In_ HANDLE hObject
 )
 {
-    INT      i;
-    HWND     hwndCB;
     NTSTATUS ntStatus;
     ULONG    returnLength;
     WCHAR    szBuffer[100];
@@ -634,18 +671,7 @@ VOID propSetDefaultInfo(
         SetDlgItemText(hwndDlg, ID_OBJECT_PP_CHARGE, szBuffer);
 
         //Attributes
-        hwndCB = GetDlgItem(hwndDlg, IDC_OBJECT_FLAGS);
-        if (hwndCB) {
-            SendMessage(hwndCB, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
-            EnableWindow(hwndCB, (obi.Attributes > 0) ? TRUE : FALSE);
-            if (obi.Attributes != 0) {
-                for (i = 0; i < 8; i++) {
-                    if (GET_BIT(obi.Attributes, i))
-                        SendMessage(hwndCB, CB_ADDSTRING, (WPARAM)0, (LPARAM)T_ObjectFlags[i]);
-                }
-                SendMessage(hwndCB, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
-            }
-        }
+        propDecodeFlagsArr(obi.Attributes, hwndDlg, IDC_OBJECT_FLAGS, T_ObjectFlags);
     }
 
     //
@@ -1588,8 +1614,6 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryProcess)
 
     PS_PROTECTION PsProtection;
 
-    HWND hwndCB;
-
     LPWSTR Name;
     PBYTE Buffer;
     WCHAR szBuffer[100];
@@ -1639,22 +1663,7 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryProcess)
             //
             // Process type flags
             //
-            hwndCB = GetDlgItem(hwndDlg, IDC_PROCESS_TYPE_FLAGS);
-
-            EnableWindow(hwndCB, (exbi.Flags > 0) ? TRUE : FALSE);
-            SendMessage(hwndCB, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
-            if (exbi.Flags > 0) {
-                for (i = 0; i < MAX_KNOWN_PROCESS_TYPE_FLAGS; i++) {
-
-                    if (GET_BIT(exbi.Flags, i))
-
-                        SendMessage(hwndCB,
-                            CB_ADDSTRING,
-                            (WPARAM)0,
-                            (LPARAM)T_ProcessTypeFlags[i]);
-                }
-                SendMessage(hwndCB, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
-            }
+            propDecodeFlagsArr(exbi.Flags, hwndDlg, IDC_PROCESS_TYPE_FLAGS, T_ProcessTypeFlags);
 
             if (exbi.BasicInfo.PebBaseAddress) {
 
@@ -1813,7 +1822,7 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryProcess)
         {
             if (PsProtection.Level) {
 
-                if (PsProtection.Type < MAX_KNOWN_PS_PROTECTED_TYPE)
+                if (PsProtection.Type < RTL_NUMBER_OF(T_PSPROTECTED_TYPE))
                     Name = T_PSPROTECTED_TYPE[PsProtection.Type];
                 else
                     Name = T_Unknown;
@@ -1821,7 +1830,7 @@ PROP_QUERY_INFORMATION_ROUTINE(propBasicQueryProcess)
                 _strcpy(szBuffer, Name);
                 _strcat(szBuffer, TEXT("-"));
 
-                if (PsProtection.Signer < MAX_KNOWN_PS_PROTECTED_SIGNER)
+                if (PsProtection.Signer < RTL_NUMBER_OF(T_PSPROTECTED_SIGNER))
                     Name = T_PSPROTECTED_SIGNER[PsProtection.Signer];
                 else
                     Name = T_Unknown;
@@ -2800,10 +2809,7 @@ VOID propSetBasicInfoEx(
     _In_ POBEX_OBJECT_INFORMATION InfoObject
 )
 {
-    INT     i;
-    HWND    hwndCB;
-    WCHAR   szBuffer[MAX_PATH];
-
+    WCHAR szBuffer[MAX_PATH];
 
     //Object & Header Address
     propSetObjectHeaderAddressInfo(
@@ -2828,24 +2834,8 @@ VOID propSetBasicInfoEx(
     ultostr(InfoObject->ObjectQuotaHeader.PagedPoolCharge, szBuffer);
     SetDlgItemText(hwndDlg, ID_OBJECT_PP_CHARGE, szBuffer);
 
-    //Attributes
-    hwndCB = GetDlgItem(hwndDlg, IDC_OBJECT_FLAGS);
-    if (hwndCB) {
-        EnableWindow(hwndCB, (InfoObject->ObjectHeader.Flags > 0) ? TRUE : FALSE);
-        SendMessage(hwndCB, CB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
-        if (InfoObject->ObjectHeader.Flags > 0) {
-            for (i = 0; i < 8; i++) {
-
-                if (GET_BIT(InfoObject->ObjectHeader.Flags, i))
-
-                    SendMessage(hwndCB,
-                        CB_ADDSTRING,
-                        (WPARAM)0,
-                        (LPARAM)T_ObjectFlags[i]);
-            }
-            SendMessage(hwndCB, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
-        }
-    }
+    //Attributes   
+    propDecodeFlagsArr(InfoObject->ObjectHeader.Flags, hwndDlg, IDC_OBJECT_FLAGS, T_ObjectFlags);
 }
 
 /*

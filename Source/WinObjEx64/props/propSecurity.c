@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2025
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       PROPSECURITY.C
 *
-*  VERSION:     2.09
+*  VERSION:     2.11
 *
-*  DATE:        21 Aug 2025
+*  DATE:        12 Jun 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -165,105 +165,105 @@ PSI_ACCESS propGetAccessTable(
     switch (This->ObjectContext->ObjectTypeIndex) {
 
     case ObjectTypeDirectory:
-        This->dwAccessMax = MAX_KNOWN_DIRECTORY_ACCESS_VALUE;
-        AccessTable = (PSI_ACCESS)&DirectoryAccessValues;
+        This->dwAccessMax = RTL_NUMBER_OF(T_DirectoryAccessValues);
+        AccessTable = (PSI_ACCESS)&T_DirectoryAccessValues;
         break;
 
     case ObjectTypeFile:
     case ObjectTypeDevice:
-        This->dwAccessMax = MAX_KNOWN_FILE_ACCESS_VALUE;
-        AccessTable = (PSI_ACCESS)&FileAccessValues;
+        This->dwAccessMax = RTL_NUMBER_OF(T_FileAccessValues);
+        AccessTable = (PSI_ACCESS)&T_FileAccessValues;
         break;
 
     case ObjectTypeSection:
-        This->dwAccessMax = MAX_KNOWN_SECTION_ACCESS_VALUE;
-        AccessTable = (PSI_ACCESS)&SectionAccessValues;
+        This->dwAccessMax = RTL_NUMBER_OF(T_SectionAccessValues);
+        AccessTable = (PSI_ACCESS)&T_SectionAccessValues;
         break;
 
     case ObjectTypeEvent:
-        This->dwAccessMax = MAX_KNOWN_EVENT_ACCESS_VALUE;
-        AccessTable = (PSI_ACCESS)&EventAccessValues;
+        This->dwAccessMax = RTL_NUMBER_OF(T_EventAccessValues);
+        AccessTable = (PSI_ACCESS)&T_EventAccessValues;
         break;
 
     case ObjectTypeMutant:
-        This->dwAccessMax = MAX_KNOWN_MUTANT_ACCESS_VALUE;
-        AccessTable = (PSI_ACCESS)&MutantAccessValues;
+        This->dwAccessMax = RTL_NUMBER_OF(T_MutantAccessValues);
+        AccessTable = (PSI_ACCESS)&T_MutantAccessValues;
         break;
 
     case ObjectTypeDesktop:
-        This->dwAccessMax = MAX_KNOWN_DESKTOP_ACCESS_VALUE;
-        AccessTable = (PSI_ACCESS)&DesktopAccessValues;
+        This->dwAccessMax = RTL_NUMBER_OF(T_DesktopAccessValues);
+        AccessTable = (PSI_ACCESS)&T_DesktopAccessValues;
         break;
 
     case ObjectTypeWinstation:
-        This->dwAccessMax = MAX_KNOWN_WINSTATION_ACCESS_VALUE;
-        AccessTable = (PSI_ACCESS)&WinStationAccessValues;
+        This->dwAccessMax = RTL_NUMBER_OF(T_WinStationAccessValues);
+        AccessTable = (PSI_ACCESS)&T_WinStationAccessValues;
         break;
 
     case ObjectTypeKey:
-        This->dwAccessMax = MAX_KNOWN_KEY_ACCESS_VALUE;
-        AccessTable = (PSI_ACCESS)&KeyAccessValues;
+        This->dwAccessMax = RTL_NUMBER_OF(T_KeyAccessValues);
+        AccessTable = (PSI_ACCESS)&T_KeyAccessValues;
         break;
 
     case ObjectTypeSemaphore:
-        This->dwAccessMax = MAX_KNOWN_SEMAPHORE_ACCESS_VALUE;
-        AccessTable = (PSI_ACCESS)&SemaphoreAccessValues;
+        This->dwAccessMax = RTL_NUMBER_OF(T_SemaphoreAccessValues);
+        AccessTable = (PSI_ACCESS)&T_SemaphoreAccessValues;
         break;
 
     case ObjectTypeSymbolicLink:
-        This->dwAccessMax = MAX_KNOWN_SYMLINK_ACCESS_VALUE;
-        AccessTable = (PSI_ACCESS)&SymlinkAccessValues;
+        This->dwAccessMax = RTL_NUMBER_OF(T_SymlinkAccessValues);
+        AccessTable = (PSI_ACCESS)&T_SymlinkAccessValues;
         break;
 
     case ObjectTypeTimer:
-        This->dwAccessMax = MAX_KNOWN_TIMER_ACCESS_VALUE;
-        AccessTable = (PSI_ACCESS)&TimerAccessValues;
+        This->dwAccessMax = RTL_NUMBER_OF(T_TimerAccessValues);
+        AccessTable = (PSI_ACCESS)&T_TimerAccessValues;
         break;
 
     case ObjectTypeJob:
-        This->dwAccessMax = MAX_KNOWN_JOB_ACCESS_VALUE;
-        AccessTable = (PSI_ACCESS)&JobAccessValues;
+        This->dwAccessMax = RTL_NUMBER_OF(T_JobAccessValues);
+        AccessTable = (PSI_ACCESS)&T_JobAccessValues;
         break;
 
     case ObjectTypeSession:
-        This->dwAccessMax = MAX_KNOWN_SESSION_ACCESS_VALUE;
-        AccessTable = (PSI_ACCESS)&SessionAccessValues;
+        This->dwAccessMax = RTL_NUMBER_OF(T_SessionAccessValues);
+        AccessTable = (PSI_ACCESS)&T_SessionAccessValues;
         break;
 
     case ObjectTypeIoCompletion:
     case ObjectTypeIoCompletionReserve:
-        This->dwAccessMax = MAX_KNOWN_IOCOMPLETION_ACCESS_VALUE;
-        AccessTable = (PSI_ACCESS)&IoCompletionAccessValues;
+        This->dwAccessMax = RTL_NUMBER_OF(T_IoCompletionAccessValues);
+        AccessTable = (PSI_ACCESS)&T_IoCompletionAccessValues;
         break;
 
     case ObjectTypeMemoryPartition:
-        This->dwAccessMax = MAX_KNOWN_MEMORYPARTITION_ACCESS_VALUE;
-        AccessTable = (PSI_ACCESS)&MemoryPartitionAccessValues;
+        This->dwAccessMax = RTL_NUMBER_OF(T_MemoryPartitionAccessValues);
+        AccessTable = (PSI_ACCESS)&T_MemoryPartitionAccessValues;
         break;
 
     case ObjectTypeProcess:
-        This->dwAccessMax = MAX_KNOWN_PROCESS_ACCESS_VALUE;
-        AccessTable = (PSI_ACCESS)&ProcessAccessValues;
+        This->dwAccessMax = RTL_NUMBER_OF(T_ProcessAccessValues);
+        AccessTable = (PSI_ACCESS)&T_ProcessAccessValues;
         break;
 
     case ObjectTypeThread:
-        This->dwAccessMax = MAX_KNOWN_THREAD_ACCESS_VALUE;
-        AccessTable = (PSI_ACCESS)&ThreadAccessValues;
+        This->dwAccessMax = RTL_NUMBER_OF(T_ThreadAccessValues);
+        AccessTable = (PSI_ACCESS)&T_ThreadAccessValues;
         break;
 
     case ObjectTypeToken:
-        This->dwAccessMax = MAX_KNOWN_TOKEN_ACCESS_VALUE;
-        AccessTable = (PSI_ACCESS)&TokenAccessValues;
+        This->dwAccessMax = RTL_NUMBER_OF(T_TokenAccessValues);
+        AccessTable = (PSI_ACCESS)&T_TokenAccessValues;
         break;
 
     case ObjectTypePort:
-        This->dwAccessMax = MAX_KNOWN_PORT_ACCESS_VALUE;
-        AccessTable = (PSI_ACCESS)&PortAccessValues;
+        This->dwAccessMax = RTL_NUMBER_OF(T_PortAccessValues);
+        AccessTable = (PSI_ACCESS)&T_PortAccessValues;
         break;
 
     case ObjectTypeRegistryTransaction:
-        This->dwAccessMax = MAX_KNOWN_TRANSACTION_ACCESS_VALUE;
-        AccessTable = (PSI_ACCESS)&TransactionAccessValues;
+        This->dwAccessMax = RTL_NUMBER_OF(T_TransactionAccessValues);
+        AccessTable = (PSI_ACCESS)&T_TransactionAccessValues;
         break;
     }
 
@@ -639,7 +639,7 @@ HRESULT propSecurityConstructor(
         TypeAccessTable = propGetAccessTable(This);
 
         //allocate access table
-        Size = (MAX_KNOWN_GENERAL_ACCESS_VALUE + (SIZE_T)This->dwAccessMax) * sizeof(SI_ACCESS);
+        Size = (RTL_NUMBER_OF(T_GeneralAccessValues) + (SIZE_T)This->dwAccessMax) * sizeof(SI_ACCESS);
         This->AccessTable = (PSI_ACCESS)supHeapAlloc(Size);
         if (This->AccessTable == NULL) {
             hResult = HRESULT_FROM_WIN32(GetLastError());
@@ -657,23 +657,23 @@ HRESULT propSecurityConstructor(
 
         if (This->ValidAccessMask & DELETE) {
             RtlCopyMemory(&This->AccessTable[This->dwAccessMax++],
-                &GeneralAccessValues[0], sizeof(SI_ACCESS));
+                &T_GeneralAccessValues[0], sizeof(SI_ACCESS));
         }
         if (This->ValidAccessMask & READ_CONTROL) {
             RtlCopyMemory(&This->AccessTable[This->dwAccessMax++],
-                &GeneralAccessValues[1], sizeof(SI_ACCESS));
+                &T_GeneralAccessValues[1], sizeof(SI_ACCESS));
         }
         if (This->ValidAccessMask & WRITE_DAC) {
             RtlCopyMemory(&This->AccessTable[This->dwAccessMax++],
-                &GeneralAccessValues[2], sizeof(SI_ACCESS));
+                &T_GeneralAccessValues[2], sizeof(SI_ACCESS));
         }
         if (This->ValidAccessMask & WRITE_OWNER) {
             RtlCopyMemory(&This->AccessTable[This->dwAccessMax++],
-                &GeneralAccessValues[3], sizeof(SI_ACCESS));
+                &T_GeneralAccessValues[3], sizeof(SI_ACCESS));
         }
         if (This->ValidAccessMask & SYNCHRONIZE) {
             RtlCopyMemory(&This->AccessTable[This->dwAccessMax++],
-                &GeneralAccessValues[4], sizeof(SI_ACCESS));
+                &T_GeneralAccessValues[4], sizeof(SI_ACCESS));
         }
         hResult = S_OK;
 

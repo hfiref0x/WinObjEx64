@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     2.10
+*  VERSION:     2.11
 *
-*  DATE:        07 Mar 2026
+*  DATE:        12 Jun 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -7540,7 +7540,6 @@ BOOL supxListViewExportCSV(
                     result = TRUE;
                 }
                 CloseHandle(f);
-                result = TRUE;
             }
             supVirtualFree(buffer0);
         }
@@ -8158,24 +8157,29 @@ LPWSTR supPrintHash(
     _In_ BOOLEAN UpcaseHex
 )
 {
-    ULONG   c;
-    PWCHAR  lpText;
-    BYTE    x;
+    ULONG c;
+    SIZE_T sz;
+    BYTE x;
+    LPWSTR lpText;
+    LPWSTR lpOut;
 
-    lpText = (LPWSTR)supHeapAlloc((2 * (SIZE_T)Length + 1) * sizeof(WCHAR));
-    if (lpText) {
+    if (Length == 0 || Buffer == NULL)
+        return NULL;
 
-        for (c = 0; c < Length; ++c) {
-            x = Buffer[c];
+    sz = ((((SIZE_T)Length) * 2) + 1) * sizeof(WCHAR);
+    lpText = (LPWSTR)supHeapAlloc(sz);
+    if (lpText == NULL)
+        return NULL;
 
-            lpText[c * 2] = nibbletoh(x >> 4, UpcaseHex);
-            lpText[c * 2 + 1] = nibbletoh(x & 15, UpcaseHex);
-        }
-#pragma warning(push)
-#pragma warning(disable: 6305)
-        lpText[Length * 2] = 0;
-#pragma warning(pop)
+    lpOut = lpText;
+
+    for (c = 0; c < Length; ++c) {
+        x = Buffer[c];
+        *lpOut++ = nibbletoh(x >> 4, UpcaseHex);
+        *lpOut++ = nibbletoh(x & 0x0F, UpcaseHex);
     }
+
+    *lpOut = 0;
 
     return lpText;
 }

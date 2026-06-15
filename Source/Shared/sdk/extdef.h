@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2025
+*  (C) COPYRIGHT AUTHORS, 2019 - 2026
 *
 *  TITLE:       EXTAPI.H
 *
-*  VERSION:     2.07
+*  VERSION:     2.11
 *
-*  DATE:        04 Feb 2025
+*  DATE:        11 Jun 2026
 *
 *  Windows SDK compatibility header.
 *
@@ -19,23 +19,27 @@
 #pragma once
 
 #ifndef PRODUCT_ENTERPRISE_S
-#define PRODUCT_ENTERPRISE_S 0x0000007D
+#define PRODUCT_ENTERPRISE_S                0x0000007D
 #endif
 
 #ifndef PRODUCT_ENTERPRISE_S_N
-#define PRODUCT_ENTERPRISE_S_N 0x0000007E
+#define PRODUCT_ENTERPRISE_S_N              0x0000007E
 #endif
 
 #ifndef PRODUCT_ENTERPRISE_S_EVALUATION
-#define PRODUCT_ENTERPRISE_S_EVALUATION 0x00000081
+#define PRODUCT_ENTERPRISE_S_EVALUATION     0x00000081
 #endif
 
 #ifndef PRODUCT_ENTERPRISE_S_N_EVALUATION
-#define PRODUCT_ENTERPRISE_S_N_EVALUATION 0x00000082
+#define PRODUCT_ENTERPRISE_S_N_EVALUATION   0x00000082
 #endif
 
 #ifndef PRODUCT_IOTENTERPRISES
-#define PRODUCT_IOTENTERPRISES 0x000000BF
+#define PRODUCT_IOTENTERPRISES              0x000000BF
+#endif
+
+#ifndef PRODUCT_IOTENTERPRISESK
+#define PRODUCT_IOTENTERPRISESK             0x000000CD
 #endif
 
 #define sidTypeUser 1
@@ -58,7 +62,7 @@
 // These constants are missing in Windows SDK 8.1
 //
 #ifndef SYSTEM_ACCESS_FILTER_ACE_TYPE
-#define SYSTEM_ACCESS_FILTER_ACE_TYPE           (0x15)
+#define SYSTEM_ACCESS_FILTER_ACE_TYPE               (0x15)
 #endif
 
 #ifndef IMAGE_SUBSYSTEM_XBOX_CODE_CATALOG
@@ -126,11 +130,7 @@
 #endif
 
 #ifndef VER_SUITE_MULTIUSERTS
-#define VER_SUITE_MULTIUSERTS 0x00020000
-#endif
-
-#ifndef FILE_SUPPORTS_BLOCK_REFCOUNTING     
-#define FILE_SUPPORTS_BLOCK_REFCOUNTING             0
+#define VER_SUITE_MULTIUSERTS                       0x00020000
 #endif
 
 #ifndef _WIN32_WINNT_WIN10
@@ -226,6 +226,10 @@ typedef enum DPI_AWARENESS {
 
 #ifndef NTDDI_WIN11_SE
 #define NTDDI_WIN11_SE 0x0A000011       /* ABRACADABRA_WIN11_SE */
+#endif
+
+#ifndef NTDDI_WIN11_KR
+#define NTDDI_WIN11_KR 0x0A000012       /* ABRACADABRA_WIN11_KR */
 #endif
 
 FORCEINLINE LONG_PTR _InterlockedExchangeAddPointer(

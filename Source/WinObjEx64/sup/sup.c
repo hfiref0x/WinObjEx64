@@ -44,9 +44,9 @@ OBEX_DEFINE_GUID(ShimCetCompat, 0x31971B07, 0x71A4, 0x480A, 0x87, 0xA9, 0xD9, 0x
 
 SUP_SHIM_INFO KsepShimInformation[] = {
     { L"DriverScope", (GUID*)&ShimDriverScope, L"ETW event logger", L"ntos" },
-    { L"VersionLie 7",  (GUID*)&ShimVersionLie1, L"Reports previous version of OS", L"ntos" },
-    { L"VersionLie 8",  (GUID*)&ShimVersionLie2, L"Reports previous version of OS", L"ntos" },
-    { L"VersionLie 8.1",  (GUID*)&ShimVersionLie3, L"Reports previous version of OS", L"ntos" },
+    { L"VersionLie 7", (GUID*)&ShimVersionLie1, L"Reports previous version of OS", L"ntos" },
+    { L"VersionLie 8", (GUID*)&ShimVersionLie2, L"Reports previous version of OS", L"ntos" },
+    { L"VersionLie 8.1", (GUID*)&ShimVersionLie3, L"Reports previous version of OS", L"ntos" },
     { L"SkipDriverUnload", (GUID*)&ShimSkipDriverUnload, L"Replaces driver unload with ETW hook", L"ntos" },
     { L"ZeroPool", (GUID*)&ShimZeroPool, L"ExAllocatePool hook that forces zeroes allocation", L"ntos" },
     { L"ClearPCIDBits", (GUID*)&ShimClearPCIDBits, L"Clears PCID bits for some ISV", L"ntos" },
@@ -63,9 +63,7 @@ SUP_SHIM_INFO KsepShimInformation[] = {
     { L"UserCetBasicModeAllowRetTargetNotCetCompat", (GUID*)&ShimCetCompat, L"Intel CET compatibility shim", L"ntos"}
 };
 
-#define WINDEPENDS_KEY_COUNT 3
-
-static LPCWSTR g_WinDependsCommandKeys[WINDEPENDS_KEY_COUNT] = {
+static LPCWSTR g_WinDependsCommandKeys[] = {
     L"sysfile\\shell\\View in WinDepends\\command",
     L"drvfile\\shell\\View in WinDepends\\command",
     L"file\\shell\\View in WinDepends\\command"
@@ -7383,7 +7381,7 @@ BOOLEAN supIsDriverShimmed(
 *
 * Purpose:
 *
-* Return TRUE if driver shimmed by KSE.
+* Return TRUE if driver shimmed by KSE known entry.
 *
 */
 SUP_SHIM_INFO* supGetDriverShimInformation(
@@ -8239,7 +8237,7 @@ NTSTATUS supxInitializeFileViewInfo(
         FILE_SHARE_READ,
         NULL,
         OPEN_EXISTING,
-        FILE_SUPPORTS_BLOCK_REFCOUNTING | FILE_ATTRIBUTE_NORMAL,
+        FILE_ATTRIBUTE_NORMAL,
         NULL);
 
     if (fileHandle != INVALID_HANDLE_VALUE) {
@@ -9068,7 +9066,8 @@ BOOLEAN supIsLongTermServicingWindows(
         PRODUCT_ENTERPRISE_S_N,            // LTSB/C N
         PRODUCT_ENTERPRISE_S_EVALUATION,   // LTSB/C Evaluation
         PRODUCT_ENTERPRISE_S_N_EVALUATION, // LTSB/C N Evaluation
-        PRODUCT_IOTENTERPRISES             // IoT Enterprise LTSC
+        PRODUCT_IOTENTERPRISES,            // IoT Enterprise LTSC
+        PRODUCT_IOTENTERPRISESK            // IoT Enterprise LTSC (K SKU)
     };
 
     ntStatus = NtQueryLicenseValue(
@@ -10956,7 +10955,7 @@ BOOLEAN supQueryWinDependsExecutable(
     lpCommand = NULL;
     bResult = FALSE;
 
-    for (i = 0; i < WINDEPENDS_KEY_COUNT; i++) {
+    for (i = 0; i < RTL_NUMBER_OF(g_WinDependsCommandKeys); i++) {
 
         if (supxReadRegistryString(HKEY_CLASSES_ROOT,
             g_WinDependsCommandKeys[i],

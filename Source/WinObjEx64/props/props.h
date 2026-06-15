@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2024
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       PROPS.H
 *
-*  VERSION:     2.05
+*  VERSION:     2.11
 *
-*  DATE:        11 Mar 2024
+*  DATE:        11 Jun 2026
 *
 *  Common header file for properties dialog definitions.
 *
@@ -185,3 +185,8 @@ VOID propDumpEnumWithNames(
     _In_ ULONG EnumValue,
     _In_ PVALUE_DESC EnumNames,
     _In_ ULONG EnumNamesCount);
+
+LPWSTR propObGetTypeDescForValue(
+    _In_ PVALUE_DESC pFlagsTable,
+    _In_ ULONG ulFlagsTableCount,
+    _In_ ULONG ulCheckedValue);

@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.11
 *
-*  DATE:        21 May 2026
+*  DATE:        11 Jun 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -33,6 +33,29 @@ typedef VOID(NTAPI* pfnObDumpRoutine)(
     _In_ PROP_OBJECT_INFO* Context,           \
     _In_ HWND hwndDlg,                        \
     _In_ HWND hwndTreeList)
+
+/*
+* propObGetTypeDescForValue
+*
+* Purpose:
+*
+* Helper routine to find an appropriate text representation of value.
+*
+*/
+LPWSTR propObGetTypeDescForValue(
+    _In_ PVALUE_DESC pFlagsTable,
+    _In_ ULONG ulFlagsTableCount,
+    _In_ ULONG ulCheckedValue)
+{
+    ULONG i;
+
+    for (i = 0; i < ulFlagsTableCount; i++) {
+        if (pFlagsTable[i].dwValue == ulCheckedValue)
+            return pFlagsTable[i].lpDescription;
+
+    }
+    return NULL;
+}
 
 /*
 * propDumpEnumWithNames
@@ -475,8 +498,8 @@ HTREEITEM propObDumpSetString(
 HTREEITEM propObDumpUlong(
     _In_ HWND TreeList,
     _In_ HTREEITEM hParent,
-    _In_ LPWSTR lpszName,
-    _In_opt_ LPWSTR lpszDesc, //additional text to be displayed
+    _In_ LPCWSTR lpszName,
+    _In_opt_ LPCWSTR lpszDesc, //additional text to be displayed
     _In_ ULONG Value,
     _In_ BOOL HexDump,
     _In_ BOOL IsUShort,
@@ -492,7 +515,7 @@ HTREEITEM propObDumpUlong(
 
     if (lpszDesc != NULL) {
         subitems.Count = 2;
-        subitems.Text[1] = lpszDesc;
+        subitems.Text[1] = (LPTSTR)lpszDesc;
     }
     else {
         subitems.Count = 1;
@@ -543,7 +566,7 @@ HTREEITEM propObDumpUlong(
         TVIF_TEXT | TVIF_STATE,
         0,
         0,
-        lpszName,
+        (LPWSTR)lpszName,
         &subitems);
 }
 
@@ -1070,6 +1093,75 @@ VOID propObDumpUnicodeString(
 }
 
 /*
+* propDumpBitFlags
+*
+* Purpose:
+*
+* Dump object bit flags as an array to the treelist.
+*
+*/
+VOID propDumpBitFlags(
+    _In_ HWND hwndTreeList,
+    _In_ HTREEITEM h_tviRootItem,
+    _In_ ULONG ulFlags,
+    _In_ PVALUE_DESC pFlagsTable,
+    _In_ ULONG ulFlagsTableCount,
+    _In_ UINT uiState,
+    _In_ LPCWSTR lpLabel
+)
+{
+    WCHAR szValue1[32];
+    TL_SUBITEMS_FIXED subitems;
+    LPCWSTR lpType;
+    ULONG i, j;
+
+    RtlSecureZeroMemory(&szValue1, sizeof(szValue1));
+    RtlSecureZeroMemory(&subitems, sizeof(subitems));
+
+    if (ulFlags == 0) {
+        //add named entry with zero data
+        propObDumpUlong(hwndTreeList, h_tviRootItem, lpLabel, NULL, 0, TRUE, FALSE, 0, 0);
+        return;
+    }
+
+    j = 0;
+    for (i = 0; i < ulFlagsTableCount; i++) {
+        if (ulFlags & pFlagsTable[i].dwValue) {
+            lpType = pFlagsTable[i].lpDescription;
+            subitems.Count = 2;
+
+            if (j == 0) {
+                //add first entry with flag description
+                szValue1[0] = L'0';
+                szValue1[1] = L'x';
+                ultohex(ulFlags, &szValue1[2]);
+
+                subitems.Text[0] = szValue1;
+                subitems.Text[1] = (LPTSTR)lpType;
+            }
+            else {
+                //add subentry
+                subitems.Text[0] = T_EmptyString;
+                subitems.Text[1] = (LPTSTR)lpType;
+            }
+
+            supTreeListAddItem(hwndTreeList,
+                h_tviRootItem,
+                TVIF_TEXT | TVIF_STATE,
+                0,
+                uiState,
+                (j == 0) ? (LPWSTR)lpLabel : T_EmptyString,
+                &subitems);
+
+            ulFlags &= ~pFlagsTable[i].dwValue;
+            j++;
+        }
+        if (ulFlags == 0)
+            break;
+    }
+}
+
+/*
 * propDumpQueryFullNamespaceNormalizedPath
 *
 * Purpose:
@@ -1441,7 +1533,7 @@ VOID propObDumpDriverExtension(
 PROP_OBJECT_DUMP_ROUTINE(propObDumpDriverObject)
 {
     BOOL                    bOkay;
-    INT                     i, j;
+    INT                     i;
     HTREEITEM               h_tviRootItem, h_tviSubItem;
     PRTL_PROCESS_MODULES    pModules;
     PVOID                   pObj, IopInvalidDeviceRequest;
@@ -1526,52 +1618,7 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpDriverObject)
         TEXT("DeviceObject"), drvObject.DeviceObject, CLR_LGRY, T_UNNAMED);
 
     //Flags
-    RtlSecureZeroMemory(&szValue1, sizeof(szValue1));
-    RtlSecureZeroMemory(&subitems, sizeof(subitems));
-    j = 0;
-    lpType = NULL;
-    if (drvObject.Flags) {
-        for (i = 0; i < MAX_KNOWN_DRV_FLAGS; i++) {
-            if (drvObject.Flags & drvFlags[i].dwValue) {
-                lpType = drvFlags[i].lpDescription;
-                subitems.Count = 2;
-
-                //add first entry with name
-                if (j == 0) {
-                    szValue1[0] = L'0';
-                    szValue1[1] = L'x';
-                    ultohex(drvObject.Flags, &szValue1[2]);
-
-                    subitems.Text[0] = szValue1;
-                    subitems.Text[1] = lpType;
-                }
-                else {
-                    //add subentry
-                    subitems.Text[0] = T_EmptyString;
-                    subitems.Text[1] = lpType;
-                }
-
-                supTreeListAddItem(
-                    hwndTreeList,
-                    h_tviRootItem,
-                    TVIF_TEXT | TVIF_STATE,
-                    0,
-                    0,
-                    (j == 0) ? T_FLAGS : T_EmptyString,
-                    &subitems);
-
-                drvObject.Flags &= ~drvFlags[i].dwValue;
-                j++;
-            }
-            if (drvObject.Flags == 0) {
-                break;
-            }
-        }
-    }
-    else {
-        //add named entry with zero data
-        propObDumpUlong(hwndTreeList, h_tviRootItem, T_FLAGS, NULL, 0, TRUE, FALSE, 0, 0);
-    }
+    propDumpBitFlags(hwndTreeList, h_tviRootItem, drvObject.Flags, T_DrvFlags, RTL_NUMBER_OF(T_DrvFlags), TVIS_EXPANDED, T_FLAGS);
 
     //DriverStart
     propObDumpAddress(hwndTreeList, h_tviRootItem, TEXT("DriverStart"), NULL, drvObject.DriverStart, 0, 0);
@@ -1815,7 +1862,6 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpDriverObject)
 
     }
 
-
     //
     //Cleanup
     //
@@ -1836,14 +1882,11 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpDriverObject)
 PROP_OBJECT_DUMP_ROUTINE(propObDumpDeviceObject)
 {
     BOOL                bOkay;
-    INT                 i, j;
     HTREEITEM           h_tviRootItem, h_tviWcb, h_tviSubItem, h_tviWaitEntry;
     LPWSTR              lpType;
-    TL_SUBITEMS_FIXED   subitems;
     DEVICE_OBJECT       devObject;
     DEVOBJ_EXTENSION    devObjExt;
     COLORREF            BgColor;
-    WCHAR               szValue1[MAX_PATH + 1];
 
     bOkay = FALSE;
 
@@ -1912,100 +1955,10 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpDeviceObject)
     propObDumpAddress(hwndTreeList, h_tviRootItem, L"Timer", lpType, devObject.Timer, 0, 0);
 
     //Flags
-    RtlSecureZeroMemory(&szValue1, sizeof(szValue1));
-    RtlSecureZeroMemory(&subitems, sizeof(subitems));
-    lpType = NULL;
-    j = 0;
-    if (devObject.Flags) {
-        for (i = 0; i < MAX_KNOWN_DEV_FLAGS; i++) {
-            if (devObject.Flags & devFlags[i].dwValue) {
-                lpType = devFlags[i].lpDescription;
-                subitems.Count = 2;
-
-                if (j == 0) {
-                    //add first entry with flag description
-                    szValue1[0] = L'0';
-                    szValue1[1] = L'x';
-                    ultohex(devObject.Flags, &szValue1[2]);
-
-                    subitems.Text[0] = szValue1;
-                    subitems.Text[1] = lpType;
-                }
-                else {
-                    //add subentry
-                    subitems.Text[0] = T_EmptyString;
-                    subitems.Text[1] = lpType;
-                }
-
-                supTreeListAddItem(hwndTreeList,
-                    h_tviRootItem,
-                    TVIF_TEXT | TVIF_STATE,
-                    0,
-                    TVIS_EXPANDED,
-                    (j == 0) ? T_FLAGS : T_EmptyString,
-                    &subitems);
-
-                devObject.Flags &= ~devFlags[i].dwValue;
-                j++;
-            }
-            if (devObject.Flags == 0) {
-                break;
-            }
-        }
-    }
-    else {
-        //add named entry with zero data
-        propObDumpUlong(hwndTreeList, h_tviRootItem, T_FLAGS, NULL, 0, TRUE, FALSE, 0, 0);
-    }
+    propDumpBitFlags(hwndTreeList, h_tviRootItem, devObject.Flags, T_DevFlags, RTL_NUMBER_OF(T_DevFlags), TVIS_EXPANDED, T_FLAGS);
 
     //Characteristics
-    RtlSecureZeroMemory(&szValue1, sizeof(szValue1));
-    RtlSecureZeroMemory(&subitems, sizeof(subitems));
-
-    lpType = NULL;
-    j = 0;
-    if (devObject.Characteristics) {
-        for (i = 0; i < MAX_KNOWN_CHR_FLAGS; i++) {
-
-            if (devObject.Characteristics & devChars[i].dwValue) {
-                lpType = devChars[i].lpDescription;
-                subitems.Count = 2;
-
-                if (j == 0) {
-                    //add first entry with chr description
-                    szValue1[0] = L'0';
-                    szValue1[1] = L'x';
-                    ultohex(devObject.Characteristics, &szValue1[2]);
-                    subitems.Text[0] = szValue1;
-                    subitems.Text[1] = lpType;
-                }
-                else {
-                    //add subentry
-                    subitems.Text[0] = T_EmptyString;
-                    subitems.Text[1] = lpType;
-                }
-
-                supTreeListAddItem(hwndTreeList,
-                    h_tviRootItem,
-                    TVIF_TEXT | TVIF_STATE,
-                    0,
-                    0,
-                    (j == 0) ? T_CHARACTERISTICS : T_EmptyString,
-                    &subitems);
-
-                devObject.Characteristics &= ~devChars[i].dwValue;
-                j++;
-            }
-
-            if (devObject.Characteristics == 0) {
-                break;
-            }
-        }
-    }
-    else {
-        //add zero value
-        propObDumpUlong(hwndTreeList, h_tviRootItem, T_CHARACTERISTICS, NULL, 0, TRUE, FALSE, 0, 0);
-    }
+    propDumpBitFlags(hwndTreeList, h_tviRootItem, devObject.Characteristics, T_DevChars, RTL_NUMBER_OF(T_DevChars), 0, T_CHARACTERISTICS);
 
     //Vpb
     lpType = L"PVPB";
@@ -2027,13 +1980,7 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpDeviceObject)
     propObDumpAddress(hwndTreeList, h_tviRootItem, L"DeviceExtension", lpType, devObject.DeviceExtension, BgColor, 0);
 
     //DeviceType
-    lpType = NULL;
-    for (i = 0; i < MAX_DEVOBJ_CHARS; i++) {
-        if (devObjChars[i].dwValue == devObject.DeviceType) {
-            lpType = devObjChars[i].lpDescription;
-            break;
-        }
-    }
+    lpType = propObGetTypeDescForValue(T_DevObjChars, RTL_NUMBER_OF(T_DevObjChars), devObject.DeviceType);
     propObDumpUlong(hwndTreeList, h_tviRootItem, L"DeviceType", lpType, devObject.DeviceType, TRUE, FALSE, 0, 0);
 
     //StackSize
@@ -2096,13 +2043,7 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpDeviceObject)
     propObDumpAddress(hwndTreeList, h_tviWcb, L"BufferChainingDpc", lpType, devObject.Queue.Wcb.BufferChainingDpc, 0, 0);
 
     //AlignmentRequirement
-    lpType = NULL;
-    for (i = 0; i < MAX_KNOWN_FILEALIGN; i++) {
-        if (fileAlign[i].dwValue == devObject.AlignmentRequirement) {
-            lpType = fileAlign[i].lpDescription;
-            break;
-        }
-    }
+    lpType = propObGetTypeDescForValue(T_FileAlign, RTL_NUMBER_OF(T_FileAlign), devObject.AlignmentRequirement);
     propObDumpUlong(hwndTreeList, h_tviRootItem, L"AlignmentRequirement", lpType, devObject.AlignmentRequirement, TRUE, FALSE, 0, 0);
 
     //DeviceQueue
@@ -2246,7 +2187,6 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpDeviceObject)
             T_UNNAMED);
 
     }
-
 }
 
 /*
@@ -2271,20 +2211,6 @@ VOID propObDumpSessionIdVersionAware(
         lpType = NULL;
 
     propObDumpUlong(hwndTreeList, h_tviRootItem, TEXT("SessionId"), lpType, SessionId, TRUE, FALSE, 0, 0);
-}
-
-LPWSTR propObGetDosDriveTypeDesc(
-    _In_ UCHAR DosDrive)
-{
-    ULONG i;
-
-    for (i = 0; i < MAX_KNOWN_DOS_DRIVE_TYPE; i++) {
-        if (dosDeviceDriveType[i].dwValue == DosDrive)
-            return dosDeviceDriveType[i].lpDescription;
-
-    }
-
-    return T_UnknownType;
 }
 
 /*
@@ -2444,11 +2370,12 @@ VOID propObDumpDeviceMap(
                     driveType = DeviceMapStruct.Versions.DeviceMapCompat->DriveType[i];
                 }
 
-                lpType = propObGetDosDriveTypeDesc(driveType);
+                lpType = propObGetTypeDescForValue(T_DosDeviceDriveType, 
+                    RTL_NUMBER_OF(T_DosDeviceDriveType), driveType);
 
                 propObDumpByte(TreeList, h_tviDriveType,
                     szBuffer,
-                    lpType,
+                    (lpType == NULL) ? T_UnknownType : lpType,
                     driveType,
                     0,
                     0,
@@ -2501,7 +2428,7 @@ VOID propObDumpDirectoryObjectInternal(
     _In_ BOOLEAN ShowErrors
 )
 {
-    INT                     i, j;
+    INT                     i;
     ULONG                   SessionId, ObjectFlags;
     HTREEITEM               h_tviRootItem, h_tviSubItem, h_tviEntry;
     LPWSTR                  lpType;
@@ -2642,7 +2569,6 @@ VOID propObDumpDirectoryObjectInternal(
     //ShadowDirectory
     if (ObjectVersion != OBVERSION_DIRECTORY_V1) {
 
-
         if (DirObject.Versions.CompatDirObject->ShadowDirectory) {
             if (DumpShadow) {
 
@@ -2767,56 +2693,7 @@ VOID propObDumpDirectoryObjectInternal(
 
     }
 
-    if (ObjectFlags == 0) {
-        propObDumpUlong(TreeList, h_tviRootItem, TEXT("Flags"), NULL, 0, TRUE, FALSE, 0, 0);
-    }
-    else {
-
-        //
-        // List flags.
-        //
-        RtlSecureZeroMemory(&szValue, sizeof(szValue));
-        RtlSecureZeroMemory(&subitems, sizeof(subitems));
-        j = 0;
-        lpType = NULL;
-        for (i = 0; i < MAX_KNOWN_OBJ_DIR_FLAGS; i++) {
-            if (ObjectFlags & objDirFlags[i].dwValue) {
-                lpType = objDirFlags[i].lpDescription;
-                subitems.Count = 2;
-                //add first entry with name
-                if (j == 0) {
-                    szValue[0] = L'0';
-                    szValue[1] = L'x';
-                    ultohex(ObjectFlags, &szValue[2]);
-
-                    subitems.Text[0] = szValue;
-                    subitems.Text[1] = lpType;
-                }
-                else {
-                    //add subentry
-                    subitems.Text[0] = T_EmptyString;
-                    subitems.Text[1] = lpType;
-                }
-
-                supTreeListAddItem(
-                    TreeList,
-                    h_tviRootItem,
-                    TVIF_TEXT | TVIF_STATE,
-                    0,
-                    0,
-                    (j == 0) ? T_FLAGS : T_EmptyString,
-                    &subitems);
-
-                ObjectFlags &= ~objDirFlags[i].dwValue;
-                j++;
-
-            }
-            if (ObjectFlags == 0) {
-                break;
-            }
-        }
-
-    }
+    propDumpBitFlags(TreeList, h_tviRootItem, ObjectFlags, T_ObjDirFlags, RTL_NUMBER_OF(T_ObjDirFlags), 0, T_FLAGS);
 
     //
     // SessionId is the last member of OBJECT_DIRECTORY_V3
@@ -2842,7 +2719,6 @@ VOID propObDumpDirectoryObjectInternal(
 PROP_OBJECT_DUMP_ROUTINE(propObDumpDirectoryObject)
 {
     HTREEITEM rootItem;
-
 
     if (Context->ObjectInfo.ObjectAddress == 0) {
         supObDumpShowError(hwndDlg, NULL);
@@ -2871,7 +2747,6 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpDirectoryObject)
             TRUE);
 
     }
-
 }
 
 /*

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2021 - 2025
+*  (C) COPYRIGHT AUTHORS, 2021 - 2026
 *
 *  TITLE:       HASH.C
 *
-*  VERSION:     2.08
+*  VERSION:     2.11
 *
-*  DATE:        12 Jun 2025
+*  DATE:        23 May 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -138,10 +138,10 @@ VOID DestroyHashContext(
 
     heapHandle = Context->HeapHandle;
 
-    if (Context->AlgHandle)
-        BCryptCloseAlgorithmProvider(Context->AlgHandle, 0);
     if (Context->HashHandle)
         BCryptDestroyHash(Context->HashHandle);
+    if (Context->AlgHandle)
+        BCryptCloseAlgorithmProvider(Context->AlgHandle, 0);
     if (Context->Hash)
         HeapFree(heapHandle, 0, Context->Hash);
     if (Context->HashObject)

@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2025
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       EXTRASUSD.C
 *
-*  VERSION:     2.09
+*  VERSION:     2.11
 *
-*  DATE:        22 Aug 2025
+*  DATE:        12 Jun 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -23,7 +23,7 @@ static EXTRASCONTEXT g_UsdDlgContext;
 static HANDLE UsdDlgThreadHandle = NULL;
 static FAST_EVENT UsdDlgInitializedEvent = FAST_EVENT_INIT;
 
-VALUE_DESC T_PROCESSOR_FEATURES_WITH_VALUES[] = {
+VALUE_DESC T_CPU_FEAT_DESC[] = {
     { L"PF_FLOATING_POINT_PRECISION_ERRATA", PF_FLOATING_POINT_PRECISION_ERRATA },
     { L"PF_FLOATING_POINT_EMULATED", PF_FLOATING_POINT_EMULATED },
     { L"PF_COMPARE_EXCHANGE_DOUBLE", PF_COMPARE_EXCHANGE_DOUBLE },
@@ -119,19 +119,6 @@ VALUE_DESC USD_SEHValidationPolicyFlags[] = {
     { L"Telemetry", SEH_VALIDATION_POLICY_TELEMETRY },
     { L"Defer", SEH_VALIDATION_POLICY_DEFER }
 };
-
-LPWSTR UsdCpuFeatureToText(
-    _In_ ULONG featureIndex
-)
-{
-    UINT i;
-    for (i = 0; i < RTL_NUMBER_OF(T_PROCESSOR_FEATURES_WITH_VALUES); i++) {
-        if (T_PROCESSOR_FEATURES_WITH_VALUES[i].dwValue == featureIndex)
-            return T_PROCESSOR_FEATURES_WITH_VALUES[i].lpDescription;
-    }
-
-    return T_Unknown;
-}
 
 /*
 * UsdDumpMitigationPolicies
@@ -372,13 +359,14 @@ VOID UsdDumpSharedRegion(
             for (i = 0; i < PROCESSOR_FEATURE_MAX; i++) {
                 if (pUserSharedData->ProcessorFeatures[i]) {
                     bAny = TRUE;
-                    lpType = UsdCpuFeatureToText(i);
+
+                    lpType = propObGetTypeDescForValue(T_CPU_FEAT_DESC, RTL_NUMBER_OF(T_CPU_FEAT_DESC), i);
                     RtlSecureZeroMemory(&subitems, sizeof(subitems));
 
                     szValue[0] = 0;
                     ultostr(i, szValue);
                     subitems.Text[0] = szValue;
-                    subitems.Text[1] = lpType;
+                    subitems.Text[1] = (lpType == NULL) ? T_Unknown : lpType;
                     subitems.Count = 2;
                     h_tviLast = supTreeListAddItem(
                         g_UsdDlgContext.TreeList,

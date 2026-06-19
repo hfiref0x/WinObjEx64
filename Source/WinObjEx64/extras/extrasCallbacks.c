@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2018 - 2025
+*  (C) COPYRIGHT AUTHORS, 2018 - 2026
 *
 *  TITLE:       EXTRASCALLBACKS.C
 *
-*  VERSION:     2.09
+*  VERSION:     2.11
 *
-*  DATE:        22 Aug 2025
+*  DATE:        15 Jun 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -48,6 +48,7 @@ static FAST_EVENT SysCbInitializedEvent = FAST_EVENT_INIT;
 #define CBT_SIZE_CO_V1        0x100
 #define CBT_SIZE_NI_V1        0xF8
 #define CBT_SIZE_GE_V1        0x100 //same as CU/GA
+#define CBT_SIZE_GE_V2        0x110
 
 typedef struct _CBT_MAPPING {
     ULONG Build;
@@ -79,7 +80,7 @@ CBT_MAPPING g_CbtMapping[] = {
     { NT_WIN11_22H2, NTDDI_WIN10_NI, CBT_SIZE_NI_V1 },
     { NT_WIN11_23H2, NTDDI_WIN10_NI, CBT_SIZE_NI_V1 },
     { NT_WIN11_24H2, NTDDI_WIN11_GE, CBT_SIZE_GE_V1 },
-    { NT_WIN11_25H2, NTDDI_WIN11_SE, CBT_SIZE_GE_V1 } //update on release
+    { NT_WIN11_25H2, NTDDI_WIN11_GE, CBT_SIZE_GE_V2 } //update on release
 };
 
 //
@@ -386,7 +387,9 @@ static const WCHAR* CiCallbackNames[] = {
     L"CiHvciReportMmIncompatibility",//30
     L"CiCompareExistingSePool",//31
     L"CiSetCachedOriginClaim",//32,
-    L"CipIsDeveloperModeEnabled"//33
+    L"CipIsDeveloperModeEnabled",//33
+    L"CiIsTrustedLaunchPolicyEnabled",//34
+    L"Id_CiUnknownCallback"//35
 };
 
 typedef enum _CiNameIds {
@@ -423,7 +426,9 @@ typedef enum _CiNameIds {
     Id_CiHvciReportMmIncompatibility,
     Id_CiCompareExistingSePool,
     Id_CiSetCachedOriginClaim,
-    Id_CipIsDeveloperModeEnabled
+    Id_CipIsDeveloperModeEnabled,
+    Id_CiIsTrustedLaunchPolicyEnabled,
+    Id_CiUnknownCallback
 } CiNameIds;
 
 //
@@ -711,9 +716,9 @@ static const BYTE CiCallbackIndexes_Win11_21H1[] = {
 };
 
 //
-// Windows 11 22H2 - 25H2
+// Windows 11 22H2 - 24H2
 //
-static const BYTE CiCallbackIndexes_Win11_22H2_25H2[] = {
+static const BYTE CiCallbackIndexes_Win11_22H2_24H2[] = {
     Id_CiSetFileCache,
     Id_CiGetFileCache,
     Id_CiQueryInformation,
@@ -744,6 +749,41 @@ static const BYTE CiCallbackIndexes_Win11_22H2_25H2[] = {
     Id_CiCompareExistingSePool,
     Id_CiSetCachedOriginClaim,
     Id_CipIsDeveloperModeEnabled
+};
+
+static const BYTE CiCallbackIndexes_Win11_25H2[] = {
+    Id_CiSetFileCache,
+    Id_CiGetFileCache,
+    Id_CiQueryInformation,
+    Id_CiValidateImageHeader,
+    Id_CiValidateImageData,
+    Id_CiHashMemory,
+    Id_KappxIsPackageFile,
+    Id_CiCompareSigningLevels,
+    Id_CiValidateFileAsImageType,
+    Id_CiRegisterSigningInformation,
+    Id_CiUnregisterSigningInformation,
+    Id_CiInitializePolicy,
+    Id_CiReleaseContext,
+    Id_XciUnknownCallback,
+    Id_CiGetStrongImageReference,
+    Id_CiHvciSetImageBaseAddress,
+    Id_CipQueryPolicyInformation,
+    Id_CiQuerySecurityPolicy,
+    Id_CiRevalidateImage,
+    Id_CiSetInformation,
+    Id_CiSetInformationProcess,
+    Id_CiGetBuildExpiryTime,
+    Id_CiCheckProcessDebugAccessPolicy,
+    Id_CiGetCodeIntegrityOriginClaimForFileObject,
+    Id_CiDeleteCodeIntegrityOriginClaimMembers,
+    Id_CiDeleteCodeIntegrityOriginClaimForFileObject,
+    Id_CiHvciReportMmIncompatibility,
+    Id_CiCompareExistingSePool,
+    Id_CiSetCachedOriginClaim,
+    Id_CipIsDeveloperModeEnabled,
+    Id_CiUnknownCallback,
+    Id_CiIsTrustedLaunchPolicyEnabled
 };
 
 typedef struct _CI_INDEX_MAP {
@@ -787,8 +827,11 @@ static CI_INDEX_MAP g_CiIndexMap[] = {
     // Windows 11 21H2
     { NT_WIN11_21H2, NT_WIN11_21H2, 0, CiCallbackIndexes_Win11_21H1, RTL_NUMBER_OF(CiCallbackIndexes_Win11_21H1) },
 
-    // Windows 11 22H2 .. 25H2
-    { NT_WIN11_22H2, NT_WIN11_25H2, 0, CiCallbackIndexes_Win11_22H2_25H2, RTL_NUMBER_OF(CiCallbackIndexes_Win11_22H2_25H2) }
+    // Windows 11 22H2 .. 24H2
+    { NT_WIN11_22H2, NT_WIN11_25H2, 0, CiCallbackIndexes_Win11_22H2_24H2, RTL_NUMBER_OF(CiCallbackIndexes_Win11_22H2_24H2) },
+
+    // Windows 11 25H2
+    { NT_WIN11_25H2, NT_WIN11_25H2, 0, CiCallbackIndexes_Win11_25H2, RTL_NUMBER_OF(CiCallbackIndexes_Win11_25H2) }
 };
 
 /*
@@ -2037,7 +2080,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindCmCallbackHead)
             if (hs.flags & F_ERROR)
                 break;
 
-            if (g_NtBuildNumber < NT_WIN11_25H2)
+            if (g_NtBuildNumber <= NT_WIN11_25H2)
             {
                 if (hs.len == 5) {
                     /*
@@ -4095,14 +4138,20 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpObCallbacks)
             (PVOID)&RegEntry,
             sizeof(OB_REGISTRATION)))
         {
-            AltitudeSize = 100 + (SIZE_T)RegEntry.Altitude.Length;
+            AltitudeSize = (SIZE_T)RegEntry.Altitude.Length + sizeof(UNICODE_NULL);
             lpAltitudeBuffer = (LPWSTR)supHeapAlloc(AltitudeSize);
             if (lpAltitudeBuffer) {
+
+                RtlSecureZeroMemory(lpAltitudeBuffer, AltitudeSize);
+
                 if (!kdReadSystemMemory((ULONG_PTR)RegEntry.Altitude.Buffer,
                     (PVOID)lpAltitudeBuffer,
                     RegEntry.Altitude.Length))
                 {
                     _strcpy(lpAltitudeBuffer, TEXT("Cannot read altitude"));
+                }
+                else {
+                    lpAltitudeBuffer[RegEntry.Altitude.Length / sizeof(WCHAR)] = UNICODE_NULL;
                 }
             }
         }
@@ -4152,6 +4201,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpObCallbacks)
 OBEX_DISPLAYCALLBACK_ROUTINE(DumpSeFileSystemCallbacks)
 {
     ULONG_PTR Next;
+    SIZE_T GuardIter = 0;
 
     SEP_LOGON_SESSION_TERMINATED_NOTIFICATION SeEntry; // This structure is different for Ex variant but 
     // key callback function field is on the same offset.
@@ -4182,6 +4232,12 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpSeFileSystemCallbacks)
     //
     Next = (ULONG_PTR)SeEntry.Next;
     while (Next) {
+        LIST_ITERATION_GUARD(GuardIter);
+
+        if (Next < g_kdctx.SystemRangeStart) {
+            logAdd(EntryTypeWarning, TEXT("SeFileSystemCallbacks invalid Next pointer"));
+            break;
+        }
         RtlSecureZeroMemory(&SeEntry, sizeof(SeEntry));
         if (!kdReadSystemMemory(Next,
             (PVOID)&SeEntry,
@@ -5122,7 +5178,7 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpPspPicoProviderRoutines)
 
         dataSize -= sizeof(SIZE_T); //exclude size element
 
-        picoRoutines = (PULONG_PTR)supHeapAlloc(ALIGN_UP(dataSize, PULONG_PTR));
+        picoRoutines = (PULONG_PTR)supHeapAlloc(ALIGN_UP(dataSize, ULONG_PTR));
         if (picoRoutines) {
             if (kdReadSystemMemory(KernelVariableAddress + sizeof(SIZE_T),
                 picoRoutines,
@@ -5184,6 +5240,12 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpKiNmiCallbackListHead)
     Next = (ULONG_PTR)NmiEntry.Next;
     while (Next) {
         LIST_ITERATION_GUARD(GuardIter);
+
+        if (Next < g_kdctx.SystemRangeStart) {
+            logAdd(EntryTypeWarning, TEXT("NmiCallbacks invalid Next pointer"));
+            break;
+        }
+
         RtlSecureZeroMemory(&NmiEntry, sizeof(NmiEntry));
 
         if (!kdReadSystemMemory(Next,
@@ -5315,6 +5377,12 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpEmpCallbackListHead)
     Next = (ULONG_PTR)Head.Next;
     while (Next) {
         LIST_ITERATION_GUARD(GuardIter);
+
+        if (Next < g_kdctx.SystemRangeStart) {
+            logAdd(EntryTypeWarning, TEXT("EmpCallbackList invalid Next pointer"));
+            break;
+        }
+
         RtlSecureZeroMemory(&CallbackRecord, sizeof(CallbackRecord));
         RecordAddress = (ULONG_PTR)Next - FIELD_OFFSET(EMP_CALLBACK_DB_RECORD, List);
 

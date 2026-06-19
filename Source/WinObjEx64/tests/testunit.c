@@ -1558,7 +1558,7 @@ VOID TestStart(
     //TestSectionControlArea();
     //TestSymbols();
     //TestSectionImage();
-    //TestShadowDirectory();
+    TestShadowDirectory();
     //TestPsObjectSecurity();
     //TestLicenseCache();
     //TestApiSetResolve();

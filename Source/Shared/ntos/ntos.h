@@ -5,9 +5,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.243
+*  VERSION:     1.244
 *
-*  DATE:        04 Jun 2026
+*  DATE:        16 Jun 2026
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -7213,7 +7213,7 @@ typedef enum _ALTERNATIVE_ARCHITECTURE_TYPE {
 #define MM_SHARED_USER_DATA_VA      0x000000007FFE0000
 
 //
-// WARNING: this definition is OS version dependent.
+// WARNING: this definition is OS version/CPU architecture type dependent.
 // Structure maybe incomplete.
 //
 #include <pshpack4.h>
@@ -7363,8 +7363,19 @@ typedef struct _KUSER_SHARED_DATA {
     union {
         USHORT QpcData;
         struct {
-            UCHAR QpcBypassEnabled : 1;
-            UCHAR QpcShift : 1;
+            union {
+                volatile UCHAR QpcBypassEnabled;
+                struct {
+                    volatile UCHAR BypassAllowed : 1;
+                    volatile UCHAR HypervisorAssist : 1;
+                    volatile UCHAR Reserved_2_3 : 2;
+                    volatile UCHAR UseMfence : 1;
+                    volatile UCHAR UseLfence : 1;
+                    volatile UCHAR Reserved_6 : 1;
+                    volatile UCHAR UseRdtscp : 1;
+                };
+            };
+            UCHAR QpcReserved;
         };
     };
 
@@ -11540,6 +11551,71 @@ NtSetSystemInformation(
 
 /************************************************************************************
 *
+* Power API.
+*
+************************************************************************************/
+
+typedef enum _SHUTDOWN_ACTION {
+    ShutdownNoReboot,
+    ShutdownReboot,
+    ShutdownPowerOff,
+    ShutdownRebootForRecovery
+} SHUTDOWN_ACTION;
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtShutdownSystem(
+    _In_ SHUTDOWN_ACTION Action);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtPowerInformation(
+    _In_ POWER_INFORMATION_LEVEL InformationLevel,
+    _In_reads_bytes_opt_(InputBufferLength) PVOID InputBuffer,
+    _In_ ULONG InputBufferLength,
+    _Out_writes_bytes_opt_(OutputBufferLength) PVOID OutputBuffer,
+    _In_ ULONG OutputBufferLength);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtInitiatePowerAction(
+    _In_ POWER_ACTION SystemAction,
+    _In_ SYSTEM_POWER_STATE LightestSystemState,
+    _In_ ULONG Flags,
+    _In_ BOOLEAN Asynchronous);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtSetSystemPowerState(
+    _In_ POWER_ACTION SystemAction,
+    _In_ SYSTEM_POWER_STATE LightestSystemState,
+    _In_ ULONG Flags);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtGetDevicePowerState(
+    _In_ HANDLE Device,
+    _Out_ PDEVICE_POWER_STATE State);
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+NtRequestWakeupLatency(
+    _In_ LATENCY_TIME latency);
+
+NTSYSAPI
+BOOLEAN
+NTAPI
+NtIsSystemResumeAutomatic(
+    VOID);
+
+/************************************************************************************
+*
 * Event (EventPair) API.
 *
 ************************************************************************************/
@@ -13519,9 +13595,11 @@ NtLoadKey2(
 //https://gist.github.com/tyranid/1db47869da253a912242c694e921009d#file-ntloadkeyex3-h
 
 typedef enum _KEY_LOAD_HANDLE_TYPE {
-    KeyLoadTrustKey = 1,
-    KeyLoadEvent,
-    KeyLoadToken
+    InvalidType,
+    TrustClassKey,
+    Event,
+    FileAccessToken,
+    TypeMax,
 } KEY_LOAD_HANDLE_TYPE;
 
 typedef struct _KEY_LOAD_HANDLE {
@@ -13540,7 +13618,7 @@ NtLoadKey3(
     _In_ ULONG LoadEntryCount,
     _In_opt_ ACCESS_MASK DesiredAccess,
     _Out_opt_ PHANDLE RootHandle,
-    _In_ PVOID Unused);
+    _Reserved_ PVOID Reserved);
 
 NTSYSAPI
 NTSTATUS
@@ -15009,8 +15087,7 @@ NtWaitForDebugEvent(
     _In_ HANDLE DebugObjectHandle,
     _In_ BOOLEAN Alertable,
     _In_opt_ PLARGE_INTEGER Timeout,
-    _Out_ PDBGUI_WAIT_STATE_CHANGE WaitStateChange
-);
+    _Out_ PDBGUI_WAIT_STATE_CHANGE WaitStateChange);
 
 NTSYSAPI
 NTSTATUS

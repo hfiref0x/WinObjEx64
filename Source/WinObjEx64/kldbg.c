@@ -2981,7 +2981,8 @@ BOOL kdLoadNtKernelImage(
                 (PSYMCONTEXT)g_kdctx.NtOsSymContext,
                 szFileName,
                 Context->NtOsImageMap,
-                0);
+                0,
+                NULL);
 
         }
 

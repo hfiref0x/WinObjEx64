@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     2.10
+*  VERSION:     2.11
 *
-*  DATE:        07 Mar 2026
+*  DATE:        22 Jun 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -524,6 +524,7 @@ VOID SdtpSetDllDirectory(
 *
 */
 BOOL SdtListCreateTableShadow(
+    _In_ HWND hwndDlg,
     _In_ PRTL_PROCESS_MODULES pModules,
     _Out_ PULONG Status
 )
@@ -555,7 +556,7 @@ BOOL SdtListCreateTableShadow(
         //
         if (W32pServiceTable.Allocated == FALSE) {
 
-            ulInitStatus = SdtWin32kInitializeOnce(pModules, &g_SDTCtx);
+            ulInitStatus = SdtWin32kInitializeOnce(pModules, &g_SDTCtx, hwndDlg);
             if (ulInitStatus != 0) {
                 *Status = ulInitStatus;
 
@@ -848,13 +849,13 @@ INT CALLBACK SdtDlgCompareFunc(
 *
 */
 VOID SdtListCreate(
-    _In_ HWND hwndDlg,
-    _In_ BOOL fRescan,
-    _In_ EXTRASCONTEXT* pDlgContext
+    _In_ EXTRASCONTEXT* pDlgContext,
+    _In_ BOOL fRescan
 )
 {
     BOOL bSuccess = FALSE;
     ULONG returnStatus;
+    HWND hwndDlg = pDlgContext->hwndDlg;
     EXTRASCALLBACK CallbackParam;
     PRTL_PROCESS_MODULES pModules = NULL;
     LPWSTR lpModule;
@@ -902,7 +903,7 @@ VOID SdtListCreate(
                 }
             }
 
-            bSuccess = SdtListCreateTableShadow(pModules, &returnStatus);
+            bSuccess = SdtListCreateTableShadow(hwndDlg, pModules, &returnStatus);
             if (bSuccess) {
 
                 if (returnStatus == ErrShadowApiSetNotFound) {
@@ -1236,7 +1237,7 @@ VOID SdtDlgOnInit(
         SendMessage(hwndDlg, WM_SIZE, 0, 0);
 
         supDisableRedraw(pDlgContext->ListView);
-        SdtListCreate(pDlgContext->hwndDlg, FALSE, pDlgContext);
+        SdtListCreate(pDlgContext, FALSE);
         supEnableRedraw(pDlgContext->ListView);
     }
 }
@@ -1330,7 +1331,7 @@ INT_PTR CALLBACK SdtDialogProc(
             pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
             if (pDlgContext) {
                 supDisableRedraw(pDlgContext->ListView);
-                SdtListCreate(hwndDlg, TRUE, pDlgContext);
+                SdtListCreate(pDlgContext, TRUE);
                 supEnableRedraw(pDlgContext->ListView);
             }
             break;

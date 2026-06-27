@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2023 - 2025
+*  (C) COPYRIGHT AUTHORS, 2023 - 2026
 *
 *  TITLE:       W32K.H
 *
-*  VERSION:     2.10
+*  VERSION:     2.11
 *
-*  DATE:        03 Oct 2025
+*  DATE:        22 Jun 2026
 *
 *  Common header file for the win32k support routines.
 *
@@ -17,6 +17,9 @@
 *
 *******************************************************************************/
 #pragma once
+
+#define APISET_RESOLVE_THRESHOLD_BUILD  18885
+#define APISET_TABLE_THRESOLD_BUILD     18935
 
 #define WIN32K_FILENAME     L"win32k.sys"       // base kernel module
 #define WIN32U_FILENAME     L"win32u.dll"       // base user module
@@ -193,7 +196,8 @@ NTSTATUS SdtResolveServiceEntryModuleSessionAware(
 
 ULONG SdtWin32kInitializeOnce(
     _In_ PRTL_PROCESS_MODULES pModules,
-    _Inout_ PSDT_CONTEXT Context);
+    _Inout_ PSDT_CONTEXT Context,
+    _In_ HWND hwndDlg);
 
 VOID SdtWin32kUninitialize(
     _In_ PSDT_CONTEXT Context);

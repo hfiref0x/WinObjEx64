@@ -4,9 +4,9 @@
 *
 *  TITLE:       W32K.C
 *
-*  VERSION:     2.10
+*  VERSION:     2.11
 *
-*  DATE:        20 Feb 2026
+*  DATE:        22 Jun 2026
 *
 *  Win32k syscall table actual handlers resolving routines.
 *
@@ -583,7 +583,7 @@ NTSTATUS SdtMapModuleFromImportThunkWithResolve(
     _Inout_ PSDT_MODULE_ENTRY ModuleEntry
 )
 {
-    BOOLEAN bNeedApiSetResolve = (g_NtBuildNumber > 18885);
+    BOOLEAN bNeedApiSetResolve = (g_NtBuildNumber > APISET_RESOLVE_THRESHOLD_BUILD);
     NTSTATUS ntStatus = STATUS_DLL_NOT_FOUND;
     PVOID pvApiSetMap = NtCurrentPeb()->ApiSetMap;
     UNICODE_STRING usModuleName;
@@ -775,7 +775,7 @@ NTSTATUS SdtResolveServiceEntryModule(
     _Inout_ PSDT_MODULE_ENTRY ModuleEntry
 )
 {
-    BOOLEAN bWin32kApiSetTableExpected = (g_NtBuildNumber > 18935);
+    BOOLEAN bWin32kApiSetTableExpected = (g_NtBuildNumber > APISET_TABLE_THRESOLD_BUILD);
     ULONG entrySize;
     NTSTATUS ntStatus = STATUS_DLL_NOT_FOUND;
     ULONG_PTR entryReference;
@@ -1109,11 +1109,12 @@ NTSTATUS SdtResolveServiceEntryModuleSessionAware(
 */
 ULONG SdtWin32kInitializeOnce(
     _In_ PRTL_PROCESS_MODULES pModules,
-    _Inout_ PSDT_CONTEXT Context
+    _Inout_ PSDT_CONTEXT Context,
+    _In_ HWND hwndDlg
 )
 {
-    BOOLEAN bNeedApiSetResolve = (g_NtBuildNumber > 18885);
-    BOOLEAN bWin32kApiSetTableExpected = (g_NtBuildNumber > 18935);
+    BOOLEAN bNeedApiSetResolve = (g_NtBuildNumber > APISET_RESOLVE_THRESHOLD_BUILD);
+    BOOLEAN bWin32kApiSetTableExpected = (g_NtBuildNumber > APISET_TABLE_THRESOLD_BUILD);
     ULONG ulResult = 0, schemaVersion;
     ULONG_PTR varAddress;
     PULONG pKernelLimit;
@@ -1125,7 +1126,6 @@ ULONG SdtWin32kInitializeOnce(
     WCHAR szModuleFileName[MAX_PATH * 2];
 
     do {
-
         if (Context->Initialized)
             return 0;
 
@@ -1251,7 +1251,7 @@ ULONG SdtWin32kInitializeOnce(
             // Load symbols for win32k.sys
             //
             if (symContext)
-                supLoadSymbolsForNtImage(symContext, szModuleFileName, hModule, 0);
+                supLoadSymbolsForNtImage(symContext, szModuleFileName, hModule, 0, hwndDlg);
 
             //
             // This is win11 next layout.

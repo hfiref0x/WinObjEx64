@@ -1165,7 +1165,7 @@ DWORD guiInitGlobals(
 
         Globals->IsWine = IsWine;
         Globals->ListViewDisplayGrid = TRUE;
-
+        Globals->dwMainThreadId = GetCurrentThreadId();
         //
         // Query version info.
         //

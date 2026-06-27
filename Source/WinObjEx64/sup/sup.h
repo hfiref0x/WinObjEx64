@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.H
 *
-*  VERSION:     2.10
+*  VERSION:     2.11
 *
-*  DATE:        07 Mar 2026
+*  DATE:        22 Jun 2026
 *
 *  Common header file for the program support routines.
 *
@@ -118,7 +118,15 @@ typedef struct _SUP_BANNER_DATA {
     HANDLE hCancelEvent;
     HANDLE hCompletionEvent;
     HWND hDialogWindow;
+    HWND hParentWindow;
 } SUP_BANNER_DATA, * PSUP_BANNER_DATA;
+
+#define WM_UPDATE_BANNER  (WM_APP + 1337)
+
+typedef struct _SUP_BANNER_UPDATE {
+    WCHAR szEventText[MAX_PATH * 2];
+    WCHAR szStatusText[MAX_PATH];
+} SUP_BANNER_UPDATE, * PSUP_BANNER_UPDATE;
 
 typedef struct _SYMBOL_LOAD_PARAMS {
     PSYMCONTEXT SymContext;
@@ -1289,7 +1297,8 @@ BOOL supLoadSymbolsForNtImage(
     _In_ PSYMCONTEXT SymContext,
     _In_ LPCWSTR ImageFileName,
     _In_ PVOID ImageBase,
-    _In_ DWORD SizeOfImage);
+    _In_ DWORD SizeOfImage,
+    _In_opt_ HWND hParentWindow);
 
 VOID CALLBACK supSymCallbackReportEvent(
     _In_ LPCWSTR EventText,

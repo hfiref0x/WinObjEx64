@@ -180,6 +180,8 @@ typedef struct _WINOBJ_GLOBALS {
     ATOM MainWindowClassAtom;
     ATOM TreeListAtom;
 
+    DWORD dwMainThreadId;
+
     HIMAGELIST ToolBarMenuImages;
     HIMAGELIST ListViewImages;
 

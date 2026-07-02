@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.11
 *
-*  DATE:        22 Jun 2026
+*  DATE:        29 Jun 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -3333,12 +3333,16 @@ BOOLEAN supQuerySecureBootState(
     _Out_ PBOOLEAN pbSecureBoot
 )
 {
-    BOOLEAN bSecureBoot = FALSE;
-    HKEY    hKey;
-    DWORD   dwState, dwSize, returnLength;
-    LSTATUS lRet;
+    BOOLEAN     restorePrivilege = FALSE;
+    BOOLEAN     bSecureBoot = FALSE;
+    NTSTATUS    status;
+    HANDLE      tokenHandle = NULL;
+    HKEY        hKey;
+    DWORD       dwState, dwSize, returnLength = 0;
+    LSTATUS     lRet;
 
     SYSTEM_SECUREBOOT_INFORMATION sbi;
+    TOKEN_PRIVILEGES oldState;
 
     if (pbSecureBoot)
         *pbSecureBoot = FALSE;
@@ -3346,23 +3350,52 @@ BOOLEAN supQuerySecureBootState(
     //
     // 1) query firmware environment variable, will not work if not fulladmin.
     //
-    if (supEnablePrivilege(SE_SYSTEM_ENVIRONMENT_PRIVILEGE, TRUE)) {
+    status = NtOpenProcessToken(
+        NtCurrentProcess(),
+        TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
+        &tokenHandle);
 
-        bSecureBoot = FALSE;
+    if (NT_SUCCESS(status)) {
 
-        returnLength = GetFirmwareEnvironmentVariable(
-            L"SecureBoot",
-            L"{8be4df61-93ca-11d2-aa0d-00e098032b8c}",
-            &bSecureBoot,
-            sizeof(BOOLEAN));
+        status = ntsupSetPrivilege(
+            tokenHandle,
+            SE_SYSTEM_ENVIRONMENT_PRIVILEGE,
+            TRUE,
+            &oldState,
+            &returnLength);
 
-        supEnablePrivilege(SE_SYSTEM_ENVIRONMENT_PRIVILEGE, FALSE);
-        if (returnLength != 0) {
-            if (pbSecureBoot) {
-                *pbSecureBoot = bSecureBoot;
+        if (NT_SUCCESS(status)) {
+
+            restorePrivilege = TRUE;
+            bSecureBoot = FALSE;
+
+            returnLength = GetFirmwareEnvironmentVariable(
+                L"SecureBoot",
+                L"{8be4df61-93ca-11d2-aa0d-00e098032b8c}",
+                &bSecureBoot,
+                sizeof(BOOLEAN));
+
+            if (restorePrivilege) {
+                NtAdjustPrivilegesToken(
+                    tokenHandle,
+                    FALSE,
+                    &oldState,
+                    0,
+                    NULL,
+                    (PULONG)&status);
             }
-            return TRUE;
+
+            if (returnLength != 0) {
+                if (pbSecureBoot) {
+                    *pbSecureBoot = bSecureBoot;
+                }
+
+                NtClose(tokenHandle);
+                return TRUE;
+            }
         }
+
+        NtClose(tokenHandle);
     }
 
     //
@@ -8720,10 +8753,13 @@ NTSTATUS supLoadDriverEx(
     _In_opt_ PVOID CallbackParam
 )
 {
+    BOOLEAN restorePrivilege = FALSE;
+    ULONG returnLength;
     SIZE_T keyOffset;
+    HANDLE tokenHandle = NULL;
     NTSTATUS status;
     UNICODE_STRING driverServiceName;
-
+    TOKEN_PRIVILEGES oldState;
     WCHAR szBuffer[MAX_PATH + 1];
 
     if (DriverName == NULL)
@@ -8757,27 +8793,52 @@ NTSTATUS supLoadDriverEx(
             return status;
     }
 
-    if (supEnablePrivilege(SE_LOAD_DRIVER_PRIVILEGE, TRUE)) {
+    status = NtOpenProcessToken(
+        NtCurrentProcess(),
+        TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
+        &tokenHandle);
 
-        status = NtLoadDriver(&driverServiceName);
+    if (NT_SUCCESS(status)) {
 
-        if (UnloadPreviousInstance) {
-            if ((status == STATUS_IMAGE_ALREADY_LOADED) ||
-                (status == STATUS_OBJECT_NAME_COLLISION) ||
-                (status == STATUS_OBJECT_NAME_EXISTS))
-            {
-                status = NtUnloadDriver(&driverServiceName);
-                if (NT_SUCCESS(status)) {
-                    status = NtLoadDriver(&driverServiceName);
+        status = supSetPrivilege(
+            tokenHandle,
+            SE_LOAD_DRIVER_PRIVILEGE,
+            TRUE,
+            &oldState,
+            &returnLength);
+
+        if (NT_SUCCESS(status)) {
+
+            restorePrivilege = TRUE;
+
+            status = NtLoadDriver(&driverServiceName);
+
+            if (UnloadPreviousInstance) {
+                if ((status == STATUS_IMAGE_ALREADY_LOADED) ||
+                    (status == STATUS_OBJECT_NAME_COLLISION) ||
+                    (status == STATUS_OBJECT_NAME_EXISTS))
+                {
+                    status = NtUnloadDriver(&driverServiceName);
+                    if (NT_SUCCESS(status)) {
+                        status = NtLoadDriver(&driverServiceName);
+                    }
                 }
             }
-        }
-        else {
-            if (status == STATUS_OBJECT_NAME_EXISTS)
-                status = STATUS_SUCCESS;
+            else {
+                if (status == STATUS_OBJECT_NAME_EXISTS)
+                    status = STATUS_SUCCESS;
+            }
+
+            NtAdjustPrivilegesToken(
+                tokenHandle,
+                FALSE,
+                &oldState,
+                0,
+                NULL,
+                &returnLength);
         }
 
-        supEnablePrivilege(SE_LOAD_DRIVER_PRIVILEGE, FALSE);
+        NtClose(tokenHandle);
     }
     else {
         status = STATUS_PRIVILEGE_NOT_HELD;
@@ -8827,9 +8888,12 @@ NTSTATUS supUnloadDriver(
 )
 {
     NTSTATUS status;
+    ULONG returnLength = 0;
     SIZE_T keyOffset;
+    HANDLE tokenHandle = NULL;
+    BOOLEAN restorePrivilege = FALSE;
     UNICODE_STRING driverServiceName;
-
+    TOKEN_PRIVILEGES oldState;
     WCHAR szBuffer[MAX_PATH + 1];
 
     RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
@@ -8850,12 +8914,39 @@ NTSTATUS supUnloadDriver(
     if (!NT_SUCCESS(status))
         return status;
 
-    if (supEnablePrivilege(SE_LOAD_DRIVER_PRIVILEGE, TRUE)) {
+    status = NtOpenProcessToken(
+        NtCurrentProcess(),
+        TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
+        &tokenHandle);
 
-        RtlInitUnicodeString(&driverServiceName, szBuffer);
-        status = NtUnloadDriver(&driverServiceName);
+    if (NT_SUCCESS(status)) {
 
-        supEnablePrivilege(SE_LOAD_DRIVER_PRIVILEGE, FALSE);
+        status = ntsupSetPrivilege(
+            tokenHandle,
+            SE_LOAD_DRIVER_PRIVILEGE,
+            TRUE,
+            &oldState,
+            &returnLength);
+
+        if (NT_SUCCESS(status)) {
+
+            restorePrivilege = TRUE;
+
+            RtlInitUnicodeString(&driverServiceName, szBuffer);
+            status = NtUnloadDriver(&driverServiceName);
+
+            if (restorePrivilege) {
+                NtAdjustPrivilegesToken(
+                    tokenHandle,
+                    FALSE,
+                    &oldState,
+                    0,
+                    NULL,
+                    &returnLength);
+            }
+        }
+
+        NtClose(tokenHandle);
     }
     else {
         status = STATUS_PRIVILEGE_NOT_HELD;

@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.11
 *
-*  DATE:        15 Jun 2026
+*  DATE:        27 Jun 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -4141,9 +4141,6 @@ OBEX_DISPLAYCALLBACK_ROUTINE(DumpObCallbacks)
             AltitudeSize = (SIZE_T)RegEntry.Altitude.Length + sizeof(UNICODE_NULL);
             lpAltitudeBuffer = (LPWSTR)supHeapAlloc(AltitudeSize);
             if (lpAltitudeBuffer) {
-
-                RtlSecureZeroMemory(lpAltitudeBuffer, AltitudeSize);
-
                 if (!kdReadSystemMemory((ULONG_PTR)RegEntry.Altitude.Buffer,
                     (PVOID)lpAltitudeBuffer,
                     RegEntry.Altitude.Length))

@@ -775,7 +775,7 @@ NTSTATUS SdtResolveServiceEntryModule(
     _Inout_ PSDT_MODULE_ENTRY ModuleEntry
 )
 {
-    BOOLEAN bWin32kApiSetTableExpected = (g_NtBuildNumber > APISET_TABLE_THRESOLD_BUILD);
+    BOOLEAN bWin32kApiSetTableExpected = (g_NtBuildNumber > APISET_TABLE_THRESHOLD_BUILD);
     ULONG entrySize;
     NTSTATUS ntStatus = STATUS_DLL_NOT_FOUND;
     ULONG_PTR entryReference;
@@ -1114,7 +1114,7 @@ ULONG SdtWin32kInitializeOnce(
 )
 {
     BOOLEAN bNeedApiSetResolve = (g_NtBuildNumber > APISET_RESOLVE_THRESHOLD_BUILD);
-    BOOLEAN bWin32kApiSetTableExpected = (g_NtBuildNumber > APISET_TABLE_THRESOLD_BUILD);
+    BOOLEAN bWin32kApiSetTableExpected = (g_NtBuildNumber > APISET_TABLE_THRESHOLD_BUILD);
     ULONG ulResult = 0, schemaVersion;
     ULONG_PTR varAddress;
     PULONG pKernelLimit;

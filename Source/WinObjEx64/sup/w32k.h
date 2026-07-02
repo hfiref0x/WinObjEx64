@@ -19,7 +19,7 @@
 #pragma once
 
 #define APISET_RESOLVE_THRESHOLD_BUILD  18885
-#define APISET_TABLE_THRESOLD_BUILD     18935
+#define APISET_TABLE_THRESHOLD_BUILD    18935
 
 #define WIN32K_FILENAME     L"win32k.sys"       // base kernel module
 #define WIN32U_FILENAME     L"win32u.dll"       // base user module

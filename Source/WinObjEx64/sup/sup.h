@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.11
 *
-*  DATE:        22 Jun 2026
+*  DATE:        29 Jun 2026
 *
 *  Common header file for the program support routines.
 *
@@ -413,6 +413,7 @@ BOOL supHeapFree(
 #define supVirtualAllocEx ntsupVirtualAllocEx
 #define supVirtualAlloc ntsupVirtualAlloc
 #define supVirtualFree ntsupVirtualFree
+#define supSetPrivilege ntsupSetPrivilege
 #define supEnablePrivilege ntsupEnablePrivilege
 #define supGetCurrentProcessToken ntsupGetCurrentProcessToken
 #define supQuerySystemRangeStart ntsupQuerySystemRangeStart

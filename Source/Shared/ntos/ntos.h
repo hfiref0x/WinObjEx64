@@ -5,9 +5,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.244
+*  VERSION:     1.245
 *
-*  DATE:        16 Jun 2026
+*  DATE:        27 Jun 2026
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -93,6 +93,14 @@ extern "C" {
 
 #ifndef POI //poi-poi
 #define POI(addr) *(ULONG *)(addr)
+#endif
+
+#ifndef MAX
+#define MAX(a,b) (((a) > (b)) ? (a) : (b))
+#endif
+
+#ifndef MIN
+#define MIN(a,b) (((a) < (b)) ? (a) : (b))
 #endif
 
 typedef char CCHAR;

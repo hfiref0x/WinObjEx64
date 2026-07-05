@@ -24,7 +24,7 @@ jobs:
 
       - name: Build WinObjEx64
         working-directory: ./Source
-        run: msbuild /m /p:Platform=x64 /p:Configuration=Release /p:PlatformToolset=v143 WinObjEx64.sln
+        run: msbuild /m /p:Platform=x64 /p:Configuration=Release /p:PlatformToolset=v145 WinObjEx64.sln
 
       - name: Build WinObjEx64 package
         run: |
@@ -34,7 +34,7 @@ jobs:
 
       - name: Build WinObjEx64 Plugins
         working-directory: ./Source
-        run: msbuild /m /p:Platform=x64 /p:PostBuildEventUseInBuild=false /p:Configuration=Release /p:PlatformToolset=v143 WinObjEx64_Plugins.sln
+        run: msbuild /m /p:Platform=x64 /p:PostBuildEventUseInBuild=false /p:Configuration=Release /p:PlatformToolset=v145 WinObjEx64_Plugins.sln
 
       - name: Gather all plugin DLLs
         run: |

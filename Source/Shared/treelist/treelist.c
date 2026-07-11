@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       TREELIST.C
 *
-*  VERSION:     1.36
+*  VERSION:     1.37
 *
-*  DATE:        20 Sep 2022
+*  DATE:        03 Jan 2026
 *
 *  TreeList control.
 *
@@ -27,8 +27,6 @@
 #include "treelist.h"
 #include "minirtl\minirtl.h"
 #pragma comment(lib, "Uxtheme.lib")
-
-HTHEME  tl_theme = NULL;
 
 VOID AddTooltipItemSub(
     HWND TreeControl,
@@ -141,6 +139,7 @@ LRESULT TreeListCustomDraw(
     BOOL            ItemSelected, first_iter = TRUE;
     HIMAGELIST      ImgList;
     HTREEITEM       iparent;
+    HTHEME          hTheme;
 
     if ((pdraw->nmcd.dwDrawStage & CDDS_ITEM) == 0)
         return CDRF_NOTIFYITEMDRAW;
@@ -158,6 +157,7 @@ LRESULT TreeListCustomDraw(
 
     TreeView_GetItemRect(pdraw->nmcd.hdr.hwndFrom, (HTREEITEM)pdraw->nmcd.dwItemSpec, &ir, TRUE);
     ImgList = TreeView_GetImageList(pdraw->nmcd.hdr.hwndFrom, TVSIL_NORMAL);
+    hTheme = (HTHEME)GetWindowLongPtr(GetParent(pdraw->nmcd.hdr.hwndFrom), TL_THEME_SLOT);
 
     if ((GetWindowLongPtr(GetParent(hwndHeader), GWL_STYLE) & TLSTYLE_LINKLINES))
     {
@@ -208,7 +208,8 @@ LRESULT TreeListCustomDraw(
         subr.right = ir.left;
 
         FillRect(pdraw->nmcd.hdc, &subr, (HBRUSH)WHITE_BRUSH);
-        if (S_OK != DrawThemeBackground(tl_theme, pdraw->nmcd.hdc, TVP_GLYPH, item.state & TVIS_EXPANDED ? GLPS_OPENED : GLPS_CLOSED, &subr, NULL))
+        if ((hTheme == NULL) ||
+            (S_OK != DrawThemeBackground(hTheme, pdraw->nmcd.hdc, TVP_GLYPH, item.state & TVIS_EXPANDED ? GLPS_OPENED : GLPS_CLOSED, &subr, NULL)))
         {
             if ((item.state & TVIS_EXPANDED) == 0)
             {
@@ -296,27 +297,27 @@ LRESULT TreeListCustomDraw(
         hdritem.mask = HDI_LPARAM;
         Header_GetItem(hwndHeader, i, &hdritem);
 
-        if ((i > 0) && subitem)
-            if (i <= (LONG)subitem->Count)
-                if (subitem->Text[i - 1]) {
-                    subr.top = ir.top;
-                    subr.bottom = ir.bottom;
-                    subr.left = hr.left + 3;
-                    subr.right = hr.right - 3;
+        if ((i > 0) && subitem) {
+            if ((i <= (LONG)subitem->Count) && subitem->Text[i - 1]) {
+                subr.top = ir.top;
+                subr.bottom = ir.bottom;
+                subr.left = hr.left + 3;
+                subr.right = hr.right - 3;
 
-                    if (!ItemSelected)
-                    {
-                        if (subitem->ColorFlags & TLF_BGCOLOR_SET) {
-                            pdraw->clrTextBk = subitem->BgColor;
-                            SetBkColor(pdraw->nmcd.hdc, subitem->BgColor);
-                        }
-
-                        if (hdritem.lParam != 0)
-                            SetBkColor(pdraw->nmcd.hdc, (COLORREF)hdritem.lParam);
+                if (!ItemSelected)
+                {
+                    if (subitem->ColorFlags & TLF_BGCOLOR_SET) {
+                        pdraw->clrTextBk = subitem->BgColor;
+                        SetBkColor(pdraw->nmcd.hdc, subitem->BgColor);
                     }
 
-                    DrawText(pdraw->nmcd.hdc, subitem->Text[i - 1], -1, &subr, DT_END_ELLIPSIS | DT_VCENTER | DT_SINGLELINE);
+                    if (hdritem.lParam != 0)
+                        SetBkColor(pdraw->nmcd.hdc, (COLORREF)hdritem.lParam);
                 }
+
+                DrawText(pdraw->nmcd.hdc, subitem->Text[i - 1], -1, &subr, DT_END_ELLIPSIS | DT_VCENTER | DT_SINGLELINE);
+            }
+        }
 
         MoveToEx(pdraw->nmcd.hdc, hr.left, ir.bottom - 1, NULL);
         LineTo(pdraw->nmcd.hdc, hr.right - 1, ir.bottom - 1);
@@ -394,15 +395,22 @@ VOID TreeListAutoExpand(
     RECT        irc;
     LONG        cx = 0, xleft = 0;
     HDITEM      hdi;
-    HTREEITEM   citem = TreeView_GetChild(nhdr->hdr.hwndFrom, nhdr->itemNew.hItem);
+    HTREEITEM   citem;
+
+    citem = TreeView_GetChild(nhdr->hdr.hwndFrom, nhdr->itemNew.hItem);
+    if (citem == NULL)
+        return;
 
     RtlSecureZeroMemory(&irc, sizeof(irc));
-    TreeView_GetItemRect(nhdr->hdr.hwndFrom, citem, &irc, TRUE);
+    if (!TreeView_GetItemRect(nhdr->hdr.hwndFrom, citem, &irc, TRUE))
+        return;
+
     xleft = irc.left;
 
     while (citem) {
         RtlSecureZeroMemory(&irc, sizeof(irc));
-        TreeView_GetItemRect(nhdr->hdr.hwndFrom, citem, &irc, TRUE);
+        if (!TreeView_GetItemRect(nhdr->hdr.hwndFrom, citem, &irc, TRUE))
+            break;
 
         if (irc.left < xleft)
             break;
@@ -494,7 +502,7 @@ LRESULT CALLBACK TreeListHookProc(
 
                     subid = (tool.uId & ((ULONG_PTR)~0xfff)) >> 12;
                     if (subid > 0) {
-                        Header_GetItemRect((HWND)GetWindowLongPtr(BaseWindow, TL_HEADERCONTROL_SLOT), subid, &hr);
+                        Header_GetItemRect((HWND)GetWindowLongPtr(BaseWindow, TL_HEADERCONTROL_SLOT), (INT)subid, &hr);
                         rc.left = hr.left;
                         rc.right = hr.right;
                     }
@@ -512,13 +520,16 @@ LRESULT CALLBACK TreeListHookProc(
             case TTN_GETDISPINFO:
 
                 subid = (hdr->hdr.idFrom & ((ULONG_PTR)~0xfff)) >> 12;
-                if (!Header_GetItemRect((HWND)GetWindowLongPtr(BaseWindow, TL_HEADERCONTROL_SLOT), subid, &hr))
+                if (!Header_GetItemRect((HWND)GetWindowLongPtr(BaseWindow, TL_HEADERCONTROL_SLOT), (INT)subid, &hr))
                     break;
 
                 if (!TreeView_GetItemRect(hwnd, (HTREEITEM)hdr->lParam, &rc, TRUE))
                     break;
 
                 privateBuffer = (LPTSTR)GetWindowLongPtr(BaseWindow, TL_TOOLTIPSBUFFER_SLOT);
+                if (privateBuffer == NULL)
+                    break;
+
                 privateBuffer[0] = 0;
 
                 RtlSecureZeroMemory(&itemex, sizeof(itemex));
@@ -532,7 +543,7 @@ LRESULT CALLBACK TreeListHookProc(
 
                 if (subid == 0) // is tooltip from the first column?
                 {
-                    if (subitems)
+                    if (subitems) {
                         if (subitems->CustomTooltip)
                         {
                             SendMessage(hdr->hdr.hwndFrom, TTM_SETMAXTIPWIDTH, 0, 1024);
@@ -540,12 +551,19 @@ LRESULT CALLBACK TreeListHookProc(
                             hdr->lpszText = privateBuffer;
                             break;
                         }
-
+                    }
                     if (rc.right < hr.right - 1) // no overflow
                         break;
                 }
 
-                if ((subid > 0) && (subitems != 0)) {   
+                if ((subid > 0) && (subitems != 0)) {
+
+                    if (subid > subitems->Count)
+                        break;
+
+                    if (subitems->Text[subid - 1] == NULL)
+                        break;
+
                     rc.left = hr.left + 3;
                     rc.right = hr.right - 3;
 
@@ -605,7 +623,7 @@ PTL_SUBITEMS PackSubitems(HANDLE hHeap, IN PTL_SUBITEMS Subitems)
         if (Subitems->Text[i])
             strings_size += (_strlen(Subitems->Text[i]) + 1) * sizeof(TCHAR);
     }
-    
+
     if (Subitems->CustomTooltip != NULL) {
         strings_size += (_strlen(Subitems->CustomTooltip) + 1) * sizeof(TCHAR);
     }
@@ -644,8 +662,10 @@ LRESULT CALLBACK TreeListWindowProc(
     LPARAM lParam
 )
 {
+    BOOL            bOwnHeaderFont = FALSE;
     HWND            TreeControl, HeaderControl, ToolTip;
-    PTL_SUBITEMS    subitems, *ppsubitems;
+    PTL_SUBITEMS    subitems, * ppsubitems;
+    PVOID           pvBuffer;
     TVHITTESTINFO   lhti;
     LONG            cx, headerheight;
     HANDLE          hheap;
@@ -655,6 +675,7 @@ LRESULT CALLBACK TreeListWindowProc(
     SCROLLINFO      scroll;
     TVITEMEX        item;
     LRESULT         result;
+    HTHEME          hTheme;
 
     NONCLIENTMETRICS    ncm;
     TV_INSERTSTRUCT     ins;
@@ -675,7 +696,7 @@ LRESULT CALLBACK TreeListWindowProc(
             return 0;
 
         item = *((LPTVITEMEX)wParam);
-        ppsubitems = (PTL_SUBITEMS *)lParam;
+        ppsubitems = (PTL_SUBITEMS*)lParam;
 
         if (ppsubitems)
             item.mask |= TVIF_PARAM;
@@ -695,7 +716,7 @@ LRESULT CALLBACK TreeListWindowProc(
     case TVM_SETITEM:
 
         item = *((LPTVITEMEX)wParam);
-        ppsubitems = (PTL_SUBITEMS *)lParam;
+        ppsubitems = (PTL_SUBITEMS*)lParam;
 
         hheap = (HANDLE)GetWindowLongPtr(hwnd, TL_HEAP_SLOT);
         if (!hheap)
@@ -753,7 +774,7 @@ LRESULT CALLBACK TreeListWindowProc(
     case HDM_HITTEST:
 
         return SendMessage((HWND)GetWindowLongPtr(hwnd, TL_HEADERCONTROL_SLOT), HDM_HITTEST, 0, lParam);
-    
+
     case TVM_GETNEXTITEM:
 
         return SendMessage((HWND)GetWindowLongPtr(hwnd, TL_TREECONTROL_SLOT), TVM_GETNEXTITEM, wParam, lParam);
@@ -779,8 +800,14 @@ LRESULT CALLBACK TreeListWindowProc(
             if (hheap == NULL)
                 return FALSE;
 
+            pvBuffer = HeapAlloc(hheap, 0, TL_SIZEOF_PRIVATEBUFFER);
+            if (pvBuffer == NULL) {
+                HeapDestroy(hheap);
+                return FALSE;
+            }
+
             SetWindowLongPtr(hwnd, TL_HEAP_SLOT, (LONG_PTR)hheap);
-            SetWindowLongPtr(hwnd, TL_TOOLTIPSBUFFER_SLOT, (LONG_PTR)HeapAlloc(hheap, 0, TL_SIZEOF_PRIVATEBUFFER));
+            SetWindowLongPtr(hwnd, TL_TOOLTIPSBUFFER_SLOT, (LONG_PTR)pvBuffer);
 
             return TRUE;
         }
@@ -915,6 +942,10 @@ LRESULT CALLBACK TreeListWindowProc(
         ncm.cbSize = sizeof(ncm) - sizeof(int);
         if (SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(ncm) - sizeof(int), &ncm, 0)) {
             font = CreateFontIndirect(&ncm.lfMenuFont);
+            if (font != NULL)
+                bOwnHeaderFont = TRUE;
+            else
+                font = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
             cx = ncm.iCaptionHeight;
         }
         else {
@@ -947,23 +978,41 @@ LRESULT CALLBACK TreeListWindowProc(
         SetWindowLongPtr(hwnd, TL_HEADERCONTROL_SLOT, (LONG_PTR)HeaderControl);
         SetWindowLongPtr(hwnd, TL_HEAP_SLOT, (LONG_PTR)hheap);
         SetWindowLongPtr(hwnd, TL_TOOLTIPS_SLOT, (LONG_PTR)ToolTip);
-        SetWindowLongPtr(hwnd, TL_TOOLTIPSBUFFER_SLOT, (LONG_PTR)HeapAlloc(hheap, 0, TL_SIZEOF_PRIVATEBUFFER));
+        SetWindowLongPtr(hwnd, TL_HEADERFONT_SLOT, (LONG_PTR)font);
+        SetWindowLongPtr(hwnd, TL_OWNHEADERFONT_SLOT, (LONG_PTR)bOwnHeaderFont);
+
+        pvBuffer = HeapAlloc(hheap, 0, TL_SIZEOF_PRIVATEBUFFER);
+        if (pvBuffer == NULL) {
+            if (bOwnHeaderFont && font)
+                DeleteObject(font);
+            HeapDestroy(hheap);
+            return -1;
+        }
+        SetWindowLongPtr(hwnd, TL_TOOLTIPSBUFFER_SLOT, (LONG_PTR)pvBuffer);
 
         SetWindowTheme(TreeControl, TEXT("Explorer"), NULL);
         SetWindowTheme(HeaderControl, TEXT("Explorer"), NULL);
 
-        if (tl_theme == NULL)
-            tl_theme = OpenThemeData(TreeControl, VSCLASS_TREEVIEW);
-
+        hTheme = OpenThemeData(TreeControl, VSCLASS_TREEVIEW);
+        SetWindowLongPtr(hwnd, TL_THEME_SLOT, (LONG_PTR)hTheme);
         break;
 
     case WM_DESTROY:
-        if (tl_theme) {
-            CloseThemeData(tl_theme);
-            tl_theme = NULL;
+        hTheme = (HTHEME)GetWindowLongPtr(hwnd, TL_THEME_SLOT);
+        if (hTheme) {
+            CloseThemeData(hTheme);
+            SetWindowLongPtr(hwnd, TL_THEME_SLOT, 0);
         }
+
+        if ((BOOL)GetWindowLongPtr(hwnd, TL_OWNHEADERFONT_SLOT)) {
+            font = (HFONT)GetWindowLongPtr(hwnd, TL_HEADERFONT_SLOT);
+            if (font)
+                DeleteObject(font);
+        }
+
         DestroyWindow((HWND)GetWindowLongPtr(hwnd, TL_TOOLTIPS_SLOT));
         HeapDestroy((HANDLE)GetWindowLongPtr(hwnd, TL_HEAP_SLOT));
+        break;
     }
 
     return DefWindowProc(hwnd, uMsg, wParam, lParam);

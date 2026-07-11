@@ -5,9 +5,9 @@
 *
 *  TITLE:       NTOS.H
 *
-*  VERSION:     1.245
+*  VERSION:     1.246
 *
-*  DATE:        27 Jun 2026
+*  DATE:        12 Jul 2026
 *
 *  Common header file for the ntos API functions and definitions.
 *
@@ -1930,7 +1930,7 @@ typedef enum _SYSTEM_INFORMATION_CLASS {
     SystemMemoryNumaInformation = 239,
     SystemMemoryNumaPerformanceInformation = 240,
     SystemCodeIntegritySignedPoliciesFullInformation = 241,
-    SystemSecureSecretsInformation = 242,
+    SystemSecureCoreInformation = 242,
     SystemTrustedAppsRuntimeInformation = 243,
     SystemBadPageInformationEx = 244,
     SystemResourceDeadlockTimeout = 245,
@@ -2101,6 +2101,12 @@ typedef struct _SYSTEM_CODE_INTEGRITY_POLICIES_FULL_INFORMATION {
 #define CODEINTEGRITY_OPTION_HVCI_IUM_ENABLED             0x2000
 #define CODEINTEGRITY_OPTION_WHQL_ENFORCEMENT_ENABLED     0x4000
 #define CODEINTEGRITY_OPTION_WHQL_AUDITMODE_ENABLED       0x8000
+
+typedef struct _SYSTEM_SECURE_CORE_INFORMATION {
+    BOOLEAN IsSecureCore;
+    ULONGLONG SecureKernelRunning;
+    ULONGLONG VslFeatures;
+} SYSTEM_SECURE_CORE_INFORMATION, * PSYSTEM_SECURE_CORE_INFORMATION;
 
 typedef struct _HV_DETAILS {
     ULONG Data[4];

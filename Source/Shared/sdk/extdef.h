@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.11
 *
-*  DATE:        11 Jun 2026
+*  DATE:        12 Jul 2026
 *
 *  Windows SDK compatibility header.
 *
@@ -287,5 +287,17 @@ FORCEINLINE BOOLEAN _InterlockedBitTestAndSetPointer(
     return _interlockedbittestandset64((PLONG64)Base, (LONG64)Bit);
 #else
     return _interlockedbittestandset((PLONG)Base, (LONG)Bit);
+#endif
+}
+
+FORCEINLINE LONG_PTR _InterlockedAndPointer(
+    _Inout_ volatile LONG_PTR* Value,
+    _In_ LONG_PTR AndValue
+)
+{
+#ifdef _WIN64
+    return _InterlockedAnd64((volatile LONG64*)Value, (LONG64)AndValue);
+#else
+    return _InterlockedAnd((volatile LONG*)Value, (LONG)AndValue);
 #endif
 }

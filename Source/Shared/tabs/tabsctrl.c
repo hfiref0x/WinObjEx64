@@ -1,16 +1,16 @@
 /*++
 
-Copyright (c) 2015-2025 (see AUTHORS.txt).
+Copyright (c) 2015 - 2026 (see AUTHORS.txt).
 
 Module Name:
 
-    tabctrl.cpp
+    tabctrl.c
 
 Abstract:
 
     Set of functions used with tab component.
 
-    VERSION 2.1 (08.06.2025)
+    VERSION 2.2 (10.07.2026)
 
     WinObjEx64 version.
 
@@ -53,10 +53,8 @@ VOID TabResizeTabWindow(
     _In_ PTABHDR hdr
 )
 {
-    HWND hParentWnd;
     RECT tr, dr;
-
-    hParentWnd = GetParent(hdr->hwndTab);
+    INT width, height;
 
     RtlZeroMemory(&tr, sizeof(RECT));
     RtlZeroMemory(&dr, sizeof(RECT));
@@ -64,12 +62,15 @@ VOID TabResizeTabWindow(
     TabCtrl_AdjustRect(hdr->hwndTab, FALSE, &tr);
     if (GetClientRect(hdr->hwndTab, &dr)) {
 
+        width = (dr.right - dr.left) + (tr.right - tr.left);
+        height = (dr.bottom - dr.top) + (tr.bottom - tr.top);
+
         SetWindowPos(hdr->hwndDisplay,
             HWND_TOP,
             dr.left + tr.left,
             dr.top + tr.top,
-            dr.right - dr.left + tr.right - tr.left,
-            dr.bottom - dr.top + tr.bottom - tr.top,
+            width,
+            height,
             SWP_SHOWWINDOW);
 
     }
@@ -170,6 +171,17 @@ VOID TabDestroyControl(
     TABCALLBACK_FREEMEM pFree;
 
     if (hdr) {
+
+        if (hdr->hwndDisplay != NULL) {
+            DestroyWindow(hdr->hwndDisplay);
+            hdr->hwndDisplay = NULL;
+        }
+
+        if (hdr->hwndTab != NULL) {
+            DestroyWindow(hdr->hwndTab);
+            hdr->hwndTab = NULL;
+        }
+
         pFree = hdr->FreeMem;
         entry = hdr->tabsHead.Flink;
 
@@ -205,6 +217,7 @@ BOOL TabAddPage(
     TC_ITEM tie;
     INT tabIndex;
 
+    //tabEntry is zeroed by allocator
     tabEntry = (PTABENTRY)hdr->MemAlloc(sizeof(TABENTRY));
     if (tabEntry == NULL)
         return FALSE;
@@ -236,7 +249,7 @@ BOOL TabAddPage(
     tabEntry->ResId = ResId;
     tabEntry->UserParam = (PVOID)lParam;
 
-    InsertHeadList(&hdr->tabsHead, &tabEntry->ListEntry);
+    InsertTailList(&hdr->tabsHead, &tabEntry->ListEntry);
     return TRUE;
 }
 
@@ -256,7 +269,10 @@ BOOL TabDeletePage(
 )
 {
     BOOL bResult;
+    INT nCurrentTab;
     PTABENTRY tabEntry;
+    PTABENTRY currentEntry;
+    PLIST_ENTRY entry;
 
     bResult = TabCtrl_DeleteItem(hdr->hwndTab, TabIndex);
     if (bResult) {
@@ -268,10 +284,21 @@ BOOL TabDeletePage(
             hdr->FreeMem(tabEntry);
         }
 
-        if (TabCtrl_GetCurSel(hdr->hwndTab) < 0) {
-            TabCtrl_SetCurSel(hdr->hwndTab, 0);
+        entry = hdr->tabsHead.Flink;
+        while ((entry != NULL) && (entry != &hdr->tabsHead)) {
+            currentEntry = CONTAINING_RECORD(entry, TABENTRY, ListEntry);
+            if (currentEntry->TabIndex > TabIndex)
+                currentEntry->TabIndex--;
+            entry = entry->Flink;
         }
-        TabOnSelChanged(hdr);
+
+        if (hdr->tabsCount > 0) {
+            nCurrentTab = TabCtrl_GetCurSel(hdr->hwndTab);
+            if (nCurrentTab < 0) {
+                TabCtrl_SetCurSel(hdr->hwndTab, 0);
+            }
+            TabOnSelChanged(hdr);
+        }
     }
     return bResult;
 }
@@ -316,6 +343,7 @@ PTABHDR TabCreateControl(
     // Set the font of the tabs to a more typical system GUI font.
     SendMessage(hwndTab, WM_SETFONT, (WPARAM)GetStockObject(DEFAULT_GUI_FONT), 0);
 
+    //result is zeroed by allocator
     result = (PTABHDR)MemAlloc(sizeof(TABHDR));
     if (result == NULL) {
         DestroyWindow(hwndTab);
@@ -373,7 +401,8 @@ VOID TabOnChangeTab(
     _In_ LPNMHDR pnmhdr
 )
 {
-    UINT TAB_SELECTION_CHANGE_NOTIFICATION = TCN_SELCHANGE;
+    const UINT TAB_SELECTION_CHANGE_NOTIFICATION = TCN_SELCHANGE;
+
     if ((pnmhdr == NULL) || (hdr == NULL))
         return;
 

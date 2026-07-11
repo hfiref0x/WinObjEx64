@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2022
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       TREELIST.H
 *
-*  VERSION:     1.35
+*  VERSION:     1.36
 *
-*  DATE:        10 Jun 2022
+*  DATE:        03 Jan 2026
 *
 *  Tree-List custom control header file.
 *
@@ -37,6 +37,9 @@
 #define TL_TOOLTIPS_SLOT        sizeof(HANDLE)*4
 #define TL_TOOLTIPSBUFFER_SLOT  sizeof(HANDLE)*5
 #define TL_HEADERWNDPROC_SLOT   sizeof(HANDLE)*6
+#define TL_HEADERFONT_SLOT      sizeof(HANDLE)*7
+#define TL_OWNHEADERFONT_SLOT   sizeof(HANDLE)*8
+#define TL_THEME_SLOT           sizeof(HANDLE)*9
 
 #define TL_SIZEOF_PRIVATEBUFFER (sizeof(TCHAR) * (MAX_PATH + 1))
 

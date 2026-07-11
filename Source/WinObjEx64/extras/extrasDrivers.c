@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRASDRIVERS.C
 *
-*  VERSION:     2.10
+*  VERSION:     2.11
 *
-*  DATE:        07 Mar 2026
+*  DATE:        12 Jul 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -599,6 +599,7 @@ DWORD DumpDialogWorkerThread(
     supSetFastEvent(&DumpDialogInitializedEvent);
 
     if (hwndDlg) {
+
         do {
 
             bResult = GetMessage(&message, NULL, 0, 0);
@@ -1851,11 +1852,10 @@ DWORD extrasDrvDlgWorkerThread(
 {
     BOOL bResult;
     HWND hwndDlg;
-    HACCEL acceleratorTable;
+    HACCEL acceleratorTable = NULL;
     HANDLE prev;
     EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)Parameter;
     MSG message;
-    FAST_EVENT fastEvent;
 
     hwndDlg = CreateDialogParam(g_WinObj.hInstance,
         MAKEINTRESOURCE(IDD_DIALOG_EXTRASLIST),
@@ -1863,12 +1863,12 @@ DWORD extrasDrvDlgWorkerThread(
         &DrvDlgProc,
         (LPARAM)pDlgContext);
 
-    fastEvent = DrvDlgInitializedEvents[pDlgContext->DialogMode];
-    supSetFastEvent(&fastEvent);
-
-    acceleratorTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
+    supSetFastEvent(&DrvDlgInitializedEvents[pDlgContext->DialogMode]);
 
     if (hwndDlg) {
+
+        acceleratorTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
+
         do {
 
             bResult = GetMessage(&message, NULL, 0, 0);
@@ -1886,7 +1886,7 @@ DWORD extrasDrvDlgWorkerThread(
         } while (bResult != 0);
     }
 
-    supResetFastEvent(&fastEvent);
+    supResetFastEvent(&DrvDlgInitializedEvents[pDlgContext->DialogMode]);
 
     if (acceleratorTable)
         DestroyAcceleratorTable(acceleratorTable);
@@ -1918,5 +1918,8 @@ VOID extrasCreateDriversDialog(
         DrvDlgThreadHandles[Mode] = supCreateDialogWorkerThread(extrasDrvDlgWorkerThread, (PVOID)&DrvDlgContext[Mode], 0);
         if (DrvDlgThreadHandles[Mode])
             supWaitForFastEvent(&DrvDlgInitializedEvents[Mode], NULL);
+    }
+    else {
+        supRestoreDialogWindow(DrvDlgContext[Mode].hwndDlg);
     }
 }

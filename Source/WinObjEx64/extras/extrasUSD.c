@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.11
 *
-*  DATE:        12 Jun 2026
+*  DATE:        12 Jul 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -745,10 +745,10 @@ DWORD extrasUsdDialogWorkerThread(
         &UsdDialogProc,
         0);
 
-
     supSetFastEvent(&UsdDlgInitializedEvent);
 
     if (hwndDlg) {
+
         g_UsdDlgContext.hwndDlg = hwndDlg;
 
         do {
@@ -793,5 +793,8 @@ VOID extrasCreateUsdDialog(
         UsdDlgThreadHandle = supCreateDialogWorkerThread(extrasUsdDialogWorkerThread, NULL, 0);
         if (UsdDlgThreadHandle)
             supWaitForFastEvent(&UsdDlgInitializedEvent, NULL);
+    }
+    else {
+        supRestoreDialogWindow(g_UsdDlgContext.hwndDlg);
     }
 }

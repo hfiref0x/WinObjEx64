@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2025
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       EXTRASPN.C
 *
-*  VERSION:     2.09
+*  VERSION:     2.11
 *
-*  DATE:        22 Aug 2025
+*  DATE:        11 Jul 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1021,5 +1021,8 @@ VOID extrasCreatePNDialog(
         PnDlgThreadHandle = supCreateDialogWorkerThread(extrasPNDialogWorkerThread, NULL, 0);
         if (PnDlgThreadHandle)
             supWaitForFastEvent(&PnDlgInitializedEvent, NULL);
+    }
+    else {
+        supRestoreDialogWindow(PnDlgContext.hwndDlg);
     }
 }

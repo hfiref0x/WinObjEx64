@@ -4,12 +4,11 @@
 *
 *  TITLE:       SYNC.C
 *
-*  VERSION:     2.10
+*  VERSION:     2.11
 *
-*  DATE:        19 Feb 2026
+*  DATE:        15 May 2026
 *
 *  Synchronization primitives.
-* 
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -18,12 +17,6 @@
 *
 *******************************************************************************/
 #include "global.h"
-
-/*
-*
-* Fast events, taken from ph2
-*
-*/
 
 /*
 * supInitFastEvent
@@ -37,6 +30,9 @@ VOID supInitFastEvent(
     _In_ PFAST_EVENT Event
 )
 {
+    if (Event == NULL)
+        return;
+
     Event->Value = FAST_EVENT_REFCOUNT_INC;
     Event->EventHandle = NULL;
 }
@@ -53,6 +49,9 @@ VOID supReferenceFastEvent(
     _In_ PFAST_EVENT Event
 )
 {
+    if (Event == NULL)
+        return;
+
     _InterlockedExchangeAddPointer((PLONG_PTR)&Event->Value, FAST_EVENT_REFCOUNT_INC);
 }
 
@@ -71,8 +70,11 @@ VOID supDereferenceFastEvent(
 {
     ULONG_PTR value;
 
+    if (Event == NULL)
+        return;
+
     value = _InterlockedExchangeAddPointer((PLONG_PTR)&Event->Value, -FAST_EVENT_REFCOUNT_INC);
-    if (((value >> FAST_EVENT_REFCOUNT_SHIFT) & FAST_EVENT_REFCOUNT_MASK) - 1 == 0)
+    if ((((value >> FAST_EVENT_REFCOUNT_SHIFT) & FAST_EVENT_REFCOUNT_MASK) - 1) == 0)
     {
         if (EventHandle)
         {
@@ -95,11 +97,13 @@ VOID supSetFastEvent(
 )
 {
     HANDLE eventHandle;
+
+    if (Event == NULL)
+        return;
+
     if (!_InterlockedBitTestAndSetPointer((PLONG_PTR)&Event->Value, FAST_EVENT_SET_SHIFT)) {
         eventHandle = Event->EventHandle;
-
-        if (eventHandle)
-        {
+        if (eventHandle) {
             NtSetEvent(eventHandle, NULL);
         }
     }
@@ -117,7 +121,13 @@ BOOLEAN supTestFastEvent(
     _In_ PFAST_EVENT Event
 )
 {
-    return (BOOLEAN)Event->Set; //-V724
+    ULONG_PTR value;
+
+    if (Event == NULL)
+        return FALSE;
+
+    value = Event->Value;
+    return (BOOLEAN)((value & FAST_EVENT_SET) != 0);
 }
 
 /*
@@ -132,11 +142,17 @@ VOID supResetFastEvent(
     _In_ PFAST_EVENT Event
 )
 {
+    HANDLE eventHandle;
+
     if (Event == NULL)
         return;
 
-    if (supTestFastEvent(Event))
-        Event->Value = FAST_EVENT_REFCOUNT_INC;
+    eventHandle = Event->EventHandle;
+    if (eventHandle != NULL) {
+        NtResetEvent(eventHandle, NULL);
+    }
+
+    _InterlockedAndPointer((PLONG_PTR)&Event->Value, ~FAST_EVENT_SET);
 }
 
 /*
@@ -155,7 +171,11 @@ BOOLEAN supWaitForFastEvent(
     BOOLEAN result;
     ULONG_PTR value;
     HANDLE eventHandle;
+    HANDLE newHandle;
     NTSTATUS ntStatus;
+
+    if (Event == NULL)
+        return FALSE;
 
     value = Event->Value;
     if (value & FAST_EVENT_SET)
@@ -165,24 +185,36 @@ BOOLEAN supWaitForFastEvent(
         return FALSE;
 
     supReferenceFastEvent(Event);
-    eventHandle = Event->EventHandle;
 
+    eventHandle = Event->EventHandle;
     if (eventHandle == NULL) {
 
-        ntStatus = NtCreateEvent(&eventHandle, EVENT_ALL_ACCESS, NULL, NotificationEvent, FALSE);
+        newHandle = NULL;
+        ntStatus = NtCreateEvent(&newHandle,
+            EVENT_MODIFY_STATE | SYNCHRONIZE,
+            NULL,
+            NotificationEvent,
+            FALSE);
 
-        if (!NT_SUCCESS(ntStatus) || (eventHandle == NULL)) {
+        if (!NT_SUCCESS(ntStatus) || (newHandle == NULL)) {
             supDereferenceFastEvent(Event, NULL);
             return FALSE;
         }
 
-        if (NULL != _InterlockedCompareExchangePointer(
+        eventHandle = _InterlockedCompareExchangePointer(
             &Event->EventHandle,
-            eventHandle,
-            NULL))
-        {
-            NtClose(eventHandle);
-            eventHandle = Event->EventHandle;
+            newHandle,
+            NULL);
+
+        if (eventHandle != NULL) {
+            NtClose(newHandle);
+        }
+        else {
+            eventHandle = newHandle;
+
+            if (Event->Value & FAST_EVENT_SET) {
+                NtSetEvent(eventHandle, NULL);
+            }
         }
     }
 

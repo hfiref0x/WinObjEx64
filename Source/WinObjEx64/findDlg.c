@@ -4,9 +4,9 @@
 *
 *  TITLE:       FINDDLG.C
 *
-*  VERSION:     2.10
+*  VERSION:     2.11
 *
-*  DATE:        27 Feb 2026
+*  DATE:        11 Jul 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -841,23 +841,22 @@ DWORD FindpDlgWorkerThread(
 
     supSetFastEvent(&FindDialogInitializedEvent);
 
-    if (hwndDlg == NULL)
-        goto Cleanup;
+    if (hwndDlg) {
 
-    do {
+        do {
 
-        bResult = GetMessage(&message, NULL, 0, 0);
-        if (bResult == -1)
-            break;
+            bResult = GetMessage(&message, NULL, 0, 0);
+            if (bResult == -1)
+                break;
 
-        if (!IsDialogMessage(hwndDlg, &message)) {
-            TranslateMessage(&message);
-            DispatchMessage(&message);
-        }
+            if (!IsDialogMessage(hwndDlg, &message)) {
+                TranslateMessage(&message);
+                DispatchMessage(&message);
+            }
 
-    } while (bResult != 0);
+        } while (bResult != 0);
+    }
 
-Cleanup:
     supResetFastEvent(&FindDialogInitializedEvent);
 
     if (FindDialogThreadHandle) {
@@ -881,8 +880,10 @@ VOID FindDlgCreate(
 {
     HANDLE hThread;
 
-    if (InterlockedCompareExchangePointer(&FindDialogThreadHandle, NULL, NULL) != NULL)
+    if (InterlockedCompareExchangePointer(&FindDialogThreadHandle, NULL, NULL) != NULL) {
+        supRestoreDialogWindow(g_FindDlgContext.DialogWindow);
         return;
+    }
 
     RtlSecureZeroMemory(&g_FindDlgContext, sizeof(g_FindDlgContext));
     hThread = supCreateDialogWorkerThread(FindpDlgWorkerThread, NULL, 0);

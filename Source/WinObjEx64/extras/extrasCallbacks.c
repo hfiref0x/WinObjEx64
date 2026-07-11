@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.11
 *
-*  DATE:        27 Jun 2026
+*  DATE:        11 Jul 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -5934,7 +5934,7 @@ DWORD extrasSysCbDialogWorkerThread(
     BOOL bResult;
     MSG message;
     EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)Parameter;
-    HACCEL acceleratorTable;
+    HACCEL acceleratorTable = NULL;
 
     hwndDlg = CreateDialogParam(
         g_WinObj.hInstance,
@@ -5943,25 +5943,28 @@ DWORD extrasSysCbDialogWorkerThread(
         &SysCbDialogProc,
         (LPARAM)pDlgContext);
 
-    acceleratorTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
-
     supSetFastEvent(&SysCbInitializedEvent);
 
-    do {
+    if (hwndDlg) {
 
-        bResult = GetMessage(&message, NULL, 0, 0);
-        if (bResult == -1)
-            break;
+        acceleratorTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
 
-        if (IsDialogMessage(hwndDlg, &message)) {
-            TranslateAccelerator(hwndDlg, acceleratorTable, &message);
-        }
-        else {
-            TranslateMessage(&message);
-            DispatchMessage(&message);
-        }
+        do {
 
-    } while (bResult != 0);
+            bResult = GetMessage(&message, NULL, 0, 0);
+            if (bResult == -1)
+                break;
+
+            if (IsDialogMessage(hwndDlg, &message)) {
+                TranslateAccelerator(hwndDlg, acceleratorTable, &message);
+            }
+            else {
+                TranslateMessage(&message);
+                DispatchMessage(&message);
+            }
+
+        } while (bResult != 0);
+    }
 
     supResetFastEvent(&SysCbInitializedEvent);
 

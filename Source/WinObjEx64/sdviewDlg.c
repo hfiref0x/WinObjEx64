@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2020 - 2025
+*  (C) COPYRIGHT AUTHORS, 2020 - 2026
 *
 *  TITLE:       SDVIEWDLG.C
 *
-*  VERSION:     2.09
+*  VERSION:     2.11
 *
-*  DATE:        22 Aug 2025
+*  DATE:        12 Jul 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1097,7 +1097,8 @@ INT_PTR CALLBACK SDViewDialogProc(
 
             FreeSDViewContext(dlgContext);
         }
-        return DestroyWindow(hwndDlg);
+        DestroyWindow(hwndDlg);
+        return TRUE;
 
     case WM_GETMINMAXINFO:
         if (lParam) {
@@ -1146,10 +1147,11 @@ DWORD SDViewDialogWorkerThread(
 {
     BOOL bResult;
     MSG message;
-    HWND hwnd;
+    HWND hwndDlg;
     SDVIEW_CONTEXT* context = (SDVIEW_CONTEXT*)Parameter;
+    HANDLE prev;
 
-    hwnd = CreateDialogParam(g_WinObj.hInstance,
+    hwndDlg = CreateDialogParam(g_WinObj.hInstance,
         MAKEINTRESOURCE(IDD_DIALOG_SDVIEW),
         0,
         (DLGPROC)&SDViewDialogProc,
@@ -1157,27 +1159,29 @@ DWORD SDViewDialogWorkerThread(
 
     supSetFastEvent(&SDViewDialogInitializedEvent);
 
-    do {
+    if (hwndDlg) {
 
-        bResult = GetMessage(&message, NULL, 0, 0);
-        if (bResult == -1)
-            break;
+        do {
 
-        if (!IsDialogMessage(hwnd, &message)) {
-            TranslateMessage(&message);
-            DispatchMessage(&message);
-        }
+            bResult = GetMessage(&message, NULL, 0, 0);
+            if (bResult == -1)
+                break;
 
-    } while (bResult != 0);
+            if (!IsDialogMessage(hwndDlg, &message)) {
+                TranslateMessage(&message);
+                DispatchMessage(&message);
+            }
 
-    supResetFastEvent(&SDViewDialogInitializedEvent);
-
-    if (SDViewDialogThreadHandle) {
-        NtClose(SDViewDialogThreadHandle);
-        SDViewDialogThreadHandle = NULL;
+        } while (bResult != 0);
     }
 
+    supResetFastEvent(&SDViewDialogInitializedEvent);
     supSetFastEvent(&SDViewDialogFinalizedEvent);
+
+    prev = InterlockedExchangePointer((PVOID*)&SDViewDialogThreadHandle, NULL);
+    if (prev) {
+        NtClose(prev);
+    }
 
     return 0;
 }
@@ -1195,14 +1199,22 @@ VOID SDViewDialogCreate(
 )
 {
     SDVIEW_CONTEXT* context;
+    HWND hwndDlg;
 
+    //
+    // Recreate window and update it contents if it already exist.
+    //
     if (SDViewDialogThreadHandle) {
-        PostMessage(SDViewDialogWindow, WM_CLOSE, 0, 0);
+        hwndDlg = SDViewDialogWindow;
+        if (hwndDlg && IsWindow(hwndDlg)) {
+            PostMessage(hwndDlg, WM_CLOSE, 0, 0);
+        }
         supWaitForFastEvent(&SDViewDialogFinalizedEvent, NULL);
     }
 
     context = AllocateSDViewContext(ObjectType);
     if (context) {
+        supInitFastEvent(&SDViewDialogInitializedEvent);
         supInitFastEvent(&SDViewDialogFinalizedEvent);
         SDViewDialogThreadHandle = supCreateDialogWorkerThread(SDViewDialogWorkerThread, context, 0);
         if (SDViewDialogThreadHandle == NULL) {

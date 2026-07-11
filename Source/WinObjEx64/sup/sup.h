@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.11
 *
-*  DATE:        29 Jun 2026
+*  DATE:        12 Jul 2026
 *
 *  Common header file for the program support routines.
 *
@@ -1318,3 +1318,6 @@ BOOL supOpenImageInWinDepends(
     _In_ HWND hwndParent,
     _In_ LPCWSTR lpImageFileName,
     _In_ LPCWSTR lpWinDependsFileName);
+
+VOID supRestoreDialogWindow(
+    _In_ HWND hwndDlg);

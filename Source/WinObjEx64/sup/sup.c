@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.11
 *
-*  DATE:        29 Jun 2026
+*  DATE:        11 Jul 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -11236,4 +11236,27 @@ BOOL supOpenImageInWinDepends(
 
     supHeapFree(lpCommandLine);
     return bResult;
+}
+
+/*
+* supRestoreDialogWindow
+*
+* Purpose:
+*
+* Restore window to user depending on window state.
+*
+*/
+VOID supRestoreDialogWindow(
+    _In_ HWND hwndDlg
+)
+{
+    if (hwndDlg && IsWindow(hwndDlg)) {
+        if (IsIconic(hwndDlg))
+            ShowWindow(hwndDlg, SW_RESTORE);
+        else
+            ShowWindow(hwndDlg, SW_SHOW);
+
+        BringWindowToTop(hwndDlg);
+        SetForegroundWindow(hwndDlg);
+    }
 }

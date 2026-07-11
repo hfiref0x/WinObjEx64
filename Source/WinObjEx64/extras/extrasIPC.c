@@ -450,8 +450,11 @@ VOID IpcDlgShowProperties(
     propConfig.NtObjectPath = &objectPathNt;
 
     Context = propContextCreate(&propConfig);
-    if (Context == NULL)
+    if (Context == NULL) {
+        supHeapFree(objectPathCombined);
+        supHeapFree(objectName);
         return;
+    }
 
     Context->ExtrasContext = (PVOID)pDlgContext;
 
@@ -1002,8 +1005,7 @@ DWORD extrasIpcDialogWorkerThread(
     HWND hwndDlg;
     BOOL bResult;
     MSG message;
-    HACCEL acceleratorTable;
-    FAST_EVENT fastEvent;
+    HACCEL acceleratorTable = NULL;
     EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)Parameter;
 
     hwndDlg = CreateDialogParam(g_WinObj.hInstance,
@@ -1012,12 +1014,12 @@ DWORD extrasIpcDialogWorkerThread(
         &IpcDlgProc,
         (LPARAM)pDlgContext);
 
-    fastEvent = IpcDlgInitializedEvents[pDlgContext->DialogMode];
-    supSetFastEvent(&fastEvent);
-
-    acceleratorTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
+    supSetFastEvent(&IpcDlgInitializedEvents[pDlgContext->DialogMode]);
 
     if (hwndDlg) {
+
+        acceleratorTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
+
         do {
 
             bResult = GetMessage(&message, NULL, 0, 0);
@@ -1035,7 +1037,7 @@ DWORD extrasIpcDialogWorkerThread(
         } while (bResult != 0);
     }
 
-    supResetFastEvent(&fastEvent);
+    supResetFastEvent(&IpcDlgInitializedEvents[pDlgContext->DialogMode]);
 
     if (acceleratorTable)
         DestroyAcceleratorTable(acceleratorTable);
@@ -1068,5 +1070,8 @@ VOID extrasCreateIpcDialog(
         if (IpcDlgThreadHandles[Mode])
             supWaitForFastEvent(&IpcDlgInitializedEvents[Mode], NULL);
 
+    }
+    else {
+        supRestoreDialogWindow(IpcDlgContext[Mode].hwndDlg);
     }
 }

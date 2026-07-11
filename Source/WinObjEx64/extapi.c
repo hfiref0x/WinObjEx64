@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017 - 2025
+*  (C) COPYRIGHT AUTHORS, 2017 - 2026
 *
 *  TITLE:       EXTAPI.C
 *
-*  VERSION:     2.09
+*  VERSION:     2.11
 *
-*  DATE:        19 Aug 2025
+*  DATE:        11 Jul 2026
 *
 *  Support unit for pre Windows 10 missing APIs.
 *

@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.11
 *
-*  DATE:        22 Jun 2026
+*  DATE:        12 Jul 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1397,7 +1397,7 @@ DWORD extrasSSDTDialogWorkerThread(
     HWND hwndDlg;
     BOOL bResult;
     MSG message;
-    HACCEL acceleratorTable;
+    HACCEL acceleratorTable = NULL;
     EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)Parameter;
 
     hwndDlg = CreateDialogParam(
@@ -1409,11 +1409,12 @@ DWORD extrasSSDTDialogWorkerThread(
 
     supAddShutdownCallback(&SdtFreeGlobals, NULL);
 
-    acceleratorTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
-
     supSetFastEvent(&SdtDlgInitializedEvents[pDlgContext->DialogMode]);
 
     if (hwndDlg) {
+
+        acceleratorTable = LoadAccelerators(g_WinObj.hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
+
         do {
 
             bResult = GetMessage(&message, NULL, 0, 0);
@@ -1466,5 +1467,8 @@ VOID extrasCreateSSDTDialog(
         SdtDlgThreadHandles[Mode] = supCreateDialogWorkerThread(extrasSSDTDialogWorkerThread, (PVOID)&SSTDlgContext[Mode], 0);
         if (SdtDlgThreadHandles[Mode])
             supWaitForFastEvent(&SdtDlgInitializedEvents[Mode], NULL);
+    }
+    else {
+        supRestoreDialogWindow(SSTDlgContext[Mode].hwndDlg);
     }
 }

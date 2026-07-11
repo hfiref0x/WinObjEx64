@@ -4,9 +4,9 @@
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     2.10
+*  VERSION:     2.11
 *
-*  DATE:        22 Feb 2026
+*  DATE:        12 Jul 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -408,6 +408,7 @@ DWORD StatsDialogWorkerThread(
     supSetFastEvent(&StatsDialogInitializedEvent);
 
     if (hwndDlg) {
+
         do {
 
             bResult = GetMessage(&message, NULL, 0, 0);

@@ -1393,7 +1393,6 @@ DWORD extrasSSDTDialogWorkerThread(
     _In_ PVOID Parameter
 )
 {
-    HANDLE prev;
     HWND hwndDlg;
     BOOL bResult;
     MSG message;
@@ -1432,13 +1431,11 @@ DWORD extrasSSDTDialogWorkerThread(
         } while (bResult != 0);
     }
 
-    supResetFastEvent(&SdtDlgInitializedEvents[pDlgContext->DialogMode]);
-
     if (acceleratorTable)
         DestroyAcceleratorTable(acceleratorTable);
 
-    prev = InterlockedExchangePointer((PVOID*)&SdtDlgThreadHandles[pDlgContext->DialogMode], NULL); 
-    if (prev) CloseHandle(prev);
+    supResetFastEvent(&SdtDlgInitializedEvents[pDlgContext->DialogMode]);
+    supCloseHandleAtomic(&SdtDlgThreadHandles[pDlgContext->DialogMode]);
 
     if (pDlgContext->DialogMode == SST_Win32k)
         SdtWin32kUninitialize(&g_SDTCtx);

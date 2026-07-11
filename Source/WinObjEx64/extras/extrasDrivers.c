@@ -581,7 +581,6 @@ DWORD DumpDialogWorkerThread(
     MSG message;
     OBEX_DRVDUMP* dumpInfo = (POBEX_DRVDUMP)Parameter;
     HWND hwndDlg, hwndParent = dumpInfo->ParentWindow;
-    HANDLE prev;
 
     SIZE_T bytesIO;
     WCHAR szBuffer[100];
@@ -663,9 +662,8 @@ DWORD DumpDialogWorkerThread(
     supHeapFree(dumpInfo);
 
     supResetFastEvent(&DumpDialogInitializedEvent);
+    supCloseHandleAtomic(&DumpDialogThreadHandle);
 
-    prev = InterlockedExchangePointer((PVOID*)&DumpDialogThreadHandle, NULL);
-    if (prev) CloseHandle(prev);
     return 0;
 }
 
@@ -1853,7 +1851,6 @@ DWORD extrasDrvDlgWorkerThread(
     BOOL bResult;
     HWND hwndDlg;
     HACCEL acceleratorTable = NULL;
-    HANDLE prev;
     EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)Parameter;
     MSG message;
 
@@ -1886,13 +1883,11 @@ DWORD extrasDrvDlgWorkerThread(
         } while (bResult != 0);
     }
 
-    supResetFastEvent(&DrvDlgInitializedEvents[pDlgContext->DialogMode]);
-
     if (acceleratorTable)
         DestroyAcceleratorTable(acceleratorTable);
 
-    prev = InterlockedExchangePointer((PVOID*)&DrvDlgThreadHandles[pDlgContext->DialogMode], NULL);
-    if (prev) CloseHandle(prev);
+    supResetFastEvent(&DrvDlgInitializedEvents[pDlgContext->DialogMode]);
+    supCloseHandleAtomic(&DrvDlgThreadHandles[pDlgContext->DialogMode]);
 
     return 0;
 }

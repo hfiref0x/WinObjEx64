@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2017 - 2025
+*  (C) COPYRIGHT AUTHORS, 2017 - 2026
 *
 *  TITLE:       EXTRASIPC.C
 *
-*  VERSION:     2.09
+*  VERSION:     2.11
 *
-*  DATE:        22 Aug 2025
+*  DATE:        12 Jul 2026
 *
 *  IPC supported: Pipes, Mailslots
 *
@@ -1001,7 +1001,6 @@ DWORD extrasIpcDialogWorkerThread(
     _In_ PVOID Parameter
 )
 {
-    HANDLE prev;
     HWND hwndDlg;
     BOOL bResult;
     MSG message;
@@ -1037,13 +1036,11 @@ DWORD extrasIpcDialogWorkerThread(
         } while (bResult != 0);
     }
 
-    supResetFastEvent(&IpcDlgInitializedEvents[pDlgContext->DialogMode]);
-
     if (acceleratorTable)
         DestroyAcceleratorTable(acceleratorTable);
 
-    prev = InterlockedExchangePointer((PVOID*)&IpcDlgThreadHandles[pDlgContext->DialogMode], NULL);
-    if (prev) CloseHandle(prev);
+    supResetFastEvent(&IpcDlgInitializedEvents[pDlgContext->DialogMode]);
+    supCloseHandleAtomic(&IpcDlgThreadHandles[pDlgContext->DialogMode]);
 
     return 0;
 }

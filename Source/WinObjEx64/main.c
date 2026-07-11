@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     2.10
+*  VERSION:     2.11
 *
-*  DATE:        20 Feb 2026
+*  DATE:        11 Jul 2026
 *
 *  Program entry point and main window handler.
 *
@@ -475,7 +475,7 @@ LRESULT MainWindowHandleWMCommand(
         break;
 
     case ID_FILE_EXIT:
-        PostQuitMessage(0);
+        SendMessage(hwnd, WM_CLOSE, 0, 0);
         break;
 
     case ID_FILE_VIEW_PLUGINS:
@@ -571,7 +571,7 @@ LRESULT MainWindowHandleWMCommand(
     }
 
     if ((ControlId >= ID_MENU_PLUGINS) && (ControlId < ID_MENU_PLUGINS_MAX)) {
-        PmProcessEntry(GetFocus(), ControlId);
+        PmProcessEntry(hwnd, ControlId);
     }
 
     return FALSE;
@@ -873,13 +873,12 @@ LRESULT MainWindowHandleWMNotify(
                 ScreenToClient(hdr->hwndFrom, &lvhti.pt);
                 ListView_HitTest(hdr->hwndFrom, &lvhti);
                 if (lvhti.flags & LVHT_ONITEM) {
-                    lvn = (LPNMLISTVIEW)lParam;
-                    if (supGetListViewItemParam(g_hwndObjectList, lvn->iItem, (PVOID*)&objRef)) {
+                    if (supGetListViewItemParam(g_hwndObjectList, lvhti.iItem, (PVOID*)&objRef)) {
                         supBuildCurrentObjectList(objRef);
                     }
 
                     supDisplayCurrentObjectPath(g_hwndStatusBar, NULL, TRUE);
-                    supSetGotoLinkTargetToolButtonState(hwnd, g_hwndObjectList, lvn->iItem, FALSE, FALSE);
+                    supSetGotoLinkTargetToolButtonState(hwnd, g_hwndObjectList, lvhti.iItem, FALSE, FALSE);
                 }
                 break;
 
@@ -1073,8 +1072,12 @@ LRESULT CALLBACK MainWindowProc(
         break;
 
     case WM_CLOSE:
+        DestroyWindow(hwnd);
+        return 0;
+
+    case WM_DESTROY:
         PostQuitMessage(0);
-        break;
+        return 0;
 
     case WM_LBUTTONDOWN:
         SetCapture(g_hwndMain);
@@ -1234,8 +1237,10 @@ DWORD guiInitGlobals(
     } while (FALSE);
 
     if (dwResult != INIT_NO_ERROR) {
-        if (Globals->Heap)
+        if (Globals->Heap) {
             supDestroyHeap(Globals->Heap);
+            Globals->Heap = NULL;
+        }
     }
 
     return dwResult;

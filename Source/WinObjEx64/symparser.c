@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT H.E., 2015 - 2025
+*  (C) COPYRIGHT H.E., 2015 - 2026
 *
 *  TITLE:       SYMPARSER.C
 *
-*  VERSION:     1.25
+*  VERSION:     1.26
 *
-*  DATE:        13 Jun 2025
+*  DATE:        13 May 2026
 *
 *  DbgHelp wrapper for symbols parser support.
 *
@@ -519,16 +519,26 @@ ULONG SymParserGetTag(
 * @param Status - Optional status output
 * @return Symbol name (must be freed with LocalFree)
 */
-_Ret_maybenull_ _Post_writable_byte_size_(MAX_SYM_NAME * sizeof(WCHAR))
-LPCWSTR SymParserGetName(
+_Ret_maybenull_ 
+_Post_writable_byte_size_(MAX_SYM_NAME * sizeof(WCHAR))
+LPWSTR SymParserGetName(
     _In_ PSYMCONTEXT Context,
     _In_ ULONG TypeIndex,
     _Out_opt_ PBOOL Status
 )
 {
-    LPCWSTR lpSymbolName = NULL;
+    LPWSTR lpSymbolName = NULL;
+    BOOL bStatus;
 
-    BOOL bStatus = Context->DbgHelp.SymGetTypeInfo(
+    if (!Context || Context->ModuleBase == 0 || !Context->DbgHelp.SymGetTypeInfo) {
+        if (Context)
+            Context->SymLastError = ERROR_INVALID_PARAMETER;
+        if (Status)
+            *Status = FALSE;
+        return NULL;
+    }
+
+    bStatus = Context->DbgHelp.SymGetTypeInfo(
         Context->ProcessHandle,
         Context->ModuleBase,
         TypeIndex,
@@ -560,6 +570,7 @@ VARTYPE SymParserGetValue(
 )
 {
     VARTYPE varResult;
+    BOOL bStatus;
 
     if (!Value) {
         if (Status) *Status = FALSE;
@@ -568,7 +579,15 @@ VARTYPE SymParserGetValue(
 
     VariantInit(Value);
 
-    BOOL bStatus = Context->DbgHelp.SymGetTypeInfo(
+    if (!Context || Context->ModuleBase == 0 || !Context->DbgHelp.SymGetTypeInfo) {
+        if (Context)
+            Context->SymLastError = ERROR_INVALID_PARAMETER;
+        if (Status)
+            *Status = FALSE;
+        return VT_EMPTY;
+    }
+
+    bStatus = Context->DbgHelp.SymGetTypeInfo(
         Context->ProcessHandle,
         Context->ModuleBase,
         TypeIndex,
@@ -842,16 +861,16 @@ ULONG64 SymParserLookupAddressBySymbol(
 {
     BOOL bStatus = FALSE;
     ULONG64 symAddress = 0;
-    PSYMBOL_INFO symbolInfo = NULL;
+    PSYMBOL_INFOW symbolInfo = NULL;
 
     if (!Context || !SymbolName) {
         if (Status) *Status = FALSE;
         return 0;
     }
 
-    symbolInfo = (PSYMBOL_INFO)supHeapAlloc(sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(WCHAR));
+    symbolInfo = (PSYMBOL_INFOW)supHeapAlloc(sizeof(SYMBOL_INFOW) + MAX_SYM_NAME * sizeof(WCHAR));
     if (symbolInfo) {
-        symbolInfo->SizeOfStruct = sizeof(SYMBOL_INFO);
+        symbolInfo->SizeOfStruct = sizeof(SYMBOL_INFOW);
         symbolInfo->MaxNameLen = 0; //name is not used
 
         bStatus = Context->DbgHelp.SymFromName(
@@ -894,7 +913,7 @@ ULONG SymParserLookupSymbolByAddress(
     BOOL bStatus = FALSE;
     ULONG nameLength = 0;
     LPWSTR symName = NULL;
-    PSYMBOL_INFO symbolInfo = NULL;
+    PSYMBOL_INFOW symbolInfo = NULL;
 
     if (!Context || !SymbolName || !Displacement) {
         if (Status) *Status = FALSE;
@@ -903,10 +922,10 @@ ULONG SymParserLookupSymbolByAddress(
 
     *SymbolName = NULL;
 
-    symbolInfo = (PSYMBOL_INFO)supHeapAlloc(
-        sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(WCHAR));
+    symbolInfo = (PSYMBOL_INFOW)supHeapAlloc(
+        sizeof(SYMBOL_INFOW) + MAX_SYM_NAME * sizeof(WCHAR));
     if (symbolInfo) {
-        symbolInfo->SizeOfStruct = sizeof(SYMBOL_INFO);
+        symbolInfo->SizeOfStruct = sizeof(SYMBOL_INFOW);
         symbolInfo->MaxNameLen = MAX_SYM_NAME;
 
         bStatus = Context->DbgHelp.SymFromAddr(
@@ -918,7 +937,7 @@ ULONG SymParserLookupSymbolByAddress(
         Context->SymLastError = GetLastError();
 
         if (bStatus && symbolInfo->NameLen > 0) {
-            symName = (LPWSTR)LocalAlloc(LPTR, MAX_SYM_NAME + 1);
+            symName = (LPWSTR)LocalAlloc(LPTR, (MAX_SYM_NAME + 1) * sizeof(WCHAR));
             if (symName) {
                 _strncpy(symName, MAX_SYM_NAME, symbolInfo->Name, symbolInfo->NameLen);
                 nameLength = (ULONG)_strlen(symName);
@@ -954,7 +973,7 @@ ULONG SymParserGetFieldOffset(
     ULONG symOffset = 0, i;
     ULONG rootIndex = 0, childCount = 0, childIndex = 0;
     LPCWSTR lpSymbolName = NULL;
-    PSYMBOL_INFO rootSymbolInfo = NULL;
+    PSYMBOL_INFOW rootSymbolInfo = NULL;
     TI_FINDCHILDREN_PARAMS* childrenBuffer = NULL;
 
     if (!Context || !SymbolName || !FieldName) {
@@ -962,7 +981,7 @@ ULONG SymParserGetFieldOffset(
         return 0;
     }
 
-    rootSymbolInfo = (PSYMBOL_INFO)supHeapAlloc(
+    rootSymbolInfo = (PSYMBOL_INFOW)supHeapAlloc(
         sizeof(SYMBOL_INFO) + (MAX_SYM_NAME * sizeof(WCHAR)));
 
     if (!rootSymbolInfo) {
@@ -970,7 +989,7 @@ ULONG SymParserGetFieldOffset(
         return 0;
     }
 
-    rootSymbolInfo->SizeOfStruct = sizeof(SYMBOL_INFO);
+    rootSymbolInfo->SizeOfStruct = sizeof(SYMBOL_INFOW);
     rootSymbolInfo->MaxNameLen = MAX_SYM_NAME;
 
     bStatus = Context->DbgHelp.SymGetTypeFromName(
@@ -1074,7 +1093,7 @@ PSYM_ENTRY SymParserDumpSymbolInformation(
     LPCWSTR lpSymbolName = NULL;
     PSYM_ENTRY dumpEntry = NULL;
     PSYM_CHILD dumpChild = NULL;
-    PSYMBOL_INFO rootSymbolInfo = NULL;
+    PSYMBOL_INFOW rootSymbolInfo = NULL;
     TI_FINDCHILDREN_PARAMS* childrenBuffer;
     TI_FINDCHILDREN_PARAMS* childEntry;
     VARIANT value;
@@ -1086,7 +1105,7 @@ PSYM_ENTRY SymParserDumpSymbolInformation(
     }
 
     do {
-        rootSymbolInfo = (PSYMBOL_INFO)supHeapAlloc(
+        rootSymbolInfo = (PSYMBOL_INFOW)supHeapAlloc(
             sizeof(SYMBOL_INFO) + (MAX_SYM_NAME * sizeof(WCHAR)));
         if (rootSymbolInfo == NULL)
             break;
@@ -1274,8 +1293,10 @@ PSYM_ENTRY SymParserDumpSymbolInformation(
 
     } while (FALSE);
 
+    if (rootSymbolInfo)
+        supHeapFree(rootSymbolInfo);
+
     if (!bStatus) {
-        if (rootSymbolInfo) supHeapFree(rootSymbolInfo);
         if (dumpEntry) {
             supHeapFree(dumpEntry);
             dumpEntry = NULL;
@@ -1432,6 +1453,11 @@ BOOL SymGlobalsInit(
     HMODULE hDbg = NULL;
     LPWSTR finalDbgHelpPath = NULL;
     WCHAR szDbgHelpPath[MAX_PATH * 2];
+
+    if (g_SymGlobals.Initialized) {
+        SetLastError(ERROR_ALREADY_INITIALIZED);
+        return FALSE;
+    }
 
     if (!lpSystemPath || !lpTempPath) {
         SetLastError(ERROR_INVALID_PARAMETER);

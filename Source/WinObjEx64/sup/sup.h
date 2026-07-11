@@ -39,10 +39,10 @@
 
 #define HHCTRLOCX                   L"hhctrl.ocx"
 
-#define T_WINSTA_SYSTEM L"-0x0-3e7$"
-#define T_WINSTA_ANONYMOUS L"-0x0-3e6$"
-#define T_WINSTA_LOCALSERVICE L"-0x0-3e5$"
-#define T_WINSTA_NETWORK_SERVICE L"-0x0-3e4$"
+#define T_WINSTA_SYSTEM             L"-0x0-3e7$"
+#define T_WINSTA_ANONYMOUS          L"-0x0-3e6$"
+#define T_WINSTA_LOCALSERVICE       L"-0x0-3e5$"
+#define T_WINSTA_NETWORK_SERVICE    L"-0x0-3e4$"
 
 #define supServicesRegPath          L"System\\CurrentControlSet\\Services\\"
 #define supServicesRegPathSize      sizeof(supServicesRegPath) - sizeof(WCHAR)
@@ -1220,6 +1220,9 @@ HANDLE supCreateThread(
     _In_ LPTHREAD_START_ROUTINE lpStartAddress,
     _In_opt_ __drv_aliasesMem LPVOID lpParameter,
     _In_ DWORD dwCreationFlags);
+
+VOID supCloseHandleAtomic(
+    _Inout_ PHANDLE Handle);
 
 HANDLE supCreateDialogWorkerThread(
     _In_ LPTHREAD_START_ROUTINE lpStartAddress,

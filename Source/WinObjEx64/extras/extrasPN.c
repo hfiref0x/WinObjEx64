@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.11
 *
-*  DATE:        11 Jul 2026
+*  DATE:        12 Jul 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -261,7 +261,7 @@ VOID PNDlgOutputSelectedSidInformation(
     LRESULT nSelected;
     PSID pSid = NULL;
     LPWSTR lpSidType, lpEnd, lpSidValue;
-    SIZE_T sidLength;
+    SIZE_T sidLength, cchRemaining, cchUsed;
 
     DWORD cAccountName = 0, cReferencedDomainName = 0;
 
@@ -346,8 +346,11 @@ VOID PNDlgOutputSelectedSidInformation(
         //
         lpSidType = supGetSidNameUse((SID_NAME_USE)peUse);
 
-        RtlStringCchPrintfSecure(lpEnd, 
-            MAX_PATH, 
+        cchUsed = (SIZE_T)(lpEnd - szAccountInfo);
+        cchRemaining = RTL_NUMBER_OF(szAccountInfo) - cchUsed;
+
+        RtlStringCchPrintfSecure(lpEnd,
+            cchRemaining,
             TEXT(" (%ws)"),
             lpSidType);
 
@@ -604,7 +607,9 @@ VOID PNDlgHandleNotify(
             break;
 
         case NM_DBLCLK:
-            PNDlgShowObjectProperties(pListView->iItem);
+            if (pListView->iItem >= 0) {
+                PNDlgShowObjectProperties(pListView->iItem);
+            }
             break;
 
         }
@@ -677,6 +682,7 @@ VOID PNDialogShowInfo(
 
     if (PNDlgQueryInfo()) {
         ListView_SortItemsEx(PnDlgContext.ListView, &PNListCompareFunc, 0);
+        SetFocus(PnDlgContext.ListView);
     }
     else {
         if (GetWindowRect(PnDlgContext.hwndDlg, &ChildWndData.Rect)) {
@@ -728,16 +734,18 @@ VOID PNDialogHandlePopup(
             &Context->lvColumnHit))
         {
             InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-            InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_VIEW_REFRESH, T_VIEW_REFRESH);
-
-            TrackPopupMenu(hMenu,
-                TPM_RIGHTBUTTON | TPM_LEFTALIGN,
-                lpPoint->x,
-                lpPoint->y,
-                0,
-                hwndDlg,
-                NULL);
         }
+
+        InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_VIEW_REFRESH, T_VIEW_REFRESH);
+
+        TrackPopupMenu(hMenu,
+            TPM_RIGHTBUTTON | TPM_LEFTALIGN,
+            lpPoint->x,
+            lpPoint->y,
+            0,
+            hwndDlg,
+            NULL);
+
         DestroyMenu(hMenu);
     }
 }
@@ -754,7 +762,10 @@ VOID PNDialogOnClose(
     _In_ HWND hwndDlg
 )
 {
-    if (PNSObjectsHeap) supDestroyHeap(PNSObjectsHeap);
+    if (PNSObjectsHeap) {
+        supDestroyHeap(PNSObjectsHeap);
+        PNSObjectsHeap = NULL;
+    }
     DestroyWindow(hwndDlg);
 }
 
@@ -911,7 +922,7 @@ DWORD extrasPNDialogWorkerThread(
     MSG message;
     HWND hwndDlg;
     HACCEL acceleratorTable = NULL;
-
+ 
     INT iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
     LVCOLUMNS_DATA columnData[] =
     {
@@ -992,15 +1003,11 @@ DWORD extrasPNDialogWorkerThread(
 
     }
 
-    supResetFastEvent(&PnDlgInitializedEvent);
-
     if (acceleratorTable)
         DestroyAcceleratorTable(acceleratorTable);
 
-    if (PnDlgThreadHandle) {
-        NtClose(PnDlgThreadHandle);
-        PnDlgThreadHandle = NULL;
-    }
+    supResetFastEvent(&PnDlgInitializedEvent);
+    supCloseHandleAtomic(&PnDlgThreadHandle);
 
     return 0;
 }

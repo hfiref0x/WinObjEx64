@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT H.E., 2015 - 2022
+*  (C) COPYRIGHT H.E., 2015 - 2026
 *
 *  TITLE:       SYMPARSER.H
 *
-*  VERSION:     1.18
+*  VERSION:     1.26
 *
-*  DATE:        05 Jun 2022
+*  DATE:        13 May 2026
 *
 *  Header file of DbgHelp wrapper for symbols parser support.
 *
@@ -230,7 +230,7 @@ typedef ULONG(WINAPI* SPGetTag)(
     _In_ ULONG TypeIndex,
     _Out_opt_ PBOOL Status);
 
-typedef LPCWSTR(WINAPI* SPGetName)(
+typedef LPWSTR(WINAPI* SPGetName)(
     _In_ PSYMCONTEXT Context,
     _In_ ULONG TypeIndex,
     _Out_opt_ PBOOL Status);
@@ -256,7 +256,7 @@ typedef ULONG(WINAPI* SPGetCallingConvention)(
     _In_ ULONG TypeIndex,
     _Out_opt_ PBOOL Status);
 
-typedef LPCWSTR(WINAPI* SPGetTypeName)(
+typedef LPWSTR(WINAPI* SPGetTypeName)(
     _In_ PSYMCONTEXT Context,
     _In_ ULONG TypeIndex,
     _Out_opt_ PUINT64 BaseTypeSize,

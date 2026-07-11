@@ -1967,15 +1967,11 @@ DWORD extrasPsListDialogWorkerThread(
 
     }
 
-    supResetFastEvent(&PsListDlgInitializedEvent);
-
     if (acceleratorTable)
         DestroyAcceleratorTable(acceleratorTable);
 
-    if (PsListDlgThreadHandle) {
-        NtClose(PsListDlgThreadHandle);
-        PsListDlgThreadHandle = NULL;
-    }
+    supResetFastEvent(&PsListDlgInitializedEvent);
+    supCloseHandleAtomic(&PsListDlgThreadHandle);
 
     return 0;
 }

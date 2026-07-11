@@ -206,6 +206,7 @@ VOID SLCacheDialogDisplayDescriptorData(
     lpText = (LPWSTR)supHeapAlloc(CacheDescriptor->NameLength + sizeof(WCHAR));
     if (lpText) {
         RtlCopyMemory(lpText, CacheDescriptor->Name, CacheDescriptor->NameLength);
+        lpText[CacheDescriptor->NameLength / sizeof(WCHAR)] = 0;
         SetDlgItemText(hwndDlg, IDC_SLVALUE_NAME, lpText);
         supHeapFree(lpText);
     }
@@ -234,6 +235,7 @@ VOID SLCacheDialogDisplayDescriptorData(
             DataPtr = RtlOffsetToPointer(CacheDescriptor,
                 (ULONG_PTR)FIELD_OFFSET(SL_KMEM_CACHE_VALUE_DESCRIPTOR, Name) + CacheDescriptor->NameLength);
             RtlCopyMemory(lpText, DataPtr, CacheDescriptor->DataLength);
+            lpText[CacheDescriptor->DataLength / sizeof(WCHAR)] = 0;
             SetDlgItemText(hwndDlg, IDC_SLVALUE, lpText);
             supHeapFree(lpText);
         }
@@ -242,6 +244,18 @@ VOID SLCacheDialogDisplayDescriptorData(
     case SL_DATA_BINARY:
         SetDlgItemText(hwndDlg, IDC_SLVALUE, TEXT("Binary data, use \"View\" button to open an external viewer"));
         EnableWindow(GetDlgItem(hwndDlg, IDC_SLVALUE_VIEWWITH), TRUE);
+        break;
+
+    case SL_DATA_MULTI_SZ:
+        SetDlgItemText(hwndDlg, IDC_SLVALUE, TEXT("Multi-string data"));
+        break;
+
+    case SL_DATA_SUM:
+        SetDlgItemText(hwndDlg, IDC_SLVALUE, TEXT("Summary data"));
+        break;
+
+    default:
+        SetDlgItemText(hwndDlg, IDC_SLVALUE, T_CannotQuery);
         break;
     }
 }
@@ -423,6 +437,7 @@ BOOL CALLBACK SLCacheEnumerateCallback(
     if (EntryName) {
 
         RtlCopyMemory(EntryName, CacheDescriptor->Name, CacheDescriptor->NameLength);
+        EntryName[CacheDescriptor->NameLength / sizeof(WCHAR)] = 0;
 
         if (Context->lpFilterByName) {
 
@@ -488,8 +503,7 @@ PVOID xxxSLCacheUpdateData(
 */
 VOID SLCacheListItems(
     _In_ EXTRASCONTEXT* Context,
-    _In_opt_ LPCWSTR FilterByName,
-    _In_ BOOL RefreshList
+    _In_opt_ LPCWSTR FilterByName
 )
 {
     PVOID SLCacheData = (PVOID)Context->Reserved;
@@ -497,8 +511,7 @@ VOID SLCacheListItems(
 
     SL_ENUM_CONTEXT enumContext;
 
-    if (RefreshList) {
-        ListView_DeleteAllItems(Context->ListView);
+    if (SLCacheData == NULL) {
         SLCacheData = xxxSLCacheUpdateData(Context);
     }
 
@@ -594,7 +607,7 @@ VOID SLCacheDialogOnInit(
             //
             g_SLCacheImageIndex = g_TypeToken.ImageIndex;
             pDlgContext->Reserved = (ULONG_PTR)SLCacheData;
-            SLCacheListItems(pDlgContext, NULL, FALSE);
+            SLCacheListItems(pDlgContext, NULL);
 
         }
     }
@@ -655,11 +668,13 @@ INT_PTR CALLBACK SLCacheDialogProc(
             //
             if (pDlgContext->Reserved) {
                 supHeapFree((PVOID)pDlgContext->Reserved);
+                pDlgContext->Reserved = 0;
             }
 
             supHeapFree(pDlgContext);
         }
-        return DestroyWindow(hwndDlg);
+        DestroyWindow(hwndDlg);
+        return TRUE;
 
     case WM_CONTEXTMENU:
 
@@ -716,8 +731,8 @@ INT_PTR CALLBACK SLCacheDialogProc(
                             lpFilter = szFilterOption;
                         }
                     }
-
-                    SLCacheListItems(pDlgContext, lpFilter, TRUE);
+                    ListView_DeleteAllItems(pDlgContext->ListView);
+                    SLCacheListItems(pDlgContext, lpFilter);
                 }
             }
             break;
@@ -769,13 +784,14 @@ DWORD extrasSLCacheDialogWorkerThread(
 
         } while (bResult != 0);
     }
+    else {
+        if (pDlgContext) {
+            supHeapFree(pDlgContext);
+        }
+    }
 
     supResetFastEvent(&SLCacheDlgInitializedEvent);
-
-    if (SLCacheDlgThreadHandle) {
-        NtClose(SLCacheDlgThreadHandle);
-        SLCacheDlgThreadHandle = NULL;
-    }
+    supCloseHandleAtomic(&SLCacheDlgThreadHandle);
 
     return 0;
 }

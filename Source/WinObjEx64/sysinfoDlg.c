@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2022 - 2025
+*  (C) COPYRIGHT AUTHORS, 2022 - 2026
 *
 *  TITLE:       SYSINFODLG.C
 *
-*  VERSION:     2.09
+*  VERSION:     2.11
 *
-*  DATE:        20 Aug 2025
+*  DATE:        11 Jul 2026
 * 
 *  System Information Dialog.
 *
@@ -358,7 +358,7 @@ VOID SysInfoCollectInformation(
 
     RtlStringCchPrintfSecure(szBuffer,
         MAX_PATH,
-        TEXT("%lu, Mask 0x%08lX"),
+        TEXT("%lu, Mask 0x%p"),
         SystemInfo.dwNumberOfProcessors,
         SystemInfo.dwActiveProcessorMask);
 

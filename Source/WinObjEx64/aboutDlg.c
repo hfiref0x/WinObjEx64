@@ -366,7 +366,8 @@ INT_PTR CALLBACK StatsDialogProc(
 
     case WM_CLOSE:
         KillTimer(hwndDlg, UPDATE_TIMER_ID);
-        return DestroyWindow(hwndDlg);
+        DestroyWindow(hwndDlg);
+        return TRUE;
 
     case WM_COMMAND:
 
@@ -424,11 +425,8 @@ DWORD StatsDialogWorkerThread(
     }
 
     supResetFastEvent(&StatsDialogInitializedEvent);
+    supCloseHandleAtomic(&StatsDialogThreadHandle);
 
-    if (StatsDialogThreadHandle) {
-        NtClose(StatsDialogThreadHandle);
-        StatsDialogThreadHandle = NULL;
-    }
     return 0;
 }
 

@@ -492,7 +492,7 @@ DWORD WINAPI FindDlgSearchWorkerThread(
 {
     PFIND_SEARCH_PARAMS searchParams = (PFIND_SEARCH_PARAMS)lpParameter;
     HWND hwndDlg = searchParams->hwndDlg;
-    PFO_LIST_ITEM flist = NULL;
+    PFO_LIST_ITEM flist = NULL, plist = NULL;
     UNICODE_STRING usName, usType;
     PUNICODE_STRING pusName = NULL, pusType = NULL;
 
@@ -508,7 +508,13 @@ DWORD WINAPI FindDlgSearchWorkerThread(
 
     FindObject(ObGetPredefinedUnicodeString(OBP_ROOT), pusName, pusType, &flist);
 
-    SendMessage(hwndDlg, WM_FINDOBJECT_SEARCHCOMPLETE, (WPARAM)flist, 0);
+    if (!PostMessage(hwndDlg, WM_FINDOBJECT_SEARCHCOMPLETE, (WPARAM)flist, 0)) {
+        while (flist != NULL) {
+            plist = flist->Prev;
+            supHeapFree(flist);
+            flist = plist;
+        }
+    }
 
     supHeapFree(searchParams);
     return 0;
@@ -761,9 +767,12 @@ INT_PTR CALLBACK FindDlgProc(
         break;
 
     case WM_DESTROY:
+        g_FindDlgContext.DialogWindow = NULL;
+        g_FindDlgContext.SearchList = NULL;
+        g_FindDlgContext.StatusBar = NULL;
+
         if (g_FindDlgContext.SearchThread) {
             g_FindDlgContext.SearchCancelled = TRUE;
-            WaitForSingleObject(g_FindDlgContext.SearchThread, INFINITE);
             CloseHandle(g_FindDlgContext.SearchThread);
             g_FindDlgContext.SearchThread = NULL;
         }
@@ -771,11 +780,13 @@ INT_PTR CALLBACK FindDlgProc(
         break;
 
     case WM_CLOSE:
-        if (g_FindDlgContext.DialogIcon)
+        if (g_FindDlgContext.DialogIcon) {
             DestroyIcon(g_FindDlgContext.DialogIcon);
+            g_FindDlgContext.DialogIcon = NULL;
+        }
 
         DestroyWindow(hwndDlg);
-        break;
+        return TRUE;
 
     case WM_COMMAND:
 
@@ -858,11 +869,8 @@ DWORD FindpDlgWorkerThread(
     }
 
     supResetFastEvent(&FindDialogInitializedEvent);
+    supCloseHandleAtomic(&FindDialogThreadHandle);
 
-    if (FindDialogThreadHandle) {
-        NtClose(FindDialogThreadHandle);
-        FindDialogThreadHandle = NULL;
-    }
     return 0;
 }
 

@@ -22,7 +22,7 @@
 HWND SDViewDialogWindow = NULL;
 static HANDLE SDViewDialogThreadHandle = NULL;
 static FAST_EVENT SDViewDialogInitializedEvent = FAST_EVENT_INIT;
-static FAST_EVENT SDViewDialogFinalizedEvent;
+static FAST_EVENT SDViewDialogFinalizedEvent = FAST_EVENT_INIT;
 
 //
 // SDView Dialog context structure.
@@ -1149,7 +1149,6 @@ DWORD SDViewDialogWorkerThread(
     MSG message;
     HWND hwndDlg;
     SDVIEW_CONTEXT* context = (SDVIEW_CONTEXT*)Parameter;
-    HANDLE prev;
 
     hwndDlg = CreateDialogParam(g_WinObj.hInstance,
         MAKEINTRESOURCE(IDD_DIALOG_SDVIEW),
@@ -1177,11 +1176,7 @@ DWORD SDViewDialogWorkerThread(
 
     supResetFastEvent(&SDViewDialogInitializedEvent);
     supSetFastEvent(&SDViewDialogFinalizedEvent);
-
-    prev = InterlockedExchangePointer((PVOID*)&SDViewDialogThreadHandle, NULL);
-    if (prev) {
-        NtClose(prev);
-    }
+    supCloseHandleAtomic(&SDViewDialogThreadHandle);
 
     return 0;
 }
@@ -1214,8 +1209,6 @@ VOID SDViewDialogCreate(
 
     context = AllocateSDViewContext(ObjectType);
     if (context) {
-        supInitFastEvent(&SDViewDialogInitializedEvent);
-        supInitFastEvent(&SDViewDialogFinalizedEvent);
         SDViewDialogThreadHandle = supCreateDialogWorkerThread(SDViewDialogWorkerThread, context, 0);
         if (SDViewDialogThreadHandle == NULL) {
             FreeSDViewContext(context);

@@ -5966,15 +5966,11 @@ DWORD extrasSysCbDialogWorkerThread(
         } while (bResult != 0);
     }
 
-    supResetFastEvent(&SysCbInitializedEvent);
-
     if (acceleratorTable)
         DestroyAcceleratorTable(acceleratorTable);
 
-    if (SysCbThreadHandle) {
-        NtClose(SysCbThreadHandle);
-        SysCbThreadHandle = NULL;
-    }
+    supResetFastEvent(&SysCbInitializedEvent);
+    supCloseHandleAtomic(&SysCbThreadHandle);
 
     return 0;
 }

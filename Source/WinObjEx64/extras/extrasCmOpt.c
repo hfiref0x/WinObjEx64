@@ -32,6 +32,7 @@
 #define COLUM_CMOPTLIST_VALUE_MEMORY            5
 
 static HANDLE CmOptThreadHandle = NULL;
+static EXTRASCONTEXT CmOptDlgContext;
 static FAST_EVENT CmOptInitializedEvent = FAST_EVENT_INIT;
 
 /*
@@ -43,7 +44,8 @@ static FAST_EVENT CmOptInitializedEvent = FAST_EVENT_INIT;
 *
 */
 VOID CmOptDlgDumpValueToFile(
-    _In_ EXTRASCONTEXT* Context,
+    _In_ HWND hwndDlg,
+    _In_ HWND ListView,
     _In_ INT iItem
 )
 {
@@ -58,7 +60,7 @@ VOID CmOptDlgDumpValueToFile(
         RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
 
         supGetItemText2(
-            Context->ListView,
+            ListView,
             iItem,
             COLUMN_CMOPTLIST_BUFFER,
             szBuffer,
@@ -70,7 +72,7 @@ VOID CmOptDlgDumpValueToFile(
 
         szBuffer[0] = 0;
         supGetItemText2(
-            Context->ListView,
+            ListView,
             iItem,
             COLUMN_CMOPTLIST_BUFFER_LENGTH,
             szBuffer,
@@ -91,7 +93,7 @@ VOID CmOptDlgDumpValueToFile(
         // Run Save As Dialog.
         //
         _strcpy(szBuffer, TEXT("dump.bin"));
-        if (!supSaveDialogExecute(Context->hwndDlg, szBuffer, TEXT("All files\0*.*\0\0"))) {
+        if (!supSaveDialogExecute(hwndDlg, szBuffer, TEXT("All files\0*.*\0\0"))) {
             bSuccess = TRUE; //user cancelled
             break;
         }
@@ -107,7 +109,7 @@ VOID CmOptDlgDumpValueToFile(
                     tempBuffer,
                     bytesRead,
                     FALSE,
-                    FALSE, 
+                    FALSE,
                     NULL));
 
             }
@@ -117,7 +119,7 @@ VOID CmOptDlgDumpValueToFile(
 
     if (bSuccess == FALSE) {
         MessageBox(
-            Context->hwndDlg,
+            hwndDlg,
             TEXT("Error dumping value"),
             PROGRAM_NAME,
             MB_ICONERROR);
@@ -292,41 +294,33 @@ VOID CmOptDlgHandleWMCommand(
 )
 {
     UNREFERENCED_PARAMETER(lParam);
-    EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
 
     switch (GET_WM_COMMAND_ID(wParam, lParam)) {
 
     case ID_OBJECT_COPY:
 
-        if (pDlgContext) {
-
-            supListViewCopyItemValueToClipboard(pDlgContext->ListView,
-                pDlgContext->lvItemHit,
-                pDlgContext->lvColumnHit);
-
-        }
+        supListViewCopyItemValueToClipboard(CmOptDlgContext.ListView,
+            CmOptDlgContext.lvItemHit,
+            CmOptDlgContext.lvColumnHit);
 
         break;
 
     case ID_CMOPTLIST_SAVE:
 
-        if (pDlgContext) {
-
-            supListViewExportToFile(
-                TEXT("CmControlVector.csv"),
-                hwndDlg,
-                pDlgContext->ListView);
-        }
+        supListViewExportToFile(
+            TEXT("CmControlVector.csv"),
+            hwndDlg,
+            CmOptDlgContext.ListView);
         break;
 
     case ID_CMOPTLIST_DUMP:
 
-        if (pDlgContext) {
-
-            CmOptDlgDumpValueToFile(pDlgContext,
-                pDlgContext->lvItemHit);
-
+        if (CmOptDlgContext.lvItemHit >= 0) {
+            CmOptDlgDumpValueToFile(hwndDlg,
+                CmOptDlgContext.ListView,
+                CmOptDlgContext.lvItemHit);
         }
+
         break;
 
     case IDCANCEL:
@@ -553,11 +547,9 @@ VOID CmOptDlgListOptions(
 *
 */
 VOID CmOptDlgOnInit(
-    _In_ HWND hwndDlg,
-    _In_ LPARAM lParam
+    _In_ HWND hwndDlg
 )
 {
-    EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)lParam;
     INT iImage = ImageList_GetImageCount(g_ListViewImages) - 1, iColumn;
     BOOLEAN bIoDriverLoaded;
     LVCOLUMNS_DATA columnDataList[] =
@@ -569,23 +561,21 @@ VOID CmOptDlgOnInit(
         { L"Type", 80, LVCFMT_LEFT | LVCFMT_BITMAP_ON_RIGHT, I_IMAGENONE }
     };
 
-    SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)pDlgContext);
+    CmOptDlgContext.hwndDlg = hwndDlg;
+    CmOptDlgContext.lvItemHit = -1;
+    CmOptDlgContext.lvColumnHit = -1;
 
-    pDlgContext->hwndDlg = hwndDlg;
-    pDlgContext->lvItemHit = -1;
-    pDlgContext->lvColumnHit = -1;
+    extrasSetDlgIcon(&CmOptDlgContext);
 
-    extrasSetDlgIcon(pDlgContext);
-
-    pDlgContext->StatusBar = GetDlgItem(hwndDlg, ID_EXTRASLIST_STATUSBAR);
-    pDlgContext->ListView = GetDlgItem(hwndDlg, ID_EXTRASLIST);
-    pDlgContext->lvColumnHit = -1;
-    pDlgContext->lvItemHit = -1;
+    CmOptDlgContext.StatusBar = GetDlgItem(hwndDlg, ID_EXTRASLIST_STATUSBAR);
+    CmOptDlgContext.ListView = GetDlgItem(hwndDlg, ID_EXTRASLIST);
+    CmOptDlgContext.lvColumnHit = -1;
+    CmOptDlgContext.lvItemHit = -1;
 
     //
     // Set listview imagelist, style flags and theme.
     //
-    supSetListViewSettings(pDlgContext->ListView,
+    supSetListViewSettings(CmOptDlgContext.ListView,
         LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP,
         FALSE,
         TRUE,
@@ -596,17 +586,17 @@ VOID CmOptDlgOnInit(
     // And columns and remember their count.
     //
     iColumn = supAddLVColumnsFromArray(
-        pDlgContext->ListView,
+        CmOptDlgContext.ListView,
         columnDataList,
         RTL_NUMBER_OF(columnDataList));
 
-    pDlgContext->lvColumnCount = iColumn;
+    CmOptDlgContext.lvColumnCount = iColumn;
 
     bIoDriverLoaded = kdIoDriverLoaded();
-    pDlgContext->Reserved = bIoDriverLoaded;
+    CmOptDlgContext.Reserved = bIoDriverLoaded;
 
     if (bIoDriverLoaded) {
-        supAddListViewColumn(pDlgContext->ListView,
+        supAddListViewColumn(CmOptDlgContext.ListView,
             iColumn,
             iColumn,
             iColumn,
@@ -614,12 +604,12 @@ VOID CmOptDlgOnInit(
             LVCFMT_CENTER | LVCFMT_BITMAP_ON_RIGHT,
             TEXT("Value (Memory)"), 80);
 
-        pDlgContext->lvColumnCount += 1;
+        CmOptDlgContext.lvColumnCount += 1;
         iColumn += 1;
     }
 
     if (g_NtBuildNumber >= NT_WIN10_REDSTONE4) {
-        supAddListViewColumn(pDlgContext->ListView,
+        supAddListViewColumn(CmOptDlgContext.ListView,
             iColumn,
             iColumn,
             iColumn,
@@ -627,15 +617,15 @@ VOID CmOptDlgOnInit(
             LVCFMT_CENTER | LVCFMT_BITMAP_ON_RIGHT,
             TEXT("Flags"), 80);
 
-        pDlgContext->lvColumnCount += 1;
+        CmOptDlgContext.lvColumnCount += 1;
     }
 
     SetWindowText(hwndDlg, TEXT("CmControlVector (Relative to: \\REGISTRY\\MACHINE\\SYSTEM\\CurrentControlSet\\Control)"));
 
-    CmOptDlgListOptions(pDlgContext);
+    CmOptDlgListOptions(&CmOptDlgContext);
 
     SendMessage(hwndDlg, WM_SIZE, 0, 0);
-    SetFocus(pDlgContext->ListView);
+    SetFocus(CmOptDlgContext.ListView);
 
     supCenterWindowSpecifyParent(hwndDlg, g_hwndMain);
 }
@@ -655,13 +645,8 @@ INT_PTR CALLBACK CmOptDlgDialogProc(
     _In_  LPARAM lParam
 )
 {
-    EXTRASCONTEXT* pDlgContext;
-
     if (uMsg == g_WinObj.SettingsChangeMessage) {
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
-            extrasHandleSettingsChange(pDlgContext);
-        }
+        extrasHandleSettingsChange(&CmOptDlgContext);
         return TRUE;
     }
 
@@ -672,23 +657,20 @@ INT_PTR CALLBACK CmOptDlgDialogProc(
         break;
 
     case WM_INITDIALOG:
-        CmOptDlgOnInit(hwndDlg, lParam);
+        CmOptDlgOnInit(hwndDlg);
         break;
 
     case WM_DESTROY:
+        CmOptDlgContext.hwndDlg = NULL;
         PostQuitMessage(0);
         break;
 
     case WM_CLOSE:
-        pDlgContext = (EXTRASCONTEXT*)RemoveProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
-            extrasRemoveDlgIcon(pDlgContext);
-            supHeapFree(pDlgContext);
-        }
-        return DestroyWindow(hwndDlg);
+        extrasRemoveDlgIcon(&CmOptDlgContext);
+        DestroyWindow(hwndDlg);
+        return TRUE;
 
     case WM_COMMAND:
-
         CmOptDlgHandleWMCommand(hwndDlg, wParam, lParam);
         break;
 
@@ -702,26 +684,17 @@ INT_PTR CALLBACK CmOptDlgDialogProc(
         break;
 
     case WM_NOTIFY:
-
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
-            return (INT_PTR)CmOptDlgHandleNotify(
-                (LPNMLISTVIEW)lParam,
-                pDlgContext);
-        }
-        break;
+        return (INT_PTR)CmOptDlgHandleNotify(
+            (LPNMLISTVIEW)lParam,
+            &CmOptDlgContext);
 
     case WM_CONTEXTMENU:
-
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
-            supHandleContextMenuMsgForListView(hwndDlg,
-                wParam,
-                lParam,
-                pDlgContext->ListView,
-                (pfnPopupMenuHandler)CmOptDlgHandlePopupMenu,
-                pDlgContext);
-        }
+        supHandleContextMenuMsgForListView(hwndDlg,
+            wParam,
+            lParam,
+            CmOptDlgContext.ListView,
+            (pfnPopupMenuHandler)CmOptDlgHandlePopupMenu,
+            &CmOptDlgContext);
         break;
     }
 
@@ -743,14 +716,15 @@ DWORD extrasCmOptDialogWorkerThread(
     BOOL bResult;
     MSG message;
     HWND hwndDlg;
-    EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)Parameter;
+
+    UNREFERENCED_PARAMETER(Parameter);
 
     hwndDlg = CreateDialogParam(
         g_WinObj.hInstance,
         MAKEINTRESOURCE(IDD_DIALOG_EXTRASLIST),
         0,
         &CmOptDlgDialogProc,
-        (LPARAM)pDlgContext);
+        0);
 
     supSetFastEvent(&CmOptInitializedEvent);
 
@@ -771,11 +745,7 @@ DWORD extrasCmOptDialogWorkerThread(
     }
 
     supResetFastEvent(&CmOptInitializedEvent);
-
-    if (CmOptThreadHandle) {
-        NtClose(CmOptThreadHandle);
-        CmOptThreadHandle = NULL;
-    }
+    supCloseHandleAtomic(&CmOptThreadHandle);
 
     return 0;
 }
@@ -792,18 +762,15 @@ VOID extrasCreateCmOptDialog(
     VOID
 )
 {
-    EXTRASCONTEXT* pDlgContext;
-
     if (!CmOptThreadHandle) {
-        pDlgContext = (EXTRASCONTEXT*)supHeapAlloc(sizeof(EXTRASCONTEXT));
-        if (pDlgContext) {
-            pDlgContext->tlSubItemHit = -1;
-            CmOptThreadHandle = supCreateDialogWorkerThread(extrasCmOptDialogWorkerThread, pDlgContext , 0);
-            if (CmOptThreadHandle == NULL) {
-                supHeapFree(pDlgContext);
-                return;
-            }
-            supWaitForFastEvent(&CmOptInitializedEvent, NULL);
+        RtlSecureZeroMemory(&CmOptDlgContext, sizeof(EXTRASCONTEXT));
+        CmOptThreadHandle = supCreateDialogWorkerThread(extrasCmOptDialogWorkerThread, NULL, 0);
+        if (CmOptThreadHandle == NULL) {
+            return;
         }
+        supWaitForFastEvent(&CmOptInitializedEvent, NULL);
+    }
+    else {
+        supRestoreDialogWindow(CmOptDlgContext.hwndDlg);
     }
 }

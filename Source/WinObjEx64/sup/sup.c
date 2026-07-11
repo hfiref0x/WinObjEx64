@@ -3333,7 +3333,6 @@ BOOLEAN supQuerySecureBootState(
     _Out_ PBOOLEAN pbSecureBoot
 )
 {
-    BOOLEAN     restorePrivilege = FALSE;
     BOOLEAN     bSecureBoot = FALSE;
     NTSTATUS    status;
     HANDLE      tokenHandle = NULL;
@@ -3366,7 +3365,6 @@ BOOLEAN supQuerySecureBootState(
 
         if (NT_SUCCESS(status)) {
 
-            restorePrivilege = TRUE;
             bSecureBoot = FALSE;
 
             returnLength = GetFirmwareEnvironmentVariable(
@@ -3375,15 +3373,13 @@ BOOLEAN supQuerySecureBootState(
                 &bSecureBoot,
                 sizeof(BOOLEAN));
 
-            if (restorePrivilege) {
-                NtAdjustPrivilegesToken(
-                    tokenHandle,
-                    FALSE,
-                    &oldState,
-                    0,
-                    NULL,
-                    (PULONG)&status);
-            }
+            NtAdjustPrivilegesToken(
+                tokenHandle,
+                FALSE,
+                &oldState,
+                0,
+                NULL,
+                (PULONG)&status);
 
             if (returnLength != 0) {
                 if (pbSecureBoot) {
@@ -8891,7 +8887,6 @@ NTSTATUS supUnloadDriver(
     ULONG returnLength = 0;
     SIZE_T keyOffset;
     HANDLE tokenHandle = NULL;
-    BOOLEAN restorePrivilege = FALSE;
     UNICODE_STRING driverServiceName;
     TOKEN_PRIVILEGES oldState;
     WCHAR szBuffer[MAX_PATH + 1];
@@ -8930,20 +8925,16 @@ NTSTATUS supUnloadDriver(
 
         if (NT_SUCCESS(status)) {
 
-            restorePrivilege = TRUE;
-
             RtlInitUnicodeString(&driverServiceName, szBuffer);
             status = NtUnloadDriver(&driverServiceName);
 
-            if (restorePrivilege) {
-                NtAdjustPrivilegesToken(
-                    tokenHandle,
-                    FALSE,
-                    &oldState,
-                    0,
-                    NULL,
-                    &returnLength);
-            }
+            NtAdjustPrivilegesToken(
+                tokenHandle,
+                FALSE,
+                &oldState,
+                0,
+                NULL,
+                &returnLength);
         }
 
         NtClose(tokenHandle);
@@ -9211,6 +9202,28 @@ HANDLE supCreateThread(
     }
 
     return threadHandle;
+}
+
+/*
+* supCloseHandleAtomic
+*
+* Purpose:
+*
+* Close the object handle atomically.
+*
+*/
+VOID supCloseHandleAtomic(
+    _Inout_ PHANDLE Handle
+)
+{
+    HANDLE hObject;
+
+    if (Handle) {
+        hObject = InterlockedExchangePointer((PVOID*)Handle, NULL);
+        if (hObject) {
+            NtClose(hObject);
+        }
+    }
 }
 
 /*

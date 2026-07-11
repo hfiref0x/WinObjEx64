@@ -689,31 +689,30 @@ INT_PTR CALLBACK UsdDialogProc(
         break;
 
     case WM_CLOSE:
-        DestroyWindow(g_UsdDlgContext.TreeList);
+        if (g_UsdDlgContext.TreeList && IsWindow(g_UsdDlgContext.TreeList)) {
+            DestroyWindow(g_UsdDlgContext.TreeList);
+            g_UsdDlgContext.TreeList = NULL;
+        }
         DestroyWindow(hwndDlg);
-        break;
+        return TRUE;
 
     case WM_COMMAND:
 
         switch (GET_WM_COMMAND_ID(wParam, lParam)) {
         case IDCANCEL:
-
             SendMessage(hwndDlg, WM_CLOSE, 0, 0);
             break;
 
         case ID_OBJECT_COPY:
-
             supTreeListCopyItemValueToClipboard(g_UsdDlgContext.TreeList,
                 g_UsdDlgContext.tlSubItemHit);
 
             break;
 
         }
-
         break;
 
     case WM_CONTEXTMENU:
-
         UsdDialogHandlePopupMenu(hwndDlg, lParam);
         break;
     }
@@ -766,11 +765,7 @@ DWORD extrasUsdDialogWorkerThread(
     }
 
     supResetFastEvent(&UsdDlgInitializedEvent);
-
-    if (UsdDlgThreadHandle) {
-        NtClose(UsdDlgThreadHandle);
-        UsdDlgThreadHandle = NULL;
-    }
+    supCloseHandleAtomic(&UsdDlgThreadHandle);
 
     return 0;
 }

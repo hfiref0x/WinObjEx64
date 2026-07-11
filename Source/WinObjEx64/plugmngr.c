@@ -22,6 +22,7 @@
 static LIST_ENTRY g_PluginsListHead;
 volatile UINT g_PluginCount = 0;
 
+static HWND PmDlgWindow = NULL;
 static HANDLE PmDlgThreadHandle = NULL;
 static FAST_EVENT PmDlgInitializedEvent = FAST_EVENT_INIT;
 
@@ -1052,10 +1053,10 @@ VOID PmpShowPluginInfo(
     _In_ INT itemIndex
 )
 {
-    PWINOBJEX_PLUGIN_INTERNAL PluginData = NULL;
-    LPWSTR lpType;
-    HWND hwndCB;
     INT nCount;
+    HWND hwndCB;
+    LPWSTR lpType;
+    PWINOBJEX_PLUGIN_INTERNAL PluginData = NULL;
 
     WCHAR szModuleName[MAX_PATH + 1];
 
@@ -1071,32 +1072,16 @@ VOID PmpShowPluginInfo(
 
     supDisableRedraw(hwndDlg);
 
-    if (PluginData->Plugin.Capabilities.u1.NeedAdmin)
-        lpType = TEXT("Yes");
-    else
-        lpType = TEXT("No");
-
+    lpType = (PluginData->Plugin.Capabilities.u1.NeedAdmin) ? TEXT("Yes") : TEXT("No");
     SetDlgItemText(hwndDlg, IDC_PLUGIN_ADMIN, lpType);
 
-    if (PluginData->Plugin.Capabilities.u1.NeedDriver)
-        lpType = TEXT("Yes");
-    else
-        lpType = TEXT("No");
-
+    lpType = (PluginData->Plugin.Capabilities.u1.NeedDriver) ? TEXT("Yes") : TEXT("No");
     SetDlgItemText(hwndDlg, IDC_PLUGIN_DRIVER, lpType);
 
-    if (PluginData->Plugin.Capabilities.u1.SupportWine)
-        lpType = TEXT("Yes");
-    else
-        lpType = TEXT("No");
-
+    lpType = (PluginData->Plugin.Capabilities.u1.SupportWine) ? TEXT("Yes") : TEXT("No");
     SetDlgItemText(hwndDlg, IDC_PLUGIN_WINE, lpType);
 
-    if (PluginData->Plugin.Capabilities.u1.SupportMultipleInstances)
-        lpType = TEXT("Yes");
-    else
-        lpType = TEXT("No");
-
+    lpType = (PluginData->Plugin.Capabilities.u1.SupportMultipleInstances) ? TEXT("Yes") : TEXT("No");
     SetDlgItemText(hwndDlg, IDC_PLUGIN_MINSTANCES, lpType);
 
     SetDlgItemText(hwndDlg, IDC_PLUGIN_DESC, PluginData->Plugin.Description);
@@ -1208,25 +1193,26 @@ INT_PTR CALLBACK PmpDialogProc(
     switch (uMsg) {
 
     case WM_INITDIALOG:
+        PmDlgWindow = hwndDlg;
         supCenterWindowSpecifyParent(hwndDlg, g_hwndMain);
         PmpEnumerateEntries(hwndDlg);
         break;
 
     case WM_COMMAND:
-
         if (LOWORD(wParam) == IDCANCEL) {
             DestroyWindow(hwndDlg);
+            return TRUE;
         }
         break;
 
     case WM_DESTROY:
+        PmDlgWindow = NULL;
         PostQuitMessage(0);
         break;
 
     case WM_NOTIFY:
         PmpHandleNotify(hwndDlg, lParam);
         break;
-
     }
 
     return FALSE;
@@ -1275,11 +1261,7 @@ DWORD PmViewPluginsWorkerThread(
     }
 
     supResetFastEvent(&PmDlgInitializedEvent);
-
-    if (PmDlgThreadHandle) {
-        NtClose(PmDlgThreadHandle);
-        PmDlgThreadHandle = NULL;
-    }
+    supCloseHandleAtomic(&PmDlgThreadHandle);
 
     return 0;
 }
@@ -1300,5 +1282,8 @@ VOID PmViewPlugins(
         PmDlgThreadHandle = supCreateDialogWorkerThread(PmViewPluginsWorkerThread, NULL, 0);
         if (PmDlgThreadHandle)
             supWaitForFastEvent(&PmDlgInitializedEvent, NULL);
+    }
+    else {
+        supRestoreDialogWindow(PmDlgWindow);
     }
 }

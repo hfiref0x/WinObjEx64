@@ -41,9 +41,9 @@ typedef struct _TL_SUBITEMS_PSLIST {
     LPTSTR      Text[PSLIST_CELLS_COUNT];
 } TL_SUBITEMS_PSLIST, * PTL_SUBITEMS_PSLIST;
 
-/*
-* PID -> HTREEITEM hash map for fast parent lookups
-*/
+//
+// PID -> HTREEITEM hash map for fast parent lookups
+//
 #define PSLIST_PIDMAP_HASH_SIZE 512
 
 typedef struct _PIDMAP_ENTRY {
@@ -80,9 +80,11 @@ static int y_splitter_pos = 300, y_capture_pos = 0, y_splitter_max = 0;
 HANDLE g_PsListWait = NULL;
 HANDLE g_PsListHeap = NULL;
 
+static volatile LONG g_PsListActiveWorkers = 0;
+static HANDLE g_PsListWorkersDoneEvent = NULL;
+
 BOOL g_IsDialogQuit;
 BOOL g_IsRefresh;
-
 
 LIST_ENTRY g_PsListHead;
 
@@ -147,6 +149,45 @@ LEGEND_MAP LegendControls[] = {
     { IDC_PCTL_IMMERSIVE_PROCESS, PS_COLOR_IMMERSIVE },
     { IDC_PCTL_PROTECTED_PROCESS, PS_COLOR_PROTECTED }
 };
+
+/*
+* PsListWorkerEnter
+*
+* Purpose:
+*
+* Registers a worker thread as in-flight. Must be paired with PsListWorkerExit
+* on every exit path of the worker, including failure to acquire the lock.
+*
+*/
+VOID PsListWorkerEnter(
+    VOID
+)
+{
+    if (InterlockedIncrement(&g_PsListActiveWorkers) == 1) {
+        if (g_PsListWorkersDoneEvent)
+            ResetEvent(g_PsListWorkersDoneEvent);
+    }
+}
+
+/*
+* PsListWorkerExit
+*
+* Purpose:
+*
+* Unregisters a worker thread. Signals g_PsListWorkersDoneEvent once the last
+* in-flight worker has finished, so the dialog thread can safely tear down
+* g_PsListWait/g_PsListHeap.
+*
+*/
+VOID PsListWorkerExit(
+    VOID
+)
+{
+    if (InterlockedDecrement(&g_PsListActiveWorkers) == 0) {
+        if (g_PsListWorkersDoneEvent)
+            SetEvent(g_PsListWorkersDoneEvent);
+    }
+}
 
 /*
 * PsListPidMapInit
@@ -275,9 +316,7 @@ INT_PTR CALLBACK PsLegendDialogProc(
     case WM_PAINT:
         hdc = BeginPaint(hwndDlg, &paint);
         if (hdc) {
-
             for (i = 0; i < RTL_NUMBER_OF(LegendControls); i++) {
-
                 hwndControl = GetDlgItem(hwndDlg, LegendControls[i].Control);
                 if (hwndControl) {
                     RtlZeroMemory(&rect, sizeof(rect));
@@ -285,7 +324,7 @@ INT_PTR CALLBACK PsLegendDialogProc(
                     MapWindowPoints(hwndControl, hwndDlg, (LPPOINT)&rect, 2);
                     hb = CreateSolidBrush(LegendControls[i].Color);
                     if (hb) {
-                        FillRect(paint.hdc, &rect, hb);
+                        FillRect(hdc, &rect, hb);
                         DeleteObject(hb);
                     }
                 }
@@ -296,7 +335,6 @@ INT_PTR CALLBACK PsLegendDialogProc(
 
         break;
     }
-
     return 0;
 }
 
@@ -309,7 +347,6 @@ VOID PsShowLegendDialog(
         hwndParent,
         PsLegendDialogProc,
         0);
-
 }
 
 /*
@@ -339,7 +376,6 @@ PROP_UNNAMED_OBJECT_INFO* PsxAllocateUnnamedObjectEntry(
         return NULL;
 
     if (ObjectType == ObjectTypeProcess) {
-
         processEntry = (PSYSTEM_PROCESS_INFORMATION)Data;
         objectEntry->ClientId.UniqueProcess = processEntry->UniqueProcessId;
         objectEntry->ClientId.UniqueThread = NULL;
@@ -352,8 +388,7 @@ PROP_UNNAMED_OBJECT_INFO* PsxAllocateUnnamedObjectEntry(
             RtlCopyUnicodeString(&objectEntry->ImageName, &processEntry->ImageName);
         }
     }
-    else if (ObjectType == ObjectTypeThread)
-    {
+    else if (ObjectType == ObjectTypeThread) {
         threadEntry = (PSYSTEM_THREAD_INFORMATION)Data;
         objectEntry->ClientId = threadEntry->ClientId;
         objectEntry->ThreadInformation = *threadEntry;
@@ -481,7 +516,6 @@ VOID PsListHandlePopupMenu(
         TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, point->x, point->y, 0, hwndDlg, NULL);
         DestroyMenu(hMenu);
     }
-
 }
 
 /*
@@ -646,12 +680,7 @@ VOID PsListHandleObjectProp(
         return;
 
     if (ImageName->Length == 0) {
-        if (UniqueProcessId == NULL) {
-            _strcpy(lpName, T_IDLE_PROCESS);
-        }
-        else {
-            _strcpy(lpName, TEXT("UnknownProcess"));
-        }
+        _strcpy(lpName, (UniqueProcessId == NULL) ? T_IDLE_PROCESS : TEXT("UnknownProcess"));
     }
     else {
         RtlCopyMemory(lpName,
@@ -758,7 +787,6 @@ HTREEITEM AddProcessEntryTreeList(
 
     lpProcessName = (PWSTR)supHeapAlloc(cbProcessName);
     if (lpProcessName) {
-
         if (uniqueProcessId == 0) {
             _strcpy(lpProcessName, T_IDLE_PROCESS);
         }
@@ -807,14 +835,12 @@ HTREEITEM AddProcessEntryTreeList(
     }
 
     if (ServicesList) {
-
         if (PsListProcessInServicesList(uniqueProcessId, ServicesList) ||
             ((processSid) && supIsLocalServiceSid(processSid)))
         {
             subitems.ColorFlags = TLF_BGCOLOR_SET;
             subitems.BgColor = PS_COLOR_SERVICE;
         }
-
     }
 
     //
@@ -832,7 +858,6 @@ HTREEITEM AddProcessEntryTreeList(
     // 4. Protected process.
     //
     if (ProcessHandle) {
-
         if (supIsImmersiveProcess(ProcessHandle)) {
             subitems.ColorFlags = TLF_BGCOLOR_SET;
             subitems.BgColor = PS_COLOR_IMMERSIVE;
@@ -844,18 +869,15 @@ HTREEITEM AddProcessEntryTreeList(
                 subitems.BgColor = PS_COLOR_PROTECTED;
             }
         }
-
     }
 
     //
     // User.
     //
     if (processSid && PolicyHandle) {
-
         if (supLookupSidUserAndDomainEx(processSid, PolicyHandle, &lpUserName)) {
             subitems.Text[PSLIST_USER_CELL] = lpUserName;
         }
-
     }
 
     if (processSid)
@@ -874,8 +896,11 @@ HTREEITEM AddProcessEntryTreeList(
         supHeapFree(lpUserName);
     if (lpProcessName)
         supHeapFree(lpProcessName);
-    
-    PsListPidMapInsert(&PsListPidMap, HandleToULong(uniqueProcessId), hTreeItem);
+
+    if (!PsListPidMapInsert(&PsListPidMap, HandleToULong(uniqueProcessId), hTreeItem)) {
+        supStatusBarSetText(PsDlgContext.StatusBar, 2,
+            TEXT("Warning: failed to cache process tree entry"));
+    }
 
     return hTreeItem;
 }
@@ -909,19 +934,22 @@ HTREEITEM FindParentItem(
 LPWSTR PsListGetThreadStateAsString(
     _In_ THREAD_STATE ThreadState,
     _In_ KWAIT_REASON WaitReason,
-    _In_ LPWSTR StateBuffer)
+    _In_ LPWSTR StateBuffer,
+    _In_ SIZE_T StateBufferLength
+)
 {
+    ULONG waitReasonIndex;
     LPWSTR lpState = T_Unknown;
     LPWSTR lpWaitReason = T_Unknown;
 
     if (ThreadState == StateWait) {
-
-        _strcpy(StateBuffer, TEXT("Wait:"));
-        lpWaitReason = T_WAITREASON[WaitReason];
-        _strcat(StateBuffer, lpWaitReason);
+        waitReasonIndex = (ULONG)WaitReason;
+        if (waitReasonIndex < RTL_NUMBER_OF(T_WAITREASON)) {
+            lpWaitReason = T_WAITREASON[waitReasonIndex];
+        }
+        RtlStringCchPrintfSecure(StateBuffer, StateBufferLength, TEXT("Wait: %ws"), lpWaitReason);
     }
     else {
-
 
         switch (ThreadState) {
         case StateInitialized:
@@ -950,6 +978,21 @@ LPWSTR PsListGetThreadStateAsString(
     return StateBuffer;
 }
 
+_Acquires_lock_(g_PsListWait)
+_Success_(return != FALSE)
+FORCEINLINE BOOL PsListLockAcquire(VOID)
+{
+    if (g_PsListWait == NULL)
+        return FALSE;
+    return (WaitForSingleObject(g_PsListWait, INFINITE) == WAIT_OBJECT_0);
+}
+
+_Releases_lock_(g_PsListWait)
+FORCEINLINE VOID PsListLockRelease(VOID)
+{
+    ReleaseMutex(g_PsListWait);
+}
+
 /*
 * CreateThreadListProc
 *
@@ -959,11 +1002,12 @@ LPWSTR PsListGetThreadStateAsString(
 *
 */
 DWORD WINAPI CreateThreadListProc(
-    _In_ PROP_UNNAMED_OBJECT_INFO* ObjectEntry
+    _In_ PROP_UNNAMED_OBJECT_INFO * ObjectEntry
 )
 {
     INT ItemIndex;
     ULONG i, ThreadCount, ErrorCount = 0;
+    ULONG_PTR startAddress = 0, objectAddress = 0;
     HANDLE UniqueProcessId;
     PVOID ProcessList = NULL;
     PSYSTEM_PROCESS_INFORMATION Process;
@@ -972,229 +1016,223 @@ DWORD WINAPI CreateThreadListProc(
     PSUP_HANDLE_DUMP SortedHandleList = NULL;
 
     PROP_UNNAMED_OBJECT_INFO* objectEntry, * threadEntry;
-    OBEX_THREAD_LOOKUP_ENTRY* stl = NULL, * stlptr;
+    OBEX_THREAD_LOOKUP_ENTRY* threadLookupEntry = NULL, * pThreadLookupEntry;
 
     LVITEM lvitem;
     WCHAR szBuffer[MAX_PATH];
 
-    ULONG_PTR startAddress = 0, objectAddress = 0;
-
-    DWORD dwWaitResult;
+    if (!PsListLockAcquire()) {
+        PsListWorkerExit();
+        return 0;
+    }
 
     supDisableRedraw(PsDlgContext.ListView);
+    supSetWaitCursor(TRUE);
 
-    __try {
+    do {
+        ListView_DeleteAllItems(PsDlgContext.ListView);
 
-        dwWaitResult = WaitForSingleObject(g_PsListWait, INFINITE);
-        if (dwWaitResult == WAIT_OBJECT_0) {
+        UniqueProcessId = ObjectEntry->ClientId.UniqueProcess;
 
-            supSetWaitCursor(TRUE);
+        //
+        // Refresh thread list.
+        //
+        ProcessList = supGetSystemInfo(SystemProcessInformation, NULL);
+        if (ProcessList == NULL)
+            break;
 
-            ListView_DeleteAllItems(PsDlgContext.ListView);
+        //
+        // Leave if process died.
+        //
+        if (!supQueryProcessEntryById(UniqueProcessId, ProcessList, &Process))
+            break;
 
-            UniqueProcessId = ObjectEntry->ClientId.UniqueProcess;
+        pModules = (PRTL_PROCESS_MODULES)supGetLoadedModulesList(NULL);
 
-            //
-            // Refresh thread list.
-            //
-            ProcessList = supGetSystemInfo(SystemProcessInformation, NULL);
-            if (ProcessList == NULL)
-                __leave;
+        ThreadCount = Process->ThreadCount;
+        threadLookupEntry = (OBEX_THREAD_LOOKUP_ENTRY*)supHeapAlloc(ThreadCount * sizeof(OBEX_THREAD_LOOKUP_ENTRY));
+        if (threadLookupEntry == NULL)
+            break;
 
-            //
-            // Leave if process died.
-            //
-            if (!supQueryProcessEntryById(UniqueProcessId, ProcessList, &Process))
-                __leave;
+        pThreadLookupEntry = threadLookupEntry;
 
-            pModules = (PRTL_PROCESS_MODULES)supGetLoadedModulesList(NULL);
+        for (i = 0, Thread = Process->Threads;
+            i < ThreadCount;
+            i++, Thread++, pThreadLookupEntry++)
+        {
+            objectEntry = PsxAllocateUnnamedObjectEntry(Thread, ObjectTypeThread);
+            if (objectEntry) {
 
-            ThreadCount = Process->ThreadCount;
-            stl = (OBEX_THREAD_LOOKUP_ENTRY*)supHeapAlloc(ThreadCount * sizeof(OBEX_THREAD_LOOKUP_ENTRY));
-            if (stl == NULL)
-                __leave;
+                pThreadLookupEntry->EntryPtr = (PVOID)objectEntry;
 
-            stlptr = stl;
-
-            for (i = 0, Thread = Process->Threads;
-                i < ThreadCount;
-                i++, Thread++, stlptr++)
-            {
-                objectEntry = PsxAllocateUnnamedObjectEntry(Thread, ObjectTypeThread);
-                if (objectEntry) {
-
-                    stlptr->EntryPtr = (PVOID)objectEntry;
-
-                    if (!NT_SUCCESS(supOpenThread(&Thread->ClientId,
-                        THREAD_QUERY_INFORMATION,
-                        &stlptr->hThread)))
-                    {
-                        supOpenThread(&Thread->ClientId,
-                            THREAD_QUERY_LIMITED_INFORMATION,
-                            &stlptr->hThread);
-                    }
+                if (!NT_SUCCESS(supOpenThread(&Thread->ClientId,
+                    THREAD_QUERY_INFORMATION,
+                    &pThreadLookupEntry->hThread)))
+                {
+                    supOpenThread(&Thread->ClientId,
+                        THREAD_QUERY_LIMITED_INFORMATION,
+                        &pThreadLookupEntry->hThread);
                 }
             }
-
-            supHeapFree(ProcessList);
-            ProcessList = NULL;
-
-            SortedHandleList = supHandlesCreateFilteredAndSortedList(GetCurrentProcessId(), FALSE);
-            stlptr = stl;
-
-            for (i = 0; i < ThreadCount; i++, stlptr++) {
-
-                threadEntry = (PROP_UNNAMED_OBJECT_INFO*)stlptr->EntryPtr;
-
-                //
-                // TID
-                //               
-                szBuffer[0] = 0;
-                ultostr(HandleToULong(threadEntry->ClientId.UniqueThread), szBuffer);
-
-                RtlZeroMemory(&lvitem, sizeof(lvitem));
-                lvitem.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM;
-                lvitem.iItem = MAXINT;
-                lvitem.iImage = I_IMAGENONE;
-                lvitem.pszText = szBuffer;
-                lvitem.cchTextMax = MAX_PATH;
-                lvitem.lParam = (LPARAM)threadEntry;
-                ItemIndex = ListView_InsertItem(PsDlgContext.ListView, &lvitem);
-                if (ItemIndex == -1)
-                    continue;
-
-                //
-                // Priority
-                //
-                szBuffer[0] = 0;
-                ultostr(threadEntry->ThreadInformation.Priority, szBuffer);
-
-                lvitem.mask = LVIF_TEXT;
-                lvitem.iSubItem++;
-                lvitem.pszText = szBuffer;
-                lvitem.iItem = ItemIndex;
-                ListView_SetItem(PsDlgContext.ListView, &lvitem);
-
-                //
-                // State
-                //
-                lvitem.iSubItem++;
-                lvitem.pszText = PsListGetThreadStateAsString(
-                    threadEntry->ThreadInformation.State,
-                    threadEntry->ThreadInformation.WaitReason, szBuffer);
-
-                ListView_SetItem(PsDlgContext.ListView, &lvitem);
-
-                // Query thread specific information - object and win32 start address (need elevation).
-                startAddress = 0;
-                objectAddress = 0;
-
-                if (stlptr->hThread) {
-
-                    if (!supQueryThreadWin32StartAddress(
-                        stlptr->hThread,
-                        &startAddress))
-                    {
-                        ErrorCount += 1;
-                    }
-
-                    if (SortedHandleList) {
-
-                        if (!supHandlesQueryObjectAddress(
-                            SortedHandleList,
-                            stlptr->hThread,
-                            &objectAddress))
-                        {
-                            ErrorCount += 1;
-                        }
-
-                    }
-                    else {
-                        ErrorCount += 1;
-                    }
-
-                    NtClose(stlptr->hThread);
-                }
-
-                if (startAddress == 0)
-                    startAddress = (ULONG_PTR)threadEntry->ThreadInformation.StartAddress;
-
-                //
-                // ETHREAD
-                //
-                szBuffer[0] = TEXT('0');
-                szBuffer[1] = TEXT('x');
-                szBuffer[2] = 0;
-                u64tohex(objectAddress, &szBuffer[2]);
-
-                lvitem.iSubItem++;
-                lvitem.pszText = szBuffer;
-                ListView_SetItem(PsDlgContext.ListView, &lvitem);
-
-                //
-                // StartAddress (either Win32StartAddress if possible or StartAddress from NtQSI)
-                //
-                szBuffer[0] = TEXT('0');
-                szBuffer[1] = TEXT('x');
-                szBuffer[2] = 0;
-                u64tohex((ULONG_PTR)startAddress, &szBuffer[2]);
-
-                lvitem.iSubItem++;
-                lvitem.pszText = szBuffer;
-                ListView_SetItem(PsDlgContext.ListView, &lvitem);
-
-                //
-                // Module (for system threads)
-                //
-                szBuffer[0] = 0;
-                if (startAddress > g_kdctx.SystemRangeStart && pModules) {
-                    if (NULL == ntsupFindModuleNameByAddress(
-                        pModules,
-                        (PVOID)startAddress,
-                        szBuffer,
-                        MAX_PATH))
-                    {
-                        _strcpy(szBuffer, T_Unknown);
-                    }
-                }
-                lvitem.iSubItem++;
-                lvitem.pszText = szBuffer;
-                ListView_SetItem(PsDlgContext.ListView, &lvitem);
-            }
-
-            if (ErrorCount != 0) {
-                _strcpy(szBuffer, TEXT("Some queries for threads information are failed"));
-            }
-            else {
-                _strcpy(szBuffer, TEXT("All queries for threads information are succeeded"));
-            }
-
-            supStatusBarSetText(PsDlgContext.StatusBar, 2, (LPWSTR)&szBuffer);
-
-            ListView_SortItemsEx(
-                PsDlgContext.ListView,
-                PsListCompareFunc,
-                PsDlgContext.lvColumnToSort);
-
         }
-    }
-    __finally {
 
-        if (AbnormalTermination())
-            supReportAbnormalTermination(__FUNCTIONW__);
+        supHeapFree(ProcessList);
+        ProcessList = NULL;
 
-        if (pModules) supHeapFree(pModules);
-        if (stl) supHeapFree(stl);
-        if (SortedHandleList) supHeapFree(SortedHandleList);
+        SortedHandleList = supHandlesCreateFilteredAndSortedList(GetCurrentProcessId(), FALSE);
+        pThreadLookupEntry = threadLookupEntry;
 
-        if (ProcessList) supHeapFree(ProcessList);
+        for (i = 0; i < ThreadCount; i++, pThreadLookupEntry++) {
 
-        supSetWaitCursor(FALSE);
+            threadEntry = (PROP_UNNAMED_OBJECT_INFO*)pThreadLookupEntry->EntryPtr;
+            if (threadEntry == NULL)
+                continue;
 
-        ReleaseMutex(g_PsListWait);
-        supEnableRedraw(PsDlgContext.ListView);
-    }
+            //
+            // TID
+            //
+            szBuffer[0] = 0;
+            ultostr(HandleToULong(threadEntry->ClientId.UniqueThread), szBuffer);
 
+            RtlZeroMemory(&lvitem, sizeof(lvitem));
+            lvitem.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM;
+            lvitem.iItem = MAXINT;
+            lvitem.iImage = I_IMAGENONE;
+            lvitem.pszText = szBuffer;
+            lvitem.cchTextMax = MAX_PATH;
+            lvitem.lParam = (LPARAM)threadEntry;
+            ItemIndex = ListView_InsertItem(PsDlgContext.ListView, &lvitem);
+            if (ItemIndex == -1)
+                continue;
+
+            //
+            // Priority
+            //
+            szBuffer[0] = 0;
+            ultostr(threadEntry->ThreadInformation.Priority, szBuffer);
+
+            lvitem.mask = LVIF_TEXT;
+            lvitem.iSubItem++;
+            lvitem.pszText = szBuffer;
+            lvitem.iItem = ItemIndex;
+            ListView_SetItem(PsDlgContext.ListView, &lvitem);
+
+            //
+            // State
+            //
+            lvitem.iSubItem++;
+            lvitem.pszText = PsListGetThreadStateAsString(
+                threadEntry->ThreadInformation.State,
+                threadEntry->ThreadInformation.WaitReason,
+                szBuffer,
+                RTL_NUMBER_OF(szBuffer));
+
+            ListView_SetItem(PsDlgContext.ListView, &lvitem);
+
+            // Query thread specific information - object and win32 start address (need elevation).
+            startAddress = 0;
+            objectAddress = 0;
+
+            if (pThreadLookupEntry->hThread) {
+
+                if (!supQueryThreadWin32StartAddress(
+                    pThreadLookupEntry->hThread,
+                    &startAddress))
+                {
+                    ErrorCount += 1;
+                }
+
+                if (SortedHandleList) {
+
+                    if (!supHandlesQueryObjectAddress(
+                        SortedHandleList,
+                        pThreadLookupEntry->hThread,
+                        &objectAddress))
+                    {
+                        ErrorCount += 1;
+                    }
+
+                }
+                else {
+                    ErrorCount += 1;
+                }
+
+                NtClose(pThreadLookupEntry->hThread);
+                pThreadLookupEntry->hThread = NULL;
+            }
+
+            if (startAddress == 0)
+                startAddress = (ULONG_PTR)threadEntry->ThreadInformation.StartAddress;
+
+            //
+            // ETHREAD
+            //
+            szBuffer[0] = TEXT('0');
+            szBuffer[1] = TEXT('x');
+            szBuffer[2] = 0;
+            u64tohex(objectAddress, &szBuffer[2]);
+
+            lvitem.iSubItem++;
+            lvitem.pszText = szBuffer;
+            ListView_SetItem(PsDlgContext.ListView, &lvitem);
+
+            //
+            // StartAddress (either Win32StartAddress if possible or StartAddress from NtQSI)
+            //
+            szBuffer[0] = TEXT('0');
+            szBuffer[1] = TEXT('x');
+            szBuffer[2] = 0;
+            u64tohex((ULONG_PTR)startAddress, &szBuffer[2]);
+
+            lvitem.iSubItem++;
+            lvitem.pszText = szBuffer;
+            ListView_SetItem(PsDlgContext.ListView, &lvitem);
+
+            //
+            // Module (for system threads)
+            //
+            szBuffer[0] = 0;
+            if (startAddress > g_kdctx.SystemRangeStart && pModules) {
+                if (NULL == ntsupFindModuleNameByAddress(
+                    pModules,
+                    (PVOID)startAddress,
+                    szBuffer,
+                    MAX_PATH))
+                {
+                    _strcpy(szBuffer, T_Unknown);
+                }
+            }
+            lvitem.iSubItem++;
+            lvitem.pszText = szBuffer;
+            ListView_SetItem(PsDlgContext.ListView, &lvitem);
+        }
+
+        if (ErrorCount != 0) {
+            _strcpy(szBuffer, TEXT("Some queries for threads information are failed"));
+        }
+        else {
+            _strcpy(szBuffer, TEXT("All queries for threads information are succeeded"));
+        }
+
+        supStatusBarSetText(PsDlgContext.StatusBar, 2, (LPWSTR)&szBuffer);
+
+        ListView_SortItemsEx(
+            PsDlgContext.ListView,
+            PsListCompareFunc,
+            PsDlgContext.lvColumnToSort);
+
+    } while (FALSE);
+
+    if (pModules) supHeapFree(pModules);
+    if (threadLookupEntry) supHeapFree(threadLookupEntry);
+    if (SortedHandleList) supHeapFree(SortedHandleList);
+    if (ProcessList) supHeapFree(ProcessList);
+
+    supSetWaitCursor(FALSE);
+    supEnableRedraw(PsDlgContext.ListView);
+
+    PsListLockRelease();
+    PsListWorkerExit();
     return 0;
 }
 
@@ -1211,7 +1249,7 @@ DWORD WINAPI CreateProcessListProc(
 )
 {
     BOOL bRefresh = (BOOL)PtrToInt(Parameter);
-    DWORD ServiceEnumType, dwWaitResult;
+    DWORD ServiceEnumType;
     ULONG NextEntryDelta = 0, nProcesses = 0, nThreads = 0;
 
     HTREEITEM ViewRootHandle;
@@ -1238,151 +1276,148 @@ DWORD WINAPI CreateProcessListProc(
     ServicesList.Entries = NULL;
     ServicesList.NumberOfEntries = 0;
 
-    __try {
-        dwWaitResult = WaitForSingleObject(g_PsListWait, INFINITE);
-        if (dwWaitResult == WAIT_OBJECT_0) {
+    if (!PsListLockAcquire()) {
+        PsListWorkerExit();
+        return 0;
+    }
 
-            InterlockedExchange((PLONG)&g_IsRefresh, TRUE);
+    do {
+        InterlockedExchange((PLONG)&g_IsRefresh, TRUE);
 
-            InitializeListHead(&g_PsListHead);
+        InitializeListHead(&g_PsListHead);
 
-            supSetWaitCursor(TRUE);
+        supSetWaitCursor(TRUE);
 
-            TreeList_ClearTree(PsDlgContext.TreeList);
-            ListView_DeleteAllItems(PsDlgContext.ListView);
-            PsListPidMapInit(&PsListPidMap);
+        TreeList_ClearTree(PsDlgContext.TreeList);
+        ListView_DeleteAllItems(PsDlgContext.ListView);
+        PsListPidMapInit(&PsListPidMap);
 
-            if (bRefresh) {
-                supDestroyHeap(g_PsListHeap);
-                g_PsListHeap = supCreateHeap(HEAP_GROWABLE, TRUE);
-                if (g_PsListHeap == NULL) {
-                    lpErrorMsg = TEXT("Could not allocate heap for process enumeration!");
-                    supStatusBarSetText(PsDlgContext.StatusBar, 2, lpErrorMsg);
-                    __leave;
-                }
-            }
-
-            ServiceEnumType = SERVICE_WIN32 | SERVICE_INTERACTIVE_PROCESS;
-
-            if (g_NtBuildNumber >= NT_WIN10_THRESHOLD1) {
-                ServiceEnumType |= SERVICE_USER_SERVICE | SERVICE_USERSERVICE_INSTANCE;
-            }
-
-            if (!supCreateSCMSnapshot(ServiceEnumType, &ServicesList)) {
-                lpErrorMsg = TEXT("Error building services list!");
+        if (bRefresh) {
+            supDestroyHeap(g_PsListHeap);
+            g_PsListHeap = supCreateHeap(HEAP_GROWABLE, TRUE);
+            if (g_PsListHeap == NULL) {
+                lpErrorMsg = TEXT("Could not allocate heap for process enumeration!");
                 supStatusBarSetText(PsDlgContext.StatusBar, 2, lpErrorMsg);
-                __leave;
+                break;
             }
-
-            RtlQuickSort(ServicesList.Entries,
-                ServicesList.NumberOfEntries,
-                sizeof(ENUM_SERVICE_STATUS_PROCESS),
-                PsxSCMLookupCallback);
-
-            InfoBuffer = supGetSystemInfo(SystemProcessInformation, NULL);
-            if (InfoBuffer == NULL) {
-                lpErrorMsg = TEXT("Error query process list!");
-                supStatusBarSetText(PsDlgContext.StatusBar, 2, lpErrorMsg);
-                __leave;
-            }
-
-            if (!supPHLCreate(&g_PsListHead,
-                (PBYTE)InfoBuffer,
-                &nProcesses,
-                &nThreads))
-            {
-                lpErrorMsg = TEXT("Error building handle list!");
-                supStatusBarSetText(PsDlgContext.StatusBar, 2, lpErrorMsg);
-                __leave;
-            }
-
-            //
-            // Show processes/threads count
-            //
-            _strcpy(szBuffer, TEXT("Processes: "));
-            ultostr(nProcesses, _strend(szBuffer));
-            supStatusBarSetText(PsDlgContext.StatusBar, 0, (LPWSTR)&szBuffer);
-
-            _strcpy(szBuffer, TEXT("Threads: "));
-            ultostr(nThreads, _strend(szBuffer));
-            supStatusBarSetText(PsDlgContext.StatusBar, 1, (LPWSTR)&szBuffer);
-
-            SortedHandleList = supHandlesCreateFilteredAndSortedList(GetCurrentProcessId(), FALSE);
-
-            OurSid = supQueryProcessSid(NtCurrentProcess());
-
-            lsaPolicyHandle = NULL;
-            supLsaOpenMachinePolicy(POLICY_LOOKUP_NAMES, &lsaPolicyHandle);
-
-            NextEntryDelta = 0;
-            ViewRootHandle = NULL;
-            List.ListRef = (PBYTE)InfoBuffer;
-
-            do {
-                List.ListRef += NextEntryDelta;
-                NextEntryDelta = List.ProcessEntry->NextEntryDelta;
-
-                if (List.ProcessEntry->UniqueProcessId == 0)
-                    continue;
-
-                ViewRootHandle = FindParentItem(List.ProcessEntry->InheritedFromUniqueProcessId);
-
-                ObjectAddress = 0;
-                ProcessHandle = supPHLGetEntry(&g_PsListHead, List.ProcessEntry->UniqueProcessId);
-
-                if (SortedHandleList && ProcessHandle) {
-                    supHandlesQueryObjectAddress(SortedHandleList,
-                        ProcessHandle,
-                        &ObjectAddress);
-                }
-
-                if (ViewRootHandle == NULL) {
-                    ViewRootHandle = AddProcessEntryTreeList(NULL,
-                        ProcessHandle,
-                        (PVOID)List.ProcessEntry,
-                        ObjectAddress,
-                        &ServicesList,
-                        OurSid,
-                        lsaPolicyHandle);
-                }
-                else {
-                    AddProcessEntryTreeList(ViewRootHandle,
-                        ProcessHandle,
-                        (PVOID)List.ProcessEntry,
-                        ObjectAddress,
-                        &ServicesList,
-                        OurSid,
-                        lsaPolicyHandle);
-                }
-
-                if (ProcessHandle) {
-                    NtClose(ProcessHandle);
-                }
-
-            } while (NextEntryDelta);
-
-            if (lsaPolicyHandle) LsaClose(lsaPolicyHandle);
-
         }
-    }
-    __finally {
 
-        if (AbnormalTermination())
-            supReportAbnormalTermination(__FUNCTIONW__);
+        ServiceEnumType = SERVICE_WIN32 | SERVICE_INTERACTIVE_PROCESS;
 
-        if (OurSid) supHeapFree(OurSid);
-        if (InfoBuffer) supHeapFree(InfoBuffer);
-        if (SortedHandleList) supHeapFree(SortedHandleList);
-        supPHLFree(&g_PsListHead, FALSE);
-        supFreeSCMSnapshot(&ServicesList);
+        if (g_NtBuildNumber >= NT_WIN10_THRESHOLD1) {
+            ServiceEnumType |= SERVICE_USER_SERVICE | SERVICE_USERSERVICE_INSTANCE;
+        }
 
-        PsListPidMapFree(&PsListPidMap);
+        if (!supCreateSCMSnapshot(ServiceEnumType, &ServicesList)) {
+            lpErrorMsg = TEXT("Error building services list!");
+            supStatusBarSetText(PsDlgContext.StatusBar, 2, lpErrorMsg);
+            break;
+        }
 
-        supSetWaitCursor(FALSE);
+        RtlQuickSort(ServicesList.Entries,
+            ServicesList.NumberOfEntries,
+            sizeof(ENUM_SERVICE_STATUS_PROCESS),
+            PsxSCMLookupCallback);
 
-        InterlockedExchange((PLONG)&g_IsRefresh, FALSE);
-        ReleaseMutex(g_PsListWait);
-    }
+        InfoBuffer = supGetSystemInfo(SystemProcessInformation, NULL);
+        if (InfoBuffer == NULL) {
+            lpErrorMsg = TEXT("Error query process list!");
+            supStatusBarSetText(PsDlgContext.StatusBar, 2, lpErrorMsg);
+            break;
+        }
+
+        if (!supPHLCreate(&g_PsListHead,
+            (PBYTE)InfoBuffer,
+            &nProcesses,
+            &nThreads))
+        {
+            lpErrorMsg = TEXT("Error building handle list!");
+            supStatusBarSetText(PsDlgContext.StatusBar, 2, lpErrorMsg);
+            break;
+        }
+
+        //
+        // Show processes/threads count
+        //
+        _strcpy(szBuffer, TEXT("Processes: "));
+        ultostr(nProcesses, _strend(szBuffer));
+        supStatusBarSetText(PsDlgContext.StatusBar, 0, (LPWSTR)&szBuffer);
+
+        _strcpy(szBuffer, TEXT("Threads: "));
+        ultostr(nThreads, _strend(szBuffer));
+        supStatusBarSetText(PsDlgContext.StatusBar, 1, (LPWSTR)&szBuffer);
+
+        SortedHandleList = supHandlesCreateFilteredAndSortedList(GetCurrentProcessId(), FALSE);
+
+        OurSid = supQueryProcessSid(NtCurrentProcess());
+
+        lsaPolicyHandle = NULL;
+        supLsaOpenMachinePolicy(POLICY_LOOKUP_NAMES, &lsaPolicyHandle);
+
+        NextEntryDelta = 0;
+        ViewRootHandle = NULL;
+        List.ListRef = (PBYTE)InfoBuffer;
+
+        do {
+            List.ListRef += NextEntryDelta;
+            NextEntryDelta = List.ProcessEntry->NextEntryDelta;
+
+            if (List.ProcessEntry->UniqueProcessId == 0)
+                continue;
+
+            ViewRootHandle = FindParentItem(List.ProcessEntry->InheritedFromUniqueProcessId);
+
+            ObjectAddress = 0;
+            ProcessHandle = supPHLGetEntry(&g_PsListHead, List.ProcessEntry->UniqueProcessId);
+
+            if (SortedHandleList && ProcessHandle) {
+                supHandlesQueryObjectAddress(SortedHandleList,
+                    ProcessHandle,
+                    &ObjectAddress);
+            }
+
+            if (ViewRootHandle == NULL) {
+                ViewRootHandle = AddProcessEntryTreeList(NULL,
+                    ProcessHandle,
+                    (PVOID)List.ProcessEntry,
+                    ObjectAddress,
+                    &ServicesList,
+                    OurSid,
+                    lsaPolicyHandle);
+            }
+            else {
+                AddProcessEntryTreeList(ViewRootHandle,
+                    ProcessHandle,
+                    (PVOID)List.ProcessEntry,
+                    ObjectAddress,
+                    &ServicesList,
+                    OurSid,
+                    lsaPolicyHandle);
+            }
+
+            if (ProcessHandle) {
+                NtClose(ProcessHandle);
+            }
+
+        } while (NextEntryDelta);
+
+    } while (FALSE);
+
+    if (lsaPolicyHandle) LsaClose(lsaPolicyHandle);
+    if (OurSid) supHeapFree(OurSid);
+    if (InfoBuffer) supHeapFree(InfoBuffer);
+    if (SortedHandleList) supHeapFree(SortedHandleList);
+    supPHLFree(&g_PsListHead, FALSE);
+    supFreeSCMSnapshot(&ServicesList);
+
+    PsListPidMapFree(&PsListPidMap);
+
+    supSetWaitCursor(FALSE);
+
+    InterlockedExchange((PLONG)&g_IsRefresh, FALSE);
+
+    PsListLockRelease();
+    PsListWorkerExit();
     return 0;
 }
 
@@ -1403,7 +1438,7 @@ VOID CreateObjectList(
     LPTHREAD_START_ROUTINE lpThreadRoutine;
 
     if (InterlockedCompareExchange((PLONG)&g_IsDialogQuit,
-        TRUE, TRUE) == TRUE) 
+        TRUE, TRUE) == TRUE)
     {
         return;
     }
@@ -1413,9 +1448,14 @@ VOID CreateObjectList(
     else
         lpThreadRoutine = (LPTHREAD_START_ROUTINE)CreateProcessListProc;
 
+    PsListWorkerEnter();
+
     hThread = supCreateThread(lpThreadRoutine, ThreadParam, 0);
     if (hThread) {
         CloseHandle(hThread);
+    }
+    else {
+        PsListWorkerExit();
     }
 }
 
@@ -1746,23 +1786,12 @@ INT_PTR CALLBACK PsListDialogProc(
     case WM_CLOSE:
 
         InterlockedExchange((PLONG)&g_IsDialogQuit, TRUE);
-
-        if (g_PsListWait) {
-            CloseHandle(g_PsListWait);
-            g_PsListWait = NULL;
-        }
-
         hMenu = GetMenu(hwndDlg);
-        if (hMenu) 
+        if (hMenu)
             DestroyMenu(hMenu);
 
         DestroyWindow(PsDlgContext.TreeList);
         DestroyWindow(hwndDlg);
-
-        if (g_PsListHeap) {
-            supDestroyHeap(g_PsListHeap);
-            g_PsListHeap = NULL;
-        }
         return TRUE;
 
     case WM_DESTROY:
@@ -1856,7 +1885,7 @@ DWORD extrasPsListDialogWorkerThread(
     RegisterClassEx(&wincls);
 
     RtlSecureZeroMemory(&PsDlgContext, sizeof(PsDlgContext));
-    
+
     hwndDlg = CreateDialogParam(
         g_WinObj.hInstance,
         MAKEINTRESOURCE(IDD_DIALOG_PSLIST),
@@ -1930,14 +1959,19 @@ DWORD extrasPsListDialogWorkerThread(
         g_IsDialogQuit = FALSE;
         g_IsRefresh = FALSE;
 
+        //
+        // Create sync mutexes and list heap.
+        //
         g_PsListWait = CreateMutex(NULL, FALSE, NULL);
         if (g_PsListWait) {
-            g_PsListHeap = supCreateHeap(HEAP_GROWABLE, TRUE);
-            if (g_PsListHeap) {
-                CreateObjectList(FALSE, NULL);
+            g_PsListWorkersDoneEvent = CreateEvent(NULL, TRUE, TRUE, NULL);
+            if (g_PsListWorkersDoneEvent) {
+                g_PsListHeap = supCreateHeap(HEAP_GROWABLE, TRUE);
+                if (g_PsListHeap) {
+                    CreateObjectList(FALSE, NULL);
+                }
             }
         }
-
     }
 
     supSetFastEvent(&PsListDlgInitializedEvent);
@@ -1970,6 +2004,22 @@ DWORD extrasPsListDialogWorkerThread(
     if (acceleratorTable)
         DestroyAcceleratorTable(acceleratorTable);
 
+    if (g_PsListWorkersDoneEvent) {
+        WaitForSingleObject(g_PsListWorkersDoneEvent, INFINITE);
+        CloseHandle(g_PsListWorkersDoneEvent);
+        g_PsListWorkersDoneEvent = NULL;
+    }
+
+    if (g_PsListWait) {
+        CloseHandle(g_PsListWait);
+        g_PsListWait = NULL;
+    }
+
+    if (g_PsListHeap) {
+        supDestroyHeap(g_PsListHeap);
+        g_PsListHeap = NULL;
+    }
+
     supResetFastEvent(&PsListDlgInitializedEvent);
     supCloseHandleAtomic(&PsListDlgThreadHandle);
 
@@ -1992,5 +2042,8 @@ VOID extrasCreatePsListDialog(
         PsListDlgThreadHandle = supCreateDialogWorkerThread(extrasPsListDialogWorkerThread, NULL, 0);
         if (PsListDlgThreadHandle)
             supWaitForFastEvent(&PsListDlgInitializedEvent, NULL);
+    }
+    else {
+        supRestoreDialogWindow(PsDlgContext.hwndDlg);
     }
 }

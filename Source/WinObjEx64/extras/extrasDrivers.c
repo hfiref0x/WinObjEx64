@@ -61,8 +61,6 @@ static LIST_ENTRY g_DrvFilterListHead;
 static ULONG g_cDrvShimmed = 0;
 static ULONG g_cDrvFilters = 0;
 
-WNDPROC g_OriginalListViewProc = NULL;
-
 LPCWSTR CryptAlgoIdRef[] = {
     BCRYPT_MD5_ALGORITHM,
     BCRYPT_SHA1_ALGORITHM,
@@ -548,6 +546,13 @@ INT_PTR CALLBACK DrvDumpProgressDialogProc(
         }
         break;
 
+    case WM_CLOSE:
+        dumpInfo = (OBEX_DRVDUMP*)RemoveProp(hwndDlg, DUMP_PROP);
+        KillTimer(hwndDlg, 1);
+        DumpWorkerWindow = NULL;
+        DestroyWindow(hwndDlg);
+        return TRUE;
+
     case WM_DESTROY:
         PostQuitMessage(0);
         break;
@@ -557,9 +562,8 @@ INT_PTR CALLBACK DrvDumpProgressDialogProc(
         switch (GET_WM_COMMAND_ID(wParam, lParam)) {
         case IDCANCEL:
             DumpTerminateWorker(hwndDlg);
-            RemoveProp(hwndDlg, DUMP_PROP);
-            KillTimer(hwndDlg, 1);
-            return DestroyWindow(hwndDlg);
+            SendMessage(hwndDlg, WM_CLOSE, 0, 0);
+            return TRUE;
         }
     }
     return 0;
@@ -961,6 +965,7 @@ VOID DrvListUnloadedDrivers(
     {
         _strcpy(szBuffer, TEXT("Could not resolve MmUnloadedDrivers"));
         supStatusBarSetText(Context->StatusBar, 0, (LPWSTR)&szBuffer);
+        supEnableRedraw(hwndList);
         return;
     }
 
@@ -1283,7 +1288,9 @@ VOID DrvDlgHandleWMCommand(
         break;
 
     case ID_DRVLIST_VIEW_WDX:
-        extrasViewWithWinDepends(pDlgContext, COLUMN_DRVLIST_MODULE_NAME);
+        if (pDlgContext) {
+            extrasViewWithWinDepends(pDlgContext, COLUMN_DRVLIST_MODULE_NAME);
+        }
         break;
 
     case ID_DRVLIST_PROP:
@@ -1296,14 +1303,10 @@ VOID DrvDlgHandleWMCommand(
         if (pDlgContext) {
 
             if (pDlgContext->DialogMode == DrvModeNormal) {
-
                 DrvListDrivers(pDlgContext, TRUE);
-
             }
             else {
-
                 DrvListUnloadedDrivers(pDlgContext, TRUE);
-
             }
         }
         break;
@@ -1487,15 +1490,14 @@ LRESULT CALLBACK DrvListViewHookProc(
     _In_ LPARAM lParam
 )
 {
+    BOOL bCheckPass = FALSE;
+    INT currentItem;
     HWND hwndTT;
+    EXTRASCONTEXT* Context = &DrvDlgContext[DrvModeNormal];
     LVHITTESTINFO ht;
     TOOLINFO toolInfo;
-    BOOL bCheckPass = FALSE;
-    static int oldX = -1, oldY = -1;
-    static int lastItem = -1;
-    INT currentItem;
 
-    hwndTT = (HWND)DrvDlgContext[DrvModeNormal].TooltipInfo;
+    hwndTT = (HWND)Context->TooltipInfo;
 
     switch (uMsg) {
 
@@ -1515,8 +1517,9 @@ LRESULT CALLBACK DrvListViewHookProc(
         // If tooltip window is not available, skip tooltip actions.
         //
         if (hwndTT == NULL || !IsWindow(hwndTT)) {
-            lastItem = -1;
-            oldX = oldY = -1;
+            Context->TooltipLastItem = -1;
+            Context->TooltipOldX = -1;
+            Context->TooltipOldY = -1;
             break;
         }
 
@@ -1525,7 +1528,7 @@ LRESULT CALLBACK DrvListViewHookProc(
         //
         if (!bCheckPass || !(ht.flags & LVHT_ONITEM)) {
 
-            if (lastItem != -1) {
+            if (Context->TooltipLastItem != -1) {
                 RtlSecureZeroMemory(&toolInfo, sizeof(toolInfo));
                 toolInfo.cbSize = sizeof(toolInfo);
                 toolInfo.hwnd = DrvDlgContext[DrvModeNormal].hwndDlg;
@@ -1534,8 +1537,9 @@ LRESULT CALLBACK DrvListViewHookProc(
                 SendMessage(hwndTT, TTM_TRACKACTIVATE, FALSE, (LPARAM)&toolInfo);
             }
 
-            lastItem = -1;
-            oldX = oldY = -1;
+            Context->TooltipLastItem = -1;
+            Context->TooltipOldX = -1;
+            Context->TooltipOldY = -1;
             break;
         }
 
@@ -1544,9 +1548,12 @@ LRESULT CALLBACK DrvListViewHookProc(
         // Only update tooltip when the hovered item changed or cursor moved sufficiently.
         //
         currentItem = ht.iItem;
-        if ((currentItem != lastItem) || (ht.pt.x != oldX) || (ht.pt.y != oldY)) {
-            oldX = ht.pt.x;
-            oldY = ht.pt.y;
+        if ((currentItem != Context->TooltipLastItem) ||
+            (ht.pt.x != Context->TooltipOldX) ||
+            (ht.pt.y != Context->TooltipOldY))
+        {
+            Context->TooltipOldX = ht.pt.x;
+            Context->TooltipOldY = ht.pt.y;
 
             DrvListSetTooltip(&DrvDlgContext[DrvModeNormal], hwnd, currentItem);
 
@@ -1563,13 +1570,13 @@ LRESULT CALLBACK DrvListViewHookProc(
             SendMessage(hwndTT, TTM_TRACKPOSITION, 0, (LPARAM)MAKELONG(ht.pt.x, ht.pt.y));
             SendMessage(hwndTT, TTM_UPDATE, 0, 0);
 
-            lastItem = currentItem;
+            Context->TooltipLastItem = currentItem;
         }
 
         break;
     }
 
-    return CallWindowProc(g_OriginalListViewProc, hwnd, uMsg, wParam, lParam);
+    return CallWindowProc(DrvDlgContext[DrvModeNormal].OriginalListViewProc, hwnd, uMsg, wParam, lParam);
 }
 
 /*
@@ -1614,6 +1621,10 @@ VOID DrvDlgOnInit(
     pDlgContext->hwndDlg = hwndDlg;
     pDlgContext->lvColumnHit = -1;
     pDlgContext->lvItemHit = -1;
+    pDlgContext->TooltipOldX = -1;
+    pDlgContext->TooltipOldY = -1;
+    pDlgContext->TooltipLastItem = -1;
+    pDlgContext->OriginalListViewProc = NULL;
 
     switch (pDlgContext->DialogMode) {
     case DrvModeUnloaded:
@@ -1655,7 +1666,7 @@ VOID DrvDlgOnInit(
 
             pDlgContext->TooltipInfo = (PVOID)supCreateTrackingToolTip(ID_EXTRASLIST, hwndDlg);
             if (pDlgContext->TooltipInfo) {
-                g_OriginalListViewProc = (WNDPROC)SetWindowLongPtr(pDlgContext->ListView,
+                pDlgContext->OriginalListViewProc = (WNDPROC)SetWindowLongPtr(pDlgContext->ListView,
                     GWLP_WNDPROC,
                     (LONG_PTR)&DrvListViewHookProc);
 
@@ -1793,23 +1804,37 @@ INT_PTR CALLBACK DrvDlgProc(
             if (pDlgContext->TooltipInfo)
                 DestroyWindow((HWND)pDlgContext->TooltipInfo);
 
+            if (pDlgContext->DialogMode == DrvModeNormal &&
+                pDlgContext->ListView &&
+                pDlgContext->OriginalListViewProc)
+            {
+                SetWindowLongPtr(pDlgContext->ListView,
+                    GWLP_WNDPROC,
+                    (LONG_PTR)pDlgContext->OriginalListViewProc);
+                pDlgContext->OriginalListViewProc = NULL;
+            }
+
             DrvTooltipFreeBuffer(pDlgContext);
 
             extrasRemoveDlgIcon(pDlgContext);
 
             if (pDlgContext->DialogMode == DrvModeNormal) {
+                pDlgContext->TooltipOldX = -1;
+                pDlgContext->TooltipOldY = -1;
+                pDlgContext->TooltipLastItem = -1;
                 kdDestroyShimmedDriversList(&g_kdctx.Data->KseEngineDump);
                 supFilterDestroyList(&g_DrvFilterListHead);
                 g_cDrvFilters = 0;
             }
 
         }
+
         if (DumpWorkerWindow) {
-            SendMessage(DumpWorkerWindow, WM_CLOSE, 0, 0);
-            DumpWorkerWindow = NULL;
+            PostMessage(DumpWorkerWindow, WM_CLOSE, 0, 0);
         }
+
         DestroyWindow(hwndDlg);
-        break;
+        return TRUE;
 
     case WM_COMMAND:
 

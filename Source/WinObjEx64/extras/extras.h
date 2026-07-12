@@ -4,9 +4,9 @@
 *
 *  TITLE:       EXTRAS.H
 *
-*  VERSION:     2.10
+*  VERSION:     2.11
 *
-*  DATE:        07 Mar 2026
+*  DATE:        12 Jul 2026
 *
 *  Common header file for Extras dialogs.
 *
@@ -31,13 +31,22 @@ typedef struct _EXTRASCONTEXT {
     INT lvColumnHit;
     INT lvItemHit;
     INT tlSubItemHit;
+    INT TooltipOldX;
+    INT TooltipOldY;
+    INT TooltipLastItem;
     BOOL bInverseSort;
     union {
         ULONG_PTR Reserved;
+        ULONG_PTR Flags;
+        ULONG_PTR SLDataCache;
         ULONG_PTR DialogMode;
     };
     HICON ObjectIcon;
     HICON DialogIcon;
+    union {
+        WNDPROC OriginalWndProc;
+        WNDPROC OriginalListViewProc;
+    };
 } EXTRASCONTEXT, *PEXTRASCONTEXT;
 
 typedef struct _EXTRASCALLBACK {

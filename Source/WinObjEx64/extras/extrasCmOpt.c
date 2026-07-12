@@ -161,7 +161,7 @@ VOID CmOptDlgHandlePopupMenu(
             InsertMenu(hMenu, ++uPos, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
         }
 
-        bIoDriverLoaded = (Context->Reserved != 0);
+        bIoDriverLoaded = (Context->Flags != 0);
         if (bIoDriverLoaded) {
             InsertMenu(hMenu, ++uPos, MF_BYCOMMAND, ID_CMOPTLIST_DUMP, T_DUMP_VALUE);
         }
@@ -523,7 +523,7 @@ VOID CmOptDlgListOptions(
     supDisableRedraw(hwndList);
 
     while (CmControlVector.Version.v1->KeyPath != NULL) {
-        CmpOptDlgAddEntry(hwndList, CmControlVector.Ref, size, (Context->Reserved != 0));
+        CmpOptDlgAddEntry(hwndList, CmControlVector.Ref, size, (Context->Flags != 0));
         CmControlVector.Ref += size;
     }
 
@@ -593,7 +593,7 @@ VOID CmOptDlgOnInit(
     CmOptDlgContext.lvColumnCount = iColumn;
 
     bIoDriverLoaded = kdIoDriverLoaded();
-    CmOptDlgContext.Reserved = bIoDriverLoaded;
+    CmOptDlgContext.Flags = bIoDriverLoaded;
 
     if (bIoDriverLoaded) {
         supAddListViewColumn(CmOptDlgContext.ListView,

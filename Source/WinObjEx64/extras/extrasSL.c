@@ -481,16 +481,16 @@ PVOID xxxSLCacheUpdateData(
     _In_ EXTRASCONTEXT* Context
 )
 {
-    PVOID SLCacheData = (PVOID)Context->Reserved;
-    if (SLCacheData) {
-        supHeapFree(SLCacheData);
-        Context->Reserved = 0;
+    PVOID SLDataCache = (PVOID)Context->SLDataCache;
+    if (SLDataCache) {
+        supHeapFree(SLDataCache);
+        Context->SLDataCache = 0;
     }
-    SLCacheData = (PVOID)supSLCacheRead();
-    if (SLCacheData)
-        Context->Reserved = (ULONG_PTR)SLCacheData;
+    SLDataCache = (PVOID)supSLCacheRead();
+    if (SLDataCache)
+        Context->SLDataCache = (ULONG_PTR)SLDataCache;
 
-    return SLCacheData;
+    return SLDataCache;
 }
 
 /*
@@ -506,16 +506,16 @@ VOID SLCacheListItems(
     _In_opt_ LPCWSTR FilterByName
 )
 {
-    PVOID SLCacheData = (PVOID)Context->Reserved;
+    PVOID SLDataCache = (PVOID)Context->SLDataCache;
     WCHAR szBuffer[100];
 
     SL_ENUM_CONTEXT enumContext;
 
-    if (SLCacheData == NULL) {
-        SLCacheData = xxxSLCacheUpdateData(Context);
+    if (SLDataCache == NULL) {
+        SLDataCache = xxxSLCacheUpdateData(Context);
     }
 
-    if (SLCacheData == NULL) {
+    if (SLDataCache == NULL) {
         MessageBox(Context->hwndDlg, T_SLCACHE_READ_FAIL, NULL, MB_ICONERROR);
         return;
     }
@@ -525,7 +525,7 @@ VOID SLCacheListItems(
     enumContext.lpFilterByName = FilterByName;
     enumContext.DialogContext = Context;
 
-    supSLCacheEnumerate(SLCacheData,
+    supSLCacheEnumerate(SLDataCache,
         (PENUMERATE_SL_CACHE_VALUE_DESCRIPTORS_CALLBACK)SLCacheEnumerateCallback,
         &enumContext);
 
@@ -552,7 +552,7 @@ VOID SLCacheDialogOnInit(
 )
 {
     INT iImage = ImageList_GetImageCount(g_ListViewImages) - 1;
-    PVOID SLCacheData;
+    PVOID SLDataCache;
     EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)lParam;
     LVCOLUMNS_DATA columnData[] =
     {
@@ -572,8 +572,8 @@ VOID SLCacheDialogOnInit(
     //
     // Read and enumerate cache.
     //
-    SLCacheData = supSLCacheRead();
-    if (SLCacheData) {
+    SLDataCache = supSLCacheRead();
+    if (SLDataCache) {
 
         //
         // Initialize main listview.
@@ -606,7 +606,7 @@ VOID SLCacheDialogOnInit(
             // Remember image index.
             //
             g_SLCacheImageIndex = g_TypeToken.ImageIndex;
-            pDlgContext->Reserved = (ULONG_PTR)SLCacheData;
+            pDlgContext->SLDataCache = (ULONG_PTR)SLDataCache;
             SLCacheListItems(pDlgContext, NULL);
 
         }
@@ -666,9 +666,9 @@ INT_PTR CALLBACK SLCacheDialogProc(
             //
             // Free SL cache data
             //
-            if (pDlgContext->Reserved) {
-                supHeapFree((PVOID)pDlgContext->Reserved);
-                pDlgContext->Reserved = 0;
+            if (pDlgContext->SLDataCache) {
+                supHeapFree((PVOID)pDlgContext->SLDataCache);
+                pDlgContext->SLDataCache = 0;
             }
 
             supHeapFree(pDlgContext);

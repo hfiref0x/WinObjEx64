@@ -922,7 +922,7 @@ INT_PTR CALLBACK IpcDlgProc(
             ImageList_Destroy(pDlgContext->ImageList);
         }
         DestroyWindow(hwndDlg);
-        break;
+        return TRUE;
 
     case WM_COMMAND:
 

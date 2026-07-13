@@ -1289,7 +1289,7 @@ VOID DrvDlgHandleWMCommand(
 
     case ID_DRVLIST_VIEW_WDX:
         if (pDlgContext) {
-            extrasViewWithWinDepends(pDlgContext, COLUMN_DRVLIST_MODULE_NAME);
+            supViewWithWinDepends(pDlgContext->hwndDlg, pDlgContext->ListView, COLUMN_DRVLIST_MODULE_NAME, TRUE);
         }
         break;
 

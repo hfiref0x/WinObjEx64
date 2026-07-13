@@ -99,10 +99,6 @@ VOID extrasShowDialogById(
 VOID extrasHandleSettingsChange(
     _In_ EXTRASCONTEXT* Context);
 
-VOID extrasViewWithWinDepends(
-    _In_ EXTRASCONTEXT* Context,
-    _In_ INT nItem);
-
 //
 // Dialog handlers.
 //

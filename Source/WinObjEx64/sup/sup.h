@@ -1324,3 +1324,9 @@ BOOL supOpenImageInWinDepends(
 
 VOID supRestoreDialogWindow(
     _In_ HWND hwndDlg);
+
+VOID supViewWithWinDepends(
+    _In_ HWND hwndDlg,
+    _In_ HWND hwndList,
+    _In_ INT nItem,
+    _In_ BOOL bListView);

@@ -216,10 +216,14 @@ VOID PsListPidMapFree(
     _In_ PPIDMAP map
 )
 {
-    for (size_t i = 0; i < PSLIST_PIDMAP_HASH_SIZE; ++i) {
-        PPIDMAP_ENTRY entry = map->buckets[i];
+    size_t i;
+    PPIDMAP_ENTRY entry;
+    PPIDMAP_ENTRY tmp;
+
+    for (i = 0; i < PSLIST_PIDMAP_HASH_SIZE; ++i) {
+        entry = map->buckets[i];
         while (entry) {
-            PPIDMAP_ENTRY tmp = entry;
+            tmp = entry;
             entry = entry->next;
             supHeapFree(tmp);
         }
@@ -241,13 +245,34 @@ BOOL PsListPidMapInsert(
     _In_ HTREEITEM hItem
 )
 {
-    size_t idx = pidmap_hash(pid);
-    PPIDMAP_ENTRY entry = (PPIDMAP_ENTRY)supHeapAlloc(sizeof(PIDMAP_ENTRY));
-    if (!entry) return FALSE;
+    size_t idx;
+    PPIDMAP_ENTRY entry, scan;
+
+    if (map == NULL)
+        return FALSE;
+
+    idx = pidmap_hash(pid);
+    if (idx >= PSLIST_PIDMAP_HASH_SIZE) //redurant for pvs
+        return FALSE;
+
+    scan = map->buckets[idx];
+    while (scan) {
+        if (scan->pid == pid) {
+            scan->hItem = hItem;
+            return TRUE;
+        }
+        scan = scan->next;
+    }
+
+    entry = (PPIDMAP_ENTRY)supHeapAlloc(sizeof(PIDMAP_ENTRY));
+    if (entry == NULL)
+        return FALSE;
+
     entry->pid = pid;
     entry->hItem = hItem;
     entry->next = map->buckets[idx];
     map->buckets[idx] = entry;
+
     return TRUE;
 }
 
@@ -265,6 +290,9 @@ HTREEITEM PsListPidMapFind(
 )
 {
     size_t idx = pidmap_hash(pid);
+    if (idx >= PSLIST_PIDMAP_HASH_SIZE)
+        return FALSE;
+
     PPIDMAP_ENTRY entry = map->buckets[idx];
     while (entry) {
         if (entry->pid == pid)
@@ -897,9 +925,11 @@ HTREEITEM AddProcessEntryTreeList(
     if (lpProcessName)
         supHeapFree(lpProcessName);
 
-    if (!PsListPidMapInsert(&PsListPidMap, HandleToULong(uniqueProcessId), hTreeItem)) {
-        supStatusBarSetText(PsDlgContext.StatusBar, 2,
-            TEXT("Warning: failed to cache process tree entry"));
+    if (hTreeItem) {
+        if (!PsListPidMapInsert(&PsListPidMap, HandleToULong(uniqueProcessId), hTreeItem)) {
+            supStatusBarSetText(PsDlgContext.StatusBar, 2,
+                TEXT("Warning: failed to cache process tree entry"));
+        }
     }
 
     return hTreeItem;
@@ -953,7 +983,7 @@ LPWSTR PsListGetThreadStateAsString(
 
         switch (ThreadState) {
         case StateInitialized:
-            lpState = TEXT("Initiailized");
+            lpState = TEXT("Initialized");
             break;
         case StateReady:
             lpState = TEXT("Ready");
@@ -1002,13 +1032,13 @@ FORCEINLINE VOID PsListLockRelease(VOID)
 *
 */
 DWORD WINAPI CreateThreadListProc(
-    _In_ PROP_UNNAMED_OBJECT_INFO * ObjectEntry
+    _In_ PVOID Parameter
 )
 {
     INT ItemIndex;
     ULONG i, ThreadCount, ErrorCount = 0;
     ULONG_PTR startAddress = 0, objectAddress = 0;
-    HANDLE UniqueProcessId;
+    HANDLE UniqueProcessId = (HANDLE)Parameter;
     PVOID ProcessList = NULL;
     PSYSTEM_PROCESS_INFORMATION Process;
     PSYSTEM_THREAD_INFORMATION Thread;
@@ -1031,8 +1061,6 @@ DWORD WINAPI CreateThreadListProc(
 
     do {
         ListView_DeleteAllItems(PsDlgContext.ListView);
-
-        UniqueProcessId = ObjectEntry->ClientId.UniqueProcess;
 
         //
         // Refresh thread list.
@@ -1585,7 +1613,7 @@ INT_PTR PsListHandleNotify(
         case TVN_SELCHANGED:
             ObjectEntry = PsListGetObjectEntry(TRUE, NULL);
             if (ObjectEntry) {
-                CreateObjectList(TRUE, ObjectEntry);
+                CreateObjectList(TRUE, (PVOID)ObjectEntry->ClientId.UniqueProcess);
             }
             return 1;
 
@@ -1612,7 +1640,7 @@ VOID PsListHandleThreadRefresh(
 
     ObjectEntry = PsListGetObjectEntry(TRUE, NULL);
     if (ObjectEntry) {
-        CreateObjectList(TRUE, ObjectEntry);
+        CreateObjectList(TRUE, (PVOID)ObjectEntry->ClientId.UniqueProcess);
     }
 }
 
@@ -1656,17 +1684,18 @@ INT_PTR CALLBACK PsListDialogProc(
         }
 
         if ((HWND)wParam == PsDlgContext.ListView) {
-
             mark = ListView_GetSelectionMark(PsDlgContext.ListView);
-
             if (lParam == MAKELPARAM(-1, -1)) {
+                if (mark < 0)
+                    break;
+
                 ListView_GetItemRect(PsDlgContext.ListView, mark, &crc, TRUE);
                 crc.top = crc.bottom;
                 ClientToScreen(PsDlgContext.ListView, (LPPOINT)&crc);
             }
-            else
+            else {
                 GetCursorPos((LPPOINT)&crc);
-
+            }
             PsListHandlePopupMenu(hwndDlg, (LPPOINT)&crc, 0, FALSE);
         }
 

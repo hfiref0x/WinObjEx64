@@ -11273,3 +11273,72 @@ VOID supRestoreDialogWindow(
         SetForegroundWindow(hwndDlg);
     }
 }
+
+/*
+* supViewWithWinDepends
+*
+* Purpose:
+*
+* Open image selected in ListView/TreeList with WinDepends.
+*
+*/
+VOID supViewWithWinDepends(
+    _In_ HWND hwndDlg,
+    _In_ HWND hwndList,
+    _In_ INT nItem,
+    _In_ BOOL bListView
+)
+{
+    LPWSTR      lpItem, lpWin32Name;
+    INT         iItem;
+    TVITEMEX    itemex;
+    WCHAR       szText[MAX_PATH * 2];
+    TL_SUBITEMS_FIXED* pSubItems = NULL;
+
+    if (bListView) {
+        if (ListView_GetSelectedCount(hwndList)) {
+            iItem = ListView_GetSelectionMark(hwndList);
+            if (iItem >= 0) {
+                lpItem = supGetItemText(hwndList, iItem, nItem, NULL);
+                if (lpItem) {
+                    lpWin32Name = supGetWin32FileName(lpItem);
+                    if (lpWin32Name) {
+                        supOpenImageInWinDepends(hwndDlg, lpWin32Name, g_WinObj.szWinDependsExecutable);
+                        supHeapFree(lpWin32Name);
+                    }
+                    supHeapFree(lpItem);
+                }
+            }
+        }
+    }
+    else {
+        szText[0] = 0;
+        lpItem = NULL;
+        RtlSecureZeroMemory(&itemex, sizeof(itemex));
+        itemex.mask = TVIF_TEXT;
+        itemex.hItem = TreeList_GetSelection(hwndList);
+        itemex.pszText = szText;
+        itemex.cchTextMax = RTL_NUMBER_OF(szText);
+
+        if (TreeList_GetTreeItem(hwndList, &itemex, &pSubItems)) {
+            if ((nItem > 0) && (pSubItems != NULL)) {
+                iItem = (nItem - 1);
+                if (iItem < (INT)pSubItems->Count) {
+                    lpItem = pSubItems->Text[iItem];
+                }
+            }
+            else {
+                if (nItem == 0) {
+                    lpItem = szText;
+                }
+            }
+            if (lpItem) {
+                lpWin32Name = supGetWin32FileName(lpItem);
+                if (lpWin32Name) {
+                    supOpenImageInWinDepends(hwndDlg, lpWin32Name, g_WinObj.szWinDependsExecutable);
+                    supHeapFree(lpWin32Name);
+                }
+            }
+        }
+    }
+}

@@ -18,10 +18,10 @@
 #include "extras.h"
 #include "propDlg.h"
 
-EXTRASCONTEXT PnDlgContext;
 ULONG PNSNumberOfObjects = 0;
 HANDLE PNSObjectsHeap = NULL;
 
+static EXTRASCONTEXT PnDlgContext;
 static HANDLE PnDlgThreadHandle = NULL;
 static FAST_EVENT PnDlgInitializedEvent = FAST_EVENT_INIT;
 
@@ -832,7 +832,7 @@ INT_PTR CALLBACK PNDialogProc(
 
     case WM_CLOSE:
         PNDialogOnClose(hwndDlg);
-        break;
+        return TRUE;
 
     case WM_COMMAND:
 
@@ -866,18 +866,13 @@ INT_PTR CALLBACK PNDialogProc(
         case ID_OBJECT_PROPERTIES:
 
             if (ListView_GetSelectedCount(PnDlgContext.ListView)) {
-
                 nSelected = ListView_GetSelectionMark(PnDlgContext.ListView);
                 if (nSelected >= 0) {
                     PNDlgShowObjectProperties(nSelected);
                 }
-
             }
-
             break;
-
         }
-
         break;
     }
 

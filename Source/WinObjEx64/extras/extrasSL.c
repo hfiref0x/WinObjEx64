@@ -26,6 +26,7 @@ typedef struct _SL_ENUM_CONTEXT {
 
 static HANDLE SLCacheDlgThreadHandle = NULL;
 static FAST_EVENT SLCacheDlgInitializedEvent = FAST_EVENT_INIT;
+static EXTRASCONTEXT g_SLCachecDlgContext;
 
 UINT g_SLCacheImageIndex;
 
@@ -631,16 +632,12 @@ INT_PTR CALLBACK SLCacheDialogProc(
     _In_  LPARAM lParam
 )
 {
-    EXTRASCONTEXT* pDlgContext;
     LPNMLISTVIEW nhdr = (LPNMLISTVIEW)lParam;
     LPCWSTR lpFilter = NULL;
     WCHAR szFilterOption[MAX_PATH + 1];
 
     if (uMsg == g_WinObj.SettingsChangeMessage) {
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
-            extrasHandleSettingsChange(pDlgContext);
-        }
+        extrasHandleSettingsChange(&g_SLCachecDlgContext);
         return TRUE;
     }
 
@@ -658,35 +655,24 @@ INT_PTR CALLBACK SLCacheDialogProc(
         break;
 
     case WM_CLOSE:
-        pDlgContext = (EXTRASCONTEXT*)RemoveProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
-
-            extrasRemoveDlgIcon(pDlgContext);
-
-            //
-            // Free SL cache data
-            //
-            if (pDlgContext->SLDataCache) {
-                supHeapFree((PVOID)pDlgContext->SLDataCache);
-                pDlgContext->SLDataCache = 0;
-            }
-
-            supHeapFree(pDlgContext);
+        extrasRemoveDlgIcon(&g_SLCachecDlgContext);
+        //
+        // Free SL cache data
+        //
+        if (g_SLCachecDlgContext.SLDataCache) {
+            supHeapFree((PVOID)g_SLCachecDlgContext.SLDataCache);
+            g_SLCachecDlgContext.SLDataCache = 0;
         }
         DestroyWindow(hwndDlg);
         return TRUE;
 
     case WM_CONTEXTMENU:
-
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
-            supHandleContextMenuMsgForListView(hwndDlg,
-                wParam,
-                lParam,
-                pDlgContext->ListView,
-                (pfnPopupMenuHandler)SLCacheDialogHandlePopup,
-                (PVOID)pDlgContext);
-        }
+        supHandleContextMenuMsgForListView(hwndDlg,
+            wParam,
+            lParam,
+            g_SLCachecDlgContext.ListView,
+            (pfnPopupMenuHandler)SLCacheDialogHandlePopup,
+            (PVOID)&g_SLCachecDlgContext);
         break;
 
     case WM_COMMAND:
@@ -698,42 +684,32 @@ INT_PTR CALLBACK SLCacheDialogProc(
             break;
 
         case IDC_SLVALUE_VIEWWITH:
-            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-            if (pDlgContext) {
-                SLCacheDialogViewBinaryData(pDlgContext->ListView,
-                    ListView_GetSelectionMark(pDlgContext->ListView));
-            }
+            SLCacheDialogViewBinaryData(g_SLCachecDlgContext.ListView,
+                ListView_GetSelectionMark(g_SLCachecDlgContext.ListView));
             break;
 
         case ID_OBJECT_COPY:
-            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-            if (pDlgContext) {
-                supListViewCopyItemValueToClipboard(pDlgContext->ListView,
-                    pDlgContext->lvItemHit,
-                    pDlgContext->lvColumnHit);
-            }
+            supListViewCopyItemValueToClipboard(g_SLCachecDlgContext.ListView,
+                g_SLCachecDlgContext.lvItemHit,
+                g_SLCachecDlgContext.lvColumnHit);
             break;
 
         case IDC_SLSEARCH:
 
             if (GET_WM_COMMAND_CMD(wParam, lParam) == EN_CHANGE) {
 
-                pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-                if (pDlgContext) {
-
-                    RtlSecureZeroMemory(szFilterOption, sizeof(szFilterOption));
-                    if (GetDlgItemText(hwndDlg,
-                        IDC_SLSEARCH,
-                        szFilterOption,
-                        MAX_PATH))
-                    {
-                        if (szFilterOption[0] != 0) {
-                            lpFilter = szFilterOption;
-                        }
+                RtlSecureZeroMemory(szFilterOption, sizeof(szFilterOption));
+                if (GetDlgItemText(hwndDlg,
+                    IDC_SLSEARCH,
+                    szFilterOption,
+                    MAX_PATH))
+                {
+                    if (szFilterOption[0] != 0) {
+                        lpFilter = szFilterOption;
                     }
-                    ListView_DeleteAllItems(pDlgContext->ListView);
-                    SLCacheListItems(pDlgContext, lpFilter);
                 }
+                ListView_DeleteAllItems(g_SLCachecDlgContext.ListView);
+                SLCacheListItems(&g_SLCachecDlgContext, lpFilter);
             }
             break;
 
@@ -784,11 +760,6 @@ DWORD extrasSLCacheDialogWorkerThread(
 
         } while (bResult != 0);
     }
-    else {
-        if (pDlgContext) {
-            supHeapFree(pDlgContext);
-        }
-    }
 
     supResetFastEvent(&SLCacheDlgInitializedEvent);
     supCloseHandleAtomic(&SLCacheDlgThreadHandle);
@@ -808,17 +779,15 @@ VOID extrasCreateSLCacheDialog(
     VOID
 )
 {
-    EXTRASCONTEXT* pDlgContext;
-
     if (!SLCacheDlgThreadHandle) {
-        pDlgContext = (EXTRASCONTEXT*)supHeapAlloc(sizeof(EXTRASCONTEXT));
-        if (pDlgContext) {
-            SLCacheDlgThreadHandle = supCreateDialogWorkerThread(extrasSLCacheDialogWorkerThread, pDlgContext, 0);
-            if (SLCacheDlgThreadHandle == NULL) {
-                supHeapFree(pDlgContext);
-                return;
-            }
-            supWaitForFastEvent(&SLCacheDlgInitializedEvent, NULL);
+        RtlSecureZeroMemory(&g_SLCachecDlgContext, sizeof(EXTRASCONTEXT));
+        SLCacheDlgThreadHandle = supCreateDialogWorkerThread(extrasSLCacheDialogWorkerThread, &g_SLCachecDlgContext, 0);
+        if (SLCacheDlgThreadHandle == NULL) {
+            return;
         }
+        supWaitForFastEvent(&SLCacheDlgInitializedEvent, NULL);
+    }
+    else {
+        supRestoreDialogWindow(g_SLCachecDlgContext.hwndDlg);
     }
 }

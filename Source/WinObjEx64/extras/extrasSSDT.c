@@ -1302,7 +1302,7 @@ INT_PTR CALLBACK SdtDialogProc(
             extrasRemoveDlgIcon(pDlgContext);
         }
         DestroyWindow(hwndDlg);
-        break;
+        return TRUE;
 
     case WM_COMMAND:
 
@@ -1355,10 +1355,9 @@ INT_PTR CALLBACK SdtDialogProc(
         case ID_SDTLIST_VIEW_WITH_WDX:
             pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
             if (pDlgContext) {
-                extrasViewWithWinDepends(pDlgContext, COLUMN_SDTLIST_MODULE);
+                supViewWithWinDepends(pDlgContext->hwndDlg, pDlgContext->ListView, COLUMN_SDTLIST_MODULE, TRUE);
             }
             break;
-
         }
 
         break;

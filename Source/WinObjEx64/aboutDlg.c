@@ -293,6 +293,7 @@ INT_PTR CALLBACK AboutDialogProc(
 
 static HANDLE StatsDialogThreadHandle = NULL;
 static FAST_EVENT StatsDialogInitializedEvent = FAST_EVENT_INIT;
+static HWND StatsDialogWindow = NULL;
 #define UPDATE_TIMER_ID 1
 
 /*
@@ -358,6 +359,7 @@ INT_PTR CALLBACK StatsDialogProc(
     case WM_INITDIALOG:
         supCenterWindowSpecifyParent(hwndDlg, g_hwndMain);
         SetTimer(hwndDlg, UPDATE_TIMER_ID, 1000, (TIMERPROC)StatsTimerProc);
+        StatsDialogWindow = hwndDlg;
         break;
 
     case WM_DESTROY:
@@ -365,12 +367,12 @@ INT_PTR CALLBACK StatsDialogProc(
         break;
 
     case WM_CLOSE:
+        StatsDialogWindow = NULL;
         KillTimer(hwndDlg, UPDATE_TIMER_ID);
         DestroyWindow(hwndDlg);
         return TRUE;
 
     case WM_COMMAND:
-
         switch (GET_WM_COMMAND_ID(wParam, lParam)) {
         case IDCANCEL:
         case IDOK:
@@ -443,9 +445,10 @@ VOID ShowStatsDialog(
 )
 {
     if (!StatsDialogThreadHandle) {
-
         StatsDialogThreadHandle = supCreateThread(StatsDialogWorkerThread, NULL, 0);
         supWaitForFastEvent(&StatsDialogInitializedEvent, NULL);
-
+    }
+    else {
+        supRestoreDialogWindow(StatsDialogWindow);
     }
 }

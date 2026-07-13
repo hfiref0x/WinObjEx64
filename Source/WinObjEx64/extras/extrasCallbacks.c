@@ -23,6 +23,10 @@
 
 static HANDLE SysCbThreadHandle = NULL;
 static FAST_EVENT SysCbInitializedEvent = FAST_EVENT_INIT;
+static EXTRASCONTEXT g_SysCbDlgContext;
+
+#define ID_CBLIST_VIEW_WDX  40108
+#define CBLIST_IMAGEPATH_INDEX 1
 
 //
 // Scan limit constants.
@@ -5713,6 +5717,13 @@ VOID SysCbDialogHandlePopupMenu(
             InsertMenu(hMenu, uPos++, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
         }
         InsertMenu(hMenu, uPos++, MF_BYCOMMAND, ID_VIEW_REFRESH, T_VIEW_REFRESH);
+
+        //
+        // View With WinDepends
+        //
+        if (g_WinObj.WinDependsPresent)
+            InsertMenu(hMenu, ++uPos, MF_BYCOMMAND, ID_CBLIST_VIEW_WDX, T_VIEWWITH_WDX);
+
         TrackPopupMenu(hMenu, TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt1.x, pt1.y, 0, hwndDlg, NULL);
         DestroyMenu(hMenu);
     }
@@ -5783,15 +5794,12 @@ VOID SysCbDialogContentRefresh(
 */
 VOID SysCbDialogOnInit(
     _In_ HWND hwndDlg,
-    _In_  LPARAM lParam
+    _In_ EXTRASCONTEXT *pDlgContext
 )
 {
-    EXTRASCONTEXT* pDlgContext = (EXTRASCONTEXT*)lParam;
     RECT rc;
     HDITEM hdritem;
     INT SbParts[] = { 200, -1 };
-
-    SetProp(hwndDlg, T_DLGCONTEXT, (HANDLE)lParam);
 
     pDlgContext->hwndDlg = hwndDlg;
     pDlgContext->StatusBar = GetDlgItem(hwndDlg, ID_EXTRASLIST_STATUSBAR);
@@ -5843,12 +5851,10 @@ INT_PTR CALLBACK SysCbDialogProc(
     _In_ LPARAM lParam
 )
 {
-    EXTRASCONTEXT* pDlgContext;
-
     switch (uMsg) {
 
     case WM_INITDIALOG:
-        SysCbDialogOnInit(hwndDlg, lParam);
+        SysCbDialogOnInit(hwndDlg, &g_SysCbDlgContext);
         break;
 
     case WM_GETMINMAXINFO:
@@ -5861,20 +5867,13 @@ INT_PTR CALLBACK SysCbDialogProc(
         break;
 
     case WM_SIZE:
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
-            SysCbDialogResize(hwndDlg, pDlgContext->StatusBar, pDlgContext->TreeList);
-        }
+        SysCbDialogResize(hwndDlg, g_SysCbDlgContext.StatusBar, g_SysCbDlgContext.TreeList);
         break;
 
     case WM_CLOSE:
-        pDlgContext = (EXTRASCONTEXT*)RemoveProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
-            extrasRemoveDlgIcon(pDlgContext);
-            supHeapFree(pDlgContext);
-        }
+        extrasRemoveDlgIcon(&g_SysCbDlgContext);
         DestroyWindow(hwndDlg);
-        break;
+        return TRUE;
 
     case WM_DESTROY:
         PostQuitMessage(0);
@@ -5887,32 +5886,23 @@ INT_PTR CALLBACK SysCbDialogProc(
             break;
 
         case ID_OBJECT_COPY:
-            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-            if (pDlgContext) {
-
-                supTreeListCopyItemValueToClipboard(pDlgContext->TreeList,
-                    pDlgContext->tlSubItemHit);
-
-            }
+            supTreeListCopyItemValueToClipboard(g_SysCbDlgContext.TreeList, g_SysCbDlgContext.tlSubItemHit);
             break;
 
         case ID_VIEW_REFRESH:
-            pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-            if (pDlgContext) {
-                SysCbDialogContentRefresh(hwndDlg, pDlgContext, TRUE);
-            }
+            SysCbDialogContentRefresh(hwndDlg, &g_SysCbDlgContext, TRUE);
+            break;
+
+        case ID_CBLIST_VIEW_WDX:
+            supViewWithWinDepends(g_SysCbDlgContext.hwndDlg, g_SysCbDlgContext.TreeList, CBLIST_IMAGEPATH_INDEX, FALSE);
             break;
 
         }
         break;
 
     case WM_CONTEXTMENU:
-        pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
-        if (pDlgContext) {
-            SysCbDialogHandlePopupMenu(hwndDlg, pDlgContext, lParam);
-        }
+        SysCbDialogHandlePopupMenu(hwndDlg, &g_SysCbDlgContext, lParam);
         break;
-
     }
 
     return FALSE;
@@ -5987,18 +5977,14 @@ VOID extrasCreateCallbacksDialog(
     VOID
 )
 {
-    EXTRASCONTEXT* pDlgContext;
-
     if (!SysCbThreadHandle) {
-        pDlgContext = (EXTRASCONTEXT*)supHeapAlloc(sizeof(EXTRASCONTEXT));
-        if (pDlgContext) {
-            pDlgContext->tlSubItemHit = -1;
-            SysCbThreadHandle = supCreateDialogWorkerThread(extrasSysCbDialogWorkerThread, pDlgContext, 0);
-            if (SysCbThreadHandle == NULL) {
-                supHeapFree(pDlgContext);
-                return;
-            }
+        RtlSecureZeroMemory(&g_SysCbDlgContext, sizeof(EXTRASCONTEXT));
+        g_SysCbDlgContext.tlSubItemHit = -1;
+        SysCbThreadHandle = supCreateDialogWorkerThread(extrasSysCbDialogWorkerThread, &g_SysCbDlgContext, 0);
+        if (SysCbThreadHandle)
             supWaitForFastEvent(&SysCbInitializedEvent, NULL);
-        }
+    }
+    else {
+        supRestoreDialogWindow(g_SysCbDlgContext.hwndDlg);
     }
 }

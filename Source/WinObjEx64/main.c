@@ -1073,7 +1073,7 @@ LRESULT CALLBACK MainWindowProc(
 
     case WM_CLOSE:
         DestroyWindow(hwnd);
-        return 0;
+        return TRUE;
 
     case WM_DESTROY:
         PostQuitMessage(0);

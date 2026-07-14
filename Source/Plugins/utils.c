@@ -4,9 +4,9 @@
 *
 *  TITLE:       UTILS.C
 *
-*  VERSION:     1.21
+*  VERSION:     1.22
 *
-*  DATE:        07 Mar 2026
+*  DATE:        11 Jul 2026
 *
 *  Shared plugins runtime support functions and prototypes.
 *
@@ -291,7 +291,6 @@ BOOL supxListViewExportCSV(
                     result = TRUE;
                 }
                 CloseHandle(f);
-                result = TRUE;
             }
             ntsupVirtualFree(buffer0);
             buffer0 = NULL;

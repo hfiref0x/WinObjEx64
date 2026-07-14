@@ -1004,7 +1004,7 @@ LRESULT CALLBACK TreeListWindowProc(
             SetWindowLongPtr(hwnd, TL_THEME_SLOT, 0);
         }
 
-        if ((BOOL)GetWindowLongPtr(hwnd, TL_OWNHEADERFONT_SLOT)) {
+        if (GetWindowLongPtr(hwnd, TL_OWNHEADERFONT_SLOT)) {
             font = (HFONT)GetWindowLongPtr(hwnd, TL_HEADERFONT_SLOT);
             if (font)
                 DeleteObject(font);

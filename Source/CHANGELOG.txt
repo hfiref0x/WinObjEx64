@@ -1,3 +1,12 @@
+v2.1.1
+win11 25H2 compatibility improvements
+change "Type" object access flags decoding (removes phantom flags)
+update constants for object structured dumps
+update Windows SDK
+update RTLs (ntos, ntsup, treelist, tabctrl)
+add WinDepends support for system callbacks view dialog
+internal rearrangement, code deduplication and small fixes
+
 v2.1.0
 ported to msvc 2026 (with backward compatibility to 2022)
 win11 25H2 compatibility improvements
@@ -23,19 +32,19 @@ updated RTLs (ntos, ntsup, ntldr, tabctrl, symparser) to their latest versions f
 support Vista again (limited set of features), as per feature request #44
 
 v2.0.7
-win11 24h2 compatibility improvements
+win11 24H2 compatibility improvements
 
 v2.0.6
-win11 24h2/25h2 compatibility improvements
+win11 24H2/25H2 compatibility improvements
 RTLs updated
 
 v2.0.5
 added Pnp manager callbacks
-win11 22h2/23h2/24h2 compatibility improvements
+win11 22H2/23H2/24H2 compatibility improvements
 
 v2.0.4
-win11 23h2 compatibility
-win11+ 24h2 compatibility improvements
+win11 23H2 compatibility
+win11+ 24H2 compatibility improvements
 fixed tooltip flickering for drivers list
 fixed log UI highlight glitch
 fixed Authenticode hash missing pad bytes (in some cases)
@@ -43,7 +52,7 @@ driver list tooltip now includes information if the given driver is registered a
 
 v2.0.3
 recent win11 compatibility improvements
-win11 24h2 preliminary support
+win11 24H2 preliminary support
 
 v2.0.2
 recent win10/win11 compatibility improvements
@@ -84,7 +93,7 @@ bugfixes
 RTLs updated
 
 v1.9.2
-more Win10/11 21h2 compatibility changes
+more Win10/11 21H2 compatibility changes
 added FLT_FILTER, FLT_OBJECT structured dump
 added Authenticode hash calculation for loaded drivers (extras->Drivers, use popup menu on driver entry)
 added coalescing callbacks to callbacks list
@@ -94,7 +103,7 @@ internal rearrangement
 RTLs updated
 
 v1.9.1
-21h2 compatibility improvements
+21H2 compatibility improvements
 RTLs updated
 
 v1.9.0
@@ -112,10 +121,10 @@ security descriptor view dialog (object sid, dacl & sacl)
 fixed SCM services list query
 fixed "jump to file may fail under certain conditions" bug
 various minor UI changes
-21h1 compatibility improvements
+21H1 compatibility improvements
 
 v1.8.7
-20h1/20h2/21h1 compatibility improvements
+20H1/20H2/21H1 compatibility improvements
 added recognizing of shimmed drivers for drivers list (win10+)
 show process trust label for sections if it present
 plugins system extended and upgraded to support context plugins
@@ -137,7 +146,7 @@ fixed security dialog regression (reported by RamMerlabs)
 v1.8.5
 fixed object cookie
 added error log
-20h1/20h2 compatibility improvements
+20H1/20H2 compatibility improvements
 
 v1.8.4
 support of additional helper driver

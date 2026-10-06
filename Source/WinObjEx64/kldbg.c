@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.12
 *
-*  DATE:        25 Jul 2026
+*  DATE:        04 Oct 2026
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -3166,6 +3166,7 @@ BOOLEAN kdpQueryMmUnloadedDrivers(
                 switch (g_NtBuildNumber) {
                 case NT_WIN11_24H2:
                 case NT_WIN11_25H2:
+                case NT_WIN11_26H2:
                     sigPattern = MiRememberUnloadedDriverPattern24H2;
                     sigSize = sizeof(MiRememberUnloadedDriverPattern24H2);
                     break;

@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.12
 *
-*  DATE:        25 Jul 2026
+*  DATE:        04 Oct 2026
 *
 *  Win32k syscall table actual handlers resolving routines.
 *
@@ -227,8 +227,9 @@ ULONG SdtpQueryW32GetWin32kApiSetTableOffset(
 
     Index = 0;
     matchCount = 0;
-    scanBytes = (g_NtBuildNumber > NT_WIN11_25H2) ? 64 : 32;
-    instCount = (g_NtBuildNumber > NT_WIN11_25H2) ? 2 : 1;
+    // WinNext signature scan is subject of change
+    scanBytes = (g_NtBuildNumber > NT_WIN11_26H2) ? 64 : 32;
+    instCount = (g_NtBuildNumber > NT_WIN11_26H2) ? 2 : 1;
 
     do {
 
@@ -299,7 +300,8 @@ ULONG_PTR SdtpQueryWin32kSessionGlobals(
             return 0;
         }
 
-        if (g_NtBuildNumber > NT_WIN11_25H2) {
+        // WinNext signature scan is subject of change
+        if (g_NtBuildNumber > NT_WIN11_26H2) {
 
             Index = 0;
             k = 0;
@@ -1296,7 +1298,8 @@ ULONG SdtWin32kInitializeOnce(
                         break;
                     }
                 }
-                else if (g_NtBuildNumber <= NT_WIN11_25H2) {
+                // WinNext signature is subject of change
+                else if (g_NtBuildNumber <= NT_WIN11_26H2) {
                     //
                     // gLowSessionGlobalSlots is in the middle of variables, use offset calculation
                     //

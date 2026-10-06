@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.12
 *
-*  DATE:        26 Jul 2026
+*  DATE:        04 Oct 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -84,7 +84,8 @@ CBT_MAPPING g_CbtMapping[] = {
     { NT_WIN11_22H2, NTDDI_WIN10_NI, CBT_SIZE_NI_V1 },
     { NT_WIN11_23H2, NTDDI_WIN10_NI, CBT_SIZE_NI_V1 },
     { NT_WIN11_24H2, NTDDI_WIN11_GE, CBT_SIZE_GE_V1 },
-    { NT_WIN11_25H2, NTDDI_WIN11_GE, CBT_SIZE_GE_V2 } //update on release
+    { NT_WIN11_25H2, NTDDI_WIN11_GE, CBT_SIZE_GE_V2 },
+    { NT_WIN11_26H2, NTDDI_WIN11_GE, CBT_SIZE_GE_V2 } //update on release
 };
 
 //
@@ -755,7 +756,7 @@ static const BYTE CiCallbackIndexes_Win11_22H2_24H2[] = {
     Id_CipIsDeveloperModeEnabled
 };
 
-static const BYTE CiCallbackIndexes_Win11_25H2[] = {
+static const BYTE CiCallbackIndexes_Win11_25H2_26H2[] = {
     Id_CiSetFileCache,
     Id_CiGetFileCache,
     Id_CiQueryInformation,
@@ -834,8 +835,8 @@ static CI_INDEX_MAP g_CiIndexMap[] = {
     // Windows 11 22H2 .. 24H2
     { NT_WIN11_22H2, NT_WIN11_25H2, 0, CiCallbackIndexes_Win11_22H2_24H2, RTL_NUMBER_OF(CiCallbackIndexes_Win11_22H2_24H2) },
 
-    // Windows 11 25H2
-    { NT_WIN11_25H2, NT_WIN11_25H2, 0, CiCallbackIndexes_Win11_25H2, RTL_NUMBER_OF(CiCallbackIndexes_Win11_25H2) }
+    // Windows 11 25H2 .. 26H2
+    { NT_WIN11_25H2, NT_WIN11_26H2, 0, CiCallbackIndexes_Win11_25H2_26H2, RTL_NUMBER_OF(CiCallbackIndexes_Win11_25H2_26H2) }
 };
 
 /*
@@ -1535,6 +1536,7 @@ BOOL IopFsNotifyChangeIsKnownPattern(
     switch (g_NtBuildNumber) {
     case NT_WIN11_24H2:
     case NT_WIN11_25H2:
+    case NT_WIN11_26H2:
         nextInstructionByte1 = 0x48;
         break;
     default:
@@ -2085,7 +2087,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindCmCallbackHead)
             if (hs.flags & F_ERROR)
                 break;
 
-            if (g_NtBuildNumber <= NT_WIN11_25H2)
+            if (g_NtBuildNumber <= NT_WIN11_26H2)
             {
                 if (hs.len == 5) {
                     /*
@@ -2689,6 +2691,7 @@ OBEX_FINDCALLBACK_ROUTINE(FindExHostCallbacks)
             case NT_WIN11_23H2:
             case NT_WIN11_24H2:
             case NT_WIN11_25H2:
+            case NT_WIN11_26H2:
             default:
                 Signature = g_ExpFindHost22631_27842;
                 SignatureSize = sizeof(g_ExpFindHost22631_27842);

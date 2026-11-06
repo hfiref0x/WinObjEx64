@@ -4,9 +4,9 @@
 *
 *  TITLE:       NTSUP.C
 *
-*  VERSION:     2.34
+*  VERSION:     2.35
 *
-*  DATE:        18 Aug 2026
+*  DATE:        19 Oct 2026
 *
 *  Native API support functions.
 *
@@ -227,6 +227,8 @@ BOOLEAN NTAPI ntsupIsAddressValid(
 {
     MEMORY_BASIC_INFORMATION mbi;
     NTSTATUS status;
+    ULONG_PTR address, regionBase;
+    SIZE_T offset;
 
     if (Address == NULL)
         return FALSE;
@@ -253,14 +255,14 @@ BOOLEAN NTAPI ntsupIsAddressValid(
 
     if (Size != 0) {
 
-        if ((ULONG_PTR)Address < (ULONG_PTR)mbi.BaseAddress)
+        address = (ULONG_PTR)Address;
+        regionBase = (ULONG_PTR)mbi.BaseAddress;
+        if (address < regionBase)
             return FALSE;
 
-        if (((ULONG_PTR)Address + Size) >
-            ((ULONG_PTR)mbi.BaseAddress + mbi.RegionSize))
-        {
+        offset = (SIZE_T)(address - regionBase);
+        if (offset > mbi.RegionSize || Size > mbi.RegionSize - offset)
             return FALSE;
-        }
     }
 
     return TRUE;

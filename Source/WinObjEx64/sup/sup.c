@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.12
 *
-*  DATE:        28 Jul 2026
+*  DATE:        17 Oct 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -6935,7 +6935,9 @@ BOOL supxDeleteKeyTreeWorker(
         if (lResult == ERROR_NO_MORE_ITEMS) {
 
             RegCloseKey(hKey);
-            RegDeleteKey(hKeyRoot, workingPath);
+            lResult = RegDeleteKey(hKeyRoot, workingPath);
+            if (lResult != ERROR_SUCCESS && lResult != ERROR_FILE_NOT_FOUND)
+                return FALSE;
             sp--;
             continue;
         }

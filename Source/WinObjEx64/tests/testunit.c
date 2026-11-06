@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.12
 *
-*  DATE:        25 Jul 2026
+*  DATE:        25 Oct 2026
 *
 *  Test code used while debug.
 *
@@ -215,6 +215,29 @@ static VOID Test_RegDeleteKeyTree_DeepNested(VOID)
     REG_TEST_ASSERT(!exists);
 }
 
+static VOID Test_RegDeleteKeyTree_ReadOnlyParent(VOID)
+{
+    const WCHAR* parent = L"Software\\WinObjEx64Test";
+    const WCHAR* child = L"Software\\WinObjEx64Test\\RegTreeReadOnly";
+    HKEY hParent = NULL;
+    BOOL exists;
+
+    CleanupTestRoot(child);
+    REG_TEST_ASSERT(CreateNestedKey(child));
+    
+    if (RegOpenKeyEx(HKEY_CURRENT_USER, parent, 0, KEY_READ, &hParent) != ERROR_SUCCESS) {
+        REG_TEST_ASSERT(FALSE);
+        CleanupTestRoot(child);
+        return;
+    }
+    
+    REG_TEST_ASSERT(!supRegDeleteKeyTree(hParent, L"RegTreeReadOnly"));
+    RegCloseKey(hParent);
+    exists = KeyExists(HKEY_CURRENT_USER, child);
+    REG_TEST_ASSERT(exists);
+    CleanupTestRoot(child);
+}
+
 VOID Test_RegDeleteKeyTree(VOID)
 {
     g_RegFailCount = 0;
@@ -223,6 +246,7 @@ VOID Test_RegDeleteKeyTree(VOID)
     Test_RegDeleteKeyTree_NonExistent();
     Test_RegDeleteKeyTree_TrailingSlash();
     Test_RegDeleteKeyTree_DeepNested();
+    Test_RegDeleteKeyTree_ReadOnlyParent();
 
     if (g_RegVerbose) {
         if (g_RegFailCount == 0) {
@@ -238,6 +262,7 @@ VOID Test_RegDeleteKeyTree(VOID)
     CleanupTestRoot(L"Software\\WinObjEx64Test\\RegTreeTrail");
     CleanupTestRoot(L"Software\\WinObjEx64Test\\RegTreeDeep");
     CleanupTestRoot(L"Software\\WinObjEx64Test\\RegTreeTest_NonExist");
+    CleanupTestRoot(L"Software\\WinObjEx64Test\\RegTreeReadOnly");
 }
 
 HANDLE TestGetPortHandle()

@@ -4,9 +4,9 @@
 *
 *  TITLE:       MAIN.C
 *
-*  VERSION:     2.11
+*  VERSION:     2.12
 *
-*  DATE:        11 Jul 2026
+*  DATE:        14 Nov 2026
 *
 *  Program entry point and main window handler.
 *
@@ -1159,6 +1159,7 @@ DWORD guiInitGlobals(
 {
     SIZE_T cch;
     DWORD dwResult = INIT_ERROR_UNSPECIFIED;
+    WCHAR szModuleName[MAX_PATH + 1];
 
 
     do {
@@ -1216,10 +1217,13 @@ DWORD guiInitGlobals(
         }
 
         //
-        // Remember program current directory.
+        // Remember program directory.
         //
-        cch = GetCurrentDirectory(MAX_PATH, Globals->szProgramDirectory);
-        if ((cch == 0) || (cch > MAX_PATH)) {
+        RtlSecureZeroMemory(szModuleName, sizeof(szModuleName));
+        cch = GetModuleFileName(NULL, szModuleName, MAX_PATH);
+        if ((cch == 0) || (cch >= MAX_PATH) ||
+            (_filepath(szModuleName, Globals->szProgramDirectory) == NULL))
+        {
             dwResult = INIT_ERROR_NOPROGDIR;
             break;
         }

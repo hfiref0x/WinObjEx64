@@ -4,9 +4,9 @@
 *
 *  TITLE:       PLUGMNGR.C
 *
-*  VERSION:     2.11
+*  VERSION:     2.12
 *
-*  DATE:        11 Jul 2026
+*  DATE:        14 Nov 2026
 *
 *  Plugin manager.
 *
@@ -344,8 +344,6 @@ DWORD WINAPI PmpWorkerThread(
     WCHAR szSearchDirectory[1024];
     WCHAR szPluginPath[1024];
 
-    DWORD dwSize;
-
     SIZE_T Length;
     HANDLE hFile;
     WIN32_FIND_DATA fdata;
@@ -361,14 +359,14 @@ DWORD WINAPI PmpWorkerThread(
     InitializeListHead(&g_PluginsListHead);
 
     //
-    // Query working directory.
+    // Query program directory.
     //
-    RtlSecureZeroMemory(szSearchDirectory, sizeof(szSearchDirectory));
-    dwSize = GetCurrentDirectory(MAX_PATH, szSearchDirectory);
-    if ((dwSize == 0) || (dwSize > MAX_PATH))
+    if (g_WinObj.szProgramDirectory[0] == 0)
         ExitThread((DWORD)-1);
 
-    _strcat(szSearchDirectory, TEXT("\\plugins\\"));
+    _strcpy(szSearchDirectory, g_WinObj.szProgramDirectory);
+    supPathAddBackSlash(szSearchDirectory);
+    _strcat(szSearchDirectory, TEXT("plugins\\"));
 
     //
     // Build plugin path.
@@ -407,7 +405,8 @@ DWORD WINAPI PmpWorkerThread(
             //
             // Load library and query plugin export.
             //
-            hPlugin = LoadLibraryEx(szPluginPath, NULL, 0);
+            hPlugin = LoadLibraryEx(szPluginPath, NULL, 
+                LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
             if (hPlugin) {
 
                 PluginInit = (pfnPluginInit)GetProcAddress(hPlugin, WINOBJEX_PLUGIN_EXPORT);

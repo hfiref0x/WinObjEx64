@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.12
 *
-*  DATE:        04 Oct 2026
+*  DATE:        14 Nov 2026
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -3855,8 +3855,6 @@ BOOL symInit(
     _In_opt_ LPWSTR lpDbgHelpDll
 )
 {
-    ULONG cch;
-
     WCHAR szFileName[MAX_PATH * 2];
     LPWSTR dbgHelpDll = lpDbgHelpDll;
 
@@ -3865,17 +3863,14 @@ BOOL symInit(
 
     if (lpDbgHelpDll == NULL) {
 
-        szFileName[0] = 0;
-        cch = GetCurrentDirectory(MAX_PATH, szFileName);
-        if (cch > 0 && cch < MAX_PATH) {
-            supPathAddBackSlash(szFileName);
-            _strcat(szFileName, TEXT("symdll\\dbghelp.dll"));
-            if (!PathFileExists(szFileName))
-                return FALSE;
-        }
-        else {
+        if (g_WinObj.szProgramDirectory[0] == 0)
             return FALSE;
-        }
+
+        _strcpy(szFileName, g_WinObj.szProgramDirectory);
+        supPathAddBackSlash(szFileName);
+        _strcat(szFileName, TEXT("symdll\\dbghelp.dll"));
+        if (!PathFileExists(szFileName))
+            return FALSE;
 
         dbgHelpDll = szFileName;
 

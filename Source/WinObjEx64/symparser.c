@@ -4,9 +4,9 @@
 *
 *  TITLE:       SYMPARSER.C
 *
-*  VERSION:     1.26
+*  VERSION:     1.27
 *
-*  DATE:        13 May 2026
+*  DATE:        14 Nov 2026
 *
 *  DbgHelp wrapper for symbols parser support.
 *
@@ -1494,7 +1494,8 @@ BOOL SymGlobalsInit(
         finalDbgHelpPath = szDbgHelpPath;
     }
 
-    hDbg = LoadLibraryEx(finalDbgHelpPath, NULL, 0);
+    hDbg = LoadLibraryEx(finalDbgHelpPath, NULL, 
+        LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
     if (hDbg == NULL)
         return FALSE;
 

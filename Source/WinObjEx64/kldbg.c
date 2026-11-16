@@ -643,6 +643,12 @@ PVOID ObDumpObjectTypeVersionAware(
         objectSize = sizeof(OBJECT_TYPE_RS1);
         objectVersion = OBVERSION_OBJECT_TYPE_V3;
         break;
+    case NT_WIN11_24H2:
+    case NT_WIN11_25H2:
+    case NT_WIN11_26H2:
+        objectSize = sizeof(OBJECT_TYPE_24H2);
+        objectVersion = OBVERSION_OBJECT_TYPE_V5;
+        break;
     default:
         objectSize = sizeof(OBJECT_TYPE_RS2);
         objectVersion = OBVERSION_OBJECT_TYPE_V4;

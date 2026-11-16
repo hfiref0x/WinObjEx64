@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPTYPECONSTS.H
 *
-*  VERSION:     2.11
+*  VERSION:     2.12
 *
-*  DATE:        21 May 2026
+*  DATE:        14 Nov 2026
 *
 *  Consts header file for Type property sheet.
 *
@@ -48,7 +48,7 @@ static LPCWSTR T_ObjectTypeFlags[] = {
 
 static LPCWSTR T_ObjectTypeFlags2[] = {
    L"UseExtendedParameters",    //8
-   L"UnknownFlag",
+   L"SeTrustConstraintMaskPresent", //9
    L"UnknownFlag",
    L"UnknownFlag",
    L"UnknownFlag",

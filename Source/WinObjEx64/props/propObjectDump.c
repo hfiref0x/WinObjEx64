@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPOBJECTDUMP.C
 *
-*  VERSION:     2.11
+*  VERSION:     2.12
 *
-*  DATE:        15 Jun 2026
+*  DATE:        15 Nov 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -2966,6 +2966,7 @@ VOID propObDumpObjectTypeFlags(
     _In_ UCHAR ObjectTypeFlags,
     _In_ HTREEITEM h_tviSubItem,
     _In_ LPWSTR * ObjectTypeFlagsText,
+    _In_ ULONG NumberOfFlags,
     _In_ BOOLEAN SetEntry
 )
 {
@@ -2981,7 +2982,7 @@ VOID propObDumpObjectTypeFlags(
         subitems.Count = 2;
 
         j = 0;
-        for (i = 0; i < 8; i++) {
+        for (i = 0; i < NumberOfFlags; i++) {
             if (GET_BIT(ObjectTypeFlags, i)) {
                 lpType = (LPWSTR)ObjectTypeFlagsText[i];
                 subitems.Text[0] = T_EmptyString;
@@ -3023,8 +3024,9 @@ VOID propObDumpObjectTypeFlags(
 */
 PROP_OBJECT_DUMP_ROUTINE(propObDumpObjectType)
 {
-    BOOLEAN bOkay, bSetEntry;
+    BOOLEAN bOkay;
     USHORT waitObjectFlagOffset, waitObjectPointerOffset;
+    USHORT objectTypeFlags;
     UINT i;
     ULONG objectSize = 0, objectVersion = 0;
     ULONG keyValue;
@@ -3047,6 +3049,7 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpObjectType)
             OBJECT_TYPE_8* ObjectType_8;
             OBJECT_TYPE_RS1* ObjectType_RS1;
             OBJECT_TYPE_RS2* ObjectType_RS2;
+            OBJECT_TYPE_24H2* ObjectType_24H2;
         } Versions;
         PVOID Ref;
     } objectType;
@@ -3144,34 +3147,83 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpObjectType)
 
             //
             // Dump Object Type Flags / Extended Object Type Flags
+            // 
+            // The code below is intended to workaround the mess Microsoft introduced 
+            // with OBJECT_TYPE_INITIALIZER->ObjectTypeFlags field during years of Windows 10/11 development.
             //
-            propObDumpObjectTypeFlags(hwndTreeList,
-                T_OBJECT_TYPE_FLAGS,
-                objectType.Versions.ObjectTypeCompatible->TypeInfo.ObjectTypeFlags,
-                treeSubItem,
-                (LPWSTR*)T_ObjectTypeFlags,
-                TRUE);
+            if (objectVersion == OBVERSION_OBJECT_TYPE_V3) {
 
-            if (objectVersion > OBVERSION_OBJECT_TYPE_V2) {
-
-                if (objectVersion == OBVERSION_OBJECT_TYPE_V3) {
-                    bSetEntry = TRUE;
-                    lpType = T_OBJECT_TYPE_FLAGS2; //fu ms
-                }
-                else {
-                    bSetEntry = FALSE;
-                    lpType = T_OBJECT_TYPE_FLAGS;
-                }
+                //
+                // RS1:
+                // ObjectTypeFlags and ObjectTypeFlags2 are separate UCHAR fields.
+                //
+                propObDumpObjectTypeFlags(hwndTreeList,
+                    T_OBJECT_TYPE_FLAGS,
+                    objectType.Versions.ObjectType_RS1->TypeInfo.ObjectTypeFlags,
+                    treeSubItem,
+                    (LPWSTR*)T_ObjectTypeFlags,
+                    8,
+                    TRUE);
 
                 propObDumpObjectTypeFlags(hwndTreeList,
-                    lpType,
+                    T_OBJECT_TYPE_FLAGS2,
                     objectType.Versions.ObjectType_RS1->TypeInfo.ObjectTypeFlags2,
                     treeSubItem,
                     (LPWSTR*)T_ObjectTypeFlags2,
-                    bSetEntry);
+                    1,
+                    TRUE);
 
             }
+            else if (objectVersion > OBVERSION_OBJECT_TYPE_V3) {
 
+                //
+                // RS2+:
+                // ObjectTypeFlags is USHORT.
+                // ObjectTypeFlags2 has been merged into ObjectTypeFlags.
+                //
+                objectTypeFlags = objectType.Versions.ObjectType_RS2->TypeInfo.ObjectTypeFlags;
+
+                //
+                // First byte: original ObjectTypeFlags (bits 0-7).
+                //
+                propObDumpObjectTypeFlags(hwndTreeList,
+                    T_OBJECT_TYPE_FLAGS,
+                    (UCHAR)(objectTypeFlags & 0xff),
+                    treeSubItem,
+                    (LPWSTR*)T_ObjectTypeFlags,
+                    8,
+                    TRUE);
+
+                //
+                // Second byte: extended flags (bits 8-15).
+                //
+                // UseExtendedParameters: RS2+
+                // SeTrustConstraintMaskPresent: Windows 11 24H2+
+                //
+                propObDumpObjectTypeFlags(hwndTreeList,
+                    T_OBJECT_TYPE_FLAGS,
+                    (UCHAR)(objectTypeFlags >> 8),
+                    treeSubItem,
+                    (LPWSTR*)T_ObjectTypeFlags2,
+                    (g_NtBuildNumber >= NT_WIN11_24H2) ? 2 : 1,
+                    FALSE);
+
+            }
+            else {
+
+                //
+                // Older versions:
+                // Only the original ObjectTypeFlags byte exists.
+                //
+                propObDumpObjectTypeFlags(hwndTreeList,
+                    T_OBJECT_TYPE_FLAGS,
+                    objectType.Versions.ObjectTypeCompatible->TypeInfo.ObjectTypeFlags,
+                    treeSubItem,
+                    (LPWSTR*)T_ObjectTypeFlags,
+                    8,
+                    TRUE);
+            }
+ 
             //
             // Structure version independent fields.
             //
@@ -3308,6 +3360,16 @@ PROP_OBJECT_DUMP_ROUTINE(propObDumpObjectType)
         propObDumpPushLock(hwndTreeList, treeRootItem, lockPtr, 0, 0);
         propObDumpUlong(hwndTreeList, treeRootItem, TEXT("Key"), NULL, keyValue, TRUE, FALSE, 0, 0);
         propObDumpListEntry(hwndTreeList, treeRootItem, TEXT("CallbackList"), pListEntry);
+
+        //
+        // 24H2+ added
+        //
+        if (objectVersion >= OBVERSION_OBJECT_TYPE_V5) {
+            propObDumpUlong(hwndTreeList, treeRootItem, TEXT("SeMandatoryLabelMask"), NULL, 
+                objectType.Versions.ObjectType_24H2->SeMandatoryLabelMask, TRUE, FALSE, 0, 0);
+            propObDumpUlong(hwndTreeList, treeRootItem, TEXT("SeTrustConstraintMask"), NULL, 
+                objectType.Versions.ObjectType_24H2->SeTrustConstraintMask, TRUE, FALSE, 0, 0);
+        }
 
         bOkay = TRUE;
 

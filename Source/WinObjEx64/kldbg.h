@@ -74,6 +74,8 @@
 #define OBVERSION_OBJECT_TYPE_V3 (3)
 // Structure version W10RS2 (15063+)
 #define OBVERSION_OBJECT_TYPE_V4 (4)
+// Structure version 24H2 (26100+)
+#define OBVERSION_OBJECT_TYPE_V5 (5)
 
 // Structure version W7-W8 BLUE (7600 - 9600)
 #define OBVERSION_OBJECT_SYMBOLIC_LINK_V1 (1)

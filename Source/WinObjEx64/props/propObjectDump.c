@@ -1192,7 +1192,7 @@ VOID propDumpBitFlags(
 * Query full namespace path for object with a normalization for output.
 *
 */
-_Success_(return)
+_Success_(return != FALSE)
 BOOL propDumpQueryFullNamespaceNormalizedPath(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PUNICODE_STRING NormalizedPath

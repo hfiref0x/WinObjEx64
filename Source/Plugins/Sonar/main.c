@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2019 - 2025
+*  (C) COPYRIGHT AUTHORS, 2019 - 2026
 *
 *  TITLE:       MAIN.C
 *
 *  VERSION:     1.20
 *
-*  DATE:        03 Oct 2025
+*  DATE:        13 Nov 2026
 *
 *  WinObjEx64 Sonar plugin.
 *
@@ -25,7 +25,7 @@
 //
 // Maximum tested build Sonar is known to work.
 //
-#define SONAR_MAX_TESTED_BUILD NT_WIN11_25H2
+#define SONAR_MAX_TESTED_BUILD NT_WIN11_26H2
 
 //
 // Safety cap for walking kernel lists to avoid infinite loops.

@@ -4,9 +4,9 @@
 *
 *  TITLE:       LIST.C
 *
-*  VERSION:     2.11
+*  VERSION:     2.12
 *
-*  DATE:        21 May 2026
+*  DATE:        16 Nov 2026
 *
 *  Program main object listing and search logic.
 *
@@ -307,6 +307,7 @@ HTREEITEM AddTreeViewItem(
 * Helper function to construct full object path.
 *
 */
+_Success_(return != FALSE)
 BOOLEAN AppendDirectoryPath(
     _In_ PUNICODE_STRING DirectoryName,
     _In_ PUNICODE_STRING ObjectName,
@@ -322,6 +323,9 @@ BOOLEAN AppendDirectoryPath(
         pathLength += OBJ_NAME_PATH_SEPARATOR_SIZE;
 
     pathLength += ObjectName->Length + sizeof(UNICODE_NULL);
+    if (pathLength > UNICODE_STRING_MAX_BYTES)
+        return FALSE;
+
     allocSize = pathLength;
 
     // Allocate buffer

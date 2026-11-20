@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.12
 *
-*  DATE:        17 Oct 2026
+*  DATE:        16 Nov 2026
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -628,13 +628,10 @@ VOID supShowHelp(
     _In_ HWND ParentWindow
 )
 {
-    DWORD   dwSize, dwType = 0;
-    HKEY    hKey;
-    LRESULT lRet;
+    DWORD   dwSize;
     HMODULE hHtmlOcx;
     LPWSTR  s;
     WCHAR   szOcxPath[MAX_PATH];
-    WCHAR   szBuffer[MAX_PATH * 2];
     WCHAR   szHelpFile[MAX_PATH * 2];
     BOOL    bHelpFileFound = FALSE;
     WCHAR   szHelpFileName[] = L"\\winobjex64.chm";
@@ -681,44 +678,30 @@ VOID supShowHelp(
     }
 
     //
-    // Query OCX path from registry.
-    //
-    RtlSecureZeroMemory(szOcxPath, sizeof(szOcxPath));
-    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-    lRet = RegOpenKeyEx(HKEY_CLASSES_ROOT, HHCTRLOCXKEY, 0, KEY_QUERY_VALUE, &hKey);
-    if (lRet == ERROR_SUCCESS) {
-        dwSize = MAX_PATH * sizeof(WCHAR);
-        lRet = RegQueryValueEx(hKey, L"", NULL, &dwType, (LPBYTE)szBuffer, &dwSize);
-        RegCloseKey(hKey);
-
-        if (lRet == ERROR_SUCCESS) {
-            if (dwType == REG_EXPAND_SZ) {
-                if (ExpandEnvironmentStrings(szBuffer, szOcxPath, MAX_PATH) == 0)
-                    lRet = ERROR_SECRET_TOO_LONG;
-            }
-            else {
-                _strncpy(szOcxPath, MAX_PATH, szBuffer, MAX_PATH);
-            }
-        }
-    }
-    if (lRet != ERROR_SUCCESS) {
-        _strcpy(szOcxPath, HHCTRLOCX);
-    }
-
-    //
     // Load OCX and call help.
     //
-    hHtmlOcx = GetModuleHandle(HHCTRLOCX);
-    if (hHtmlOcx == NULL) {
-        hHtmlOcx = LoadLibrary(szOcxPath);
-        if (hHtmlOcx == NULL) {
+    if (g_WinObj.HtmlHelpW == NULL) {
+        dwSize = GetSystemDirectoryW(szOcxPath, RTL_NUMBER_OF(szOcxPath));
+        if (dwSize == 0 ||
+            dwSize >= RTL_NUMBER_OF(szOcxPath) ||
+            dwSize + 1 + RTL_NUMBER_OF(HHCTRLOCX) > RTL_NUMBER_OF(szOcxPath))
+        {
+            MessageBox(ParentWindow, TEXT("Could not load HTML Help library"), NULL, MB_ICONERROR);
             return;
         }
-    }
-    if (g_WinObj.HtmlHelpW == NULL) {
+
+        _strcat(szOcxPath, L"\\");
+        _strcat(szOcxPath, HHCTRLOCX);
+        hHtmlOcx = LoadLibraryExW(szOcxPath, NULL, LOAD_LIBRARY_SEARCH_SYSTEM32);
+        if (hHtmlOcx == NULL) {
+            MessageBox(ParentWindow, TEXT("Could not load HTML Help library"), NULL, MB_ICONERROR);
+            return;
+        }
+
         g_WinObj.HtmlHelpW = (pfnHtmlHelpW)GetProcAddress(hHtmlOcx, MAKEINTRESOURCEA(0xF));
         if (g_WinObj.HtmlHelpW == NULL) {
             FreeLibrary(hHtmlOcx);
+            MessageBox(ParentWindow, TEXT("Could not load HTML Help library"), NULL, MB_ICONERROR);
             return;
         }
     }
@@ -791,7 +774,7 @@ HICON supGetMainIcon(
 * Release memory allocated for string.
 *
 */
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supFreeUnicodeString(
     _In_ HANDLE HeapHandle,
     _Inout_ PUNICODE_STRING String
@@ -811,7 +794,7 @@ BOOL supFreeUnicodeString(
 * Release memory allocated for duplicated string.
 *
 */
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supFreeDuplicatedUnicodeString(
     _In_ HANDLE HeapHandle,
     _Inout_ PUNICODE_STRING DuplicatedString,
@@ -839,7 +822,7 @@ BOOL supFreeDuplicatedUnicodeString(
 * Note: Use supFreeDuplicatedUnicodeString to release allocated memory.
 *
 */
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supDuplicateUnicodeString(
     _In_ HANDLE HeapHandle,
     _Out_ PUNICODE_STRING DestinationString,
@@ -873,7 +856,7 @@ BOOL supDuplicateUnicodeString(
 * Note: Use supFreeDuplicatedUnicodeString to release allocated memory.
 *
 */
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supCreateObjectPathFromElements(
     _In_ PUNICODE_STRING ObjectName,
     _In_ PUNICODE_STRING DirectoryName,
@@ -948,7 +931,7 @@ BOOL supCreateObjectPathFromElements(
 * Build string that include current directory and object name.
 *
 */
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supCreateObjectPathFromCurrentPath(
     _In_ PUNICODE_STRING ObjectName,
     _Out_ PUNICODE_STRING ObjectPath,
@@ -5815,7 +5798,7 @@ BOOL supPrintTimeConverted(
 * Return TreeView item associated parameter.
 *
 */
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supGetTreeViewItemParam(
     _In_ HWND hwndTreeView,
     _In_ HTREEITEM hTreeItem,
@@ -5844,7 +5827,7 @@ BOOL supGetTreeViewItemParam(
 * Return ListView item associated parameter.
 *
 */
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supGetListViewItemParam(
     _In_ HWND hwndListView,
     _In_ INT itemIndex,
@@ -9330,7 +9313,7 @@ BOOL supGetCurrentObjectPath(
 * Return name of currently selected object.
 *
 */
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supGetCurrentObjectName(
     _Out_ PUNICODE_STRING ObjectName
 )
@@ -9399,7 +9382,7 @@ VOID supBuildCurrentObjectList(
 * Create a copy of unicode string, friendly for output.
 *
 */
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supNormalizeUnicodeStringForDisplay(
     _In_ HANDLE HeapHandle,
     _In_ PUNICODE_STRING SourceString,
@@ -9492,7 +9475,7 @@ VOID supDisplayCurrentObjectPath(
 * Return FALSE on error.
 *
 */
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supResolveSymbolicLinkTarget(
     _In_opt_ HANDLE LinkHandle,
     _In_opt_ HANDLE RootDirectoryHandle,
@@ -9596,7 +9579,7 @@ BOOL supResolveSymbolicLinkTarget(
 * Return FALSE on error.
 *
 */
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supResolveSymbolicLinkTargetNormalized(
     _In_opt_ HANDLE LinkHandle,
     _In_opt_ HANDLE RootDirectoryHandle,
@@ -9881,7 +9864,7 @@ BOOL supxWriteDwordValue(
 * Writes program configuration data to the registry.
 *
 */
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supWriteObexConfiguration(
     _In_ HWND hwnd
 )
@@ -10051,7 +10034,7 @@ VOID supxValidateWindowPlacement(
 * Reads program configuration data from registry if present.
 *
 */
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supReadObexConfiguration(
     _Out_ POBEX_CONFIG Configuration
 )

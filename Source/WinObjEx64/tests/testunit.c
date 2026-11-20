@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.12
 *
-*  DATE:        25 Oct 2026
+*  DATE:        16 Nov 2026
 *
 *  Test code used while debug.
 *
@@ -263,6 +263,53 @@ VOID Test_RegDeleteKeyTree(VOID)
     CleanupTestRoot(L"Software\\WinObjEx64Test\\RegTreeDeep");
     CleanupTestRoot(L"Software\\WinObjEx64Test\\RegTreeTest_NonExist");
     CleanupTestRoot(L"Software\\WinObjEx64Test\\RegTreeReadOnly");
+}
+
+static VOID Test_AppendDirectoryPath(VOID)
+{
+    BOOLEAN result;
+    PWSTR longName;
+    UNICODE_STRING directory, objectName, fullPath, expectedPath;
+
+    g_RegFailCount = 0;
+    RtlInitUnicodeString(&directory, L"\\");
+    longName = (PWSTR)supHeapAlloc(UNICODE_STRING_MAX_BYTES);
+    if (longName == NULL) {
+        REG_TEST_ASSERT(FALSE);
+        return;
+    }
+
+    objectName.Buffer = longName;
+    objectName.MaximumLength = UNICODE_STRING_MAX_BYTES;
+    objectName.Length = UNICODE_STRING_MAX_BYTES - 2 * sizeof(WCHAR);
+    RtlInitEmptyUnicodeString(&fullPath, NULL, 0);
+    result = AppendDirectoryPath(&directory, &objectName, &fullPath);
+    REG_TEST_ASSERT(result);
+    if (result) {
+        REG_TEST_ASSERT(fullPath.Length == UNICODE_STRING_MAX_BYTES - sizeof(WCHAR));
+        REG_TEST_ASSERT(fullPath.MaximumLength == UNICODE_STRING_MAX_BYTES);
+        supHeapFree(fullPath.Buffer);
+    }
+
+    objectName.Length += sizeof(WCHAR);
+    RtlInitEmptyUnicodeString(&fullPath, NULL, 0);
+    result = AppendDirectoryPath(&directory, &objectName, &fullPath);
+    REG_TEST_ASSERT(!result);
+    if (result)
+        supHeapFree(fullPath.Buffer);
+
+    RtlInitUnicodeString(&directory, L"\\Dir");
+    RtlInitUnicodeString(&objectName, L"Object");
+    RtlInitUnicodeString(&expectedPath, L"\\Dir\\Object");
+    RtlInitEmptyUnicodeString(&fullPath, NULL, 0);
+    result = AppendDirectoryPath(&directory, &objectName, &fullPath);
+    REG_TEST_ASSERT(result);
+    if (result) {
+        REG_TEST_ASSERT(RtlEqualUnicodeString(&fullPath, &expectedPath, TRUE));
+        supHeapFree(fullPath.Buffer);
+    }
+
+    supHeapFree(longName);
 }
 
 HANDLE TestGetPortHandle()
@@ -1573,6 +1620,7 @@ VOID TestStart(
     VOID
 )
 {
+    Test_AppendDirectoryPath();
     //TestCall();
     //TestRegistryTransaction();
     //TestTransactionResourceManager();

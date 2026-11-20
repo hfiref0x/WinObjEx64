@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.12
 *
-*  DATE:        14 Nov 2026
+*  DATE:        15 Nov 2026
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -314,7 +314,6 @@ NTSTATUS ObIsValidUnicodeStringWorker(
             {
                 ntStatus = STATUS_INVALID_PARAMETER;
             }
-
 
         }
 

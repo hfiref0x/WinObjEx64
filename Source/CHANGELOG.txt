@@ -1,3 +1,7 @@
+v2.1.2
+win11 24H2/25H2/26H2 compatibility improvements
+internal rearrangement
+
 v2.1.1
 win11 25H2 compatibility improvements
 change "Type" object access flags decoding (removes phantom flags)

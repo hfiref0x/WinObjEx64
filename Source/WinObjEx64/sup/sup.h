@@ -6,7 +6,7 @@
 *
 *  VERSION:     2.12
 *
-*  DATE:        28 Jul 2026
+*  DATE:        16 Nov 2026
 *
 *  Common header file for the program support routines.
 *
@@ -29,7 +29,6 @@
 
 #define T_VERSION_TRANSLATION       L"\\VarFileInfo\\Translation"
 #define FORMAT_VERSION_DESCRIPTION  L"\\StringFileInfo\\%04x%04x\\FileDescription"
-#define HHCTRLOCXKEY                L"CLSID\\{ADB880A6-D8FF-11CF-9377-00AA003B7A11}\\InprocServer32"
 #define T_OBJECT_TYPES              L"ObjectTypes"
 
 #define FORMAT_TIME_DATE_VALUE      L"%02hd:%02hd:%02hd, %02hd %ws %04hd"
@@ -535,37 +534,37 @@ HICON supGetMainIcon(
     _In_ INT cx,
     _In_ INT cy);
 
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supNormalizeUnicodeStringForDisplay(
     _In_ HANDLE HeapHandle,
     _In_ PUNICODE_STRING SourceString,
     _Out_ PUNICODE_STRING NormalizedString);
 
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supFreeUnicodeString(
     _In_ HANDLE HeapHandle,
     _Inout_ PUNICODE_STRING String);
 
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supFreeDuplicatedUnicodeString(
     _In_ HANDLE HeapHandle,
     _Inout_ PUNICODE_STRING DuplicatedString,
     _In_ BOOL DoZeroMemory);
 
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supDuplicateUnicodeString(
     _In_ HANDLE HeapHandle,
     _Out_ PUNICODE_STRING DestinationString,
     _In_ PUNICODE_STRING SourceString);
 
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supCreateObjectPathFromElements(
     _In_ PUNICODE_STRING ObjectName,
     _In_ PUNICODE_STRING DirectoryName,
     _Out_ PUNICODE_STRING ObjectPath,
     _In_ BOOLEAN NullTerminate);
 
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supCreateObjectPathFromCurrentPath(
     _In_ PUNICODE_STRING ObjectName,
     _Out_ PUNICODE_STRING ObjectPath,
@@ -921,13 +920,13 @@ BOOL supPrintTimeConverted(
     _In_ WCHAR* lpszBuffer,
     _In_ SIZE_T cchBuffer);
 
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supGetTreeViewItemParam(
     _In_ HWND hwndTreeView,
     _In_ HTREEITEM hTreeItem,
     _Out_ PVOID * outParam);
 
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supGetListViewItemParam(
     _In_ HWND hwndListView,
     _In_ INT itemIndex,
@@ -1251,7 +1250,7 @@ BOOL supGetCurrentObjectPath(
     _In_ BOOLEAN IncludeName,
     _Out_ PUNICODE_STRING ObjectPath);
 
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supGetCurrentObjectName(
     _Out_ PUNICODE_STRING ObjectName);
 
@@ -1260,14 +1259,14 @@ VOID supDisplayCurrentObjectPath(
     _In_opt_ PUNICODE_STRING Path,
     _In_ BOOLEAN NormalizePath);
 
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supResolveSymbolicLinkTarget(
     _In_opt_ HANDLE LinkHandle,
     _In_opt_ HANDLE RootDirectoryHandle,
     _In_ PUNICODE_STRING LinkName,
     _Out_ PUNICODE_STRING LinkTarget);
 
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supResolveSymbolicLinkTargetNormalized(
     _In_opt_ HANDLE LinkHandle,
     _In_opt_ HANDLE RootDirectoryHandle,
@@ -1283,11 +1282,11 @@ BOOL supImageFixSections(
 VOID supCloseKnownPropertiesDialog(
     _In_opt_ HWND hwndDlg);
 
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supWriteObexConfiguration(
     _In_ HWND hwnd);
 
-_Success_(return)
+_Success_(return != FALSE)
 BOOL supReadObexConfiguration(
     _Out_ POBEX_CONFIG Configuration);
 

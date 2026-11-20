@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2025
+*  (C) COPYRIGHT AUTHORS, 2015 - 2026
 *
 *  TITLE:       LIST.H
 *
-*  VERSION:     2.09
+*  VERSION:     2.12
 *
-*  DATE:        19 Aug 2025
+*  DATE:        16 Nov 2025
 *
 *  Common header file for the program object listing logic.
 *
@@ -58,3 +58,9 @@ VOID FindObject(
 
 VOID ListCurrentDirectoryObjects(
     _In_ HTREEITEM ViewRootHandle);
+
+_Success_(return != FALSE)
+BOOLEAN AppendDirectoryPath(
+    _In_ PUNICODE_STRING DirectoryName,
+    _In_ PUNICODE_STRING ObjectName,
+    _Out_ PUNICODE_STRING FullPath);
